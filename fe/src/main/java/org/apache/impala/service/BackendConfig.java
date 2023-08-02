@@ -432,4 +432,8 @@ public class BackendConfig {
   public boolean isJsonScannerEnabled() {
     return backendCfg_.enable_json_scanner;
   }
+
+  public double getMaxFilterErrorRateFromFullScan() {
+    return backendCfg_.max_filter_error_rate_from_full_scan;
+  }
 }

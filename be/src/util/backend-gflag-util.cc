@@ -241,6 +241,14 @@ DEFINE_bool_hidden(skip_resource_checking_on_last_executor_group_set, true,
     "ensure that query will always get admitted into last executor group set if it does "
     "not fit in any other group set.");
 
+DEFINE_double_hidden(max_filter_error_rate_from_full_scan, 0.9,
+    "(Advance) Skip generating bloom runtime filter that is generated from "
+    "a full build scan and has resulting error rate estimation that is higher than "
+    "this value after filter size limit applied. This config may get ignored if "
+    "target error rate is set with higher value through RUNTIME_FILTER_ERROR_RATE "
+    "query option or max_filter_error_rate backend flag. Setting value less than 0 "
+    "will disable this runtime filter reduction feature.");
+
 using strings::Substitute;
 
 namespace impala {
@@ -427,6 +435,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_iceberg_reload_new_files_threshold(FLAGS_iceberg_reload_new_files_threshold);
   cfg.__set_enable_skipping_older_events(FLAGS_enable_skipping_older_events);
   cfg.__set_enable_json_scanner(FLAGS_enable_json_scanner);
+  cfg.__set_max_filter_error_rate_from_full_scan(
+      FLAGS_max_filter_error_rate_from_full_scan);
   return Status::OK();
 }
 

@@ -540,3 +540,1205 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=12.88K
    in pipelines: 00(GETNEXT)
 ====
+# IMPALA-12357: filter size 512KB can achieve fpp lower than 0.9.
+select STRAIGHT_JOIN count(*) from
+     (select l_orderkey from tpch_parquet.lineitem) a
+     join (select o_orderkey from tpch_parquet.orders) l1 on a.l_orderkey = l1.o_orderkey
+     join (select o_orderkey from tpch_parquet.orders) l2 on l1.o_orderkey = l2.o_orderkey
+     join (select o_orderkey from tpch_parquet.orders) l3 on l2.o_orderkey = l3.o_orderkey;
+---- QUERYOPTIONS
+RUNTIME_FILTER_MAX_SIZE=512KB
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=379.83MB mem-reservation=119.50MB thread-reservation=5 runtime-filters-memory=1.50MB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  runtime filters: RF000[bloom] <- o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=32B cardinality=1
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=1.50M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  runtime filters: RF002[bloom] <- o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=24B cardinality=1
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     runtime filters: RF000[bloom] -> o_orderkey
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF004[bloom] <- o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=16B cardinality=1
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     runtime filters: RF000[bloom] -> tpch_parquet.orders.o_orderkey, RF002[bloom] -> o_orderkey
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF000[bloom] -> tpch_parquet.lineitem.l_orderkey, RF002[bloom] -> tpch_parquet.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 12(GETNEXT), 07(OPEN)
+|
+11:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=289.90MB mem-reservation=107.50MB thread-reservation=2 runtime-filters-memory=1.50MB
+07:AGGREGATE
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  runtime filters: RF000[bloom] <- o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=32B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--10:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.02MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=8B cardinality=1.50M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.05MB mem-reservation=4.00MB thread-reservation=2
+|  03:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=1.50M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  runtime filters: RF002[bloom] <- o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=24B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--09:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.02MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=1.50M
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.55MB mem-reservation=4.50MB thread-reservation=2 runtime-filters-memory=512.00KB
+|  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     runtime filters: RF000[bloom] -> o_orderkey
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF004[bloom] <- o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=16B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--08:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.02MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=1.50M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=41.05MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     runtime filters: RF000[bloom] -> tpch_parquet.orders.o_orderkey, RF002[bloom] -> o_orderkey
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF000[bloom] -> tpch_parquet.lineitem.l_orderkey, RF002[bloom] -> tpch_parquet.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-12357: filter size < 512KB can not achieve fpp lower than 0.9 and will be skipped.
+select STRAIGHT_JOIN count(*) from
+     (select l_orderkey from tpch_parquet.lineitem) a
+     join (select o_orderkey from tpch_parquet.orders) l1 on a.l_orderkey = l1.o_orderkey
+     join (select o_orderkey from tpch_parquet.orders) l2 on l1.o_orderkey = l2.o_orderkey
+     join (select o_orderkey from tpch_parquet.orders) l3 on l2.o_orderkey = l3.o_orderkey;
+---- QUERYOPTIONS
+RUNTIME_FILTER_MAX_SIZE=256KB
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=378.33MB mem-reservation=118.00MB thread-reservation=5
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=32B cardinality=1
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=1.50M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=24B cardinality=1
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=16B cardinality=1
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 12(GETNEXT), 07(OPEN)
+|
+11:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=288.40MB mem-reservation=106.00MB thread-reservation=2
+07:AGGREGATE
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=32B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--10:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.02MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=8B cardinality=1.50M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.05MB mem-reservation=4.00MB thread-reservation=2
+|  03:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=1.50M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=24B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--09:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.02MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=1.50M
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.05MB mem-reservation=4.00MB thread-reservation=2
+|  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=16B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--08:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.02MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=1.50M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.05MB mem-reservation=4.00MB thread-reservation=2
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-12357: no filter elimination because no fk/pk conjuncts detected.
+select STRAIGHT_JOIN count(*) from
+     (select l_orderkey from tpch_parquet.lineitem a LIMIT 1) a
+     join (select l_orderkey from tpch_parquet.lineitem) l1 on a.l_orderkey = l1.l_orderkey
+     join (select l_orderkey from tpch_parquet.lineitem) l2 on l1.l_orderkey = l2.l_orderkey
+     join (select l_orderkey from tpch_parquet.lineitem) l3 on l2.l_orderkey = l3.l_orderkey;
+---- QUERYOPTIONS
+RUNTIME_FILTER_MAX_SIZE=256KB
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=1.21GB mem-reservation=118.75MB thread-reservation=5 runtime-filters-memory=768.00KB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = l_orderkey
+|  fk/pk conjuncts: none
+|  runtime filters: RF000[bloom] <- l_orderkey
+|  mem-estimate=305.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=32B cardinality=58
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpch_parquet.lineitem]
+|     HDFS partitions=1/1 files=3 size=194.00MB
+|     stored statistics:
+|       table: rows=6.00M size=194.00MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
+|     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=6.00M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = l_orderkey
+|  fk/pk conjuncts: none
+|  runtime filters: RF002[bloom] <- l_orderkey
+|  mem-estimate=305.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=24B cardinality=15
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpch_parquet.lineitem]
+|     HDFS partitions=1/1 files=3 size=194.00MB
+|     runtime filters: RF000[bloom] -> l_orderkey
+|     stored statistics:
+|       table: rows=6.00M size=194.00MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
+|     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=6.00M
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = l_orderkey
+|  fk/pk conjuncts: none
+|  runtime filters: RF004[bloom] <- l_orderkey
+|  mem-estimate=305.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=16B cardinality=4
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpch_parquet.lineitem]
+|     HDFS partitions=1/1 files=3 size=194.00MB
+|     runtime filters: RF000[bloom] -> tpch_parquet.lineitem.l_orderkey, RF002[bloom] -> l_orderkey
+|     stored statistics:
+|       table: rows=6.00M size=194.00MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
+|     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=6.00M
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem a]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   limit: 1
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=1
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=947.37MB mem-reservation=102.75MB thread-reservation=1 runtime-filters-memory=768.00KB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_orderkey = l_orderkey
+|  fk/pk conjuncts: none
+|  runtime filters: RF000[bloom] <- l_orderkey
+|  mem-estimate=305.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=32B cardinality=58
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--11:EXCHANGE [UNPARTITIONED]
+|  |  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=8B cardinality=6.00M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=80.05MB mem-reservation=4.00MB thread-reservation=2
+|  03:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+|     HDFS partitions=1/1 files=3 size=194.00MB
+|     stored statistics:
+|       table: rows=6.00M size=194.00MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
+|     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=6.00M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_orderkey = l_orderkey
+|  fk/pk conjuncts: none
+|  runtime filters: RF002[bloom] <- l_orderkey
+|  mem-estimate=305.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=24B cardinality=15
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--10:EXCHANGE [UNPARTITIONED]
+|  |  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=6.00M
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=80.30MB mem-reservation=4.25MB thread-reservation=2 runtime-filters-memory=256.00KB
+|  02:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+|     HDFS partitions=1/1 files=3 size=194.00MB
+|     runtime filters: RF000[bloom] -> l_orderkey
+|     stored statistics:
+|       table: rows=6.00M size=194.00MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
+|     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=6.00M
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_orderkey = l_orderkey
+|  fk/pk conjuncts: none
+|  runtime filters: RF004[bloom] <- l_orderkey
+|  mem-estimate=305.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=16B cardinality=4
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--09:EXCHANGE [UNPARTITIONED]
+|  |  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=6.00M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=80.55MB mem-reservation=4.50MB thread-reservation=2 runtime-filters-memory=512.00KB
+|  01:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+|     HDFS partitions=1/1 files=3 size=194.00MB
+|     runtime filters: RF000[bloom] -> tpch_parquet.lineitem.l_orderkey, RF002[bloom] -> l_orderkey
+|     stored statistics:
+|       table: rows=6.00M size=194.00MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2.14M
+|     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=6.00M
+|     in pipelines: 01(GETNEXT)
+|
+08:EXCHANGE [UNPARTITIONED]
+|  limit: 1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=8B cardinality=1
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.30MB mem-reservation=4.25MB thread-reservation=2 runtime-filters-memory=256.00KB
+00:SCAN HDFS [tpch_parquet.lineitem a, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   limit: 1
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=1
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-12357: RF004 still created because 01:SCAN has filter predicate.
+select STRAIGHT_JOIN count(*) from
+     (select l_orderkey from tpch_parquet.lineitem) a
+     join (select o_orderkey, o_custkey from tpch_parquet.orders) l1 on a.l_orderkey = l1.o_orderkey
+     join (select o_orderkey from tpch_parquet.orders) l2 on l1.o_orderkey = l2.o_orderkey
+     join (select o_orderkey from tpch_parquet.orders) l3 on l2.o_orderkey = l3.o_orderkey
+where l1.o_custkey < 1000;
+---- QUERYOPTIONS
+RUNTIME_FILTER_MAX_SIZE=256KB
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=367.64MB mem-reservation=96.75MB thread-reservation=5 runtime-filters-memory=256.00KB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=40B cardinality=1
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=1.50M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=32B cardinality=1
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF004[bloom] <- o_orderkey
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=0,2 row-size=24B cardinality=1
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: tpch_parquet.orders.o_custkey < CAST(1000 AS BIGINT)
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     parquet statistics predicates: tpch_parquet.orders.o_custkey < CAST(1000 AS BIGINT)
+|     parquet dictionary predicates: tpch_parquet.orders.o_custkey < CAST(1000 AS BIGINT)
+|     mem-estimate=80.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=2 row-size=16B cardinality=150.00K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 13(GETNEXT), 07(OPEN)
+|
+12:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT)
+|
+F03:PLAN FRAGMENT [HASH(o_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=83.98MB mem-reservation=68.00MB thread-reservation=1
+07:AGGREGATE
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=40B cardinality=575.77K
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--11:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=5.75MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=8B cardinality=1.50M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.14MB mem-reservation=4.00MB thread-reservation=2
+|  03:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=6 row-size=8B cardinality=1.50M
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o_orderkey = o_orderkey
+|  fk/pk conjuncts: o_orderkey = o_orderkey
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=32B cardinality=575.77K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--10:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=5.75MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=1.50M
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.14MB mem-reservation=4.00MB thread-reservation=2
+|  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+09:EXCHANGE [HASH(o_orderkey)]
+|  mem-estimate=4.49MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,2 row-size=24B cardinality=575.77K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=91.08MB mem-reservation=12.75MB thread-reservation=2 runtime-filters-memory=256.00KB
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF004[bloom] <- o_orderkey
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=0,2 row-size=24B cardinality=575.77K
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--08:EXCHANGE [BROADCAST]
+|  |  mem-estimate=2.33MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=16B cardinality=150.00K
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=80.08MB mem-reservation=8.00MB thread-reservation=2
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: tpch_parquet.orders.o_custkey < CAST(1000 AS BIGINT)
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     parquet statistics predicates: tpch_parquet.orders.o_custkey < CAST(1000 AS BIGINT)
+|     parquet dictionary predicates: tpch_parquet.orders.o_custkey < CAST(1000 AS BIGINT)
+|     mem-estimate=80.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=2 row-size=16B cardinality=150.00K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-12357: build fragment with union still eligible for filter elimination.
+select STRAIGHT_JOIN count(*) from
+     (select l_orderkey from tpch_parquet.lineitem) a
+     join (
+      select o_orderkey from tpch_parquet.orders
+      union all
+      select o_orderkey from tpch_parquet.orders
+     ) l1 on a.l_orderkey = l1.o_orderkey;
+---- QUERYOPTIONS
+RUNTIME_FILTER_MAX_SIZE=256KB
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=262.03MB mem-reservation=42.25MB thread-reservation=3
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: assumed fk/pk
+|  mem-estimate=141.78MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,4 row-size=16B cardinality=2
+|  in pipelines: 00(GETNEXT), 02(OPEN), 03(OPEN)
+|
+|--01:UNION
+|  |  pass-through-operands: all
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=3.00M
+|  |  in pipelines: 02(GETNEXT), 03(GETNEXT)
+|  |
+|  |--03:SCAN HDFS [tpch_parquet.orders]
+|  |     HDFS partitions=1/1 files=2 size=54.21MB
+|  |     stored statistics:
+|  |       table: rows=1.50M size=54.21MB
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|  |     tuple-ids=3 row-size=8B cardinality=1.50M
+|  |     in pipelines: 03(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=8B cardinality=1
+|  in pipelines: 09(GETNEXT), 05(OPEN)
+|
+08:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT)
+|
+F04:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=67.32MB mem-reservation=34.00MB thread-reservation=1
+05:AGGREGATE
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: assumed fk/pk
+|  mem-estimate=47.26MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,4 row-size=16B cardinality=11.52M
+|  in pipelines: 00(GETNEXT), 02(OPEN), 03(OPEN)
+|
+|--07:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=10.02MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=3.00M
+|  |  in pipelines: 02(GETNEXT), 03(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.14MB mem-reservation=4.00MB thread-reservation=2
+|  01:UNION
+|  |  pass-through-operands: all
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=3.00M
+|  |  in pipelines: 02(GETNEXT), 03(GETNEXT)
+|  |
+|  |--03:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|  |     HDFS partitions=1/1 files=2 size=54.21MB
+|  |     stored statistics:
+|  |       table: rows=1.50M size=54.21MB
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|  |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|  |     tuple-ids=3 row-size=8B cardinality=1.50M
+|  |     in pipelines: 03(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 02(GETNEXT)
+|
+06:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=8B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.14MB mem-reservation=4.00MB thread-reservation=2
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-12357: build fragment with plan node other than scan or union is not eligible
+# for filter elimination.
+select STRAIGHT_JOIN count(*) from
+     (select l_orderkey from tpch_parquet.lineitem) a
+     join (select distinct o_orderkey from tpch_parquet.orders) l1 on a.l_orderkey = l1.o_orderkey;
+---- QUERYOPTIONS
+RUNTIME_FILTER_MAX_SIZE=256KB
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=173.69MB mem-reservation=72.25MB thread-reservation=3 runtime-filters-memory=256.00KB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000[bloom] <- o_orderkey
+|  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,3 row-size=16B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: o_orderkey
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=8B cardinality=1.50M
+|  |  in pipelines: 02(GETNEXT), 01(OPEN)
+|  |
+|  01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF000[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1
+|  in pipelines: 09(GETNEXT), 04(OPEN)
+|
+08:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1
+|  in pipelines: 04(GETNEXT)
+|
+F02:PLAN FRAGMENT [HASH(o_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=61.29MB mem-reservation=51.25MB thread-reservation=1 runtime-filters-memory=256.00KB
+04:AGGREGATE
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000[bloom] <- o_orderkey
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,3 row-size=16B cardinality=5.76M
+|  in pipelines: 00(GETNEXT), 06(OPEN)
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  group by: o_orderkey
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=8B cardinality=1.50M
+|  |  in pipelines: 06(GETNEXT), 01(OPEN)
+|  |
+|  05:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=5.75MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=3 row-size=8B cardinality=1.50M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=57.14MB mem-reservation=21.00MB thread-reservation=2
+|  02:AGGREGATE [STREAMING]
+|  |  group by: o_orderkey
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=8B cardinality=1.50M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     stored statistics:
+|       table: rows=1.50M size=54.21MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+07:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=8B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.39MB mem-reservation=4.25MB thread-reservation=2 runtime-filters-memory=256.00KB
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF000[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-12357: build fragment scanning collection type is not eligible
+# for filter elimination.
+select STRAIGHT_JOIN count(*) from
+     (select l_orderkey from tpch_parquet.lineitem) a
+     join (select item from functional_parquet.complextypestbl_medium.int_array_array.item) l1 on a.l_orderkey = l1.item;
+---- QUERYOPTIONS
+RUNTIME_FILTER_MAX_SIZE=256KB
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=980.77MB mem-reservation=38.75MB thread-reservation=3 runtime-filters-memory=256.00KB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=8B cardinality=1
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = item
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- item
+|  mem-estimate=884.52MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=12B cardinality=6.00M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [functional_parquet.complextypestbl_medium.int_array_array.item]
+|     HDFS partitions=1/1 files=1 size=480.14KB
+|     stored statistics:
+|       table: rows=unavailable size=480.14KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=4B cardinality=30.54M
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF000[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=8B cardinality=1
+|  in pipelines: 07(GETNEXT), 03(OPEN)
+|
+06:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=8B cardinality=1
+|  in pipelines: 03(GETNEXT)
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=315.13MB mem-reservation=34.25MB thread-reservation=1 runtime-filters-memory=256.00KB
+03:AGGREGATE
+|  output: count(*)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=8B cardinality=1
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = item
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- item
+|  mem-estimate=294.84MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=12B cardinality=6.00M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--05:EXCHANGE [HASH(item)]
+|  |  mem-estimate=10.01MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=4B cardinality=30.54M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.09MB mem-reservation=512.00KB thread-reservation=2
+|  01:SCAN HDFS [functional_parquet.complextypestbl_medium.int_array_array.item, RANDOM]
+|     HDFS partitions=1/1 files=1 size=480.14KB
+|     stored statistics:
+|       table: rows=unavailable size=480.14KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=4B cardinality=30.54M
+|     in pipelines: 01(GETNEXT)
+|
+04:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=8B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.39MB mem-reservation=4.25MB thread-reservation=2 runtime-filters-memory=256.00KB
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   runtime filters: RF000[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====

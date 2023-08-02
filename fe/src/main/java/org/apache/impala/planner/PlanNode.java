@@ -158,6 +158,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Gets set correctly in computeProcessingCost().
   protected ProcessingCost processingCost_ = ProcessingCost.invalid();
 
+  // True if this PlanNode and its children has very accurate cardinality estimates,
+  // assuming that the initial stats collection is also accurate and no runtime filter
+  // is involved.
+  protected boolean hasHardEstimates_ = false;
+
   protected PlanNode(PlanNodeId id, List<TupleId> tupleIds, String displayName) {
     this(id, displayName);
     tupleIds_.addAll(tupleIds);

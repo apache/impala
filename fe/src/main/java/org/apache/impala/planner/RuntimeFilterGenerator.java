@@ -19,6 +19,7 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -27,6 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -39,15 +41,14 @@ import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.Predicate;
-import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
-import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.PrimitiveType;
@@ -60,7 +61,6 @@ import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
-import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
 import org.apache.impala.thrift.TRuntimeFilterMode;
@@ -68,6 +68,7 @@ import org.apache.impala.thrift.TRuntimeFilterTargetDesc;
 import org.apache.impala.thrift.TRuntimeFilterType;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.TColumnValueUtil;
+import org.apache.impala.util.Visitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,6 +128,12 @@ public final class RuntimeFilterGenerator {
   private final IdGenerator<RuntimeFilterId> filterIdGenerator =
       RuntimeFilterId.createGenerator();
 
+  // Map between a FragmentId to the height of plan subtree rooted at that FragmentId.
+  // Can also be interpreted as the distance between FragmentId to its furthest leaf
+  // fragment + 1. Leaf fragment has height 1.
+  // Note that RuntimeFilterGenerator operate over a distributed plan tree.
+  private final Map<PlanFragmentId, Integer> fragmentHeight_ = new HashMap<>();
+
   /**
    * Internal class that encapsulates the max, min and default sizes used for creating
    * bloom filter objects, and entry limit for in-list filters.
@@ -153,11 +160,13 @@ public final class RuntimeFilterGenerator {
       long maxLimit = tQueryOptions.getRuntime_filter_max_size();
       long minBufferSize = BackendConfig.INSTANCE.getMinBufferSize();
       maxVal = BitUtil.roundUpToPowerOf2(Math.max(maxLimit, minBufferSize));
+      Preconditions.checkState(maxVal <= MAX_BLOOM_FILTER_SIZE);
 
       long minLimit = tQueryOptions.getRuntime_filter_min_size();
       minLimit = Math.max(minLimit, minBufferSize);
       // Make sure minVal <= defaultVal <= maxVal
       minVal = BitUtil.roundUpToPowerOf2(Math.min(minLimit, maxVal));
+      Preconditions.checkState(minVal >= MIN_BLOOM_FILTER_SIZE);
 
       long defaultValue = tQueryOptions.getRuntime_bloom_filter_size();
       defaultValue = Math.max(defaultValue, minVal);
@@ -220,6 +229,8 @@ public final class RuntimeFilterGenerator {
     private long filterSizeBytes_ = 0;
     // Size of the filter (in Bytes) before applying min/max filter sizes.
     private long originalFilterSizeBytes_ = 0;
+    // False positive probability of this filter. Only set for bloom filter.
+    private double est_fpp_ = 0;
     // If true, the filter is produced by a broadcast join and there is at least one
     // destination scan node which is in the same fragment as the join; set in
     // DistributedPlanner.createHashJoinFragment().
@@ -236,6 +247,10 @@ public final class RuntimeFilterGenerator {
     // If set, indicates that the filter is targeted for Kudu scan node with source
     // timestamp truncation.
     private boolean isTimestampTruncation_ = false;
+    // The level of this runtime filter.
+    // Runtime filter level is defined as the height of build side subtree of the
+    // join node that produce this filter.
+    private int level_ = 1;
 
     /**
      * Internal representation of a runtime filter target.
@@ -313,13 +328,13 @@ public final class RuntimeFilterGenerator {
       @Override
       public String toString() {
         StringBuilder output = new StringBuilder();
-        return output.append("Target Id: " + node.getId() + " ")
-            .append("Target expr: " + expr.debugString() + " ")
-            .append("Partition columns: " + isBoundByPartitionColumns)
-            .append("Is column stored in data files: " + isColumnInDataFile)
-            .append("Is local: " + isLocalTarget)
-            .append("lowValue: " + (lowValue != null ? lowValue.toString() : -1))
-            .append("highValue: " + (highValue != null ? highValue.toString() : -1))
+        return output.append("Target Id: " + node.getId())
+            .append(" Target expr: " + expr.debugString())
+            .append(" Partition columns: " + isBoundByPartitionColumns)
+            .append(" Is column stored in data files: " + isColumnInDataFile)
+            .append(" Is local: " + isLocalTarget)
+            .append(" lowValue: " + (lowValue != null ? lowValue.toString() : -1))
+            .append(" highValue: " + (highValue != null ? highValue.toString() : -1))
             .toString();
       }
     }
@@ -327,7 +342,7 @@ public final class RuntimeFilterGenerator {
     private RuntimeFilter(RuntimeFilterId filterId, JoinNode filterSrcNode, Expr srcExpr,
         Expr origTargetExpr, Operator exprCmpOp, Map<TupleId, List<SlotId>> targetSlots,
         TRuntimeFilterType type, FilterSizeLimits filterSizeLimits,
-        boolean isTimestampTruncation) {
+        boolean isTimestampTruncation, int level) {
       id_ = filterId;
       src_ = filterSrcNode;
       srcExpr_ = srcExpr;
@@ -336,6 +351,7 @@ public final class RuntimeFilterGenerator {
       targetSlotsByTid_ = targetSlots;
       type_ = type;
       isTimestampTruncation_ = isTimestampTruncation;
+      level_ = level;
       computeNdvEstimate();
       calculateFilterSize(filterSizeLimits);
     }
@@ -387,7 +403,7 @@ public final class RuntimeFilterGenerator {
     public static RuntimeFilter create(IdGenerator<RuntimeFilterId> idGen,
         Analyzer analyzer, Expr joinPredicate, JoinNode filterSrcNode,
         TRuntimeFilterType type, FilterSizeLimits filterSizeLimits,
-        boolean isTimestampTruncation) {
+        boolean isTimestampTruncation, int level) {
       Preconditions.checkNotNull(idGen);
       Preconditions.checkNotNull(joinPredicate);
       Preconditions.checkNotNull(filterSrcNode);
@@ -522,7 +538,7 @@ public final class RuntimeFilterGenerator {
       }
       return new RuntimeFilter(idGen.getNextId(), filterSrcNode, srcExpr, targetExpr,
           normalizedJoinConjunct.getOp(), targetSlots, type, filterSizeLimits,
-          isTimestampTruncation);
+          isTimestampTruncation, level);
     }
 
     /**
@@ -715,6 +731,9 @@ public final class RuntimeFilterGenerator {
       filterSizeBytes_ = originalFilterSizeBytes_;
       filterSizeBytes_ = Math.max(filterSizeBytes_, filterSizeLimits.minVal);
       filterSizeBytes_ = Math.min(filterSizeBytes_, filterSizeLimits.maxVal);
+      int actualLogFilterSize = (int) (Math.log(filterSizeBytes_) / Math.log(2));
+      est_fpp_ =
+          FeSupport.GetFalsePositiveProbForBloomFilter(ndvEstimate_, actualLogFilterSize);
     }
 
     /**
@@ -728,18 +747,21 @@ public final class RuntimeFilterGenerator {
 
     public String debugString() {
       StringBuilder output = new StringBuilder();
-      return output.append("FilterID: " + id_ + " ")
-          .append("Type: " + type_ + " ")
-          .append("Source: " + src_.getId() + " ")
-          .append("SrcExpr: " + getSrcExpr().debugString() +  " ")
-          .append("Target(s): ")
-          .append(Joiner.on(", ").join(targets_) + " ")
-          .append("Selectivity: " + getSelectivity() + " ")
-          .append("Build key NDV: " + buildKeyNdv_ + " ")
-          .append("NDV estimate " + ndvEstimate_ + " ")
-          .append("Filter size (bytes): " + filterSizeBytes_ + " ")
-          .append("Original filter size (bytes): " + originalFilterSizeBytes_ + " ")
-          .toString();
+      output.append("FilterID: " + id_)
+          .append(" Type: " + type_)
+          .append(" Source: " + src_.getId())
+          .append(" SrcExpr: " + getSrcExpr().debugString())
+          .append(" Target(s): " + Joiner.on(", ").join(targets_))
+          .append(" Selectivity: " + getSelectivity())
+          .append(" Build key NDV: " + buildKeyNdv_)
+          .append(" NDV estimate " + ndvEstimate_)
+          .append(" Filter size (bytes): " + filterSizeBytes_)
+          .append(" Original filter size (bytes): " + originalFilterSizeBytes_)
+          .append(" Level: " + level_);
+      if (type_ == TRuntimeFilterType.BLOOM) {
+        output.append(" Est fpp: " + est_fpp_);
+      }
+      return output.toString();
     }
   }
 
@@ -813,6 +835,92 @@ public final class RuntimeFilterGenerator {
   }
 
   /**
+   * Visitor class over PlanNode tree to check whether the build hand side of join is
+   * eligible for runtime filter pruning based on full scan assumption.
+   */
+  private class BuildVisitor implements Visitor<PlanNode> {
+    private boolean hasIncomingFilter_ = false;
+
+    @Override
+    public void visit(PlanNode a) {
+      if (!isEligibleForPrunning() || !(a instanceof ScanNode)) return;
+
+      ScanNode scan = (ScanNode) a;
+      TupleId sourceTid = scan.getTupleIds().get(0);
+      List<RuntimeFilter> incomingFilters = runtimeFiltersByTid_.get(sourceTid);
+      hasIncomingFilter_ |= (incomingFilters != null && !incomingFilters.isEmpty());
+    }
+
+    public boolean isEligibleForPrunning() { return !hasIncomingFilter_; }
+
+    public void reset() { hasIncomingFilter_ = false; }
+  }
+
+  /**
+   * Remove filters that are unlikely to be useful out of allFilters list.
+   */
+  private void reduceFilters(Collection<RuntimeFilter> allFilters) {
+    if (BackendConfig.INSTANCE.getMaxFilterErrorRateFromFullScan() < 0) return;
+
+    // Filter out bloom filter with fpp > max_filter_error_rate_from_full_scan that
+    // comes from full table scan without filter predicate or incoming runtime filter.
+    // Only do this optimization for filter level 1 for simplicity.
+    boolean hasEliminatedFilter = true;
+    final double maxAllowedFpp =
+        Math.max(BackendConfig.INSTANCE.getMaxFilterErrorRateFromFullScan(),
+            filterSizeLimits_.targetFpp);
+    List<RuntimeFilter> highFppFilters =
+        allFilters.stream()
+            .filter(f
+                -> f.getType() == TRuntimeFilterType.BLOOM
+                    && f.level_ <= 1
+                    // Build hand node has hard cardinality estimates
+                    // (no reduction before runtime filter addition).
+                    && f.src_.getChild(1).hasHardEstimates_
+                    // At least assumed to have fk/pk relationship.
+                    && f.src_.fkPkEqJoinConjuncts_ != null
+                    // TODO: FK/PK alone may not be enough to justify eliminating the
+                    // filter because it could end up eliminating a filter that is
+                    // effective because it filters a lot of NULLs. Therefore, fpp
+                    // threshold check is added here to only consider the high fpp one.
+                    // This last check can be removed once IMPALA-2743 is implemented
+                    // to cover the NULL filtering.
+                    && f.est_fpp_ > maxAllowedFpp)
+            .collect(Collectors.toList());
+
+    // As we eliminate a runtime filter in one iteration, there might be another runtime
+    // filter that becomes eligible for removal. Loop this routine until it does eliminate
+    // any other runtime filter.
+    while (!highFppFilters.isEmpty() && hasEliminatedFilter) {
+      hasEliminatedFilter = false;
+      List<RuntimeFilter> skippedFilters = new ArrayList<>();
+      BuildVisitor buildVisitor = new BuildVisitor();
+      for (RuntimeFilter filter : highFppFilters) {
+        // Check if the build side of filter.src_ has a filtering scan or not.
+        buildVisitor.reset();
+        filter.src_.getChild(1).accept(buildVisitor);
+        if (buildVisitor.isEligibleForPrunning()) {
+          // Build side of filter.src_ is all full scan.
+          // Skip this filter and remove it from all of its target TupleIds in
+          // runtimeFiltersByTid_ map.
+          hasEliminatedFilter = true;
+          skippedFilters.add(filter);
+          for (RuntimeFilter.RuntimeFilterTarget target : filter.getTargets()) {
+            TupleId targetTid = target.node.getTupleIds().get(0);
+            runtimeFiltersByTid_.get(targetTid).remove(filter);
+          }
+        }
+      }
+
+      // Remove all skippedFilters from highFppFilters and allFilters for next iteration.
+      for (RuntimeFilter filter : skippedFilters) {
+        highFppFilters.remove(filter);
+        allFilters.remove(filter);
+      }
+    }
+  }
+
+  /**
    * Returns a list of all the registered runtime filters, ordered by filter ID.
    */
   public List<RuntimeFilter> getRuntimeFilters() {
@@ -828,7 +936,19 @@ public final class RuntimeFilterGenerator {
         }
       }
     );
+    reduceFilters(resultList);
     return resultList;
+  }
+
+  private void generateFilters(PlannerContext ctx, PlanNode root) {
+    root.getFragment().postAccept(f -> {
+      int height = 0;
+      for (PlanFragment child : f.getChildren()) {
+        height = Math.max(height, fragmentHeight_.get(child.getId()));
+      }
+      fragmentHeight_.put(((PlanFragment) f).getId(), height + 1);
+    });
+    generateFiltersRecursive(ctx, root);
   }
 
   /**
@@ -838,9 +958,18 @@ public final class RuntimeFilterGenerator {
    * In the bottom-up traversal of the plan tree, the filters are assigned to destination
    * (scan) nodes. Filters that cannot be assigned to a scan node are discarded.
    */
-  private void generateFilters(PlannerContext ctx, PlanNode root) {
+  private void generateFiltersRecursive(PlannerContext ctx, PlanNode root) {
     if (root instanceof HashJoinNode || root instanceof NestedLoopJoinNode) {
       JoinNode joinNode = (JoinNode) root;
+
+      // Determine level of filter produced by root.
+      PlanNode buildHandNode = root.getChild(1);
+      while (buildHandNode.getFragment() == root.getFragment()
+          && buildHandNode.hasChild(0)) {
+        buildHandNode = buildHandNode.getChild(0);
+      }
+      int level = fragmentHeight_.get(buildHandNode.getFragment().getId());
+
       List<Expr> joinConjuncts = new ArrayList<>();
       if (!joinNode.getJoinOp().isLeftOuterJoin()
           && !joinNode.getJoinOp().isFullOuterJoin()
@@ -858,10 +987,9 @@ public final class RuntimeFilterGenerator {
       for (TRuntimeFilterType filterType : TRuntimeFilterType.values()) {
         if (!enabledRuntimeFilterTypes.contains(filterType)) continue;
         for (Expr conjunct : joinConjuncts) {
-          RuntimeFilter filter =
-              RuntimeFilter.create(filterIdGenerator, ctx.getRootAnalyzer(), conjunct,
-                  joinNode, filterType, filterSizeLimits_,
-                  /* isTimestampTruncation */ false);
+          RuntimeFilter filter = RuntimeFilter.create(filterIdGenerator,
+              ctx.getRootAnalyzer(), conjunct, joinNode, filterType, filterSizeLimits_,
+              /* isTimestampTruncation */ false, level);
           if (filter != null) {
             registerRuntimeFilter(filter);
             filters.add(filter);
@@ -872,27 +1000,26 @@ public final class RuntimeFilterGenerator {
               && Predicate.isEquivalencePredicate(conjunct)
               && conjunct.getChild(0).getType().isTimestamp()
               && conjunct.getChild(1).getType().isTimestamp()) {
-            RuntimeFilter filter2 =
-                RuntimeFilter.create(filterIdGenerator, ctx.getRootAnalyzer(), conjunct,
-                    joinNode, filterType, filterSizeLimits_,
-                    /* isTimestampTruncation */ true);
+            RuntimeFilter filter2 = RuntimeFilter.create(filterIdGenerator,
+                ctx.getRootAnalyzer(), conjunct, joinNode, filterType, filterSizeLimits_,
+                /* isTimestampTruncation */ true, level);
             if (filter2 == null) continue;
             registerRuntimeFilter(filter2);
             filters.add(filter2);
           }
         }
       }
-      generateFilters(ctx, root.getChild(0));
+      generateFiltersRecursive(ctx, root.getChild(0));
       // Finalize every runtime filter of that join. This is to ensure that we don't
       // assign a filter to a scan node from the right subtree of joinNode or ancestor
       // join nodes in case we don't find a destination node in the left subtree.
       for (RuntimeFilter runtimeFilter: filters) finalizeRuntimeFilter(runtimeFilter);
-      generateFilters(ctx, root.getChild(1));
+      generateFiltersRecursive(ctx, root.getChild(1));
     } else if (root instanceof ScanNode) {
       assignRuntimeFilters(ctx, (ScanNode) root);
     } else {
       for (PlanNode childNode: root.getChildren()) {
-        generateFilters(ctx, childNode);
+        generateFiltersRecursive(ctx, childNode);
       }
     }
   }

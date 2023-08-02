@@ -652,6 +652,14 @@ Java_org_apache_impala_service_FeSupport_MinLogSpaceForBloomFilter(
   return BloomFilter::MinLogSpace(ndv, fpp);
 }
 
+/// Returns the expected false positive rate for the given ndv and log_bufferpool_space.
+extern "C"
+JNIEXPORT jdouble JNICALL
+Java_org_apache_impala_service_FeSupport_FalsePositiveProbForBloomFilter(
+    JNIEnv* env, jclass fe_support_class, jlong ndv, jint log_bufferpool_space) {
+  return BloomFilter::FalsePositiveProb(ndv, log_bufferpool_space);
+}
+
 extern "C"
 JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_nativeParseDateString(JNIEnv* env,
@@ -752,6 +760,10 @@ static JNINativeMethod native_methods[] = {
   {
     const_cast<char*>("MinLogSpaceForBloomFilter"), const_cast<char*>("(JD)I"),
     (void*)::Java_org_apache_impala_service_FeSupport_MinLogSpaceForBloomFilter
+  },
+  {
+    const_cast<char*>("FalsePositiveProbForBloomFilter"), const_cast<char*>("(JI)D"),
+    (void*)::Java_org_apache_impala_service_FeSupport_FalsePositiveProbForBloomFilter
   },
   {
     const_cast<char*>("nativeParseDateString"),

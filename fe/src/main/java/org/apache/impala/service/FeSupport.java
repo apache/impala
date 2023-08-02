@@ -132,6 +132,8 @@ public class FeSupport {
       byte[] queryOptions);
 
   public native static int MinLogSpaceForBloomFilter(long ndv, double fpp);
+  public native static double FalsePositiveProbForBloomFilter(
+      long ndv, int logBufferpoolSpace);
 
   // Parses date string, verifies if it is valid and returns the resulting
   // TParseDateStringResult object. Different date string variations are accepted.
@@ -434,6 +436,19 @@ public class FeSupport {
       loadLibrary();
     }
     return MinLogSpaceForBloomFilter(ndv, fpp);
+  }
+
+  /**
+   * Returns the expected false positive rate for the given ndv and logBufferpoolSpace.
+   */
+  public static double GetFalsePositiveProbForBloomFilter(
+      long ndv, int logBufferpoolSpace) {
+    try {
+      return FalsePositiveProbForBloomFilter(ndv, logBufferpoolSpace);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return FalsePositiveProbForBloomFilter(ndv, logBufferpoolSpace);
   }
 
   public static byte[] GetPartialCatalogObject(byte[] thriftReq)

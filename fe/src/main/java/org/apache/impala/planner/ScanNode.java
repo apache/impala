@@ -89,6 +89,12 @@ abstract public class ScanNode extends PlanNode {
     desc_ = desc;
   }
 
+  @Override
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
+    hasHardEstimates_ = !hasScanConjuncts() && !isAccessingCollectionType();
+  }
+
   public TupleDescriptor getTupleDesc() { return desc_; }
 
   @Override

@@ -245,4 +245,14 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
     visitor.visit((C) this);
     for (NodeType p: children_) p.accept(visitor);
   }
+
+  /**
+   * A variant of visitor pattern accept method that do post-order traversal instead
+   * of pre-order.
+   */
+  @SuppressWarnings("unchecked")
+  public <C extends TreeNode<NodeType>> void postAccept(Visitor<C> visitor) {
+    for (NodeType p : children_) p.postAccept(visitor);
+    visitor.visit((C) this);
+  }
 }

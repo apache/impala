@@ -111,6 +111,7 @@ public class ExchangeNode extends PlanNode {
     cardinality_ = capCardinalityAtLimit(children_.get(0).getCardinality());
     // Apply the offset correction if there's a valid cardinality
     if (cardinality_ > -1) cardinality_ = Math.max(0, cardinality_ - offset_);
+    hasHardEstimates_ = children_.get(0).hasHardEstimates_;
   }
 
   /**

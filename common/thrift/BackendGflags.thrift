@@ -264,4 +264,6 @@ struct TBackendGflags {
   116: required bool enable_skipping_older_events;
 
   117: required bool enable_json_scanner
+
+  118: required double max_filter_error_rate_from_full_scan
 }

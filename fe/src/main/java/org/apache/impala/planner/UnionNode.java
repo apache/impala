@@ -116,6 +116,7 @@ public class UnionNode extends PlanNode {
     super.computeStats(analyzer);
     long totalChildCardinality = 0;
     boolean haveChildWithCardinality = false;
+    hasHardEstimates_ = true;
     for (PlanNode child: children_) {
       // ignore missing child cardinality info in the hope it won't matter enough
       // to change the planning outcome
@@ -129,6 +130,7 @@ public class UnionNode extends PlanNode {
       // subsets of each other, i.e. not just partly overlapping.
       numNodes_ = Math.max(child.getNumNodes(), numNodes_);
       numInstances_ = Math.max(child.getNumInstances(), numInstances_);
+      hasHardEstimates_ &= child.hasHardEstimates_;
     }
     // Consider estimate valid if we have at least one child with known cardinality, or
     // only constant values.
