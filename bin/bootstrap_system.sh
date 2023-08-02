@@ -346,7 +346,9 @@ if [ ! -d /usr/local/apache-maven-3.9.2 ]; then
     https://archive.apache.org/dist/maven/maven-3/3.9.2/binaries/apache-maven-3.9.2-bin.tar.gz
   sha512sum -c - <<< '900bdeeeae550d2d2b3920fe0e00e41b0069f32c019d566465015bdd1b3866395cbe016e22d95d25d51d3a5e614af2c83ec9b282d73309f644859bbad08b63db  apache-maven-3.9.2-bin.tar.gz'
   sudo tar -C /usr/local -xzf apache-maven-3.9.2-bin.tar.gz
-  sudo ln -s /usr/local/apache-maven-3.9.2/bin/mvn /usr/local/bin
+  # Ensure that Impala's preferred version is installed locally,
+  # even if a previous version exists there.
+  sudo ln -s -f /usr/local/apache-maven-3.9.2/bin/mvn /usr/local/bin
 
   # reset permissions on redhat8
   # TODO: figure out why this is necessary for redhat8
