@@ -140,34 +140,51 @@ class TestCodegenCache(CustomClusterTestSuite):
     self._test_codegen_cache(vector,
       "select sum(identity(bigint_col)) from functional.alltypes", False)
 
-  CODEGEN_CACHE_CAPACITY_IN_SYMBOL_EMITTER_TESTS = "3.25MB"
+  SYMBOL_EMITTER_TESTS_IMPALAD_ARGS = "--cache_force_single_shard=1 \
+      --codegen_cache_entry_bytes_charge_overhead=10000000 --codegen_cache_capacity=25MB "
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-          impalad_args="--codegen_cache_capacity={} --asm_module_dir=/dev/null".format(
-              CODEGEN_CACHE_CAPACITY_IN_SYMBOL_EMITTER_TESTS))
+          impalad_args=SYMBOL_EMITTER_TESTS_IMPALAD_ARGS + "--asm_module_dir=/dev/null")
   # Regression test for IMPALA-12260.
   def test_codegen_cache_with_asm_module_dir(self, vector):
     self._test_codegen_cache_with_symbol_emitter(vector)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-          impalad_args="--codegen_cache_capacity={} --perf_map".format(
-              CODEGEN_CACHE_CAPACITY_IN_SYMBOL_EMITTER_TESTS))
+          impalad_args=SYMBOL_EMITTER_TESTS_IMPALAD_ARGS + "--perf_map")
   # Regression test for IMPALA-12260.
   def test_codegen_cache_with_perf_map(self, vector):
     self._test_codegen_cache_with_symbol_emitter(vector)
 
   def _test_codegen_cache_with_symbol_emitter(self, vector):
-    # Regression test for IMPALA-12260. The first query produces two entries in the cache,
-    # and one of them has a 'CodegenSymbolEmitter' as an event listener because of the
-    # '--asm_module_dir' or '--perf_map' flag. The second query inserts new entries in the
-    # cache - the size of the cache is chosen such that both entries from the first query
-    # fit in it but both are evicted during the second query. When an
-    # 'llvm::ExecutionEngine', which is part of the cache entry, is destroyed, it notifies
-    # its listeners, so the listeners should be alive at this time. Prior to IMPALA-12260
-    # the 'CodegenSymbolEmitter' was destroyed at the end of the first query, causing a
-    # crash during the second one.
+    """Regression test for IMPALA-12260. In the test we run two queries. The first query
+    produces two entries in the cache, and they both have a 'CodegenSymbolEmitter' as
+    event listeners because of the '--asm_module_dir' or '--perf_map' startup flag. The
+    second query inserts new entries in the cache - the size of the cache should be such
+    that both entries from the first query fit in it but both are evicted during the
+    second query.
+
+    When an 'llvm::ExecutionEngine', which is part of the cache entry, is destroyed, it
+    frees any remaining object files and notifies the listeners about this, so the
+    listeners should be alive at this time. Prior to IMPALA-12260 the
+    'CodegenSymbolEmitter's of the cached fragment instances were destroyed at the end of
+    the first query, causing a use-after-free (sometimes leading to a crash) during the
+    second one.
+
+    The choice of the size of the cache is based on the following:
+      - the first query imposes a lower bound on the cache size (both cache entries should
+        fit in the cache) AND
+      - the second query imposes an upper bound (the cache entries of the first query
+        should be evicted during the second query).
+    The acceptable values are in the intersection of these two intervals.
+    However, code changes and the difference between debug and release builds
+    can have a huge effect on the acceptable range. To get around this, we use
+    the '--codegen_cache_entry_bytes_charge_overhead' startup flag to
+    artificially assign a higher size to the cache entries, compared to which
+    the real size, and therefore also changes in the real size, are
+    insignificant."""
+
     exec_options = copy(vector.get_value('exec_option'))
     exec_options['exec_single_node_rows_threshold'] = 0
 

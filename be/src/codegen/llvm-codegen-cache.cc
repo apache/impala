@@ -23,6 +23,10 @@
 using namespace std;
 using strings::Substitute;
 
+DEFINE_int32_hidden(codegen_cache_entry_bytes_charge_overhead, 0,
+    "Value (in bytes) that is added to the memory charge of codegen cache entries. "
+    "Used for testing.");
+
 namespace impala {
 
 // Maximum codegen cache entry size for the purposes of histogram sizing in stats
@@ -148,7 +152,7 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
   }
   // Memory charge includes both key and entry size.
   int64_t mem_charge = codegen->memory_manager_->bytes_allocated() + key.size()
-      + sizeof(CodeGenCacheEntry);
+      + sizeof(CodeGenCacheEntry) + FLAGS_codegen_cache_entry_bytes_charge_overhead;
   Cache::UniquePendingHandle pending_handle(
       cache_->Allocate(key, sizeof(CodeGenCacheEntry), mem_charge));
   if (pending_handle == nullptr) {
