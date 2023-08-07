@@ -1244,11 +1244,7 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
   while (1) {
     {
       unique_lock<mutex> l(*catalog_manager_.GetLock());
-      if (rpc_receivers.empty()) {
-        update_catalod_cv_.Wait(l);
-      } else {
-        update_catalod_cv_.WaitFor(l, timeout_us);
-      }
+      update_catalod_cv_.WaitFor(l, timeout_us);
     }
     SendUpdateCatalogdNotification(&last_active_catalogd_version, rpc_receivers);
   }
@@ -1272,6 +1268,8 @@ void Statestore::SendUpdateCatalogdNotification(int64_t* last_active_catalogd_ve
   bool resend_rpc = false;
   if (active_catalogd_version > *last_active_catalogd_version) {
     // Send notification for the latest elected active catalogd.
+    LOG(INFO) << "Send notification for active catalogd version: "
+              << active_catalogd_version;
     active_catalogd_address_metric_->SetValue(
         TNetworkAddressToString(catalogd_registration.address));
     rpc_receivers.clear();

@@ -367,6 +367,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     Verify that one and only one catalogd is active."""
     catalogds = self.cluster.catalogds()
     assert(len(catalogds) == 2)
+    sleep_time_s = build_flavor_timeout(2, slow_build_timeout=5)
+    sleep(sleep_time_s)
     catalogd_service_1 = catalogds[0].service
     catalogd_service_2 = catalogds[1].service
     assert(catalogd_service_1.get_metric_value("catalog-server.active-status")
