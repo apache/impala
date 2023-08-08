@@ -65,16 +65,16 @@ add_custom_target(gen_ir_descriptions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
 
 set(IR_INPUT_FILES impala-ir.cc)
 
-function(COMPILE_TO_IR_C_ARRAY IR_C_FILE VARNAME OPT PLATFORM_SPECIFIC)
+function(COMPILE_TO_IR_C_ARRAY IR_C_FILE VARNAME)
   # Run the clang compiler to generate IR. Then run the LLVM opt tool to apply specific
   # optimisations. We need to compile to IR several times for different optimization settings
-  # and legacy AVX support.
+  # and legacy AVX support. Additional args (ARGN) are passed to clang as compiler flags.
   get_filename_component(BASE_NAME ${IR_C_FILE} NAME_WE)
   set(IR_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/${BASE_NAME}.bc")
   set(IR_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/${BASE_NAME}-tmp.bc")
   add_custom_command(
     OUTPUT ${IR_OUTPUT_FILE}
-    COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${OPT} ${PLATFORM_SPECIFIC}
+    COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${ARGN}
             ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
     COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_TMP_OUTPUT_FILE} > ${IR_OUTPUT_FILE}
     COMMAND rm ${IR_TMP_OUTPUT_FILE}

@@ -272,8 +272,19 @@ Status LlvmCodeGen::CreateFromMemory(FragmentState* state, ObjectPool* pool,
   SCOPED_THREAD_COUNTER_MEASUREMENT((*codegen)->llvm_thread_counters());
 
   llvm::StringRef module_ir;
-  string module_name;
-
+  string module_name = "Impala IR";
+  if (FLAGS_llvm_ir_opt == "O1") {
+    module_ir = llvm::StringRef(
+        reinterpret_cast<const char*>(impala_llvm_o1_ir), impala_llvm_o1_ir_len);
+  } else if (FLAGS_llvm_ir_opt == "O2") {
+    module_ir = llvm::StringRef(
+        reinterpret_cast<const char*>(impala_llvm_o2_ir), impala_llvm_o2_ir_len);
+  } else if (FLAGS_llvm_ir_opt == "Os") {
+    module_ir = llvm::StringRef(
+        reinterpret_cast<const char*>(impala_llvm_os_ir), impala_llvm_os_ir_len);
+  } else {
+    CHECK(false) << "llvm_ir_opt flag invalid; try O1, O2, or Os.";
+  }
 #if __x86_64__
   // By default, Impala now requires AVX2 support, but the enable_legacy_avx_support
   // flag can allow running on AVX machines. The minimum requirement must have already
@@ -281,18 +292,6 @@ Status LlvmCodeGen::CreateFromMemory(FragmentState* state, ObjectPool* pool,
   // LLVM IR to use.
   if (IsCPUFeatureEnabled(CpuInfo::AVX2)) {
     // Use the default IR that supports AVX2
-    if (FLAGS_llvm_ir_opt == "O1") {
-      module_ir = llvm::StringRef(
-          reinterpret_cast<const char*>(impala_llvm_o1_ir), impala_llvm_o1_ir_len);
-    } else if (FLAGS_llvm_ir_opt == "O2") {
-      module_ir = llvm::StringRef(
-          reinterpret_cast<const char*>(impala_llvm_o2_ir), impala_llvm_o2_ir_len);
-    } else if (FLAGS_llvm_ir_opt == "Os") {
-      module_ir = llvm::StringRef(
-          reinterpret_cast<const char*>(impala_llvm_os_ir), impala_llvm_os_ir_len);
-    } else {
-      CHECK(false) << "llvm_ir_opt flag invalid; try O1, O2, or Os.";
-    }
     module_name = "Impala IR with AVX2 support";
   } else if (FLAGS_enable_legacy_avx_support && IsCPUFeatureEnabled(CpuInfo::AVX)) {
     // If there is no AVX but legacy mode is enabled, use legacy IR with AVX support
@@ -304,11 +303,6 @@ Status LlvmCodeGen::CreateFromMemory(FragmentState* state, ObjectPool* pool,
     // This should have been enforced earlier.
     CHECK(false) << "CPU is missing AVX/AVX2 support";
   }
-#else
-  // Non-x86_64 always use the default IR
-  module_ir = llvm::StringRef(
-      reinterpret_cast<const char*>(impala_llvm_ir), impala_llvm_ir_len);
-  module_name = "Impala IR";
 #endif
 
   unique_ptr<llvm::MemoryBuffer> module_ir_buf(
