@@ -140,6 +140,8 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
           Alternatively, you can also use custom catalogs to use existing tables. It means you need to define
           your catalog in hive-site.xml.
           The advantage of this method is that other engines are more likely to be able to interact with this table.
+          Please note that the automatic metadata update will not work for these tables, you will have to manually
+          call REFRESH on the table when it changes outside Impala.
           To globally register different catalogs, set the following Hadoop configurations:
           <table rowsep="1" colsep="1" id="iceberg_custom_catalogs">
             <tgroup cols="2">
