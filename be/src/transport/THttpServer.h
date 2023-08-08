@@ -159,6 +159,14 @@ protected:
   static const std::string HEADER_IMPALA_SESSION_ID;
   // Impala query id specified by the Impala backend.  Used for tracing HTTP requests.
   static const std::string HEADER_IMPALA_QUERY_ID;
+  static const std::string HEADER_SAML2_TOKEN_RESPONSE_PORT;
+  static const std::string HEADER_SAML2_CLIENT_IDENTIFIER;
+  static const std::string HEADER_TRANSFER_ENCODING;
+  static const std::string HEADER_CONTENT_LENGTH;
+  static const std::string HEADER_X_FORWARDED_FOR;
+  static const std::string HEADER_AUTHORIZATION;
+  static const std::string HEADER_COOKIE;
+  static const std::string HEADER_EXPECT;
 
   void readHeaders();
   virtual void parseHeader(char* header);

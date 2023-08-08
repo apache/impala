@@ -24,6 +24,7 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -233,7 +234,7 @@ public class LdapHS2Test {
       }
     }
 
-    // Attempt to authenticate with a different mechanism. SHould fail, but won't
+    // Attempt to authenticate with a different mechanism. Should fail, but won't
     // increment the total-basic-auth-failure metric because its not considered a 'Basic'
     // auth attempt.
     headers.put("Authorization", "Negotiate VGVzdDFMZGFwOjEyMzQ1");
@@ -282,6 +283,27 @@ public class LdapHS2Test {
         assertEquals(e.getMessage(), "HTTP Response code: 401");
       }
     }
+
+    // Authenticate as 'Test1Ldap' with password '12345' - the request
+    // contains an empty 'a' header to test the fix of IMPALA-12341
+    // should succeed
+    Map<String, String> orderedHeaders = new LinkedHashMap<>();
+    orderedHeaders.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    // This empty "a" header breaks authentication in builds prior to IMPALA-12341
+    orderedHeaders.put("a", "");
+    transport.setCustomHeaders(orderedHeaders);
+    transport.open();
+
+    // Open a session which will get username 'Test1Ldap'.
+    TOpenSessionReq openReq6 = new TOpenSessionReq();
+    TOpenSessionResp openResp6 = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(10, numFailures);
+    // Running a query should succeed.
+    TOperationHandle operationHandle6 = execAndFetch(
+            client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(12, numFailures);
   }
 
   /**

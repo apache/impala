@@ -129,6 +129,23 @@ THttpServer::~THttpServer() {
 const std::string THttpServer::HEADER_REQUEST_ID = "X-Request-Id";
 const std::string THttpServer::HEADER_IMPALA_SESSION_ID = "X-Impala-Session-Id";
 const std::string THttpServer::HEADER_IMPALA_QUERY_ID = "X-Impala-Query-Id";
+const std::string THttpServer::HEADER_SAML2_TOKEN_RESPONSE_PORT = "X-Hive-Token-Response-Port";
+const std::string THttpServer::HEADER_SAML2_CLIENT_IDENTIFIER = "X-Hive-Client-Identifier";
+const std::string THttpServer::HEADER_TRANSFER_ENCODING = "Transfer-Encoding";
+const std::string THttpServer::HEADER_CONTENT_LENGTH = "Content-length";
+const std::string THttpServer::HEADER_X_FORWARDED_FOR = "X-Forwarded-For";
+const std::string THttpServer::HEADER_AUTHORIZATION = "Authorization";
+const std::string THttpServer::HEADER_COOKIE = "Cookie";
+const std::string THttpServer::HEADER_EXPECT = "Expect";
+
+// Checks whether the name of the http header given in the 'header' parameter,
+// with length 'header_name_len', matches the constant given in 'header_constant_str'
+// parameter.
+inline bool MatchesHeader(const char* header, const string& header_constant_str,
+    const size_t header_name_len) {
+  return (header_name_len == header_constant_str.length() &&
+    THRIFT_strncasecmp(header, header_constant_str.c_str(), header_name_len) == 0);
+}
 
 void THttpServer::parseHeader(char* header) {
   char* colon = strchr(header, ':');
@@ -138,49 +155,47 @@ void THttpServer::parseHeader(char* header) {
   size_t sz = colon - header;
   char* value = colon + 1;
 
-  static const char* SAML2_TOKEN_RESPONSE_PORT = "X-Hive-Token-Response-Port";
-  static const char* SAML2_CLIENT_IDENTIFIER = "X-Hive-Client-Identifier";
-  if (THRIFT_strncasecmp(header, "Transfer-Encoding", sz) == 0) {
+  if (MatchesHeader(header, HEADER_TRANSFER_ENCODING, sz)) {
     if (THRIFT_strcasestr(value, "chunked") != NULL) {
       chunked_ = true;
     }
-  } else if (THRIFT_strncasecmp(header, "Content-length", sz) == 0) {
+  } else if (MatchesHeader(header, HEADER_CONTENT_LENGTH, sz)) {
     chunked_ = false;
     contentLength_ = atoi(value);
-  } else if (THRIFT_strncasecmp(header, "X-Forwarded-For", sz) == 0) {
+  } else if (MatchesHeader(header, HEADER_X_FORWARDED_FOR, sz)) {
     origin_ = value;
   } else if ((has_ldap_ || has_kerberos_ || has_saml_ || has_jwt_)
-      && THRIFT_strncasecmp(header, "Authorization", sz) == 0) {
+      && MatchesHeader(header, HEADER_AUTHORIZATION, sz)) {
     auth_value_ = string(value);
-  } else if (use_cookies_ && THRIFT_strncasecmp(header, "Cookie", sz) == 0) {
+  } else if (use_cookies_ && MatchesHeader(header, HEADER_COOKIE, sz)) {
     cookie_value_ = string(value);
-  } else if (THRIFT_strncasecmp(header, "Expect", sz) == 0) {
+  } else if (MatchesHeader(header, HEADER_EXPECT, sz)) {
     if (THRIFT_strcasestr(value, "100-continue")){
       continue_ = true;
     }
   } else if (has_saml_
-        && THRIFT_strncasecmp(header, SAML2_TOKEN_RESPONSE_PORT, sz) == 0) {
+        && MatchesHeader(header, HEADER_SAML2_TOKEN_RESPONSE_PORT, sz)) {
     saml_port_ = atoi(value);
     string port_str = string(value);
     StripWhiteSpace(&port_str);
     DCHECK(wrapped_request_ != nullptr);
-    wrapped_request_->headers[SAML2_TOKEN_RESPONSE_PORT] = port_str;
+    wrapped_request_->headers[HEADER_SAML2_TOKEN_RESPONSE_PORT] = port_str;
   } else if (has_saml_
-        && THRIFT_strncasecmp(header, SAML2_CLIENT_IDENTIFIER, sz) == 0) {
+        && MatchesHeader(header, HEADER_SAML2_CLIENT_IDENTIFIER, sz)) {
     DCHECK(wrapped_request_ != nullptr);
     string client_id = string(value);
     StripWhiteSpace(&client_id);
-    wrapped_request_->headers[SAML2_CLIENT_IDENTIFIER] = client_id;
+    wrapped_request_->headers[HEADER_SAML2_CLIENT_IDENTIFIER] = client_id;
   } else if (check_trusted_auth_header_
-      && THRIFT_strncasecmp(header, FLAGS_trusted_auth_header.c_str(), sz) == 0) {
+      && MatchesHeader(header, FLAGS_trusted_auth_header, sz)) {
     found_trusted_auth_header_ = true;
-  } else if (THRIFT_strncasecmp(header, HEADER_REQUEST_ID.c_str(), sz) == 0) {
+  } else if (MatchesHeader(header, HEADER_REQUEST_ID, sz)) {
     header_x_request_id_ = string(value);
     StripWhiteSpace(&header_x_request_id_);
-  } else if (THRIFT_strncasecmp(header, HEADER_IMPALA_SESSION_ID.c_str(), sz) == 0) {
+  } else if (MatchesHeader(header, HEADER_IMPALA_SESSION_ID, sz)) {
     header_x_session_id_ = string(value);
     StripWhiteSpace(&header_x_session_id_);
-  } else if (THRIFT_strncasecmp(header, HEADER_IMPALA_QUERY_ID.c_str(), sz) == 0) {
+  } else if (MatchesHeader(header, HEADER_IMPALA_QUERY_ID, sz)) {
     header_x_query_id_ = string(value);
     StripWhiteSpace(&header_x_query_id_);
   }
@@ -321,7 +336,7 @@ void THttpServer::headersDone() {
         fallback_to_other_auths = false;
         // Final SAML message in browser mode, check bearer and replace it with a cookie.
         DCHECK(wrapped_request_ != nullptr);
-        wrapped_request_->headers["Authorization"] = auth_value_;
+        wrapped_request_->headers[HEADER_AUTHORIZATION] = auth_value_;
         if (callbacks_.validate_saml2_bearer_fn()) {
           // During EE tests it makes things easier to return 401-Unauthorized here.
           // This hack can be removed once there is a Python client that
