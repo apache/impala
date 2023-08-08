@@ -83,6 +83,7 @@ void KuduPartitionExpr::CloseEvaluator(FunctionContext::FunctionStateScope scope
   // The destructor of KuduPartitionExprCtx handles all cleanup. Note that 'ctx' may be
   // NULL, in which case this is a no-op.
   delete ctx;
+  ScalarExpr::CloseEvaluator(scope, state, eval);
 }
 
 IntVal KuduPartitionExpr::GetIntValInterpreted(

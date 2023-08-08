@@ -680,3 +680,14 @@ select id, vali, valv, auto_incrementing_id from insert_non_unique_key_test_tbl4
 ---- TYPES
 INT,BIGINT,STRING,BIGINT
 ====
+---- QUERY
+# Regression test for IMPALA-10829.
+set ABORT_ON_ERROR=1;
+create table impala_10829_tbl (id int, primary key(id))
+    partition by hash partitions 3 stored as kudu;
+insert /*+clustered*/ into impala_10829_tbl
+    select case id when 0 then 1 else 2 end from functional.alltypestiny;
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 6
+====
