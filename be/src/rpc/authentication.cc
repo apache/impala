@@ -1495,6 +1495,14 @@ Status AuthManager::Init() {
   TSSLSocketFactory::setManualOpenSSLInitialization(true);
   kudu::security::InitializeOpenSSL();
   LOG(INFO) << "Initialized " << OPENSSL_VERSION_TEXT;
+  LOG(INFO) << "Runtime OpenSSL version " << SSLeay_version(SSLEAY_VERSION);
+  unsigned long openssl_version = SSLeay();
+  // Check if we are running against an OpenSSL version that is vulnerable to
+  // CVE-2009-3555
+  if (openssl_version >= 0x10100000L && openssl_version <= 0x1010007fL)  {
+    LOG(WARNING) <<
+        "OpenSSL runtime version detected that is vulnerable to CVE-2009-3555";
+  }
 
   // Could use any other requiered flag for SAML
   bool use_saml = !FLAGS_saml2_sp_callback_url.empty();

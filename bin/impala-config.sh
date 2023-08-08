@@ -85,7 +85,7 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=324-bb64c6ed91
+export IMPALA_TOOLCHAIN_BUILD_ID=351-c240088ecb
 # Versions of toolchain dependencies.
 # -----------------------------------
 if $USE_AVRO_CPP; then

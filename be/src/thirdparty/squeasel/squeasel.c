@@ -3792,15 +3792,21 @@ static int set_uid_option(struct sq_context *ctx) {
 
 static pthread_mutex_t *ssl_mutexes;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+// IMPALA-11195: disable TLS/SSL renegotiation. In version 1.0.2 and prior it's
+// possible to use the undocumented SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS flag.
+static void ssl_disable_renegotiation_cb(const SSL *ssl, int where, int ret)
+{
+    (void)ret;
+    if ((where & SSL_CB_HANDSHAKE_DONE) != 0) {
+        // disable renegotiation (CVE-2009-3555)
+        ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+    }
+}
+#endif
+
 static int sslize(struct sq_connection *conn, SSL_CTX *s, int (*func)(SSL *)) {
   return (conn->ssl = SSL_new(s)) != NULL &&
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-  // IMPALA-11195: disable TLS/SSL renegotiation. In version 1.0.2 and prior it's
-  // possible to use the undocumented SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS flag.
-  // For more context, see a note on the SSL_OP_NO_RENEGOTIATION option in the
-  // $OPENSSL_ROOT/CHANGES and https://github.com/openssl/openssl/issues/4739.
-  (conn->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS) &&
-#endif
     SSL_set_fd(conn->ssl, conn->client.sock) == 1 &&
     func(conn->ssl) == 1;
 }
@@ -3928,6 +3934,14 @@ static int set_ssl_option(struct sq_context *ctx) {
   //     will be accepted but nothing will happen, i.e. renegotiation will
   //     not be prevented.
   options |= SSL_OP_NO_RENEGOTIATION;
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L
+  // IMPALA-11195: disable TLS/SSL renegotiation. In version 1.0.2 and prior it's
+  // possible to use the undocumented SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS flag.
+  // We need to set the flag in the callback 'ssl_disable_renegotiation_cb' after
+  // handshake is done, otherwise the flag would get reset in SSL_accept().
+  SSL_CTX_set_info_callback(ctx_, ssl_disable_renegotiation_cb);
+#else
+  static_error(false, "Found SSL version that is vulnerable to CVE-2009-3555.");
 #endif
 
   if ((SSL_CTX_set_options(ctx->ssl_ctx, options) & options) != options) {
