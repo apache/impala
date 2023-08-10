@@ -101,6 +101,7 @@ the same dependencies
                 <include>org/apache/hadoop/hive/ql/exec/vector/expressions/**/*</include>
                 <include>org/apache/hive/common/HiveVersionAnnotation.class</include>
                 <include>org/apache/hive/common/HiveCompat*</include>
+                <include>org/apache/hive/common/package-info.class</include>
                 <include>org/apache/hive/common/util/**</include>
                 <include>org/apache/hive/service/rpc/thrift/**</include>
                 <include>org/apache/hadoop/hive/serde/**</include>
@@ -109,7 +110,6 @@ the same dependencies
                 <include>org/apache/hadoop/hive/ql/plan/ColStatistics.class</include>
                 <include>org/apache/hadoop/hive/ql/stats/estimator/**</include>
                 <include>org/apache/hive/service/rpc/thrift/**</include>
-                <include>org/apache/hive/common/HiveVersionAnnotation.class</include>
                 <include>org/apache/hadoop/hive/ql/ErrorMsg.class</include>
                 <include>com/google/**</include>
                 <include>com/esri/**</include>
