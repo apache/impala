@@ -1016,11 +1016,22 @@ class ImpalaTestSuite(BaseTestSuite):
     # This should never happen.
     assert 0, 'Unable to get location for table: ' + table_name
 
+  def run_impala_stmt_in_beeline(self, stmt, username=None, default_db='default'):
+    """ Run a statement in impala by Beeline. """
+    url = 'jdbc:hive2://localhost:' + pytest.config.option.impalad_hs2_port + '/'\
+      + default_db + ";auth=noSasl"
+    return self.run_stmt_in_beeline(url, username, stmt)
+
   # TODO(todd) make this use Thrift to connect to HS2 instead of shelling
   # out to beeline for better performance
   def run_stmt_in_hive(self, stmt, username=None):
+    """Run a statement in Hive by Beeline."""
+    url = 'jdbc:hive2://' + pytest.config.option.hive_server2
+    return self.run_stmt_in_beeline(url, username, stmt)
+
+  def run_stmt_in_beeline(self, url, username, stmt):
     """
-    Run a statement in Hive, returning stdout if successful and throwing
+    Run a statement by Beeline, returning stdout if successful and throwing
     RuntimeError(stderr) if not.
     """
     # Remove HADOOP_CLASSPATH from environment. Beeline doesn't need it,
@@ -1033,8 +1044,10 @@ class ImpalaTestSuite(BaseTestSuite):
     env.pop("HADOOP_CLASSPATH", None)
     call = subprocess.Popen(
         ['beeline',
+         # TODO IMPALA-2228: Prevents query output from being confused with log.
+         '--silent=true',
          '--outputformat=csv2',
-         '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
+         '-u', url,
          '-n', username or getuser(),
          '-e', stmt],
         stdout=subprocess.PIPE,

@@ -493,8 +493,12 @@ void ImpalaServer::GetInfo(TGetInfoResp& return_val,
       return_val.infoValue.__set_stringValue(GetDaemonBuildVersion());
       break;
     default:
-      HS2_RETURN_ERROR(return_val, "Unsupported operation",
-          SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
+      return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
+      return_val.status.__set_errorMessage(("Unsupported operation"));
+      return_val.status.__set_sqlState((SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED));
+      // 'infoValue' is a required field of TGetInfoResp
+      return_val.infoValue.__set_stringValue("");
+      return;
   }
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
