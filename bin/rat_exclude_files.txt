@@ -44,6 +44,7 @@ www/bootstrap/css/bootstrap*
 www/bootstrap/js/bootstrap*
 www/favicon.ico
 www/Chart*
+www/icons/*
 tests/comparison/leopard/static/css/bootstrap*
 tests/comparison/leopard/static/fonts/glyphicons-halflings*
 tests/comparison/leopard/static/js/bootstrap*

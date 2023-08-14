@@ -35,6 +35,45 @@ under the License.
 }
 </style>
 
+<style>
+g.plan_node:hover {
+  transform-box: fill-box;
+  transform: translateY(-50%) scaleY(1.50);
+}
+
+g.plan_node:active {
+  transform-box: fill-box;
+  transform: translateY(-100%) scaleY(2);
+}
+
+#host_utilization_wrapper, #fragment_metrics_wrapper {
+  display: none;
+  user-select: none;
+}
+
+#host_utilization_resize_bar, #fragment_metrics_resize_bar {
+  display: inline-block;
+  cursor: row-resize;
+  user-select: none;
+  height: 6px;
+}
+
+#hor_zoomout {
+  background-image: url("www/icons/horizontal_zoomout.png");
+}
+
+#hor_zoomin {
+  background-image: url("www/icons/horizontal_zoomin.png");
+}
+
+#hor_zoomout, #hor_zoomin{
+  background-size: cover;
+  height: 1.75em;
+  width: 1.75em;
+  cursor: pointer;
+}
+</style>
+
 {{> www/query_detail_tabs.tmpl }}
 
 
@@ -45,6 +84,10 @@ under the License.
 {{^plan_metadata_unavailable}}
   <div style="display:flex; justify-content:space-between;">
     <h3>Timeline</h3>
+    <span id="controls">
+      <button id="hor_zoomin" class="btn btn-primary"></button>
+      <button id="hor_zoomout" class="btn btn-primary" disabled></button>
+    </span>
     <label>
       <h4 style="display:inline;"> Download : </h4>
       <input type="button" class="btn btn-primary" data-toggle="modal" value="HTML"
@@ -93,9 +136,21 @@ under the License.
     <svg id="timeticks_footer"></svg>
   </div>
 </div>
-<div id="host_utilization_diagram">
-  <!--Utilization metrics is not available. Please make sure to set query option
-    RESOURCE_TRACE_RATIO=true.-->
+<div id="host_utilization_wrapper">
+  <img id="host_utilization_resize_bar" src="www/icons/drag_handle.png" draggable="false"/>
+  <input id="host_utilization_close_btn" class="btn btn-primary btn-sm" type="button"
+      value="X" data-dismiss="modal"/>
+  <div id="host_utilization_diagram">
+    <!--Utilization metrics is not available. Please make sure to set query option
+      RESOURCE_TRACE_RATIO=true.-->
+  </div>
+</div>
+<div id="fragment_metrics_wrapper">
+  <img id="fragment_metrics_resize_bar" src="www/icons/drag_handle.png" draggable="false"/>
+  <input id="fragment_metrics_close_btn" class="btn btn-primary btn-sm" type="button"
+      value="X" data-dismiss="modal"/>
+  <div id="fragment_metrics_diagram">
+  </div>
 </div>
 
 {{/plan_metadata_unavailable}}
@@ -109,6 +164,8 @@ import {renderTimingDiagram, collectFragmentEventsFromProfile, ntics, set_ntics}
     "./www/scripts/query_timeline/fragment_diagram.js";
 import {collectUtilizationFromProfile, toogleUtilizationVisibility} from
     "/www/scripts/query_timeline/host_utilization_diagram.js";
+import {collectFragmentMetricsFromProfile} from
+    "/www/scripts/query_timeline/fragment_metrics_diagram.js";
 import {profile, set_profile, diagram_width, set_diagram_width, border_stroke_width,
     resizeHorizontalAll, maxts} from "/www/scripts/query_timeline/global_members.js";
 
@@ -122,6 +179,7 @@ window.onload = function refresh() {
       set_profile(JSON.parse(req.responseText)["profile_json"]);
       collectFragmentEventsFromProfile();
       collectUtilizationFromProfile();
+      collectFragmentMetricsFromProfile();
       if (last_maxts != maxts) {
         renderTimingDiagram();
         last_maxts = maxts;
@@ -137,10 +195,48 @@ window.onload = function refresh() {
   req.send();
 }
 
+window.addEventListener('mousemove', function(e) {
+  var scroll_margin = window.innerWidth / 10;
+  var scroll_amount = window.innerWidth / 3;
+  if (e.clientX <= scroll_margin) {
+    window.scrollBy({left : - scroll_amount, behavior : "smooth"});
+  } else if (e.clientX >= window.innerWidth - scroll_margin) {
+    window.scrollBy({left : + scroll_amount, behavior : "smooth"});
+  }
+});
+
 window.addEventListener('resize', function(event) {
-  set_diagram_width(Math.max(window.innerWidth, diagram_width - border_stroke_width));
+  var window_diagram_width = window.innerWidth - border_stroke_width;
+  if (diagram_width <= window_diagram_width) {
+    set_diagram_width(window_diagram_width);
+    hor_zoomout.disabled = true;
+  } else {
+    hor_zoomout.disabled = false;
+  }
   resizeHorizontalAll();
 }, true);
+
+hor_zoomin.addEventListener('click', function(event) {
+  set_diagram_width(diagram_width + window.innerWidth * 0.2)
+  set_ntics(ntics + 2);
+  resizeHorizontalAll();
+  hor_zoomout.disabled = false;
+});
+
+hor_zoomout.addEventListener('click', function(event) {
+  var prev_diagram_width = diagram_width;
+  var next_width = diagram_width - window.innerWidth * 0.2;
+  var window_diagram_width = window.innerWidth - border_stroke_width;
+  if (next_width <= window_diagram_width) {
+    next_width = window_diagram_width;
+    hor_zoomout.disabled = true;
+  }
+  set_diagram_width(next_width);
+  var next_ntics = ntics + (diagram_width - prev_diagram_width) * 10 / window.innerWidth;
+  next_ntics = Math.round(next_ntics);
+  set_ntics(next_ntics);
+  resizeHorizontalAll();
+});
 
 // Attaches a SVG blob of the complete timeline to the associated link
 export_link.addEventListener('click', function (event) {

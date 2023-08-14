@@ -42,6 +42,12 @@ describe("Test initializeUtilizationMetrics", () => {
             "num": 59,
             "period": 100,
             "data": "312,679,445,440,301,301,312,125,125,437"
+          }, {
+            "counter_name": "HostNetworkRx",
+            "unit": "BASIS_POINTS",
+            "num": 59,
+            "period": 100,
+            "data": "312,679,445,440,301,301,312,125,125,437"
           }]
         }
       ]
@@ -56,18 +62,26 @@ describe("Test initializeUtilizationMetrics", () => {
         ["HostCpuUserPercentage", "avg io wait", 0],
         ["HostCpuSysPercentage", "avg sys", 0]
     ];
+    var counters_y2 = [
+        ["HostNetworkRx", "avg network rx", 0]
+    ];
     var timeaxis_name = "utilization timeticks";
-    var {cpu_nodes_usage_aggregate, sampled_utilization_timeseries} =
-        initializeUtilizationMetrics(parent_profile, counters_y1, max_samples,
-        timeaxis_name);
+    var {cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
+        sampled_utilization_timeseries} = initializeUtilizationMetrics(
+        parent_profile, counters_y1, counters_y2,
+        max_samples, timeaxis_name);
     expect(cpu_nodes_usage_aggregate).toEqual([
         [counters_y1[0][1], 0, null, null, null],
         [counters_y1[1][1], 0, null, null, null]
+    ]);
+    expect(read_write_metrics_aggregate).toEqual([
+        [counters_y2[0][1], 0, null, null, null]
     ]);
     expect(sampled_utilization_timeseries).toEqual(
         [timeaxis_name, null, null, null, null]
     );
     expect(counters_y1[0][2]).toBe(0);
     expect(counters_y1[1][2]).toBe(1);
+    expect(counters_y2[0][2]).toBe(2);
   });
 });

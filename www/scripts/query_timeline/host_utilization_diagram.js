@@ -20,8 +20,10 @@ import {profile, set_maxts, maxts, diagram_width, diagram_controls_height,
     from "./global_members.js";
 import {name_width, page_additional_height, setTimingDiagramDimensions}
     from "./fragment_diagram.js";
-import {aggregateProfileTimeseries, generateTimesamples, clearTimeseriesValues,
-    mapTimeseriesCounters, displayWarning, destroyChart} from "./chart_commons.js";
+import {array_values_start_index, aggregateProfileTimeseries, generateTimesamples,
+    clearTimeseriesValues, mapTimeseriesCounters, displayWarning, destroyChart}
+    from "./chart_commons.js";
+import {getFragmentMetricsWrapperHeight} from "./fragment_metrics_diagram.js";
 import "./global_dom.js";
 
 export var exportedForTest;
@@ -36,7 +38,14 @@ var cpu_utilization_counters = [
     ["HostCpuSysPercentage", "avg sys", 0],
     ["HostCpuUserPercentage", "avg user", 0]
 ];
+var read_write_metrics_counters = [
+    ["HostDiskReadThroughput", "avg disk read", 0],
+    ["HostDiskWriteThroughput", "avg disk write", 0],
+    ["HostNetworkRx", "avg network rx", 0],
+    ["HostNetworkTx", "avg network tx", 0]
+];
 var cpu_nodes_usage_aggregate;
+var read_write_metrics_aggregate;
 var sampled_utilization_timeseries;
 var utilization_timeaxis_name = "utilization timeticks";
 var prev_utilization_num_samples = 0;
@@ -47,11 +56,18 @@ var max_samples_utilization = {
   period : null
 };
 var host_utilization_resize_factor = 0.2;
+var min_num_samples = 3;
+
+var host_utilization_close_btn = document.getElementById("host_utilization_close_btn");
+var host_utilization_resize_bar = document.getElementById("host_utilization_resize_bar");
 
 function initializeUtilizationChart() {
   var axis_mappings = {};
   for(var i = 0; i < cpu_utilization_counters.length; ++i) {
     axis_mappings[cpu_utilization_counters[i][1]] = "y";
+  }
+  for(var i = 0; i < read_write_metrics_counters.length; ++i) {
+    axis_mappings[read_write_metrics_counters[i][1]] = "y2";
   }
   var cpu_utilization_counter_group = new Array(cpu_utilization_counters.length);
   for (var i = 0; i < cpu_utilization_counters.length; i++){
@@ -89,6 +105,13 @@ function initializeUtilizationChart() {
         tick : {
           format : function (y) { return y + '%'; }
         }
+      },
+      y2 :
+      {
+        tick : {
+          format : function (y2) { return `${getReadableSize(y2, 1)}/s`; }
+        },
+        show : true
       }
     }, legend : {
       show : false
@@ -111,10 +134,25 @@ function initializeUtilizationChart() {
     unload : true
   });
   var chart_width = diagram_width - margin_chart_end - name_width;
+  host_utilization_resize_bar.style.marginLeft = `${name_width + chart_width / 4}px`;
+  host_utilization_resize_bar.style.width = `${chart_width / 2}px`;
+  host_utilization_resize_bar.style.marginRight = `${chart_width / 4}px`;
 }
 
-function initializeUtilizationMetrics(parent_profile, counters_y1, max_samples,
-    timeaxis_name) {
+function dragResizeBar(mousemove_e) {
+  if (mousemove_e.target.classList[0] == "c3-event-rect") return;
+  var next_height = getUtilizationHeight() + (host_utilization_resize_bar.offsetTop -
+      mousemove_e.clientY);
+  if (next_height >= diagram_min_height && window.innerHeight - next_height
+      - diagram_controls_height >= page_additional_height
+      + getFragmentMetricsWrapperHeight() + diagram_min_height) {
+    host_utilization_resize_factor = next_height / window.innerHeight;
+    resizeVerticalAll();
+  }
+}
+
+function initializeUtilizationMetrics(parent_profile, counters_y1, counters_y2,
+    max_samples, timeaxis_name) {
   console.assert(parent_profile.profile_name == "Per Node Profiles");
   // user, sys, io and sampled timeticks
   var cpu_nodes_usage_aggregate = new Array(counters_y1.length);
@@ -126,29 +164,50 @@ function initializeUtilizationMetrics(parent_profile, counters_y1, max_samples,
     cpu_nodes_usage_aggregate[i][0] = counters_y1[i][1];
     cpu_nodes_usage_aggregate[i][1] = 0;
   }
+  var read_write_metrics_aggregate = new Array(counters_y2.length);
+  for (var i = 0; i < counters_y2.length; ++i) {
+    read_write_metrics_aggregate[i] = new Array(max_samples.allocated + 2)
+        .fill(null);
+    read_write_metrics_aggregate[i][0] = counters_y2[i][1];
+    read_write_metrics_aggregate[i][1] = 0;
+  }
   var sampled_utilization_timeseries = new Array(max_samples.allocated + 2)
       .fill(null);
   sampled_utilization_timeseries[0] = timeaxis_name;
   mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters, counters_y1);
-  return {cpu_nodes_usage_aggregate, sampled_utilization_timeseries};
+  mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters, counters_y2);
+  return {cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
+      sampled_utilization_timeseries};
 }
 
-export function getUtilizationHeight() {
+function getUtilizationHeight() {
   return Math.max(diagram_min_height, window.innerHeight *
       host_utilization_resize_factor);
 }
 
+export function getUtilizationWrapperHeight() {
+  return (utilization_metrics_parse_successful && host_utilization_visible) *
+      (getUtilizationHeight() + diagram_controls_height);
+}
+
+export function resetUtilizationHeight() {
+  host_utilization_resize_factor = 0.2;
+}
+
 export function toogleUtilizationVisibility() {
   if (utilization_metrics_parse_successful && host_utilization_visible) {
-    host_utilization_diagram.style.display = "initial";
+    host_utilization_wrapper.style.display = "initial";
   } else {
-    host_utilization_diagram.style.display = "none";
+    host_utilization_wrapper.style.display = "none";
   }
 }
 
 export async function resizeUtilizationChart() {
   if (host_utilization_chart == null) return;
   var chart_width = diagram_width - margin_chart_end - name_width;
+  host_utilization_resize_bar.style.marginLeft = `${name_width + chart_width / 4}px`;
+  host_utilization_resize_bar.style.width = `${chart_width / 2}px`;
+  host_utilization_resize_bar.style.marginRight = `${chart_width / 4}px`;
   host_utilization_chart.resize({
     height : getUtilizationHeight(),
     width : diagram_width
@@ -170,8 +229,9 @@ export function collectUtilizationFromProfile() {
     var per_node_profiles = profile.child_profiles[2].child_profiles[0];
     console.assert(per_node_profiles.profile_name == "Per Node Profiles");
     if (host_utilization_chart == null) {
-      ({cpu_nodes_usage_aggregate, sampled_utilization_timeseries} =
-          initializeUtilizationMetrics(per_node_profiles, cpu_utilization_counters,
+      ({cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
+          sampled_utilization_timeseries} = initializeUtilizationMetrics(
+          per_node_profiles, cpu_utilization_counters, read_write_metrics_counters,
           max_samples_utilization, utilization_timeaxis_name));
       initializeUtilizationChart();
     }
@@ -187,9 +247,11 @@ export function collectUtilizationFromProfile() {
     // For each node's profile seperately aggregate into two different units of metrics
     aggregateProfileTimeseries(per_node_profiles, cpu_nodes_usage_aggregate,
         cpu_utilization_counters, max_samples_utilization);
+    aggregateProfileTimeseries(per_node_profiles, read_write_metrics_aggregate,
+        read_write_metrics_counters, max_samples_utilization);
 
     // display warnings in case less samples are available without plotting
-    if (max_samples_utilization.available <= 2) {
+    if (max_samples_utilization.available < min_num_samples) {
       var utilization_samples_message = `Warning: Not enough samples for
           CPU utilization plot. Please decrease the value of starting flag
           variable <b><i>periodic_counter_update_period_ms </b></i> to
@@ -203,8 +265,15 @@ export function collectUtilizationFromProfile() {
     }
     // average the aggregated metrics
     cpu_nodes_usage_aggregate.forEach(function (acc_usage) {
-      for (var i = 2; i < max_samples_utilization.available + 2; ++i) {
+      for (var i = array_values_start_index; i < max_samples_utilization.available
+          + array_values_start_index; ++i) {
         acc_usage[i] = acc_usage[i] / (100 * per_node_profiles.child_profiles.length);
+      }
+    });
+    read_write_metrics_aggregate.forEach(function (acc_usage) {
+      for (var i = array_values_start_index; i < max_samples_utilization.available
+          + array_values_start_index; ++i) {
+        acc_usage[i] = acc_usage[i] / per_node_profiles.child_profiles.length;
       }
     });
     // generate timestamps for utilization values and decide on last timestamp value
@@ -212,10 +281,14 @@ export function collectUtilizationFromProfile() {
 
     // load the utilization values to the chart
     host_utilization_chart.load({
-      columns : [...cpu_nodes_usage_aggregate, sampled_utilization_timeseries]
+      columns : [...cpu_nodes_usage_aggregate, ...read_write_metrics_aggregate,
+          sampled_utilization_timeseries]
     });
     // clear utilization value and timestamp samples arrays
     cpu_nodes_usage_aggregate.forEach(function (acc_usage) {
+      clearTimeseriesValues(acc_usage, max_samples_utilization);
+    });
+    read_write_metrics_aggregate.forEach(function (acc_usage) {
       clearTimeseriesValues(acc_usage, max_samples_utilization);
     });
     prev_utilization_num_samples = profile.child_profiles[1].summary_stats_counters[0]
@@ -228,6 +301,28 @@ export function collectUtilizationFromProfile() {
     console.log(e);
   }
 }
+
+host_utilization_resize_bar.addEventListener('mousedown',
+    function dragResizeBarBegin(mousedown_e) {
+  host_utilization_resize_bar.removeEventListener('mousedown', dragResizeBarBegin);
+  document.body.addEventListener('mousemove', dragResizeBar);
+  document.body.addEventListener('mouseup', function dragResrizeBarEnd() {
+    document.body.removeEventListener('mouseup', dragResrizeBarEnd);
+    document.body.removeEventListener('mousemove', dragResizeBar);
+    host_utilization_resize_bar.addEventListener('mousedown', dragResizeBarBegin);
+  });
+});
+
+
+host_utilization_close_btn.addEventListener('click', function(e) {
+  host_utilization_visible = false;
+  host_utilization_chart = destroyChart(host_utilization_chart, host_utilization_diagram);
+  toogleUtilizationVisibility();
+  setTimingDiagramDimensions();
+});
+
+host_utilization_close_btn.style.height = `${diagram_controls_height}px`;
+host_utilization_close_btn.style.fontSize = `${diagram_controls_height / 2}px`;
 
 if (typeof process != "undefined" && process.env.NODE_ENV === 'test') {
   exportedForTest = {initializeUtilizationMetrics};

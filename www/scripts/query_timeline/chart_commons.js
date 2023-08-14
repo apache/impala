@@ -19,6 +19,11 @@ import {maxts, set_maxts, clearDOMChildren} from "./global_members.js";
 import {name_width} from "./fragment_diagram.js";
 
 export var exportedForTest;
+// In the data array provided for c3's line chart,
+// 0th element is name of dataset
+// 1st element is zero in all datasets(to compensate missing value for line chart)
+// Hence the values index start at 2
+export var array_values_start_index = 2;
 
 function accumulateTimeseriesValues(values_array, time_series_counter, max_samples) {
   var samples = time_series_counter.data.split(",").map(el => parseInt(el));
@@ -77,7 +82,7 @@ export function mapTimeseriesCounters(time_series_counters, counters) {
 
 export function clearTimeseriesValues(values_array, max_samples) {
   var max_traverse_len = Math.min(max_samples.available + 1, values_array.length - 1);
-  for (var j = 2; j <= max_traverse_len; ++j) {
+  for (var j = array_values_start_index; j <= max_traverse_len; ++j) {
     values_array[j] = null;
   }
 }
@@ -91,6 +96,17 @@ export function aggregateProfileTimeseries(parent_profile, aggregate_array,
           max_samples);
     }
   });
+}
+
+export function showTooltip(chart, x) {
+  if (chart == undefined) return;
+  chart.tooltip.show({x : chart.internal.findClosestFromTargetsByX(
+      chart.internal.getTargets(), x).x});
+}
+
+export function hideTooltip(chart) {
+  if (chart == undefined) return;
+  chart.tooltip.hide();
 }
 
 export function displayWarning(parent_element, msg, diagram_width, margin_l, margin_r) {

@@ -19,8 +19,11 @@ import {profile, set_maxts, maxts, decimals, set_decimals, diagram_width,
     set_diagram_width, diagram_controls_height, diagram_min_height,
     margin_header_footer, border_stroke_width, margin_chart_end, clearDOMChildren,
     resizeHorizontalAll} from "./global_members.js";
-import {host_utilization_chart, getUtilizationHeight} from
-    "./host_utilization_diagram.js";
+import {host_utilization_chart, getUtilizationWrapperHeight}
+    from "./host_utilization_diagram.js";
+import {fragment_metrics_chart, getFragmentMetricsWrapperHeight,
+    updateFragmentMetricsChartOnClick} from "./fragment_metrics_diagram.js";
+import {showTooltip, hideTooltip} from "./chart_commons.js"
 import "./global_dom.js";
 
 export var exportedForTest;
@@ -56,6 +59,7 @@ var receiver_nodes = [];
 var max_namelen = 0;
 var frag_name_width;
 var chart_width;
+var timestamp_gridline;
 
 // #timeticks_footer
 export var ntics = 10;
@@ -201,14 +205,15 @@ async function renderFragmentDiagram() {
           row_height, false));
 
       // Fragment/sender timing row
-      DrawBars(fragment_diagram, rownum_l, row_height, fevents, name_width, px_per_ns);
+      var fragment_svg_group = getSvgGroup();
+      DrawBars(fragment_svg_group, rownum_l, row_height, fevents, name_width, px_per_ns);
 
       for (var i = 0; i < fragment.nodes.length; ++i) {
         var node = fragment.nodes[i];
 
         if (node.events != undefined) {
           // Plan node timing row
-          DrawBars(fragment_diagram, rownum_l, row_height, node.events, name_width,
+          DrawBars(fragment_svg_group, rownum_l, row_height, node.events, name_width,
               px_per_ns);
           if (node.type == "HASH_JOIN_NODE") {
             fragment_diagram.appendChild(getSvgText("X", stroke_fill_colors.black,
@@ -284,6 +289,9 @@ async function renderFragmentDiagram() {
         }
 
       }
+      fragment_svg_group.id = fragment.name;
+      fragment_svg_group.addEventListener('click', updateFragmentMetricsChartOnClick);
+      fragment_diagram.appendChild(fragment_svg_group);
 
       // Visit sender fragments in reverse order to avoid dag edges crossing
       pending_fragments.reverse().forEach(printFragment);
@@ -527,7 +535,8 @@ export function setTimingDiagramDimensions(ignored_arg) {
   page_additional_height = timing_diagram.offsetTop + (row_height + margin_header_footer
       + border_stroke_width * 4) * 2;
   var fragment_diagram_initial_height = window.innerHeight - page_additional_height;
-  var remaining_height = fragment_diagram_initial_height - getUtilizationHeight();
+  var remaining_height = fragment_diagram_initial_height - getUtilizationWrapperHeight()
+      - getFragmentMetricsWrapperHeight();
   var display_height = Math.max(diagram_min_height, Math.min(remaining_height,
       rownum * row_height));
   chart_width = diagram_width - name_width - margin_chart_end - border_stroke_width;
@@ -557,17 +566,47 @@ export function renderTimingDiagram() {
   }
 }
 
+fragment_diagram.addEventListener('mouseout', function(e) {
+  hideTooltip(host_utilization_chart);
+  hideTooltip(fragment_metrics_chart);
+  removeChildIfExists(fragment_diagram, timestamp_gridline);
+});
+
+fragment_diagram.addEventListener('mousemove', function(e) {
+  if (e.pageX >= name_width && e.pageX <= name_width + chart_width){
+    removeChildIfExists(fragment_diagram, timestamp_gridline);
+    timestamp_gridline = getSvgLine(stroke_fill_colors.black, e.pageX, 0, e.pageX,
+        parseInt(fragment_diagram.style.height));
+    fragment_diagram.appendChild(timestamp_gridline);
+    var gridline_time = ((maxts * (e.pageX - name_width) / chart_width) / 1e9);
+    showTooltip(host_utilization_chart, gridline_time);
+    showTooltip(fragment_metrics_chart, gridline_time);
+    fragment_diagram_title.textContent = gridline_time.toFixed(decimals) + " s";
+  } else {
+    try {
+      host_utilization_chart.tooltip.hide();
+    } catch (e) {
+    }
+    removeChildIfExists(fragment_diagram, timestamp_gridline);
+    fragment_diagram_title.textContent = "";
+  }
+});
+
 fragment_diagram.addEventListener('wheel', function(e) {
   if (e.shiftKey) {
-    if (e.wheelDelta <= 0 && diagram_width <= window.innerWidth) return;
+    var window_diagram_width = window.innerWidth - border_stroke_width;
+    if (e.wheelDelta <= 0 && diagram_width <= window_diagram_width) return;
     var next_diagram_width = diagram_width + Math.round(e.wheelDelta);
-    if (next_diagram_width <= window.innerWidth) {
-      next_diagram_width = window.innerWidth;
+    hor_zoomout.disabled = false;
+    if (next_diagram_width <= window_diagram_width) {
+      next_diagram_width = window_diagram_width;
+      hor_zoomout.disabled = true;
     }
     var next_chart_width = next_diagram_width - name_width - margin_chart_end
         - border_stroke_width;
     var next_ntics = (next_diagram_width - diagram_width) * 10 / window.innerWidth;
     next_ntics = ntics + Math.round(next_ntics);
+    if (next_ntics < 10) next_ntics = 10;
     var rendering_constraint = char_width * (decimals + integer_part_estimate) >=
         next_chart_width / next_ntics;
     if (rendering_constraint) return;

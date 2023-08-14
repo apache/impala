@@ -16,6 +16,7 @@
 // under the License.
 
 import {renderTimingDiagram, setTimingDiagramDimensions} from "./fragment_diagram.js";
+import {resizeFragmentMetricsChart} from "./fragment_metrics_diagram.js";
 import {resizeUtilizationChart} from "./host_utilization_diagram.js";
 
 export var profile = {};
@@ -53,9 +54,11 @@ export function clearDOMChildren(element) {
 export function resizeHorizontalAll() {
   renderTimingDiagram();
   resizeUtilizationChart();
+  resizeFragmentMetricsChart();
 }
 
 export function resizeVerticalAll() {
   setTimingDiagramDimensions();
   resizeUtilizationChart();
+  resizeFragmentMetricsChart();
 }
