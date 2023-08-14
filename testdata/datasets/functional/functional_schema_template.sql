@@ -3708,7 +3708,23 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
               'format-version'='2');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
-hadoop fs -Ddfs.block.size=524288 -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_lineitem_multiblock /test-warehouse/iceberg_test/hadoop_catalog/ice
+hadoop fs -Ddfs.block.size=1048576 -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_lineitem_multiblock /test-warehouse/iceberg_test/hadoop_catalog/ice
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+iceberg_lineitem_sixblocks
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+LIKE PARQUET '/test-warehouse/lineitem_sixblocks_iceberg/lineitem_sixblocks.parquet'
+STORED AS PARQUET
+LOCATION '/test-warehouse/lineitem_sixblocks_iceberg/';
+ALTER TABLE {db_name}{db_suffix}.{table_name} CONVERT TO ICEBERG;
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES ('format-version'='2');
+DELETE FROM {db_name}{db_suffix}.{table_name} WHERE l_returnflag='N';
+---- LOAD
+`hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_sixblocks_iceberg && \
+hadoop fs -Ddfs.block.size=1048576 -put -f ${IMPALA_HOME}/testdata/LineItemMultiBlock/lineitem_sixblocks.parquet /test-warehouse/lineitem_sixblocks_iceberg
 ====
 ---- DATASET
 functional
