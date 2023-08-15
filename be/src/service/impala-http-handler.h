@@ -281,5 +281,16 @@ class ImpalaHttpHandler {
   /// supplied argument. Produces no JSON output.
   void ResetResourcePoolStatsHandler(
       const Webserver::WebRequest& req, rapidjson::Document* document);
+
+  /// Fill the sessions information into the document.
+  void FillSessionsInfo(rapidjson::Document* document);
+
+  /// Fill the client hosts information into the document.
+  void FillClientHostsInfo(rapidjson::Document* document,
+      const ThriftServer::ConnectionContextList& connection_contexts);
+
+  /// Fill the connections information into the document.
+  void FillConnectionsInfo(rapidjson::Document* document,
+      const ThriftServer::ConnectionContextList& connection_contexts);
 };
 }

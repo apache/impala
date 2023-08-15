@@ -521,6 +521,10 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Returns true if 'user' was configured as an authorized proxy user.
   bool IsAuthorizedProxyUser(const std::string& user) WARN_UNUSED_RESULT;
 
+  /// Gets connection contexts for all types of thrift servers.
+  void GetAllConnectionContexts(
+      ThriftServer::ConnectionContextList* connection_contexts);
+
   // Mapping between query option names and levels
   QueryOptionLevels query_option_levels_;
 
@@ -659,8 +663,11 @@ class ImpalaServer : public ImpalaServiceIf,
   friend class ImpalaServerTest;
   friend class QueryDriver;
 
+  static const string BEESWAX_SERVER_NAME;
+  static const string HS2_SERVER_NAME;
+  static const string HS2_HTTP_SERVER_NAME;
   // Used to identify external frontend RPC calls
-  const string EXTERNAL_FRONTEND_SERVER_NAME = "external-frontend";
+  static const string EXTERNAL_FRONTEND_SERVER_NAME;
 
   boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
 

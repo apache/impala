@@ -453,9 +453,10 @@ const string LINEAGE_LOG_FILE_PREFIX = "impala_lineage_log_1.0-";
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 
-const string BEESWAX_SERVER_NAME = "beeswax-frontend";
-const string HS2_SERVER_NAME = "hiveserver2-frontend";
-const string HS2_HTTP_SERVER_NAME = "hiveserver2-http-frontend";
+const string ImpalaServer::BEESWAX_SERVER_NAME = "beeswax-frontend";
+const string ImpalaServer::HS2_SERVER_NAME = "hiveserver2-frontend";
+const string ImpalaServer::HS2_HTTP_SERVER_NAME = "hiveserver2-http-frontend";
+const string ImpalaServer::EXTERNAL_FRONTEND_SERVER_NAME = "external-frontend";
 
 const string ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME = "default";
 
@@ -3427,5 +3428,26 @@ __attribute__((noinline)) int ImpalaServer::SecretArg::ConstantTimeCompare(
   // TODO: consider replacing with CRYPTO_memcmp() once our minimum supported OpenSSL
   // version has it.
   return (secret_.hi != other.hi) + (secret_.lo != other.lo);
+}
+
+void ImpalaServer::GetAllConnectionContexts(
+    ThriftServer::ConnectionContextList* connection_contexts) {
+  DCHECK_EQ(connection_contexts->size(), 0);
+  // Get the connection contexts of the beeswax server
+  if (beeswax_server_.get()) {
+    beeswax_server_->GetConnectionContextList(connection_contexts);
+  }
+  // Get the connection contexts of the hs2 server
+  if (hs2_server_.get()) {
+    hs2_server_->GetConnectionContextList(connection_contexts);
+  }
+  // Get the connection contexts of the hs2-http server
+  if (hs2_http_server_.get()) {
+    hs2_http_server_->GetConnectionContextList(connection_contexts);
+  }
+  // Get the connection contexts of the external fe server
+  if (external_fe_server_.get()) {
+    external_fe_server_->GetConnectionContextList(connection_contexts);
+  }
 }
 }

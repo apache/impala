@@ -691,11 +691,24 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
 
 void ImpalaHttpHandler::SessionsHandler(const Webserver::WebRequest& req,
     Document* document) {
+  VLOG(1) << "Step1: Fill the sessions information into the document.";
+  FillSessionsInfo(document);
+
+  ThriftServer::ConnectionContextList connection_contexts;
+  server_->GetAllConnectionContexts(&connection_contexts);
+  VLOG(1) << "Step2: Fill the client hosts information into the document.";
+  FillClientHostsInfo(document, connection_contexts);
+
+  VLOG(1) << "Step3: Fill the connections information into the document.";
+  FillConnectionsInfo(document, connection_contexts);
+}
+
+void ImpalaHttpHandler::FillSessionsInfo(Document* document) {
   lock_guard<mutex> l(server_->session_state_map_lock_);
   Value sessions(kArrayType);
   int num_active = 0;
-  for (const ImpalaServer::SessionStateMap::value_type& session:
-           server_->session_state_map_) {
+  for (const ImpalaServer::SessionStateMap::value_type& session :
+      server_->session_state_map_) {
     shared_ptr<ImpalaServer::SessionState> state = session.second;
     Value session_json(kObjectType);
     Value type(PrintValue(state->session_type).c_str(), document->GetAllocator());
@@ -716,9 +729,9 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::WebRequest& req,
     Value session_id(PrintId(session.first).c_str(), document->GetAllocator());
     session_json.AddMember("session_id", session_id, document->GetAllocator());
 
-    Value network_address(TNetworkAddressToString(state->network_address).c_str(),
+    Value connection_ids(PrintIdSet(state->connections, "\n").c_str(),
         document->GetAllocator());
-    session_json.AddMember("network_address", network_address, document->GetAllocator());
+    session_json.AddMember("connection_ids", connection_ids, document->GetAllocator());
 
     Value default_db(state->database.c_str(), document->GetAllocator());
     session_json.AddMember("default_database", default_db, document->GetAllocator());
@@ -751,6 +764,150 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::WebRequest& req,
   document->AddMember("num_active", num_active, document->GetAllocator());
   document->AddMember("num_inactive", server_->session_state_map_.size() - num_active,
       document->GetAllocator());
+}
+
+void ImpalaHttpHandler::FillClientHostsInfo(
+    Document* document, const ThriftServer::ConnectionContextList& connection_contexts) {
+  lock_guard<mutex> session_state_map_l(server_->session_state_map_lock_);
+  lock_guard<mutex> connection_to_sessions_map_l(
+      server_->connection_to_sessions_map_lock_);
+  Value client_hosts(kArrayType);
+  /// Map from a client hostname to the associated list of connections.
+  std::map<std::string, std::set<TUniqueId>> client_hostname_to_connections_map;
+  for (const ThriftServer::ConnectionContextList::value_type& connection_context :
+      connection_contexts) {
+    client_hostname_to_connections_map[connection_context->network_address.hostname]
+        .insert(connection_context->connection_id);
+  }
+  for (const auto& pair : client_hostname_to_connections_map) {
+    std::set<TUniqueId> client_hostname_sessions;
+    Value client_host_json(kObjectType);
+    int64_t total_connections = 0;
+    int64_t total_sessions = 0;
+    int64_t total_active_sessions = 0;
+    int64_t total_inactive_sessions = 0;
+    int64_t inflight_queries = 0;
+    int64_t total_queries = 0;
+    std::set<TUniqueId> connection_ids = pair.second;
+    total_connections += connection_ids.size();
+    Value hostname(pair.first.c_str(), document->GetAllocator());
+    client_host_json.AddMember("hostname", hostname, document->GetAllocator());
+    for (TUniqueId connection_id : connection_ids) {
+      ImpalaServer::ConnectionToSessionMap::iterator it =
+          server_->connection_to_sessions_map_.find(connection_id);
+      if (it != server_->connection_to_sessions_map_.end()) {
+        std::set<TUniqueId> session_ids = it->second;
+        for (TUniqueId session_id : session_ids) {
+          ImpalaServer::SessionStateMap::iterator session_state_map_iterator =
+              server_->session_state_map_.find(session_id);
+          if (session_state_map_iterator != server_->session_state_map_.end()
+              && client_hostname_sessions.find(session_id)
+                  == client_hostname_sessions.end()) {
+            client_hostname_sessions.insert(session_id);
+            ++total_sessions;
+            shared_ptr<ImpalaServer::SessionState> session_state =
+                session_state_map_iterator->second;
+            if (session_state->expired || session_state->closed) {
+              ++total_inactive_sessions;
+            } else {
+              ++total_active_sessions;
+            }
+            inflight_queries += session_state->inflight_queries.size();
+            total_queries += session_state->total_queries;
+          }
+        }
+      }
+    }
+    client_host_json.AddMember("total_connections", total_connections,
+        document->GetAllocator());
+    client_host_json.AddMember("total_sessions", total_sessions,
+        document->GetAllocator());
+    client_host_json.AddMember("total_active_sessions", total_active_sessions,
+        document->GetAllocator());
+    client_host_json.AddMember("total_inactive_sessions", total_inactive_sessions,
+        document->GetAllocator());
+    client_host_json.AddMember("inflight_queries", inflight_queries,
+        document->GetAllocator());
+    client_host_json.AddMember("total_queries", total_queries, document->GetAllocator());
+    client_hosts.PushBack(client_host_json, document->GetAllocator());
+  }
+  document->AddMember("client_hosts", client_hosts, document->GetAllocator());
+}
+
+void ImpalaHttpHandler::FillConnectionsInfo(
+    Document* document, const ThriftServer::ConnectionContextList& connection_contexts) {
+  lock_guard<mutex> session_state_map_l(server_->session_state_map_lock_);
+  lock_guard<mutex> connection_to_sessions_map_l(
+      server_->connection_to_sessions_map_lock_);
+  Value connections(kArrayType);
+  int64_t num_beeswax_frontend_connections = 0;
+  int64_t num_hiveserver2_frontend_connections = 0;
+  int64_t num_hiveserver2_http_frontend_connections = 0;
+  int64_t num_external_frontend_connections = 0;
+  for (const ThriftServer::ConnectionContextList::value_type& connection_context :
+      connection_contexts) {
+    if (connection_context.get()) {
+      if (connection_context->server_name == ImpalaServer::BEESWAX_SERVER_NAME) {
+        ++num_beeswax_frontend_connections;
+      } else if (connection_context->server_name == ImpalaServer::HS2_SERVER_NAME) {
+        ++num_hiveserver2_frontend_connections;
+      } else if (connection_context->server_name == ImpalaServer::HS2_HTTP_SERVER_NAME) {
+        ++num_hiveserver2_http_frontend_connections;
+      } else if (connection_context->server_name
+          == ImpalaServer::EXTERNAL_FRONTEND_SERVER_NAME) {
+        ++num_external_frontend_connections;
+      }
+      Value connection_json(kObjectType);
+      Value connection_id(PrintId(connection_context->connection_id).c_str(),
+          document->GetAllocator());
+      connection_json.AddMember("connection_id", connection_id, document->GetAllocator());
+
+      Value user(connection_context->username.c_str(), document->GetAllocator());
+      connection_json.AddMember("user", user, document->GetAllocator());
+
+      Value delegated_user(
+          connection_context->do_as_user.c_str(), document->GetAllocator());
+      connection_json.AddMember(
+          "delegated_user", delegated_user, document->GetAllocator());
+
+      Value network_address(
+          TNetworkAddressToString(connection_context->network_address).c_str(),
+          document->GetAllocator());
+      connection_json.AddMember(
+          "network_address", network_address, document->GetAllocator());
+
+      Value server_name(
+          connection_context->server_name.c_str(), document->GetAllocator());
+      connection_json.AddMember("server_name", server_name, document->GetAllocator());
+
+      std::set<TUniqueId> valid_session_ids;
+      ImpalaServer::ConnectionToSessionMap::iterator it =
+          server_->connection_to_sessions_map_.find(connection_context->connection_id);
+      if (it != server_->connection_to_sessions_map_.end()) {
+        // Filter out invalid session
+        for (TUniqueId session_id : it->second) {
+          if (server_->session_state_map_.find(session_id)
+              != server_->session_state_map_.end())
+            valid_session_ids.insert(session_id);
+        }
+      }
+      Value session_ids_str(PrintIdSet(valid_session_ids, "\n").c_str(),
+          document->GetAllocator());
+      connection_json.AddMember("session_ids", session_ids_str, document->GetAllocator());
+      connections.PushBack(connection_json, document->GetAllocator());
+    }
+  }
+  document->AddMember("connections", connections, document->GetAllocator());
+  document->AddMember(
+      "num_connections", connection_contexts.size(), document->GetAllocator());
+  document->AddMember("num_beeswax_frontend_connections",
+      num_beeswax_frontend_connections, document->GetAllocator());
+  document->AddMember("num_hiveserver2_frontend_connections",
+      num_hiveserver2_frontend_connections, document->GetAllocator());
+  document->AddMember("num_hiveserver2_http_frontend_connections",
+      num_hiveserver2_http_frontend_connections, document->GetAllocator());
+  document->AddMember("num_external_frontend_connections",
+      num_external_frontend_connections, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::CatalogHandler(const Webserver::WebRequest& req,

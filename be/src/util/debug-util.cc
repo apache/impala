@@ -97,6 +97,18 @@ void PrintIdCompromised(const TUniqueId& id, char out[TUniqueIdBufferSize],
   my_i64tohex(id.lo, out+17);
 }
 
+string PrintIdSet(const std::set<TUniqueId>& ids, std::string separator) {
+  stringstream out;
+  auto it = ids.begin();
+  while (it != ids.end()) {
+    out << PrintId(*it);
+    if (++it != ids.end()) {
+      out << separator;
+    }
+  }
+  return out.str();
+}
+
 bool ParseId(const string& s, TUniqueId* id) {
   // For backwards compatibility, this method parses two forms of query ID from text:
   //  - <hex-int64_t><colon><hex-int64_t> - this format is the standard going forward

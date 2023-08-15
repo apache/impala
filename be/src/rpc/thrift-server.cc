@@ -434,4 +434,11 @@ void ThriftServer::StopForTesting() {
   server_->stop();
   if (started_) Join();
 }
+
+void ThriftServer::GetConnectionContextList(ConnectionContextList* connection_contexts) {
+  lock_guard<mutex> l(connection_contexts_lock_);
+  for (const ConnectionContextSet::value_type& pair : connection_contexts_) {
+    connection_contexts->push_back(pair.second);
+  }
+}
 }

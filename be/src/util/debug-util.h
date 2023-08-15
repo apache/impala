@@ -65,6 +65,7 @@ std::string PrintBatch(RowBatch* batch);
 ///    printf "%lx:%lx\n", id.hi, id.lo
 std::string PrintId(const TUniqueId& id, const std::string& separator = ":");
 std::string PrintId(const UniqueIdPB& id, const std::string& separator = ":");
+std::string PrintIdSet(const std::set<TUniqueId>& ids, std::string separator = ",");
 
 /// Converts id to a string representation without using any shared library calls.
 /// Follows Breakpad's guidance for compromised contexts, see

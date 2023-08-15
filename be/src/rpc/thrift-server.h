@@ -178,6 +178,11 @@ class ThriftServer {
   /// It is also only safe to reference the returned value during an RPC method.
   static const ConnectionContext* GetThreadConnectionContext();
 
+  typedef std::vector<std::shared_ptr<const ConnectionContext>> ConnectionContextList;
+
+  /// Gets connection contexts for the thrift server.
+  void GetConnectionContextList(ConnectionContextList* connection_contexts);
+
  private:
   friend class ThriftServerBuilder;
   friend class apache::thrift::server::TAcceptQueueServer;

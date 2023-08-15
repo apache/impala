@@ -17,6 +17,68 @@ specific language governing permissions and limitations
 under the License.
 -->
 {{> www/common-header.tmpl }}
+<h2>Client Hosts</h2>
+<table id="client-hosts-tbl" class='table table-bordered table-hover table-condensed'>
+  <thead>
+    <tr>
+      <th><small>Hostname</small></th>
+      <th><small>Total Connections</small></th>
+      <th><small>Total Sessions</small></th>
+      <th><small>Total Active Sessions</small></th>
+      <th><small>Total Inactive Sessions</small></th>
+      <th><small>Open Queries</small></th>
+      <th><small>Total Queries</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#client_hosts}}
+    <tr>
+      <td><small>{{hostname}}</small></td>
+      <td><small>{{total_connections}}</small></td>
+      <td><small>{{total_sessions}}</small></td>
+      <td><small>{{total_active_sessions}}</small></td>
+      <td><small>{{total_inactive_sessions}}</small></td>
+      <td><small>{{inflight_queries}}</small></td>
+      <td><small>{{total_queries}}</small></td>
+    </tr>
+    {{/client_hosts}}
+  </tbody>
+</table>
+
+<h2>Connections</h2>
+<div class="alert alert-info" role="alert">
+<h4>There are {{num_connections}} connections, of which
+{{num_beeswax_frontend_connections}} are beeswax-frontend connections,
+{{num_hiveserver2_frontend_connections}} are hiveserver2-frontend connections,
+{{num_hiveserver2_http_frontend_connections}} are
+hiveserver2-http-frontend connections and {{num_external_frontend_connections}}
+are external-frontend connections
+</h4>
+</div>
+<table id="connections-tbl" class='table table-bordered table-hover table-condensed'>
+  <thead>
+    <tr>
+      <th><small>Connection ID</small></th>
+      <th><small>Connection Type</small></th>
+      <th><small>User</small></th>
+      <th><small>Delegated User</small></th>
+      <th><small>Network Address</small></th>
+      <th><small>Session IDs</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#connections}}
+    <tr>
+      <td><small>{{connection_id}}</small></td>
+      <td><small>{{server_name}}</small></td>
+      <td><small>{{user}}</small></td>
+      <td><small>{{delegated_user}}</small></td>
+      <td><small>{{network_address}}</small></td>
+      <td style="white-space: pre-wrap;"><small>{{session_ids}}</small></td>
+    </tr>
+    {{/connections}}
+  </tbody>
+</table>
 
 <h2>Sessions</h2>
 
@@ -40,7 +102,7 @@ which the session is removed from this list.</div>
       <th><small>User</small></th>
       <th><small>Delegated User</small></th>
       <th><small>Session ID</small></th>
-      <th><small>Network Address</small></th>
+      <th><small>Connection IDs</small></th>
       <th><small>Default Database</small></th>
       <th><small>Start Time</small></th>
       <th><small>Last Accessed</small></th>
@@ -60,7 +122,7 @@ which the session is removed from this list.</div>
       <td><small>{{user}}</small></td>
       <td><small>{{delegated_user}}</small></td>
       <td><small>{{session_id}}</small></td>
-      <td><small>{{network_address}}</small></td>
+      <td style="white-space: pre-wrap;"><small>{{connection_ids}}</small></td>
       <td><small>{{default_database}}</small></td>
       <td data-order="{{start_time_sort}}"><small>{{start_time}}</small></td>
       <td data-order="{{last_accessed_sort}}"><small>{{last_accessed}}</small></td>
@@ -73,6 +135,24 @@ which the session is removed from this list.</div>
     {{/sessions}}
   </tbody>
 </table>
+
+<script>
+    $(document).ready(function() {
+        $('#client-hosts-tbl').DataTable({
+            "order": [[ 1, "desc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
+
+<script>
+    $(document).ready(function() {
+        $('#connections-tbl').DataTable({
+            "order": [[ 4, "desc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
 
 <script>
     $(document).ready(function() {
