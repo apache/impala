@@ -27,6 +27,7 @@ under the License.
       <data name="Category" value="Impala"/>
       <data name="Category" value="SQL"/>
       <data name="Category" value="Kudu"/>
+      <data name="Category" value="Iceberg"/>
       <data name="Category" value="ETL"/>
       <data name="Category" value="Ingest"/>
       <data name="Category" value="DML"/>
@@ -39,8 +40,8 @@ under the License.
 
     <p>
       <indexterm audience="hidden">DELETE statement</indexterm>
-      Deletes an arbitrary number of rows from a Kudu table.
-      This statement only works for Impala tables that use the Kudu storage engine.
+      Deletes an arbitrary number of rows from a table.
+      This statement only works for Kudu (from <keyword keyref="impala28"/>) and Iceberg tables (from <keyword keyref="impala43"/>).
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -61,8 +62,8 @@ DELETE <varname>table_ref</varname> FROM [<varname>joined_table_refs</varname>] 
     <p>
       The second form evaluates one or more join clauses, and deletes
       all matching rows from one of the tables. The join clauses can
-      include non-Kudu tables, but the table from which the rows
-      are deleted must be a Kudu table. The <codeph>FROM</codeph>
+      include tables of any kind, but the table from which the rows
+      are deleted must be a Kudu or Iceberg table. The <codeph>FROM</codeph>
       keyword is required in this case, to separate the name of
       the table whose rows are being deleted from the table names
       of the join clauses.
@@ -80,7 +81,7 @@ DELETE <varname>table_ref</varname> FROM [<varname>joined_table_refs</varname>] 
       The conditions in the <codeph>WHERE</codeph> clause can refer to
       any combination of primary key columns or other columns. Referring to
       primary key columns in the <codeph>WHERE</codeph> clause is more efficient
-      than referring to non-primary key columns.
+      than referring to non-primary key columns (in case of Kudu tables).
     </p>
 
     <p>
@@ -114,6 +115,11 @@ DELETE <varname>table_ref</varname> FROM [<varname>joined_table_refs</varname>] 
     </ul>
 
     <p>
+      Iceberg also allows concurrent DELETE operations, in which case the concurrent DELETEs might
+      remove the same rows. This won't corrupt the table as Iceberg allows such behavior.
+    </p>
+
+    <p>
       The number of affected rows is reported in an <cmdname>impala-shell</cmdname> message
       and in the query profile.
     </p>
@@ -132,16 +138,16 @@ DELETE <varname>table_ref</varname> FROM [<varname>joined_table_refs</varname>] 
 
 <codeblock>
 -- Deletes all rows. The FROM keyword is optional.
-DELETE FROM kudu_table;
-DELETE kudu_table;
+DELETE FROM table;
+DELETE table;
 
 -- Deletes 0, 1, or more rows.
 -- (If c1 is a single-column primary key, the statement could only
 -- delete 0 or 1 rows.)
-DELETE FROM kudu_table WHERE c1 = 100;
+DELETE FROM table WHERE c1 = 100;
 
 -- Deletes all rows that match all the WHERE conditions.
-DELETE FROM kudu_table WHERE
+DELETE FROM table WHERE
   (c1 > c2 OR c3 IN ('hello','world')) AND c4 IS NOT NULL;
 DELETE FROM t1 WHERE
   (c1 IN (1,2,3) AND c2 > c3) OR c4 IS NOT NULL;
@@ -153,7 +159,7 @@ DELETE FROM t1 WHERE
   c5 IN (SELECT DISTINCT other_col FROM other_table);
 
 -- Does not delete any rows, because the WHERE condition is always false.
-DELETE FROM kudu_table WHERE 1 = 0;
+DELETE FROM table WHERE 1 = 0;
 </codeblock>
 
     <p>
@@ -169,17 +175,18 @@ DELETE t1 FROM t1 JOIN t2 ON t1.x = t2.x;
 DELETE t1 FROM t1 JOIN t2 ON t1.x = t2.x
   WHERE t1.y = FALSE and t2.z > 100;
 
--- Delete from a Kudu table based on a join with a non-Kudu table.
-DELETE t1 FROM kudu_table t1 JOIN non_kudu_table t2 ON t1.x = t2.x;
+-- Delete from a table based on a join with another table.
+DELETE t1 FROM table t1 JOIN other_table t2 ON t1.x = t2.x;
 
--- The tables can be joined in any order as long as the Kudu table
+-- The tables can be joined in any order as long as the Kudu or Iceberg table
 -- is specified as the deletion target.
-DELETE t2 FROM non_kudu_table t1 JOIN kudu_table t2 ON t1.x = t2.x;
+DELETE t2 FROM non_kudu_non_ice_table t1 JOIN kudu_or_ice_table t2 ON t1.x = t2.x;
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
+      <xref href="impala_iceberg.xml#impala_iceberg"/>,
       <xref href="impala_kudu.xml#impala_kudu"/>, <xref href="impala_insert.xml#insert"/>,
       <xref href="impala_update.xml#update"/>, <xref href="impala_upsert.xml#upsert"/>
     </p>

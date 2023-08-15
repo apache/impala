@@ -43,10 +43,6 @@ under the License.
       Iceberg Catalogs (e.g. HiveCatalog, HadoopCatalog). It also supports location-based
       tables (HadoopTables).
     </p>
-    <p>
-      Currently only Iceberg V1 DML operations are allowed, i.e. INSERT INTO /INSERT OVERWRITE.
-      Iceberg V2 operations like row-level modifications (UPDATE, DELETE) are not supported yet.
-    </p>
 
     <p>
       For more information on Iceberg, see <xref keyref="upstream_iceberg_site"/>.
@@ -209,6 +205,37 @@ CREATE TABLE ice_ctas STORED AS ICEBERG AS SELECT i, b FROM value_tbl;
 CREATE TABLE ice_ctas_part PARTITIONED BY(d) STORED AS ICEBERG AS SELECT s, ts, d FROM value_tbl;
 
 CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS ICEBERG AS SELECT cast(t as INT), s, d FROM value_tbl;
+        </codeblock>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_v2">
+    <title>Iceberg V2 tables</title>
+    <conbody>
+      <p>
+        Iceberg V2 tables support row-level modifications (DELETE, UPDATE) via "merge-on-read", which means instead
+        of rewriting existing data files, separate so-called delete files are being written that store information
+        about the deleted records. There are two kinds of delete files in Iceberg:
+        <ul>
+          <li>position deletes</li>
+          <li>equality deletes</li>
+        </ul>
+        Impala only supports position delete files. These files contain the file path and file position of the deleted
+        rows.
+      </p>
+      <p>
+        One can create Iceberg V2 tables via the <codeph>CREATE TABLE</codeph> statement, they just need to specify
+        the 'format-version' table property:
+        <codeblock>
+CREATE TABLE ice_v2 (i int) STORED BY ICEBERG TBLPROPERTIES('format-version'='2');
+        </codeblock>
+      </p>
+      <p>
+        It is also possible to upgrade existing Iceberg V1 tables to Iceberg V2 tables. One can use the following
+        <codeph>ALTER TABLE</codeph> statement to do so:
+        <codeblock>
+ALTER TABLE ice_v1_to_v2 SET TBLPROPERTIES('format-version'='2');
         </codeblock>
       </p>
     </conbody>
@@ -418,7 +445,7 @@ CREATE TABLE ice_p (i INT, b INT) PARTITIONED BY (p1 INT, p2 STRING) STORED AS I
   </concept>
 
   <concept id="iceberg_inserts">
-    <title>Writing Iceberg tables</title>
+    <title>Inserting data into Iceberg tables</title>
     <conbody>
       <p>
         Impala is also able to insert new data to Iceberg tables. Currently the <codeph>INSERT INTO</codeph>
@@ -443,6 +470,32 @@ INSERT INTO ice_p VALUES (1, 2);
       </p>
       <p>
         Impala can only write Iceberg tables with Parquet data files.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_delete">
+    <title>Delete data from Iceberg tables</title>
+    <conbody>
+      <p>
+        Since <keyword keyref="impala43"/> Impala is able to run <codeph>DELETE</codeph> statements against
+        Iceberg V2 tables. E.g.:
+        <codeblock>
+DELETE FROM ice_t where i = 3;
+        </codeblock>
+      </p>
+      <p>
+        More information about the <codeph>DELETE</codeph> statement can be found at <xref href="impala_delete.xml#delete"/>.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_update">
+    <title>Updating data int Iceberg tables</title>
+    <conbody>
+      <p>
+        Impala does not yet support the UPDATE statement. One can mimic its behaviour by calling
+        DELETE + INSERT statements one after the other, but please note that this creates two transactions.
       </p>
     </conbody>
   </concept>
