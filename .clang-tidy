@@ -36,6 +36,7 @@ Checks: "-*,clang*,\
 -clang-diagnostic-class-varargs,\
 -clang-diagnostic-conversion,\
 -clang-diagnostic-covered-switch-default,\
+-clang-diagnostic-deprecated,\
 -clang-diagnostic-disabled-macro-expansion,\
 -clang-diagnostic-documentation-html,\
 -clang-diagnostic-documentation-unknown-command,\

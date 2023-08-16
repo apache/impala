@@ -36,10 +36,6 @@ option(BUILD_WITH_NO_TESTS "Do not generate test and benchmark targets" OFF)
 #  -Wno-unknown-pragmas: suppress warnings for unknown (compiler specific) pragmas
 #  -fsigned-char: on aarch64 platform, type of char default is unsigned char, here
 #        set it to signed-char to be compatible with x86-64
-#  -Wno-deprecated: gutil contains deprecated headers
-#  -Wno-deprecated-declarations: OpenSSL3 deprecated various APIs currently used by
-#       Impala, so this disables those warnings until they can be addressed.
-#       See IMPALA-12226.
 #  -Wno-vla: we use C99-style variable-length arrays
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
@@ -51,7 +47,7 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-p
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fsigned-char")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++17")
-SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-deprecated-declarations -Wno-vla")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_SYSTEM_NO_DEPRECATED")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_BIND_GLOBAL_PLACEHOLDERS")
@@ -63,6 +59,12 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_ALLOW_DEPRECATED_HEADERS")
 #      isn't supported (e.g., that might happen in containerized deployments).
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/binutils-$ENV{IMPALA_BINUTILS_VERSION}/bin/")
+#  -Wno-deprecated-declarations: OpenSSL3 deprecated various APIs currently used by
+#      Impala, so this disables those warnings when using OpenSSL3 until they can be
+#      addressed. See IMPALA-12226.
+if (OPENSSL_VERSION VERSION_GREATER_EQUAL 3)
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated-declarations")
+endif()
 IF($ENV{USE_GOLD_LINKER} STREQUAL "true")
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fuse-ld=gold")
 ENDIF()
@@ -291,15 +293,20 @@ add_definitions(-DKUDU_HEADERS_USE_RICH_SLICE -DKUDU_HEADERS_NO_STUBS)
 # Set clang flags for cross-compiling to IR.
 # IR_COMPILE is #defined for the cross compile to remove code that bloats the IR.
 # Optimization is omitted and left up to individual uses.
-#  -Wno-deprecated: gutil contains deprecated headers
 #  -Wno-return-type-c-linkage: UDFs return C++ classes but use C linkage to prevent
 #       mangling
 #  -DBOOST_NO_EXCEPTIONS: call a custom error handler for exceptions in codegen'd code.
 set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++17" "-DIR_COMPILE" "-DHAVE_INTTYPES_H"
   "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG" "-DBOOST_NO_EXCEPTIONS"
   "-DBOOST_BIND_GLOBAL_PLACEHOLDERS" "-DBOOST_ALLOW_DEPRECATED_HEADERS"
-  "-DKUDU_HEADERS_NO_STUBS" "-fcolor-diagnostics" "-Wno-deprecated"
+  "-DKUDU_HEADERS_NO_STUBS" "-fcolor-diagnostics"
   "-Wno-return-type-c-linkage" "-fsigned-char")
+#  -Wno-deprecated-declarations: OpenSSL3 deprecated various APIs currently used by
+#      Impala, so this disables those warnings when using OpenSSL3 until they can be
+#      addressed. See IMPALA-12226.
+if (OPENSSL_VERSION VERSION_GREATER_EQUAL 3)
+  SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Wno-deprecated-declarations")
+endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
   set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-march=armv8-a+crc"
