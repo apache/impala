@@ -3939,7 +3939,7 @@ static int set_ssl_option(struct sq_context *ctx) {
   // possible to use the undocumented SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS flag.
   // We need to set the flag in the callback 'ssl_disable_renegotiation_cb' after
   // handshake is done, otherwise the flag would get reset in SSL_accept().
-  SSL_CTX_set_info_callback(ctx, ssl_disable_renegotiation_cb);
+  SSL_CTX_set_info_callback(ctx->ssl_ctx, ssl_disable_renegotiation_cb);
 #else
   static_error(false, "Found SSL version that is vulnerable to CVE-2009-3555.");
 #endif
