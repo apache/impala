@@ -705,9 +705,18 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
   DebugActionNoFail(exec_request_->query_options, "CRS_DELAY_BEFORE_CATALOG_OP_EXEC");
 
   Status status = catalog_op_executor_->Exec(exec_request_->catalog_op_request);
+  query_events_->MarkEvent("CatalogDdlRequest finished");
   {
     lock_guard<mutex> l(lock_);
     RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
+
+  if (catalog_op_executor_->ddl_exec_response() != nullptr &&
+      catalog_op_executor_->ddl_exec_response()->__isset.profile) {
+    for (const TEventSequence& catalog_timeline :
+        catalog_op_executor_->ddl_exec_response()->profile.event_sequences) {
+      summary_profile_->AddEventSequence(catalog_timeline.name, catalog_timeline);
+    }
   }
 
   // If this is a CTAS request, there will usually be more work to do
@@ -725,7 +734,7 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
   // Add newly created table to catalog cache.
   status = parent_server_->ProcessCatalogUpdateResult(
       *catalog_op_executor_->update_catalog_result(),
-      exec_request_->query_options.sync_ddl, query_options());
+      exec_request_->query_options.sync_ddl, query_options(), query_events_);
   {
     lock_guard<mutex> l(lock_);
     RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
@@ -842,7 +851,7 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
 
   status = parent_server_->ProcessCatalogUpdateResult(
       resp.result,
-      exec_request_->query_options.sync_ddl, query_options());
+      exec_request_->query_options.sync_ddl, query_options(), query_events_);
   {
     lock_guard<mutex> l(lock_);
     RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
@@ -1597,7 +1606,7 @@ Status ClientRequestState::UpdateCatalog() {
         query_events_->MarkEvent("Transaction committed");
       }
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(resp.result,
-          exec_request_->query_options.sync_ddl, query_options()));
+          exec_request_->query_options.sync_ddl, query_options(), query_events_));
     }
   } else if (InKuduTransaction()) {
     // Commit the Kudu transaction. Clear transaction state if it's successful.
@@ -1757,7 +1766,7 @@ Status ClientRequestState::UpdateTableAndColumnStats(
   }
   RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
       *catalog_op_executor_->update_catalog_result(),
-      exec_request_->query_options.sync_ddl, query_options()));
+      exec_request_->query_options.sync_ddl, query_options(), query_events_));
 
   // Set the results to be reported to the client.
   SetResultSet(catalog_op_executor_->ddl_exec_response());

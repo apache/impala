@@ -41,6 +41,7 @@ import org.apache.impala.thrift.TKuduPartitionParam;
 import org.apache.impala.thrift.TKuduPartitionByHashParam;
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.thrift.TRangePartitionOperationType;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.ColumnSchema.ColumnSchemaBuilder;
@@ -70,16 +71,59 @@ import com.google.common.collect.Sets;
 public class KuduCatalogOpExecutor {
   public static final Logger LOG = Logger.getLogger(KuduCatalogOpExecutor.class);
 
+  // Labels used in catalog timeline
+  private static final String CHECKED_KUDU_TABLE_EXISTENCE =
+      "Checked table existence in Kudu";
+  private static final String CREATED_KUDU_TABLE = "Created table in Kudu";
+  private static final String GOT_KUDU_CLIENT = "Got Kudu client";
+  private static final String GOT_KUDU_DDL_LOCK = "Got kuduDdlLock";
+  private static final String OPENED_KUDU_TABLE = "Opened Kudu table";
+  private static final String POPULATED_COLS_FROM_KUDU =
+      "Populated external table cols from Kudu";
+
   private static final Object kuduDdlLock_ = new Object();
+
+  /**
+   * Wrapper to get kudu client and mark the given 'catalogTimeline' when it finishes.
+   */
+  private static KuduClient getKuduClient(String masterHosts,
+      EventSequence catalogTimeline) {
+    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    catalogTimeline.markEvent(GOT_KUDU_CLIENT);
+    return kudu;
+  }
+
+  /**
+   * Wrapper to check kudu table existence and mark the given 'catalogTimeline' when it
+   * finishes.
+   */
+  private static boolean checkTableExistence(KuduClient client, String kuduTableName,
+      EventSequence catalogTimeline) throws KuduException {
+    boolean tableExists = client.tableExists(kuduTableName);
+    catalogTimeline.markEvent(CHECKED_KUDU_TABLE_EXISTENCE);
+    return tableExists;
+  }
+
+  /**
+   * Wrapper to create the kudu table and mark the given 'catalogTimeline' when it
+   * finishes.
+   */
+  private static org.apache.kudu.client.KuduTable createKuduTable(KuduClient client,
+      String name, Schema schema, CreateTableOptions tableOpts,
+      EventSequence catalogTimeline) throws KuduException {
+    org.apache.kudu.client.KuduTable table = client.createTable(name, schema, tableOpts);
+    catalogTimeline.markEvent(CREATED_KUDU_TABLE);
+    return table;
+  }
 
   /**
    * Create a table in Kudu with a schema equivalent to the schema stored in 'msTbl'.
    * Throws an exception if 'msTbl' represents an external table or if the table couldn't
    * be created in Kudu.
    */
-  public static void createSynchronizedTable(
-          org.apache.hadoop.hive.metastore.api.Table msTbl,
-          TCreateTableParams params) throws ImpalaRuntimeException {
+  public static void createSynchronizedTable(EventSequence catalogTimeline,
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      TCreateTableParams params) throws ImpalaRuntimeException {
     Preconditions.checkState(KuduTable.isSynchronizedTable(msTbl));
     Preconditions.checkState(
         msTbl.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
@@ -89,13 +133,14 @@ public class KuduCatalogOpExecutor {
       LOG.trace(String.format("Creating table '%s' in master '%s'", kuduTableName,
           masterHosts));
     }
-    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    KuduClient kudu = getKuduClient(masterHosts, catalogTimeline);
     try {
       // Acquire lock to protect table existence check and table creation, see IMPALA-8984
       synchronized (kuduDdlLock_) {
+        catalogTimeline.markEvent(GOT_KUDU_DDL_LOCK);
         // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
         // (see KUDU-1710).
-        boolean tableExists = kudu.tableExists(kuduTableName);
+        boolean tableExists = checkTableExistence(kudu, kuduTableName, catalogTimeline);
         if (tableExists && params.if_not_exists) return;
 
         // if table is managed or external with external.purge.table = true in
@@ -107,8 +152,8 @@ public class KuduCatalogOpExecutor {
         Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
         Schema schema = createTableSchema(params);
         CreateTableOptions tableOpts = buildTableOptions(msTbl, params, schema);
-        org.apache.kudu.client.KuduTable table =
-            kudu.createTable(kuduTableName, schema, tableOpts);
+        org.apache.kudu.client.KuduTable table = createKuduTable(
+            kudu, kuduTableName, schema, tableOpts, catalogTimeline);
         // Populate table ID from Kudu table if Kudu's integration with the Hive
         // Metastore is enabled.
         if (KuduTable.isHMSIntegrationEnabled(masterHosts)) {
@@ -312,7 +357,7 @@ public class KuduCatalogOpExecutor {
    * an equivalent schema for external tables. Throws an exception if any errors
    * are encountered.
    */
-  public static void populateExternalTableColsFromKudu(
+  public static void populateExternalTableColsFromKudu(EventSequence catalogTimeline,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaRuntimeException {
     org.apache.hadoop.hive.metastore.api.Table msTblCopy = msTbl.deepCopy();
     List<FieldSchema> cols = msTblCopy.getSd().getCols();
@@ -327,13 +372,14 @@ public class KuduCatalogOpExecutor {
       LOG.trace(String.format("Loading schema of table '%s' from master '%s'",
           kuduTableName, masterHosts));
     }
-    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    KuduClient kudu = getKuduClient(masterHosts, catalogTimeline);
     try {
-      if (!kudu.tableExists(kuduTableName)) {
+      if (!checkTableExistence(kudu, kuduTableName, catalogTimeline)) {
         throw new ImpalaRuntimeException(String.format("Table does not exist in Kudu: " +
             "'%s'", kuduTableName));
       }
       org.apache.kudu.client.KuduTable kuduTable = kudu.openTable(kuduTableName);
+      catalogTimeline.markEvent(OPENED_KUDU_TABLE);
       // Replace the columns in the Metastore table with the columns from the recently
       // accessed Kudu schema.
       cols.clear();
@@ -358,6 +404,7 @@ public class KuduCatalogOpExecutor {
     List<FieldSchema> newCols = msTbl.getSd().getCols();
     newCols.clear();
     newCols.addAll(cols);
+    catalogTimeline.markEvent(POPULATED_COLS_FROM_KUDU);
   }
 
   /**

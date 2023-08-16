@@ -2287,7 +2287,7 @@ public class Frontend {
     }
   }
 
-  private static TRuntimeProfileNode createTRuntimeProfileNode(
+  public static TRuntimeProfileNode createTRuntimeProfileNode(
       String childrenProfileName) {
     return new TRuntimeProfileNode(childrenProfileName,
         /*num_children=*/0,

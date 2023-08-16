@@ -440,6 +440,14 @@ class TestObservability(ImpalaTestSuite):
       r'Query Timeline:',
       r'Planning finished'
     ]
+    # Events for DDLs. Currently just CreateTable has them.
+    ddl_event_regexes = [
+      r'Catalog Server Operation:',
+      r'Got metastoreDdlLock:',
+      r'Created table in Metastore:',
+      r'Created table in catalog cache:',
+      r'DDL finished:',
+    ]
     # queries that explore different code paths in Frontend compilation
     queries = [
       'create table if not exists impala_6568 (i int)',
@@ -454,6 +462,10 @@ class TestObservability(ImpalaTestSuite):
       runtime_profile = self.execute_query(query).runtime_profile
       # and check that all the expected events appear in the resulting profile
       self.__verify_profile_contains_every_event(event_regexes, runtime_profile, query)
+      # Verify catalogOp timeline
+      if query.startswith("create table"):
+        self.__verify_profile_contains_every_event(
+            ddl_event_regexes, runtime_profile, query)
 
   def __verify_profile_contains_every_event(self, event_regexes, runtime_profile, query):
     """Test that all the expected events show up in a given query profile."""
@@ -461,6 +473,54 @@ class TestObservability(ImpalaTestSuite):
       assert any(re.search(regex, line) for line in runtime_profile.splitlines()), \
           "Didn't find event '" + regex + "' for query '" + query + \
           "' in profile: \n" + runtime_profile
+
+  def test_create_table_profile_events(self, unique_database):
+    # Create normal table
+    stmt = "create table %s.t1(id int)" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+        "Got metastoreDdlLock",
+        "Got Metastore client",
+        "Got current Metastore event id",
+        "Created table in Metastore",
+        "Fetched event batch from Metastore",
+        "Created table in catalog cache",
+        "DDL finished"
+    ])
+    # Create Kudu table
+    stmt = "create table %s.t2(id int, name string, primary key(id))" \
+           " partition by hash(id) partitions 3 stored as kudu" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+        "Got Metastore client",
+        "Got current Metastore event id",
+        "Got Kudu client",
+        "Got kuduDdlLock",
+        "Checked table existence in Kudu",
+        "Created table in Kudu",
+        "Got metastoreDdlLock",
+        "Got Metastore client",
+        "Checked table existence in Metastore",
+        "Created table in Metastore",
+        "Fetched event batch from Metastore",
+        "Created table in catalog cache",
+        "DDL finished",
+    ])
+    # Create Iceberg table
+    stmt = "create table %s.t3(id int) stored as iceberg" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+        "Got Metastore client",
+        "Checked table existence in Metastore",
+        "Got current Metastore event id",
+        "Created table using Iceberg Catalog HIVE_CATALOG",
+        "Fetched event batch from Metastore",
+        "Created table in catalog cache",
+        "Set Iceberg table owner in Metastore",
+        "DDL finished",
+    ])
+
+  def __verify_event_labels_in_profile(self, stmt, event_labels):
+    profile = self.execute_query(stmt).runtime_profile
+    for label in event_labels:
+      assert label in profile
 
   def test_compute_stats_profile(self, unique_database):
     """Test that the profile for a 'compute stats' query contains three unique query ids:

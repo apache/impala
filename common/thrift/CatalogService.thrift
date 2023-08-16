@@ -23,6 +23,7 @@ include "JniCatalog.thrift"
 include "Types.thrift"
 include "Status.thrift"
 include "Results.thrift"
+include "RuntimeProfile.thrift"
 include "hive_metastore.thrift"
 include "SqlConstraints.thrift"
 
@@ -209,6 +210,9 @@ struct TDdlExecResponse {
   // created table. This is useful for establishing lineage between table and it's
   // location for external tables.
   6: optional string table_location
+
+  // Profile of the DDL execution in catalogd
+  7: optional RuntimeProfile.TRuntimeProfileNode profile
 }
 
 

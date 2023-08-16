@@ -49,6 +49,7 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.PatternMatcher;
 
 import com.google.common.base.Joiner;
@@ -395,6 +396,15 @@ public abstract class Catalog implements AutoCloseable {
    * Returns a managed meta store client from the client connection pool.
    */
   public MetaStoreClient getMetaStoreClient() { return metaStoreClientPool_.getClient(); }
+
+  /**
+   * Same as the above but also update the given 'timeline'.
+   */
+  public MetaStoreClient getMetaStoreClient(EventSequence timeline) {
+    MetaStoreClient client = getMetaStoreClient();
+    if (timeline != null) timeline.markEvent("Got Metastore client");
+    return client;
+  }
 
   /**
    * Return all members of 'candidates' that match 'matcher'.

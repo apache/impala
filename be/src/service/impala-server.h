@@ -423,24 +423,26 @@ class ImpalaServer : public ImpalaServiceIf,
   ///
   /// 'query_options' is used for running debug actions.
   Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result,
-      bool wait_for_all_subscribers, const TQueryOptions& query_options)
+      bool wait_for_all_subscribers, const TQueryOptions& query_options,
+      RuntimeProfile::EventSequence* timeline)
       WARN_UNUSED_RESULT;
 
   /// Wait until the catalog update with version 'catalog_update_version' is
   /// received and applied in the local catalog cache or until the catalog
   /// service id has changed.
   void WaitForCatalogUpdate(const int64_t catalog_update_version,
-      const TUniqueId& catalog_service_id);
+      const TUniqueId& catalog_service_id, RuntimeProfile::EventSequence* timeline);
 
   /// Wait until the minimum catalog object version in the local cache is
   /// greater than 'min_catalog_update_version' or until the catalog
   /// service id has changed.
   void WaitForMinCatalogUpdate(const int64_t min_catalog_update_version,
-      const TUniqueId& catalog_service_id);
+      const TUniqueId& catalog_service_id, RuntimeProfile::EventSequence* timeline);
 
   /// Wait until the last applied catalog update has been broadcast to
   /// all coordinators or until the catalog service id has changed.
-  void WaitForCatalogUpdateTopicPropagation(const TUniqueId& catalog_service_id);
+  void WaitForCatalogUpdateTopicPropagation(const TUniqueId& catalog_service_id,
+      RuntimeProfile::EventSequence* timeline);
 
   /// Returns true if lineage logging is enabled, false otherwise.
   ///

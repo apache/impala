@@ -2192,7 +2192,7 @@ void ImpalaServer::CatalogUpdateCallback(
 }
 
 void ImpalaServer::WaitForCatalogUpdate(const int64_t catalog_update_version,
-    const TUniqueId& catalog_service_id) {
+    const TUniqueId& catalog_service_id, RuntimeProfile::EventSequence* timeline) {
   unique_lock<mutex> unique_lock(catalog_version_lock_);
   // Wait for the update to be processed locally.
   VLOG_QUERY << "Waiting for catalog version: " << catalog_update_version
@@ -2203,14 +2203,17 @@ void ImpalaServer::WaitForCatalogUpdate(const int64_t catalog_update_version,
   }
 
   if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+    timeline->MarkEvent("Detected change in catalog service ID");
     VLOG_QUERY << "Detected change in catalog service ID";
   } else {
+    timeline->MarkEvent(Substitute("Received catalog version $0",
+        catalog_update_version));
     VLOG_QUERY << "Received catalog version: " << catalog_update_version;
   }
 }
 
 void ImpalaServer::WaitForCatalogUpdateTopicPropagation(
-    const TUniqueId& catalog_service_id) {
+    const TUniqueId& catalog_service_id, RuntimeProfile::EventSequence* timeline) {
   unique_lock<mutex> unique_lock(catalog_version_lock_);
   int64_t min_req_subscriber_topic_version =
       catalog_update_info_.catalog_topic_version;
@@ -2223,15 +2226,18 @@ void ImpalaServer::WaitForCatalogUpdateTopicPropagation(
   }
 
   if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+    timeline->MarkEvent("Detected change in catalog service ID");
     VLOG_QUERY << "Detected change in catalog service ID";
   } else {
+    timeline->MarkEvent(Substitute("Received min subscriber topic version $0",
+        min_req_subscriber_topic_version));
     VLOG_QUERY << "Received min subscriber topic version: "
         << min_req_subscriber_topic_version;
   }
 }
 
 void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_version,
-    const TUniqueId& catalog_service_id) {
+    const TUniqueId& catalog_service_id, RuntimeProfile::EventSequence* timeline) {
   unique_lock<mutex> unique_lock(catalog_version_lock_);
   int64_t catalog_object_version_lower_bound =
       catalog_update_info_.catalog_object_version_lower_bound;
@@ -2247,8 +2253,11 @@ void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_
   }
 
   if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+    timeline->MarkEvent("Detected change in catalog service ID");
     VLOG_QUERY << "Detected change in catalog service ID";
   } else {
+    timeline->MarkEvent(Substitute("Local min catalog version reached $0",
+        min_req_catalog_object_version));
     VLOG_QUERY << "Updated catalog object version lower bound: "
         << min_req_catalog_object_version;
   }
@@ -2256,7 +2265,7 @@ void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_
 
 Status ImpalaServer::ProcessCatalogUpdateResult(
     const TCatalogUpdateResult& catalog_update_result, bool wait_for_all_subscribers,
-    const TQueryOptions& query_options) {
+    const TQueryOptions& query_options, RuntimeProfile::EventSequence* timeline) {
   const TUniqueId& catalog_service_id = catalog_update_result.catalog_service_id;
   if (!catalog_update_result.__isset.updated_catalog_objects &&
       !catalog_update_result.__isset.removed_catalog_objects) {
@@ -2264,15 +2273,16 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     // 'catalog_update_result' to determine when the effects of this operation
     // have been applied to the local catalog cache.
     if (catalog_update_result.is_invalidate) {
-      WaitForMinCatalogUpdate(catalog_update_result.version, catalog_service_id);
+      WaitForMinCatalogUpdate(catalog_update_result.version, catalog_service_id,
+          timeline);
     } else {
-      WaitForCatalogUpdate(catalog_update_result.version, catalog_service_id);
+      WaitForCatalogUpdate(catalog_update_result.version, catalog_service_id, timeline);
     }
     if (wait_for_all_subscribers) {
       // Now wait for this update to be propagated to all catalog topic subscribers.
       // If we make it here it implies the first condition was met (the update was
       // processed locally or the catalog service id has changed).
-      WaitForCatalogUpdateTopicPropagation(catalog_service_id);
+      WaitForCatalogUpdateTopicPropagation(catalog_service_id, timeline);
     }
   } else {
     TUniqueId cur_service_id;
@@ -2304,6 +2314,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
       // Apply the changes to the local catalog cache.
       TUpdateCatalogCacheResponse resp;
       Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
+      timeline->MarkEvent("Applied catalog updates from DDL");
       if (!status.ok()) LOG(ERROR) << status.GetDetail();
       RETURN_IF_ERROR(status);
     } else {
@@ -2336,10 +2347,10 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     if (!wait_for_all_subscribers) return Status::OK();
     // Wait until we receive and process the catalog update that covers the effects
     // (catalog objects) of this operation.
-    WaitForCatalogUpdate(catalog_update_result.version, catalog_service_id);
+    WaitForCatalogUpdate(catalog_update_result.version, catalog_service_id, timeline);
     // Now wait for this update to be propagated to all catalog topic
     // subscribers.
-    WaitForCatalogUpdateTopicPropagation(catalog_service_id);
+    WaitForCatalogUpdateTopicPropagation(catalog_service_id, timeline);
   }
   return Status::OK();
 }

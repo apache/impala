@@ -228,6 +228,7 @@ import org.apache.impala.thrift.TResetMetadataResponse;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
@@ -245,6 +246,7 @@ import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.CatalogOpUtil;
 import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.DebugUtils;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
@@ -366,6 +368,27 @@ public class CatalogOpExecutor {
   // Table capabilities property name
   public static final String CAPABILITIES_KEY = "OBJCAPABILITIES";
 
+  // Labels used in catalog timelines
+  private static final String CHECKED_HMS_TABLE_EXISTENCE =
+      "Checked table existence in Metastore";
+  private static final String CREATED_HMS_TABLE = "Created table in Metastore";
+  private static final String CREATED_CATALOG_TABLE = "Created table in catalog cache";
+  private static final String CREATED_ICEBERG_TABLE =
+      "Created table using Iceberg Catalog ";
+  private static final String DDL_FINISHED = "DDL finished";
+  private static final String FETCHED_LATEST_HMS_EVENT_ID =
+      "Got current Metastore event id ";
+  private static final String FETCHED_HMS_EVENT_BATCH =
+      "Fetched event batch from Metastore";
+  private static final String FETCHED_HMS_TABLE = "Fetched table from Metastore";
+  private static final String GOT_METASTORE_DDL_LOCK = "Got metastoreDdlLock";
+  private static final String GOT_TABLE_WRITE_LOCK = "Got table write lock";
+  private static final String LOADED_ICEBERG_TABLE = "Loaded iceberg table";
+  private static final String SENT_CATALOG_FOR_SYNC_DDL =
+      "Sent catalog update for sync_ddl";
+  private static final String SET_ICEBERG_TABLE_OWNER =
+      "Set Iceberg table owner in Metastore";
+
   private final CatalogServiceCatalog catalog_;
   private final AuthorizationConfig authzConfig_;
   private final AuthorizationManager authzManager_;
@@ -395,6 +418,7 @@ public class CatalogOpExecutor {
 
   public TDdlExecResponse execDdlRequest(TDdlExecRequest ddlRequest)
       throws ImpalaException {
+    EventSequence catalogTimeline = new EventSequence("Catalog Server Operation");
     TDdlExecResponse response = new TDdlExecResponse();
     response.setResult(new TCatalogUpdateResult());
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
@@ -443,28 +467,29 @@ public class CatalogOpExecutor {
           tTableName = Optional.of(create_table_as_select_params.getTable_name());
           catalogOpMetric_.increment(ddl_type, tTableName);
           response.setNew_table_created(createTable(create_table_as_select_params,
-              response, syncDdl, wantMinimalResult));
+              response, catalogTimeline, syncDdl, wantMinimalResult));
           break;
         case CREATE_TABLE:
           TCreateTableParams create_table_params = ddlRequest.getCreate_table_params();
           tTableName = Optional.of((create_table_params.getTable_name()));
           catalogOpMetric_.increment(ddl_type, tTableName);
-          createTable(ddlRequest.getCreate_table_params(), response, syncDdl,
-              wantMinimalResult);
+          createTable(ddlRequest.getCreate_table_params(), response, catalogTimeline,
+              syncDdl, wantMinimalResult);
           break;
         case CREATE_TABLE_LIKE:
           TCreateTableLikeParams create_table_like_params =
               ddlRequest.getCreate_table_like_params();
           tTableName = Optional.of(create_table_like_params.getTable_name());
           catalogOpMetric_.increment(ddl_type, tTableName);
-          createTableLike(create_table_like_params, response, syncDdl, wantMinimalResult);
+          createTableLike(create_table_like_params, response, catalogTimeline, syncDdl,
+              wantMinimalResult);
           break;
         case CREATE_VIEW:
           TCreateOrAlterViewParams create_view_params =
               ddlRequest.getCreate_view_params();
           tTableName = Optional.of(create_view_params.getView_name());
           catalogOpMetric_.increment(ddl_type, tTableName);
-          createView(create_view_params, wantMinimalResult, response);
+          createView(create_view_params, wantMinimalResult, response, catalogTimeline);
           break;
         case CREATE_FUNCTION:
           catalogOpMetric_.increment(ddl_type, Optional.empty());
@@ -559,6 +584,7 @@ public class CatalogOpExecutor {
           throw new IllegalStateException(
               "Unexpected DDL exec request type: " + ddl_type);
       }
+      catalogTimeline.markEvent(DDL_FINISHED);
 
       // If SYNC_DDL is set, set the catalog update that contains the results of this DDL
       // operation. The version of this catalog update is returned to the requesting
@@ -567,8 +593,12 @@ public class CatalogOpExecutor {
       if (syncDdl) {
         response.getResult().setVersion(
             catalog_.waitForSyncDdlVersion(response.getResult()));
+        catalogTimeline.markEvent(SENT_CATALOG_FOR_SYNC_DDL);
       }
 
+      TRuntimeProfileNode profile = Frontend.createTRuntimeProfileNode("CatalogOp");
+      profile.addToEvent_sequences(catalogTimeline.toThrift());
+      response.setProfile(profile);
       // At this point, the operation is considered successful. If any errors occurred
       // during execution, this function will throw an exception and the CatalogServer
       // will handle setting a bad status code.
@@ -2054,9 +2084,22 @@ public class CatalogOpExecutor {
    */
   private List<NotificationEvent> getNextMetastoreEventsIfEnabled(long eventId,
       NotificationFilter eventsFilter) throws MetastoreNotificationException {
+    return getNextMetastoreEventsIfEnabled(null, eventId, eventsFilter);
+  }
+
+  /**
+   * Same as the above but also update the given 'catalogTimeline'.
+   */
+  private List<NotificationEvent> getNextMetastoreEventsIfEnabled(
+      EventSequence catalogTimeline, long eventId, NotificationFilter eventsFilter)
+      throws MetastoreNotificationException {
     if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
-    return MetastoreEventsProcessor
+    List<NotificationEvent> events = MetastoreEventsProcessor
         .getNextMetastoreEventsInBatches(catalog_, eventId, eventsFilter);
+    if (catalogTimeline != null) {
+      catalogTimeline.markEvent(FETCHED_HMS_EVENT_BATCH);
+    }
+    return events;
   }
 
   /**
@@ -2230,8 +2273,20 @@ public class CatalogOpExecutor {
    * Returns the latest notification event id from the Hive metastore.
    */
   private long getCurrentEventId(MetaStoreClient msClient) throws ImpalaRuntimeException {
+    return getCurrentEventId(msClient, null);
+  }
+
+  /**
+   * Same as the above but also update the given 'catalogTimeline'.
+   */
+  private long getCurrentEventId(MetaStoreClient msClient, EventSequence catalogTimeline)
+      throws ImpalaRuntimeException {
     try {
-      return msClient.getHiveClient().getCurrentNotificationEventId().getEventId();
+      long id = msClient.getHiveClient().getCurrentNotificationEventId().getEventId();
+      if (catalogTimeline != null) {
+        catalogTimeline.markEvent(FETCHED_LATEST_HMS_EVENT_ID + id);
+      }
+      return id;
     } catch (TException e) {
       throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
           "getCurrentNotificationEventId") + e
@@ -3290,7 +3345,8 @@ public class CatalogOpExecutor {
    * otherwise.
    */
   private boolean createTable(TCreateTableParams params, TDdlExecResponse response,
-      boolean syncDdl, boolean wantMinimalResult) throws ImpalaException {
+      EventSequence catalogTimeline, boolean syncDdl, boolean wantMinimalResult)
+      throws ImpalaException {
     Preconditions.checkNotNull(params);
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
@@ -3306,6 +3362,7 @@ public class CatalogOpExecutor {
       LOG.trace("Skipping table creation because {} already exists and " +
           "IF NOT EXISTS was specified.", tableName);
       tryWriteLock(existingTbl);
+      catalogTimeline.markEvent(GOT_TABLE_WRITE_LOCK);
       try {
         if (syncDdl) {
           // When SYNC_DDL is enabled and the table already exists, we force a version
@@ -3334,18 +3391,18 @@ public class CatalogOpExecutor {
     org.apache.hadoop.hive.metastore.api.Table tbl = createMetaStoreTable(params);
     LOG.trace("Creating table {}", tableName);
     if (KuduTable.isKuduTable(tbl)) {
-      return createKuduTable(tbl, params, wantMinimalResult, response);
+      return createKuduTable(tbl, params, wantMinimalResult, response, catalogTimeline);
     } else if (IcebergTable.isIcebergTable(tbl)) {
-      return createIcebergTable(tbl, wantMinimalResult, response, params.if_not_exists,
-          params.getColumns(), params.getPartition_spec(), params.getTable_properties(),
-          params.getComment());
+      return createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,
+          params.if_not_exists, params.getColumns(), params.getPartition_spec(),
+          params.getTable_properties(), params.getComment());
     }
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
     MetastoreShim.setTableLocation(catalog_.getDb(tbl.getDbName()), tbl);
     return createTable(tbl, params.if_not_exists, params.getCache_op(),
         params.server_name, params.getPrimary_keys(), params.getForeign_keys(),
-        wantMinimalResult, response);
+        wantMinimalResult, response, catalogTimeline);
   }
 
   /**
@@ -3453,42 +3510,44 @@ public class CatalogOpExecutor {
    * table was created as part of this call, false otherwise.
    */
   private boolean createKuduTable(org.apache.hadoop.hive.metastore.api.Table newTable,
-      TCreateTableParams params, boolean wantMinimalResult, TDdlExecResponse response)
-      throws ImpalaException {
+      TCreateTableParams params, boolean wantMinimalResult, TDdlExecResponse response,
+      EventSequence catalogTimeline) throws ImpalaException {
     Preconditions.checkState(KuduTable.isKuduTable(newTable));
     boolean createHMSTable;
     long eventId;
-    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      eventId = getCurrentEventId(msClient);
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
+      eventId = getCurrentEventId(msClient, catalogTimeline);
     }
     if (!KuduTable.isSynchronizedTable(newTable)) {
       // if this is not a synchronized table, we assume that the table must be existing
       // in kudu and use the column spec from Kudu
-      KuduCatalogOpExecutor.populateExternalTableColsFromKudu(newTable);
+      KuduCatalogOpExecutor.populateExternalTableColsFromKudu(catalogTimeline, newTable);
       createHMSTable = true;
     } else {
       // if this is a synchronized table (managed or external.purge table) then we
       // create it in Kudu first
-      KuduCatalogOpExecutor.createSynchronizedTable(newTable, params);
+      KuduCatalogOpExecutor.createSynchronizedTable(catalogTimeline, newTable, params);
       createHMSTable = !isKuduHmsIntegrationEnabled(newTable);
     }
     try {
       // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
       // ensure the atomicity of these operations.
-      List<NotificationEvent> events = Collections.EMPTY_LIST;
-      getMetastoreDdlLock().lock();
+      List<NotificationEvent> events = Collections.emptyList();
+      acquireMetastoreDdlLock(catalogTimeline);
       if (createHMSTable) {
-        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
           boolean tableInMetastore =
               msClient.getHiveClient().tableExists(newTable.getDbName(),
                                                    newTable.getTableName());
+          catalogTimeline.markEvent(CHECKED_HMS_TABLE_EXISTENCE);
           if (!tableInMetastore) {
             msClient.getHiveClient().createTable(newTable);
+            catalogTimeline.markEvent(CREATED_HMS_TABLE);
           } else {
             addSummary(response, "Table already exists.");
             return false;
           }
-          events = getNextMetastoreEventsIfEnabled(eventId,
+          events = getNextMetastoreEventsIfEnabled(catalogTimeline, eventId,
                   event -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
                       .equals(event.getEventType())
                       && newTable.getDbName().equalsIgnoreCase(event.getDbName())
@@ -3505,12 +3564,13 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTable =
           eventTblPair == null ? null : eventTblPair.second;
       setTableNameAndCreateTimeInResponse(msTable,
-          newTable.getDbName(), newTable.getTableName(), response);
+          newTable.getDbName(), newTable.getTableName(), response, catalogTimeline);
 
       // Add the table to the catalog cache
       Table newTbl = catalog_
           .addIncompleteTable(newTable.getDbName(), newTable.getTableName(),
               TImpalaTableType.TABLE, params.getComment(), createEventId);
+      catalogTimeline.markEvent(CREATED_CATALOG_TABLE);
       LOG.debug("Created a Kudu table {} with create event id {}", newTbl.getFullName(),
           createEventId);
       addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
@@ -3551,26 +3611,28 @@ public class CatalogOpExecutor {
   private boolean createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
       boolean if_not_exists, THdfsCachingOp cacheOp, String serverName,
       List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys,
-      boolean wantMinimalResult, TDdlExecResponse response) throws ImpalaException {
+      boolean wantMinimalResult, TDdlExecResponse response, EventSequence catalogTimeline)
+      throws ImpalaException {
     Preconditions.checkState(!KuduTable.isKuduTable(newTable));
-    getMetastoreDdlLock().lock();
+    acquireMetastoreDdlLock(catalogTimeline);
     try {
       org.apache.hadoop.hive.metastore.api.Table msTable;
       Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventIdTblPair = null;
-      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-        long eventId = getCurrentEventId(msClient);
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
+        long eventId = getCurrentEventId(msClient, catalogTimeline);
         if (primaryKeys == null && foreignKeys == null) {
           msClient.getHiveClient().createTable(newTable);
         } else {
           MetastoreShim.createTableWithConstraints(
               msClient.getHiveClient(), newTable,
-              primaryKeys == null ? new ArrayList<>() : primaryKeys,
-              foreignKeys == null ? new ArrayList<>() : foreignKeys);
+              primaryKeys == null ? Collections.emptyList() : primaryKeys,
+              foreignKeys == null ? Collections.emptyList() : foreignKeys);
         }
-
+        catalogTimeline.markEvent(CREATED_HMS_TABLE);
         addSummary(response, "Table has been created.");
         final org.apache.hadoop.hive.metastore.api.Table finalNewTable = newTable;
-        List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(eventId,
+        List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(
+            catalogTimeline, eventId,
             notificationEvent -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
                 .equals(notificationEvent.getEventType())
                 && finalNewTable.getDbName()
@@ -3583,10 +3645,11 @@ public class CatalogOpExecutor {
           // not atomic.
           eventIdTblPair = new Pair<>(-1L, msClient.getHiveClient()
               .getTable(newTable.getDbName(), newTable.getTableName()));
+          catalogTimeline.markEvent(FETCHED_HMS_TABLE);
         }
         msTable = eventIdTblPair.second;
         setTableNameAndCreateTimeInResponse(msTable, newTable.getDbName(),
-            newTable.getTableName(), response);
+            newTable.getTableName(), response, catalogTimeline);
         // For external tables set table location needed for lineage generation.
         if (newTable.getTableType() == TableType.EXTERNAL_TABLE.toString()) {
           String tableLocation = newTable.getSd().getLocation();
@@ -3611,6 +3674,7 @@ public class CatalogOpExecutor {
           MetadataOp.getTableComment(msTable),
           eventIdTblPair.first);
       Preconditions.checkNotNull(newTbl);
+      catalogTimeline.markEvent(CREATED_CATALOG_TABLE);
       LOG.debug("Created catalog table {} with create event id {}", newTbl.getFullName(),
           eventIdTblPair.first);
       // Submit the cache request and update the table metadata.
@@ -3651,10 +3715,12 @@ public class CatalogOpExecutor {
    */
   private void setTableNameAndCreateTimeInResponse(
       org.apache.hadoop.hive.metastore.api.Table msTable, String dbName, String tblName,
-      TDdlExecResponse response) throws org.apache.thrift.TException {
+      TDdlExecResponse response, EventSequence catalogTimeline)
+      throws org.apache.thrift.TException {
     if (msTable == null) {
-      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
         msTable = msClient.getHiveClient().getTable(dbName, tblName);
+        catalogTimeline.markEvent(FETCHED_HMS_TABLE + " to get create time");
       }
     }
     response.setTable_name(dbName + "." + tblName);
@@ -3667,9 +3733,9 @@ public class CatalogOpExecutor {
    * exceptions encountered during the create.
    */
   private void createView(TCreateOrAlterViewParams params, boolean wantMinimalResult,
-      TDdlExecResponse response) throws ImpalaException {
+      TDdlExecResponse response, EventSequence catalogTimeline) throws ImpalaException {
     TableName tableName = TableName.fromThrift(params.getView_name());
-    Preconditions.checkState(tableName != null && tableName.isFullyQualified());
+    Preconditions.checkState(tableName.isFullyQualified());
     Preconditions.checkState(params.getColumns() != null &&
         params.getColumns().size() > 0,
           "Null or empty column list given as argument to DdlExecutor.createView");
@@ -3687,8 +3753,9 @@ public class CatalogOpExecutor {
         new org.apache.hadoop.hive.metastore.api.Table();
     setCreateViewAttributes(params, view);
     LOG.trace(String.format("Creating view %s", tableName));
-    if (!createTable(view, params.if_not_exists, null, params.server_name,
-        new ArrayList<>(), new ArrayList<>(), wantMinimalResult, response)) {
+    if (!createTable(view, params.if_not_exists, /*cacheOp*/null, params.server_name,
+        /*primaryKeys*/null, /*foreignKeys*/null, wantMinimalResult, response,
+        catalogTimeline)) {
       addSummary(response, "View already exists.");
     } else {
       addSummary(response, "View has been created.");
@@ -3699,8 +3766,8 @@ public class CatalogOpExecutor {
    * Creates a new Iceberg table.
    */
   private boolean createIcebergTable(org.apache.hadoop.hive.metastore.api.Table newTable,
-      boolean wantMinimalResult, TDdlExecResponse response, boolean ifNotExists,
-      List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
+      boolean wantMinimalResult, TDdlExecResponse response, EventSequence catalogTimeline,
+      boolean ifNotExists, List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
       Map<String, String> tableProperties, String tblComment) throws ImpalaException {
     Preconditions.checkState(IcebergTable.isIcebergTable(newTable));
 
@@ -3708,13 +3775,14 @@ public class CatalogOpExecutor {
     try {
       // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
       // ensure the atomicity of these operations.
-      List<NotificationEvent> events = Collections.emptyList();
-      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      List<NotificationEvent> events;
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
         boolean tableInMetastore =
             msClient.getHiveClient().tableExists(newTable.getDbName(),
                 newTable.getTableName());
+        catalogTimeline.markEvent(CHECKED_HMS_TABLE_EXISTENCE);
         if (!tableInMetastore) {
-          long eventId = getCurrentEventId(msClient);
+          long eventId = getCurrentEventId(msClient, catalogTimeline);
           TIcebergCatalog catalog = IcebergUtil.getTIcebergCatalog(newTable);
           String location = newTable.getSd().getLocation();
           //Create table in iceberg if necessary
@@ -3737,6 +3805,7 @@ public class CatalogOpExecutor {
                 IcebergUtil.getIcebergTableIdentifier(newTable), location, columns,
                 partitionSpec, tableProperties).location();
             newTable.getSd().setLocation(tableLoc);
+            catalogTimeline.markEvent(CREATED_ICEBERG_TABLE + catalog.name());
           } else {
             // If this is not a synchronized table, we assume that the table must be
             // existing in an Iceberg Catalog.
@@ -3758,6 +3827,7 @@ public class CatalogOpExecutor {
             TableIdentifier identifier = IcebergUtil.getIcebergTableIdentifier(newTable);
             org.apache.iceberg.Table iceTable = IcebergUtil.loadTable(
                 catalog, identifier, locationToLoadFrom, newTable.getParameters());
+            catalogTimeline.markEvent(LOADED_ICEBERG_TABLE);
             // Populate the HMS table schema based on the Iceberg table's schema because
             // the Iceberg metadata is the source of truth. This also avoids an
             // unnecessary ALTER TABLE.
@@ -3776,8 +3846,9 @@ public class CatalogOpExecutor {
               newTable.getPartitionKeys().isEmpty());
           if (!isIcebergHmsIntegrationEnabled(newTable)) {
             msClient.getHiveClient().createTable(newTable);
+            catalogTimeline.markEvent(CREATED_HMS_TABLE);
           }
-          events = getNextMetastoreEventsIfEnabled(eventId, event ->
+          events = getNextMetastoreEventsIfEnabled(catalogTimeline, eventId, event ->
               CreateTableEvent.CREATE_TABLE_EVENT_TYPE.equals(event.getEventType())
                   && newTable.getDbName().equalsIgnoreCase(event.getDbName())
                   && newTable.getTableName().equalsIgnoreCase(event.getTableName()));
@@ -3792,11 +3863,12 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTable =
           eventTblPair == null ? null : eventTblPair.second;
       setTableNameAndCreateTimeInResponse(msTable,
-          newTable.getDbName(), newTable.getTableName(), response);
+          newTable.getDbName(), newTable.getTableName(), response, catalogTimeline);
       // Add the table to the catalog cache
       Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
           newTable.getTableName(), TImpalaTableType.TABLE, tblComment,
           createEventId);
+      catalogTimeline.markEvent(CREATED_CATALOG_TABLE);
       LOG.debug("Created an iceberg table {} in catalog with create event Id {} ",
           newTbl.getFullName(), createEventId);
       addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
@@ -3808,6 +3880,7 @@ public class CatalogOpExecutor {
         // extra "ALTER TABLE SET OWNER" step is required.
         setIcebergTableOwnerAfterCreateTable(newTable.getDbName(),
             newTable.getTableName(), newTable.getOwner());
+        catalogTimeline.markEvent(SET_ICEBERG_TABLE_OWNER);
         LOG.debug("Table owner has been changed to " + newTable.getOwner());
       } catch (Exception e) {
         LOG.warn("Failed to set table owner after creating " +
@@ -3852,7 +3925,8 @@ public class CatalogOpExecutor {
    * @param  syncDdl tells is SYNC_DDL is enabled for this DDL request.
    */
   private void createTableLike(TCreateTableLikeParams params, TDdlExecResponse response,
-      boolean syncDdl, boolean wantMinimalResult) throws ImpalaException {
+      EventSequence catalogTimeline, boolean syncDdl, boolean wantMinimalResult)
+      throws ImpalaException {
     Preconditions.checkNotNull(params);
     THdfsFileFormat fileFormat =
         params.isSetFile_format() ? params.getFile_format() : null;
@@ -3985,16 +4059,18 @@ public class CatalogOpExecutor {
       for (Column col: srcIceTable.getColumns()) columns.add(col.toThrift());
       TIcebergPartitionSpec partitionSpec = srcIceTable.getDefaultPartitionSpec()
           .toThrift();
-      createIcebergTable(tbl, wantMinimalResult, response, params.if_not_exists, columns,
-          partitionSpec, tableProperties, params.getComment());
+      createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,
+          params.if_not_exists, columns, partitionSpec, tableProperties,
+          params.getComment());
     } else if (srcTable instanceof KuduTable && KuduTable.isKuduTable(tbl)) {
       TCreateTableParams createTableParams =
           extractKuduCreateTableParams(params, tblName, (KuduTable) srcTable, tbl);
-      createKuduTable(tbl, createTableParams, wantMinimalResult, response);
+      createKuduTable(tbl, createTableParams, wantMinimalResult, response,
+          catalogTimeline);
     } else {
       MetastoreShim.setTableLocation(catalog_.getDb(tbl.getDbName()), tbl);
       createTable(tbl, params.if_not_exists, null, params.server_name, null, null,
-          wantMinimalResult, response);
+          wantMinimalResult, response, catalogTimeline);
     }
   }
 
@@ -4868,6 +4944,14 @@ public class CatalogOpExecutor {
 
   public ReentrantLock getMetastoreDdlLock() {
     return metastoreDdlLock_;
+  }
+
+  /**
+   * Acquires 'metastoreDdlLock_' and also updates 'catalogTimeline' when it's done.
+   */
+  private void acquireMetastoreDdlLock(EventSequence catalogTimeline) {
+    metastoreDdlLock_.lock();
+    catalogTimeline.markEvent(GOT_METASTORE_DDL_LOCK);
   }
 
   /**
