@@ -168,8 +168,8 @@ union all
 (select count(*) from alltypes_datasource
 where smallint_col IS DISTINCT FROM 11 and tinyint_col IS DISTINCT FROM 1)
 ---- RESULTS
-4096
-4096
+4500
+4500
 ---- TYPES
 BIGINT
 ====

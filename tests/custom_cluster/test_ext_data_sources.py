@@ -43,3 +43,17 @@ class TestExtDataSources(CustomClusterTestSuite):
   def test_jdbc_data_source(self, vector, unique_database):
     """Start Impala cluster in LocalCatalog Mode"""
     self.run_test_case('QueryTest/jdbc-data-source', vector, use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args='--data_source_batch_size=2048')
+  def test_data_source_big_batch_size(self, vector, unique_database):
+    """Run test with batch size greater than default size 1024"""
+    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args='--data_source_batch_size=512')
+  def test_data_source_small_batch_size(self, vector, unique_database):
+    """Run test with batch size less than default size 1024"""
+    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
