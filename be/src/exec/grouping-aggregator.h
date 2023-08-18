@@ -192,8 +192,7 @@ class GroupingAggregatorConfig : public AggregatorConfig {
 class GroupingAggregator : public Aggregator {
  public:
   GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-      const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
-      bool needUnsetLimit);
+      const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality);
 
   virtual Status Prepare(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
@@ -214,8 +213,6 @@ class GroupingAggregator : public Aggregator {
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;
 
   virtual int64_t GetNumKeys() const override;
-
-  void UnsetLimit() { limit_ = -1; }
 
  private:
   struct Partition;

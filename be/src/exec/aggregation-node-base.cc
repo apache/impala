@@ -82,8 +82,7 @@ AggregationNodeBase::AggregationNodeBase(
           static_cast<const GroupingAggregatorConfig*>(agg);
       DCHECK(grouping_config != nullptr);
       node.reset(new GroupingAggregator(this, pool_, *grouping_config,
-          pnode.tnode_->agg_node.estimated_input_cardinality,
-          pnode.tnode_->agg_node.fast_limit_check));
+          pnode.tnode_->agg_node.estimated_input_cardinality));
     }
     aggs_.push_back(std::move(node));
     runtime_profile_->AddChild(aggs_[i]->runtime_profile());

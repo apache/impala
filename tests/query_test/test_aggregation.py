@@ -24,6 +24,7 @@ import pytest
 from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
+    ALL_CLUSTER_SIZES,
     create_exec_option_dimension,
     create_exec_option_dimension_from_dict,
     create_uncompressed_text_dimension)
@@ -91,7 +92,7 @@ class TestAggregation(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestAggregation, cls).add_test_dimensions()
+    super(TestAggregation, cls).add_test_dimensions(ALL_CLUSTER_SIZES)
 
     # Add two more dimensions
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('agg_func', *AGG_FUNCTIONS))
@@ -390,6 +391,21 @@ class TestAggregationQueries(ImpalaTestSuite):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - HBase null handling is inconsistent")
     self.run_test_case('QueryTest/grouping-sets', vector)
+
+  def test_aggregation_limit(self, vector):
+    """Test that limits are honoured when enforced by aggregation node."""
+    # 1-phase
+    result = self.execute_query(
+        "select distinct l_orderkey from tpch.lineitem limit 10",
+        vector.get_value('exec_option'))
+    assert len(result.data) == 10
+
+    # 2-phase with transpose
+    result = self.execute_query(
+        "select count(distinct l_discount), group_concat(distinct l_linestatus), "
+        "max(l_quantity) from tpch.lineitem group by l_tax, l_shipmode limit 10;",
+        vector.get_value('exec_option'))
+    assert len(result.data) == 10
 
 
 class TestDistinctAggregation(ImpalaTestSuite):

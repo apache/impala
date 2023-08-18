@@ -203,9 +203,8 @@ def orc_schema_resolution_constraint(v):
 # Common sets of values for the exec option vectors
 ALL_BATCH_SIZES = [0]
 
-# Don't run with NUM_NODES=1 due to IMPALA-561
-# ALL_CLUSTER_SIZES = [0, 1]
-ALL_CLUSTER_SIZES = [0]
+# Test SingleNode and Distributed Planners
+ALL_CLUSTER_SIZES = [0, 1]
 
 SINGLE_NODE_ONLY = [1]
 ALL_NODES_ONLY = [0]
@@ -219,7 +218,9 @@ def create_single_exec_option_dimension(num_nodes=0, disable_codegen_rows_thresh
       disable_codegen_rows_threshold_options=[disable_codegen_rows_threshold],
       batch_sizes=[0])
 
-def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
+
+# TODO IMPALA-12394: switch to ALL_CLUSTER_SIZES
+def create_exec_option_dimension(cluster_sizes=ALL_NODES_ONLY,
                                  disable_codegen_options=ALL_DISABLE_CODEGEN_OPTIONS,
                                  batch_sizes=ALL_BATCH_SIZES,
                                  sync_ddl=None, exec_single_node_option=[0],

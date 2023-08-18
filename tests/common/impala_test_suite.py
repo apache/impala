@@ -48,7 +48,6 @@ from tests.common.impala_connection import create_connection
 from tests.common.impala_service import ImpaladService
 from tests.common.test_dimensions import (
     ALL_BATCH_SIZES,
-    ALL_CLUSTER_SIZES,
     ALL_DISABLE_CODEGEN_OPTIONS,
     ALL_NODES_ONLY,
     TableFormatInfo,
@@ -166,7 +165,7 @@ GROUP_NAME = grp.getgrgid(pwd.getpwnam(getuser()).pw_gid).gr_name
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
   @classmethod
-  def add_test_dimensions(cls):
+  def add_test_dimensions(cls, cluster_sizes=None):
     """
     A hook for adding additional dimensions.
 
@@ -176,7 +175,10 @@ class ImpalaTestSuite(BaseTestSuite):
     super(ImpalaTestSuite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         cls.create_table_info_dimension(cls.exploration_strategy()))
-    cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension())
+    if not cluster_sizes:
+      # TODO IMPALA-12394: switch to ALL_CLUSTER_SIZES for exhaustive runs
+      cluster_sizes = ALL_NODES_ONLY
+    cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension(cluster_sizes))
     # Execute tests through Beeswax by default. Individual tests that have been converted
     # to work with the HS2 client can add HS2 in addition to or instead of beeswax.
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol', 'beeswax'))
@@ -1081,14 +1083,12 @@ class ImpalaTestSuite(BaseTestSuite):
     return tf_dimensions
 
   @classmethod
-  def __create_exec_option_dimension(cls):
-    cluster_sizes = ALL_CLUSTER_SIZES
+  def __create_exec_option_dimension(cls, cluster_sizes):
     disable_codegen_options = ALL_DISABLE_CODEGEN_OPTIONS
     batch_sizes = ALL_BATCH_SIZES
     exec_single_node_option = [0]
     if cls.exploration_strategy() == 'core':
       disable_codegen_options = [False]
-      cluster_sizes = ALL_NODES_ONLY
     return create_exec_option_dimension(cluster_sizes, disable_codegen_options,
                                         batch_sizes,
                                         exec_single_node_option=exec_single_node_option,

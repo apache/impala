@@ -133,8 +133,7 @@ static const int STREAMING_HT_MIN_REDUCTION_SIZE =
     sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
 
 GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-    const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
-    bool needUnsetLimit)
+    const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality)
   : Aggregator(exec_node, pool, config,
       Substitute("$0$1", RuntimeProfile::PREFIX_GROUPING_AGGREGATOR, config.agg_idx_)),
     hash_table_config_(*config.hash_table_config_),
@@ -152,9 +151,6 @@ GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
     estimated_input_cardinality_(estimated_input_cardinality),
     partition_pool_(new ObjectPool()) {
   DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
-  if (needUnsetLimit) {
-    UnsetLimit();
-  }
 }
 
 Status GroupingAggregator::Prepare(RuntimeState* state) {
