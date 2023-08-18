@@ -218,33 +218,33 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
   // Initialize resource tracking counters.
   if (query_ctx().trace_resource_usage) {
     SystemStateInfo* system_state_info = exec_env->system_state_info();
-    host_profile_->AddChunkedTimeSeriesCounter(
+    host_profile_->AddSamplingTimeSeriesCounter(
         "HostCpuUserPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
         return system_state_info->GetCpuUsageRatios().user;
         });
-    host_profile_->AddChunkedTimeSeriesCounter(
+    host_profile_->AddSamplingTimeSeriesCounter(
         "HostCpuSysPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
         return system_state_info->GetCpuUsageRatios().system;
         });
-    host_profile_->AddChunkedTimeSeriesCounter(
+    host_profile_->AddSamplingTimeSeriesCounter(
         "HostCpuIoWaitPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
         return system_state_info->GetCpuUsageRatios().iowait;
         });
     // Add network usage
-    host_profile_->AddChunkedTimeSeriesCounter(
+    host_profile_->AddSamplingTimeSeriesCounter(
         "HostNetworkRx", TUnit::BYTES_PER_SECOND, [system_state_info] () {
         return system_state_info->GetNetworkUsage().rx_rate;
         });
-    host_profile_->AddChunkedTimeSeriesCounter(
+    host_profile_->AddSamplingTimeSeriesCounter(
         "HostNetworkTx", TUnit::BYTES_PER_SECOND, [system_state_info] () {
         return system_state_info->GetNetworkUsage().tx_rate;
         });
     // Add disk stats
-    host_profile_->AddChunkedTimeSeriesCounter(
+    host_profile_->AddSamplingTimeSeriesCounter(
         "HostDiskReadThroughput", TUnit::BYTES_PER_SECOND, [system_state_info] () {
         return system_state_info->GetDiskStats().read_rate;
         });
-    host_profile_->AddChunkedTimeSeriesCounter(
+    host_profile_->AddSamplingTimeSeriesCounter(
         "HostDiskWriteThroughput", TUnit::BYTES_PER_SECOND, [system_state_info] () {
         return system_state_info->GetDiskStats().write_rate;
         });

@@ -39,6 +39,11 @@ namespace impala {
 /// future stale samples from polluting the useful values.
 class PeriodicCounterUpdater {
  public:
+
+  PeriodicCounterUpdater(const int32_t update_period)
+    : update_period_(update_period) {
+  }
+
   enum PeriodicCounterType {
     RATE_COUNTER = 0,
     SAMPLING_COUNTER,
@@ -52,7 +57,7 @@ class PeriodicCounterUpdater {
   /// Registers an update function that will be called before individual counters will be
   /// updated. This can be used to update some global metric once before reading it
   /// through individual counters.
-  static void RegisterUpdateFunction(UpdateFn update_fn);
+  static void RegisterUpdateFunction(UpdateFn update_fn, bool is_system);
 
   /// Registers a periodic counter to be updated by the update thread.
   /// Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
@@ -80,7 +85,8 @@ class PeriodicCounterUpdater {
   /// convert the buckets from count to percentage. If not registered, has no effect.
   /// Perioidic counters are updated periodically so should be removed as soon as the
   /// underlying counter is no longer going to change.
-  static void StopBucketingCounters(std::vector<RuntimeProfile::Counter*>* buckets);
+  static void StopBucketingCounters(std::vector<RuntimeProfile::Counter*>* buckets,
+      bool is_system = false);
 
   /// Stops 'counter' from receiving any more samples.
   static void StopTimeSeriesCounter(RuntimeProfile::TimeSeriesCounter* counter);
@@ -107,7 +113,7 @@ class PeriodicCounterUpdater {
 
   /// Loop for periodic counter update thread.  This thread wakes up once in a while
   /// and updates all the added rate counters and sampling counters.
-  [[noreturn]] void UpdateLoop();
+  [[noreturn]] void UpdateLoop(PeriodicCounterUpdater* instance);
 
   /// Thread performing asynchronous updates.
   boost::scoped_ptr<boost::thread> update_thread_;
@@ -149,8 +155,14 @@ class PeriodicCounterUpdater {
   typedef boost::unordered_set<RuntimeProfile::TimeSeriesCounter*> TimeSeriesCounters;
   TimeSeriesCounters time_series_counters_;
 
-  /// Singleton object that keeps track of all rate counters and the thread
-  /// for updating them.
+  /// Singleton object that keeps track of all profile rate counters and the thread
+  /// for updating them. Interval set by flag periodic_counter_update_period_ms.
   static PeriodicCounterUpdater* instance_;
+
+  /// Singleton object that keeps track of all system rate counters and the thread
+  /// for updating them. Interval set by flag periodic_system_counter_update_period_ms.
+  static PeriodicCounterUpdater* system_instance_;
+
+  int32_t update_period_;
 };
 }

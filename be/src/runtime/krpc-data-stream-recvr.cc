@@ -707,7 +707,7 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
   // Initialize various counters for measuring dequeuing from queues.
   bytes_dequeued_counter_ =
       ADD_COUNTER(dequeue_profile_, "TotalBytesDequeued", TUnit::BYTES);
-  bytes_dequeued_time_series_counter_ = ADD_TIME_SERIES_COUNTER(
+  bytes_dequeued_time_series_counter_ = ADD_SYSTEM_TIME_SERIES_COUNTER(
       dequeue_profile_, "BytesDequeued", bytes_dequeued_counter_);
   queue_get_batch_timer_ = ADD_TIMER(dequeue_profile_, "TotalGetBatchTime");
   data_wait_timer_ =
@@ -719,7 +719,7 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
   // Initialize various counters for measuring enqueuing into queues.
   bytes_received_counter_ =
       ADD_COUNTER(enqueue_profile_, "TotalBytesReceived", TUnit::BYTES);
-  bytes_received_time_series_counter_ = ADD_TIME_SERIES_COUNTER(
+  bytes_received_time_series_counter_ = ADD_SYSTEM_TIME_SERIES_COUNTER(
       enqueue_profile_, "BytesReceived", bytes_received_counter_);
   deserialize_row_batch_timer_ =
       ADD_TIMER(enqueue_profile_, "DeserializeRowBatchTime");
@@ -735,7 +735,7 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
       ADD_COUNTER(enqueue_profile_, "TotalRPCsDeferred", TUnit::UNIT);
   deferred_rpcs_time_series_counter_ =
       enqueue_profile_->AddSamplingTimeSeriesCounter("DeferredQueueSize", TUnit::UNIT,
-      bind<int64_t>(mem_fn(&KrpcDataStreamRecvr::num_deferred_rpcs), this));
+      bind<int64_t>(mem_fn(&KrpcDataStreamRecvr::num_deferred_rpcs), this), true);
   total_has_deferred_rpcs_timer_ =
       ADD_TIMER(enqueue_profile_, "TotalHasDeferredRPCsTime");
   dispatch_timer_ =

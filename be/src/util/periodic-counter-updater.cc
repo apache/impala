@@ -26,25 +26,43 @@ namespace posix_time = boost::posix_time;
 using boost::get_system_time;
 using boost::system_time;
 
-// Period to update rate counters and sampling counters in ms.
-DEFINE_int32(periodic_counter_update_period_ms, 500, "Period to update rate counters and"
-    " sampling counters in ms");
+// Period to update query profile rate counters and sampling counters in ms.
+DEFINE_int32(periodic_counter_update_period_ms, 50, "Period to update"
+    " query profile rate counters and sampling counters in ms");
+
+// Period to update system-level rate counters and sampling counters in ms.
+DEFINE_int32(periodic_system_counter_update_period_ms, 500, "Period to update"
+    " system-level rate counters and sampling counters in ms");
 
 namespace impala {
 
+// Updater for profile counters
 PeriodicCounterUpdater* PeriodicCounterUpdater::instance_ = nullptr;
 
+// Updater for system counters
+PeriodicCounterUpdater* PeriodicCounterUpdater::system_instance_ = nullptr;
+
 void PeriodicCounterUpdater::Init() {
-  DCHECK(instance_ == nullptr);
-  // Create the singleton, which will live until the process terminates.
-  instance_ = new PeriodicCounterUpdater;
+  DCHECK(instance_ == nullptr && system_instance_ == nullptr);
+  // Create two singletons, which will live until the process terminates.
+  instance_ = new PeriodicCounterUpdater(FLAGS_periodic_counter_update_period_ms);
+
   instance_->update_thread_.reset(
-      new thread(&PeriodicCounterUpdater::UpdateLoop, instance_));
+      new thread(boost::bind(&PeriodicCounterUpdater::UpdateLoop, instance_, instance_)));
+
+  system_instance_ =
+      new PeriodicCounterUpdater(FLAGS_periodic_system_counter_update_period_ms);
+
+  system_instance_->update_thread_.reset(
+      new thread(boost::bind(&PeriodicCounterUpdater::UpdateLoop, system_instance_,
+          system_instance_)));
+
 }
 
-void PeriodicCounterUpdater::RegisterUpdateFunction(UpdateFn update_fn) {
-  lock_guard<SpinLock> l(instance_->update_fns_lock_);
-  instance_->update_fns_.push_back(update_fn);
+void PeriodicCounterUpdater::RegisterUpdateFunction(UpdateFn update_fn, bool is_system) {
+  PeriodicCounterUpdater* instance = is_system ? system_instance_ : instance_;
+  lock_guard<SpinLock> l(instance->update_fns_lock_);
+  instance->update_fns_.push_back(update_fn);
 }
 
 void PeriodicCounterUpdater::RegisterPeriodicCounter(
@@ -52,6 +70,9 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
     RuntimeProfile::SampleFunction sample_fn,
     RuntimeProfile::Counter* dst_counter, PeriodicCounterType type) {
   DCHECK(src_counter == NULL || sample_fn == NULL);
+  DCHECK(src_counter == NULL || src_counter->GetIsSystem() == dst_counter->GetIsSystem());
+  PeriodicCounterUpdater* instance = dst_counter->GetIsSystem() ?
+      system_instance_ : instance_;
 
   switch (type) {
     case RATE_COUNTER: {
@@ -59,8 +80,8 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
       counter.src_counter = src_counter;
       counter.sample_fn = sample_fn;
       counter.elapsed_ms = 0;
-      lock_guard<SpinLock> ratelock(instance_->rate_lock_);
-      instance_->rate_counters_[dst_counter] = counter;
+      lock_guard<SpinLock> ratelock(instance->rate_lock_);
+      instance->rate_counters_[dst_counter] = counter;
       break;
     }
     case SAMPLING_COUNTER: {
@@ -69,8 +90,8 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
       counter.sample_fn = sample_fn;
       counter.num_sampled = 0;
       counter.total_sampled_value = 0;
-      lock_guard<SpinLock> samplinglock(instance_->sampling_lock_);
-      instance_->sampling_counters_[dst_counter] = counter;
+      lock_guard<SpinLock> samplinglock(instance->sampling_lock_);
+      instance->sampling_counters_[dst_counter] = counter;
       break;
     }
     default:
@@ -79,35 +100,43 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
 }
 
 void PeriodicCounterUpdater::StopRateCounter(RuntimeProfile::Counter* counter) {
-  lock_guard<SpinLock> ratelock(instance_->rate_lock_);
-  instance_->rate_counters_.erase(counter);
+  PeriodicCounterUpdater* instance = counter->GetIsSystem() ?
+      system_instance_ : instance_;
+  lock_guard<SpinLock> ratelock(instance->rate_lock_);
+  instance->rate_counters_.erase(counter);
 }
 
 void PeriodicCounterUpdater::StopSamplingCounter(RuntimeProfile::Counter* counter) {
-  lock_guard<SpinLock> samplinglock(instance_->sampling_lock_);
-  instance_->sampling_counters_.erase(counter);
+  PeriodicCounterUpdater* instance = counter->GetIsSystem() ?
+      system_instance_ : instance_;
+  lock_guard<SpinLock> samplinglock(instance->sampling_lock_);
+  instance->sampling_counters_.erase(counter);
 }
 
 void PeriodicCounterUpdater::RegisterBucketingCounters(
     RuntimeProfile::Counter* src_counter, vector<RuntimeProfile::Counter*>* buckets) {
+  PeriodicCounterUpdater* instance = src_counter->GetIsSystem() ?
+      system_instance_ : instance_;
   BucketCountersInfo info;
   info.src_counter = src_counter;
   info.num_sampled = 0;
-  lock_guard<SpinLock> bucketinglock(instance_->bucketing_lock_);
-  instance_->bucketing_counters_[buckets] = info;
+  lock_guard<SpinLock> bucketinglock(instance->bucketing_lock_);
+  instance->bucketing_counters_[buckets] = info;
 }
 
 void PeriodicCounterUpdater::StopBucketingCounters(
-    vector<RuntimeProfile::Counter*>* buckets) {
+    vector<RuntimeProfile::Counter*>* buckets, bool is_system) {
   int64_t num_sampled = 0;
+  PeriodicCounterUpdater* instance = is_system ? system_instance_ : instance_;
   {
-    lock_guard<SpinLock> bucketinglock(instance_->bucketing_lock_);
+    lock_guard<SpinLock> bucketinglock(instance->bucketing_lock_);
     BucketCountersMap::iterator itr =
-        instance_->bucketing_counters_.find(buckets);
+        instance->bucketing_counters_.find(buckets);
     // If not registered, we have nothing to do.
-    if (itr == instance_->bucketing_counters_.end()) return;
+    if (itr == instance->bucketing_counters_.end()) return;
+    DCHECK(is_system == itr->second.src_counter->GetIsSystem());
     num_sampled = itr->second.num_sampled;
-    instance_->bucketing_counters_.erase(itr);
+    instance->bucketing_counters_.erase(itr);
   }
 
   if (num_sampled > 0) {
@@ -120,20 +149,24 @@ void PeriodicCounterUpdater::StopBucketingCounters(
 
 void PeriodicCounterUpdater::RegisterTimeSeriesCounter(
     RuntimeProfile::TimeSeriesCounter* counter) {
-  lock_guard<SpinLock> timeserieslock(instance_->time_series_lock_);
-  instance_->time_series_counters_.insert(counter);
+  PeriodicCounterUpdater* instance = counter->GetIsSystem() ?
+      system_instance_ : instance_;
+  lock_guard<SpinLock> timeserieslock(instance->time_series_lock_);
+  instance->time_series_counters_.insert(counter);
 }
 
 void PeriodicCounterUpdater::StopTimeSeriesCounter(
     RuntimeProfile::TimeSeriesCounter* counter) {
-  lock_guard<SpinLock> timeserieslock(instance_->time_series_lock_);
-  instance_->time_series_counters_.erase(counter);
+  PeriodicCounterUpdater* instance = counter->GetIsSystem() ?
+     system_instance_ : instance_;
+  lock_guard<SpinLock> timeserieslock(instance->time_series_lock_);
+  instance->time_series_counters_.erase(counter);
 }
 
-void PeriodicCounterUpdater::UpdateLoop() {
+void PeriodicCounterUpdater::UpdateLoop(PeriodicCounterUpdater* instance) {
   while (true) {
     system_time before_time = get_system_time();
-    SleepForMs(FLAGS_periodic_counter_update_period_ms);
+    SleepForMs(update_period_);
     posix_time::time_duration elapsed = get_system_time() - before_time;
     int elapsed_ms = elapsed.total_milliseconds();
 
@@ -143,7 +176,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     }
 
     {
-      lock_guard<SpinLock> ratelock(instance_->rate_lock_);
+      lock_guard<SpinLock> ratelock(instance->rate_lock_);
       for (RateCounterMap::iterator it = rate_counters_.begin();
            it != rate_counters_.end(); ++it) {
         it->second.elapsed_ms += elapsed_ms;
@@ -160,7 +193,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     }
 
     {
-      lock_guard<SpinLock> samplinglock(instance_->sampling_lock_);
+      lock_guard<SpinLock> samplinglock(instance->sampling_lock_);
       for (SamplingCounterMap::iterator it = sampling_counters_.begin();
            it != sampling_counters_.end(); ++it) {
         ++it->second.num_sampled;
@@ -179,7 +212,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     }
 
     {
-      lock_guard<SpinLock> bucketinglock(instance_->bucketing_lock_);
+      lock_guard<SpinLock> bucketinglock(instance->bucketing_lock_);
       for (BucketCountersMap::iterator it = bucketing_counters_.begin();
            it != bucketing_counters_.end(); ++it) {
         int64_t val = it->second.src_counter->value();
@@ -190,7 +223,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     }
 
     {
-      lock_guard<SpinLock> timeserieslock(instance_->time_series_lock_);
+      lock_guard<SpinLock> timeserieslock(instance->time_series_lock_);
       for (TimeSeriesCounters::iterator it = time_series_counters_.begin();
            it != time_series_counters_.end(); ++it) {
         (*it)->AddSample(elapsed_ms);

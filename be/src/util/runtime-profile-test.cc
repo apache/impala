@@ -1105,7 +1105,7 @@ void ValidateSampler(const StreamingSampler<int, 10>& sampler, int expected_num,
 }
 
 TEST(CountersTest, StreamingSampler) {
-  StreamingSampler<int, 10> sampler;
+  StreamingSampler<int, 10> sampler(500);
 
   int idx = 0;
   for (int i = 0; i < 3; ++i) {
@@ -1623,6 +1623,7 @@ TEST_P(TimeSeriesCounterResampleTest, TestPrettyPrint) {
   RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
 
   const TimeSeriesTestParam& param = GetParam();
+  FLAGS_periodic_counter_update_period_ms = 500;
   const int test_period = FLAGS_periodic_counter_update_period_ms;
 
   // Add a counter with a sample function that counts up, starting from 0.

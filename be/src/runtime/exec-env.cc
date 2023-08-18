@@ -637,7 +637,7 @@ void ExecEnv::InitSystemStateInfo() {
   system_state_info_.reset(new SystemStateInfo());
   PeriodicCounterUpdater::RegisterUpdateFunction([s = system_state_info_.get()]() {
     s->CaptureSystemStateSnapshot();
-  });
+  }, true);
 }
 
 Status ExecEnv::GetKuduClient(const vector<string>& master_addresses,

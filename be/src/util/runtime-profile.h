@@ -99,7 +99,8 @@ class RuntimeProfileBase {
 
   class Counter {
    public:
-    Counter(TUnit::type unit, int64_t value = 0) : value_(value), unit_(unit) {}
+    Counter(TUnit::type unit, int64_t value = 0)
+      : value_(value), unit_(unit), is_system_(false) {}
     virtual ~Counter(){}
 
     virtual void Add(int64_t delta) {
@@ -144,11 +145,15 @@ class RuntimeProfileBase {
 
     TUnit::type unit() const { return unit_; }
 
+    void SetIsSystem() { is_system_ = true; }
+    bool GetIsSystem() const { return  is_system_; }
+
    protected:
     friend class RuntimeProfile;
 
     AtomicInt64 value_;
     TUnit::type unit_;
+    bool is_system_;
   };
 
   class AveragedCounter;
@@ -658,11 +663,11 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// calling PeriodicCounterUpdater::StopTimeSeriesCounter() if the input stops changing.
   /// Note: these counters don't get merged (to make average profiles)
   TimeSeriesCounter* AddSamplingTimeSeriesCounter(const std::string& name,
-      TUnit::type unit, SampleFunction sample_fn);
+      TUnit::type unit, SampleFunction sample_fn, bool is_system = false);
 
   /// Same as above except the samples are collected from 'src_counter'.
   TimeSeriesCounter* AddSamplingTimeSeriesCounter(const std::string& name, Counter*
-      src_counter);
+      src_counter, bool is_system = false);
 
   /// Adds a chunked time series counter to the profile. This begins sampling immediately.
   /// This counter will collect new samples periodically by calling 'sample_fn()'. Samples

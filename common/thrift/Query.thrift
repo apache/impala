@@ -371,7 +371,7 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   74: optional string client_identifier;
 
-  75: optional double resource_trace_ratio = 0;
+  75: optional double resource_trace_ratio = 1;
 
   // See comment in ImpalaService.thrift.
   // The default value is set to 3 as this is the default value of HDFS replicas.

@@ -592,10 +592,10 @@ class TestObservability(ImpalaTestSuite):
     assert any(expected_str in line for line in profile.splitlines())
 
   def test_query_profile_host_resource_metrics_off(self):
-    """Tests that the query profile does not contain resource usage metrics by default or
+    """Tests that the query profile does not contain resource usage metrics
        when disabled explicitly."""
     query = "select count(*), sleep(1000) from functional.alltypes"
-    for query_opts in [None, {'resource_trace_ratio': 0.0}]:
+    for query_opts in [{'resource_trace_ratio': 0.0}]:
       profile = self.execute_query(query, query_opts).runtime_profile
       # Assert that no host resource counters exist in the profile
       for line in profile.splitlines():
@@ -604,23 +604,24 @@ class TestObservability(ImpalaTestSuite):
         assert not re.search("HostDiskReadThroughput", line)
 
   def test_query_profile_contains_host_resource_metrics(self):
-    """Tests that the query profile contains various CPU and network metrics."""
-    query_opts = {'resource_trace_ratio': 1.0}
+    """Tests that the query profile contains various CPU and network metrics
+       by default or when enabled explicitly."""
     query = "select count(*), sleep(1000) from functional.alltypes"
-    profile = self.execute_query(query, query_opts).runtime_profile
-    # We check for 500ms because a query with 1s duration won't hit the 64 values limit
-    # that would trigger resampling.
-    expected_strs = ["HostCpuIoWaitPercentage (500.000ms):",
-                     "HostCpuSysPercentage (500.000ms):",
-                     "HostCpuUserPercentage (500.000ms):",
-                     "HostNetworkRx (500.000ms):",
-                     "HostNetworkTx (500.000ms):",
-                     "HostDiskReadThroughput (500.000ms):",
-                     "HostDiskWriteThroughput (500.000ms):"]
+    for query_opts in [{}, {'resource_trace_ratio': 1.0}]:
+      profile = self.execute_query(query, query_opts).runtime_profile
+      # We check for 50ms because a query with 1s duration won't hit the 64 values limit
+      # that would trigger resampling.
+      expected_strs = ["HostCpuIoWaitPercentage (50.000ms):",
+                     "HostCpuSysPercentage (50.000ms):",
+                     "HostCpuUserPercentage (50.000ms):",
+                     "HostNetworkRx (50.000ms):",
+                     "HostNetworkTx (50.000ms):",
+                     "HostDiskReadThroughput (50.000ms):",
+                     "HostDiskWriteThroughput (50.000ms):"]
 
-    # Assert that all expected counters exist in the profile.
-    for expected_str in expected_strs:
-      assert any(expected_str in line for line in profile.splitlines()), expected_str
+      # Assert that all expected counters exist in the profile.
+      for expected_str in expected_strs:
+        assert any(expected_str in line for line in profile.splitlines()), expected_str
 
     # Check that there are some values for each counter.
     for line in profile.splitlines():

@@ -54,6 +54,8 @@ namespace impala {
   #define ADD_COUNTER(profile, name, unit) (profile)->AddCounter(name, unit)
   #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) \
       (profile)->AddSamplingTimeSeriesCounter(name, src_counter)
+  #define ADD_SYSTEM_TIME_SERIES_COUNTER(profile, name, src_counter) \
+      (profile)->AddSamplingTimeSeriesCounter(name, src_counter, true)
   #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TUnit::TIME_NS)
   #define ADD_SUMMARY_STATS_TIMER(profile, name) \
       (profile)->AddSummaryStatsCounter(name, TUnit::TIME_NS)
@@ -754,6 +756,9 @@ class RuntimeProfile::TimeSeriesCounter {
 
   TUnit::type unit() const { return unit_; }
 
+  void SetIsSystem() { is_system_ = true; }
+  bool GetIsSystem() const { return  is_system_; }
+
  private:
   friend class RuntimeProfile;
 
@@ -794,7 +799,7 @@ class RuntimeProfile::TimeSeriesCounter {
  protected:
   TimeSeriesCounter(const std::string& name, TUnit::type unit,
       SampleFunction fn = SampleFunction())
-    : name_(name), unit_(unit), sample_fn_(fn) {}
+    : name_(name), unit_(unit), sample_fn_(fn), is_system_(false) {}
 
   std::string name_;
   TUnit::type unit_;
@@ -802,6 +807,7 @@ class RuntimeProfile::TimeSeriesCounter {
   /// The number of samples that have been retrieved and cleared from this counter.
   int64_t previous_sample_count_ = 0;
   mutable SpinLock lock_;
+  bool is_system_;
 };
 
 typedef StreamingSampler<int64_t, 64> StreamingCounterSampler;
@@ -811,8 +817,8 @@ class RuntimeProfile::SamplingTimeSeriesCounter
   friend class RuntimeProfile;
 
   SamplingTimeSeriesCounter(
-      const std::string& name, TUnit::type unit, SampleFunction fn)
-    : TimeSeriesCounter(name, unit, fn) {}
+      const std::string& name, TUnit::type unit, SampleFunction fn, int initial_period)
+    : TimeSeriesCounter(name, unit, fn), samples_(initial_period) {}
 
   virtual void AddSampleLocked(int64_t sample, int ms_elapsed) override;
   virtual const int64_t* GetSamplesLocked( int* num_samples, int* period) const override;

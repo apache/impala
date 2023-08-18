@@ -37,7 +37,7 @@ template<typename T, int MAX_SAMPLES>
 class StreamingSampler {
   static_assert(std::is_arithmetic<T>::value, "Numerical type required");
  public:
-  StreamingSampler(int initial_period = 500)
+  StreamingSampler(int initial_period)
     : samples_collected_(0) ,
       period_(initial_period),
       current_sample_sum_(0),

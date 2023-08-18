@@ -53,6 +53,7 @@
 
 DECLARE_int32(status_report_interval_ms);
 DECLARE_int32(periodic_counter_update_period_ms);
+DECLARE_int32(periodic_system_counter_update_period_ms);
 
 // This must be set on the coordinator to enable the alternative profile representation.
 // It should not be set on executors - the setting is sent to the executors by
@@ -2018,12 +2019,19 @@ RuntimeProfileBase::SummaryStatsCounter* RuntimeProfile::AddSummaryStatsCounter(
 }
 
 RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
-    const string& name, TUnit::type unit, SampleFunction fn) {
+    const string& name, TUnit::type unit, SampleFunction fn, bool is_system) {
   DCHECK(fn != nullptr);
   lock_guard<SpinLock> l(counter_map_lock_);
   TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
   if (it != time_series_counter_map_.end()) return it->second;
-  TimeSeriesCounter* counter = pool_->Add(new SamplingTimeSeriesCounter(name, unit, fn));
+  int32_t update_interval = is_system ?
+      FLAGS_periodic_system_counter_update_period_ms :
+      FLAGS_periodic_counter_update_period_ms;
+  TimeSeriesCounter* counter = pool_->Add(new SamplingTimeSeriesCounter(name,
+      unit, fn, update_interval));
+  if (is_system) {
+    counter->SetIsSystem();
+  }
   time_series_counter_map_[name] = counter;
   PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
   has_active_periodic_counters_ = true;
@@ -2031,10 +2039,10 @@ RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
 }
 
 RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
-    const string& name, Counter* src_counter) {
+    const string& name, Counter* src_counter, bool is_system) {
   DCHECK(src_counter != NULL);
   return AddSamplingTimeSeriesCounter(name, src_counter->unit(),
-      bind(&Counter::value, src_counter));
+      bind(&Counter::value, src_counter), is_system);
 }
 
 void RuntimeProfile::TimeSeriesCounter::AddSample(int ms_elapsed) {
