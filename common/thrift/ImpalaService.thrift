@@ -833,6 +833,14 @@ enum TImpalaQueryOptions {
   // Valid values are in [0.0, 1.0]. Setting value 1.0 will result in an equal memory
   // estimate as the default estimation (no change). Default to 0.5.
   AGG_MEM_CORRELATION_FACTOR = 163
+
+  // A per coordinator approximate limit on the memory consumption
+  // of this query. Only applied if MEM_LIMIT is not specified.
+  // Unspecified or a limit of 0 or negative value means no limit;
+  // Otherwise specified either as:
+  // a) an int (= number of bytes);
+  // b) a float followed by "M" (MB) or "G" (GB)
+  MEM_LIMIT_COORDINATORS = 164
 }
 
 // The summary of a DML statement.

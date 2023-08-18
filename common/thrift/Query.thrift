@@ -657,6 +657,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   164: optional double agg_mem_correlation_factor = 0.5
+
+  // See comment in ImpalaService.thrift
+  165: optional i64 mem_limit_coordinators = 0;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

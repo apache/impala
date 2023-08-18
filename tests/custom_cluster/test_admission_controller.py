@@ -717,6 +717,47 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     assert expected_mem_limits['executor'] == float(
       expected_exec_mem_limit), expected_mem_limits
 
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=2,
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+          pool_max_mem=2 * 1024 * 1024 * 1024, proc_mem_limit=3 * 1024 * 1024 * 1024))
+  def test_mem_limit_coordinators(self, vector, unique_database):
+    """Verify that the query option mem_limit_coordinators is only enforced on the
+    coordinators."""
+    expected_exec_mem_limit = "999999999"
+    expected_coord_mem_limit = "111111111"
+    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    self.client.set_configuration({"MEM_LIMIT_EXECUTORS": expected_exec_mem_limit,
+        "MEM_LIMIT_COORDINATORS": expected_coord_mem_limit})
+    handle = self.client.execute_async(QUERY.format(1))
+    self.client.wait_for_finished_timeout(handle, 1000)
+    expected_mem_limits = self.__get_mem_limits_admission_debug_page()
+    assert expected_mem_limits['executor'] == float(
+      expected_exec_mem_limit), expected_mem_limits
+    assert expected_mem_limits['coordinator'] == float(
+      expected_coord_mem_limit), expected_mem_limits
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=2,
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+          pool_max_mem=2 * 1024 * 1024 * 1024, proc_mem_limit=3 * 1024 * 1024 * 1024))
+  def test_mem_limits(self, vector, unique_database):
+    """Verify that the query option mem_limit_coordinators and mem_limit_executors are
+    ignored when mem_limit is set."""
+    exec_mem_limit = "999999999"
+    coord_mem_limit = "111111111"
+    mem_limit = "888888888"
+    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    self.client.set_configuration({"MEM_LIMIT_EXECUTORS": exec_mem_limit,
+        "MEM_LIMIT_COORDINATORS": coord_mem_limit, "MEM_LIMIT": mem_limit})
+    handle = self.client.execute_async(QUERY.format(1))
+    self.client.wait_for_finished_timeout(handle, 1000)
+    expected_mem_limits = self.__get_mem_limits_admission_debug_page()
+    assert expected_mem_limits['executor'] == float(mem_limit), expected_mem_limits
+    assert expected_mem_limits['coordinator'] == float(mem_limit), expected_mem_limits
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=2, max_queued=1,

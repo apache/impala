@@ -1140,6 +1140,12 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_agg_mem_correlation_factor(double_val);
         break;
       }
+      case TImpalaQueryOptions::MEM_LIMIT_COORDINATORS: {
+        MemSpec mem_spec_val{};
+        RETURN_IF_ERROR(QueryOptionParser::Parse<MemSpec>(option, value, &mem_spec_val));
+        query_options->__set_mem_limit_coordinators(mem_spec_val.value);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

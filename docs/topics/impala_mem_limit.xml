@@ -213,7 +213,7 @@ information about the per-node memory requirements.</codeblock>
 <concept id="mem_limit_executors">
   <title>MEM_LIMIT_EXECUTORS Query Option</title>
     <conbody>
-      <note>This is a developer-only query option. Setting this query option is not recommended
+      <note>This is an advanced query option. Setting this query option is not recommended
         unless specifically advised.</note>
       <p>The existing <codeph>MEM_LIMIT</codeph> query option applies to all impala coordinators and
         executors. This means that the same amount of memory gets reserved but coordinators
@@ -226,6 +226,25 @@ information about the per-node memory requirements.</codeblock>
         scenarios where the query needs much higher memory on executors compared with
         coordinators.</p>
       <p>Note that the <codeph>MEM_LIMIT_EXECUTORS</codeph> option does not work with
+          <codeph>MEM_LIMIT</codeph>. If you set both, only <codeph>MEM_LIMIT</codeph> applies.</p>
+    </conbody>
+</concept>
+<concept id="mem_limit_coordinators">
+  <title>MEM_LIMIT_COORDINATORS Query Option</title>
+    <conbody>
+      <note>This is an advanced query option. Setting this query option is not recommended
+        unless specifically advised.</note>
+      <p>The existing <codeph>MEM_LIMIT</codeph> query option applies to all impala coordinators and
+        executors. This means that the same amount of memory gets reserved but coordinators
+        typically just do the job of coordinating the query and thus do not necessarily need all the
+        estimated memory. Blocking the estimated memory on coordinators blocks the memory to be used
+        for other queries.</p>
+      <p>The new <codeph>MEM_LIMIT_COORDINATORS</codeph> query option functions similarly to the
+          <codeph>MEM_LIMIT</codeph> option but sets the query memory limit only on coordinators. This
+        new option addresses the issue related to <codeph>MEM_LIMIT</codeph> and is recommended in
+        scenarios where the query needs higher or lower memory on coordinators compared to the planner
+        estimates.</p>
+      <p>Note that the <codeph>MEM_LIMIT_COORDINATORS</codeph> option does not work with
           <codeph>MEM_LIMIT</codeph>. If you set both, only <codeph>MEM_LIMIT</codeph> applies.</p>
     </conbody>
 </concept>

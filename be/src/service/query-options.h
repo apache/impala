@@ -50,7 +50,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::AGG_MEM_CORRELATION_FACTOR + 1);                              \
+      TImpalaQueryOptions::MEM_LIMIT_COORDINATORS + 1);                              \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -193,7 +193,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(now_string, NOW_STRING, TQueryOptionLevel::DEVELOPMENT)                   \
   QUERY_OPT_FN(parquet_object_store_split_size, PARQUET_OBJECT_STORE_SPLIT_SIZE,         \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(mem_limit_executors, MEM_LIMIT_EXECUTORS, TQueryOptionLevel::DEVELOPMENT) \
+  QUERY_OPT_FN(mem_limit_executors, MEM_LIMIT_EXECUTORS, TQueryOptionLevel::ADVANCED)    \
   QUERY_OPT_FN(                                                                          \
       broadcast_bytes_limit, BROADCAST_BYTES_LIMIT, TQueryOptionLevel::ADVANCED)         \
   QUERY_OPT_FN(preagg_bytes_limit, PREAGG_BYTES_LIMIT, TQueryOptionLevel::ADVANCED)      \
@@ -303,6 +303,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(                                                                          \
       large_agg_mem_threshold, LARGE_AGG_MEM_THRESHOLD, TQueryOptionLevel::ADVANCED)     \
   QUERY_OPT_FN(agg_mem_correlation_factor, AGG_MEM_CORRELATION_FACTOR,                   \
+      TQueryOptionLevel::ADVANCED)                                                       \
+  QUERY_OPT_FN(mem_limit_coordinators, MEM_LIMIT_COORDINATORS,                           \
       TQueryOptionLevel::ADVANCED)                                                       \
   ;
 

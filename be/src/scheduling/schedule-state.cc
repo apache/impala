@@ -315,6 +315,14 @@ void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg,
     }
   }
 
+  // Enforce the MEM_LIMIT_COORDINATORS query option if MEM_LIMIT is not specified.
+  const bool is_mem_limit_coordinators_set =
+      query_options().__isset.mem_limit_coordinators
+      && query_options().mem_limit_coordinators > 0;
+  if (!is_mem_limit_set && is_mem_limit_coordinators_set) {
+    coord_backend_mem_to_admit = query_options().mem_limit_coordinators;
+  }
+
   // Enforce the MEM_LIMIT_EXECUTORS query option if MEM_LIMIT is not specified.
   const bool is_mem_limit_executors_set = query_options().__isset.mem_limit_executors
       && query_options().mem_limit_executors > 0;
@@ -336,7 +344,8 @@ void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg,
   }
 
   int64_t per_backend_mem_limit;
-  if (mimic_old_behaviour && !is_mem_limit_set && !is_mem_limit_executors_set) {
+  if (mimic_old_behaviour && !is_mem_limit_set && !is_mem_limit_executors_set
+      && !is_mem_limit_coordinators_set) {
     per_backend_mem_limit = -1;
     query_schedule_pb_->set_coord_backend_mem_limit(-1);
   } else {
