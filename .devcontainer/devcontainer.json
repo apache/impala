@@ -1,0 +1,22 @@
+{
+  "name": "Impala Dev",
+  "dockerFile": "Dockerfile",
+  "runArgs": [
+    "--privileged"
+  ],
+  "remoteUser": "impdev",
+  "containerUser": "impdev",
+  "postCreateCommand": "echo 'yes' | bin/bootstrap_development.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cmake-tools",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "vadimcn.vscode-lldb",
+        "webfreak.debug",
+        "vscjava.vscode-java-pack",
+        "ms-python.python"
+      ]
+    }
+  }
+}
