@@ -37,6 +37,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
@@ -333,6 +334,20 @@ class DirectMetaProvider implements MetaProvider {
     // See above.
     throw new UnsupportedOperationException(
         "Functions not supported by DirectMetaProvider");
+  }
+
+  @Override
+  public ImmutableList<DataSource> loadDataSources() throws TException {
+    // See above.
+    throw new UnsupportedOperationException(
+        "DataSource not supported by DirectMetaProvider");
+  }
+
+  @Override
+  public DataSource loadDataSource(String dsName) throws TException {
+    // See above.
+    throw new UnsupportedOperationException(
+        "DataSource not supported by DirectMetaProvider");
   }
 
   @Override

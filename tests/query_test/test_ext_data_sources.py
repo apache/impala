@@ -17,9 +17,12 @@
 
 from __future__ import absolute_import, division, print_function
 
+import re
+
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfCatalogV2, SkipIf
+from tests.common.skip import SkipIf, SkipIfDockerizedCluster
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 
 class TestExtDataSources(ImpalaTestSuite):
@@ -59,15 +62,15 @@ class TestExtDataSources(ImpalaTestSuite):
         properties[fields[1].rstrip()] = fields[2].rstrip()
     return properties
 
-  @SkipIfCatalogV2.data_sources_unsupported()
   @SkipIf.not_hdfs
   def test_verify_jdbc_table_properties(self, vector):
     jdbc_tbl_name = "functional.alltypes_jdbc_datasource"
     properties = self._get_tbl_properties(jdbc_tbl_name)
     # Verify data source related table properties
     assert properties['__IMPALA_DATA_SOURCE_NAME'] == 'jdbcdatasource'
-    assert properties['__IMPALA_DATA_SOURCE_LOCATION'] == \
-        'hdfs://localhost:20500/test-warehouse/data-sources/jdbc-data-source.jar'
+    expected_location =\
+        "{0}/test-warehouse/data-sources/jdbc-data-source.jar".format(FILESYSTEM_PREFIX)
+    assert re.search(expected_location, properties['__IMPALA_DATA_SOURCE_LOCATION'])
     assert properties['__IMPALA_DATA_SOURCE_CLASS'] == \
         'org.apache.impala.extdatasource.jdbc.JdbcDataSource'
     assert properties['__IMPALA_DATA_SOURCE_API_VERSION'] == 'V1'
@@ -76,11 +79,15 @@ class TestExtDataSources(ImpalaTestSuite):
     assert 'table\\":\\"alltypes' \
         in properties['__IMPALA_DATA_SOURCE_INIT_STRING']
 
-  @SkipIfCatalogV2.data_sources_unsupported()
-  def test_data_source_tables(self, vector):
-    self.run_test_case('QueryTest/data-source-tables', vector)
+  def test_data_source_tables(self, vector, unique_database):
+    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
 
-  @SkipIfCatalogV2.data_sources_unsupported()
+  # The test uses pre-written jdbc external tables where the jdbc.url refers to Postgres
+  # server via full URI, i.e. url starts with 'jdbc:postgresql://hostname:5432/'. In the
+  # dockerised environment, the Postgres server is running on a different host. It is
+  # configured to accept only local connection. Have to skip this test for dockerised
+  # cluster since Postgres server is not accessible from impalad.
+  @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.not_hdfs
-  def test_jdbc_data_source(self, vector):
-    self.run_test_case('QueryTest/jdbc-data-source', vector)
+  def test_jdbc_data_source(self, vector, unique_database):
+    self.run_test_case('QueryTest/jdbc-data-source', vector, use_db=unique_database)

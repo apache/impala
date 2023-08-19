@@ -115,7 +115,7 @@ abstract class LocalTable implements FeTable {
     } else if (IcebergTable.isIcebergTable(msTbl)) {
       t = LocalIcebergTable.loadIcebergTableViaMetaProvider(db, msTbl, ref);
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
-      // TODO(todd) support datasource table
+      t = LocalDataSourceTable.load(db, msTbl, ref);
     } else if (HdfsFileFormat.isHdfsInputFormatClass(
         msTbl.getSd().getInputFormat())) {
       t = LocalFsTable.load(db, msTbl, ref);

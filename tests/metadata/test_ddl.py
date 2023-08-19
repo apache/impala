@@ -1168,7 +1168,6 @@ class TestLibCache(TestDdlBase):
   # Run serially because this test inspects global impalad metrics.
   # TODO: The metrics checks could be relaxed to enable running this test in
   # parallel, but that might need a more general wait_for_metric_value().
-  @SkipIfCatalogV2.data_sources_unsupported()
   @pytest.mark.execute_serially
   def test_create_drop_data_src(self, vector, unique_database):
     """This will create, run, and drop the same data source repeatedly, exercising

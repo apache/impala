@@ -57,6 +57,7 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObjectCache;
+import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -81,6 +82,7 @@ import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDbInfoSelector;
 import org.apache.impala.thrift.TErrorCode;
@@ -236,6 +238,8 @@ public class CatalogdMetaProvider implements MetaProvider {
   private static final String FUNCTIONS_STATS_CATEGORY = "Functions";
   private static final String RPC_STATS_CATEGORY = "RPCs";
   private static final String STORAGE_METADATA_LOAD_CATEGORY = "StorageLoad";
+  private static final String DATA_SOURCE_LIST_STATS_CATEGORY = "DataSourceLists";
+  private static final Object DS_OBJ_LIST_CACHE_KEY = new Object();
   private static final String RPC_REQUESTS =
       CATALOG_FETCH_PREFIX + "." + RPC_STATS_CATEGORY + ".Requests";
   private static final String RPC_BYTES =
@@ -455,6 +459,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       case TABLE_NOT_FOUND:
       case TABLE_NOT_LOADED:
       case PARTITION_NOT_FOUND:
+      case DATA_SOURCE_NOT_FOUND:
         invalidateCacheForObject(req.object_desc);
         throw new InconsistentMetadataFetchException(
             String.format("Fetching %s failed. Could not find %s",
@@ -665,6 +670,14 @@ public class CatalogdMetaProvider implements MetaProvider {
     return req;
   }
 
+  private TGetPartialCatalogObjectRequest newReqForDataSource(String dsName) {
+    TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
+    req.object_desc = new TCatalogObject();
+    req.object_desc.setType(TCatalogObjectType.DATA_SOURCE);
+    if (dsName == null) dsName = "";
+    req.object_desc.setData_source(new TDataSource(dsName, "", "", ""));
+    return req;
+  }
 
   @Override
   public Database loadDb(final String dbName) throws TException {
@@ -1214,6 +1227,51 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   /**
+   * Get all DataSource objects from catalogd.
+   */
+  public ImmutableList<DataSource> loadDataSources() throws TException {
+    ImmutableList<TDataSource> thriftDataSrcs = loadWithCaching(
+        "DataSource object list", DATA_SOURCE_LIST_STATS_CATEGORY,
+        DS_OBJ_LIST_CACHE_KEY, new Callable<ImmutableList<TDataSource>>() {
+          @Override
+          public ImmutableList<TDataSource> call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForDataSource(null);
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.data_srcs != null, req, "no existing DataSource");
+            return ImmutableList.copyOf(resp.data_srcs);
+          }
+      });
+    ImmutableList.Builder<DataSource> dataSrcBld = ImmutableList.builder();
+    for (TDataSource thriftDataSrc : thriftDataSrcs) {
+      dataSrcBld.add(DataSource.fromThrift(thriftDataSrc));
+    }
+    return dataSrcBld.build();
+  }
+
+  /**
+   * Get the DataSource object from catalogd for the given DataSource name.
+   */
+  public DataSource loadDataSource(String dsName) throws TException {
+    Preconditions.checkState(dsName != null && !dsName.isEmpty());
+    return loadWithCaching("DataSource object for " + dsName,
+        DATA_SOURCE_LIST_STATS_CATEGORY,
+        new DataSourceCacheKey(dsName.toLowerCase()), new Callable<DataSource>() {
+          @Override
+          public DataSource call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForDataSource(dsName);
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.data_srcs != null, req, "missing expected DataSource");
+            if (resp.data_srcs.size() == 1) {
+              return DataSource.fromThrift(resp.data_srcs.get(0));
+            } else {
+              Preconditions.checkState(resp.data_srcs.size() == 0);
+              return null;
+            }
+          }
+      });
+  }
+
+  /**
    * Invalidate portions of the cache as indicated by the provided request.
    *
    * This is called in two scenarios:
@@ -1519,6 +1577,12 @@ public class CatalogdMetaProvider implements MetaProvider {
           DbCacheKey.DbInfoType.HMS_METADATA,
           DbCacheKey.DbInfoType.FUNCTION_NAMES), invalidated);
       break;
+    case DATA_SOURCE:
+      if (cache_.asMap().remove(DS_OBJ_LIST_CACHE_KEY) != null) {
+        invalidated.add("list of DataSource objects");
+      }
+      invalidateCacheForDataSource(obj.data_source.name, invalidated);
+      break;
     default:
       break;
     }
@@ -1577,6 +1641,18 @@ public class CatalogdMetaProvider implements MetaProvider {
     FunctionsCacheKey key = new FunctionsCacheKey(dbName, functionName);
     if (cache_.asMap().remove(key) != null) {
       invalidated.add("function " + dbName + "." + functionName);
+    }
+  }
+
+  /**
+   * Invalidate cached DataSource for the given DataSource name. If anything was
+   * invalidated, adds a human-readable string to 'invalidated' indicating the
+   * invalidated DataSource.
+   */
+  private void invalidateCacheForDataSource(String dsName, List<String> invalidated) {
+    DataSourceCacheKey key = new DataSourceCacheKey(dsName.toLowerCase());
+    if (cache_.asMap().remove(key) != null) {
+      invalidated.add("DataSource " + dsName);
     }
   }
 
@@ -2013,6 +2089,30 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     public IcebergApiTableCacheKey(TableMetaRefImpl table) {
       super(table);
+    }
+  }
+
+  /**
+   * Cache key for a DataSource object.
+   */
+  @Immutable
+  private static class DataSourceCacheKey {
+    private final String dsName_;
+
+    DataSourceCacheKey(String dsName) {
+      dsName_ = dsName;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(dsName_, getClass());
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (!(obj instanceof DataSourceCacheKey)) return false;
+      DataSourceCacheKey other = (DataSourceCacheKey)obj;
+      return dsName_.equals(other.dsName_);
     }
   }
 

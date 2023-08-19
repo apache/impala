@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -105,6 +106,16 @@ public interface MetaProvider {
    */
   ImmutableList<Function> loadFunction(String dbName, String functionName)
       throws TException;
+
+  /**
+   * Retrieve all DataSource objects.
+   */
+  ImmutableList<DataSource> loadDataSources() throws TException;
+
+  /**
+   * Retrieve the DataSource object for the given DataSource name.
+   */
+  DataSource loadDataSource(String dsName) throws TException;
 
   /**
    * Load the given partitions from the specified table.

@@ -146,7 +146,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         compare=compare_describe_formatted)
 
   @pytest.mark.execute_serially # due to data src setup/teardown
-  @SkipIfCatalogV2.data_sources_unsupported()
   def test_show_data_sources(self, vector):
     try:
       self.__create_data_sources()

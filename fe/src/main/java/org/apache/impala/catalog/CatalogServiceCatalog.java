@@ -97,6 +97,7 @@ import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
+import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
@@ -874,9 +875,8 @@ public class CatalogServiceCatalog extends Catalog {
         min.setFn(fnObject);
         break;
       case DATA_SOURCE:
-        // These are currently not cached by v2 impalad.
-        // TODO(todd): handle these items.
-        return null;
+        min.setData_source(new TDataSource(obj.data_source));
+        break;
       case HDFS_CACHE_POOL:
         // HdfsCachePools just contain the name strings. Publish them as minimal objects.
         return obj;
@@ -3649,6 +3649,38 @@ public class CatalogServiceCatalog extends Catalog {
         versionLock_.readLock().unlock();
       }
     }
+    case DATA_SOURCE: {
+      TDataSource dsDesc = Preconditions.checkNotNull(req.object_desc.data_source);
+      versionLock_.readLock().lock();
+      try {
+        TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
+        if (dsDesc.getName() == null || dsDesc.getName().isEmpty()) {
+          // Return all DataSource objects.
+          List<DataSource> data_srcs = getDataSources();
+          if (data_srcs == null || data_srcs.isEmpty()) {
+            resp.setData_srcs(Collections.emptyList());
+          } else {
+            List<TDataSource> thriftDataSrcs =
+                Lists.newArrayListWithCapacity(data_srcs.size());
+            for (DataSource ds : data_srcs) thriftDataSrcs.add(ds.toThrift());
+            resp.setData_srcs(thriftDataSrcs);
+          }
+        } else {
+          // Return the DataSource for the given name.
+          DataSource ds = getDataSource(dsDesc.getName());
+          if (ds == null) {
+            resp.setData_srcs(Collections.emptyList());
+          } else {
+            List<TDataSource> thriftDataSrcs = Lists.newArrayListWithCapacity(1);
+            thriftDataSrcs.add(ds.toThrift());
+            resp.setData_srcs(thriftDataSrcs);
+          }
+        }
+        return resp;
+      } finally {
+        versionLock_.readLock().unlock();
+      }
+    }
     default:
       throw new CatalogException("Unable to fetch partial info for type: " +
           req.object_desc.type);
@@ -3756,7 +3788,7 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Return a partial view of information about global parts of the catalog (eg
-   * the list of tables, etc).
+   * the list of database names, etc).
    */
   private TGetPartialCatalogObjectResponse getPartialCatalogInfo(
       TGetPartialCatalogObjectRequest req) {

@@ -590,7 +590,8 @@ enum CatalogLookupStatus {
   // change over the lifetime of a table with queries like invalidate metadata. In such
   // cases this lookup status is set and the caller can retry the fetch.
   // TODO: Fix partition lookup logic to not do it with IDs.
-  PARTITION_NOT_FOUND
+  PARTITION_NOT_FOUND,
+  DATA_SOURCE_NOT_FOUND
 }
 
 // RPC response for GetPartialCatalogObject.
@@ -609,6 +610,8 @@ struct TGetPartialCatalogObjectResponse {
 
   // Functions are small enough that we return them wholesale.
   7: optional list<Types.TFunction> functions
+  // DataSource objects are small enough that we return them wholesale.
+  8: optional list<CatalogObjects.TDataSource> data_srcs
 }
 
 

@@ -1,5 +1,49 @@
 ====
 ---- QUERY
+# Create DataSource
+DROP DATA SOURCE IF EXISTS TestGenericDataSource;
+CREATE DATA SOURCE TestGenericDataSource
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/data-sources/test-data-source.jar'
+CLASS 'org.apache.impala.extdatasource.AllTypesDataSource'
+API_VERSION 'V1';
+---- RESULTS
+'Data source has been created.'
+====
+---- QUERY
+# Show created DataSource
+SHOW DATA SOURCES LIKE 'testgenericdatasource';
+---- LABELS
+NAME,LOCATION,CLASS NAME,API VERSION
+---- RESULTS
+'testgenericdatasource',regex:'.*/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Create DataSource table
+DROP TABLE IF EXISTS alltypes_datasource;
+CREATE TABLE alltypes_datasource (
+  id INT,
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  timestamp_col TIMESTAMP,
+  string_col STRING,
+  dec_col1 DECIMAL(9,0),
+  dec_col2 DECIMAL(10,0),
+  dec_col3 DECIMAL(20,10),
+  dec_col4 DECIMAL(38,37),
+  dec_col5 DECIMAL(10,5),
+  date_col DATE)
+PRODUCED BY DATA SOURCE TestGenericDataSource("TestInitString");
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
 # Gets all types including a row with a NULL value. The predicate pushed to
 # the data source is not actually used, but the second predicate is
 # evaluated by Impala.
@@ -128,4 +172,16 @@ where smallint_col IS DISTINCT FROM 11 and tinyint_col IS DISTINCT FROM 1)
 4096
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# Drop table
+DROP TABLE alltypes_datasource;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+# Drop DataSource
+DROP DATA SOURCE TestGenericDataSource;
+---- RESULTS
+'Data source has been dropped.'
 ====

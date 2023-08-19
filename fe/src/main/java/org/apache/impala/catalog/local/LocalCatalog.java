@@ -27,6 +27,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalog;
@@ -43,14 +44,19 @@ import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Implementation of FeCatalog which runs within the impalad and fetches metadata
@@ -68,6 +74,8 @@ import com.google.common.base.Preconditions;
  * returned from its methods.
  */
 public class LocalCatalog implements FeCatalog {
+  private final static Logger LOG = LoggerFactory.getLogger(LocalCatalog.class);
+
   private final MetaProvider metaProvider_;
   private Map<String, FeDb> dbs_ = new HashMap<>();
   private Map<String, HdfsCachePool> hdfsCachePools_ = null;
@@ -107,7 +115,6 @@ public class LocalCatalog implements FeCatalog {
     dbs.put(bdb.getName(), bdb);
     dbs_ = dbs;
   }
-
 
   @Override
   public List<String> getTableNames(String dbName, PatternMatcher matcher)
@@ -152,7 +159,29 @@ public class LocalCatalog implements FeCatalog {
       throws CatalogException {
     // TODO(todd): this probably makes the /catalog page not load with an error.
     // We should probably disable that page in local-catalog mode.
-    throw new UnsupportedOperationException("LocalCatalog.getTCatalogObject");
+    Preconditions.checkNotNull(objectDesc, "invalid objectDesc");
+    if (objectDesc.type == TCatalogObjectType.DATA_SOURCE) {
+      // This function could be called by backend function
+      // CatalogOpExecutor::HandleDropDataSource() when cleaning jar file of data source.
+      TDataSource dsDesc = Preconditions.checkNotNull(objectDesc.data_source);
+      String dsName = dsDesc.getName();
+      if (dsName != null && !dsName.isEmpty()) {
+        try {
+          DataSource ds = metaProvider_.loadDataSource(dsName);
+          if (ds != null) {
+            TCatalogObject resultObj = new TCatalogObject();
+            resultObj.setType(TCatalogObjectType.DATA_SOURCE);
+            resultObj.setData_source(ds.toThrift());
+            return resultObj;
+          }
+        } catch (Exception e) {
+          LOG.info("Data source not found: " + dsName + ", " + e.getMessage());
+        }
+      }
+      throw new CatalogException("Data source not found: " + dsName);
+    } else {
+      throw new UnsupportedOperationException("LocalCatalog.getTCatalogObject");
+    }
   }
 
   @Override
@@ -195,14 +224,26 @@ public class LocalCatalog implements FeCatalog {
   }
 
   @Override
-  public List<? extends FeDataSource> getDataSources(
-      PatternMatcher createHivePatternMatcher) {
-    throw new UnsupportedOperationException("TODO");
+  public List<? extends FeDataSource> getDataSources(PatternMatcher matcher) {
+    try {
+      List<DataSource> dataSrcs = metaProvider_.loadDataSources();
+      return Catalog.filterCatalogObjectsByPattern(dataSrcs, matcher);
+    } catch (Exception e) {
+      LOG.info("Unable to load DataSource objects, ", e);
+      // Return empty list.
+      return Lists.newArrayList();
+    }
   }
 
   @Override
-  public FeDataSource getDataSource(String dataSourceName) {
-    throw new UnsupportedOperationException("TODO");
+  public FeDataSource getDataSource(String dsName) {
+    Preconditions.checkNotNull(dsName);
+    try {
+      return metaProvider_.loadDataSource(dsName);
+    } catch (Exception e) {
+      LOG.info("DataSource not found: " + dsName, e);
+      return null;
+    }
   }
 
   @Override
