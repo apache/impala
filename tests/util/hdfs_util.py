@@ -298,9 +298,9 @@ class HadoopFsCommandLineClient(BaseFilesystem):
   def delete_file_dir(self, path, recursive=False):
     """Delete the file or directory given by the specified path. Recursive must be true
     for directories."""
-    rm_command = ['-rm', path]
+    rm_command = ['-rm', '-skipTrash', path]
     if recursive:
-      rm_command = ['-rm', '-r', path]
+      rm_command = ['-rm', '-skipTrash', '-r', path]
     (status, stdout, stderr) = self._hadoop_fs_shell(rm_command)
     return status == 0
 

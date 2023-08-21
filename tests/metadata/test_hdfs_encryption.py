@@ -27,10 +27,7 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.util.shell_util import exec_process
 
 TEST_DB = 'test_encryption_db'
-
-# PyWebHdfs takes absolute paths without a leading slash
-PYWEBHDFS_TMP_DIR = 'tmp/test_encryption_load_data'
-TMP_DIR = '/%s' % (PYWEBHDFS_TMP_DIR)
+TMP_DIR = '/tmp/test_encryption_load_data'
 
 
 @SkipIfFS.hdfs_encryption
@@ -74,12 +71,12 @@ class TestHdfsEncryption(ImpalaTestSuite):
     self.__cleanup()
     self.client.execute('create database if not exists %s' % TEST_DB)
     self.client.execute('use %s' % TEST_DB)
-    self.hdfs_client.make_dir(PYWEBHDFS_TMP_DIR)
+    self.hdfs_client.make_dir(TMP_DIR)
     # Few tests depend on the .Trash directory being present. In case it doesn't
     # exist, we create a random text file and delete it so that hdfs recreates
     # the hierarchy of trash
     if not self.hdfs_client.exists("/user/{0}/.Trash/".format(getpass.getuser())):
-      self.hdfs_client.create_file("test-warehouse/random",file_data="random")
+      self.hdfs_client.create_file("/test-warehouse/random", file_data="random")
       rc, stdout, stderr = exec_process("hadoop fs -rm /test-warehouse/random")
       assert rc == 0, 'Error re-creating trash: %s %s' % (stdout, stderr)
 
@@ -102,7 +99,7 @@ class TestHdfsEncryption(ImpalaTestSuite):
     self.client.execute('drop table if exists %s.tbl purge' % TEST_DB)
     self.client.execute('drop table if exists %s.t1 purge' % TEST_DB)
     self.cleanup_db(TEST_DB)
-    self.hdfs_client.delete_file_dir(PYWEBHDFS_TMP_DIR, recursive=True)
+    self.hdfs_client.delete_file_dir(TMP_DIR, recursive=True)
 
   def test_load_data(self, vector):
     key_tbl_dir = vector.get_value('key_tbl_dir')

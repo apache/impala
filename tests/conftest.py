@@ -371,6 +371,17 @@ def unique_database(request, testid_checksum):
                        'characters.'.format(db_name))
 
   def cleanup_database(client, db_name, must_exist):
+    # By default, dropping a database will move the files to the trash. Since the dev
+    # environment uses a long fs.trash.interval, these files will accumulate and
+    # waste disk space. To avoid that, we blast away the database directory (skipping
+    # trash) before dropping the database.
+    #
+    # When there are external tables, the external locations are not removed by cascade.
+    # These preexisting files/directories can cause errors when tests run repeatedly or
+    # use a data snapshot (see IMPALA-9702). Deleting the database directory prevents
+    # this as well.
+    db_location = "{0}/{1}.db".format(WAREHOUSE, db_name)
+    request.instance.filesystem_client.delete_file_dir(db_location, recursive=True)
     for i in range(2):
       try:
         result = client.execute('DROP DATABASE {0} `{1}` CASCADE'.format(
@@ -383,13 +394,6 @@ def unique_database(request, testid_checksum):
         else:
           raise e
     assert result.success
-    # The database directory may not be removed if there are external tables in the
-    # database when it is dropped. The external locations are not removed by cascade.
-    # These preexisting files/directories can cause errors when tests run repeatedly or
-    # use a data snapshot (see IMPALA-9702), so this forces cleanup of the database
-    # directory.
-    db_location = "{0}/{1}.db".format(WAREHOUSE, db_name).lstrip('/')
-    request.instance.filesystem_client.delete_file_dir(db_location, recursive=True)
 
   def cleanup():
     with request.instance.create_impala_client(protocol=HS2) as client:

@@ -131,7 +131,8 @@ def generate_new_path(table_params, file_path):
     assert len(li) == 2
     return new_expr.join(li)
 
-  return replace_last(result, table_name, "{}/{}".format(unique_database, table_name))
+  return replace_last(result, table_name,
+      "{}/{}".format(unique_database + ".db", table_name))
 
 
 def add_prefix_to_snapshot(table_params, snapshot):

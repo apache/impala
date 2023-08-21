@@ -507,7 +507,7 @@ class TestUdfTargeted(TestUdfBase):
     self.execute_query_expect_success(client, drop_fn_stmt)
     self.execute_query_expect_success(client, create_fn_stmt)
     # Delete the udf jar
-    check_call(["hadoop", "fs", "-rm", jar_path])
+    check_call(["hadoop", "fs", "-rm", "-skipTrash", jar_path])
 
     different_impalad = cluster.get_different_impalad(impalad)
     client = different_impalad.service.create_client_from_vector(vector)

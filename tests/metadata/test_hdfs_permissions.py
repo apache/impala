@@ -41,7 +41,7 @@ class TestHdfsPermissions(ImpalaTestSuite):
 
   def _cleanup(self):
     self.client.execute('drop table if exists %s' % TEST_TBL)
-    self.hdfs_client.delete_file_dir('test-warehouse/%s' % TEST_TBL, recursive=True)
+    self.hdfs_client.delete_file_dir('/test-warehouse/%s' % TEST_TBL, recursive=True)
 
   @SkipIfCatalogV2.impala_7539()
   def test_insert_into_read_only_table(self):
@@ -50,7 +50,7 @@ class TestHdfsPermissions(ImpalaTestSuite):
       # In Isilon OneFS 8.0, a change was introduced that requires this. See IMPALA-3698.
       permission = 544
     # Create a directory that is read-only
-    self.hdfs_client.make_dir('test-warehouse/%s' % TEST_TBL, permission=permission)
+    self.hdfs_client.make_dir('/test-warehouse/%s' % TEST_TBL, permission=permission)
     self.client.execute("create external table %s (i int) location '%s'"
         % (TEST_TBL, TBL_LOC))
     try:
@@ -63,8 +63,8 @@ class TestHdfsPermissions(ImpalaTestSuite):
     assert self.execute_scalar('select count(*) from %s' % TEST_TBL) == "0"
 
     # Now re-create the directory with write privileges.
-    self.hdfs_client.delete_file_dir('test-warehouse/%s' % TEST_TBL, recursive=True)
-    self.hdfs_client.make_dir('test-warehouse/%s' % TEST_TBL, permission=777)
+    self.hdfs_client.delete_file_dir('/test-warehouse/%s' % TEST_TBL, recursive=True)
+    self.hdfs_client.make_dir('/test-warehouse/%s' % TEST_TBL, permission=777)
 
     self.client.execute('refresh  %s' % TEST_TBL)
     self.client.execute('insert into table %s select 1' % TEST_TBL)

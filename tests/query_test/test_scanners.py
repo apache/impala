@@ -1503,7 +1503,7 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
     options = vector.get_value('exec_option')
     TABLE_NAME = "test_text_split_delimiters"
     qualified_table_name = "%s.%s" % (unique_database, TABLE_NAME)
-    location = get_fs_path("/test-warehouse/%s_%s" % (unique_database, TABLE_NAME))
+    location = get_fs_path("/test-warehouse/%s.db/%s" % (unique_database, TABLE_NAME))
     query = "create table %s (s string) location '%s'" % (qualified_table_name, location)
     self.execute_query(query, options)
 

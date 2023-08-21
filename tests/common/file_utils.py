@@ -56,11 +56,11 @@ def create_iceberg_table_from_directory(impala_client, unique_database, table_na
   rewrite_metadata(warehouse_prefix, unique_database, os.path.join(local_dir, 'metadata'))
 
   # Put the directory in the database's directory (not the table directory)
-  hdfs_parent_dir = os.path.join(get_fs_path("/test-warehouse"), unique_database)
+  hdfs_parent_dir = os.path.join(get_fs_path("/test-warehouse"), unique_database + ".db")
   hdfs_dir = os.path.join(hdfs_parent_dir, table_name)
 
   # Purge existing files if any
-  check_call(['hdfs', 'dfs', '-rm', '-f', '-r', hdfs_dir])
+  check_call(['hdfs', 'dfs', '-rm', '-skipTrash', '-f', '-r', hdfs_dir])
 
   # Note: -d skips a staging copy
   check_call(['hdfs', 'dfs', '-mkdir', '-p', hdfs_parent_dir])

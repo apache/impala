@@ -106,6 +106,14 @@
     <value>${DATANODE_LOCKED_MEM}</value>
   </property>
 
+  <!-- To make deletions of large numbers of blocks faster (e.g. expunge immediate),
+    increase the number of deletions that can be done in a single heartbeat.
+    The default was 1000. -->
+  <property>
+    <name>dfs.block.invalidate.limit</name>
+    <value>50000</value>
+  </property>
+
   <!-- Increase the frequency the NN talks to the DNs to update the caching policy.
    This is useful to reduce the lag between asking a path to be cached and it actually
    being cached. -->
