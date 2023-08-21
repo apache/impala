@@ -108,6 +108,7 @@ TEST(ParquetPageIndex, DeterminePageIndexRangesInRowGroup) {
 template <typename T>
 vector<string> ToStringVector(vector<T> vec) {
   vector<string> result;
+  result.reserve(vec.size());
   for (auto v : vec) {
     result.emplace_back(string(reinterpret_cast<char*>(new T(v)), sizeof(v)));
   }

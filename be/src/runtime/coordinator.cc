@@ -1167,7 +1167,7 @@ Status Coordinator::UpdateBlacklistWithAuxErrorInfo(
   // the failed RPC. Only blacklist one node per ReportExecStatusRequestPB to avoid
   // blacklisting nodes too aggressively. Currently, only blacklist the first node
   // that contains a valid RPCErrorInfoPB object.
-  for (auto aux_error : *aux_error_info) {
+  for (const auto& aux_error : *aux_error_info) {
     if (aux_error.has_rpc_error_info()) {
       RPCErrorInfoPB rpc_error_info = aux_error.rpc_error_info();
       DCHECK(rpc_error_info.has_dest_node());
@@ -1257,6 +1257,7 @@ void Coordinator::HandleFailedExecRpcs(vector<BackendState*> failed_backend_stat
 
   // Create an error based on the Exec RPC failure Status
   vector<string> backend_addresses;
+  backend_addresses.reserve(failed_backend_states.size());
   for (BackendState* backend_state : failed_backend_states) {
     backend_addresses.push_back(
         NetworkAddressPBToString(backend_state->krpc_impalad_address()));
@@ -1429,6 +1430,7 @@ void Coordinator::ReleaseBackendAdmissionControlResources(
       parent_request_state_->admission_control_client();
   DCHECK(admission_control_client != nullptr);
   vector<NetworkAddressPB> host_addrs;
+  host_addrs.reserve(backend_states.size());
   for (auto backend_state : backend_states) {
     host_addrs.push_back(backend_state->impalad_address());
   }

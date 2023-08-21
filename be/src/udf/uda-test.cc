@@ -300,6 +300,7 @@ TEST(MemTest, Basic) {
       ::MemTestInit, ::MemTestUpdate, ::MemTestMerge, ::MemTestSerialize,
       ::MemTestFinalize);
   vector<BigIntVal> input;
+  input.reserve(10);
   for (int i = 0; i < 10; ++i) {
     input.push_back(10);
   }

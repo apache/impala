@@ -73,7 +73,11 @@ Checks: "-*,clang*,\
 -clang-diagnostic-used-but-marked-unused,\
 -clang-diagnostic-vla-extension,\
 -clang-diagnostic-weak-template-vtables,\
--clang-diagnostic-weak-vtables"
+-clang-diagnostic-weak-vtables,\
+performance-*,\
+-performance-inefficient-string-concatenation,\
+-performance-unnecessary-copy-initialization,\
+-performance-unnecessary-value-param"
 
 # Ignore warnings in gutil
 

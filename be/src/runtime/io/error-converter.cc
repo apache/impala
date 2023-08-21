@@ -100,7 +100,7 @@ bool ErrorConverter::IsBlacklistableError(const Status& status) {
   size_t found = status.msg().msg().find("errno=");
   if (found == string::npos) return false;
   size_t start_pos = found + 6;
-  size_t end_pos = status.msg().msg().find(",", start_pos);
+  size_t end_pos = status.msg().msg().find(',', start_pos);
   string value = (end_pos != string::npos) ?
       status.msg().msg().substr(start_pos, end_pos - start_pos) :
       status.msg().msg().substr(start_pos);

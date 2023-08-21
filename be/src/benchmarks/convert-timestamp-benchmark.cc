@@ -177,6 +177,7 @@ vector<TimestampValue> AddTestDataDateTimes(int n, const string& startstr) {
 
   boost::posix_time::ptime start(boost::posix_time::time_from_string(startstr));
   vector<TimestampValue> data;
+  data.reserve(n);
   for (int i = 0; i < n; ++i) {
     start += boost::gregorian::date_duration(dis_days(gen));
     start += boost::posix_time::nanoseconds(dis_nanosec(gen));
@@ -216,6 +217,7 @@ public:
       const vector<FROM>& data, const char* label) {
     // Create TestData for each thread.
     vector<unique_ptr<TestData<FROM, TO, converter>>> test_data;
+    test_data.reserve(num_of_threads);
     for (int i = 0; i < num_of_threads; ++i) {
       test_data.push_back(make_unique<TestData<FROM, TO, converter>>(data));
     }

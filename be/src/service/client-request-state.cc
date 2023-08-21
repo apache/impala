@@ -912,7 +912,7 @@ void ClientRequestState::ExecLoadIcebergDataRequestImpl(TLoadDataResp response) 
       lock_guard<mutex> l(lock_);
       RETURN_VOID_IF_ERROR(UpdateQueryStatus(Status(revert_err + hdfs_ret.GetDetail())));
     }
-    for (string src_path : response.loaded_files) {
+    for (const string& src_path : response.loaded_files) {
       hdfsFS hdfs_src_conn;
       hdfs_ret = HdfsFsCache::instance()->GetConnection(dst_path, &hdfs_src_conn);
       if (!hdfs_ret.ok()) {

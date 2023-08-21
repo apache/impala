@@ -89,7 +89,7 @@ struct HttpRequest {
       if (method == "POST") {
         request_stream << "Content-Length: 0\r\n";
       }
-      for (const std::pair<string, string>& header : headers) {
+      for (const auto& header : headers) {
         request_stream << header.first << ": " << header.second << "\r\n";
       }
 
@@ -449,7 +449,7 @@ TEST(Webserver, SslGoodTlsVersion) {
     ASSERT_OK(webserver.Start());
   }
 
-  for (auto v : unsupported_versions) {
+  for (const auto& v : unsupported_versions) {
     auto ssl_version = ScopedFlagSetter<string>::Make(&FLAGS_ssl_minimum_version, v);
 
     MetricGroup metrics("webserver-test");

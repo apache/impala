@@ -269,13 +269,13 @@ Status RpcMgr::StartServices() {
 void RpcMgr::Join() {
   if (services_started_) {
     if (messenger_.get() == nullptr) return;
-    for (auto service_pool : service_pools_) service_pool->Join();
+    for (const auto& service_pool : service_pools_) service_pool->Join();
   }
 }
 
 void RpcMgr::Shutdown() {
   if (messenger_.get() == nullptr) return;
-  for (auto service_pool : service_pools_) service_pool->Shutdown();
+  for (const auto& service_pool : service_pools_) service_pool->Shutdown();
   acceptor_pool_.reset();
 
   messenger_->UnregisterAllServices();
@@ -377,7 +377,7 @@ void RpcMgr::ToJson(Document* document) {
 
   // Add service pool metrics
   Value services(kArrayType);
-  for (auto service_pool : service_pools_) {
+  for (const auto& service_pool : service_pools_) {
     Value service_entry(kObjectType);
     service_pool->ToJson(&service_entry, document);
     services.PushBack(service_entry, document->GetAllocator());

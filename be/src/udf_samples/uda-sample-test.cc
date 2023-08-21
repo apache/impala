@@ -60,6 +60,7 @@ bool TestAvg() {
   test.SetIntermediateSize(16);
 
   vector<DoubleVal> vals;
+  vals.reserve(1001);
   for (int i = 0; i < 1001; ++i) {
     vals.push_back(DoubleVal(i));
   }
@@ -81,6 +82,7 @@ bool TestStringConcat() {
   values.push_back("World");
 
   vector<StringVal> separators;
+  separators.reserve(values.size());
   for(int i = 0; i < values.size(); ++i) {
     separators.push_back(",");
   }

@@ -1080,6 +1080,7 @@ void RuntimeProfile::SortChildrenByTotalTime() {
   // Create a snapshot of total time values so that they don't change while we're
   // sorting. Sort the <total_time, index> pairs, then reshuffle children_.
   vector<pair<int64_t, int64_t>> total_times;
+  total_times.reserve(children_.size());
   for (int i = 0; i < children_.size(); ++i) {
     total_times.emplace_back(children_[i].first->total_time_counter()->value(), i);
   }
@@ -1089,6 +1090,7 @@ void RuntimeProfile::SortChildrenByTotalTime() {
         return p1.first > p2.first;
       });
   ChildVector new_children;
+  new_children.reserve(total_times.size());
   for (const auto& p : total_times) new_children.emplace_back(children_[p.second]);
   children_ = move(new_children);
 }

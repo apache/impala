@@ -55,6 +55,7 @@ class FreeListTest : public ::testing::Test {
 
   vector<const void*> GetSortedAddrs(const vector<BufferHandle>& buffers) {
     vector<const void*> addrs;
+    addrs.reserve(buffers.size());
     for (const BufferHandle& buffer : buffers) addrs.push_back(buffer.data());
     std::sort(addrs.begin(), addrs.end());
     return addrs;

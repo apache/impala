@@ -286,7 +286,7 @@ struct ColumnType {
     switch (col_type.type) {
       case TYPE_STRUCT: {
         int struct_size = 0;
-        for (ColumnType child_type : col_type.children) {
+        for (const ColumnType& child_type : col_type.children) {
           struct_size += GetSlotSize(child_type);
         }
         return struct_size;
@@ -310,7 +310,7 @@ struct ColumnType {
     switch (col_type.type) {
       case TYPE_STRUCT: {
         int struct_size = 0;
-        for (ColumnType child_type : col_type.children) {
+        for (const ColumnType& child_type : col_type.children) {
           struct_size += GetByteSize(child_type);
         }
         return struct_size;

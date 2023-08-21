@@ -1094,7 +1094,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
   // Two types of paths, one with directory, one without.
   vector<string> hdfs_paths{
       test_env_->GetDefaultFsPath(""), test_env_->GetDefaultFsPath("/tmp")};
-  for (string hdfs_path : hdfs_paths) {
+  for (const string& hdfs_path : hdfs_paths) {
     string full_hdfs_path = hdfs_path + "/impala-scratch";
     auto& dirs1 = GetTmpRemoteDir(CreateTmpFileMgr(hdfs_path + ",/tmp/local-buffer-dir"));
     EXPECT_NE(nullptr, dirs1);
@@ -1166,7 +1166,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
   fake_hdfs_conn_map.insert(make_pair("s3a://fake_host/", fake_conn));
   // Two types of paths, one with directory, one without.
   vector<string> s3_paths{"s3a://fake_host", "s3a://fake_host/dir"};
-  for (string s3_path : s3_paths) {
+  for (const string& s3_path : s3_paths) {
     string full_s3_path = s3_path + "/impala-scratch";
     auto& dirs13 = GetTmpRemoteDir(
         CreateTmpFileMgr("/tmp/local-buffer-dir, " + s3_path, true, &fake_hdfs_conn_map));

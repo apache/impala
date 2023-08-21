@@ -182,6 +182,7 @@ HdfsColumnarScanner::DivideReservationBetweenColumnsHelper(int64_t min_buffer_si
     int64_t reservation_to_distribute) {
   // Pair of (column index, reservation allocated).
   ColumnReservations tmp_reservations;
+  tmp_reservations.reserve(col_range_lengths.size());
   for (int i = 0; i < col_range_lengths.size(); ++i) tmp_reservations.emplace_back(i, 0);
 
   // Sort in descending order of length, breaking ties by index so that larger columns

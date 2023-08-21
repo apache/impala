@@ -98,6 +98,7 @@ TEST(HistogramTest, TestInt) {
   // TODO: Add more deterministic test cases
   {
     vector<IntVal> input;
+    input.reserve(INPUT_SIZE);
     for (int i = 0; i < INPUT_SIZE; ++i) input.push_back(i);
     test_histogram.SetResultComparator(CheckHistogramDistribution);
     StringVal max_expected_stdev = StringVal("100.0");
@@ -123,6 +124,7 @@ TEST(HistogramTest, TestDecimal) {
   // All input values are x, result should be constant.
   {
     vector<DecimalVal> input;
+    input.reserve(INPUT_SIZE);
     __int128_t val = MAX_UNSCALED_DECIMAL16;
     stringstream ss;
     for (int i = 0; i < INPUT_SIZE; ++i) input.push_back(DecimalVal(val));
@@ -135,6 +137,7 @@ TEST(HistogramTest, TestDecimal) {
 
   {
     vector<DecimalVal> input;
+    input.reserve(INPUT_SIZE);
     for (int i = 0; i < INPUT_SIZE; ++i) input.push_back(DecimalVal(i));
     test.SetResultComparator(CheckHistogramDistribution);
     StringVal max_expected_stdev = StringVal("100.0");
@@ -154,6 +157,7 @@ TEST(HistogramTest, TestString) {
 
   // All input values are x, result should be constant.
   vector<StringVal> input;
+  input.reserve(INPUT_SIZE);
   for (int i = 0; i < INPUT_SIZE; ++i) input.push_back(StringVal("x"));
   char expected[] = "x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, "
       "x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, "

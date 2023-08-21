@@ -843,6 +843,7 @@ LlvmCodeGen::FnPrototype::FnPrototype(
 llvm::Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
     LlvmBuilder* builder, llvm::Value** params) {
   vector<llvm::Type*> arguments;
+  arguments.reserve(args_.size());
   for (int i = 0; i < args_.size(); ++i) {
     arguments.push_back(args_[i].type);
   }

@@ -186,7 +186,7 @@ class AdmissionControllerTest : public testing::Test {
   /// Set the slots in use for all the hosts in 'host_addrs'.
   void SetSlotsInUse(AdmissionController* admission_controller,
       const vector<NetworkAddressPB>& host_addrs, int slots_in_use) {
-    for (NetworkAddressPB host_addr : host_addrs) {
+    for (const NetworkAddressPB& host_addr : host_addrs) {
       string host = NetworkAddressPBToString(host_addr);
       admission_controller->host_stats_[host].slots_in_use = slots_in_use;
     }

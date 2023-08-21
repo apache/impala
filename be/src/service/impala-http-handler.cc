@@ -792,12 +792,12 @@ void ImpalaHttpHandler::FillClientHostsInfo(
     total_connections += connection_ids.size();
     Value hostname(pair.first.c_str(), document->GetAllocator());
     client_host_json.AddMember("hostname", hostname, document->GetAllocator());
-    for (TUniqueId connection_id : connection_ids) {
+    for (const TUniqueId& connection_id : connection_ids) {
       ImpalaServer::ConnectionToSessionMap::iterator it =
           server_->connection_to_sessions_map_.find(connection_id);
       if (it != server_->connection_to_sessions_map_.end()) {
         std::set<TUniqueId> session_ids = it->second;
-        for (TUniqueId session_id : session_ids) {
+        for (const TUniqueId& session_id : session_ids) {
           ImpalaServer::SessionStateMap::iterator session_state_map_iterator =
               server_->session_state_map_.find(session_id);
           if (session_state_map_iterator != server_->session_state_map_.end()
@@ -885,7 +885,7 @@ void ImpalaHttpHandler::FillConnectionsInfo(
           server_->connection_to_sessions_map_.find(connection_context->connection_id);
       if (it != server_->connection_to_sessions_map_.end()) {
         // Filter out invalid session
-        for (TUniqueId session_id : it->second) {
+        for (const TUniqueId& session_id : it->second) {
           if (server_->session_state_map_.find(session_id)
               != server_->session_state_map_.end())
             valid_session_ids.insert(session_id);

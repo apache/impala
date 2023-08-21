@@ -1000,6 +1000,7 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
     unique_ptr<RequestContext> reader = io_mgr.RegisterContext();
 
     vector<ScanRange*> ranges;
+    ranges.reserve(num_ranges);
     for (int i = 0; i < num_ranges; ++i) {
       ranges.push_back(InitRange(&pool_, tmp_file, 0, DATA_BYTES, 0, stat_val.st_mtime));
     }
@@ -1482,6 +1483,7 @@ TEST_F(DiskIoMgrTest, SkipAllocateBuffers) {
 
   // We should not read past the end of file.
   vector<ScanRange*> ranges;
+  ranges.reserve(4);
   for (int i = 0; i < 4; ++i) {
     ranges.push_back(InitRange(&pool_, tmp_file, 0, len, 0, stat_val.st_mtime));
   }

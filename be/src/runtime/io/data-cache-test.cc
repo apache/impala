@@ -733,7 +733,7 @@ TEST_P(DataCacheTest, AccessTraceAnonymization) {
     ASSERT_OK(SimpleLogger::GetLogFiles(trace_dir, trace::TRACE_FILE_PREFIX,
         &trace_files));
 
-    for (string filename : trace_files) {
+    for (const string& filename : trace_files) {
       trace::TraceFileIterator trace_file_iter(filename);
       ASSERT_OK(trace_file_iter.Init());
       while (true) {

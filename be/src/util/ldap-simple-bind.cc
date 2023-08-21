@@ -182,7 +182,7 @@ string LdapSimpleBind::ConstructUserDN(const string& user) {
   string user_dn = user;
   if (!FLAGS_ldap_domain.empty()) {
     // Append @domain if there isn't already an @ in the user string.
-    if (user_dn.find("@") == string::npos) {
+    if (user_dn.find('@') == string::npos) {
       user_dn = Substitute("$0@$1", user_dn, FLAGS_ldap_domain);
     }
   } else if (!FLAGS_ldap_baseDN.empty()) {

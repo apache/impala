@@ -429,6 +429,7 @@ TEST(DictTest, TestSkippingValues) {
   };
 
   vector<int32_t> literal_values;
+  literal_values.reserve(200);
   for (int i = 0; i < 200; ++i) literal_values.push_back(i);
   ValidateSkipping(literal_values, literal_values, 0, 4);
   ValidateSkipping(literal_values, literal_values, 0, 130);

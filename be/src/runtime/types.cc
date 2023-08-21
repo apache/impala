@@ -282,6 +282,7 @@ string ColumnType::DebugString() const {
 
 vector<ColumnType> ColumnType::FromThrift(const vector<TColumnType>& ttypes) {
   vector<ColumnType> types;
+  types.reserve(ttypes.size());
   for (const TColumnType& ttype : ttypes) types.push_back(FromThrift(ttype));
   return types;
 }

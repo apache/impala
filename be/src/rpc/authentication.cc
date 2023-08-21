@@ -503,7 +503,7 @@ int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
 // Takes a Kerberos principal (either user/hostname@realm or user@realm)
 // and returns the username part.
 string GetShortUsernameFromKerberosPrincipal(const string& principal) {
-  size_t end_idx = min(principal.find("/"), principal.find("@"));
+  size_t end_idx = min(principal.find('/'), principal.find('@'));
   string short_user(
       end_idx == string::npos || end_idx == 0 ?
       principal : principal.substr(0, end_idx));

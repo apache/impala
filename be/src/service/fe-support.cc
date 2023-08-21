@@ -447,6 +447,7 @@ Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
       JniUtil::internal_exc_class(), nullptr);
 
   vector<ColumnType> arg_types;
+  arg_types.reserve(lookup.arg_types.size());
   for (int i = 0; i < lookup.arg_types.size(); ++i) {
     arg_types.push_back(ColumnType::FromThrift(lookup.arg_types[i]));
   }

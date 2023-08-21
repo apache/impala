@@ -230,6 +230,7 @@ class RleTest : public ::testing::Test {
   void TestRleValues(int bit_width, int num_vals, int value = -1) {
     const int64_t mod = (bit_width == 64) ? 1 : 1LL << bit_width;
     vector<int> values;
+    values.reserve(num_vals);
     for (int v = 0; v < num_vals; ++v) {
       values.push_back((value != -1) ? value : (v % mod));
     }
@@ -450,6 +451,7 @@ TEST_F(RleTest, BitWidthZeroLiteral) {
 // group but flush before finishing.
 TEST_F(RleTest, Flush) {
     vector<int> values;
+    values.reserve(18);
     for (int i = 0; i < 16; ++i) values.push_back(1);
     values.push_back(0);
     ValidateRle(values, 1, NULL, -1);

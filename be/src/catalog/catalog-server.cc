@@ -919,7 +919,7 @@ void CatalogServer::TableMetricsUrlCallback(const Webserver::WebRequest& req,
   if (object_name_arg != args.end()) {
     // Parse the object name to extract database and table names
     const string& full_tbl_name = object_name_arg->second;
-    int pos = full_tbl_name.find(".");
+    int pos = full_tbl_name.find('.');
     if (pos == string::npos || pos >= full_tbl_name.size() - 1) {
       stringstream error_msg;
       error_msg << "Invalid table name: " << full_tbl_name;

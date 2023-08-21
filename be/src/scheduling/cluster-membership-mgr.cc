@@ -517,7 +517,7 @@ ClusterMembershipMgr::BeDescSharedPtr ClusterMembershipMgr::GetLocalBackendDescr
 
 void ClusterMembershipMgr::NotifyListeners(SnapshotPtr snapshot) {
   lock_guard<mutex> l(callback_fn_lock_);
-  for (auto fn : update_callback_fns_) fn(snapshot);
+  for (const auto& fn : update_callback_fns_) fn(snapshot);
 }
 
 void ClusterMembershipMgr::SetState(const SnapshotPtr& new_state) {
@@ -695,6 +695,7 @@ void PopulateExecutorMembershipRequest(ClusterMembershipMgr::SnapshotPtr& snapsh
     }
     if (matching_exec_groups_found != snapshot->executor_groups.size()) {
       vector<string> group_sets;
+      group_sets.reserve(exec_group_sets.size());
       for (const auto& set : exec_group_sets) {
         group_sets.push_back(set.exec_group_name_prefix);
       }

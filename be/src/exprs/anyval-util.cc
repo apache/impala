@@ -102,6 +102,7 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
 vector<FunctionContext::TypeDesc> AnyValUtil::ColumnTypesToTypeDescs(
     const vector<ColumnType>& types) {
   vector<FunctionContext::TypeDesc> type_descs;
+  type_descs.reserve(types.size());
   for (const ColumnType& type : types) type_descs.push_back(ColumnTypeToTypeDesc(type));
   return type_descs;
 }

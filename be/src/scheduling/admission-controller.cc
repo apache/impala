@@ -545,6 +545,7 @@ string AdmissionController::GetLogStringForTopNQueriesInPool(
   // Now we are ready to report the stats.
   // Prepare an index object that indicates the reporting for all elements.
   std::vector<int> indices;
+  indices.reserve(items);
   for (int i=0; i<items; i++) indices.emplace_back(i);
   int indent = 0;
   stringstream ss;
@@ -782,7 +783,7 @@ void AdmissionController::PoolStats::Dequeue(bool timed_out) {
 void AdmissionController::UpdateStatsOnReleaseForBackends(const UniqueIdPB& query_id,
     RunningQuery& running_query, const vector<NetworkAddressPB>& host_addrs) {
   int64_t total_mem_to_release = 0;
-  for (auto host_addr : host_addrs) {
+  for (const auto& host_addr : host_addrs) {
     auto backend_allocation = running_query.per_backend_resources.find(host_addr);
     if (backend_allocation == running_query.per_backend_resources.end()) {
       // In the context of the admission control service, this may happen, eg. if a
@@ -1548,7 +1549,7 @@ void AdmissionController::ReleaseQueryBackendsLocked(const UniqueIdPB& query_id,
   if (VLOG_IS_ON(2)) {
     stringstream ss;
     ss << "Released query backend(s) ";
-    for (auto host_addr : host_addrs) ss << host_addr << " ";
+    for (const auto& host_addr : host_addrs) ss << host_addr << " ";
     ss << "for query id=" << PrintId(query_id) << " "
        << GetPoolStats(running_query.request_pool)->DebugString();
     VLOG(2) << ss.str();

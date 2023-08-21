@@ -100,6 +100,7 @@ TEST_F(HdfsParquetScannerTest, ComputeIdealReservation) {
   // Test sum of reservations that doesn't fit in int32.
   vector<int64_t> col_range_lengths;
   const int64_t LARGE_NUM_RANGES = 10000;
+  col_range_lengths.reserve(LARGE_NUM_RANGES);
   for (int i = 0; i < LARGE_NUM_RANGES; ++i) {
     col_range_lengths.push_back(4 * MAX_BUFFER_SIZE);
   }

@@ -100,7 +100,7 @@ class BufferPoolTest : public ::testing::Test {
     obj_pool_.Clear();
 
     // Tests modify permissions, so make sure we can delete if they didn't clean up.
-    for (string created_tmp_dir : created_tmp_dirs_) {
+    for (const string& created_tmp_dir : created_tmp_dirs_) {
       chmod((created_tmp_dir + SCRATCH_SUFFIX).c_str(), S_IRWXU);
     }
     ASSERT_OK(FileSystemUtil::RemovePaths(created_tmp_dirs_));
@@ -408,6 +408,7 @@ class BufferPoolTest : public ::testing::Test {
   // pages.
   static string TmpFilePaths(vector<PageHandle>& pages) {
     vector<string> paths;
+    paths.reserve(pages.size());
     for (PageHandle& page : pages) {
       paths.push_back(TmpFilePath(&page));
     }

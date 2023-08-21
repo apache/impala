@@ -696,6 +696,7 @@ Status StatestoreSubscriber::StatestoreStub::UpdateState(
   // Put the updates into ascending order of topic name to match the lock acquisition
   // order of TopicRegistration::update_lock.
   vector<const TTopicDelta*> deltas_to_process;
+  deltas_to_process.reserve(incoming_topic_deltas.size());
   for (auto& delta : incoming_topic_deltas) deltas_to_process.push_back(&delta.second);
   sort(deltas_to_process.begin(), deltas_to_process.end(),
       [](const TTopicDelta* left, const TTopicDelta* right) {

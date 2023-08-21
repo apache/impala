@@ -361,7 +361,7 @@ void DmlExecState::PopulatePathPermissionCache(hdfsFS fs, const string& path_str
   string stripped_str;
   if (scheme_end != string::npos) {
     // Skip past the subsequent location:port/ prefix.
-    stripped_str = path_str.substr(path_str.find("/", scheme_end + 3));
+    stripped_str = path_str.substr(path_str.find('/', scheme_end + 3));
   } else {
     stripped_str = path_str;
   }

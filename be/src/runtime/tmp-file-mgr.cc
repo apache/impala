@@ -817,7 +817,7 @@ Status TmpDirHdfs::ParsePathTokens(vector<string>& toks) {
   split(toks, raw_path_, is_any_of(":"), token_compress_off);
   // Only called on paths starting with `hdfs://` or `ofs://`.
   DCHECK(toks.size() >= 2);
-  if (toks[1].rfind("/") > 1) {
+  if (toks[1].rfind('/') > 1) {
     // Contains a slash after the scheme, so port number was omitted.
     toks[0] = Substitute("$0:$1", toks[0], toks[1]);
     toks.erase(toks.begin()+1);

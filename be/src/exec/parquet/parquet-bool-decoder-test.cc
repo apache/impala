@@ -73,6 +73,7 @@ void TestSkipping(parquet::Encoding::type encoding, uint8_t* encoded_data,
 TEST(ParquetBoolDecoder, TestDecodeAndSkipping) {
   vector<bool> expected_data;
   // Write 100 falses, 100 trues, 100 alternating falses and trues, 100 falses
+  expected_data.reserve(400);
   for (int i = 0; i < 100; ++i) expected_data.push_back(false);
   for (int i = 0; i < 100; ++i) expected_data.push_back(true);
   for (int i = 0; i < 100; ++i) expected_data.push_back(i % 2);

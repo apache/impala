@@ -165,7 +165,7 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->__set_type(object_type);
       catalog_object->__set_table(TTable());
       // Parse what should be a fully qualified table name
-      int pos = object_name.find(".");
+      int pos = object_name.find('.');
       if (pos == string::npos || pos >= object_name.size() - 1) {
         stringstream error_msg;
         error_msg << "Invalid table name: " << object_name;
@@ -181,8 +181,8 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       // db, fn and signature.
       catalog_object->__set_type(object_type);
       catalog_object->__set_fn(TFunction());
-      int dot = object_name.find(".");
-      int paren = object_name.find("(");
+      int dot = object_name.find('.');
+      int paren = object_name.find('(');
       if (dot == string::npos || dot >= object_name.size() - 1 ||
           paren == string::npos || paren >= object_name.size() - 1 ||
           paren <= dot) {

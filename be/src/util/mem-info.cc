@@ -130,7 +130,7 @@ MappedMemInfo MemInfo::ParseSmaps() {
     size_t colon_pos = line.find(':');
     if (colon_pos == string::npos) continue;
     string name = line.substr(0, colon_pos);
-    size_t non_space_after_colon_pos = line.find_first_not_of(" ", colon_pos + 1);
+    size_t non_space_after_colon_pos = line.find_first_not_of(' ', colon_pos + 1);
     if (non_space_after_colon_pos == string::npos) continue;
     // From the first non-space after the colon through the end of the string.
     string value = line.substr(non_space_after_colon_pos);

@@ -634,7 +634,7 @@ Status ImpalaServer::PopulateAuthorizedProxyConfig(
       token_compress_on);
   if (proxy_config.size() > 0) {
     for (const string& config: proxy_config) {
-      size_t pos = config.find("=");
+      size_t pos = config.find('=');
       if (pos == string::npos) {
         return Status(config);
       }
@@ -2060,7 +2060,7 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
 
   // Get the short version of the user name (the user name up to the first '/' or '@')
   // from the full principal name.
-  size_t end_idx = min(user.find("/"), user.find("@"));
+  size_t end_idx = min(user.find('/'), user.find('@'));
   // If neither are found (or are found at the beginning of the user name),
   // return the username. Otherwise, return the username up to the matching character.
   string short_user(
@@ -2117,7 +2117,7 @@ bool ImpalaServer::IsAuthorizedProxyUser(const string& user) {
 
   // Get the short version of the user name (the user name up to the first '/' or '@')
   // from the full principal name.
-  size_t end_idx = min(user.find("/"), user.find("@"));
+  size_t end_idx = min(user.find('/'), user.find('@'));
   // If neither are found (or are found at the beginning of the user name),
   // return the username. Otherwise, return the username up to the matching character.
   string short_user(
