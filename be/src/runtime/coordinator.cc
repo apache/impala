@@ -662,6 +662,7 @@ string Coordinator::FilterDebugString() {
 
       // Also add the min/max value for the accumulated filter as follows.
       //  'PartialUpdates' - The min and the max are partially updated;
+      //  'LOCAL'          - It is a local filter that is not aggregate in coordinator;
       //  'AlwaysTrue'     - One received filter is AlwaysTrue;
       //  'AlwaysFalse'    - No filter is received or all received filters are empty;
       //  'Real values'    - The final accumulated min/max from all filters received.
@@ -686,9 +687,12 @@ string Coordinator::FilterDebugString() {
             row.push_back(MinMaxFilter::DebugString(minmax_filterPB.max(),
                 ColumnType::FromThrift(state.desc().src_expr.nodes[0].type)));
           }
+        } else if (state.desc().has_remote_targets) {
+          row.push_back("PartialUpdates");
+          row.push_back("PartialUpdates");
         } else {
-          row.push_back("PartialUpdates");
-          row.push_back("PartialUpdates");
+          row.push_back("LOCAL");
+          row.push_back("LOCAL");
         }
       }
       row.push_back("");
@@ -707,8 +711,10 @@ string Coordinator::FilterDebugString() {
         } else {
           row.push_back(std::to_string(in_list_filterPB.value().size()));
         }
-      } else {
+      } else if (state.desc().has_remote_targets) {
         row.push_back("PartialUpdates");
+      } else {
+        row.push_back("LOCAL");
       }
     }
     table_printer.AddRow(row);
