@@ -123,7 +123,7 @@ public class CastExpr extends Expr {
     isImplicit_ = other.isImplicit_;
     noOp_ = other.noOp_;
     castFormat_ = other.castFormat_;
-    compatibility_ = TypeCompatibility.DEFAULT;
+    compatibility_ = other.compatibility_;
   }
 
   private static String getFnName(Type targetType) {

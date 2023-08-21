@@ -555,6 +555,9 @@ class TestUnsafeImplicitCasts(ImpalaTestSuite):
       double_col double, decimal_col decimal, timestamp_col timestamp, date_col date,
       string_col string, varchar_col varchar(100), char_col char(100),
       bool_col boolean, binary_col binary)""".format(unique_database)
+    create_partitioned_stmt = """create table {0}.unsafe_insert_partitioned(int_col int,
+      tinyint_col tinyint) partitioned by(string_col string)""".format(unique_database)
     self.client.execute(create_stmt)
+    self.client.execute(create_partitioned_stmt)
     vector.get_value('exec_option')['allow_unsafe_casts'] = "true"
     self.run_test_case('QueryTest/insert-unsafe', vector, unique_database)
