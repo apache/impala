@@ -119,6 +119,10 @@ class Frontend {
   /// information on the error will be returned.
   Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
 
+  /// Gets the Java object of a Catalog table object. It can be used to call Java methods
+  /// of the Catalog Table object.
+  Status GetCatalogTable(const TTableName& table_name, jobject *result);
+
   /// Call FE to get the roles.
   Status ShowRoles(const TShowRolesParams& params, TShowRolesResult* result);
 
@@ -246,6 +250,7 @@ class Frontend {
   jmethodID get_functions_id_; // JniFrontend.getFunctions
   jmethodID get_table_history_id_; // JniFrontend.getTableHistory
   jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject
+  jmethodID get_catalog_table_id_; // JniFrontend.getCatalogTable
   jmethodID show_roles_id_; // JniFrontend.getRoles
   jmethodID get_principal_privileges_id_; // JniFrontend.getPrincipalPrivileges
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp

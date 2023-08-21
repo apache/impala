@@ -3758,6 +3758,23 @@ INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(3, 'parquet', 2.5, fa
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_query_metadata
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  i int
+)
+STORED BY ICEBERG
+LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata'
+TBLPROPERTIES('format-version'='2');
+---- DEPENDENT_LOAD
+INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (1);
+INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (2);
+INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (3);
+DELETE FROM {db_name}{db_suffix}.{table_name} WHERE i = 2;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 iceberg_lineitem_multiblock
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}

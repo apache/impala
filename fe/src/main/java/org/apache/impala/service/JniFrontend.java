@@ -38,8 +38,10 @@ import org.apache.impala.authentication.saml.WrappedWebContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
@@ -53,6 +55,7 @@ import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBuildTestDescriptorTableParams;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDescribeDbParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
@@ -112,6 +115,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.lang.IllegalArgumentException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -612,6 +616,13 @@ public class JniFrontend {
   public void waitForCatalog() {
     Preconditions.checkNotNull(frontend_);
     frontend_.waitForCatalog();
+  }
+
+  FeTable getCatalogTable(byte[] tableNameParam) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TTableName tableName = new TTableName();
+    JniUtil.deserializeThrift(protocolFactory_, tableName, tableNameParam);
+    return frontend_.getCatalog().getTable(tableName.db_name, tableName.table_name);
   }
 
   // Caching this saves ~50ms per call to getHadoopConfigAsHtml

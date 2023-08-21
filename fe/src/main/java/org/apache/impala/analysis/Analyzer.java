@@ -3618,7 +3618,7 @@ public class Analyzer {
       // The catalog table (the base of the virtual table) has been loaded and cached
       // under the name of the virtual table.
       FeTable catalogTable = getStmtTableCache().tables.get(virtualTableName);
-      if (catalogTable instanceof IcebergMetadataTable) return;
+      if (catalogTable instanceof IcebergMetadataTable || catalogTable == null) return;
       IcebergMetadataTable virtualTable =
           new IcebergMetadataTable(catalogTable, tblRefPath.get(2));
       getStmtTableCache().tables.put(catalogTableName, catalogTable);

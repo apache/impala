@@ -29,6 +29,7 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.VirtualColumn;
+import org.apache.impala.catalog.VirtualTable;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.thrift.TVirtualColumnType;
 import org.apache.impala.util.AcidUtils;
@@ -447,6 +448,9 @@ public class Path {
     } else {
       result.add(rootTable_.getDb().getName());
       result.add(rootTable_.getName());
+      if (rootTable_ instanceof VirtualTable) {
+        result.add(((IcebergMetadataTable)rootTable_).getMetadataTableName());
+      }
     }
     result.addAll(rawPath_);
     return result;

@@ -71,6 +71,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -1872,7 +1873,6 @@ public class SingleNodePlanner {
       Expr.removeDuplicates(conjuncts);
     }
 
-    // TODO(todd) introduce FE interfaces for DataSourceTable, HBaseTable, KuduTable
     FeTable table = tblRef.getTable();
     if (table instanceof FeFsTable) {
       if (table instanceof FeIcebergTable) {
@@ -1897,16 +1897,18 @@ public class SingleNodePlanner {
           aggInfo, tblRef);
       scanNode.init(analyzer);
       return scanNode;
+    } else if (table instanceof IcebergMetadataTable) {
+      return createIcebergMetadataScanNode(tblRef, conjuncts, analyzer);
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table class: " + table.getClass());
     }
   }
 
-  private PlanNode createIcebergMetadataScanNode(TableRef tblRef, Analyzer analyzer)
-      throws ImpalaException {
+  private PlanNode createIcebergMetadataScanNode(TableRef tblRef, List<Expr> conjuncts,
+      Analyzer analyzer) throws ImpalaException {
     IcebergMetadataScanNode icebergMetadataScanNode =
-        new IcebergMetadataScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
+        new IcebergMetadataScanNode(ctx_.getNextNodeId(), conjuncts, tblRef);
     icebergMetadataScanNode.init(analyzer);
     return icebergMetadataScanNode;
   }
@@ -2224,7 +2226,7 @@ public class SingleNodePlanner {
       result = new SingularRowSrcNode(ctx_.getNextNodeId(), ctx_.getSubplan());
       result.init(analyzer);
     } else if (tblRef instanceof IcebergMetadataTableRef) {
-      result = createIcebergMetadataScanNode(tblRef, analyzer);
+      result = createScanNode(tblRef, aggInfo, analyzer);
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table ref class: " + tblRef.getClass());

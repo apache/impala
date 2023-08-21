@@ -29,6 +29,8 @@ import com.google.common.base.Preconditions;
  */
 public class IcebergMetadataTableRef extends TableRef {
 
+  private String metadataTableName_;
+
   public IcebergMetadataTableRef(TableRef tableRef, Path resolvedPath) {
     super(tableRef);
     Preconditions.checkState(resolvedPath.isResolved());
@@ -37,10 +39,15 @@ public class IcebergMetadataTableRef extends TableRef {
     resolvedPath_ = resolvedPath;
     IcebergMetadataTable iceMTbl = (IcebergMetadataTable)resolvedPath.getRootTable();
     FeIcebergTable iceTbl = iceMTbl.getBaseTable();
+    metadataTableName_ = iceMTbl.getMetadataTableName();
     if (hasExplicitAlias()) return;
     aliases_ = new String[] {
       iceTbl.getTableName().toString().toLowerCase(),
       iceTbl.getName().toLowerCase()};
+  }
+
+  public String getMetadataTableName() {
+    return metadataTableName_;
   }
 
   @Override
@@ -49,8 +56,11 @@ public class IcebergMetadataTableRef extends TableRef {
     IcebergMetadataTable rootTable = (IcebergMetadataTable)resolvedPath_.getRootTable();
     FeTable iceRootTable = rootTable.getBaseTable();
     analyzer.registerAuthAndAuditEvent(iceRootTable, priv_, requireGrantOption_);
+    analyzeTimeTravel(analyzer);
     desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;
+    analyzeHints(analyzer);
+    analyzeJoin(analyzer);
   }
 
 }

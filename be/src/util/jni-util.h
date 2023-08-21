@@ -226,6 +226,8 @@ class JniCall {
 
   Status ObjectToResult(jobject obj, std::string* result) WARN_UNUSED_RESULT;
 
+  Status ObjectToResult(jobject obj, jobject* result) WARN_UNUSED_RESULT;
+
   const jmethodID method_;
   JNIEnv* const env_;
   JniLocalFrame frame_;
@@ -280,6 +282,16 @@ class JniUtil {
   /// (e.g. a JNI exception). This function does not log any errors or exceptions.
   static bool MethodExists(JNIEnv* env, jclass class_ref,
       const char* method_str, const char* method_signature);
+
+  /// Wrapper method around JNI's 'GetMethodID'. Returns the method reference for the
+  /// requested method.
+  static Status GetMethodID(JNIEnv* env, jclass class_ref, const char* method_str,
+      const char* method_signature, jmethodID* method_ref);
+
+  /// Wrapper method around JNI's 'GetStaticMethodID'. Returns the method reference for
+  /// the requested method.
+  static Status GetStaticMethodID(JNIEnv* env, jclass class_ref, const char* method_str,
+      const char* method_signature, jmethodID* method_ref);
 
   /// Returns a global JNI reference to the class specified by class_str into class_ref.
   /// The returned reference must eventually be freed by calling FreeGlobalRef() (or have
@@ -377,6 +389,10 @@ class JniUtil {
   static Status CallJniMethod(const jobject& obj, const jmethodID& method,
       R* response) WARN_UNUSED_RESULT;
 
+  template <typename T>
+  static Status CallJniMethod(const jobject& obj, const jmethodID& method,
+      const T& arg, jobject* response) WARN_UNUSED_RESULT;
+
  private:
   // Slow-path for GetJNIEnv, used on the first call by any thread.
   static JNIEnv* GetJNIEnvSlowPath();
@@ -442,6 +458,12 @@ inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method
   return JniCall::instance_method(obj, method).Call(response);
 }
 
+template <typename T>
+inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method,
+    const T& arg, jobject* response) {
+  return JniCall::instance_method(obj, method).with_thrift_arg(arg).Call(response);
+}
+
 inline JniCall::JniCall(jmethodID method)
   : method_(method),
     env_(JniUtil::GetJNIEnv()) {
@@ -503,6 +525,14 @@ inline Status JniCall::ObjectToResult(jobject obj, std::string* result) {
   JniUtfCharGuard utf;
   RETURN_IF_ERROR(JniUtfCharGuard::create(env_, static_cast<jstring>(obj), &utf));
   *result = utf.get();;
+  return Status::OK();
+}
+
+inline Status JniCall::ObjectToResult(jobject obj, jobject* result) {
+  DCHECK(obj) << "Call returned unexpected null Thrift object";
+  JNIEnv* env = JniUtil::GetJNIEnv();
+  if (env == nullptr) return Status("Failed to get/create JVM");
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, obj, result));
   return Status::OK();
 }
 

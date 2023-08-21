@@ -27,7 +27,6 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.VirtualTable;
@@ -45,7 +44,11 @@ import com.google.common.base.Preconditions;
  * table object based on the Iceberg API.
  */
 public class IcebergMetadataTable extends VirtualTable {
+
+  // The Iceberg table that is the base of the metadata table.
   private FeIcebergTable baseTable_;
+
+  // Name of the metadata table.
   private String metadataTableName_;
 
   public IcebergMetadataTable(FeTable baseTable, String metadataTableTypeStr)
@@ -53,7 +56,7 @@ public class IcebergMetadataTable extends VirtualTable {
     super(null, baseTable.getDb(), baseTable.getName(), baseTable.getOwnerUser());
     Preconditions.checkArgument(baseTable instanceof FeIcebergTable);
     baseTable_ = (FeIcebergTable) baseTable;
-    metadataTableName_ = metadataTableTypeStr;
+    metadataTableName_ = metadataTableTypeStr.toUpperCase();
     MetadataTableType type = MetadataTableType.from(metadataTableTypeStr.toUpperCase());
     Preconditions.checkNotNull(type);
     Table metadataTable = MetadataTableUtils.createMetadataTableInstance(
@@ -77,6 +80,10 @@ public class IcebergMetadataTable extends VirtualTable {
   @Override
   public String getFullName() {
     return super.getFullName() + "." + metadataTableName_;
+  }
+
+  public String getMetadataTableName() {
+    return metadataTableName_;
   }
 
   @Override
@@ -105,7 +112,6 @@ public class IcebergMetadataTable extends VirtualTable {
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
     TTableDescriptor desc = baseTable_.toThriftDescriptor(tableId, referencedPartitions);
-    desc.setColumnDescriptors(FeCatalogUtils.getTColumnDescriptors(this));
     return desc;
   }
 

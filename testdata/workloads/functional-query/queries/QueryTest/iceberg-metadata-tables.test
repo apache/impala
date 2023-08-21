@@ -1,132 +1,456 @@
+# The test table for these tests are created during dataload by Impala. An existing table
+# could not have been rewritten manually, because avrotools removes additional schemata
+# from the manifests files that Iceberg adds. Therefore, the query results are checked
+# with regexp.
+####
+# Test 0 : Query all the metadata tables once
+####
 ====
 ---- QUERY
-# List of all metadata tables in current version
-select * from functional_parquet.iceberg_alltypes_part_orc.entries
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.entries' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.entries;
+---- RESULTS
+# Example:
+# 1,8283026816932323050,3,3
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
 ---- TYPES
-STRING
+INT,BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
-# 'Files' is a keyword and need to be escaped
-select * from functional_parquet.iceberg_alltypes_part_orc.`files`
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.files' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.`files`;
+---- RESULTS
+# Example:
+# 0,'hdfs://localhost:20500/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/754b1471ee8d8aa2-4f2f33ef00000000_134436143_data.0.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'NULL',NULL
 ---- TYPES
-STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,BINARY,INT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.data_files
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.data_files' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.data_files;
+---- RESULTS
+# Example:
+# 0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/data/944a2355e618932f-18f086b600000000_1283312202_data.0.parq','PARQUET',0,1,351,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
 ---- TYPES
-STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,BINARY,INT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.delete_files
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.delete_files' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.delete_files;
+---- RESULTS
+# Example:
+# 1,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/data/delete-1f43b217940cc094-fedf515600000000_248998721_data.0.parq','PARQUET',0,1,1489,'NULL',NULL
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'NULL',NULL
 ---- TYPES
-STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,BINARY,INT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.history
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.history;
+---- RESULTS
+# Example:
+# 2023-08-16 12:18:15.523000000,9046920472784493998,8491702501245661704,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
 ---- TYPES
-STRING
+TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.snapshots
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.snapshots' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.metadata_log_entries;
+---- RESULTS
+# Example:
+# 2023-08-16 12:18:11.061000000,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/00000-0ae98ebd-b200-4381-9d97-1f93954423a9.metadata.json',NULL,NULL,NULL
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',NULL,NULL,NULL
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,1
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,2
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,3
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,4
 ---- TYPES
-STRING
+TIMESTAMP,STRING,BIGINT,INT,BIGINT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.manifests
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.manifests' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.snapshots;
+---- RESULTS
+# Example:
+# 2023-08-16 12:18:15.322000000,8491702501245661704,NULL,'append','hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/snap-8491702501245661704-1-88a39285-529f-41a4-bd69-6d2560fac64e.avro'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,'overwrite','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro'
 ---- TYPES
-STRING
+TIMESTAMP,BIGINT,BIGINT,STRING,STRING
 ====
 ---- QUERY
-# 'Partitions' is a keyword and need to be escaped
-select * from functional_parquet.iceberg_alltypes_part_orc.`partitions`
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.partitions' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.refs;
+---- RESULTS
+row_regex:'main','BRANCH',[1-9]\d*|0,NULL,NULL,NULL
 ---- TYPES
-STRING
+STRING,STRING,BIGINT,BIGINT,INT,BIGINT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.all_data_files
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_data_files' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.manifests;
+---- RESULTS
+# Example:
+# row_regex:0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/38e5a1bd-5b7f-4eae-9362-16a2de3c575d-m0.avro',6631,0,8283026816932323050,1,0,0,0,0,0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,0,0,0,1,0,0
 ---- TYPES
-STRING
+INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.all_files
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_files' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.`partitions`;
+---- RESULTS
+3,3,1,1,0,0
 ---- TYPES
-STRING
+BIGINT,INT,BIGINT,INT,BIGINT,INT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.all_manifests
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_manifests' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.all_data_files;
+---- RESULTS
+# Example:
+# 0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/data/944a2355e618932f-18f086b600000000_1283312202_data.0.parq','PARQUET',0,1,351,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
 ---- TYPES
-STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,BINARY,INT
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_alltypes_part_orc.all_entries
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.all_entries' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.all_delete_files;
+---- RESULTS
+# Example:
+# 1,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/data/delete-1f43b217940cc094-fedf515600000000_248998721_data.0.parq','PARQUET',0,1,1489,'NULL',NULL
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'NULL',NULL
 ---- TYPES
-STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,BINARY,INT
 ====
 ---- QUERY
-# Select list with column name
-select snapshot_id from functional_parquet.iceberg_alltypes_part_orc.history
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.all_files;
+---- RESULTS
+# Example:
+# 0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/data/3d481ed88b2941f0-ea33816200000000_1109948289_data.0.parq','PARQUET',0,1,351,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'',0
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*|0,'NULL',NULL
 ---- TYPES
-STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,BINARY,INT
 ====
 ---- QUERY
-# Joining tables
-select *
-from functional_parquet.iceberg_alltypes_part_orc.history q
-  join functional_parquet.iceberg_alltypes_part_orc.snapshots z
-  on z.snapshot_id = q.snapshot_id
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.all_manifests;
+---- RESULTS
+# Example:
+# 0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/38e5a1bd-5b7f-4eae-9362-16a2de3c575d-m0.avro',6631,0,8283026816932323050,1,0,0,0,0,0,7858675898458780516
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,1,0,0,0,0,0,[1-9]\d*|0
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',[1-9]\d*|0,0,[1-9]\d*|0,0,0,0,1,0,0,[1-9]\d*|0
 ---- TYPES
-STRING
+INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT,BIGINT
 ====
 ---- QUERY
-# Inline query
-select x.snapshot_id
-from (select * from functional_parquet.iceberg_alltypes_part_orc.history) x;
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.history' refers to a metadata table which is currently not supported.
+select * from functional_parquet.iceberg_query_metadata.all_entries;
+---- RESULTS
+# Example:
+# 1,7858675898458780516,4,4
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
+row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
 ---- TYPES
-STRING
+INT,BIGINT,BIGINT,BIGINT
+
+####
+# Test 1 : Test select list
+####
 ====
 ---- QUERY
-# Complext type
-select *, a.partition_summaries.pos from functional_parquet.iceberg_alltypes_part_orc.manifests a, a.partition_summaries
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.manifests' refers to a metadata table which is currently not supported.
+select snapshot_id from functional_parquet.iceberg_query_metadata.history;
+---- RESULTS
+# Example:
+# 7858675898458780516
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
 ---- TYPES
-STRING
+BIGINT
 ====
 ---- QUERY
-# Using complex type 'map' column without a join
-select summary from functional_parquet.iceberg_alltypes_part_orc.snapshots;
----- CATCH
-NotImplementedException: 'functional_parquet.iceberg_alltypes_part_orc.snapshots' refers to a metadata table which is currently not supported.
+select snapshot_id, * from functional_parquet.iceberg_query_metadata.history;
+---- RESULTS
+# Example:
+# 7858675898458780516,2023-08-16 12:18:18.584000000,7858675898458780516,8283026816932323050,true
+row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
+row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
 ---- TYPES
-STRING
+BIGINT,TIMESTAMP,BIGINT,BIGINT,BOOLEAN
+====
+---- QUERY
+select count(*) from functional_parquet.iceberg_query_metadata.history;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+select record_count + file_count from functional_parquet.iceberg_query_metadata.`partitions`;
+---- RESULTS
+6
+---- TYPES
+BIGINT
+
+####
+# Test 2 : Test filtering
+####
+====
+---- QUERY
+# Test BIGINT
+select * from functional_parquet.iceberg_query_metadata.history
+where snapshot_id = $OVERWRITE_SNAPSHOT_ID;
+---- RESULTS
+# Example:
+# 2023-08-16 12:18:15.523000000,9046920472784493998,8491702501245661704,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
+---- TYPES
+TIMESTAMP,BIGINT,BIGINT,BOOLEAN
+====
+---- QUERY
+# Test BOOLEAN
+select * from functional_parquet.iceberg_query_metadata.history
+where is_current_ancestor = true;
+---- RESULTS
+# Example:
+# 2023-08-16 12:18:15.523000000,9046920472784493998,8491702501245661704,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+---- TYPES
+TIMESTAMP,BIGINT,BIGINT,BOOLEAN
+====
+---- QUERY
+# Test STRING
+select * from functional_parquet.iceberg_query_metadata.snapshots
+where operation = 'overwrite';
+---- RESULTS
+# Example:
+# 2023-08-16 12:18:15.322000000,8491702501245661704,NULL,'append','hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/snap-8491702501245661704-1-88a39285-529f-41a4-bd69-6d2560fac64e.avro'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,'overwrite','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro'
+---- TYPES
+TIMESTAMP,BIGINT,BIGINT,STRING,STRING
+====
+---- QUERY
+# Test TIMESTAMP
+select * from functional_parquet.iceberg_query_metadata.history
+where made_current_at = cast("$OVERWRITE_SNAPSHOT_TS" as timestamp);
+---- RESULTS
+row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
+---- TYPES
+TIMESTAMP,BIGINT,BIGINT,BOOLEAN
+====
+---- QUERY
+# Test conjunct slot materialization
+select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots
+where operation = 'overwrite';
+---- RESULTS
+$OVERWRITE_SNAPSHOT_ID
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test an expression rewrite: OR -> IN ()
+select * from functional_parquet.iceberg_query_metadata.history
+where snapshot_id = $OVERWRITE_SNAPSHOT_ID or snapshot_id = 1;
+---- RESULTS
+row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
+---- TYPES
+TIMESTAMP,BIGINT,BIGINT,BOOLEAN
+
+####
+# Test 2 : Test joins
+####
+====
+---- QUERY
+select a.snapshot_id, b.snapshot_id from functional_parquet.iceberg_query_metadata.history a
+join functional_parquet.iceberg_query_metadata.history b on a.snapshot_id = b.snapshot_id;
+---- RESULTS
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+select a.snapshot_id, b.parent_id from functional_parquet.iceberg_query_metadata.history a
+join functional_parquet.iceberg_query_metadata.history b on a.snapshot_id = b.snapshot_id;
+---- RESULTS
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+row_regex:[1-9]\d*|0,[1-9]\d*|0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+select count(b.parent_id) from functional_parquet.iceberg_query_metadata.history a
+join functional_parquet.iceberg_query_metadata.history b on a.snapshot_id = b.snapshot_id;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+select a.snapshot_id from functional_parquet.iceberg_query_metadata.history a
+join functional_parquet.iceberg_query_metadata.snapshots b on a.snapshot_id = b.snapshot_id
+where a.snapshot_id = $OVERWRITE_SNAPSHOT_ID;
+---- RESULTS
+$OVERWRITE_SNAPSHOT_ID
+---- TYPES
+BIGINT
+
+####
+# Test 3 : Inline query
+####
+====
+---- QUERY
+select a.snapshot_id
+from (select * from functional_parquet.iceberg_query_metadata.history) a;
+---- RESULTS
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+---- TYPES
+BIGINT
+
+####
+# Test 4 : Complex types
+# Currently not supported, complex type slots are set to NULL (IMPALA-12205)
+####
+====
+---- QUERY
+select snapshot_id, summary from functional_parquet.iceberg_query_metadata.snapshots;
+---- RESULTS
+row_regex:[1-9]\d*|0,'NULL'
+row_regex:[1-9]\d*|0,'NULL'
+row_regex:[1-9]\d*|0,'NULL'
+row_regex:[1-9]\d*|0,'NULL'
+---- TYPES
+BIGINT,STRING
+
+####
+# Test 5 : Multiple RowBatch results
+####
+====
+---- QUERY
+set BATCH_SIZE=1;
+select * from functional_parquet.iceberg_query_metadata.history;
+---- RESULTS
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+---- TYPES
+TIMESTAMP,BIGINT,BIGINT,BOOLEAN
+
+
+####
+# Test 6 : Timetravel
+# Timetravel is not supported currently, related Jira IMPALA-11991.
+####
+====
+---- QUERY
+select * from functional_parquet.iceberg_query_metadata.snapshots FOR SYSTEM_VERSION AS OF $OVERWRITE_SNAPSHOT_ID;
+---- CATCH
+AnalysisException: FOR SYSTEM_VERSION AS OF clause is only supported for Iceberg tables. functional_parquet.iceberg_query_metadata.SNAPSHOTS is not an Iceberg table.
+====
+
+####
+# Test 7 : Use-cases
+####
+====
+---- QUERY
+# All reachable manifest files size
+select sum(length) from functional_parquet.iceberg_query_metadata.all_manifests;
+---- RESULTS
+row_regex:[1-9]\d*|0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# How many manifests?
+SELECT count(*) FROM functional_parquet.iceberg_query_metadata.manifests;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Join metadata table with table
+SELECT i, INPUT__FILE__NAME, file_size_in_bytes from functional_parquet.iceberg_query_metadata tbl
+JOIN functional_parquet.iceberg_query_metadata.all_files mtbl on tbl.input__file__name = mtbl.file_path;
+---- RESULTS
+row_regex:[1-9]\d*|0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',[1-9]\d*|0
+row_regex:[1-9]\d*|0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',[1-9]\d*|0
+---- TYPES
+INT,STRING,BIGINT
+
+####
+# Test 8 : Invalid operations
+# In most cases the parser catches the table reference.
+####
+====
+---- QUERY
+describe functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+AnalysisException: Could not resolve path: 'functional_parquet.iceberg_query_metadata.snapshots'
+====
+---- QUERY
+show create table functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+ParseException: Syntax error in line 1
+====
+---- QUERY
+insert into table functional_parquet.iceberg_query_metadata.snapshots values (1);
+---- CATCH
+ParseException: Syntax error in line 1
+====
+---- QUERY
+refresh functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+ParseException: Syntax error in line 1
+====
+---- QUERY
+invalidate metadata functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+ParseException: Syntax error in line 1
+====
+---- QUERY
+drop table functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+ParseException: Syntax error in line 1
+====
+---- QUERY
+alter table functional_parquet.iceberg_query_metadata.snapshots add columns (col int);
+---- CATCH
+ParseException: Syntax error in line 1
 ====

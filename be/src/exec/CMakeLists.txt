@@ -24,6 +24,7 @@ add_subdirectory(parquet)
 add_subdirectory(rcfile)
 add_subdirectory(sequence)
 add_subdirectory(text)
+add_subdirectory(iceberg-metadata)
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")

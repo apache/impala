@@ -81,6 +81,7 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -141,7 +142,8 @@ public class IcebergScanPlanner {
   public IcebergScanPlanner(Analyzer analyzer, PlannerContext ctx,
       TableRef iceTblRef, List<Expr> conjuncts, MultiAggregateInfo aggInfo)
       throws ImpalaException {
-    Preconditions.checkState(iceTblRef.getTable() instanceof FeIcebergTable);
+    Preconditions.checkState(iceTblRef.getTable() instanceof FeIcebergTable ||
+        iceTblRef.getTable() instanceof IcebergMetadataTable);
     analyzer_ = analyzer;
     ctx_ = ctx;
     tblRef_ = iceTblRef;

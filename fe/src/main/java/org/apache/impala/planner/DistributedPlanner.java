@@ -116,8 +116,13 @@ public class DistributedPlanner {
 
     PlanFragment result = null;
     if (root instanceof ScanNode) {
-      result = createScanFragment(root);
-      fragments.add(result);
+      if (root instanceof IcebergMetadataScanNode) {
+        result = createIcebergMetadataScanFragment(root);
+        fragments.add(result);
+      } else {
+        result = createScanFragment(root);
+        fragments.add(result);
+      }
     } else if (root instanceof HashJoinNode) {
       Preconditions.checkState(childFragments.size() == 2);
       result = createHashJoinFragment((HashJoinNode) root,
@@ -152,9 +157,6 @@ public class DistributedPlanner {
           ctx_.getNextFragmentId(), root, DataPartition.UNPARTITIONED);
     } else if (root instanceof CardinalityCheckNode) {
       result = createCardinalityCheckNodeFragment((CardinalityCheckNode) root, childFragments);
-    } else if (root instanceof IcebergMetadataScanNode) {
-      result = createIcebergMetadataScanFragment(root);
-      fragments.add(result);
     } else if (root instanceof IcebergDeleteNode) {
       Preconditions.checkState(childFragments.size() == 2);
       result = createIcebergDeleteFragment((IcebergDeleteNode) root,
@@ -406,7 +408,8 @@ public class DistributedPlanner {
   }
 
   /**
-   * Create an Iceberg Metadata scan fragment.
+   * Create an Iceberg Metadata scan fragment. This fragment is UNPARTITIONED, so the
+   * scheduler can schedule it as coordinator only fragment.
    */
   private PlanFragment createIcebergMetadataScanFragment(PlanNode node) {
     return new PlanFragment(ctx_.getNextFragmentId(), node, DataPartition.UNPARTITIONED);

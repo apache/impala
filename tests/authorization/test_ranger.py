@@ -2033,6 +2033,44 @@ class TestRanger(CustomClusterTestSuite):
                            user=ADMIN)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_iceberg_metadata_table_privileges(self, unique_name):
+    user = getuser()
+    admin_client = self.create_impala_client()
+    non_admin_client = self.create_impala_client()
+    short_table_name = "ice_1"
+    unique_database = unique_name + "_db"
+    tbl_name = unique_database + "." + short_table_name
+
+    try:
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database), user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+      admin_client.execute("create table {0} (a int) stored as iceberg"
+          .format(tbl_name), user=ADMIN)
+
+      # At this point, non-admin user without select privileges cannot query the metadata
+      # tables
+      result = self.execute_query_expect_failure(non_admin_client,
+          "select * from {0}.history".format(tbl_name), user=user)
+      assert "User '{0}' does not have privileges to execute 'SELECT' on: {1}".format(
+          user, unique_database) in str(result)
+
+      # Grant 'user' select privilege on the table
+      admin_client.execute("grant select on table {0} to user {1}".format(tbl_name, user),
+          user=ADMIN)
+      result = non_admin_client.execute("select * from {0}.history".format(tbl_name),
+          user=user)
+      assert result.success is True
+
+    finally:
+      admin_client.execute("revoke select on table {0} from user {1}"
+          .format(tbl_name, user), user=ADMIN)
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+          user=ADMIN)
+
+  @pytest.mark.execute_serially
   @SkipIf.is_test_jdk
   @SkipIfFS.hive
   @SkipIfHive2.ranger_auth

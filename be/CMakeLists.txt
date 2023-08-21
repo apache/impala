@@ -495,6 +495,7 @@ set (IMPALA_LIBS
   ExecRcfile
   ExecSequence
   ExecText
+  ExecIcebergMetadata
   Exprs
   ExprsIr
   GlobalFlags
@@ -594,6 +595,7 @@ if (BUILD_SHARED_LIBS)
     ExecRcfile
     ExecSequence
     ExecText
+    ExecIcebergMetadata
     CodeGen
     Exprs
     Rpc

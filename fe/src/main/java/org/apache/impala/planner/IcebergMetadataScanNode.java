@@ -17,28 +17,45 @@
 
 package org.apache.impala.planner;
 
+import java.util.List;
+
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.TableRef;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TIcebergMetadataScanNode;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRangeSpec;
+import org.apache.impala.thrift.TTableName;
 
 import com.google.common.base.Preconditions;
 
 public class IcebergMetadataScanNode extends ScanNode {
 
-  protected IcebergMetadataScanNode(PlanNodeId id, TupleDescriptor desc) {
-    super(id, desc, "SCAN ICEBERG METADATA");
+  // Metadata table name, it is stored here so it can be passed to the backend.
+  protected final String metadataTableName_;
+
+  protected IcebergMetadataScanNode(PlanNodeId id, List<Expr> conjuncts,
+      TableRef tblRef) {
+    super(id, tblRef.getDesc(), "SCAN ICEBERG METADATA");
+    conjuncts_ = conjuncts;
+    metadataTableName_ = ((IcebergMetadataTable)tblRef.getTable()).getMetadataTableName();
   }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
-    super.init(analyzer);
     scanRangeSpecs_ = new TScanRangeSpec();
+    assignConjuncts(analyzer);
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
+    analyzer.materializeSlots(conjuncts_);
     computeMemLayout(analyzer);
     computeStats(analyzer);
+    numInstances_ = 1;
+    numNodes_ = 1;
   }
 
   @Override
@@ -62,7 +79,12 @@ public class IcebergMetadataScanNode extends ScanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    // Implement for fragment execution
+    msg.iceberg_scan_metadata_node = new TIcebergMetadataScanNode();
+    msg.node_type = TPlanNodeType.ICEBERG_METADATA_SCAN_NODE;
+    msg.iceberg_scan_metadata_node.table_name =
+        new TTableName(desc_.getTableName().getDb(), desc_.getTableName().getTbl());
+    msg.iceberg_scan_metadata_node.metadata_table_name = metadataTableName_;
+    msg.iceberg_scan_metadata_node.tuple_id = desc_.getId().asInt();
   }
 
   @Override

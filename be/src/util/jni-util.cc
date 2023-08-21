@@ -112,6 +112,20 @@ bool JniUtil::MethodExists(JNIEnv* env, jclass class_ref, const char* method_str
   return true;
 }
 
+Status JniUtil::GetMethodID(JNIEnv* env, jclass class_ref, const char* method_str,
+    const char* method_signature, jmethodID* method_ref) {
+  *method_ref = env->GetMethodID(class_ref, method_str, method_signature);
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
+Status JniUtil::GetStaticMethodID(JNIEnv* env, jclass class_ref, const char* method_str,
+    const char* method_signature, jmethodID* method_ref) {
+  *method_ref = env->GetStaticMethodID(class_ref, method_str, method_signature);
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
 Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* class_ref) {
   *class_ref = NULL;
   jclass local_cl = env->FindClass(class_str);

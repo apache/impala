@@ -113,6 +113,8 @@ Frontend::Frontend() {
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getTableHistory", "([B)[B", &get_table_history_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
+    {"getCatalogTable", "([B)Lorg/apache/impala/catalog/FeTable;",
+        &get_catalog_table_id_},
     {"getRoles", "([B)[B", &show_roles_id_},
     {"getPrincipalPrivileges", "([B)[B", &get_principal_privileges_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
@@ -251,6 +253,10 @@ Status Frontend::ShowRoles(const TShowRolesParams& params, TShowRolesResult* res
 Status Frontend::GetCatalogObject(const TCatalogObject& req,
     TCatalogObject* resp) {
   return JniUtil::CallJniMethod(fe_, get_catalog_object_id_, req, resp);
+}
+
+Status Frontend::GetCatalogTable(const TTableName& table_name, jobject* result) {
+  return JniUtil::CallJniMethod(fe_, get_catalog_table_id_, table_name, result);
 }
 
 Status Frontend::GetExecRequest(
