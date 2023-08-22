@@ -61,7 +61,7 @@ TEST_F(CodegenFnPtrTest, StoreNonVoidPtrAndLoad) {
   ASSERT_TRUE(loaded_fn_ptr == int_identity);
 }
 
-class LlvmCodeGenTest : public testing:: Test {
+class LlvmCodeGenTest : public testing::Test {
  protected:
   scoped_ptr<TestEnv> test_env_;
   FragmentState* fragment_state_;
@@ -110,10 +110,6 @@ class LlvmCodeGenTest : public testing:: Test {
     RETURN_IF_ERROR(LlvmCodeGen::CreateFromFile(fragment_state_,
         fragment_state_->obj_pool(), NULL, filename, "test", codegen));
     return (*codegen)->MaterializeModule();
-  }
-
-  static void ClearHashFns(LlvmCodeGen* codegen) {
-    codegen->ClearHashFns();
   }
 
   static void AddFunctionToJit(LlvmCodeGen* codegen, llvm::Function* fn,
@@ -565,6 +561,148 @@ TEST_F(LlvmCodeGenTest, CleanupNonFinalizedMethodsTest) {
   ASSERT_TRUE(ContainsHandcraftedFn(codegen.get(), complete_fn));
   ASSERT_OK(FinalizeModule(codegen.get()));
 }
+
+class LlvmOptTest :
+    public testing::TestWithParam<std::tuple<TCodeGenOptLevel::type, bool>> {
+ protected:
+  scoped_ptr<MetricGroup> metrics_;
+  scoped_ptr<TestEnv> test_env_;
+  FragmentState* fragment_state_;
+  TQueryOptions query_opts_;
+
+  virtual void SetUp() {
+    metrics_.reset(new MetricGroup("codegen-test"));
+    test_env_.reset(new TestEnv());
+    ASSERT_OK(test_env_->Init());
+    SetUpQuery(0, std::get<0>(GetParam()));
+  }
+
+  virtual void TearDown() {
+    fragment_state_->ReleaseResources();
+    fragment_state_ = nullptr;
+    test_env_.reset();
+    metrics_.reset();
+  }
+
+  void SetUpQuery(int64_t query_id, TCodeGenOptLevel::type level) {
+    query_opts_.__set_codegen_opt_level(level);
+    RuntimeState* runtime_state_;
+    ASSERT_OK(test_env_->CreateQueryState(query_id, &query_opts_, &runtime_state_));
+    QueryState* qs = runtime_state_->query_state();
+    TPlanFragment* fragment = qs->obj_pool()->Add(new TPlanFragment());
+    PlanFragmentCtxPB* fragment_ctx = qs->obj_pool()->Add(new PlanFragmentCtxPB());
+    fragment_state_ =
+        qs->obj_pool()->Add(new FragmentState(qs, *fragment, *fragment_ctx));
+  }
+
+  void EnableCodegenCache() {
+    test_env_->ResetCodegenCache(metrics_.get());
+    EXPECT_OK(test_env_->codegen_cache()->Init(1024*1024));
+  }
+
+  // Wrapper to call private test-only methods on LlvmCodeGen object
+  Status CreateFromFile(const string& filename, scoped_ptr<LlvmCodeGen>* codegen) {
+    RETURN_IF_ERROR(LlvmCodeGen::CreateFromFile(fragment_state_,
+        fragment_state_->obj_pool(), nullptr, filename, "test", codegen));
+    return (*codegen)->MaterializeModule();
+  }
+
+  static void AddFunctionToJit(LlvmCodeGen* codegen, llvm::Function* fn,
+      CodegenFnPtrBase* fn_ptr) {
+    // Bypass Impala-specific logic in AddFunctionToJit() that assumes Impala's struct
+    // types are available in the module.
+    return codegen->AddFunctionToJitInternal(fn, fn_ptr);
+  }
+
+  static Status FinalizeModule(LlvmCodeGen* codegen) { return codegen->FinalizeModule(); }
+
+  static void VerifyCounters(LlvmCodeGen* codegen, bool expect_unopt) {
+    ASSERT_GT(codegen->num_functions_->value(), 0);
+    ASSERT_GT(codegen->num_instructions_->value(), 0);
+    if (expect_unopt) {
+      ASSERT_EQ(codegen->num_opt_functions_->value(), codegen->num_functions_->value());
+      ASSERT_EQ(
+          codegen->num_opt_instructions_->value(), codegen->num_instructions_->value());
+    } else {
+      ASSERT_LT(codegen->num_opt_functions_->value(), codegen->num_functions_->value());
+      ASSERT_LT(
+          codegen->num_opt_instructions_->value(), codegen->num_instructions_->value());
+    }
+  }
+
+  void LoadTestOpt(scoped_ptr<LlvmCodeGen>& codegen) {
+    const string func("_Z9loop_nullPii");
+    typedef void (*LoopFn)(int*, int);
+
+    string module_file;
+    PathBuilder::GetFullPath("llvm-ir/test-opt.bc", &module_file);
+
+    ASSERT_OK(CreateFromFile(module_file.c_str(), &codegen));
+    EXPECT_TRUE(codegen.get() != nullptr);
+    codegen->EnableOptimizations(true);
+
+    llvm::Function* fn = codegen->GetFunction(func, false);
+    EXPECT_TRUE(fn != nullptr);
+    EXPECT_EQ(fn->arg_size(), 2);
+    CodegenFnPtr<LoopFn> fn_impl;
+    AddFunctionToJit(codegen.get(), fn, &fn_impl);
+
+    ASSERT_OK(FinalizeModule(codegen.get()));
+    ASSERT_TRUE(fn_impl.load() != nullptr);
+  }
+};
+
+TEST_P(LlvmOptTest, OptFunction) {
+  scoped_ptr<LlvmCodeGen> codegen;
+  LoadTestOpt(codegen);
+  VerifyCounters(codegen.get(), std::get<1>(GetParam()));
+  codegen->Close();
+}
+
+TEST_P(LlvmOptTest, CachedOptFunction) {
+  TCodeGenOptLevel::type opt_level = std::get<0>(GetParam());
+  bool expect_unoptimized = std::get<1>(GetParam());
+  EnableCodegenCache();
+
+  scoped_ptr<LlvmCodeGen> codegen;
+  LoadTestOpt(codegen);
+  VerifyCounters(codegen.get(), expect_unoptimized);
+  codegen->Close();
+
+  int64_t query_id = 0;
+  constexpr std::array<TCodeGenOptLevel::type, 5> opt_levels{{TCodeGenOptLevel::O0,
+      TCodeGenOptLevel::O1, TCodeGenOptLevel::Os, TCodeGenOptLevel::O2,
+      TCodeGenOptLevel::O3}};
+  for (TCodeGenOptLevel::type level : opt_levels) {
+    codegen.reset();
+    SetUpQuery(++query_id, level);
+    LoadTestOpt(codegen);
+    // Higher levels are by definition O1+, which expects optimized size.
+    // Lower or equal levels should use the cached value from before the loop.
+    VerifyCounters(codegen.get(), level > opt_level ? false : expect_unoptimized);
+    codegen->Close();
+  }
+
+  // Check for cache hits/misses. Levels greater than opt_level will be a hit, others
+  // will be misses.
+  int num_less = opt_level - TCodeGenOptLevel::O0;
+  IntCounter* cache_hits =
+      metrics_->FindMetricForTesting<IntCounter>("impala.codegen-cache.hits");
+  EXPECT_NE(cache_hits, nullptr);
+  EXPECT_EQ(cache_hits->GetValue(), 1 + num_less);
+  IntCounter* cache_misses =
+      metrics_->FindMetricForTesting<IntCounter>("impala.codegen-cache.misses");
+  EXPECT_NE(cache_misses, nullptr);
+  EXPECT_EQ(cache_misses->GetValue(), opt_levels.size() - num_less);
+}
+
+INSTANTIATE_TEST_CASE_P(OptLevels, LlvmOptTest, ::testing::Values(
+  //              Optimization level    Expect unoptimized
+  std::make_tuple(TCodeGenOptLevel::O0, true),
+  std::make_tuple(TCodeGenOptLevel::O1, false),
+  std::make_tuple(TCodeGenOptLevel::Os, false),
+  std::make_tuple(TCodeGenOptLevel::O2, false),
+  std::make_tuple(TCodeGenOptLevel::O3, false)));
 }
 
 int main(int argc, char **argv) {

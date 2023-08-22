@@ -108,6 +108,14 @@ enum TParquetBloomFilterWrite {
   ALWAYS
 }
 
+enum TCodeGenOptLevel {
+  O0,
+  O1,
+  Os,
+  O2,
+  O3
+}
+
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
 const i32 NUM_NODES_ALL_RACKS = -1
@@ -666,6 +674,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   167: optional i64 hdfs_scanner_non_reserved_bytes = -1
+
+  // See comment in ImpalaService.thrift
+  168: optional TCodeGenOptLevel codegen_opt_level = TCodeGenOptLevel.O2
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

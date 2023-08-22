@@ -136,6 +136,7 @@ class LlvmCodeGenCacheTest : public testing::Test {
   scoped_ptr<CodeGenCache> codegen_cache_;
   shared_ptr<LlvmExecutionEngineWrapper> exec_engine_wrapper_;
   TQueryOptions query_options_;
+  TCodeGenOptLevel::type opt_level_ = TCodeGenOptLevel::O2;
 };
 
 void LlvmCodeGenCacheTest::AddLlvmCodegenEcho(LlvmCodeGen* codegen) {
@@ -214,7 +215,7 @@ void LlvmCodeGenCacheTest::TestBasicFunction(TCodeGenCacheMode::type mode) {
       GetMemCharge(codegen_double.get(), cache_key.data(), is_normal_mode);
 
   // Store and lookup the entry by the key.
-  EXPECT_OK(codegen_cache_->Store(cache_key, codegen.get(), mode));
+  EXPECT_OK(codegen_cache_->Store(cache_key, codegen.get(), mode, opt_level_));
   CheckInUseMetrics(
       codegen_cache_.get(), 1 /*num_entry_in_use*/, mem_charge /*bytes_in_use*/);
   EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_wrapper_));
@@ -225,7 +226,7 @@ void LlvmCodeGenCacheTest::TestBasicFunction(TCodeGenCacheMode::type mode) {
   CheckResult(entry);
   // Override the entry with a different function, should be able to find the new
   // function from the new entry.
-  EXPECT_OK(codegen_cache_->Store(cache_key, codegen_double.get(), mode));
+  EXPECT_OK(codegen_cache_->Store(cache_key, codegen_double.get(), mode, opt_level_));
   CheckInUseMetrics(
       codegen_cache_.get(), 1 /*num_entry_in_use*/, mem_charge_double /*bytes_in_use*/);
   EXPECT_OK(codegen_cache_->Lookup(cache_key, mode, &entry, &exec_engine_wrapper_));
@@ -269,12 +270,12 @@ int64_t LlvmCodeGenCacheTest::GetMemCharge(
 void LlvmCodeGenCacheTest::TestAtCapacity(TCodeGenCacheMode::type mode) {
   int64_t codegen_cache_capacity = 196; // 196B
   bool is_normal_mode = !CodeGenCacheModeAnalyzer::is_optimal(mode);
-  // 128B for optimal mode, or 140B on ARM systems
+  // 150B for optimal mode, or 164B on ARM systems
   if (!is_normal_mode) {
 #ifdef __aarch64__
-    codegen_cache_capacity = 140;
+    codegen_cache_capacity = 164;
 #else
-    codegen_cache_capacity = 128;
+    codegen_cache_capacity = 150;
 #endif
   }
   // Using single shard makes the logic of scenarios simple for capacity and
@@ -472,7 +473,7 @@ void LlvmCodeGenCacheTest::TestSwitchModeHelper(TCodeGenCacheMode::type mode, st
   CodeGenCacheKeyConstructor::construct(key, &cache_key);
 
   // Store and lookup the entry by the key.
-  EXPECT_OK(codegen_cache_->Store(cache_key, codegen.get(), mode));
+  EXPECT_OK(codegen_cache_->Store(cache_key, codegen.get(), mode, opt_level_));
   if (expect_entry_num != -1) {
     CheckInUseMetrics(codegen_cache_.get(), expect_entry_num /*num_entry_in_use*/);
   }
@@ -546,7 +547,7 @@ void LlvmCodeGenCacheTest::StoreHelper(TCodeGenCacheMode::type mode, string key)
   CodeGenCacheKey cache_key;
   CodeGenCacheEntry entry;
   CodeGenCacheKeyConstructor::construct(key, &cache_key);
-  EXPECT_OK(codegen_cache_->Store(cache_key, codegen.get(), mode));
+  EXPECT_OK(codegen_cache_->Store(cache_key, codegen.get(), mode, opt_level_));
   codegen->Close();
 }
 

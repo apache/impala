@@ -854,6 +854,10 @@ enum TImpalaQueryOptions {
   // value, the value of flag hdfs_scanner_thread_max_estimated_bytes will be used
   // (which defaults to 32MB). The default value of this option is -1 (not set).
   HDFS_SCANNER_NON_RESERVED_BYTES = 166
+
+  // Select codegen optimization level from O0, O1, Os, O2, or O3. Higher levels will
+  // overwrite existing codegen cache entries.
+  CODEGEN_OPT_LEVEL = 167
 }
 
 // The summary of a DML statement.

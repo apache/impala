@@ -161,25 +161,37 @@ class CodeGenCacheModeAnalyzer {
 };
 
 struct CodeGenCacheEntry {
-  CodeGenCacheEntry() { Init(); }
+  CodeGenCacheEntry() : engine_pointer(nullptr) {}
+  // When Empty, no guarantees are made about the content of other fields.
   bool Empty() { return engine_pointer == nullptr; }
-  void Init() { memset((uint8_t*)this, 0, sizeof(CodeGenCacheEntry)); }
-  void Reset() { Reset(nullptr, 0, 0, 0, 0); }
+  void Reset() { engine_pointer = nullptr; }
   void Reset(llvm::ExecutionEngine* engine_ptr, int64_t num_funcs, int64_t num_instrucs,
-      uint64_t names_hashcode, int64_t charge) {
+      int64_t num_opt_funcs, int64_t num_opt_instrucs, uint64_t names_hashcode,
+      int64_t charge, TCodeGenOptLevel::type opt) {
     engine_pointer = engine_ptr;
     num_functions = num_funcs;
     num_instructions = num_instrucs;
+    num_opt_functions = num_opt_funcs;
+    num_opt_instructions = num_opt_instrucs;
     function_names_hashcode = names_hashcode;
     total_bytes_charge = charge;
+    opt_level = opt;
   }
   llvm::ExecutionEngine* engine_pointer;
+  /// Number of functions before optimization.
   int64_t num_functions;
+  /// Number of instructions before optimization.
   int64_t num_instructions;
+  /// Number of functions after optimization.
+  int64_t num_opt_functions;
+  /// Number of instructions after optimization.
+  int64_t num_opt_instructions;
   /// The hashcode of function names in the entry.
   uint64_t function_names_hashcode;
   /// Bytes charge including the key and the entry.
   int64_t total_bytes_charge;
+  /// CodeGen optimization level used to generate this entry.
+  TCodeGenOptLevel::type opt_level;
 };
 
 /// Each CodeGenCache is supposed to be a singleton in the daemon, manages the codegen
@@ -208,7 +220,7 @@ class CodeGenCache {
 
   /// Store the cache entry with the specific cache key.
   Status Store(const CodeGenCacheKey& key, LlvmCodeGen* codegen,
-      const TCodeGenCacheMode::type& mode);
+      TCodeGenCacheMode::type mode, TCodeGenOptLevel::type opt_level);
 
   /// Store the shared pointer of llvm execution engine to the cache to keep all the
   /// jitted functions in that engine alive.
@@ -257,7 +269,7 @@ class CodeGenCache {
 
   /// Helper function to store the entry to the cache.
   Status StoreInternal(const CodeGenCacheKey& key, LlvmCodeGen* codegen,
-      const TCodeGenCacheMode::type& mode);
+      TCodeGenCacheMode::type mode, TCodeGenOptLevel::type opt_level);
 
   /// Indicate if the cache is closed. If is closed, no call is allowed for any functions
   /// other than ReleaseResources().

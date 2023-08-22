@@ -112,9 +112,16 @@ add_custom_target(test-loop.bc
   SOURCES ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc
 )
 
+# Provide "unoptimized" output. Clang O0 adds attributes to everything which prevents us
+# doing optimizations in the test, so use O1 instead.
+add_custom_target(test-opt.bc
+  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} -O1 ${CLANG_INCLUDE_FLAGS} ${CMAKE_SOURCE_DIR}/testdata/llvm/test-opt.cc -o ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt.bc
+  SOURCES ${CMAKE_SOURCE_DIR}/testdata/llvm/test-opt.cc
+)
+
 # Exception to unified be tests: custom main initializes LLVM
 ADD_BE_LSAN_TEST(llvm-codegen-test)
-add_dependencies(llvm-codegen-test test-loop.bc)
+add_dependencies(llvm-codegen-test test-loop.bc test-opt.bc)
 ADD_BE_LSAN_TEST(llvm-codegen-cache-test LlvmCodegenCacheTest.*)
 
 ADD_UNIFIED_BE_LSAN_TEST(instruction-counter-test InstructionCounterTest.*)

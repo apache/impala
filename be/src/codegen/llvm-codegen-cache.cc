@@ -133,8 +133,9 @@ Status CodeGenCache::Lookup(const CodeGenCacheKey& cache_key,
     // to look for jitted functions.
     if (LookupEngine(cached_entry->engine_pointer, execution_engine)) {
       entry->Reset(cached_entry->engine_pointer, cached_entry->num_functions,
-          cached_entry->num_instructions, cached_entry->function_names_hashcode,
-          cached_entry->total_bytes_charge);
+          cached_entry->num_instructions, cached_entry->num_opt_functions,
+          cached_entry->num_opt_instructions, cached_entry->function_names_hashcode,
+          cached_entry->total_bytes_charge, cached_entry->opt_level);
       return Status::OK();
     }
   }
@@ -143,7 +144,8 @@ Status CodeGenCache::Lookup(const CodeGenCacheKey& cache_key,
 }
 
 Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
-    LlvmCodeGen* codegen, const TCodeGenCacheMode::type& mode) {
+    LlvmCodeGen* codegen, TCodeGenCacheMode::type mode,
+    TCodeGenOptLevel::type opt_level) {
   // In normal mode, we will store the whole key content to the cache.
   // Otherwise, in optimal mode, we will only store the hash code and length of the key.
   Slice key = cache_key.optimal_key_slice();
@@ -163,7 +165,9 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
   CodeGenCacheEntry* cache_entry =
       reinterpret_cast<CodeGenCacheEntry*>(cache_->MutableValue(&pending_handle));
   cache_entry->Reset(codegen->execution_engine(), codegen->num_functions_->value(),
-      codegen->num_instructions_->value(), codegen->function_names_hashcode_, mem_charge);
+      codegen->num_instructions_->value(), codegen->num_opt_functions_->value(),
+      codegen->num_opt_instructions_->value(), codegen->function_names_hashcode_,
+      mem_charge, opt_level);
   StoreEngine(codegen);
   /// It is thread-safe, but could override the existing entry with the same key.
   Cache::UniqueHandle cache_handle =
@@ -181,7 +185,7 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
 }
 
 Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, LlvmCodeGen* codegen,
-    const TCodeGenCacheMode::type& mode) {
+    TCodeGenCacheMode::type mode, TCodeGenOptLevel::type opt_level) {
   DCHECK(!is_closed_);
   DCHECK(cache_ != nullptr);
   DCHECK(codegen != nullptr);
@@ -206,7 +210,7 @@ Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, LlvmCodeGen* codege
     if (!key_to_insert_it.second) return status;
   }
   // Do store the cache entry to the cache.
-  status = StoreInternal(cache_key, codegen, mode);
+  status = StoreInternal(cache_key, codegen, mode, opt_level);
   // Remove the hash code of the key from the to_insert_keys set.
   lock_guard<mutex> lock(to_insert_set_lock_);
   keys_to_insert_.erase(key_to_insert_it.first);

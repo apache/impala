@@ -647,6 +647,7 @@ class LlvmCodeGen {
   friend class LlvmCodeGenTest;
   friend class LlvmCodeGenTest_CpuAttrWhitelist_Test;
   friend class LlvmCodeGenTest_HashTest_Test;
+  friend class LlvmOptTest;
   friend class SubExprElimination;
   friend class CodeGenCache;
   friend class LlvmCodeGenCacheTest;
@@ -876,6 +877,10 @@ class LlvmCodeGen {
   /// unused functions from the module.
   RuntimeProfile::Counter* num_functions_;
   RuntimeProfile::Counter* num_instructions_;
+
+  /// Number of instructions after optimization.
+  RuntimeProfile::Counter* num_opt_functions_;
+  RuntimeProfile::Counter* num_opt_instructions_;
 
   /// Number of functions that are used and cached.
   RuntimeProfile::Counter* num_cached_functions_;

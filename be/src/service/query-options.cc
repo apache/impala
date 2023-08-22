@@ -1156,6 +1156,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_hdfs_scanner_non_reserved_bytes(mem_spec_val.value);
         break;
       };
+      case TImpalaQueryOptions::CODEGEN_OPT_LEVEL: {
+        TCodeGenOptLevel::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(
+            value, "CodeGen Opt Level", _TCodeGenOptLevel_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_codegen_opt_level(enum_type);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

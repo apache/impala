@@ -242,6 +242,8 @@ LlvmCodeGen::LlvmCodeGen(FragmentState* state, ObjectPool* pool,
       ASYNC_CODEGEN_THREAD_COUNTERS_PREFIX);
   num_functions_ = ADD_COUNTER(profile_, "NumFunctions", TUnit::UNIT);
   num_instructions_ = ADD_COUNTER(profile_, "NumInstructions", TUnit::UNIT);
+  num_opt_functions_ = ADD_COUNTER(profile_, "NumOptimizedFunctions", TUnit::UNIT);
+  num_opt_instructions_ = ADD_COUNTER(profile_, "NumOptimizedInstructions", TUnit::UNIT);
   num_cached_functions_ = ADD_COUNTER(profile_, "NumCachedFunctions", TUnit::UNIT);
   llvm_thread_counters_ = ADD_THREAD_COUNTERS(profile_, "Codegen");
 }
@@ -1184,14 +1186,24 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
       return false;
     }
 
+    if (entry.opt_level < state_->query_options().codegen_opt_level) {
+      // Requested optimization level is higher than cached entry, so treat as a miss.
+      VLOG(2) << "Overwriting codegen cache entry at " << entry.opt_level
+          << " with optimization level " << state_->query_options().codegen_opt_level;
+      cache->IncHitOrMissCount(/*hit*/ false);
+      return false;
+    }
+
     const bool fn_pointers_set_from_cache = SetFunctionPointers(cache, &cache_key);
     if (!fn_pointers_set_from_cache) return false;
 
     // Because we cache the entire execution engine, the cached number of functions should
-    // be the same as the total function number.
-    COUNTER_SET(num_cached_functions_, entry.num_functions);
+    // be the same as the total optimized function number.
+    COUNTER_SET(num_cached_functions_, entry.num_opt_functions);
     COUNTER_SET(num_functions_, entry.num_functions);
     COUNTER_SET(num_instructions_, entry.num_instructions);
+    COUNTER_SET(num_opt_functions_, entry.num_opt_functions);
+    COUNTER_SET(num_opt_instructions_, entry.num_opt_instructions);
   }
   cache->IncHitOrMissCount(/*hit*/ entry_exists);
   return entry_exists;
@@ -1219,7 +1231,8 @@ void LlvmCodeGen::GenerateFunctionNamesHashCode() {
 Status LlvmCodeGen::StoreCache(CodeGenCacheKey& cache_key) {
   DCHECK(!cache_key.empty());
   Status store_status = ExecEnv::GetInstance()->codegen_cache()->Store(
-      cache_key, this, state_->query_options().codegen_cache_mode);
+      cache_key, this, state_->query_options().codegen_cache_mode,
+      state_->query_options().codegen_opt_level);
   LOG(INFO) << DebugCacheEntryString(cache_key, false /*is_lookup*/,
       CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode),
       store_status.ok());
@@ -1313,9 +1326,22 @@ Status LlvmCodeGen::FinalizeModule() {
     if (LookupCache(cache_key)) return Status::OK();
   }
 
+  // Update counters before final optimization, but after removing unused functions. This
+  // gives us a rough measure of how much work the optimization and compilation must do.
+  // If found in cache, counters will be restored from the cache entry.
+  InstructionCounter counter;
+  counter.visit(*module_);
+  COUNTER_SET(num_functions_, counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
+  COUNTER_SET(num_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
+
   if (optimizations_enabled_ && !FLAGS_disable_optimization_passes) {
     RETURN_IF_ERROR(OptimizeModule());
+    counter.ResetCount();
+    counter.visit(*module_);
   }
+  COUNTER_SET(num_opt_functions_,
+      counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
+  COUNTER_SET(num_opt_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
 
   if (FLAGS_opt_module_dir.size() != 0) {
     string path = FLAGS_opt_module_dir + "/" + id_ + "_opt.ll";
@@ -1404,18 +1430,30 @@ Status LlvmCodeGen::OptimizeModule() {
   pass_builder.registerLoopAnalyses(LAM);
   pass_builder.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  llvm::ModulePassManager pass_manager = pass_builder.buildPerModuleDefaultPipeline(
-      llvm::PassBuilder::OptimizationLevel::O2);
-
-  // Update counters before final optimization, but after removing unused functions. This
-  // gives us a rough measure of how much work the optimization and compilation must do.
-  InstructionCounter counter;
-  counter.visit(*module_);
-  COUNTER_SET(num_functions_, counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
-  COUNTER_SET(num_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
+  TCodeGenOptLevel::type opt_level = state_->query_options().codegen_opt_level;
+  llvm::PassBuilder::OptimizationLevel opt;
+  // GCC's -Werror=switch errors if a case is not covered.
+  switch (opt_level) {
+    case TCodeGenOptLevel::O0:
+      // Default optimization pipeline requires O1 or greater, so for O0 we skip.
+      return Status::OK();
+    case TCodeGenOptLevel::O1:
+      opt = llvm::PassBuilder::OptimizationLevel::O1;
+      break;
+    case TCodeGenOptLevel::Os:
+      opt = llvm::PassBuilder::OptimizationLevel::Os;
+      break;
+    case TCodeGenOptLevel::O2:
+      opt = llvm::PassBuilder::OptimizationLevel::O2;
+      break;
+    case TCodeGenOptLevel::O3:
+      opt = llvm::PassBuilder::OptimizationLevel::O3;
+      break;
+  }
+  llvm::ModulePassManager pass_manager = pass_builder.buildPerModuleDefaultPipeline(opt);
 
   int64_t estimated_memory = ESTIMATED_OPTIMIZER_BYTES_PER_INST
-      * counter.GetCount(InstructionCounter::TOTAL_INSTS);
+      * num_instructions_->value();
   if (!mem_tracker_->TryConsume(estimated_memory)) {
     const string& msg = Substitute(
         "Codegen failed to reserve '$0' bytes for optimization", estimated_memory);
