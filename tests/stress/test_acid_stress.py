@@ -164,7 +164,6 @@ class TestAcidInsertsBasic(TestAcidStress):
 
   @SkipIfHive2.acid
   @SkipIfFS.hive
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_read_hive_inserts(self, unique_database):
     """Check that Impala can read partitioned and non-partitioned ACID tables
@@ -173,7 +172,6 @@ class TestAcidInsertsBasic(TestAcidStress):
       self._run_test_read_hive_inserts(unique_database, is_partitioned)
 
   @SkipIfHive2.acid
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_read_impala_inserts(self, unique_database):
     """Check that Impala can read partitioned and non-partitioned ACID tables
@@ -192,7 +190,6 @@ class TestAcidInsertsBasic(TestAcidStress):
     finally:
       impalad_client.close()
 
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   @SkipIf.not_dfs
   @UniqueDatabase.parametrize(sync_ddl=True)
@@ -284,7 +281,6 @@ class TestConcurrentAcidInserts(TestAcidStress):
   @SkipIfFS.stress_insert_timeouts
   @SkipIfHive2.acid
   @SkipIfDockerizedCluster.jira(reason="IMPALA-11189")
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_concurrent_inserts(self, unique_database):
@@ -383,7 +379,6 @@ class TestFailingAcidInserts(TestAcidStress):
   @SkipIfFS.stress_insert_timeouts
   @SkipIfDockerizedCluster.jira(reason="IMPALA-11191")
   @SkipIfHive2.acid
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_failing_inserts(self, unique_database):

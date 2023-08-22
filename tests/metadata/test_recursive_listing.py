@@ -140,7 +140,6 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._get_rows(fq_tbl_name)) == 1
 
   @SkipIfFS.no_partial_listing
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_large_staging_dirs(self, unique_database):
     """Regression test for IMPALA-11464:
@@ -164,7 +163,6 @@ class TestRecursiveListing(ImpalaTestSuite):
                                  refresh_should_fail=False)
 
   @SkipIfFS.no_partial_listing
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_partition_dir_removed_inflight(self, unique_database):
     """Test REFRESH with concurrent add/remove ops on large partition dirs

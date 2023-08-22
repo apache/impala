@@ -311,7 +311,7 @@ if __name__ == "__main__":
       run(base_args + build_test_args("serial{0}".format(shard_identifier)))
       print_metrics('connections')
 
-    # Run the stress tests tests
+    # Run the stress tests
     if not skip_stress:
       base_args = ['-m', 'stress', '-n', NUM_STRESS_CLIENTS]
       run(base_args + build_test_args("stress{0}".format(shard_identifier)))

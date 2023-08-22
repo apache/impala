@@ -82,7 +82,6 @@ class TestInsertStress(ImpalaTestSuite):
     finally:
       impalad_client.close()
 
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_inserts(self, unique_database):
@@ -105,7 +104,6 @@ class TestInsertStress(ImpalaTestSuite):
                 for i in range(0, num_checkers)]
     run_tasks(writers + checkers)
 
-  @pytest.mark.execute_serially
   @pytest.mark.stress
   @SkipIf.not_dfs
   @UniqueDatabase.parametrize(sync_ddl=True)
