@@ -60,7 +60,7 @@ void ValidateDict(const vector<InternalType>& values,
   MemPool pool(&tracker);
   DictEncoder<InternalType> encoder(&pool, fixed_buffer_byte_size, &track_encoder);
   encoder.UsedbyTest();
-  for (InternalType i: values) encoder.Put(i);
+  for (const InternalType& i: values) encoder.Put(i);
   bytes_alloc = encoder.DictByteSize();
   EXPECT_EQ(track_encoder.consumption(), bytes_alloc);
   EXPECT_EQ(encoder.num_entries(), values_set.size());

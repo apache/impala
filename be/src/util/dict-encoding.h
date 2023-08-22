@@ -459,6 +459,13 @@ inline uint32_t DictEncoder<StringValue>::Hash(const StringValue& value) const {
   return HashUtil::Hash(value.ptr, value.len, 0);
 }
 
+template<>
+inline uint32_t DictEncoder<TimestampValue>::Hash(const TimestampValue& value) const {
+  // TimestampValue needs to use its own hash function, because it has padding
+  // that must be ignored for consistency.
+  return value.Hash();
+}
+
 template<typename T>
 inline int DictEncoder<T>::AddToTable(const T& value, NodeIndex* bucket) {
   DCHECK_GT(encoded_value_size_, 0);
