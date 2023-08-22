@@ -687,6 +687,38 @@ select count(*) from iceberg_lineitem_multiblock where l_linenumber%5=0;
 bigint
 ====
 ---- QUERY
+SET MT_DOP=0;
+select count(*) from iceberg_lineitem_sixblocks;
+---- RESULTS
+19836
+---- TYPES
+bigint
+====
+---- QUERY
+SET MT_DOP=2;
+select count(*) from iceberg_lineitem_sixblocks;
+---- RESULTS
+19836
+---- TYPES
+bigint
+====
+---- QUERY
+SET MT_DOP=0;
+select count(*) from iceberg_lineitem_sixblocks where l_returnflag='N';
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+SET MT_DOP=2;
+select count(*) from iceberg_lineitem_sixblocks where l_returnflag='N';
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
 SELECT * from iceberg_v2_partitioned_position_deletes;
 ---- RESULTS
 6,'Alex','view',2020-01-01 09:00:00
