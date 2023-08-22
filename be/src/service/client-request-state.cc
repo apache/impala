@@ -983,6 +983,7 @@ Status ClientRequestState::ExecShutdownRequest() {
     }
   }
   string krpc_error = "RemoteShutdown() RPC failed: Network error";
+  string krpc_error2 = "RemoteShutdown() RPC failed: Timed out";
   NetworkAddressPB krpc_addr = MakeNetworkAddressPB(ip_address, port, backend_id,
       ExecEnv::GetInstance()->rpc_mgr()->GetUdsAddressUniqueId());
   std::unique_ptr<ControlServiceProxy> proxy;
@@ -1014,7 +1015,9 @@ Status ClientRequestState::ExecShutdownRequest() {
     string err_string = Substitute(
         "Rpc to $0 failed with error '$1'", NetworkAddressPBToString(krpc_addr), msg);
     // Attempt to detect if the the failure is because of not using a KRPC port.
-    if (backend_port_specified && msg.find(krpc_error) != string::npos) {
+    if (backend_port_specified &&
+           (msg.find(krpc_error) != string::npos ||
+            msg.find(krpc_error2) != string::npos)) {
       // Prior to IMPALA-7985 :shutdown() used the backend port.
       err_string.append(" This may be because the port specified is wrong. You may have"
                         " specified the backend (thrift) port which :shutdown() can no"

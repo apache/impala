@@ -17,6 +17,8 @@
 
 #include "rpc/thrift-util.h"
 
+#include <limits>
+
 #include <gtest/gtest.h>
 #include <thrift/config.h>
 
@@ -56,10 +58,10 @@
 
 #include "common/names.h"
 
-DEFINE_int32(thrift_rpc_max_message_size, (1024 * 1024 * 1024),
-    "The maximum size of a message that any RPC that the server will accept. "
-    "Default to 1GB. Setting 0 or negative value will use the default defined in the "
-    "Thrift. The upper limit is 2147483647 bytes.");
+DEFINE_int32(thrift_rpc_max_message_size, std::numeric_limits<int32_t>::max(),
+    "The maximum size of a message for any RPC that the server will accept. "
+    "Default to the upper limit of 2147483647 bytes (~2GB). "
+    "Setting 0 or negative value will use the default defined in Thrift.");
 
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
