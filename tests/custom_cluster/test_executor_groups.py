@@ -764,9 +764,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def test_query_assignment_with_two_exec_groups(self):
     """This test verifies that query assignment works with two executor groups with
     different number of executors and memory limit in each."""
-    # A small query with estimated memory per host of 10MB that can run on the small
+    # A small query with estimated memory per host of 16MB that can run on the small
     # executor group
-    SMALL_QUERY = "select count(*) from tpcds_parquet.date_dim;"
+    SMALL_QUERY = "select count(*) from tpcds_parquet.date_dim where d_year=2022;"
     # A large query with estimated memory per host of 132MB that can only run on
     # the large executor group.
     LARGE_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 limit 50;"
@@ -1093,6 +1093,41 @@ class TestExecutorGroups(CustomClusterTestSuite):
       'PROCESSING_COST_MIN_THREADS': '',
       'MAX_FRAGMENT_INSTANCES_PER_NODE': ''})
 
+    # BEGIN testing count queries
+    # Test optimized count star query with 1824 scan ranges assign to small group.
+    self._run_query_and_verify_profile(
+        "SELECT count(*) FROM tpcds_parquet.store_sales",
+        ["Executor Group: root.small-group", "EffectiveParallelism: 10",
+         "ExecutorGroupsConsidered: 2"])
+
+    # Test optimized count star query with 383 scan ranges assign to tiny group.
+    self._run_query_and_verify_profile(
+       "SELECT count(*) FROM tpcds_parquet.store_sales WHERE ss_sold_date_sk < 2451200",
+       ["Executor Group: root.tiny-group", "EffectiveParallelism: 2",
+        "ExecutorGroupsConsidered: 1"])
+
+    # Test optimized count star query with 1 scan range detected as trivial query
+    # and assign to tiny group.
+    self._run_query_and_verify_profile(
+       "SELECT count(*) FROM tpcds_parquet.date_dim",
+       ["Executor Group: empty group (using coordinator only)",
+        "ExecutorGroupsConsidered: 1",
+        "Verdict: Assign to first group because the number of nodes is 1"])
+
+    # Test unoptimized count star query assign to small group.
+    self._run_query_and_verify_profile(
+      ("SELECT count(*) FROM tpcds_parquet.store_sales "
+       "WHERE ss_ext_discount_amt != 0.3857"),
+      ["Executor Group: root.small-group", "EffectiveParallelism: 10",
+       "ExecutorGroupsConsidered: 2"])
+
+    # Test zero slot scan query assign to small group.
+    self._run_query_and_verify_profile(
+      "SELECT count(ss_sold_date_sk) FROM tpcds_parquet.store_sales",
+      ["Executor Group: root.small-group", "EffectiveParallelism: 10",
+       "ExecutorGroupsConsidered: 2"])
+    # END testing count queries
+
     # BEGIN testing insert + MAX_FS_WRITER
     # Test unpartitioned insert, small scan, no MAX_FS_WRITER.
     # Scanner and writer will collocate since num scanner equals to num writer (1).
@@ -1186,11 +1221,11 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # END testing insert + MAX_FS_WRITER
 
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.small", 7)
-    self._verify_query_num_for_resource_pool("root.tiny", 4)
+    self._verify_query_num_for_resource_pool("root.small", 10)
+    self._verify_query_num_for_resource_pool("root.tiny", 6)
     self._verify_query_num_for_resource_pool("root.large", 12)
-    self._verify_total_admitted_queries("root.small", 8)
-    self._verify_total_admitted_queries("root.tiny", 6)
+    self._verify_total_admitted_queries("root.small", 11)
+    self._verify_total_admitted_queries("root.tiny", 8)
     self._verify_total_admitted_queries("root.large", 16)
 
   @pytest.mark.execute_serially

@@ -1558,6 +1558,13 @@ public class HdfsScanNode extends ScanNode {
           numRangesAdjusted :
           Math.min(inputCardinality_, numRangesAdjusted);
     }
+
+    if (countStarSlot_ != null) {
+      // We are doing optimized count star. Override cardinality with total num files.
+      long totalFiles = sumValues(totalFilesPerFs_);
+      inputCardinality_ = totalFiles;
+      cardinality_ = totalFiles;
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("HdfsScan: cardinality_=" + Long.toString(cardinality_));
     }

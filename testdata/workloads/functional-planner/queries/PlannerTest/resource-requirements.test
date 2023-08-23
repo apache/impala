@@ -1869,6 +1869,7 @@ select count(*) from tpch_parquet.lineitem
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=128.00KB Threads=2
 Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
 Analyzed query: SELECT count(*) FROM tpch_parquet.lineitem
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -1890,11 +1891,12 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=1.00MB mem-reservation=128.00KB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=6.00M
+   tuple-ids=0 row-size=8B cardinality=3
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=128.00KB Threads=3
 Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
 Analyzed query: SELECT count(*) FROM tpch_parquet.lineitem
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -1929,11 +1931,12 @@ Per-Host Resources: mem-estimate=1.02MB mem-reservation=128.00KB thread-reservat
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=1.00MB mem-reservation=128.00KB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=6.00M
+   tuple-ids=0 row-size=8B cardinality=3
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=128.00KB Threads=2
 Per-Host Resource Estimates: Memory=80MB
+Codegen disabled by planner
 Analyzed query: SELECT count(*) FROM tpch_parquet.lineitem
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -1968,7 +1971,7 @@ Per-Instance Resources: mem-estimate=80.02MB mem-reservation=128.00KB thread-res
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=0 row-size=8B cardinality=6.00M
+   tuple-ids=0 row-size=8B cardinality=3
    in pipelines: 00(GETNEXT)
 ====
 # Sort
