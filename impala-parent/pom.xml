@@ -46,7 +46,7 @@ under the License.
     <knox.version>${env.IMPALA_KNOX_VERSION}</knox.version>
     <thrift.version>0.9.3-1</thrift.version>
     <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
-    <impala.query.event.hook.api.version>1.0-SNAPSHOT</impala.query.event.hook.api.version>
+    <impala.query.event.hook.api.version>3.4.0.7.1.7.1065-1</impala.query.event.hook.api.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kudu.version>${env.IMPALA_KUDU_JAVA_VERSION}</kudu.version>
     <commons-io.version>2.6</commons-io.version>
@@ -143,7 +143,7 @@ under the License.
     </repository>
     <repository>
       <id>cdh.rcs.releases.repo</id>
-      <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
+      <url>https://repository.cloudera.com/artifactory/cdh-releases-rcs</url>
       <name>CDH Releases Repository</name>
       <snapshots>
         <enabled>true</enabled>
@@ -192,14 +192,7 @@ under the License.
         <enabled>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED}</enabled>
       </snapshots>
     </repository>
-    <repository>
-      <id>cloudera.thirdparty.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/third-party</url>
-      <name>Cloudera Third Party Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
+
     <repository>
       <!--
       HWX Nexus is disabled. This is a tombstone to list out why:
@@ -232,9 +225,9 @@ under the License.
   </repositories>
   <pluginRepositories>
     <pluginRepository>
-      <id>cloudera.thirdparty.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/third-party</url>
-      <name>Cloudera Third Party Repository</name>
+      <id>cdh.rcs.releases.repo</id>
+      <url>https://repository.cloudera.com/artifactory/cdh-releases-rcs</url>
+      <name>CDH Releases Repository</name>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>

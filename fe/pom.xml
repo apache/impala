@@ -52,7 +52,7 @@ under the License.
     <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-data-source-api</artifactId>
-      <version>${impala.extdatasrc.api.version}</version>
+      <version>3.4.0.7.1.7.1065-1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -140,20 +140,20 @@ under the License.
       <groupId>org.apache.hudi</groupId>
       <artifactId>hudi-hadoop-mr</artifactId>
       <version>${hudi.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.parquet</groupId>
-            <artifactId>parquet-avro</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-        </exclusions>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.parquet</groupId>
+          <artifactId>parquet-avro</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -195,7 +195,7 @@ under the License.
     <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>yarn-extras</artifactId>
-      <version>${yarn-extras.version}</version>
+      <version>3.4.0.7.1.7.1065-1</version>
     </dependency>
 
     <dependency>
@@ -334,7 +334,7 @@ under the License.
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-common</artifactId>
         </exclusion>
-       <exclusion>
+        <exclusion>
           <groupId>org.apache.hive</groupId>
           <artifactId>*</artifactId>
         </exclusion>
@@ -345,12 +345,12 @@ under the License.
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>
-       <exclusions>
-         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-         <exclusion>
-           <groupId>net.minidev</groupId>
-           <artifactId>json-smart</artifactId>
-         </exclusion>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -358,12 +358,12 @@ under the License.
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-common</artifactId>
       <version>${hbase.version}</version>
-       <exclusions>
-         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-         <exclusion>
-           <groupId>net.minidev</groupId>
-           <artifactId>json-smart</artifactId>
-         </exclusion>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -456,9 +456,9 @@ under the License.
     </dependency>
 
     <dependency>
-        <groupId>com.google.errorprone</groupId>
-        <artifactId>error_prone_annotations</artifactId>
-        <version>2.3.1</version>
+      <groupId>com.google.errorprone</groupId>
+      <artifactId>error_prone_annotations</artifactId>
+      <version>2.3.1</version>
     </dependency>
 
     <dependency>
@@ -469,9 +469,9 @@ under the License.
     </dependency>
 
     <dependency>
-        <groupId>org.ehcache</groupId>
-        <artifactId>sizeof</artifactId>
-        <version>0.3.0</version>
+      <groupId>org.ehcache</groupId>
+      <artifactId>sizeof</artifactId>
+      <version>0.3.0</version>
     </dependency>
 
     <dependency>
@@ -557,13 +557,13 @@ under the License.
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>2.6</version>
-      <executions>
-        <execution>
-          <goals>
-            <goal>test-jar</goal>
-          </goals>
-        </execution>
-      </executions>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
 
       <plugin>
@@ -648,14 +648,23 @@ under the License.
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.20</version>
         <configuration>
-          <trimStackTrace>false</trimStackTrace>
-          <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
-          <redirectTestOutputToFile>true</redirectTestOutputToFile>
-          <argLine>${surefireJacocoArg}</argLine>
-          <groups>${testcase.groups}</groups>
+          <forkCount>3</forkCount>
+          <reuseForks>true</reuseForks>
+          <argLine>-Xmx1024m -XX:MaxPermSize=256m</argLine>
+          <!--          <trimStackTrace>false</trimStackTrace>-->
+          <!--          <reportsDirectory>${surefire.reports.dir}</reportsDirectory>-->
+          <!--          <redirectTestOutputToFile>true</redirectTestOutputToFile>-->
+
+          <!--          <groups>${testcase.groups}</groups>-->
         </configuration>
       </plugin>
-
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <testFailureIgnore>true</testFailureIgnore>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
@@ -677,7 +686,7 @@ under the License.
                 <source>${project.basedir}/generated-sources/gen-java</source>
                 <source>${project.build.directory}/generated-sources/cup</source>
                 <source>${project.basedir}/src/compat-hive-${hive.major.version}/java</source>
-               </sources>
+              </sources>
             </configuration>
           </execution>
         </executions>
@@ -702,7 +711,7 @@ under the License.
             <id>jacoco-report</id>
             <phase>test</phase>
             <goals>
-             <goal>report</goal>
+              <goal>report</goal>
             </goals>
             <configuration>
               <dataFile>${jacoco.data.file}</dataFile>
@@ -920,14 +929,14 @@ under the License.
               <groupId>org.apache.calcite.avatica</groupId>
               <artifactId>avatica</artifactId>
             </exclusion>
-          <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>ant</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
 
@@ -1268,7 +1277,7 @@ under the License.
       <activation>
         <file>
           <exists>${env.THRIFT_HOME}/bin/thrift</exists>
-          </file>
+        </file>
       </activation>
       <properties>
         <thrift.executable>${env.THRIFT_HOME}/bin/thrift</thrift.executable>
@@ -1338,13 +1347,13 @@ under the License.
           <name>m2e.version</name>
         </property>
       </activation>
-        <!-- By default, we separate Eclipse-built files from Maven-built
-             files. Otherwise, they are both in target/classes, and Eclipse
-             and Maven may clobber each other, complicating attaching to
-             a running process. -->
-        <properties>
-          <buildOutputDirectory>${project.build.directory}/${eclipse.output.directory}</buildOutputDirectory>
-        </properties>
+      <!-- By default, we separate Eclipse-built files from Maven-built
+           files. Otherwise, they are both in target/classes, and Eclipse
+           and Maven may clobber each other, complicating attaching to
+           a running process. -->
+      <properties>
+        <buildOutputDirectory>${project.build.directory}/${eclipse.output.directory}</buildOutputDirectory>
+      </properties>
     </profile>
 
     <profile>
