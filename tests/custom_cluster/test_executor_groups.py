@@ -1473,3 +1473,72 @@ class TestExecutorGroups(CustomClusterTestSuite):
         "scheduling, F00 scheduled instance count (16) is higher than its effective "
         "count (12)") in profile, profile
     self.client.close_query(handle)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=1,
+      impalad_args="--num_expected_executors=7")
+  def test_expected_executors_no_healthy_groups(self):
+    """Tests expected executor group size used for planning when no executor groups
+    are healthy. Query planning should use expected executor group size from
+    'num_expected_executors' in such cases. If 'expected_executor_group_sets' is
+    set then executor group size is obtained from that config.
+    """
+    # Create fresh client
+    self.create_impala_clients()
+
+    # Compute stats on tpcds_parquet.store_sales
+    self.execute_query_expect_success(self.client,
+        "compute stats tpcds_parquet.store_sales", query_options={'NUM_NODES': '1'})
+
+    # Query planning should use expected number hosts from 'num_expected_executors'.
+    handle = self.execute_query_async(CPU_TEST_QUERY, {
+      "COMPUTE_PROCESSING_COST": "true"})
+    sleep(1)
+    profile = self.client.get_runtime_profile(handle)
+    assert "F00:PLAN FRAGMENT [RANDOM] hosts=7" in profile, profile
+    # The query should run on default resource pool.
+    assert "Request Pool: default-pool" in profile, profile
+
+    coordinator_test_args = ''
+    # The path to resources directory which contains the admission control config files.
+    RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test",
+                                 "resources")
+
+    # Reuse cluster configuration from _setup_three_exec_group_cluster, but only start
+    # root.large executor groups.
+    fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-3-groups.xml")
+    llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-3-groups.xml")
+
+    # extra args template to start coordinator
+    extra_args_template = ("-vmodule admission-controller=3 "
+        "-expected_executor_group_sets=root.small:2,root.large:12 "
+        "-fair_scheduler_allocation_path %s "
+        "-llama_site_path %s "
+        "%s ")
+
+    # Start with a regular admission config, multiple pools, no resource limits.
+    self._restart_coordinators(num_coordinators=1,
+        extra_args=extra_args_template % (fs_allocation_path, llama_site_path,
+          coordinator_test_args))
+
+    self.create_impala_clients()
+
+    # Small query should get planned using the small executor group set's resources.
+    handle = self.execute_query_async(CPU_TEST_QUERY, {
+      "COMPUTE_PROCESSING_COST": "true"})
+    sleep(1)
+    profile = self.client.get_runtime_profile(handle)
+    assert "F00:PLAN FRAGMENT [RANDOM] hosts=2" in profile, profile
+    # The query should run on root.small resource pool.
+    assert "Request Pool: root.small" in profile, profile
+
+    # Large query should get planned using the large executor group set's resources.
+    handle = self.execute_query_async(GROUPING_TEST_QUERY, {
+      "COMPUTE_PROCESSING_COST": "true"})
+    sleep(1)
+    profile = self.client.get_runtime_profile(handle)
+    assert "F00:PLAN FRAGMENT [RANDOM] hosts=12" in profile, profile
+    # The query should run on root.large resource pool.
+    assert "Request Pool: root.large" in profile, profile
+
+    self.client.close_query(handle)
