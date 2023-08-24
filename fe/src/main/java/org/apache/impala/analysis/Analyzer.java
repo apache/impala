@@ -580,6 +580,8 @@ public class Analyzer {
     // singleton.
     private int numExecutorsForPlanning_ = -1;
 
+    // Number of available cores per executor node.
+    // Set by Frontend.java.
     private int availableCoresPerNode_ = -1;
 
     // Cache of KuduTables opened for this query. (map from table name to kudu table)

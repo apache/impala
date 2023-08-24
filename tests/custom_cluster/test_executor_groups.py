@@ -994,10 +994,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
           "Memory and cpu limit checking is skipped."),
          "EffectiveParallelism: 13", "ExecutorGroupsConsidered: 1"])
 
-    # Test setting REQUEST_POOL and disabling COMPUTE_PROCESSING_COST
-    self._set_query_options({
-      'COMPUTE_PROCESSING_COST': 'false',
-      'REQUEST_POOL': 'root.large'})
+    # Test setting REQUEST_POOL=root.large and disabling COMPUTE_PROCESSING_COST
+    self._set_query_options({'COMPUTE_PROCESSING_COST': 'false'})
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
         ["Query Options (set by configuration): REQUEST_POOL=root.large",
          "Executor Group: root.large-group",
@@ -1024,26 +1022,13 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
           "Verdict: Match", "CpuAsk: 12"])
 
-    # ENABLE_REPLAN=false should force query to run in tiny group, but high scan
-    # parallelism will cause it to exceed the admission control slots.
+    # ENABLE_REPLAN=false should force query to run in first group (tiny).
     self._set_query_options({'ENABLE_REPLAN': 'false'})
-    result = self.execute_query_expect_failure(self.client, CPU_TEST_QUERY)
-    status = ("Rejected query from pool root.tiny: number of admission control slots "
-        r"needed \(10\) on backend '.*' is greater than total slots available 8. "
-        "Reduce mt_dop to less than 8 to ensure that the query can execute.")
-    assert re.search(status, str(result))
-
-    # ENABLE_REPLAN=false and MAX_FRAGMENT_INSTANCES_PER_NODE=4 should allow query to run
-    # in tiny group.
-    self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '4'})
-    self._run_query_and_verify_profile(CPU_TEST_QUERY,
+    self._run_query_and_verify_profile(TEST_QUERY,
         ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
          "Verdict: Assign to first group because query option ENABLE_REPLAN=false"])
-
-    # Unset both ENABLE_REPLAN and MAX_FRAGMENT_INSTANCES_PER_NODE
-    self._set_query_options({
-      'ENABLE_REPLAN': '',
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': ''})
+    # Unset ENABLE_REPLAN.
+    self._set_query_options({'ENABLE_REPLAN': ''})
 
     # Trivial query should be assigned to tiny group by Frontend.
     # Backend may decide to run it in coordinator only.
@@ -1065,33 +1050,31 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["Executor Group:"])
 
     # Test combination of PROCESSING_COST_MIN_THREADS and MAX_FRAGMENT_INSTANCES_PER_NODE.
-    self._set_query_options({
-      'PROCESSING_COST_MIN_THREADS': '1',
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': '3'})
+    self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '3'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
         ["Executor Group: root.large-group", "EffectiveParallelism: 9",
          "ExecutorGroupsConsidered: 3"])
-    self._set_query_options({
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': '4'})
+    self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '4'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
         ["Executor Group: root.large-group", "EffectiveParallelism: 12",
          "ExecutorGroupsConsidered: 3"])
-    self._set_query_options({
-      'PROCESSING_COST_MIN_THREADS': '3',
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': '1'})
+    self._set_query_options({'PROCESSING_COST_MIN_THREADS': '2'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
-        ["Executor Group: root.large-group", "EffectiveParallelism: 9",
+        ["Executor Group: root.large-group", "EffectiveParallelism: 12",
          "ExecutorGroupsConsidered: 3"])
-    self._set_query_options({
-      'PROCESSING_COST_MIN_THREADS': '2',
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': '2'})
+    self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '2'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
-        ["Executor Group: root.small-group", "EffectiveParallelism: 2",
+        ["Executor Group: root.small-group", "EffectiveParallelism: 4",
          "ExecutorGroupsConsidered: 2"])
+    self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '1'})
+    result = self.execute_query_expect_failure(self.client, CPU_TEST_QUERY)
+    status = (r"PROCESSING_COST_MIN_THREADS \(2\) can not be larger than "
+              r"MAX_FRAGMENT_INSTANCES_PER_NODE \(1\).")
+    assert re.search(status, str(result))
     # Unset PROCESSING_COST_MIN_THREADS and MAX_FRAGMENT_INSTANCES_PER_NODE.
     self._set_query_options({
-      'PROCESSING_COST_MIN_THREADS': '',
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': ''})
+      'MAX_FRAGMENT_INSTANCES_PER_NODE': '',
+      'PROCESSING_COST_MIN_THREADS': ''})
 
     # BEGIN testing count queries
     # Test optimized count star query with 1824 scan ranges assign to small group.
@@ -1222,7 +1205,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
     # Check resource pools on the Web queries site and admission site
     self._verify_query_num_for_resource_pool("root.small", 10)
-    self._verify_query_num_for_resource_pool("root.tiny", 6)
+    self._verify_query_num_for_resource_pool("root.tiny", 5)
     self._verify_query_num_for_resource_pool("root.large", 12)
     self._verify_total_admitted_queries("root.small", 11)
     self._verify_total_admitted_queries("root.tiny", 8)

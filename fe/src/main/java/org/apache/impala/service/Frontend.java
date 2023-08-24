@@ -180,6 +180,7 @@ import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTableHistoryResultItem;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
+import org.apache.impala.thrift.TImpalaQueryOptions;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
@@ -257,10 +258,8 @@ public class Frontend {
   private static final String VERDICT = "Verdict";
   private static final String MEMORY_MAX = "MemoryMax";
   private static final String MEMORY_ASK = "MemoryAsk";
-  private static final String MEMORY_ASK_UNBOUNDED = "MemoryAskUnbounded";
   private static final String CPU_MAX = "CpuMax";
   private static final String CPU_ASK = "CpuAsk";
-  private static final String CPU_ASK_UNBOUNDED = "CpuAskUnbounded";
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -2074,8 +2073,6 @@ public class Frontend {
     int attempt = 0;
     int lastExecutorGroupTotalCores =
         expectedTotalCores(executorGroupSetsToUse.get(num_executor_group_sets - 1));
-    long memoryAskUnbounded = -1;
-    int cpuAskUnbounded = -1;
     int i = 0;
     while (i < num_executor_group_sets) {
       group_set = executorGroupSetsToUse.get(i);
@@ -2175,6 +2172,16 @@ public class Frontend {
       int scaled_cores_requirement = -1;
       if (isComputeCost) {
         Preconditions.checkState(cores_requirement > 0);
+        if (queryOptions.getProcessing_cost_min_threads()
+            > queryOptions.getMax_fragment_instances_per_node()) {
+          throw new AnalysisException(
+              TImpalaQueryOptions.PROCESSING_COST_MIN_THREADS.name() + " ("
+              + queryOptions.getProcessing_cost_min_threads()
+              + ") can not be larger than "
+              + TImpalaQueryOptions.MAX_FRAGMENT_INSTANCES_PER_NODE.name() + " ("
+              + queryOptions.getMax_fragment_instances_per_node() + ").");
+        }
+
         scaled_cores_requirement = (int) Math.min(Integer.MAX_VALUE,
             Math.ceil(
                 cores_requirement / BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
@@ -2184,19 +2191,6 @@ public class Frontend {
             groupSetProfile, new TCounter(CPU_ASK, TUnit.UNIT, scaled_cores_requirement));
         addCounter(groupSetProfile,
             new TCounter(EFFECTIVE_PARALLELISM, TUnit.UNIT, cores_requirement));
-
-        if (memoryAskUnbounded > 0) {
-          addCounter(groupSetProfile,
-              new TCounter(MEMORY_ASK_UNBOUNDED, TUnit.BYTES,
-                  LongMath.saturatedMultiply(
-                      expectedNumExecutor(group_set), memoryAskUnbounded)));
-          memoryAskUnbounded = -1;
-        }
-        if (cpuAskUnbounded > 0) {
-          addCounter(groupSetProfile,
-              new TCounter(CPU_ASK_UNBOUNDED, TUnit.UNIT, cpuAskUnbounded));
-          cpuAskUnbounded = -1;
-        }
       }
 
       boolean matchFound = false;

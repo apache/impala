@@ -84,6 +84,10 @@ abstract public class ScanNode extends PlanNode {
   // Refer to the comment of 'TableRef.tableNumRowsHint_'
   protected long tableNumRowsHint_ = -1;
 
+  // Maximum number of scanner threads after considering number of scan ranges
+  // and related query options.Calculated at computeScanProcessingCost.
+  protected int maxScannerThreads_ = -1;
+
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
     desc_ = desc;
@@ -358,39 +362,38 @@ abstract public class ScanNode extends PlanNode {
    */
   protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
     Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
-    ProcessingCost cardinalityBasedCost =
-        ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
-            ExprUtil.computeExprsTotalCost(conjuncts_), rowMaterializationCost());
 
     // maxThread calculation below intentionally does not include core count from
     // executor group config. This is to allow scan fragment parallelism to scale
     // regardless of the core count limit.
     int maxThreadsPerNode = Math.max(queryOptions.getProcessing_cost_min_threads(),
         queryOptions.getMax_fragment_instances_per_node());
-    int maxScannerThreads = (int) Math.min(getEffectiveNumScanRanges(),
+    maxScannerThreads_ = (int) Math.min(getEffectiveNumScanRanges(),
         IntMath.saturatedMultiply(getNumNodes(), maxThreadsPerNode));
+    long inputCardinality = getInputCardinality();
 
-    if (getInputCardinality() == 0) {
-      Preconditions.checkState(cardinalityBasedCost.getTotalCost() == 0,
-          "Scan is empty but cost is non-zero.");
+    if (inputCardinality >= 0) {
+      ProcessingCost cardinalityBasedCost =
+          ProcessingCost.basicCost(getDisplayLabel(), inputCardinality,
+              ExprUtil.computeExprsTotalCost(conjuncts_), rowMaterializationCost());
+      if (inputCardinality == 0) {
+        Preconditions.checkState(cardinalityBasedCost.getTotalCost() == 0,
+            "Scan is empty but cost is non-zero.");
+      }
       return cardinalityBasedCost;
-    } else if (maxScannerThreads < cardinalityBasedCost.getTotalCost()
-            / BackendConfig.INSTANCE.getMinProcessingPerThread()) {
-      // Input cardinality is unknown or cost is too high compared to maxScanThreads
-      // Return synthetic ProcessingCost based on maxScanThreads.
+    } else {
+      // Input cardinality is unknown. Return synthetic ProcessingCost based on
+      // maxScannerThreads_.
       long syntheticCardinality =
-          Math.max(1, Math.min(getInputCardinality(), maxScannerThreads));
+          Math.max(1, Math.min(inputCardinality, maxScannerThreads_));
       long syntheticPerRowCost = LongMath.saturatedMultiply(
           Math.max(1,
               BackendConfig.INSTANCE.getMinProcessingPerThread() / syntheticCardinality),
-          maxScannerThreads);
+          maxScannerThreads_);
 
       return ProcessingCost.basicCost(
           getDisplayLabel(), syntheticCardinality, 0, syntheticPerRowCost);
     }
-
-    // None of the conditions above apply.
-    return cardinalityBasedCost;
   }
 
   /**

@@ -192,7 +192,7 @@ public class CostingSegment extends TreeNode<CostingSegment> {
         nodeStepCount, minParallelism, maxParallelism, producerCost, cost_);
     newParallelism = Math.max(newParallelism, cost_.getNumInstancesExpected());
     Preconditions.checkState(newParallelism <= maxParallelism,
-        "originalParallelism=" + originalParallelism + ". newParallelism="
+        getRootId() + " originalParallelism=" + originalParallelism + ". newParallelism="
             + newParallelism + " > maxParallelism=" + maxParallelism);
 
     if (LOG.isTraceEnabled()) {

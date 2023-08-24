@@ -1062,6 +1062,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       int parentParallelism, int nodeStepCount) {
     int maxThreadAllowed = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
     boolean canTryLower = true;
+    int maxScannerThreads = Integer.MAX_VALUE;
 
     // Compute selectedParallelism as the maximum allowed parallelism.
     int selectedParallelism = getNumInstances();
@@ -1099,13 +1100,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         if (!scanNodes.isEmpty()) {
           // The existence of scan node may justify an increase of parallelism for this
           // union fargment, but it should be capped at costBasedMaxParallelism.
-          long maxRangesPerScanNode = 1;
+          maxScannerThreads = 1;
           for (ScanNode scanNode : scanNodes) {
-            maxRangesPerScanNode =
-                Math.max(maxRangesPerScanNode, scanNode.getEffectiveNumScanRanges());
+            maxScannerThreads = Math.max(maxScannerThreads, scanNode.maxScannerThreads_);
           }
-          maxParallelism_ = Math.max(maxParallelism_,
-              (int) Math.min(costBasedMaxParallelism, maxRangesPerScanNode));
+          maxParallelism_ = Math.max(
+              maxParallelism_, Math.min(costBasedMaxParallelism, maxScannerThreads));
         }
 
         if (maxParallelism_ > maxThreadAllowed) {
@@ -1135,8 +1135,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         if (!scanNodes.isEmpty()) {
           Preconditions.checkState(scanNodes.size() == 1);
           ScanNode scanNode = scanNodes.get(0);
-          maxParallelism_ =
-              (int) Math.min(maxParallelism_, scanNode.getEffectiveNumScanRanges());
+          maxScannerThreads = scanNode.maxScannerThreads_;
+          maxParallelism_ = Math.min(maxParallelism_, maxScannerThreads);
 
           // Prevent caller from lowering parallelism if fragment has ScanNode
           // because there is no child fragment to compare with.
@@ -1153,7 +1153,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
                 getNumInstances(), selectedParallelism, "Follow maxThreadPerNode.");
           }
         } else {
-          if (maxParallelism_ < minParallelism && scanNodes.isEmpty()) {
+          if (maxParallelism_ < minParallelism && minParallelism < maxScannerThreads) {
             maxParallelism_ = minParallelism;
             canTryLower = false;
             if (LOG.isTraceEnabled()) {
@@ -1177,18 +1177,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
     // Initialize this fragment's parallelism to the selectedParallelism.
     setAdjustedInstanceCount(selectedParallelism);
-    return canTryLower;
+    return canTryLower && selectedParallelism > 1;
   }
 
   private boolean hasUnionNode() {
     List<ScanNode> nodes = Lists.newArrayList();
     collectPlanNodes(Predicates.instanceOf(UnionNode.class), nodes);
-    return !nodes.isEmpty();
-  }
-
-  private boolean hasScanNode() {
-    List<ScanNode> nodes = Lists.newArrayList();
-    collectPlanNodes(Predicates.instanceOf(ScanNode.class), nodes);
     return !nodes.isEmpty();
   }
 
