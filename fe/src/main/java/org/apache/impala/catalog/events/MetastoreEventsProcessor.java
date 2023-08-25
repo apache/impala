@@ -265,6 +265,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   private static final long SECOND_IN_NANOS = 1000 * 1000 * 1000L;
 
+  // List of event types that can be skipped while fetching notification events from metastore
+  private static final List<String> eventSkipList = Arrays.asList("OPEN_TXN");
+
   /**
    * Wrapper around {@link
    * MetastoreEventsProcessor#getNextMetastoreEventsInBatches(CatalogServiceCatalog,
@@ -312,6 +315,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         NotificationEventRequest eventRequest = new NotificationEventRequest();
         eventRequest.setMaxEvents(batchSize);
         eventRequest.setLastEvent(currentEventId);
+        eventRequest.setEventTypeSkipList(eventSkipList);
         NotificationEventResponse notificationEventResponse = MetastoreShim
             .getNextNotification(msc.getHiveClient(), eventRequest);
         for (NotificationEvent event : notificationEventResponse.getEvents()) {
@@ -819,6 +823,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEventRequest eventRequest = new NotificationEventRequest();
       eventRequest.setLastEvent(eventId);
       eventRequest.setMaxEvents(batchSize);
+      eventRequest.setEventTypeSkipList(eventSkipList);
       NotificationEventResponse response = MetastoreShim
           .getNextNotification(msClient.getHiveClient(), eventRequest);
       LOG.info(String.format("Received %d events. Start event id : %d",
