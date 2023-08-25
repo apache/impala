@@ -1162,11 +1162,10 @@ int
 ====
 ---- QUERY
 # We can query a snapshot if it doesn't have equality deletes.
-select * from iceberg_v2_delete_equality for system_version as of 6816997371555012807;
+select * from iceberg_v2_delete_equality for system_version as of 3207673167795000154;
 ---- RESULTS
-1,'a'
-2,'b'
-3,'c'
+1,'test_1_base'
+2,'test_2_base'
 ---- TYPES
 BIGINT,STRING
 ====

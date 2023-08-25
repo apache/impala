@@ -730,7 +730,7 @@ ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equal
 ---- QUERY
 # Querying a table with equality deletes is not allowed.
 # Use time-travel based on snapshot id.
-select * from functional_parquet.iceberg_v2_delete_equality for system_version as of 5725822353600261755;
+select * from functional_parquet.iceberg_v2_delete_equality for system_version as of 5763349507283783091;
 ---- CATCH
 ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
 ====

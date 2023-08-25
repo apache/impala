@@ -748,10 +748,27 @@ HiveCatalog.
 The table has a positional delete file.
 
 iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality:
-Since Hive/Spark is unable to write equality delete files we've copied the contents of
-'iceberg_v2_delete_positional' and manually edited the metadata to have equality delete
-files in it. Only modified the metadata files, the actual delete files are still
-positional.
+Since Hive/Spark is unable to write equality delete files Flink has been used to create
+an equality delete file by overwriting an existing unique row with the following
+statements:
+    CREATE TABLE `ssb`.`ssb_default`.`iceberg_v2_delete_equality` (
+      `id`  BIGINT UNIQUE COMMENT 'unique id',
+      `data` STRING NOT NULL,
+    PRIMARY KEY(`id`) NOT ENFORCED
+    ) with ('format-version'='2',
+    'write.upsert.enabled'='true',
+    'connector' = 'iceberg',
+    'catalog-database' = 'test_db',
+    'catalog-type' = 'hive',
+    'catalog-name' = 'iceberg_hive_catalog',
+    'hive-conf-dir' = '/etc/hive/conf',
+    'engine.hive.enabled' = 'true'
+    );
+    insert into iceberg_v2_delete_equality values (1, 'test_1_base');
+    insert into iceberg_v2_delete_equality values (2, 'test_2_base');
+    insert into iceberg_v2_delete_equality values (2, 'test_2_updated');
+This table was created with HDFS absolute paths, which were replaced with the script
+specified in `iceberg_test/hadoop_catalog/ice/iceberg_v2_no_deletes`.
 
 iceberg_test/iceberg_migrated_alter_test
 Generated and migrated by Hive
