@@ -1569,15 +1569,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
     // is compatible with all types and no cast is necessary.
     if (targetType.isNull()) return this;
-    if (!targetType.isDecimal()) {
-      // requested cast must be to assignment-compatible type
-      // (which implies no loss of precision)
-      if (!targetType.equals(type)) {
-        throw new SqlCastException(
-          "targetType=" + targetType + " type=" + type);
-      }
-    }
-    return uncheckedCastTo(targetType, compatibility);
+    // If decimal, cast to the target type.
+    if (targetType.isDecimal()) return uncheckedCastTo(targetType, compatibility);
+    // If they match, cast to the type both values can be assigned to (the definition of
+    // getAssignmentCompatibleType), which implies no loss of precision. Note that
+    // getAssignmentCompatibleType always returns a "real" (not wildcard) type.
+    if (type.matchesType(targetType)) return uncheckedCastTo(type, compatibility);
+    throw new SqlCastException("targetType=" + targetType + " type=" + type);
   }
 
   public final Expr castTo(Type targetType) throws AnalysisException {

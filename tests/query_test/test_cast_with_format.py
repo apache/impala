@@ -2185,3 +2185,61 @@ class TestCastWithFormat(ImpalaTestSuite):
     err = self.execute_query_expect_failure(self.client,
         r'''select cast(date"2001-03-03" as string format '"text"FXYYYY-MM-DD')''')
     assert "FX modifier should be at the beginning of the format string." in str(err)
+
+  def test_varchar_cast(self, unique_database):
+    table = "{0}.test_varchar_casts".format(unique_database)
+    self.execute_query("create table {0} (c char(6), v varchar(6))".format(table))
+    self.execute_query("insert into {0} values (cast('test' as char(6)), "
+        "cast('test' as varchar(6))), (cast('tester' as char(6)), "
+        "cast('tester' as varchar(6)))".format(table))
+
+    # Compare char to varchar
+    select_star = "select * from " + table
+    assert ['test  \ttest', 'tester\ttester'] == self.execute_query(
+        select_star + " where c = cast(v as char(6))").data
+    assert ['tester\ttester'] == self.execute_query(
+        select_star + " where v = cast(c as varchar(6))").data
+    assert ['tester\ttester'] == self.execute_query(
+        select_star + " where v = cast(c as varchar)").data
+    # Newly supported cases in IMPALA-10086
+    assert ['tester\ttester'] == self.execute_query(
+        select_star + " where c = v").data
+    assert ['tester\ttester'] == self.execute_query(
+        select_star + " where v = c").data
+
+    # Compare char to literal
+    select_c = "select c from " + table
+    assert [] == self.execute_query(select_c + " where c = 'test'").data
+    assert ['test  '] == self.execute_query(
+        select_c + " where c = 'test  '").data
+    assert ['tester'] == self.execute_query(
+        select_c + " where c = 'tester'").data
+    assert ['test  '] == self.execute_query(
+        select_c + " where c = cast('test' as char(6))").data
+    assert ['tester'] == self.execute_query(
+        select_c + " where c = cast('tester' as char(6))").data
+    # Newly supported cases in IMPALA-10086
+    assert [] == self.execute_query(
+        select_c + " where c = cast('test' as varchar(6))").data
+    assert ['test  '] == self.execute_query(
+        select_c + " where c = cast('test  ' as varchar(6))").data
+    assert ['tester'] == self.execute_query(
+        select_c + " where c = cast('tester' as varchar(6))").data
+
+    # Compare varchar to literal
+    select_v = "select v from " + table
+    assert ['test'] == self.execute_query(
+        select_v + " where v = 'test'").data
+    assert ['tester'] == self.execute_query(
+        select_v + " where v = 'tester'").data
+    assert ['test'] == self.execute_query(
+        select_v + " where v = cast('test' as varchar(6))").data
+    assert ['tester'] == self.execute_query(
+        select_v + " where v = cast('tester' as varchar(6))").data
+    # Newly supported cases in IMPALA-10086
+    assert [] == self.execute_query(
+        select_v + " where v = cast('test' as char(6))").data
+    assert ['test'] == self.execute_query(
+        select_v + " where v = cast('test' as char(4))").data
+    assert ['tester'] == self.execute_query(
+        select_v + " where v = cast('tester' as char(6))").data

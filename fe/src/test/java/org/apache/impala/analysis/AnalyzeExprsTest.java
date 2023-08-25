@@ -495,6 +495,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select cast(cast('helloworld' as VARCHAR(3)) as string)");
     AnalyzesOk("select cast(cast('3.0' as VARCHAR(5)) as float)");
     AnalyzesOk("select NULL = cast('123' as CHAR(3))");
+    AnalyzesOk("select * from functional.chars_tiny where cs = vc");
+    AnalyzesOk("select * from functional.chars_tiny where vc = cs");
+    AnalyzesOk("insert into functional.chars_tiny(vc) VALUES " +
+        "(cast('aaabbb' as varchar(6))), (cast('cccddd' as char(6)))");
+    AnalyzesOk("insert into functional.chars_tiny(vc) VALUES " +
+        "(cast('aaabbb' as varchar(32))), (cast('cccddd' as char(32)))");
     AnalysisError("select now() = cast('hi' as CHAR(3))",
         "operands of type TIMESTAMP and CHAR(3) are not comparable: " +
         "now() = CAST('hi' AS CHAR(3))");
