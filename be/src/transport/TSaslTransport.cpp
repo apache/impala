@@ -72,6 +72,10 @@ namespace apache { namespace thrift { namespace transport {
     return sasl_->getUsername();
   }
 
+  string TSaslTransport::getMechanismName() {
+    return sasl_->getMechanismName();
+  }
+
   void TSaslTransport::doSaslNegotiation() {
     NegotiationStatus status = TSASL_INVALID;
     uint32_t resLength;

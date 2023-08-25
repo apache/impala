@@ -79,6 +79,19 @@ public class LdapImpalaShellTest {
     return Boolean.parseBoolean(RunShellCommand.Run(cmd, true, "", "").replace("\n", ""));
   }
 
+  /**
+   * Returns list of transport protocols: "beeswax", "hs2" is always available,
+   * "hs2-http" is not available on older version of python.
+   */
+  protected List<String> getProtocolsToTest() throws Exception {
+    List<String> protocolsToTest = Arrays.asList("beeswax", "hs2");
+    if (pythonSupportsSSLContext()) {
+      // http transport tests will fail with older python versions (IMPALA-8873)
+      protocolsToTest = Arrays.asList("beeswax", "hs2", "hs2-http");
+    }
+    return protocolsToTest;
+  }
+
   private void verifyMetrics(Range<Long> expectedBasicSuccess,
       Range<Long> expectedBasicFailure, Range<Long> expectedCookieSuccess,
       Range<Long> expectedCookieFailure) throws Exception {
@@ -154,13 +167,8 @@ public class LdapImpalaShellTest {
     String[] commandWithoutAuth = {
         "impala-shell.sh", "", String.format("--query=%s", query)};
     String protocolTemplate = "--protocol=%s";
-    List<String> protocolsToTest = Arrays.asList("beeswax", "hs2");
-    if (pythonSupportsSSLContext()) {
-      // http transport tests will fail with older python versions (IMPALA-8873)
-      protocolsToTest = Arrays.asList("beeswax", "hs2", "hs2-http");
-    }
 
-    for (String p : protocolsToTest) {
+    for (String p : getProtocolsToTest()) {
       String protocol = String.format(protocolTemplate, p);
       validCommand[1] = protocol;
       RunShellCommand.Run(validCommand, /*shouldSucceed*/ true, TEST_USER_1,

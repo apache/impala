@@ -167,6 +167,31 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
   }
 
   /**
+   * Tests proxy-user authentication without impersonation over all available protocols.
+   */
+  @Test
+  public void testLdapFiltersWithProxyWithoutDoAsUser() throws Exception {
+    // These correspond to the values in fe/src/test/resources/users.ldif
+    // Sets up a cluster where TEST_USER_1 can act as a proxy for any other user
+    // and TEST_USER_1 passes the group filter, and user filter, too.
+    setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
+            + "--ldap_group_search_basedn=ou=Groups,dc=myorg,dc=com "
+            + "--ldap_user_filter=(&(objectClass=person)(cn={0})(!(cn=Test2Ldap))) "
+            + "--ldap_group_filter=(&(cn=group1)(uniqueMember={0})) "
+            + "--authorized_proxy_user_config=%s=* ", TEST_USER_1));
+
+    String query = "select logged_in_user()";
+
+    for (String protocol : getProtocolsToTest()) {
+      // Run as the proxy without a delegate user,
+      // testcase should pass since the proxy user passes the filters.
+      String[] command =
+          buildCommand(query, protocol, TEST_USER_1, TEST_PASSWORD_1, "/cliservice");
+      RunShellCommand.Run(command, /* shouldSucceed */ true, TEST_USER_1, "");
+    }
+  }
+
+  /**
    * Test LDAP Search on multiple OUs.
    */
   @Test

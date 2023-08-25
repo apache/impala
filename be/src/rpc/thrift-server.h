@@ -114,6 +114,9 @@ class ThriftServer {
     std::string saml_relay_state;
     std::unique_ptr<TWrappedHttpRequest> request;
     std::unique_ptr<TWrappedHttpResponse> response;
+    // Used in case of Kerberos authentication only to store the authenticated Kerberos
+    // user principal
+    std::string kerberos_user_principal;
   };
 
   /// Interface class for receiving connection creation / termination events.

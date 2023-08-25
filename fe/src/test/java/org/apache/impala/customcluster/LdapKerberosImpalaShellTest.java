@@ -206,6 +206,10 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
             "/?doAs=" + delegateUser_,
             /* shouldSucceed */ true,
             delegateUser_, "");
+
+    // Proxy-user without delegation with different transport protocols.
+    testShellKerberosAuthWithUser(kerberosKdcEnvironment, TEST_USER_1,
+            /* shouldSucceed */ true);
   }
 
   /**
@@ -274,6 +278,10 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
             "/?doAs=" + TEST_USER_7,
             /* shouldSucceed */ true,
             TEST_USER_7, "");
+
+    // Proxy-user without delegation with different transport protocols.
+    testShellKerberosAuthWithUser(kerberosKdcEnvironment, TEST_USER_1,
+            /* shouldSucceed */ true);
   }
 
   /**
@@ -421,6 +429,10 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
             "/?doAs=" + delegateUser_,
             /* shouldSucceed */ true,
             delegateUser_, "");
+
+    // Proxy-user without delegation with different transport protocols.
+    testShellKerberosAuthWithUser(kerberosKdcEnvironment, TEST_USER_1,
+            /* shouldSucceed */ true);
   }
 
   /**

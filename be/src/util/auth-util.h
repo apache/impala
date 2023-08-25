@@ -67,6 +67,10 @@ Status GetExternalKerberosPrincipal(std::string* out_principal);
 Status ParseKerberosPrincipal(const std::string& principal, std::string* service_name,
     std::string* hostname, std::string* realm);
 
+// Takes a Kerberos principal (either user/hostname@realm or user@realm)
+// and returns the username part.
+string GetShortUsernameFromKerberosPrincipal(const string& principal);
+
 /// Returns true if kerberos is enabled.
 inline bool IsKerberosEnabled() {
   return !FLAGS_principal.empty();

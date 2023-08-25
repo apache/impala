@@ -366,6 +366,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
         // If the current user is a valid proxy user, he/she can optionally perform
         // authorization requests on behalf of another user. This is done by setting
         // the 'impala.doas.user' Hive Server 2 configuration property.
+        // Note: The 'impala.doas.user' configuration overrides the user specified
+        // in the 'doAs' request parameter, which can be specified for hs2-http transport.
         state->do_as_user = v.second;
         Status status = AuthorizeProxyUser(state->connected_user, state->do_as_user);
         HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
@@ -394,9 +396,27 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // If the connected user is an authorized proxy user, we were not able to check the LDAP
   // filters when the connection was created because we didn't know what the effective
   // user would be yet, so check now.
+  // When no 'doAs' user is specified and Kerberos authentication is enabled, then the
+  // connected user is a Kerberos user principal and that will certainly not pass the
+  // LDAP checks, so in this case the LDAP filters will be checked with the short username
+  // derived from the Kerberos user principal.
   if (FLAGS_enable_ldap_auth && IsAuthorizedProxyUser(state->connected_user)) {
+    string username_for_ldap_filters = GetEffectiveUser(*state);
+    if (state->do_as_user.empty() &&
+        !connection_context->kerberos_user_principal.empty()) {
+
+      string short_username = GetShortUsernameFromKerberosPrincipal(
+        connection_context->kerberos_user_principal);
+      VLOG(1) << "No doAs user is specified and Kerberos authentication is enabled, "
+              << "the authenticated user principal is \""
+              << connection_context->kerberos_user_principal << "\". "
+              << "LDAP filters will be checked using the short username \""
+              << short_username << "\", which is extracted from the user principal.";
+      username_for_ldap_filters = short_username;
+    }
+
     bool success =
-        AuthManager::GetInstance()->GetLdap()->LdapCheckFilters(GetEffectiveUser(*state));
+      AuthManager::GetInstance()->GetLdap()->LdapCheckFilters(username_for_ldap_filters);
     if (!success) {
       HS2_RETURN_ERROR(return_val, "User is not authorized.", SQLSTATE_GENERAL_ERROR);
     }

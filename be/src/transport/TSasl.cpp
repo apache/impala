@@ -256,5 +256,18 @@ uint8_t* TSaslServer::evaluateChallengeOrResponse(const uint8_t* response,
   *resLen = outlen;
   return out;
 }
+
+string TSaslServer::getMechanismName() {
+  const char* mechName;
+  int result =
+      sasl_getprop(conn, SASL_MECHNAME, reinterpret_cast<const void **>(&mechName));
+  if (result != SASL_OK) {
+    stringstream ss;
+    ss << "Error getting SASL_MECHNAME property: " << sasl_errstring(result, NULL, NULL);
+    throw SaslException(ss.str().c_str());
+  }
+  string ret(mechName);
+  return ret;
+}
 };
 #endif

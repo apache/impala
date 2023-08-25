@@ -97,4 +97,12 @@ Status ParseKerberosPrincipal(const string& principal, string* service_name,
   return Status::OK();
 }
 
+string GetShortUsernameFromKerberosPrincipal(const string& principal) {
+  size_t end_idx = min(principal.find('/'), principal.find('@'));
+  string short_user(
+      end_idx == string::npos || end_idx == 0 ?
+      principal : principal.substr(0, end_idx));
+  return short_user;
+}
+
 }

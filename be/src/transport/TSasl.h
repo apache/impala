@@ -229,6 +229,10 @@ class TSaslServer : public sasl::TSasl {
   /* Evaluates the response data and generates a challenge. */
   virtual uint8_t* evaluateChallengeOrResponse(const uint8_t* challenge,
                                                const uint32_t len, uint32_t* resLen);
+
+  /* Returns the active IANA-registered mechanism name of this SASL server. */
+  virtual std::string getMechanismName();
+
  private:
   /* The domain of the user agent */
   std::string userRealm;

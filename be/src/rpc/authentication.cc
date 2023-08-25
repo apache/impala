@@ -500,16 +500,6 @@ int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
   return SASL_BADAUTH;
 }
 
-// Takes a Kerberos principal (either user/hostname@realm or user@realm)
-// and returns the username part.
-string GetShortUsernameFromKerberosPrincipal(const string& principal) {
-  size_t end_idx = min(principal.find('/'), principal.find('@'));
-  string short_user(
-      end_idx == string::npos || end_idx == 0 ?
-      principal : principal.substr(0, end_idx));
-  return short_user;
-}
-
 // If Kerberos and LDAP authentications are enabled and
 // enable_group_filter_check_for_authenticated_kerberos_user flag is set,
 // then this callback checks if the authenticated user passes LDAP group
@@ -715,11 +705,12 @@ bool JWTTokenAuth(ThriftServer::ConnectionContext* connection_context,
   return true;
 }
 
-// Performs a step of SPNEGO auth for the HTTP transport and sets the username on
-// 'connection_context' if auth is successful. 'header_token' is the value from an
-// 'Authorization: Negotiate" header. Returns true if the step was successful and sets
-// 'is_complete' to indicate if more steps are needed. Returns false if an error was
-// encountered and the connection should be closed.
+// Performs a step of SPNEGO auth for the HTTP transport and sets the username and
+// kerberos_user_principal on 'connection_context' if auth is successful.
+// 'header_token' is the value from an 'Authorization: Negotiate" header.
+// Returns true if the step was successful and sets 'is_complete' to indicate
+// if more steps are needed. Returns false if an error was encountered and the
+// connection should be closed.
 bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
     const AuthenticationHash& hash, const std::string& header_token, bool* is_complete) {
   if (header_token.empty()) {
@@ -774,6 +765,8 @@ bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
 
         // Authentication was successful, so set the username on the connection.
         connection_context->username = username;
+        // Save the username as Kerberos user principal in the connection context.
+        connection_context->kerberos_user_principal = username;
         // Create a cookie to return.
         connection_context->return_headers.push_back(
             Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
@@ -1367,6 +1360,11 @@ void SecureAuthProvider::SetupConnectionContext(
       socket = down_cast<TSocket*>(sasl_transport->getUnderlyingTransport().get());
       // Get the username from the transport.
       connection_ptr->username = sasl_transport->getUsername();
+      if (sasl_transport->getMechanismName() == KERBEROS_MECHANISM) {
+        // Save the username as Kerberos user principal in the connection context
+        // if the actual auth mechanism is Kerberos.
+        connection_ptr->kerberos_user_principal = connection_ptr->username;
+      }
       break;
     }
     case ThriftServer::HTTP: {

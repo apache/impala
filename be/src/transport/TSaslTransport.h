@@ -144,6 +144,13 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
    */
   std::string getUsername();
 
+  /**
+   * Returns the IANA-registered mechanism name from underlying sasl connection.
+   *
+   * @throws TTransportException if an error occurs
+   */
+  std::string getMechanismName();
+
  protected:
   /// Underlying transport
   std::shared_ptr<TTransport> transport_;
