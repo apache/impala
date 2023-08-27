@@ -265,6 +265,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   private static final long SECOND_IN_NANOS = 1000 * 1000 * 1000L;
 
+  // List of event types to skip while fetching notification events from metastore
+  private static final List<String> EVENT_SKIP_LIST = Arrays.asList("OPEN_TXN");
+
   /**
    * Wrapper around {@link
    * MetastoreEventsProcessor#getNextMetastoreEventsInBatches(CatalogServiceCatalog,
@@ -1126,4 +1129,6 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static MessageDeserializer getMessageDeserializer() {
     return MESSAGE_DESERIALIZER;
   }
+
+  public static List<String> getEventSkipList() { return EVENT_SKIP_LIST; }
 }

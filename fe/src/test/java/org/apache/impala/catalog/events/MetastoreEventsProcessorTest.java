@@ -3259,6 +3259,23 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  /**
+   * Test whether open transaction event is skipped while fetching notification events
+   * @throws Exception
+   */
+  @Test
+  public void testSkipFetchOpenTransactionEvent() throws Exception {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      // Make an empty transaction
+      long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+    }
+    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    assertEquals(1, events.size());
+    assertEquals(MetastoreEventType.COMMIT_TXN,
+        MetastoreEventType.from(events.get(0).getEventType()));
+  }
+
   private void createDatabase(String catName, String dbName,
       Map<String, String> params) throws TException {
     try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {

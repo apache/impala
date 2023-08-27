@@ -586,6 +586,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    */
   public static NotificationEventResponse getNextNotification(IMetaStoreClient msClient,
       NotificationEventRequest eventRequest) throws TException {
+    eventRequest.setEventTypeSkipList(MetastoreEventsProcessor.getEventSkipList());
     return msClient.getThriftClient().get_next_notification(eventRequest);
   }
 
