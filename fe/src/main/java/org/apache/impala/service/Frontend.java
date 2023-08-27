@@ -868,6 +868,7 @@ public class Frontend {
           clientRequest.getRedacted_stmt() : clientRequest.getStmt());
       header.setWant_minimal_response(
           BackendConfig.INSTANCE.getBackendCfg().use_local_catalog);
+      header.setCoordinator_hostname(BackendConfig.INSTANCE.getHostname());
       ddl.getDdl_params().setHeader(header);
       // Forward relevant query options to the catalogd.
       TDdlQueryOptions ddlQueryOpts = new TDdlQueryOptions();

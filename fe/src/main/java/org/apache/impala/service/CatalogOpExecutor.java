@@ -144,7 +144,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKe
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
-import org.apache.impala.catalog.monitor.CatalogOperationMetrics;
+import org.apache.impala.catalog.monitor.CatalogOperationTracker;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -210,6 +210,7 @@ import org.apache.impala.thrift.TDropStatsParams;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TFunctionName;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.THdfsCachingOp;
@@ -238,6 +239,7 @@ import org.apache.impala.thrift.TTableRowFormat;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTestCaseData;
 import org.apache.impala.thrift.TTruncateParams;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.thrift.TUpdatedPartition;
@@ -394,9 +396,9 @@ public class CatalogOpExecutor {
   private final AuthorizationManager authzManager_;
   private final HiveJavaFunctionFactory hiveJavaFuncFactory_;
 
-  // A singleton monitoring class that keeps track of the catalog usage metrics.
-  private final CatalogOperationMetrics catalogOpMetric_ =
-      CatalogMonitor.INSTANCE.getCatalogOperationMetrics();
+  // A singleton monitoring class that keeps track of the catalog operations.
+  private final CatalogOperationTracker catalogOpTracker_ =
+      CatalogMonitor.INSTANCE.getCatalogOperationTracker();
 
   // Lock used to ensure that CREATE[DROP] TABLE[DATABASE] operations performed in
   // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
@@ -423,6 +425,7 @@ public class CatalogOpExecutor {
     response.setResult(new TCatalogUpdateResult());
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
     User requestingUser = null;
+    TUniqueId queryId = null;
     boolean wantMinimalResult = false;
     if (ddlRequest.isSetHeader()) {
       TCatalogServiceRequestHeader header = ddlRequest.getHeader();
@@ -430,49 +433,50 @@ public class CatalogOpExecutor {
         requestingUser = new User(ddlRequest.getHeader().getRequesting_user());
       }
       wantMinimalResult = ddlRequest.getHeader().isWant_minimal_response();
+      queryId = header.getQuery_id();
     }
     Optional<TTableName> tTableName = Optional.empty();
-    TDdlType ddl_type = ddlRequest.ddl_type;
+    TDdlType ddlType = ddlRequest.ddl_type;
     try {
       boolean syncDdl = ddlRequest.getQuery_options().isSync_ddl();
-      switch (ddl_type) {
+      switch (ddlType) {
         case ALTER_DATABASE:
           TAlterDbParams alter_db_params = ddlRequest.getAlter_db_params();
           tTableName = Optional.of(new TTableName(alter_db_params.db, ""));
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           alterDatabase(alter_db_params, wantMinimalResult, response);
           break;
         case ALTER_TABLE:
           TAlterTableParams alter_table_params = ddlRequest.getAlter_table_params();
           tTableName = Optional.of(alter_table_params.getTable_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           alterTable(alter_table_params, ddlRequest.getQuery_options().getDebug_action(),
               wantMinimalResult, response);
           break;
         case ALTER_VIEW:
           TCreateOrAlterViewParams alter_view_params = ddlRequest.getAlter_view_params();
           tTableName = Optional.of(alter_view_params.getView_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           alterView(alter_view_params, wantMinimalResult, response);
           break;
         case CREATE_DATABASE:
           TCreateDbParams create_db_params = ddlRequest.getCreate_db_params();
           tTableName = Optional.of(new TTableName(create_db_params.db, ""));
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           createDatabase(create_db_params, response, syncDdl, wantMinimalResult);
           break;
         case CREATE_TABLE_AS_SELECT:
           TCreateTableParams create_table_as_select_params =
               ddlRequest.getCreate_table_params();
           tTableName = Optional.of(create_table_as_select_params.getTable_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           response.setNew_table_created(createTable(create_table_as_select_params,
               response, catalogTimeline, syncDdl, wantMinimalResult));
           break;
         case CREATE_TABLE:
           TCreateTableParams create_table_params = ddlRequest.getCreate_table_params();
           tTableName = Optional.of((create_table_params.getTable_name()));
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           createTable(ddlRequest.getCreate_table_params(), response, catalogTimeline,
               syncDdl, wantMinimalResult);
           break;
@@ -480,7 +484,7 @@ public class CatalogOpExecutor {
           TCreateTableLikeParams create_table_like_params =
               ddlRequest.getCreate_table_like_params();
           tTableName = Optional.of(create_table_like_params.getTable_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           createTableLike(create_table_like_params, response, catalogTimeline, syncDdl,
               wantMinimalResult);
           break;
@@ -488,31 +492,37 @@ public class CatalogOpExecutor {
           TCreateOrAlterViewParams create_view_params =
               ddlRequest.getCreate_view_params();
           tTableName = Optional.of(create_view_params.getView_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           createView(create_view_params, wantMinimalResult, response, catalogTimeline);
           break;
         case CREATE_FUNCTION:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          createFunction(ddlRequest.getCreate_fn_params(), response);
+          TCreateFunctionParams create_func_params = ddlRequest.getCreate_fn_params();
+          TFunctionName fnName = create_func_params.getFn().getName();
+          tTableName = Optional.of(new TTableName(fnName.db_name, fnName.function_name));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          createFunction(create_func_params, response);
           break;
         case CREATE_DATA_SOURCE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          createDataSource(ddlRequest.getCreate_data_source_params(), response);
+          TCreateDataSourceParams create_ds_params =
+              ddlRequest.getCreate_data_source_params();
+          tTableName = Optional.of(
+              new TTableName(create_ds_params.getData_source().name, ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          createDataSource(create_ds_params, response);
           break;
         case COMPUTE_STATS:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
           Preconditions.checkState(false, "Compute stats should trigger an ALTER TABLE.");
           break;
         case DROP_STATS:
           TDropStatsParams drop_stats_params = ddlRequest.getDrop_stats_params();
           tTableName = Optional.of(drop_stats_params.getTable_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           dropStats(drop_stats_params, wantMinimalResult, response);
           break;
         case DROP_DATABASE:
           TDropDbParams drop_db_params = ddlRequest.getDrop_db_params();
           tTableName = Optional.of(new TTableName(drop_db_params.getDb(), ""));
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           dropDatabase(drop_db_params, response);
           break;
         case DROP_TABLE:
@@ -520,7 +530,7 @@ public class CatalogOpExecutor {
           TDropTableOrViewParams drop_table_or_view_params =
               ddlRequest.getDrop_table_or_view_params();
           tTableName = Optional.of(drop_table_or_view_params.getTable_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           // Dropped tables and views are already returned as minimal results, so don't
           // need to pass down wantMinimalResult here.
           dropTableOrView(drop_table_or_view_params, response,
@@ -529,60 +539,82 @@ public class CatalogOpExecutor {
         case TRUNCATE_TABLE:
           TTruncateParams truncate_params = ddlRequest.getTruncate_params();
           tTableName = Optional.of(truncate_params.getTable_name());
-          catalogOpMetric_.increment(ddl_type, tTableName);
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           truncateTable(truncate_params, wantMinimalResult, response,
               ddlRequest.getQuery_options().getLock_max_wait_time_s());
           break;
         case DROP_FUNCTION:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          dropFunction(ddlRequest.getDrop_fn_params(), response);
+          TDropFunctionParams drop_func_params = ddlRequest.getDrop_fn_params();
+          TFunctionName dropFnName = drop_func_params.getFn_name();
+          tTableName = Optional.of(
+              new TTableName(dropFnName.db_name, dropFnName.function_name));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          dropFunction(drop_func_params, response);
           break;
         case DROP_DATA_SOURCE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          dropDataSource(ddlRequest.getDrop_data_source_params(), response);
+          TDropDataSourceParams drop_ds_params = ddlRequest.getDrop_data_source_params();
+          tTableName = Optional.of(new TTableName(drop_ds_params.data_source, ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          dropDataSource(drop_ds_params, response);
           break;
         case CREATE_ROLE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          createRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
+          TCreateDropRoleParams create_role_params =
+              ddlRequest.getCreate_drop_role_params();
+          tTableName = Optional.of(new TTableName(create_role_params.role_name, ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          createRole(requestingUser, create_role_params, response);
           break;
         case DROP_ROLE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          dropRole(requestingUser, ddlRequest.getCreate_drop_role_params(), response);
+          TCreateDropRoleParams drop_role_params =
+            ddlRequest.getCreate_drop_role_params();
+          tTableName = Optional.of(new TTableName(drop_role_params.role_name, ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          dropRole(requestingUser, drop_role_params, response);
           break;
         case GRANT_ROLE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          grantRoleToGroup(
-              requestingUser, ddlRequest.getGrant_revoke_role_params(), response);
+          TGrantRevokeRoleParams grant_role_params =
+              ddlRequest.getGrant_revoke_role_params();
+          tTableName = Optional.of(new TTableName(
+              StringUtils.join(",", grant_role_params.group_names), ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          grantRoleToGroup(requestingUser, grant_role_params, response);
           break;
         case REVOKE_ROLE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          TGrantRevokeRoleParams revoke_role_params =
+              ddlRequest.getGrant_revoke_role_params();
+          tTableName = Optional.of(new TTableName(
+              StringUtils.join(",", revoke_role_params.group_names), ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
           revokeRoleFromGroup(
-              requestingUser, ddlRequest.getGrant_revoke_role_params(), response);
+              requestingUser, revoke_role_params, response);
           break;
         case GRANT_PRIVILEGE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          grantPrivilege(
-              ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(), response);
+          TGrantRevokePrivParams grant_priv_params =
+              ddlRequest.getGrant_revoke_priv_params();
+          tTableName = Optional.of(new TTableName(grant_priv_params.principal_name, ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          grantPrivilege(ddlRequest.getHeader(), grant_priv_params, response);
           break;
         case REVOKE_PRIVILEGE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
-          revokePrivilege(
-              ddlRequest.getHeader(), ddlRequest.getGrant_revoke_priv_params(), response);
+          TGrantRevokePrivParams revoke_priv_params =
+              ddlRequest.getGrant_revoke_priv_params();
+          tTableName = Optional.of(new TTableName(revoke_priv_params.principal_name, ""));
+          catalogOpTracker_.increment(ddlRequest, tTableName);
+          revokePrivilege(ddlRequest.getHeader(), revoke_priv_params, response);
           break;
         case COMMENT_ON:
-          TCommentOnParams comment_on_params = ddlRequest.getComment_on_params();
           tTableName = Optional.of(new TTableName("", ""));
-          alterCommentOn(comment_on_params, response, tTableName, wantMinimalResult);
+          alterCommentOn(ddlRequest, response, tTableName, wantMinimalResult);
           break;
         case COPY_TESTCASE:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          catalogOpTracker_.increment(ddlRequest, Optional.empty());
           copyTestCaseData(ddlRequest.getCopy_test_case_params(), response,
               wantMinimalResult);
           break;
         default:
-          catalogOpMetric_.increment(ddl_type, Optional.empty());
+          catalogOpTracker_.increment(ddlRequest, Optional.empty());
           throw new IllegalStateException(
-              "Unexpected DDL exec request type: " + ddl_type);
+              "Unexpected DDL exec request type: " + ddlType);
       }
       catalogTimeline.markEvent(DDL_FINISHED);
 
@@ -602,9 +634,12 @@ public class CatalogOpExecutor {
       // At this point, the operation is considered successful. If any errors occurred
       // during execution, this function will throw an exception and the CatalogServer
       // will handle setting a bad status code.
-      response.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
-    } finally {
-      catalogOpMetric_.decrement(ddl_type, tTableName);
+      response.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<>()));
+      catalogOpTracker_.decrement(ddlType, queryId, tTableName, /*exception*/null);
+    } catch (Exception e) {
+      catalogOpTracker_.decrement(ddlType, queryId, tTableName,
+          JniUtil.throwableToString(e));
+      throw e;
     }
     return response;
   }
@@ -6511,6 +6546,19 @@ public class CatalogOpExecutor {
     return fsList;
   }
 
+  public TResetMetadataResponse execResetMetadata(TResetMetadataRequest req)
+      throws CatalogException {
+    catalogOpTracker_.increment(req);
+    try {
+      TResetMetadataResponse response = execResetMetadataImpl(req);
+      catalogOpTracker_.decrement(req, /*errorMsg*/null);
+      return response;
+    } catch (Exception e) {
+      catalogOpTracker_.decrement(req, JniUtil.throwableToString(e));
+      throw e;
+    }
+  }
+
   /**
    * Executes a TResetMetadataRequest and returns the result as a
    * TResetMetadataResponse. Based on the request parameters, this operation
@@ -6525,7 +6573,7 @@ public class CatalogOpExecutor {
    * For details on the specific commands see comments on their respective
    * methods in CatalogServiceCatalog.java.
    */
-  public TResetMetadataResponse execResetMetadata(TResetMetadataRequest req)
+  public TResetMetadataResponse execResetMetadataImpl(TResetMetadataRequest req)
       throws CatalogException {
     String cmdString = CatalogOpUtil.getShortDescForReset(req);
     TResetMetadataResponse resp = new TResetMetadataResponse();
@@ -6733,6 +6781,19 @@ public class CatalogOpExecutor {
     }
   }
 
+  public TUpdateCatalogResponse updateCatalog(TUpdateCatalogRequest update)
+      throws ImpalaException {
+    catalogOpTracker_.increment(update);
+    try {
+      TUpdateCatalogResponse response = updateCatalogImpl(update);
+      catalogOpTracker_.decrement(update, /*errorMsg*/null);
+      return response;
+    } catch (Exception e) {
+      catalogOpTracker_.decrement(update, JniUtil.throwableToString(e));
+      throw e;
+    }
+  }
+
   /**
    * Create any new partitions required as a result of an INSERT statement and refreshes
    * the table metadata after every INSERT statement. Any new partitions will inherit
@@ -6743,7 +6804,7 @@ public class CatalogOpExecutor {
    * watch the associated cache directives will be submitted. This will result in an
    * async table refresh once the cache request completes.
    */
-  public TUpdateCatalogResponse updateCatalog(TUpdateCatalogRequest update)
+  public TUpdateCatalogResponse updateCatalogImpl(TUpdateCatalogRequest update)
       throws ImpalaException {
     TUpdateCatalogResponse response = new TUpdateCatalogResponse();
     // Only update metastore for Hdfs tables.
@@ -7262,20 +7323,22 @@ public class CatalogOpExecutor {
     return tbl;
   }
 
-  private void alterCommentOn(TCommentOnParams params, TDdlExecResponse response,
+  private void alterCommentOn(TDdlExecRequest ddlRequest, TDdlExecResponse response,
       Optional<TTableName> tTableName, boolean wantMinimalResult)
       throws ImpalaRuntimeException, CatalogException, InternalException {
+    Preconditions.checkState(tTableName.isPresent());
+    TCommentOnParams params = ddlRequest.getComment_on_params();
     if (params.getDb() != null) {
       Preconditions.checkArgument(!params.isSetTable_name() &&
           !params.isSetColumn_name());
       tTableName.get().setDb_name(params.db);
-      catalogOpMetric_.increment(TDdlType.COMMENT_ON, tTableName);
+      catalogOpTracker_.increment(ddlRequest, tTableName);
       alterCommentOnDb(params.getDb(), params.getComment(), wantMinimalResult, response);
     } else if (params.getTable_name() != null) {
       Preconditions.checkArgument(!params.isSetDb() && !params.isSetColumn_name());
       tTableName.get().setDb_name(params.table_name.db_name);
       tTableName.get().setTable_name(params.table_name.table_name);
-      catalogOpMetric_.increment(TDdlType.COMMENT_ON, tTableName);
+      catalogOpTracker_.increment(ddlRequest, tTableName);
       alterCommentOnTableOrView(TableName.fromThrift(params.getTable_name()),
           params.getComment(), wantMinimalResult, response);
     } else if (params.getColumn_name() != null) {
@@ -7283,7 +7346,7 @@ public class CatalogOpExecutor {
       TColumnName columnName = params.getColumn_name();
       tTableName.get().setDb_name(columnName.table_name.table_name);
       tTableName.get().setTable_name(columnName.table_name.table_name);
-      catalogOpMetric_.increment(TDdlType.COMMENT_ON, tTableName);
+      catalogOpTracker_.increment(ddlRequest, tTableName);
       alterCommentOnColumn(TableName.fromThrift(columnName.getTable_name()),
           columnName.getColumn_name(), params.getComment(), wantMinimalResult, response);
     } else {

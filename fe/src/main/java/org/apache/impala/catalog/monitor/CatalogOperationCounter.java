@@ -95,6 +95,7 @@ public abstract class CatalogOperationCounter {
    */
   protected String getTableName(Optional<TTableName> tTableName) {
     if (tTableName.isPresent()) {
+      if (tTableName.get().table_name.isEmpty()) return tTableName.get().db_name;
       return tTableName.get().db_name + "." + tTableName.get().table_name;
     } else {
       return "Not available";

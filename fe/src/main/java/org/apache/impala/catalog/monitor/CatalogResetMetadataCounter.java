@@ -61,7 +61,7 @@ public class CatalogResetMetadataCounter extends CatalogOperationCounter {
         getResetMetadataType(req, tTableName).toString(), getTableName(tTableName));
   }
 
-  private ResetMetadataType getResetMetadataType(
+  public static ResetMetadataType getResetMetadataType(
       TResetMetadataRequest req, Optional<TTableName> tTableName) {
     if (req.is_refresh) {
       return ResetMetadataType.REFRESH;

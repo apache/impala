@@ -268,4 +268,8 @@ struct TBackendGflags {
   118: required double max_filter_error_rate_from_full_scan
 
   119: required i32 local_catalog_cache_concurrency_level
+
+  120: required i32 catalog_operation_log_size
+
+  121: required string hostname
 }

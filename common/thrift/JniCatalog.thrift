@@ -863,10 +863,31 @@ struct TOperationUsageCounter {
   3: optional i64 op_counter
 }
 
+struct TCatalogOpRecord {
+  1: required i64 thread_id
+  2: required Types.TUniqueId query_id
+  3: required string client_ip
+  4: required string coordinator_hostname
+  5: required string catalog_op_name
+  // Name of the target depends on the operation types, e.g. table name for CreateTable,
+  // db name for CreateDb, function name for CreateFunction, etc.
+  6: required string target_name
+  7: required string user
+  8: required i64 start_time_ms
+  9: required i64 finish_time_ms
+  10: required string status
+  11: required string details
+}
+
 // Response to getOperationUsage request.
 struct TGetOperationUsageResponse {
-  // List of the the number of running catalog operations
+  // List of the number of running catalog operations
   1: required list<TOperationUsageCounter> catalog_op_counters
+  // List of the in-flight catalog operations. Sorted by start time.
+  2: optional list<TCatalogOpRecord> in_flight_catalog_operations;
+  // List of the finished catalog operations. Sorted by finish time descendingly, i.e.
+  // the most recently finished operations is shown first.
+  3: optional list<TCatalogOpRecord> finished_catalog_operations;
 }
 
 struct TColumnName {

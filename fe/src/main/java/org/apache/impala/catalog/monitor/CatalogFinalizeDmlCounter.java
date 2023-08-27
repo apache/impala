@@ -68,7 +68,7 @@ public class CatalogFinalizeDmlCounter extends CatalogOperationCounter {
    * after analysis. Therefore, we need to guess it if the SQL statement is
    * available.
    */
-  private FinalizeDmlType getDmlType(String sql_stmt) {
+  public static FinalizeDmlType getDmlType(String sql_stmt) {
     sql_stmt = sql_stmt.toUpperCase();
     if (sql_stmt.contains("INSERT INTO")) {
       return FinalizeDmlType.FINALIZE_INSERT_INTO;

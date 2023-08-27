@@ -436,4 +436,13 @@ public class BackendConfig {
   public double getMaxFilterErrorRateFromFullScan() {
     return backendCfg_.max_filter_error_rate_from_full_scan;
   }
+
+  public int catalogOperationLogSize() {
+    return backendCfg_.catalog_operation_log_size >= 0 ?
+        backendCfg_.catalog_operation_log_size : Integer.MAX_VALUE;
+  }
+
+  public String getHostname() {
+    return backendCfg_.hostname;
+  }
 }

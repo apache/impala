@@ -111,6 +111,8 @@ DECLARE_string(java_weigher);
 DECLARE_int32(iceberg_reload_new_files_threshold);
 DECLARE_bool(enable_skipping_older_events);
 DECLARE_bool(enable_json_scanner);
+DECLARE_int32(catalog_operation_log_size);
+DECLARE_string(hostname);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -440,6 +442,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_enable_json_scanner(FLAGS_enable_json_scanner);
   cfg.__set_max_filter_error_rate_from_full_scan(
       FLAGS_max_filter_error_rate_from_full_scan);
+  cfg.__set_catalog_operation_log_size(FLAGS_catalog_operation_log_size);
+  cfg.__set_hostname(FLAGS_hostname);
   return Status::OK();
 }
 

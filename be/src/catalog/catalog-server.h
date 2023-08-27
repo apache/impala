@@ -304,6 +304,10 @@ class CatalogServer {
   /// Retrieves the catalog operation metrics from FE.
   void OperationUsageUrlCallback(
       const Webserver::WebRequest& req, rapidjson::Document* document);
+  void GetCatalogOpSummary(
+      const TGetOperationUsageResponse& response, rapidjson::Document* document);
+  void GetCatalogOpRecords(
+      const TGetOperationUsageResponse& response, rapidjson::Document* document);
 
   /// Debug webpage handler that is used to dump all the registered metrics of a
   /// table. The caller specifies the "name" parameter which is the fully

@@ -45,26 +45,6 @@ under the License.
         {{/catalog_op_summary}}
       </tbody>
     </table>
-  </div>
-</div>
-
-<script>
-    $(document).ready(function() {
-        $('#summary').DataTable({
-            "order": [[ 1, "desc" ]],
-            "pageLength": 10
-        });
-    });
-</script>
-
-<div class="panel panel-info">
-<div class="card">
-  <div class="card-header">
-      <h5 class="card-title">
-      In-progress Catalog Operations
-      </h5>
-  </div>
-  <div class="card-body">
     <table id=operations class='table table-hover table-bordered'>
       <thead>
         <tr>
@@ -88,11 +68,102 @@ under the License.
 
 <script>
     $(document).ready(function() {
+        $('#summary').DataTable({
+            "order": [[ 1, "desc" ]],
+            "pageLength": 10
+        });
         $('#operations').DataTable({
             "order": [[ 1, "desc" ]],
             "pageLength": 10
         });
     });
 </script>
+
+<div class="panel panel-info">
+<div class="card">
+  <div class="card-header">
+      <h5 class="card-title">
+      In-progress Catalog Operations
+      </h5>
+  </div>
+  <div class="card-body">
+    <table id="inflight_operations" class='table table-hover table-border'>
+      <tr>
+        <th>Thread ID</th>
+        <th>Query ID</th>
+        <th>Client IP</th>
+        <th>Coordinator</th>
+        <th>Type</th>
+        <th>Target</th>
+        <th>User</th>
+        <th>Start Time</th>
+        <th>Duration</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+      {{#inflight_catalog_operations}}
+      <tr>
+        <td>{{thread_id}}</td>
+        <td>{{query_id}}</td>
+        <td>{{client_ip}}</td>
+        <td>{{coordinator}}</td>
+        <td>{{catalog_op_name}}</td>
+        <td>{{target_name}}</td>
+        <td>{{user}}</td>
+        <td>{{start_time}}</td>
+        <td>{{duration}}</td>
+        <td>{{status}}</td>
+        <td>{{details}}</td>
+      </tr>
+      {{/inflight_catalog_operations}}
+    </table>
+  </div>
+</div>
+
+<div class="panel panel-info">
+<div class="card">
+  <div class="card-header">
+      <h5 class="card-title">
+      Finished Catalog Operations
+      </h5>
+  </div>
+  <div class="card-body">
+    <p>This table lists all completed catalog operations that are archived in memory.
+       The size of that archive is controlled with the
+       <samp>--catalog_operation_log_size</samp> command line parameter.</p>
+    <table id="finished_operations" class='table table-hover table-border'>
+      <tr>
+        <th>Thread ID</th>
+        <th>Query ID</th>
+        <th>Client IP</th>
+        <th>Coordinator</th>
+        <th>Type</th>
+        <th>Target</th>
+        <th>User</th>
+        <th>Start Time</th>
+        <th>End Time</th>
+        <th>Duration</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+      {{#finished_catalog_operations}}
+      <tr>
+        <td>{{thread_id}}</td>
+        <td>{{query_id}}</td>
+        <td>{{client_ip}}</td>
+        <td>{{coordinator}}</td>
+        <td>{{catalog_op_name}}</td>
+        <td>{{target_name}}</td>
+        <td>{{user}}</td>
+        <td>{{start_time}}</td>
+        <td>{{finish_time}}</td>
+        <td>{{duration}}</td>
+        <td>{{status}}</td>
+        <td>{{details}}</td>
+      </tr>
+      {{/finished_catalog_operations}}
+    </table>
+  </div>
+</div>
 
 {{> www/common-footer.tmpl }}

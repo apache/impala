@@ -68,6 +68,9 @@ struct TCatalogServiceRequestHeader {
 
   // The query id if this request comes from a query
   5: optional Types.TUniqueId query_id
+
+  // Hostname of the coordinator
+  6: optional string coordinator_hostname
 }
 
 // Returns details on the result of an operation that updates the catalog. Information

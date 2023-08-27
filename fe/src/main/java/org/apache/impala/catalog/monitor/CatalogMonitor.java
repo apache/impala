@@ -28,19 +28,19 @@ public final class CatalogMonitor {
 
   private final CatalogTableMetrics catalogTableMetrics_;
 
-  private final CatalogOperationMetrics catalogOperationUsage_;
+  private final CatalogOperationTracker catalogOperationTracker_;
 
   private final Metrics catalogdHmsCacheMetrics_ = new Metrics();
 
   private CatalogMonitor() {
     catalogTableMetrics_ = CatalogTableMetrics.INSTANCE;
-    catalogOperationUsage_ = CatalogOperationMetrics.INSTANCE;
+    catalogOperationTracker_ = CatalogOperationTracker.INSTANCE;
   }
 
   public CatalogTableMetrics getCatalogTableMetrics() { return catalogTableMetrics_; }
 
-  public CatalogOperationMetrics getCatalogOperationMetrics() {
-    return catalogOperationUsage_;
+  public CatalogOperationTracker getCatalogOperationTracker() {
+    return catalogOperationTracker_;
   }
 
   public Metrics getCatalogdHmsCacheMetrics() {

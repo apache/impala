@@ -145,7 +145,7 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
   }
 }
 
-Status CatalogOpExecutor::ExecComputeStats(
+Status CatalogOpExecutor::ExecComputeStats(const TCatalogServiceRequestHeader& header,
     const TCatalogOpRequest& compute_stats_request,
     const TTableSchema& tbl_stats_schema, const TRowSet& tbl_stats_data,
     const TTableSchema& col_stats_schema, const TRowSet& col_stats_data) {
@@ -159,8 +159,7 @@ Status CatalogOpExecutor::ExecComputeStats(
   update_stats_req.query_options.__set_sync_ddl(compute_stats_request.sync_ddl);
   update_stats_req.query_options.__set_debug_action(
       compute_stats_request.ddl_params.query_options.debug_action);
-  update_stats_req.__set_header(TCatalogServiceRequestHeader());
-  update_stats_req.header.__set_want_minimal_response(FLAGS_use_local_catalog);
+  update_stats_req.__set_header(header);
 
   const TComputeStatsParams& compute_stats_params =
       compute_stats_request.ddl_params.compute_stats_params;

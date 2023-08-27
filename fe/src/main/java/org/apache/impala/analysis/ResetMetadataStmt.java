@@ -27,6 +27,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
@@ -81,6 +82,9 @@ public class ResetMetadataStmt extends StatementBase {
 
   // Set during analysis.
   private TUniqueId queryId_;
+
+  // Set during analysis.
+  private String clientIp_;
 
   private ResetMetadataStmt(Action action, String db, TableName tableName,
       PartitionSpec partitionSpec) {
@@ -146,6 +150,7 @@ public class ResetMetadataStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     requestingUser_ = analyzer.getUser();
     queryId_ = analyzer.getQueryCtx().getQuery_id();
+    clientIp_ = analyzer.getQueryCtx().getSession().getNetwork_address().getHostname();
     switch (action_) {
       case INVALIDATE_METADATA_TABLE:
       case REFRESH_TABLE:
@@ -257,6 +262,8 @@ public class ResetMetadataStmt extends StatementBase {
     params.setHeader(new TCatalogServiceRequestHeader());
     params.header.setRequesting_user(requestingUser_.getShortName());
     params.header.setQuery_id(queryId_);
+    params.header.setCoordinator_hostname(BackendConfig.INSTANCE.getHostname());
+    params.header.setClient_ip(clientIp_);
     params.setIs_refresh(action_.isRefresh());
     if (tableName_ != null) {
       params.setTable_name(new TTableName(tableName_.getDb(), tableName_.getTbl()));

@@ -34,7 +34,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -123,7 +122,6 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TTableUsageMetrics;
-import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.CatalogBlacklistUtils;
@@ -3427,8 +3425,7 @@ public class CatalogServiceCatalog extends Catalog {
    * Retrieves information about the current catalog on-going operations.
    */
   public TGetOperationUsageResponse getOperationUsage() {
-    return new TGetOperationUsageResponse(
-        CatalogMonitor.INSTANCE.getCatalogOperationMetrics().getOperationMetrics());
+    return CatalogMonitor.INSTANCE.getCatalogOperationTracker().getOperationMetrics();
   }
 
   /**

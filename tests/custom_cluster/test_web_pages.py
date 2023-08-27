@@ -257,3 +257,62 @@ class TestWebPage(CustomClusterTestSuite):
       response = requests.get("http://localhost:%s" % port)
       assert 'Content-Security-Policy' not in response.headers, \
         "CSP header present despite being disabled (port %s)" % port
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--catalog_operation_log_size=2")
+  def test_catalog_operations_limit(self, unique_database):
+    tbl = unique_database + ".tbl"
+    self.execute_query("create table {0}_1 (id int)".format(tbl))
+    self.execute_query("create table {0}_2 (id int)".format(tbl))
+    self.execute_query("create table {0}_3 (id int)".format(tbl))
+    self.execute_query("drop table {0}_1".format(tbl))
+    response = requests.get("http://localhost:25020/operations?json")
+    assert response.status_code == requests.codes.ok
+    operations = json.loads(response.text)
+    assert "finished_catalog_operations" in operations
+    finished_operations = operations["finished_catalog_operations"]
+    # Verify only 2 operations are shown
+    assert len(finished_operations) == 2
+    op = finished_operations[0]
+    assert op["status"] == "FINISHED"
+    assert op["catalog_op_name"] == "DROP_TABLE"
+    assert op["target_name"] == tbl + "_1"
+    op = finished_operations[1]
+    assert op["status"] == "FINISHED"
+    assert op["catalog_op_name"] == "CREATE_TABLE"
+    assert op["target_name"] == tbl + "_3"
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--catalog_operation_log_size=-1")
+  def test_catalog_operations_negative_limit(self, unique_database):
+    # Test negative limit on catalog_operation_log_size. The limit is converted to be
+    # Integer.MAX_VALUE. Run hundreds of commands and see whether they are all in the
+    # operation log.
+    tbl = unique_database + ".tbl"
+    self.execute_query("create table {0} (id int)".format(tbl))
+    num = 500
+    for i in range(num):
+      self.execute_query("invalidate metadata " + tbl)
+    response = requests.get("http://localhost:25020/operations?json")
+    assert response.status_code == requests.codes.ok
+    operations = json.loads(response.text)
+    assert "finished_catalog_operations" in operations
+    finished_operations = operations["finished_catalog_operations"]
+    # Verify all operations are in the history. There are one DROP_DATABASE, one
+    # CREATE_DATABASE, one CREATE_TABLE and 'num' INVALIDATEs in the list.
+    assert len(finished_operations) == 3 + num
+    for i in range(num):
+      op = finished_operations[i]
+      assert op["status"] == "FINISHED"
+      assert op["catalog_op_name"] == "INVALIDATE_METADATA"
+      assert op["target_name"] == tbl
+    op = finished_operations[-3]
+    assert op["status"] == "FINISHED"
+    assert op["catalog_op_name"] == "CREATE_TABLE"
+    assert op["target_name"] == tbl
+    op = finished_operations[-2]
+    assert op["status"] == "FINISHED"
+    assert op["catalog_op_name"] == "CREATE_DATABASE"
+    assert op["target_name"] == unique_database
+    op = finished_operations[-1]
+    assert op["status"] == "FINISHED"
+    assert op["catalog_op_name"] == "DROP_DATABASE"
+    assert op["target_name"] == unique_database

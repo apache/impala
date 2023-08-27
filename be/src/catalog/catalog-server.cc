@@ -32,6 +32,7 @@
 #include "util/event-metrics.h"
 #include "util/logging-support.h"
 #include "util/metrics.h"
+#include "util/pretty-printer.h"
 #include "util/thrift-debug-util.h"
 #include "util/webserver.h"
 
@@ -147,6 +148,9 @@ DEFINE_bool(enable_skipping_older_events, false, "This configuration is used to 
     "current event id to that of lastRefreshEventId. The default is set to false to"
     "disable the optimisation. Set this true to enable skipping the older events and"
     "quickly catch with the events of HMS");
+
+DEFINE_int32(catalog_operation_log_size, 100, "Number of catalog operation log records "
+    "to retain in catalogd. If -1, the operation log has unbounded size.");
 
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
@@ -874,17 +878,22 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
 
 void CatalogServer::OperationUsageUrlCallback(
     const Webserver::WebRequest& req, Document* document) {
-  TGetOperationUsageResponse opeartion_usage;
-  Status status = catalog_->GetOperationUsage(&opeartion_usage);
+  TGetOperationUsageResponse operation_usage;
+  Status status = catalog_->GetOperationUsage(&operation_usage);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
+  GetCatalogOpSummary(operation_usage, document);
+  GetCatalogOpRecords(operation_usage, document);
+}
 
+void CatalogServer::GetCatalogOpSummary(const TGetOperationUsageResponse& operation_usage,
+    Document* document) {
   // Add the catalog operation counters to the document
   Value catalog_op_list(kArrayType);
-  for (const auto& catalog_op : opeartion_usage.catalog_op_counters) {
+  for (const auto& catalog_op : operation_usage.catalog_op_counters) {
     Value catalog_op_obj(kObjectType);
     Value op_name(catalog_op.catalog_op_name.c_str(), document->GetAllocator());
     catalog_op_obj.AddMember("catalog_op_name", op_name, document->GetAllocator());
@@ -899,7 +908,7 @@ void CatalogServer::OperationUsageUrlCallback(
 
   // Create a summary and add it to the document
   map<string, int> aggregated_operations;
-  for (const auto& catalog_op : opeartion_usage.catalog_op_counters) {
+  for (const auto& catalog_op : operation_usage.catalog_op_counters) {
     aggregated_operations[catalog_op.catalog_op_name] += catalog_op.op_counter;
   }
   Value catalog_op_summary(kArrayType);
@@ -913,6 +922,75 @@ void CatalogServer::OperationUsageUrlCallback(
     catalog_op_summary.PushBack(catalog_op_obj, document->GetAllocator());
   }
   document->AddMember("catalog_op_summary", catalog_op_summary, document->GetAllocator());
+}
+
+static void CatalogOpListToJson(const vector<TCatalogOpRecord>& catalog_ops,
+    Value* catalog_op_list, Document* document) {
+  for (const auto& catalog_op : catalog_ops) {
+    Value obj(kObjectType);
+    Value op_name(catalog_op.catalog_op_name.c_str(), document->GetAllocator());
+    obj.AddMember("catalog_op_name", op_name, document->GetAllocator());
+
+    Value thread_id;
+    thread_id.SetInt64(catalog_op.thread_id);
+    obj.AddMember("thread_id", thread_id, document->GetAllocator());
+
+    Value query_id(PrintId(catalog_op.query_id).c_str(), document->GetAllocator());
+    obj.AddMember("query_id", query_id, document->GetAllocator());
+
+    Value client_ip(catalog_op.client_ip.c_str(), document->GetAllocator());
+    obj.AddMember("client_ip", client_ip, document->GetAllocator());
+
+    Value coordinator(catalog_op.coordinator_hostname.c_str(), document->GetAllocator());
+    obj.AddMember("coordinator", coordinator, document->GetAllocator());
+
+    Value user(catalog_op.user.c_str(), document->GetAllocator());
+    obj.AddMember("user", user, document->GetAllocator());
+
+    Value target_name(catalog_op.target_name.c_str(), document->GetAllocator());
+    obj.AddMember("target_name", target_name, document->GetAllocator());
+
+    Value start_time(ToUtcStringFromUnixMillis(catalog_op.start_time_ms,
+        TimePrecision::Millisecond).c_str(), document->GetAllocator());
+    obj.AddMember("start_time", start_time, document->GetAllocator());
+
+    int64_t end_time_ms;
+    if (catalog_op.finish_time_ms > 0) {
+      end_time_ms = catalog_op.finish_time_ms;
+      Value finish_time(ToUtcStringFromUnixMillis(catalog_op.finish_time_ms,
+          TimePrecision::Millisecond).c_str(), document->GetAllocator());
+      obj.AddMember("finish_time", finish_time, document->GetAllocator());
+    } else {
+      end_time_ms = UnixMillis();
+    }
+
+    int64_t duration_ms = end_time_ms - catalog_op.start_time_ms;
+    const string& printed_duration = PrettyPrinter::Print(duration_ms, TUnit::TIME_MS);
+    Value duration(printed_duration.c_str(), document->GetAllocator());
+    obj.AddMember("duration", duration, document->GetAllocator());
+
+    Value status(catalog_op.status.c_str(), document->GetAllocator());
+    obj.AddMember("status", status, document->GetAllocator());
+
+    Value details(catalog_op.details.c_str(), document->GetAllocator());
+    obj.AddMember("details", details, document->GetAllocator());
+
+    catalog_op_list->PushBack(obj, document->GetAllocator());
+  }
+}
+
+void CatalogServer::GetCatalogOpRecords(const TGetOperationUsageResponse& response,
+    Document* document) {
+  Value inflight_catalog_ops(kArrayType);
+  CatalogOpListToJson(response.in_flight_catalog_operations, &inflight_catalog_ops,
+      document);
+  document->AddMember("inflight_catalog_operations", inflight_catalog_ops,
+      document->GetAllocator());
+  Value finished_catalog_ops(kArrayType);
+  CatalogOpListToJson(response.finished_catalog_operations, &finished_catalog_ops,
+      document);
+  document->AddMember("finished_catalog_operations", finished_catalog_ops,
+      document->GetAllocator());
 }
 
 void CatalogServer::TableMetricsUrlCallback(const Webserver::WebRequest& req,
