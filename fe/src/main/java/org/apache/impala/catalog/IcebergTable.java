@@ -29,6 +29,10 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.mr.Catalogs;
+import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
@@ -339,6 +343,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
       throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
+    verifyTable(msTbl);
     try {
       // Copy the table to check later if anything has changed.
       msTable_ = msTbl.deepCopy();
@@ -391,6 +396,30 @@ public class IcebergTable extends Table implements FeIcebergTable {
       }
     } finally {
       context.stop();
+    }
+  }
+
+  /**
+   * @throws TableLoadingException when it is unsafe to load the table.
+   */
+  private void verifyTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
+      throws TableLoadingException {
+    if (IcebergUtil.isHiveCatalog(msTbl.getParameters())) {
+      String tableId = IcebergUtil.getIcebergTableIdentifier(
+          msTbl.getDbName(), msTbl.getTableName()).toString();
+      Map<String, String> params = msTbl.getParameters();
+      if (!tableId.equalsIgnoreCase(
+              params.getOrDefault(IcebergTable.ICEBERG_TABLE_IDENTIFIER, tableId)) ||
+          !tableId.equalsIgnoreCase(
+              params.getOrDefault(Catalogs.NAME, tableId)) ||
+          !tableId.equalsIgnoreCase(
+              params.getOrDefault(InputFormatConfig.TABLE_IDENTIFIER, tableId))) {
+        throw new TableLoadingException(String.format(
+            "Table %s cannot be loaded because it is an " +
+            "EXTERNAL table in the HiveCatalog that points to another table. " +
+            "Query the original table instead.",
+            getFullName()));
+      }
     }
   }
 

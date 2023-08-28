@@ -25,6 +25,8 @@ import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.mr.Catalogs;
+import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
@@ -155,6 +157,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG);
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION);
     icebergPropertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+    icebergPropertyCheck(Catalogs.NAME);
+    icebergPropertyCheck(InputFormatConfig.TABLE_IDENTIFIER);
     icebergPropertyCheck(IcebergTable.METADATA_LOCATION);
     if (tblProperties_.containsKey(IcebergTable.ICEBERG_FILE_FORMAT)) {
       icebergTableFormatCheck(tblProperties_.get(IcebergTable.ICEBERG_FILE_FORMAT));

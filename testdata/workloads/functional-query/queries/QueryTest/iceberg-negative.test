@@ -93,7 +93,55 @@ CREATE EXTERNAL TABLE iceberg_hive_tbls_external(
 )
 STORED AS ICEBERG;
 ---- CATCH
-Table property 'iceberg.table_identifier' is necessary for external Iceberg tables stored in hive.catalog. For creating a completely new Iceberg table, use 'CREATE TABLE' (no EXTERNAL keyword).
+Cannot create EXTERNAL Iceberg table in the Hive Catalog.
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_hive_tbls_external(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.table_identifier'='functional_parquet.iceberg_partitioned');
+---- CATCH
+Cannot create EXTERNAL Iceberg table in the Hive Catalog.
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_hive_tbls_external(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.catalog'='hive.catalog',
+'iceberg.table_identifier'='functional_parquet.iceberg_partitioned');
+---- CATCH
+Cannot create EXTERNAL Iceberg table in the Hive Catalog.
+====
+---- QUERY
+CREATE TABLE iceberg_hive_alias(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.table_identifier'='functional_parquet.iceberg_mixed_file_format');
+---- CATCH
+AlreadyExistsException: Table already exists: functional_parquet.iceberg_mixed_file_format
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_hive_tbls_external(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.catalog'='hive.catalog',
+'iceberg.table_identifier'='functional_parquet.iceberg_partitioned');
+---- CATCH
+Cannot create EXTERNAL Iceberg table in the Hive Catalog.
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_hive_tbls_external(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.catalog'='ice_hive_catalog',
+'iceberg.table_identifier'='functional_parquet.iceberg_partitioned');
+---- CATCH
+Cannot create EXTERNAL Iceberg table in the Hive Catalog.
 ====
 ---- QUERY
 CREATE EXTERNAL TABLE fake_iceberg_table_hadoop_catalog
@@ -247,6 +295,16 @@ AnalysisException: Unsetting the 'iceberg.catalog_location' table property is no
 ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.table_identifier'='fake_db.fake_table');
 ---- CATCH
 AnalysisException: Changing the 'iceberg.table_identifier' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('name'='fake_db.fake_table');
+---- CATCH
+AnalysisException: Changing the 'name' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.mr.table.identifier'='fake_db.fake_table');
+---- CATCH
+AnalysisException: Changing the 'iceberg.mr.table.identifier' table property is not supported for Iceberg table.
 ====
 ---- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog unset TBLPROPERTIES('iceberg.table_identifier');

@@ -775,25 +775,16 @@ public class CreateTableStmt extends StatementBase {
       analyzer_.addWarning("The table property 'external.table.purge' will be set "
           + "to 'TRUE' on newly created managed Iceberg tables.");
     }
+    if (isExternalWithNoPurge() && IcebergUtil.isHiveCatalog(getTblProperties())) {
+        throw new AnalysisException("Cannot create EXTERNAL Iceberg table in the " +
+            "Hive Catalog.");
+    }
   }
 
   private void validateTableInHiveCatalog() throws AnalysisException {
     if (getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION) != null) {
       throw new AnalysisException(String.format("%s cannot be set for Iceberg table " +
           "stored in hive.catalog", IcebergTable.ICEBERG_CATALOG_LOCATION));
-    }
-    if (isExternalWithNoPurge()) {
-      String tableId = getTblProperties().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
-      if (tableId == null || tableId.isEmpty()) {
-        tableId = getTblProperties().get(Catalogs.NAME);
-      }
-      if (tableId == null || tableId.isEmpty()) {
-        throw new AnalysisException(String.format("Table property '%s' is necessary " +
-            "for external Iceberg tables stored in hive.catalog. " +
-            "For creating a completely new Iceberg table, use 'CREATE TABLE' " +
-            "(no EXTERNAL keyword).",
-            IcebergTable.ICEBERG_TABLE_IDENTIFIER));
-      }
     }
   }
 

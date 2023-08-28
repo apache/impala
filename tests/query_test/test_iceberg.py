@@ -1086,6 +1086,33 @@ class TestIcebergTable(IcebergTestSuite):
 
     assert parquet_column_name_type_list == iceberg_column_name_type_list
 
+  @SkipIfFS.hive
+  def test_hive_external_forbidden(self, vector, unique_database):
+    tbl_name = unique_database + ".hive_ext"
+    error_msg = ("cannot be loaded because it is an EXTERNAL table in the HiveCatalog "
+        "that points to another table. Query the original table instead.")
+    self.execute_query("create table {0} (i int) stored by iceberg".
+        format(tbl_name))
+    # 'iceberg.table_identifier' can refer to another table
+    self.run_stmt_in_hive("""alter table {0} set tblproperties
+        ('external.table.purge'='false',
+         'iceberg.table_identifier'='functional_iceberg.iceberg_partitioned')""".
+         format(tbl_name))
+    ex = self.execute_query_expect_failure(self.client, "refresh {0}".format(tbl_name))
+    assert error_msg in str(ex)
+    # 'iceberg.mr.table.identifier' can refer to another table
+    self.run_stmt_in_hive("""
+        alter table {0} unset tblproperties('iceberg.table_identifier')""".
+        format(tbl_name))
+    self.run_stmt_in_hive("""alter table {0} set tblproperties
+        ('iceberg.mr.table.identifier'='functional_iceberg.iceberg_partitioned')""".
+        format(tbl_name))
+    ex = self.execute_query_expect_failure(self.client, "refresh {0}".format(tbl_name))
+    assert error_msg in str(ex)
+    # 'name' can also refer to another table but cannot be set by Hive/Impala. Also,
+    # during table migration both Impala and Hive clears existing table properties
+    # See IMPALA-12410
+
   @SkipIfFS.incorrent_reported_ec
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-compute-stats', vector, unique_database)
