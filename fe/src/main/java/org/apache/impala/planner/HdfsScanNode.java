@@ -26,12 +26,14 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
@@ -327,8 +329,8 @@ public class HdfsScanNode extends ScanNode {
   // this scan node has the count(*) optimization enabled.
   protected SlotDescriptor countStarSlot_ = null;
 
-  // Sampled file descriptors if table sampling is used.
-  Map<SampledPartitionMetadata, List<FileDescriptor>> sampledFiles_ = null;
+  // Sampled file descriptors if table sampling is used. Grouped by partition id.
+  Map<Long, List<FileDescriptor>> sampledFiles_ = null;
 
   // Conjuncts used to trim the set of partitions passed to this node.
   // Used only to display EXPLAIN information.
@@ -1093,37 +1095,6 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * A collection of metadata associated with a sampled partition. Unlike
-   * {@link FeFsPartition} this class is safe to use in hash-based data structures.
-   */
-  public static final class SampledPartitionMetadata {
-
-    private final long partitionId;
-    private final FileSystemUtil.FsType partitionFsType;
-
-    public SampledPartitionMetadata(
-        long partitionId, FileSystemUtil.FsType partitionFsType) {
-      this.partitionId = partitionId;
-      this.partitionFsType = partitionFsType;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
-      SampledPartitionMetadata that = (SampledPartitionMetadata) o;
-      return partitionId == that.partitionId && partitionFsType == that.partitionFsType;
-    }
-
-    @Override
-    public int hashCode() {
-      return java.util.Objects.hash(partitionId, partitionFsType);
-    }
-
-    private FileSystemUtil.FsType getPartitionFsType() { return partitionFsType; }
-  }
-
-  /**
    * Computes scan ranges (i.e. hdfs splits) plus their storage locations, including
    * volume ids, based on the given maximum number of bytes each scan range should scan.
    * If 'sampleParams_' is not null, generates a sample and computes the scan ranges
@@ -1152,14 +1123,7 @@ public class HdfsScanNode extends ScanNode {
         .getMax_scan_range_length();
     scanRangeSpecs_ = new TScanRangeSpec();
 
-    if (sampledFiles_ != null) {
-      numPartitionsPerFs_ = sampledFiles_.keySet().stream().collect(Collectors.groupingBy(
-          SampledPartitionMetadata::getPartitionFsType, Collectors.counting()));
-    } else {
-      numPartitionsPerFs_.putAll(partitions_.stream().collect(
-          Collectors.groupingBy(FeFsPartition::getFsType, Collectors.counting())));
-    }
-
+    numPartitionsPerFs_ = new TreeMap<>();
     totalFilesPerFs_ = new TreeMap<>();
     totalBytesPerFs_ = new TreeMap<>();
     totalFilesPerFsEC_ = new TreeMap<>();
@@ -1173,15 +1137,43 @@ public class HdfsScanNode extends ScanNode {
             .isOptimize_simple_limit()
         && analyzer.getSimpleLimitStatus() != null
         && analyzer.getSimpleLimitStatus().first);
+
+    // Save the last looked up FileSystem object. It is enough for the scheme and
+    // authority part of the URI to match to ensure that getFileSystem() would return the
+    // same file system. See Hadoop's filesystem caching implementation at
+    // https://github.com/apache/hadoop/blob/1046f9cf9888155c27923f3f56efa107d908ad5b/hadoop-common-project/hadoop-common/src/main/java/org/apache/hadoop/fs/FileSystem.java#L3867
+    // Note that in the Hadoop code the slow part is UserGroupInformation.getCurrentUser()
+    // which is not important here as the user is always the same in Impala.
+    String lastFsScheme = null;
+    String lastFsAuthority = null;
+    FileSystem lastFileSytem = null;
     for (FeFsPartition partition: partitions_) {
+      // Save location to local variable beacuse getLocation() can be slow as it needs to
+      // decompress the partition's location.
+      String partitionLocation = partition.getLocation();
+      Path partitionPath = new Path(partitionLocation);
+      String fsScheme = partitionPath.toUri().getScheme();
+      String fsAuthority = partitionPath.toUri().getAuthority();
+      FileSystemUtil.FsType fsType = FileSystemUtil.FsType.getFsType(fsScheme);
+
+      FileSystem partitionFs;
+      if (lastFileSytem != null &&
+         Objects.equals(lastFsScheme, fsScheme) &&
+         Objects.equals(lastFsAuthority, fsAuthority)) {
+        partitionFs = lastFileSytem;
+      } else {
+        try {
+          partitionFs = partitionPath.getFileSystem(CONF);
+        } catch (IOException e) {
+          throw new ImpalaRuntimeException("Error determining partition fs type", e);
+        }
+        lastFsScheme = fsScheme;
+        lastFsAuthority = fsAuthority;
+        lastFileSytem = partitionFs;
+      }
+
       // Missing disk id accounting is only done for file systems that support the notion
       // of disk/storage ids.
-      FileSystem partitionFs;
-      try {
-        partitionFs = partition.getLocationPath().getFileSystem(CONF);
-      } catch (IOException e) {
-        throw new ImpalaRuntimeException("Error determining partition fs type", e);
-      }
       boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
       List<FileDescriptor> fileDescs = getFileDescriptorsWithLimit(partition, fsHasBlocks,
           isSimpleLimit ? analyzer.getSimpleLimitStatus().second - simpleLimitNumRows
@@ -1191,10 +1183,10 @@ public class HdfsScanNode extends ScanNode {
 
       if (sampledFiles_ != null) {
         // If we are sampling, check whether this partition is included in the sample.
-        fileDescs = sampledFiles_.get(
-            new SampledPartitionMetadata(partition.getId(), partition.getFsType()));
+        fileDescs = sampledFiles_.get(partition.getId());
         if (fileDescs == null) continue;
       }
+
       long partitionNumRows = partition.getNumRows();
 
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
@@ -1211,7 +1203,7 @@ public class HdfsScanNode extends ScanNode {
         // short-circuiting the scan for a partition key scan).
         long defaultBlockSize = (partition.getFileFormat().isParquetBased()) ?
             analyzer.getQueryOptions().parquet_object_store_split_size :
-            partitionFs.getDefaultBlockSize(partition.getLocationPath());
+            partitionFs.getDefaultBlockSize(partitionPath);
         long maxBlockSize =
             Math.max(defaultBlockSize, FileDescriptor.MIN_SYNTHETIC_BLOCK_SIZE);
         if (scanRangeBytesLimit > 0) {
@@ -1223,32 +1215,34 @@ public class HdfsScanNode extends ScanNode {
       final long partitionBytes = FileDescriptor.computeTotalFileLength(fileDescs);
       long partitionMaxScanRangeBytes = 0;
       boolean partitionMissingDiskIds = false;
-      totalBytesPerFs_.merge(partition.getFsType(), partitionBytes, Long::sum);
-      totalFilesPerFs_.merge(partition.getFsType(), (long) fileDescs.size(), Long::sum);
+      totalBytesPerFs_.merge(fsType, partitionBytes, Long::sum);
+      totalFilesPerFs_.merge(fsType, (long) fileDescs.size(), Long::sum);
+      numPartitionsPerFs_.merge(fsType, 1L, Long::sum);
 
       for (FileDescriptor fileDesc: fileDescs) {
         if (!analyzer.getQueryOptions().isAllow_erasure_coded_files() &&
             fileDesc.getIsEc()) {
           throw new ImpalaRuntimeException(String
               .format("Scanning of HDFS erasure-coded file (%s) is not supported",
-                  fileDesc.getAbsolutePath(partition.getLocation())));
+                  fileDesc.getAbsolutePath(partitionLocation)));
         }
 
         // Accumulate on the number of EC files and the total size of such files.
         if (fileDesc.getIsEc()) {
-          totalFilesPerFsEC_.merge(partition.getFsType(), 1L, Long::sum);
-          totalBytesPerFsEC_.merge(
-              partition.getFsType(), fileDesc.getFileLength(), Long::sum);
+          totalFilesPerFsEC_.merge(fsType, 1L, Long::sum);
+          totalBytesPerFsEC_.merge(fsType, fileDesc.getFileLength(), Long::sum);
         }
 
         if (!fsHasBlocks) {
           Preconditions.checkState(fileDesc.getNumFileBlocks() == 0);
-          generateScanRangeSpecs(partition, fileDesc, scanRangeBytesLimit);
+          generateScanRangeSpecs(
+              partition, partitionLocation, fileDesc, scanRangeBytesLimit);
         } else {
           // Skips files that have no associated blocks.
           if (fileDesc.getNumFileBlocks() == 0) continue;
           Pair<Boolean, Long> result = transformBlocksToScanRanges(
-              partition, fileDesc, fsHasBlocks, scanRangeBytesLimit, analyzer);
+              partition, partitionLocation, fsType, fileDesc, fsHasBlocks,
+              scanRangeBytesLimit, analyzer);
           partitionMaxScanRangeBytes =
               Math.max(partitionMaxScanRangeBytes, result.second);
           if (result.first) partitionMissingDiskIds = true;
@@ -1310,7 +1304,7 @@ public class HdfsScanNode extends ScanNode {
    * @param minSampleBytes minimum number of bytes to read.
    * @param randomSeed used for random number generation.
    */
-  protected Map<SampledPartitionMetadata, List<FileDescriptor>> getFilesSample(
+  protected Map<Long, List<FileDescriptor>> getFilesSample(
       long percentBytes, long minSampleBytes, long randomSeed) {
     return FeFsTable.Utils.getFilesSample(tbl_, partitions_, percentBytes, minSampleBytes,
         randomSeed);
@@ -1342,17 +1336,21 @@ public class HdfsScanNode extends ScanNode {
    * Used for file systems that do not have any physical attributes associated with
    * blocks (e.g., replica locations, caching, etc.). 'maxBlock' size determines how large
    * the scan ranges can be (may be ignored if the file is not splittable).
+   * Expects partition's location string in partitionLocation as getting it from
+   * FeFsPartition can be expensive.
    */
-  private void generateScanRangeSpecs(
-      FeFsPartition partition, FileDescriptor fileDesc, long maxBlockSize) {
+  private void generateScanRangeSpecs(FeFsPartition partition, String partitionLocation,
+      FileDescriptor fileDesc, long maxBlockSize) {
     Preconditions.checkArgument(fileDesc.getNumFileBlocks() == 0);
     Preconditions.checkArgument(maxBlockSize > 0);
     if (fileDesc.getFileLength() <= 0) return;
     boolean splittable = partition.getFileFormat().isSplittable(
         HdfsCompression.fromFileName(fileDesc.getPath()));
+    // Hashing must use String.hashCode() for consistency.
+    int partitionHash = partitionLocation.hashCode();
     TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(
         fileDesc.toThrift(), maxBlockSize, splittable, partition.getId(),
-        partition.getLocation().hashCode());
+        partitionHash);
     scanRangeSpecs_.addToSplit_specs(splitSpec);
     long scanRangeBytes = Math.min(maxBlockSize, fileDesc.getFileLength());
     if (splittable && !isPartitionKeyScan_) {
@@ -1371,14 +1369,15 @@ public class HdfsScanNode extends ScanNode {
    * coordinator can assign ranges to workers to avoid remote reads. These
    * TScanRangeLocationLists are added to scanRanges_. A pair is returned that indicates
    * whether the file has a missing disk id and the maximum scan range (in bytes) found.
+   * Expects partition's location string in partitionLocation and filesystem type in
+   * fsType as getting these from FeFsPartition can be expensive.
    */
   private Pair<Boolean, Long> transformBlocksToScanRanges(FeFsPartition partition,
-      FileDescriptor fileDesc, boolean fsHasBlocks,
-      long scanRangeBytesLimit, Analyzer analyzer) {
+      String partitionLocation, FileSystemUtil.FsType fsType, FileDescriptor fileDesc,
+      boolean fsHasBlocks, long scanRangeBytesLimit, Analyzer analyzer) {
     Preconditions.checkArgument(fileDesc.getNumFileBlocks() > 0);
     boolean fileDescMissingDiskIds = false;
     long fileMaxScanRangeBytes = 0;
-    FileSystemUtil.FsType fsType = partition.getFsType();
     int i = 0;
     if (isPartitionKeyScan_ && (partition.getFileFormat().isParquetBased()
         || partition.getFileFormat() == HdfsFileFormat.ORC)) {
@@ -1430,7 +1429,7 @@ public class HdfsScanNode extends ScanNode {
         THdfsFileSplit hdfsFileSplit = new THdfsFileSplit(fileDesc.getRelativePath(),
             currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
             fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime(),
-            partition.getLocation().hashCode());
+            partitionLocation.hashCode());
         hdfsFileSplit.setAbsolute_path(fileDesc.getAbsolutePath());
         hdfsFileSplit.setIs_encrypted(fileDesc.getIsEncrypted());
         hdfsFileSplit.setIs_erasure_coded(fileDesc.getIsEc());
@@ -1454,7 +1453,7 @@ public class HdfsScanNode extends ScanNode {
       ++numFilesNoDiskIds_;
       if (LOG.isTraceEnabled()) {
         LOG.trace("File blocks mapping to unknown disk ids. Dir: "
-            + partition.getLocation() + " File:" + fileDesc.toString());
+            + partitionLocation + " File:" + fileDesc.toString());
       }
     }
 

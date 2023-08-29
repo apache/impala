@@ -180,7 +180,7 @@ public class IcebergScanNode extends HdfsScanNode {
    * The algorithm is based on FeFsTable.Utils.getFilesSample()
    */
   @Override
-  protected Map<SampledPartitionMetadata, List<FileDescriptor>> getFilesSample(
+  protected Map<Long, List<FileDescriptor>> getFilesSample(
       long percentBytes, long minSampleBytes, long randomSeed) {
     Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
     Preconditions.checkState(minSampleBytes >= 0);
@@ -191,8 +191,6 @@ public class IcebergScanNode extends HdfsScanNode {
 
     Preconditions.checkState(partitions_.size() == 1);
     FeFsPartition part = partitions_.get(0);
-    SampledPartitionMetadata sampledPartitionMetadata =
-        new SampledPartitionMetadata(part.getId(), part.getFsType());
 
     long totalBytes = 0;
     for (FileDescriptor fd : orderedFds) {
@@ -218,8 +216,8 @@ public class IcebergScanNode extends HdfsScanNode {
       orderedFds.set(selectedIdx, orderedFds.get(numFilesRemaining - 1));
       --numFilesRemaining;
     }
-    Map<SampledPartitionMetadata, List<FileDescriptor>> result = new HashMap<>();
-    result.put(sampledPartitionMetadata, sampleFiles);
+    Map<Long, List<FileDescriptor>> result = new HashMap<>();
+    result.put(part.getId(), sampleFiles);
     return result;
   }
 

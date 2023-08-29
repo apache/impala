@@ -482,7 +482,7 @@ public interface FeFsTable extends FeTable {
      *
      * TODO(IMPALA-9883): Fix this for full ACID tables.
      */
-    public static Map<HdfsScanNode.SampledPartitionMetadata, List<FileDescriptor>>
+    public static Map<Long, List<FileDescriptor>>
         getFilesSample(FeFsTable table, Collection<? extends FeFsPartition> inputParts,
             long percentBytes, long minSampleBytes, long randomSeed) {
       Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
@@ -540,15 +540,14 @@ public interface FeFsTable extends FeTable {
       // selected.
       Random rnd = new Random(randomSeed);
       long selectedBytes = 0;
-      Map<HdfsScanNode.SampledPartitionMetadata, List<FileDescriptor>> result =
+      Map<Long, List<FileDescriptor>> result =
           new HashMap<>();
       while (selectedBytes < targetBytes && numFilesRemaining > 0) {
         int selectedIdx = Math.abs(rnd.nextInt()) % numFilesRemaining;
         FeFsPartition part = parts[selectedIdx];
-        HdfsScanNode.SampledPartitionMetadata sampledPartitionMetadata =
-            new HdfsScanNode.SampledPartitionMetadata(part.getId(), part.getFsType());
+        Long partId = Long.valueOf(part.getId());
         List<FileDescriptor> sampleFileIdxs = result.computeIfAbsent(
-            sampledPartitionMetadata, partMetadata -> Lists.newArrayList());
+            partId, id -> Lists.newArrayList());
         FileDescriptor fd = part.getFileDescriptors().get(fileIdxs[selectedIdx]);
         sampleFileIdxs.add(fd);
         selectedBytes += fd.getFileLength();

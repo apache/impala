@@ -830,9 +830,8 @@ public class ComputeStatsStmt extends StatementBase {
     // TODO(todd): can we avoid loading all the partitions for this?
     Collection<? extends FeFsPartition> partitions =
         FeCatalogUtils.loadAllPartitions(hdfsTable);
-    Map<HdfsScanNode.SampledPartitionMetadata, List<FileDescriptor>> sample =
-            FeFsTable.Utils.getFilesSample(hdfsTable,
-        partitions, samplePerc, minSampleBytes, sampleSeed);
+    Map<Long, List<FileDescriptor>> sample = FeFsTable.Utils.getFilesSample(
+        hdfsTable, partitions, samplePerc, minSampleBytes, sampleSeed);
     long sampleFileBytes = 0;
     for (List<FileDescriptor> fds: sample.values()) {
       for (FileDescriptor fd: fds) sampleFileBytes += fd.getFileLength();

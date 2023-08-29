@@ -122,9 +122,10 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public FileSystemUtil.FsType getFsType() {
-    Preconditions.checkNotNull(getLocationPath().toUri().getScheme(),
-        "Cannot get scheme from path " + getLocationPath());
-    return FileSystemUtil.FsType.getFsType(getLocationPath().toUri().getScheme());
+    Path location = getLocationPath();
+    Preconditions.checkNotNull(location.toUri().getScheme(),
+        "Cannot get scheme from path " + location);
+    return FileSystemUtil.FsType.getFsType(location.toUri().getScheme());
   }
 
   @Override
