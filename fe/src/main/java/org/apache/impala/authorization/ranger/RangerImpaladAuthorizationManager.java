@@ -133,6 +133,9 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
         // The branch for SHOW ROLES.
         Preconditions.checkState(!params.isIs_show_current_roles());
         Set<RangerRole> roles = plugin_.get().getRoles().getRangerRoles();
+        if (null == roles) {
+          roles = Collections.emptySet();
+        }
         roleNames = roles.stream().map(RangerRole::getName).collect(Collectors.toSet());
       }
 

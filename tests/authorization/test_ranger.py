@@ -2302,6 +2302,35 @@ class TestRanger(CustomClusterTestSuite):
           .format(unique_database), user=ADMIN)
       TestRanger._remove_policy(unique_name)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=LOCAL_CATALOG_IMPALAD_ARGS,
+    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS,
+    # We additionally set 'reset_ranger' to True, to reset all the policies in the
+    # Ranger service, so even if there were roles before this test, they will be
+    # deleted when this test runs. since the Ranger policies are reset before this
+    # test, we do not have to worry about there could be existing roles when the test
+    # is running.
+    reset_ranger=True)
+  def test_no_exception_in_show_roles_if_no_roles_in_ranger(self, unique_name):
+    self._test_no_exception_in_show_roles_if_no_roles_in_ranger(unique_name)
+
+  def _test_no_exception_in_show_roles_if_no_roles_in_ranger(self, unique_name):
+    """
+    Ensure that no exception should throw for show roles statement
+    if there are no roles in ranger.
+    """
+    admin_client = self.create_impala_client()
+    show_roles_statements = [
+      "SHOW ROLES",
+      "SHOW CURRENT ROLES",
+      "SHOW ROLE GRANT GROUP admin"
+    ]
+    for statement in show_roles_statements:
+      result = self.execute_query_expect_success(admin_client, statement,
+                                                 user=ADMIN)
+      assert len(result.data) == 0
+
 
 class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
   """
