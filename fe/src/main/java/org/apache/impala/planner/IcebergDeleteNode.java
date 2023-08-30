@@ -225,7 +225,7 @@ public class IcebergDeleteNode extends JoinNode {
     // Compute the processing cost for lhs.
     ProcessingCost probeProcessingCost =
         ProcessingCost.basicCost(getDisplayLabel() + " Probe side (eqJoinConjuncts_)",
-            getChild(0).getCardinality(), eqJoinPredicateEvalCost);
+            getProbeCardinalityForCosting(), eqJoinPredicateEvalCost);
 
     // Compute the processing cost for rhs.
     ProcessingCost buildProcessingCost =

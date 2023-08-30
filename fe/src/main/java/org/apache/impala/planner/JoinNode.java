@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.Analyzer;
@@ -429,7 +430,7 @@ public abstract class JoinNode extends PlanNode {
 
     // first collect all the join cardinalities
     for (EqJoinConjunctScanSlots slots: eqJoinConjunctSlots) {
-      joinCardList.add(getGenericJoinCardinalityInternal(slots.lhsNdv(), slots.rhsNdv(),
+      joinCardList.add(computeGenericJoinCardinality(slots.lhsNdv(), slots.rhsNdv(),
           slots.lhsNumRows(), slots.rhsNumRows(), lhsCard, rhsCard));
     }
 
@@ -461,11 +462,11 @@ public abstract class JoinNode extends PlanNode {
   }
 
   /**
-   * An internal utility method to compute generic join cardinality as described
+   * A utility method to compute generic join cardinality as described
    * in the comments for {@link JoinNode#getJoinCardinality}. The input
    * cardinalities must be >= 0.
    */
-  private long getGenericJoinCardinalityInternal(double lhsNdv, double rhsNdv,
+  public static long computeGenericJoinCardinality(double lhsNdv, double rhsNdv,
       double lhsNumRows, double rhsNumRows, long lhsCard, long rhsCard) {
     Preconditions.checkState(lhsCard >= 0 && rhsCard >= 0);
     // Adjust the NDVs on both sides to account for predicates. Intuitively, the NDVs
@@ -482,10 +483,10 @@ public abstract class JoinNode extends PlanNode {
   }
 
   /**
-   * This function mirrors the logic for {@link JoinNode#getGenericJoinCardinality} except
-   * that instead of the EqJoinConjunctScanSlots, it uses the {@link NdvAndRowCountStats}
-   * to directly access stats that were pre-populated. Currently, this function is
-   * restricted to inner and outer joins.
+   * This function mirrors the logic for {@link JoinNode#computeGenericJoinCardinality}
+   * except that instead of the EqJoinConjunctScanSlots, it uses the {@link
+   * NdvAndRowCountStats} to directly access stats that were pre-populated. Currently,
+   * this function is restricted to inner and outer joins.
    * TODO: check if applicable for anti and semi joins
    */
   private long getGenericJoinCardinality2(List<NdvAndRowCountStats> statsList,
@@ -498,7 +499,7 @@ public abstract class JoinNode extends PlanNode {
       analyzer.getQueryOptions().getJoin_selectivity_correlation_factor();
     double cumulativeSel = 1.0;
     for (NdvAndRowCountStats stats: statsList) {
-      long joinCard = getGenericJoinCardinalityInternal(stats.lhsNdv(), stats.rhsNdv(),
+      long joinCard = computeGenericJoinCardinality(stats.lhsNdv(), stats.rhsNdv(),
           stats.lhsNumRows(), stats.rhsNumRows(), lhsCard, rhsCard);
       if (result == -1) {
         result = joinCard;
@@ -1002,4 +1003,35 @@ public abstract class JoinNode extends PlanNode {
    * Does not modify the state of this node.
    */
   public abstract Pair<ProcessingCost, ProcessingCost> computeJoinProcessingCost();
+
+  protected long getProbeCardinalityForCosting() {
+    return getChild(0).getFilteredCardinality();
+  }
+
+  @Override
+  protected void reduceCardinalityByRuntimeFilter(
+      Stack<PlanNode> nodeStack, double reductionScale) {
+    if (isSelectiveAndReducingJoin()) {
+      nodeStack.add(this);
+    } else {
+      nodeStack.clear();
+    }
+    int i = 0;
+    for (PlanNode child : getChildren()) {
+      if (i > 0) nodeStack.clear(); // not probe child
+      child.reduceCardinalityByRuntimeFilter(nodeStack, reductionScale);
+      ++i;
+    }
+  }
+
+  private boolean isSelectiveAndReducingJoin() {
+    if (eqJoinConjuncts_.isEmpty() || getChild(0).getCardinality() < 0
+        || getChild(1).getCardinality() < 0
+        || (!joinOp_.isInnerJoin() && !joinOp_.isLeftOuterJoin()
+            && !joinOp_.isLeftSemiJoin())) {
+      return false;
+    }
+    double selectivity = RuntimeFilterGenerator.getJoinNodeSelectivity(this);
+    return 0 <= selectivity && selectivity <= 1;
+  }
 }

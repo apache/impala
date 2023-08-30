@@ -799,7 +799,7 @@ Per-Host Resources: mem-estimate=111.37MB mem-reservation=69.00MB thread-reserva
 |
 04:EXCHANGE [HASH(l_orderkey)]
 |  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=8B cardinality=6.00M
+|  tuple-ids=0 row-size=8B cardinality=5.76M(filtered from 6.00M)
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -812,7 +812,7 @@ Per-Host Resources: mem-estimate=81.14MB mem-reservation=5.00MB thread-reservati
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=6.00M
+   tuple-ids=0 row-size=8B cardinality=5.76M(filtered from 6.00M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=120.00MB Threads=6
@@ -892,7 +892,7 @@ Per-Instance Resources: mem-estimate=66.70MB mem-reservation=34.00MB thread-rese
 |
 04:EXCHANGE [HASH(l_orderkey)]
 |  mem-estimate=10.04MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=8B cardinality=6.00M
+|  tuple-ids=0 row-size=8B cardinality=5.76M(filtered from 6.00M)
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -906,7 +906,7 @@ Per-Instance Resources: mem-estimate=80.14MB mem-reservation=4.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=0 row-size=8B cardinality=6.00M
+   tuple-ids=0 row-size=8B cardinality=5.76M(filtered from 6.00M)
    in pipelines: 00(GETNEXT)
 ====
 # High NDV aggregation - should use default buffer size.

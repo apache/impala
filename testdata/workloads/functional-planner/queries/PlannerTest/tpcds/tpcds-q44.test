@@ -246,7 +246,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=18.00K
 |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-|     tuple-ids=26 row-size=38B cardinality=18.00K
+|     tuple-ids=26 row-size=38B cardinality=10(filtered from 18.00K)
 |     in pipelines: 18(GETNEXT)
 |
 19:SCAN HDFS [tpcds_parquet.item i2]
@@ -257,7 +257,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=18.00K
    mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-   tuple-ids=27 row-size=38B cardinality=18.00K
+   tuple-ids=27 row-size=38B cardinality=10(filtered from 18.00K)
    in pipelines: 19(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=36.44MB Threads=20

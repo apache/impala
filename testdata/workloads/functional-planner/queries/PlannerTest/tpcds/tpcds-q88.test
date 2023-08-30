@@ -179,7 +179,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=42 row-size=12B cardinality=2.88M
+|     tuple-ids=42 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 56(GETNEXT)
 |
 69:NESTED LOOP JOIN [CROSS JOIN]
@@ -263,7 +263,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=36 row-size=12B cardinality=2.88M
+|     tuple-ids=36 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 48(GETNEXT)
 |
 68:NESTED LOOP JOIN [CROSS JOIN]
@@ -347,7 +347,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=30 row-size=12B cardinality=2.88M
+|     tuple-ids=30 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 40(GETNEXT)
 |
 67:NESTED LOOP JOIN [CROSS JOIN]
@@ -431,7 +431,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=24 row-size=12B cardinality=2.88M
+|     tuple-ids=24 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 32(GETNEXT)
 |
 66:NESTED LOOP JOIN [CROSS JOIN]
@@ -515,7 +515,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=18 row-size=12B cardinality=2.88M
+|     tuple-ids=18 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 24(GETNEXT)
 |
 65:NESTED LOOP JOIN [CROSS JOIN]
@@ -599,7 +599,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=12 row-size=12B cardinality=2.88M
+|     tuple-ids=12 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 16(GETNEXT)
 |
 64:NESTED LOOP JOIN [CROSS JOIN]
@@ -683,7 +683,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=6 row-size=12B cardinality=2.88M
+|     tuple-ids=6 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 08(GETNEXT)
 |
 07:AGGREGATE [FINALIZE]
@@ -762,7 +762,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=0 row-size=12B cardinality=2.88M
+   tuple-ids=0 row-size=12B cardinality=69.82K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=73.12MB Threads=72
@@ -895,7 +895,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=42 row-size=12B cardinality=2.88M
+|     tuple-ids=42 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 56(GETNEXT)
 |
 69:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1020,7 +1020,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=36 row-size=12B cardinality=2.88M
+|     tuple-ids=36 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 48(GETNEXT)
 |
 68:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1145,7 +1145,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=30 row-size=12B cardinality=2.88M
+|     tuple-ids=30 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 40(GETNEXT)
 |
 67:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1270,7 +1270,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=24 row-size=12B cardinality=2.88M
+|     tuple-ids=24 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 32(GETNEXT)
 |
 66:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1395,7 +1395,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=18 row-size=12B cardinality=2.88M
+|     tuple-ids=18 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 24(GETNEXT)
 |
 65:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1520,7 +1520,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=12 row-size=12B cardinality=2.88M
+|     tuple-ids=12 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 16(GETNEXT)
 |
 64:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1645,7 +1645,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=6 row-size=12B cardinality=2.88M
+|     tuple-ids=6 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 08(GETNEXT)
 |
 75:AGGREGATE [FINALIZE]
@@ -1758,7 +1758,7 @@ Per-Host Resources: mem-estimate=55.88MB mem-reservation=8.81MB thread-reservati
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=0 row-size=12B cardinality=2.88M
+   tuple-ids=0 row-size=12B cardinality=69.82K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=137.62MB Threads=79
@@ -1923,7 +1923,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=42 row-size=12B cardinality=2.88M
+|     tuple-ids=42 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 56(GETNEXT)
 |
 69:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -2080,7 +2080,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=36 row-size=12B cardinality=2.88M
+|     tuple-ids=36 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 48(GETNEXT)
 |
 68:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -2237,7 +2237,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=30 row-size=12B cardinality=2.88M
+|     tuple-ids=30 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 40(GETNEXT)
 |
 67:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -2394,7 +2394,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=24 row-size=12B cardinality=2.88M
+|     tuple-ids=24 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 32(GETNEXT)
 |
 66:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -2551,7 +2551,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=18 row-size=12B cardinality=2.88M
+|     tuple-ids=18 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 24(GETNEXT)
 |
 65:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -2708,7 +2708,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=12 row-size=12B cardinality=2.88M
+|     tuple-ids=12 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 16(GETNEXT)
 |
 64:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -2865,7 +2865,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=12B cardinality=2.88M
+|     tuple-ids=6 row-size=12B cardinality=69.82K(filtered from 2.88M)
 |     in pipelines: 08(GETNEXT)
 |
 75:AGGREGATE [FINALIZE]
@@ -3003,6 +3003,6 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=1.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.88M
+   tuple-ids=0 row-size=12B cardinality=69.82K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ====

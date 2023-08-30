@@ -150,7 +150,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=50.00K
 |  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-|  |     tuple-ids=6 row-size=21B cardinality=50.00K
+|  |     tuple-ids=6 row-size=21B cardinality=49.54K(filtered from 50.00K)
 |  |     in pipelines: 05(GETNEXT)
 |  |
 |  04:AGGREGATE [FINALIZE]
@@ -218,9 +218,9 @@ PLAN-ROOT SINK
      table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=187(filtered from 1824)
    mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=0 row-size=12B cardinality=2.88M
+   tuple-ids=0 row-size=12B cardinality=293.73K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=35.96MB Threads=15
@@ -346,7 +346,7 @@ Per-Host Resources: mem-estimate=51.24MB mem-reservation=11.81MB thread-reservat
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=50.00K
 |  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-|  |     tuple-ids=6 row-size=21B cardinality=50.00K
+|  |     tuple-ids=6 row-size=21B cardinality=49.54K(filtered from 50.00K)
 |  |     in pipelines: 05(GETNEXT)
 |  |
 |  18:AGGREGATE [FINALIZE]
@@ -441,9 +441,9 @@ Per-Host Resources: mem-estimate=51.24MB mem-reservation=11.81MB thread-reservat
      table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=187(filtered from 1824)
    mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=0 row-size=12B cardinality=2.88M
+   tuple-ids=0 row-size=12B cardinality=293.73K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=54.46MB Threads=16
@@ -595,7 +595,7 @@ Per-Instance Resources: mem-estimate=26.85MB mem-reservation=3.00MB thread-reser
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=50.00K
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |     tuple-ids=6 row-size=21B cardinality=50.00K
+|  |     tuple-ids=6 row-size=21B cardinality=49.54K(filtered from 50.00K)
 |  |     in pipelines: 05(GETNEXT)
 |  |
 |  18:AGGREGATE [FINALIZE]
@@ -707,8 +707,8 @@ Per-Instance Resources: mem-estimate=26.85MB mem-reservation=3.00MB thread-reser
      table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=187(filtered from 1824)
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.88M
+   tuple-ids=0 row-size=12B cardinality=293.73K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ====

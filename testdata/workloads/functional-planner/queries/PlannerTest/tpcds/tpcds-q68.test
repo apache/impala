@@ -195,7 +195,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=128.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=0 row-size=40B cardinality=2.88M
+   tuple-ids=0 row-size=40B cardinality=702.92K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=111.89MB Threads=16
@@ -410,7 +410,7 @@ Per-Host Resources: mem-estimate=179.04MB mem-reservation=53.56MB thread-reserva
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=128.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=0 row-size=40B cardinality=2.88M
+   tuple-ids=0 row-size=40B cardinality=702.92K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=143.70MB Threads=17
@@ -675,6 +675,6 @@ Per-Instance Resources: mem-estimate=35.08MB mem-reservation=21.00MB thread-rese
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=0 row-size=40B cardinality=2.88M
+   tuple-ids=0 row-size=40B cardinality=702.92K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ====

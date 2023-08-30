@@ -570,6 +570,8 @@ public class AggregationNode extends PlanNode {
     processingCost_ = ProcessingCost.zero();
     AggregationNode prevAgg = getPrevAggInputNode();
     for (AggregateInfo aggInfo : aggInfos_) {
+      // TODO: Cost should be much lower for NonGroupingAggregator
+      // (aggInfo.getGroupingExprs() is empty).
       ProcessingCost aggCost = aggInfo.computeProcessingCost(
           getDisplayLabel(), getAggClassNumGroup(prevAgg, aggInfo));
       processingCost_ = ProcessingCost.sumCost(processingCost_, aggCost);

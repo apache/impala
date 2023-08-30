@@ -834,7 +834,7 @@ enum TImpalaQueryOptions {
   LARGE_AGG_MEM_THRESHOLD = 162
 
   // Correlation factor that will be used to calculate a lower memory estimation of
-  // aggregation node when the default memory estimation exceed
+  // aggregation node when the default memory estimation exceeds
   // LARGE_AGG_MEM_THRESHOLD. The reduction is achieved by calculating a memScale
   // multiplier (a fraction between 0.0 and 1.0). Given N as number of non-literal
   // grouping expressions:
@@ -846,7 +846,7 @@ enum TImpalaQueryOptions {
   // low value means there is low correlation between them. High correlation means
   // aggregation node can be scheduled with lower memory estimation (lower memScale).
   // Setting value 1.0 will result in an equal memory estimate as the default estimation
-  // (no change). Default to 0.5.
+  // (no change). Defaults to 0.5.
   AGG_MEM_CORRELATION_FACTOR = 163
 
   // A per coordinator approximate limit on the memory consumption
@@ -892,6 +892,14 @@ enum TImpalaQueryOptions {
   // For those regions that do not observe DST, could set this flag to false
   // to re-enable kudu local timestamp bloom filter.
   DISABLE_KUDU_LOCAL_TIMESTAMP_BLOOM_FILTER = 170
+
+  // A range of [0.0..1.0] that controls the cardinality reduction scale from runtime
+  // filter analysis. This is a linear scale with 0.0 meaning no cardinality estimate
+  // reduction should be applied and 1.0 meaning maximum cardinality estimate reduction
+  // should be applied. For example, if a table has 1M rows and runtime filters are
+  // estimated to reduce cardinality to 500K, setting value 0.25 will result in an 875K
+  // cardinality estimate. Default to 1.0.
+  RUNTIME_FILTER_CARDINALITY_REDUCTION_SCALE = 171
 }
 
 // The summary of a DML statement.

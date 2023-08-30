@@ -310,6 +310,45 @@ TEST(QueryOptions, SetBigIntOptions) {
   }
 }
 
+// Test double options with expected value between 0 and 1 (inclusive or exclusive).
+TEST(QueryOptions, SetFractionalOptions) {
+  TQueryOptions options;
+  // List of pairs of Key and boolean flag on whether the option is inclusive of 0 and 1.
+  pair<OptionDef<double>, bool> case_set[]{
+      {MAKE_OPTIONDEF(resource_trace_ratio), true},
+      {MAKE_OPTIONDEF(runtime_filter_error_rate), false},
+      {MAKE_OPTIONDEF(minmax_filter_threshold), true},
+      {MAKE_OPTIONDEF(join_selectivity_correlation_factor), true},
+      {MAKE_OPTIONDEF(agg_mem_correlation_factor), true},
+      {MAKE_OPTIONDEF(runtime_filter_cardinality_reduction_scale), true},
+  };
+  for (const auto& test_case : case_set) {
+    const OptionDef<double>& option_def = test_case.first;
+    const bool& is_inclusive = test_case.second;
+    auto TestOk = MakeTestOkFn(options, option_def);
+    auto TestError = MakeTestErrFn(options, option_def);
+    TestOk("0.5", 0.5);
+    TestOk("0.01", 0.01);
+    TestOk("0.001", 0.001);
+    TestOk("0.0001", 0.0001);
+    TestOk("0.0000000001", 0.0000000001);
+    TestOk("0.999999999", 0.999999999);
+    TestOk(" 0.9", 0.9);
+    if (is_inclusive) {
+      TestOk("1", 1.0);
+      TestOk("0", 0.0);
+    } else {
+      TestError("1");
+      TestError("0");
+    }
+    // Out of range values
+    TestError("-1");
+    TestError("-0.1");
+    TestError("1.1");
+    TestError("Not a number!");
+  }
+}
+
 // Test options with non regular validation rule
 TEST(QueryOptions, SetSpecialOptions) {
   // REPLICA_PREFERENCE has unsettable enum values: cache_rack(1) & disk_rack(3)
@@ -386,26 +425,6 @@ TEST(QueryOptions, SetSpecialOptions) {
     TestOk("128KB", 128 * 1024);
     TestError("8191"); // default value of FLAGS_min_buffer_size is 8KB
     TestOk("64KB", 64 * 1024);
-  }
-  {
-    // RUNTIME_FILTER_ERROR_RATE is a double in range (0.0, 1.0)
-    OptionDef<double> key_def = MAKE_OPTIONDEF(runtime_filter_error_rate);
-    auto TestOk = MakeTestOkFn(options, key_def);
-    auto TestError = MakeTestErrFn(options, key_def);
-    TestOk("0.5", 0.5);
-    TestOk("0.01", 0.01);
-    TestOk("0.001", 0.001);
-    TestOk("0.0001", 0.0001);
-    TestOk("0.0000000001", 0.0000000001);
-    TestOk("0.999999999", 0.999999999);
-    TestOk(" 0.9", 0.9);
-    // Out of range values
-    TestError("1");
-    TestError("0");
-    TestError("-1");
-    TestError("-0.1");
-    TestError("1.1");
-    TestError("Not a number!");
   }
 }
 

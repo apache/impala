@@ -204,7 +204,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.92M
 |  |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=3 row-size=39B cardinality=181.75K
+|  |     tuple-ids=3 row-size=39B cardinality=71.76K(filtered from 181.75K)
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  05:SCAN HDFS [tpcds_parquet.customer_address]
@@ -218,7 +218,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |     parquet dictionary predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |     mem-estimate=48.00MB mem-reservation=256.00KB thread-reservation=1
-|     tuple-ids=5 row-size=43B cardinality=8.69K
+|     tuple-ids=5 row-size=43B cardinality=1.63K(filtered from 8.69K)
 |     in pipelines: 05(GETNEXT)
 |
 04:SCAN HDFS [tpcds_parquet.customer_demographics cd2]
@@ -230,7 +230,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=1.92M
    mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-   tuple-ids=4 row-size=39B cardinality=181.75K
+   tuple-ids=4 row-size=39B cardinality=359(filtered from 181.75K)
    in pipelines: 04(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=83.65MB Threads=20
@@ -458,7 +458,7 @@ Per-Host Resources: mem-estimate=66.10MB mem-reservation=17.88MB thread-reservat
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.92M
 |  |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=3 row-size=39B cardinality=181.75K
+|  |     tuple-ids=3 row-size=39B cardinality=71.76K(filtered from 181.75K)
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  18:EXCHANGE [HASH(ws_item_sk,ws_order_number)]
@@ -777,7 +777,7 @@ Per-Instance Resources: mem-estimate=26.22MB mem-reservation=10.00MB thread-rese
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.92M
 |  |     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-|  |     tuple-ids=3 row-size=39B cardinality=181.75K
+|  |     tuple-ids=3 row-size=39B cardinality=71.76K(filtered from 181.75K)
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  18:EXCHANGE [HASH(ws_item_sk,ws_order_number)]

@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Stack;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -123,9 +124,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // TODO for 2.3: Save this state in the PlannerContext instead.
   protected Set<ExprId> assignedConjuncts_;
 
-  // estimate of the output cardinality of this node; set in computeStats();
+  // estimate of the output cardinality of this node; set in computeStats() and can be
+  // replaced through filterCardinality();
   // invalid: -1
   protected long cardinality_;
+
+  // Estimate of the output cardinality of this node after reduction by runtime filter.
+  // Set in setFilteredCardinality(). Valid value is > -1.
+  // TODO: merge this with cardinality_.
+  protected long filteredCardinality_ = -1;
 
   // Estimated number of nodes on which the plan tree rooted at this node would be
   // scheduled;
@@ -376,8 +383,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       if (detailLevel == TExplainLevel.STANDARD) expBuilder.append(detailPrefix);
       expBuilder.append("row-size=")
           .append(PrintUtils.printBytes(Math.round(avgRowSize_)))
-          .append(" cardinality=")
-          .append(PrintUtils.printEstCardinality(cardinality_));
+          .append(" cardinality=");
+      if (filteredCardinality_ > -1) {
+        expBuilder.append(PrintUtils.printEstCardinality(filteredCardinality_))
+            .append("(filtered from ")
+            .append(PrintUtils.printEstCardinality(cardinality_))
+            .append(")");
+      } else {
+        expBuilder.append(PrintUtils.printEstCardinality(cardinality_));
+      }
       if (queryOptions.isCompute_processing_cost()) {
         // Show processing cost total.
         expBuilder.append(" cost=");
@@ -1156,5 +1170,32 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       }
     }
     return numCols;
+  }
+
+  protected void setFilteredCardinality(long newCardinality) {
+    Preconditions.checkState(newCardinality > -1);
+    Preconditions.checkState(newCardinality < cardinality_);
+    filteredCardinality_ = newCardinality;
+  }
+
+  // TODO: merge this with getCardinality().
+  protected long getFilteredCardinality() {
+    return filteredCardinality_ > -1 ? filteredCardinality_ : getCardinality();
+  }
+
+  /**
+   * Find contiguous probe pipeline consisting of ScanNode, ExchangeNodes, and JoinNodes
+   * and reduce their cardinality with assumption that runtime filter targeting
+   * the ScanNode can filter out rows effectively (as selective as the originating
+   * join node) before the join operation. 'reductionScale' is a [0.0..1.0] range to
+   * control the scale of reduction. Higher value means more reduction (lower cardinality
+   * estimate).
+   */
+  protected void reduceCardinalityByRuntimeFilter(
+      Stack<PlanNode> nodeStack, double reductionScale) {
+    nodeStack.clear();
+    for (PlanNode child : getChildren()) {
+      child.reduceCardinalityByRuntimeFilter(nodeStack, reductionScale);
+    }
   }
 }

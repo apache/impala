@@ -111,7 +111,7 @@ PLAN-ROOT SINK
 05:SCAN HDFS [tpch_nested_parquet.customer c]
    HDFS partitions=1/1 files=4 size=289.02MB
    runtime filters: RF000 -> c_nationkey, RF001 -> c.c_comment, RF004 -> c.c_nationkey, RF005 -> c_comment
-   row-size=87B cardinality=150.00K
+   row-size=87B cardinality=10.16K(filtered from 150.00K)
 ====
 # Test subplans: Cross join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a cross join a.int_array_col b
@@ -2502,7 +2502,7 @@ PLAN-ROOT SINK
 |  |  01:SCAN HDFS [tpch_nested_parquet.customer t2]
 |  |     HDFS partitions=1/1 files=4 size=289.02MB
 |  |     runtime filters: RF004 -> t2.c_custkey
-|  |     row-size=59B cardinality=150.00K
+|  |     row-size=59B cardinality=5(filtered from 150.00K)
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.region t3]
 |     HDFS partitions=1/1 files=1 size=3.59KB

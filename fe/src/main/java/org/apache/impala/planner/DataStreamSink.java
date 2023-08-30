@@ -73,7 +73,7 @@ public class DataStreamSink extends DataSink {
         outputPartition_.isPartitioned() ? exchNode_.getFragment().getNumInstances() : 1;
     long rowBatchSize = PlanNode.getRowBatchSize(queryOptions);
     long avgOutboundRowBatchSize = Math.min(
-        (long) Math.ceil(rowBatchSize * exchNode_.getAvgSerializedRowSize(exchNode_)),
+        (long) Math.ceil(rowBatchSize * ExchangeNode.getAvgSerializedRowSize(exchNode_)),
         PlanNode.ROWBATCH_MAX_MEM_USAGE);
     // Each channel has 2 OutboundRowBatch (KrpcDataStreamSender::NUM_OUTBOUND_BATCHES).
     int outboundBatchesPerChannel = 2;
@@ -89,7 +89,8 @@ public class DataStreamSink extends DataSink {
     // The sending part of the processing cost for the exchange node.
     processingCost_ =
         ProcessingCost.basicCost(getLabel() + "(" + exchNode_.getDisplayLabel() + ")",
-            exchNode_.getCardinality(), 0, exchNode_.estimateSerializationCostPerRow());
+            exchNode_.getFilteredCardinality(), 0,
+            exchNode_.estimateSerializationCostPerRow());
   }
 
   @Override

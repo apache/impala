@@ -1181,6 +1181,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_kudu_table_reserve_seconds(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::RUNTIME_FILTER_CARDINALITY_REDUCTION_SCALE: {
+        double double_val = 0.0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(
+            option, value, 0.0, 1.0, &double_val));
+        query_options->__set_runtime_filter_cardinality_reduction_scale(double_val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

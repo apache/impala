@@ -567,7 +567,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: o_orderkey = o_orderkey
 |  runtime filters: RF000[bloom] <- o_orderkey
 |  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6 row-size=32B cardinality=1
+|  tuple-ids=0,2,4,6 row-size=32B cardinality=5.76M
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpch_parquet.orders]
@@ -585,7 +585,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: o_orderkey = o_orderkey
 |  runtime filters: RF002[bloom] <- o_orderkey
 |  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2,4 row-size=24B cardinality=1
+|  tuple-ids=0,2,4 row-size=24B cardinality=5.76M
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpch_parquet.orders]
@@ -604,7 +604,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: l_orderkey = o_orderkey
 |  runtime filters: RF004[bloom] <- o_orderkey
 |  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2 row-size=16B cardinality=1
+|  tuple-ids=0,2 row-size=16B cardinality=5.76M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpch_parquet.orders]
@@ -1158,7 +1158,7 @@ PLAN-ROOT SINK
 |  hash predicates: o_orderkey = o_orderkey
 |  fk/pk conjuncts: o_orderkey = o_orderkey
 |  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6 row-size=40B cardinality=1
+|  tuple-ids=0,2,4,6 row-size=40B cardinality=575.77K
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpch_parquet.orders]
@@ -1175,7 +1175,7 @@ PLAN-ROOT SINK
 |  hash predicates: o_orderkey = o_orderkey
 |  fk/pk conjuncts: o_orderkey = o_orderkey
 |  mem-estimate=59.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2,4 row-size=32B cardinality=1
+|  tuple-ids=0,2,4 row-size=32B cardinality=575.77K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpch_parquet.orders]
@@ -1193,7 +1193,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: l_orderkey = o_orderkey
 |  runtime filters: RF004[bloom] <- o_orderkey
 |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=0,2 row-size=24B cardinality=1
+|  tuple-ids=0,2 row-size=24B cardinality=575.77K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpch_parquet.orders]
@@ -1217,7 +1217,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=6.00M
+   tuple-ids=0 row-size=8B cardinality=575.77K(filtered from 6.00M)
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -1336,7 +1336,7 @@ Per-Host Resources: mem-estimate=91.08MB mem-reservation=12.75MB thread-reservat
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=0 row-size=8B cardinality=6.00M
+   tuple-ids=0 row-size=8B cardinality=575.77K(filtered from 6.00M)
    in pipelines: 00(GETNEXT)
 ====
 # IMPALA-12357: build fragment with union still eligible for filter elimination.

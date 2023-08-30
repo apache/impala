@@ -95,7 +95,7 @@ PLAN-ROOT SINK
 |  |  03:HASH JOIN [LEFT OUTER JOIN]
 |  |  |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  |  |  other predicates: sr_ticket_number IS NULL
-|  |  |  row-size=52B cardinality=2.88M
+|  |  |  row-size=52B cardinality=589.03K(filtered from 2.88M)
 |  |  |
 |  |  |--01:SCAN HDFS [tpcds.store_returns]
 |  |  |     HDFS partitions=1/1 files=1 size=31.19MB
@@ -104,7 +104,7 @@ PLAN-ROOT SINK
 |  |  00:SCAN HDFS [tpcds.store_sales]
 |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |  |     runtime filters: RF016 -> ss_sold_date_sk
-|  |     row-size=36B cardinality=2.88M
+|  |     row-size=36B cardinality=589.03K(filtered from 2.88M)
 |  |
 |  11:AGGREGATE [FINALIZE]
 |  |  output: sum(ws_quantity), sum(ws_wholesale_cost), sum(ws_sales_price)
@@ -233,7 +233,7 @@ PLAN-ROOT SINK
 |  |  03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  |  |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  |  |  other predicates: sr_ticket_number IS NULL
-|  |  |  row-size=52B cardinality=2.88M
+|  |  |  row-size=52B cardinality=589.03K(filtered from 2.88M)
 |  |  |
 |  |  |--JOIN BUILD
 |  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
@@ -250,7 +250,7 @@ PLAN-ROOT SINK
 |  |  00:SCAN HDFS [tpcds.store_sales]
 |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |  |     runtime filters: RF016 -> ss_sold_date_sk
-|  |     row-size=36B cardinality=2.88M
+|  |     row-size=36B cardinality=589.03K(filtered from 2.88M)
 |  |
 |  28:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_quantity), sum:merge(ws_wholesale_cost), sum:merge(ws_sales_price)
@@ -417,7 +417,7 @@ PLAN-ROOT SINK
 |  |  03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  |  |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  |  |  other predicates: sr_ticket_number IS NULL
-|  |  |  row-size=52B cardinality=2.88M
+|  |  |  row-size=52B cardinality=589.03K(filtered from 2.88M)
 |  |  |
 |  |  |--JOIN BUILD
 |  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
@@ -434,7 +434,7 @@ PLAN-ROOT SINK
 |  |  00:SCAN HDFS [tpcds.store_sales]
 |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |  |     runtime filters: RF016 -> ss_sold_date_sk
-|  |     row-size=36B cardinality=2.88M
+|  |     row-size=36B cardinality=589.03K(filtered from 2.88M)
 |  |
 |  28:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_quantity), sum:merge(ws_wholesale_cost), sum:merge(ws_sales_price)

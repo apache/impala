@@ -177,7 +177,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=1.92M
    mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-   tuple-ids=2 row-size=39B cardinality=181.75K
+   tuple-ids=2 row-size=39B cardinality=3.01K(filtered from 181.75K)
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=36.08MB Threads=14

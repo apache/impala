@@ -119,7 +119,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  runtime filters: RF006[bloom] <- household_demographics.hd_demo_sk, RF007[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=48B cardinality=281.17K
+|  |  tuple-ids=0,3 row-size=48B cardinality=281.17K(filtered from 281.17K)
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN HDFS [tpcds_parquet.household_demographics]
@@ -142,7 +142,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=112.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=0 row-size=36B cardinality=2.88M
+|     tuple-ids=0 row-size=36B cardinality=281.17K(filtered from 2.88M)
 |     in pipelines: 00(GETNEXT)
 |
 08:SCAN HDFS [tpcds_parquet.customer]
@@ -153,7 +153,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=100.00K
    mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=6 row-size=40B cardinality=100.00K
+   tuple-ids=6 row-size=40B cardinality=46.86K(filtered from 100.00K)
    in pipelines: 08(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=30.52MB Threads=13
@@ -294,7 +294,7 @@ Per-Host Resources: mem-estimate=132.64MB mem-reservation=15.81MB thread-reserva
 |  fk/pk conjuncts: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
 |  runtime filters: RF006[bloom] <- household_demographics.hd_demo_sk, RF007[min_max] <- household_demographics.hd_demo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=48B cardinality=281.17K
+|  tuple-ids=0,3 row-size=48B cardinality=281.17K(filtered from 281.17K)
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--11:EXCHANGE [BROADCAST]
@@ -324,7 +324,7 @@ Per-Host Resources: mem-estimate=132.64MB mem-reservation=15.81MB thread-reserva
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=112.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=0 row-size=36B cardinality=2.88M
+   tuple-ids=0 row-size=36B cardinality=281.17K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=48.34MB Threads=16
@@ -490,7 +490,7 @@ Per-Instance Resources: mem-estimate=27.65MB mem-reservation=6.00MB thread-reser
 |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
 |  fk/pk conjuncts: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=48B cardinality=281.17K
+|  tuple-ids=0,3 row-size=48B cardinality=281.17K(filtered from 281.17K)
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -528,6 +528,6 @@ Per-Instance Resources: mem-estimate=27.65MB mem-reservation=6.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=0 row-size=36B cardinality=2.88M
+   tuple-ids=0 row-size=36B cardinality=281.17K(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ====

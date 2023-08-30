@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=287.51K
 |     mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=6 row-size=16B cardinality=287.51K
+|     tuple-ids=6 row-size=16B cardinality=53.81K(filtered from 287.51K)
 |     in pipelines: 06(GETNEXT)
 |
 12:HASH JOIN [INNER JOIN]
@@ -157,7 +157,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=287.51K
 |     mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=0 row-size=16B cardinality=287.51K
+|     tuple-ids=0 row-size=16B cardinality=53.81K(filtered from 287.51K)
 |     in pipelines: 00(GETNEXT)
 |
 05:SCAN HDFS [tpcds_parquet.customer]
@@ -168,7 +168,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=100.00K
    mem-estimate=32.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=5 row-size=32B cardinality=100.00K
+   tuple-ids=5 row-size=32B cardinality=53.81K(filtered from 100.00K)
    in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=49.20MB Threads=16
@@ -287,7 +287,7 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=287.51K
 |     mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=6 row-size=16B cardinality=287.51K
+|     tuple-ids=6 row-size=16B cardinality=53.81K(filtered from 287.51K)
 |     in pipelines: 06(GETNEXT)
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -391,7 +391,7 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=287.51K
 |     mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=0 row-size=16B cardinality=287.51K
+|     tuple-ids=0 row-size=16B cardinality=53.81K(filtered from 287.51K)
 |     in pipelines: 00(GETNEXT)
 |
 05:SCAN HDFS [tpcds_parquet.customer, RANDOM]
@@ -402,7 +402,7 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=100.00K
    mem-estimate=32.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=5 row-size=32B cardinality=100.00K
+   tuple-ids=5 row-size=32B cardinality=53.81K(filtered from 100.00K)
    in pipelines: 05(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=64.70MB Threads=15
@@ -539,7 +539,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=287.51K
 |     mem-estimate=24.00MB mem-reservation=4.00MB thread-reservation=0
-|     tuple-ids=6 row-size=16B cardinality=287.51K
+|     tuple-ids=6 row-size=16B cardinality=53.81K(filtered from 287.51K)
 |     in pipelines: 06(GETNEXT)
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -669,7 +669,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=287.51K
 |     mem-estimate=24.00MB mem-reservation=4.00MB thread-reservation=0
-|     tuple-ids=0 row-size=16B cardinality=287.51K
+|     tuple-ids=0 row-size=16B cardinality=53.81K(filtered from 287.51K)
 |     in pipelines: 00(GETNEXT)
 |
 05:SCAN HDFS [tpcds_parquet.customer, RANDOM]
@@ -680,6 +680,6 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=100.00K
    mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-   tuple-ids=5 row-size=32B cardinality=100.00K
+   tuple-ids=5 row-size=32B cardinality=53.81K(filtered from 100.00K)
    in pipelines: 05(GETNEXT)
 ====

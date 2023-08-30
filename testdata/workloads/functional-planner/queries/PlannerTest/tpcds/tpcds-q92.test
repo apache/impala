@@ -83,7 +83,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |  |     mem-estimate=96.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=0 row-size=16B cardinality=719.38K
+|  |     tuple-ids=0 row-size=16B cardinality=760(filtered from 719.38K)
 |  |     in pipelines: 00(GETNEXT)
 |  |
 |  02:SCAN HDFS [tpcds_parquet.date_dim]
@@ -97,7 +97,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: CAST(d_date AS DATE) <= DATE '2000-04-26', CAST(d_date AS DATE) >= DATE '2000-01-27'
 |     parquet dictionary predicates: CAST(d_date AS DATE) <= DATE '2000-04-26', CAST(d_date AS DATE) >= DATE '2000-01-27'
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=2 row-size=26B cardinality=7.30K
+|     tuple-ids=2 row-size=26B cardinality=760(filtered from 7.30K)
 |     in pipelines: 02(GETNEXT)
 |
 06:AGGREGATE [FINALIZE]
@@ -258,7 +258,7 @@ Per-Host Resources: mem-estimate=13.23MB mem-reservation=4.88MB thread-reservati
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=96.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=0 row-size=16B cardinality=719.38K
+|     tuple-ids=0 row-size=16B cardinality=760(filtered from 719.38K)
 |     in pipelines: 00(GETNEXT)
 |
 14:AGGREGATE [FINALIZE]
@@ -465,7 +465,7 @@ Per-Instance Resources: mem-estimate=10.18MB mem-reservation=1.94MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=0 row-size=16B cardinality=719.38K
+|     tuple-ids=0 row-size=16B cardinality=760(filtered from 719.38K)
 |     in pipelines: 00(GETNEXT)
 |
 14:AGGREGATE [FINALIZE]

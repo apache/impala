@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
-|     tuple-ids=3 row-size=8B cardinality=2.88M
+|     tuple-ids=3 row-size=8B cardinality=3.85K(filtered from 2.88M)
 |     in pipelines: 03(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.inventory]
@@ -242,7 +242,7 @@ Per-Host Resources: mem-estimate=168.99MB mem-reservation=55.88MB thread-reserva
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
-|     tuple-ids=3 row-size=8B cardinality=2.88M
+|     tuple-ids=3 row-size=8B cardinality=3.85K(filtered from 2.88M)
 |     in pipelines: 03(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.inventory, RANDOM]
@@ -407,7 +407,7 @@ Per-Instance Resources: mem-estimate=98.96MB mem-reservation=50.00MB thread-rese
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=3 row-size=8B cardinality=2.88M
+|     tuple-ids=3 row-size=8B cardinality=3.85K(filtered from 2.88M)
 |     in pipelines: 03(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.inventory, RANDOM]

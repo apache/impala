@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 import java.util.stream.Collectors;
 
 import org.apache.impala.analysis.AnalysisContext;
@@ -496,6 +497,23 @@ public class Planner {
     Pair<CoreCount, List<CoreCount>> rootCores = fragmentCoreState.get(root.getId());
 
     return root.maxCore(rootCores.first, CoreCount.sum(rootCores.second));
+  }
+
+  /**
+   * Reduce plan node cardinalities based on runtime filter information.
+   * Valid to call after runtime filter generation and before processing cost
+   * computation.
+   */
+  public static void reduceCardinalityByRuntimeFilter(
+      List<PlanFragment> planRoots, PlannerContext planCtx) {
+    double reductionScale = planCtx.getRootAnalyzer()
+                                .getQueryOptions()
+                                .getRuntime_filter_cardinality_reduction_scale();
+    if (reductionScale <= 0) return;
+    PlanFragment rootFragment = planRoots.get(0);
+    Stack<PlanNode> nodeStack = new Stack<>();
+    rootFragment.getPlanRoot().reduceCardinalityByRuntimeFilter(
+        nodeStack, reductionScale);
   }
 
   /**

@@ -1,0 +1,792 @@
+# Case 01: This is a base case, a modified subquery from TPC-DS Q78.
+# Actual run results in 00:SCAN node to return 549.33K rows.
+# With cardinality reduction disabled, 00:SCAN estimate cardinality is 2.88M.
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+join date_dim on ss_sold_date_sk = d_date_sk
+where sr_ticket_number is null
+  and d_year = 2002
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=0.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=195.94MB mem-reservation=57.94MB thread-reservation=4 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=31.46MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=38.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=56B cardinality=589.03K
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2 row-size=60B cardinality=589.03K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=52B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF001[min_max] -> ss_sold_date_sk, RF000[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=2.88M
+   in pipelines: 00(GETNEXT)
+====
+# Case 02: With cardinality reduction fully enabled, 00:SCAN estimate cardinality is 589.03K.
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+join date_dim on ss_sold_date_sk = d_date_sk
+where sr_ticket_number is null
+  and d_year = 2002
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=195.94MB mem-reservation=57.94MB thread-reservation=4 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=31.46MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=38.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=56B cardinality=589.03K
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2 row-size=60B cardinality=589.03K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=52B cardinality=589.03K(filtered from 2.88M)
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF001[min_max] -> ss_sold_date_sk, RF000[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
+   mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=589.03K(filtered from 2.88M)
+   in pipelines: 00(GETNEXT)
+====
+# Case 03: With cardinality reduction applied half, 00:SCAN estimate cardinality is 1.73M.
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+join date_dim on ss_sold_date_sk = d_date_sk
+where sr_ticket_number is null
+  and d_year = 2002
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=0.5
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=195.94MB mem-reservation=57.94MB thread-reservation=4 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=31.46MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=38.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=56B cardinality=589.03K
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2 row-size=60B cardinality=589.03K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=52B cardinality=1.73M(filtered from 2.88M)
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF001[min_max] -> ss_sold_date_sk, RF000[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1099(filtered from 1824)
+   mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=1.73M(filtered from 2.88M)
+   in pipelines: 00(GETNEXT)
+====
+# Case 04: Removing sr_ticket_number=ss_ticket_number predicate will turn 03:HASH JOIN into
+# an expanding join and makes probe pipeline ineligible for cardinality reduction.
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on ss_item_sk=sr_item_sk
+join date_dim on ss_sold_date_sk = d_date_sk
+where sr_ticket_number is null
+  and d_year = 2002
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=637.75MB mem-reservation=55.94MB thread-reservation=4 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=536.75MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=56B cardinality=9.42M
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2 row-size=52B cardinality=9.42M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk
+|  fk/pk conjuncts: none
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=44B cardinality=46.07M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF001[min_max] -> ss_sold_date_sk, RF000[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   mem-estimate=80.00MB mem-reservation=2.00MB thread-reservation=1
+   tuple-ids=0 row-size=28B cardinality=2.88M
+   in pipelines: 00(GETNEXT)
+====
+# Case 05: Add sr_returned_date_sk = d_date_sk predicate so that build side scan (01:SCAN HDFS)
+# is targetted by a runtime filter. No cardinality reduction should happen in build scan
+# because cardinality reduction only applied at probe pipeline.
+# TODO: RF000[bloom] is duplicate of RF001[bloom].
+#       RF002[min_max] is duplicate of RF003[min_max].
+#       Consider deduplicating it in the future.
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+join date_dim on ss_sold_date_sk = d_date_sk and sr_returned_date_sk = d_date_sk
+where sr_ticket_number is null
+  and d_year = 2002
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=220.94MB mem-reservation=58.94MB thread-reservation=4 runtime-filters-memory=2.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=28.79MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=34.96MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=56B cardinality=539.08K
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: sr_returned_date_sk = d_date_sk, ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: sr_returned_date_sk = d_date_sk, ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[bloom] <- d_date_sk, RF002[min_max] <- d_date_sk, RF003[min_max] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2 row-size=64B cardinality=539.08K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=56B cardinality=589.03K(filtered from 2.88M)
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     runtime filters: RF000[bloom] -> sr_returned_date_sk, RF001[bloom] -> tpcds_parquet.store_returns.sr_returned_date_sk
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=72.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=20B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF002[min_max] -> tpcds_parquet.store_sales.ss_sold_date_sk, RF003[min_max] -> ss_sold_date_sk, RF000[bloom] -> tpcds_parquet.store_sales.ss_sold_date_sk, RF001[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
+   mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=589.03K(filtered from 2.88M)
+   in pipelines: 00(GETNEXT)
+====
+# Case 06: Additionally join against time_dim. 00:SCAN will receive 2 bloom runtime filter
+# and estimate cardinality is 61 (actual is 91).
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+join date_dim on ss_sold_date_sk = d_date_sk
+join time_dim on ss_sold_time_sk = t_time_sk
+where sr_ticket_number is null
+  and d_year = 2002
+  and t_time = 36360
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=246.88MB mem-reservation=32.38MB thread-reservation=5 runtime-filters-memory=2.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=56B cardinality=13
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,3,2 row-size=72B cardinality=13
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_time_sk = t_time_sk
+|  fk/pk conjuncts: ss_sold_time_sk = t_time_sk
+|  runtime filters: RF002[bloom] <- t_time_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,3 row-size=64B cardinality=61(filtered from 62)
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpcds_parquet.time_dim]
+|     HDFS partitions=1/1 files=1 size=1.31MB
+|     predicates: t_time = CAST(36360 AS INT)
+|     stored statistics:
+|       table: rows=86.40K size=1.31MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=86.40K
+|     parquet statistics predicates: t_time = CAST(36360 AS INT)
+|     parquet dictionary predicates: t_time = CAST(36360 AS INT)
+|     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
+|     tuple-ids=3 row-size=8B cardinality=1
+|     in pipelines: 03(GETNEXT)
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=56B cardinality=61(filtered from 2.88M)
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF001[min_max] -> ss_sold_date_sk, RF000[bloom] -> ss_sold_date_sk, RF002[bloom] -> ss_sold_time_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
+   mem-estimate=112.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=40B cardinality=61(filtered from 2.88M)
+   in pipelines: 00(GETNEXT)
+====
+# Case 07: Same as Case 06, but make the RHS of join predicate an expression.
+# No cardinality reduction should happen.
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+join date_dim on ss_sold_date_sk = (d_date_sk + 1)
+join time_dim on ss_sold_time_sk = (t_time_sk - 1)
+where sr_ticket_number is null
+  and d_year = 2002
+  and t_time = 36360
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=321.67MB mem-reservation=60.88MB thread-reservation=5 runtime-filters-memory=2.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=186.79MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=56B cardinality=2.88M
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_time_sk = (t_time_sk - 1)
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- (t_time_sk - 1)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2,3 row-size=72B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpcds_parquet.time_dim]
+|     HDFS partitions=1/1 files=1 size=1.31MB
+|     predicates: t_time = CAST(36360 AS INT)
+|     stored statistics:
+|       table: rows=86.40K size=1.31MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=86.40K
+|     parquet statistics predicates: t_time = CAST(36360 AS INT)
+|     parquet dictionary predicates: t_time = CAST(36360 AS INT)
+|     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
+|     tuple-ids=3 row-size=8B cardinality=1
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = (d_date_sk + 1)
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF002[bloom] <- (d_date_sk + 1), RF003[min_max] <- (d_date_sk + 1)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2 row-size=64B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=56B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF003[min_max] -> ss_sold_date_sk, RF000[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   mem-estimate=112.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=40B cardinality=2.88M
+   in pipelines: 00(GETNEXT)
+====
+# Case 08: Same as Case 06, but make the LHS of join predicate an expression.
+# No cardinality reduction should happen.
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from store_sales
+left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+join date_dim on (ss_sold_date_sk + 1) = d_date_sk
+join time_dim on (ss_sold_time_sk - 1) = t_time_sk
+where sr_ticket_number is null
+  and d_year = 2002
+  and t_time = 36360
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=321.67MB mem-reservation=60.88MB thread-reservation=5 runtime-filters-memory=2.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+07:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  group by: d_year, ss_item_sk, ss_customer_sk
+|  mem-estimate=186.79MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=56B cardinality=2.88M
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: (ss_sold_time_sk - 1) = t_time_sk
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- t_time_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2,3 row-size=72B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpcds_parquet.time_dim]
+|     HDFS partitions=1/1 files=1 size=1.31MB
+|     predicates: t_time = CAST(36360 AS INT)
+|     stored statistics:
+|       table: rows=86.40K size=1.31MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=86.40K
+|     parquet statistics predicates: t_time = CAST(36360 AS INT)
+|     parquet dictionary predicates: t_time = CAST(36360 AS INT)
+|     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
+|     tuple-ids=3 row-size=8B cardinality=1
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: (ss_sold_date_sk + 1) = d_date_sk
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF002[bloom] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1N,2 row-size=64B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=2 row-size=8B cardinality=373
+|     in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  other predicates: sr_ticket_number IS NULL
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1N row-size=56B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF000[bloom] -> (ss_sold_time_sk - 1), RF002[bloom] -> (ss_sold_date_sk + 1)
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   mem-estimate=112.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=40B cardinality=2.88M
+   in pipelines: 00(GETNEXT)
+====
+# Case 09: Test against left anti join (a variant of left semi join).
+select d_year AS ss_sold_year, ss_item_sk,
+  ss_customer_sk,
+  sum(ss_quantity) ss_qty,
+  sum(ss_wholesale_cost) ss_wc,
+  sum(ss_sales_price) ss_sp
+from (
+  select * from store_sales
+  where ss_ticket_number not in (
+    select sr_ticket_number from store_returns)
+) ss
+join date_dim on ss_sold_date_sk = d_date_sk
+where d_year = 2002
+group by d_year, ss_item_sk, ss_customer_sk
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=174.94MB mem-reservation=60.94MB thread-reservation=4 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  output exprs: d_year, ss_item_sk, ss_customer_sk, sum(ss_quantity), sum(ss_wholesale_cost), sum(ss_sales_price)
+|  mem-estimate=31.46MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(CAST(tpcds_parquet.store_sales.ss_quantity AS BIGINT)), sum(tpcds_parquet.store_sales.ss_wholesale_cost), sum(tpcds_parquet.store_sales.ss_sales_price)
+|  group by: d_year, tpcds_parquet.store_sales.ss_item_sk, tpcds_parquet.store_sales.ss_customer_sk
+|  mem-estimate=38.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=56B cardinality=589.03K
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_parquet.store_sales.ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: tpcds_parquet.store_sales.ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,4 row-size=44B cardinality=589.03K
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpcds_parquet.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d_year = CAST(2002 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: d_year = CAST(2002 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=4 row-size=8B cardinality=373
+|     in pipelines: 03(GETNEXT)
+|
+02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  hash predicates: ss_ticket_number = sr_ticket_number
+|  mem-estimate=20.00MB mem-reservation=20.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0 row-size=36B cardinality=589.03K(filtered from 2.88M)
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.store_returns]
+|     HDFS partitions=1/1 files=1 size=15.43MB
+|     stored statistics:
+|       table: rows=287.51K size=15.43MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=287.51K
+|     mem-estimate=24.00MB mem-reservation=2.00MB thread-reservation=1
+|     tuple-ids=1 row-size=8B cardinality=287.51K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.46MB
+   runtime filters: RF001[min_max] -> tpcds_parquet.store_sales.ss_sold_date_sk, RF000[bloom] -> tpcds_parquet.store_sales.ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=199.46MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
+   mem-estimate=96.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=589.03K(filtered from 2.88M)
+   in pipelines: 00(GETNEXT)
+====

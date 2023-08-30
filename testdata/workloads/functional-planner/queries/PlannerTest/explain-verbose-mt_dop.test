@@ -289,10 +289,10 @@ Per-Instance Resources: mem-estimate=27.88MB mem-reservation=3.00MB thread-reser
        table: rows=2.88M size=199.44MB
        partitions: 1824/1824 rows=2.88M
        columns: all
-     extrapolated-rows=disabled max-scan-range-rows=130.09K
+     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=109(filtered from 1824)
      file formats: [PARQUET]
      mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-     tuple-ids=0 row-size=20B cardinality=2.88M
+     tuple-ids=0 row-size=20B cardinality=170.55K(filtered from 2.88M)
      in pipelines: 01(GETNEXT)
 
 F93:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -841,7 +841,7 @@ Per-Instance Resources: mem-estimate=59.88MB mem-reservation=6.00MB thread-reser
      extrapolated-rows=disabled max-scan-range-rows=650.14K
      file formats: [PARQUET]
      mem-estimate=48.00MB mem-reservation=4.00MB thread-reservation=0
-     tuple-ids=34 row-size=20B cardinality=1.44M
+     tuple-ids=34 row-size=20B cardinality=85.31K(filtered from 1.44M)
      in pipelines: 43(GETNEXT)
 
 F105:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1382,7 +1382,7 @@ Per-Instance Resources: mem-estimate=43.88MB mem-reservation=6.00MB thread-reser
      extrapolated-rows=disabled max-scan-range-rows=644.77K
      file formats: [PARQUET]
      mem-estimate=32.00MB mem-reservation=4.00MB thread-reservation=0
-     tuple-ids=68 row-size=20B cardinality=719.38K
+     tuple-ids=68 row-size=20B cardinality=42.85K(filtered from 719.38K)
      in pipelines: 85(GETNEXT)
 
 F117:PLAN FRAGMENT [RANDOM] hosts=2 instances=2

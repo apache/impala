@@ -1468,4 +1468,23 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile(
         "agg-node-high-mem-estimate", "tpcds_parquet", options, testOptions);
   }
+
+  /**
+   * Test cardinality reduction by runtime filter.
+   */
+  @Test
+  public void testRuntimeFilterCardinalityReduction() {
+    runPlannerTestFile("runtime-filter-cardinality-reduction", "tpcds_parquet",
+        ImmutableSet.of(
+            PlannerTestOption.EXTENDED_EXPLAIN, PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
+   * Test cardinality reduction by runtime filter against Kudu.
+   */
+  @Test
+  public void testRuntimeFilterCardinalityReductionOnKudu() {
+    runPlannerTestFile("runtime-filter-cardinality-reduction-on-kudu", "tpch_kudu",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
 }

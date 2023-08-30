@@ -404,7 +404,7 @@ PLAN-ROOT SINK
    predicates: CAST(a.id AS STRING) > '123'
    kudu predicates: a.id > 10
    runtime filters: RF000 -> a.id, RF001 -> a.id
-   row-size=4B cardinality=730
+   row-size=4B cardinality=10(filtered from 730)
 ====
 # IMPALA-4662: Kudu analysis failure for NULL literal in IN list
 # NULL literal in values list results in applying predicate at scan node

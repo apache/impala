@@ -129,9 +129,9 @@ PLAN-ROOT SINK
 |  |       table: rows=2.88M size=200.95MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=109(filtered from 1824)
 |  |     mem-estimate=48.00MB mem-reservation=2.00MB thread-reservation=1
-|  |     tuple-ids=5 row-size=20B cardinality=2.88M
+|  |     tuple-ids=5 row-size=20B cardinality=170.55K(filtered from 2.88M)
 |  |     in pipelines: 08(GETNEXT)
 |  |
 |  |--07:HASH JOIN [INNER JOIN]
@@ -163,7 +163,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |  |     mem-estimate=192.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=3 row-size=20B cardinality=1.44M
+|  |     tuple-ids=3 row-size=20B cardinality=85.31K(filtered from 1.44M)
 |  |     in pipelines: 05(GETNEXT)
 |  |
 |  04:HASH JOIN [INNER JOIN]
@@ -195,7 +195,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=128.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=20B cardinality=719.38K
+|     tuple-ids=1 row-size=20B cardinality=42.85K(filtered from 719.38K)
 |     in pipelines: 02(GETNEXT)
 |
 11:SCAN HDFS [tpcds_parquet.time_dim]
@@ -209,7 +209,7 @@ PLAN-ROOT SINK
    parquet statistics predicates: t_meal_time IN ('breakfast', 'dinner')
    parquet dictionary predicates: t_meal_time IN ('breakfast', 'dinner')
    mem-estimate=64.00MB mem-reservation=512.00KB thread-reservation=1
-   tuple-ids=9 row-size=31B cardinality=57.60K
+   tuple-ids=9 row-size=31B cardinality=1.00K(filtered from 57.60K)
    in pipelines: 11(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=42.94MB Threads=15
@@ -358,9 +358,9 @@ Per-Host Resources: mem-estimate=201.69MB mem-reservation=16.88MB thread-reserva
 |       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=109(filtered from 1824)
 |     mem-estimate=48.00MB mem-reservation=2.00MB thread-reservation=1
-|     tuple-ids=5 row-size=20B cardinality=2.88M
+|     tuple-ids=5 row-size=20B cardinality=170.55K(filtered from 2.88M)
 |     in pipelines: 08(GETNEXT)
 |
 |--07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -399,7 +399,7 @@ Per-Host Resources: mem-estimate=201.69MB mem-reservation=16.88MB thread-reserva
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |     mem-estimate=192.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=3 row-size=20B cardinality=1.44M
+|     tuple-ids=3 row-size=20B cardinality=85.31K(filtered from 1.44M)
 |     in pipelines: 05(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -438,7 +438,7 @@ Per-Host Resources: mem-estimate=201.69MB mem-reservation=16.88MB thread-reserva
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=644.77K
    mem-estimate=128.00MB mem-reservation=8.00MB thread-reservation=1
-   tuple-ids=1 row-size=20B cardinality=719.38K
+   tuple-ids=1 row-size=20B cardinality=42.85K(filtered from 719.38K)
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=84.50MB Threads=18
@@ -612,9 +612,9 @@ Per-Instance Resources: mem-estimate=49.60MB mem-reservation=8.00MB thread-reser
 |       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=109(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-|     tuple-ids=5 row-size=20B cardinality=2.88M
+|     tuple-ids=5 row-size=20B cardinality=170.55K(filtered from 2.88M)
 |     in pipelines: 08(GETNEXT)
 |
 |--07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -661,7 +661,7 @@ Per-Instance Resources: mem-estimate=49.60MB mem-reservation=8.00MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=3 row-size=20B cardinality=1.44M
+|     tuple-ids=3 row-size=20B cardinality=85.31K(filtered from 1.44M)
 |     in pipelines: 05(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -708,6 +708,6 @@ Per-Instance Resources: mem-estimate=49.60MB mem-reservation=8.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=644.77K
    mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=1 row-size=20B cardinality=719.38K
+   tuple-ids=1 row-size=20B cardinality=42.85K(filtered from 719.38K)
    in pipelines: 02(GETNEXT)
 ====

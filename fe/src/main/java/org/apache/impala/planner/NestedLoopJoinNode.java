@@ -101,19 +101,20 @@ public class NestedLoopJoinNode extends JoinNode {
     // TODO: The cost should consider conjuncts_ as well.
     ProcessingCost probeProcessingCost = ProcessingCost.zero();
     ProcessingCost buildProcessingCost = ProcessingCost.zero();
+    long probeCardinality = getProbeCardinalityForCosting();
+    long buildCardinality = getChild(1).getCardinality();
     if (getChild(1) instanceof SingularRowSrcNode) {
       // Compute the processing cost for lhs.
-      probeProcessingCost =
-          ProcessingCost.basicCost(getDisplayLabel() + "(c0, singularRowSrc) Probe side",
-              getChild(0).getCardinality(), 0);
+      probeProcessingCost = ProcessingCost.basicCost(
+          getDisplayLabel() + "(c0, singularRowSrc) Probe side", probeCardinality, 0);
 
       // Compute the processing cost for rhs.
       buildProcessingCost = ProcessingCost.basicCost(
           getDisplayLabel() + "(c0, singularRowSrc) Build side per probe",
-          getChild(1).getCardinality(), 0);
+          buildCardinality, 0);
       // Multiply by the number of probes
-      buildProcessingCost = ProcessingCost.scaleCost(
-          buildProcessingCost, Math.max(0, getChild(0).getCardinality()));
+      buildProcessingCost =
+          ProcessingCost.scaleCost(buildProcessingCost, Math.max(0, probeCardinality));
     } else {
       // Assume 'eqJoinConjuncts_' will be applied to all rows from lhs side,
       // and 'otherJoinConjuncts_' to the resultant rows.
@@ -124,18 +125,18 @@ public class NestedLoopJoinNode extends JoinNode {
       // Compute the processing cost for lhs.
       probeProcessingCost = ProcessingCost.basicCost(
           getDisplayLabel() + "(c0, non-singularRowSrc, eqJoinConjuncts_) Probe side",
-          getChild(0).getCardinality(), eqJoinPredicateEvalCost);
+          probeCardinality, eqJoinPredicateEvalCost);
 
       probeProcessingCost = ProcessingCost.sumCost(probeProcessingCost,
           ProcessingCost.basicCost(getDisplayLabel()
                   + "(c0, non-singularRowSrc, otherJoinConjuncts_) Probe side",
-              getCardinality(), otherJoinPredicateEvalCost));
+              getFilteredCardinality(), otherJoinPredicateEvalCost));
 
       // Compute the processing cost for rhs, assuming 'eqJoinConjuncts_' will be applied
       // to all rows from rhs side.
       buildProcessingCost = ProcessingCost.basicCost(
-          getDisplayLabel() + "(c0, non-singularRowSrc) Build side",
-          getChild(1).getCardinality(), eqJoinPredicateEvalCost);
+          getDisplayLabel() + "(c0, non-singularRowSrc) Build side", buildCardinality,
+          eqJoinPredicateEvalCost);
     }
     return Pair.create(probeProcessingCost, buildProcessingCost);
   }

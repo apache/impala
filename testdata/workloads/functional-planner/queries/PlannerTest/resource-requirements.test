@@ -3352,7 +3352,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
-|     tuple-ids=3 row-size=66B cardinality=6.00M
+|     tuple-ids=3 row-size=66B cardinality=1.15M(filtered from 6.00M)
 |     in pipelines: 05(GETNEXT)
 |
 04:AGGREGATE [FINALIZE]
@@ -3498,7 +3498,7 @@ Per-Host Resources: mem-estimate=151.74MB mem-reservation=60.00MB thread-reserva
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
-|     tuple-ids=3 row-size=66B cardinality=6.00M
+|     tuple-ids=3 row-size=66B cardinality=1.15M(filtered from 6.00M)
 |     in pipelines: 05(GETNEXT)
 |
 14:AGGREGATE [FINALIZE]
@@ -3688,7 +3688,7 @@ Per-Instance Resources: mem-estimate=80.28MB mem-reservation=24.00MB thread-rese
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=0
-|     tuple-ids=3 row-size=66B cardinality=6.00M
+|     tuple-ids=3 row-size=66B cardinality=1.15M(filtered from 6.00M)
 |     in pipelines: 05(GETNEXT)
 |
 14:AGGREGATE [FINALIZE]

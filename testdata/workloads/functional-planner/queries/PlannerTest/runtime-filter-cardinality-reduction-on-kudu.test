@@ -1,0 +1,113 @@
+# Test query crafted similar to one in runtime-filter-cardinality-reduction.test
+# Actual run results in 00:SCAN node to return 262.38K.
+# With cardinality reduction disabled, 00:SCAN estimate cardinality is 6.00M.
+select l_partkey, l_suppkey, sum(o_orderkey) o_qty, sum(l_linenumber) l_qty
+from lineitem
+  left join orders on l_orderkey = o_orderkey
+  inner join supplier on l_suppkey = s_suppkey
+where s_nationkey = 11
+group by l_partkey, l_suppkey
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=0.0
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(o_orderkey), sum(l_linenumber)
+|  group by: l_partkey, l_suppkey
+|  row-size=32B cardinality=240.05K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|  runtime filters: RF000 <- s_suppkey, RF001 <- s_suppkey
+|  row-size=44B cardinality=240.05K
+|
+|--02:SCAN KUDU [tpch_kudu.supplier]
+|     kudu predicates: s_nationkey = 11
+|     row-size=8B cardinality=400
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  row-size=36B cardinality=6.00M
+|
+|--01:SCAN KUDU [tpch_kudu.orders]
+|     row-size=8B cardinality=1.50M
+|
+00:SCAN KUDU [tpch_kudu.lineitem]
+   runtime filters: RF000 -> l_suppkey, RF001 -> l_suppkey
+   row-size=28B cardinality=6.00M
+====
+# With cardinality reduction fully enabled, 00:SCAN estimate cardinality is 247.17K.
+select l_partkey, l_suppkey, sum(o_orderkey) o_qty, sum(l_linenumber) l_qty
+from lineitem
+  left join orders on l_orderkey = o_orderkey
+  inner join supplier on l_suppkey = s_suppkey
+where s_nationkey = 11
+group by l_partkey, l_suppkey
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=1.0
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(o_orderkey), sum(l_linenumber)
+|  group by: l_partkey, l_suppkey
+|  row-size=32B cardinality=240.05K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|  runtime filters: RF000 <- s_suppkey, RF001 <- s_suppkey
+|  row-size=44B cardinality=240.05K
+|
+|--02:SCAN KUDU [tpch_kudu.supplier]
+|     kudu predicates: s_nationkey = 11
+|     row-size=8B cardinality=400
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  row-size=36B cardinality=247.17K(filtered from 6.00M)
+|
+|--01:SCAN KUDU [tpch_kudu.orders]
+|     row-size=8B cardinality=1.50M
+|
+00:SCAN KUDU [tpch_kudu.lineitem]
+   runtime filters: RF000 -> l_suppkey, RF001 -> l_suppkey
+   row-size=28B cardinality=247.17K(filtered from 6.00M)
+====
+# With cardinality reduction applied half, 00:SCAN estimate cardinality is 3.12M.
+select l_partkey, l_suppkey, sum(o_orderkey) o_qty, sum(l_linenumber) l_qty
+from lineitem
+  left join orders on l_orderkey = o_orderkey
+  inner join supplier on l_suppkey = s_suppkey
+where s_nationkey = 11
+group by l_partkey, l_suppkey
+---- QUERYOPTIONS
+runtime_filter_cardinality_reduction_scale=0.5
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(o_orderkey), sum(l_linenumber)
+|  group by: l_partkey, l_suppkey
+|  row-size=32B cardinality=240.05K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|  runtime filters: RF000 <- s_suppkey, RF001 <- s_suppkey
+|  row-size=44B cardinality=240.05K
+|
+|--02:SCAN KUDU [tpch_kudu.supplier]
+|     kudu predicates: s_nationkey = 11
+|     row-size=8B cardinality=400
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  row-size=36B cardinality=3.12M(filtered from 6.00M)
+|
+|--01:SCAN KUDU [tpch_kudu.orders]
+|     row-size=8B cardinality=1.50M
+|
+00:SCAN KUDU [tpch_kudu.lineitem]
+   runtime filters: RF000 -> l_suppkey, RF001 -> l_suppkey
+   row-size=28B cardinality=3.12M(filtered from 6.00M)
+====

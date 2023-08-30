@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)
 |     parquet dictionary predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)
 |     mem-estimate=96.00MB mem-reservation=16.00MB thread-reservation=1
-|     tuple-ids=1 row-size=16B cardinality=1.17M
+|     tuple-ids=1 row-size=16B cardinality=15.68K(filtered from 1.17M)
 |     in pipelines: 01(GETNEXT)
 |
 03:SCAN HDFS [tpcds_parquet.catalog_sales]
@@ -114,7 +114,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=650.14K
    mem-estimate=48.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=3 row-size=8B cardinality=1.44M
+   tuple-ids=3 row-size=8B cardinality=125.59K(filtered from 1.44M)
    in pipelines: 03(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=52.31MB Threads=11
@@ -248,7 +248,7 @@ Per-Host Resources: mem-estimate=62.68MB mem-reservation=13.94MB thread-reservat
 |     parquet statistics predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)
 |     parquet dictionary predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)
 |     mem-estimate=96.00MB mem-reservation=16.00MB thread-reservation=1
-|     tuple-ids=1 row-size=16B cardinality=1.17M
+|     tuple-ids=1 row-size=16B cardinality=15.68K(filtered from 1.17M)
 |     in pipelines: 01(GETNEXT)
 |
 03:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
@@ -259,7 +259,7 @@ Per-Host Resources: mem-estimate=62.68MB mem-reservation=13.94MB thread-reservat
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=650.14K
    mem-estimate=48.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=3 row-size=8B cardinality=1.44M
+   tuple-ids=3 row-size=8B cardinality=125.59K(filtered from 1.44M)
    in pipelines: 03(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=58.19MB Threads=10
@@ -419,7 +419,7 @@ Per-Instance Resources: mem-estimate=59.74MB mem-reservation=11.00MB thread-rese
 |     parquet statistics predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)
 |     parquet dictionary predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)
 |     mem-estimate=32.00MB mem-reservation=16.00MB thread-reservation=0
-|     tuple-ids=1 row-size=16B cardinality=1.17M
+|     tuple-ids=1 row-size=16B cardinality=15.68K(filtered from 1.17M)
 |     in pipelines: 01(GETNEXT)
 |
 03:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
@@ -430,6 +430,6 @@ Per-Instance Resources: mem-estimate=59.74MB mem-reservation=11.00MB thread-rese
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=650.14K
    mem-estimate=48.00MB mem-reservation=2.00MB thread-reservation=0
-   tuple-ids=3 row-size=8B cardinality=1.44M
+   tuple-ids=3 row-size=8B cardinality=125.59K(filtered from 1.44M)
    in pipelines: 03(GETNEXT)
 ====

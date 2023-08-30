@@ -140,9 +140,9 @@ PLAN-ROOT SINK
 |  |       table: rows=2.88M size=200.96MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=109(filtered from 1824)
 |  |     mem-estimate=64.00MB mem-reservation=2.00MB thread-reservation=1
-|  |     tuple-ids=1 row-size=24B cardinality=2.88M
+|  |     tuple-ids=1 row-size=24B cardinality=29.00K(filtered from 2.88M)
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_parquet.customer]
@@ -153,7 +153,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100.00K
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=3 row-size=8B cardinality=100.00K
+|     tuple-ids=3 row-size=8B cardinality=1.72K(filtered from 100.00K)
 |     in pipelines: 03(GETNEXT)
 |
 04:SCAN HDFS [tpcds_parquet.customer_address]
@@ -164,7 +164,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=50.00K
    mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-   tuple-ids=4 row-size=21B cardinality=50.00K
+   tuple-ids=4 row-size=21B cardinality=1.76K(filtered from 50.00K)
    in pipelines: 04(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=31.08MB Threads=16
@@ -365,9 +365,9 @@ Per-Host Resources: mem-estimate=73.28MB mem-reservation=9.88MB thread-reservati
      table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=109(filtered from 1824)
    mem-estimate=64.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=1 row-size=24B cardinality=2.88M
+   tuple-ids=1 row-size=24B cardinality=29.00K(filtered from 2.88M)
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=49.77MB Threads=21
@@ -610,8 +610,8 @@ Per-Instance Resources: mem-estimate=18.80MB mem-reservation=2.00MB thread-reser
      table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=109(filtered from 1824)
    mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-   tuple-ids=1 row-size=24B cardinality=2.88M
+   tuple-ids=1 row-size=24B cardinality=29.00K(filtered from 2.88M)
    in pipelines: 01(GETNEXT)
 ====

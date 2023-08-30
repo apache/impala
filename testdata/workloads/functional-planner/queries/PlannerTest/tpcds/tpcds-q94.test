@@ -138,7 +138,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |  |     mem-estimate=224.00MB mem-reservation=16.00MB thread-reservation=1
-|  |     tuple-ids=0 row-size=32B cardinality=719.38K
+|  |     tuple-ids=0 row-size=32B cardinality=19.41K(filtered from 719.38K)
 |  |     in pipelines: 00(GETNEXT)
 |  |
 |  04:SCAN HDFS [tpcds_parquet.web_sales ws2]
@@ -339,7 +339,7 @@ Per-Host Resources: mem-estimate=19.96MB mem-reservation=7.75MB thread-reservati
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=224.00MB mem-reservation=16.00MB thread-reservation=1
-|     tuple-ids=0 row-size=32B cardinality=719.38K
+|     tuple-ids=0 row-size=32B cardinality=19.41K(filtered from 719.38K)
 |     in pipelines: 00(GETNEXT)
 |
 18:EXCHANGE [HASH(ws2.ws_order_number)]
@@ -578,7 +578,7 @@ Per-Instance Resources: mem-estimate=14.15MB mem-reservation=1.94MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=32.00MB mem-reservation=16.00MB thread-reservation=0
-|     tuple-ids=0 row-size=32B cardinality=719.38K
+|     tuple-ids=0 row-size=32B cardinality=19.41K(filtered from 719.38K)
 |     in pipelines: 00(GETNEXT)
 |
 18:EXCHANGE [HASH(ws2.ws_order_number)]

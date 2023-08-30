@@ -149,7 +149,7 @@ PLAN-ROOT SINK
 |  |  |  fk/pk conjuncts: sr_customer_sk = ss_customer_sk, sr_item_sk = ss_item_sk, sr_ticket_number = ss_ticket_number
 |  |  |  runtime filters: RF012[bloom] <- ss_customer_sk, RF013[bloom] <- ss_item_sk, RF014[bloom] <- ss_ticket_number, RF015[min_max] <- ss_customer_sk, RF016[min_max] <- ss_item_sk, RF017[min_max] <- ss_ticket_number
 |  |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
-|  |  |  tuple-ids=1,0,3 row-size=82B cardinality=105.69K
+|  |  |  tuple-ids=1,0,3 row-size=82B cardinality=39.38K(filtered from 105.69K)
 |  |  |  in pipelines: 01(GETNEXT), 00(OPEN)
 |  |  |
 |  |  |--08:HASH JOIN [INNER JOIN]
@@ -180,9 +180,9 @@ PLAN-ROOT SINK
 |  |  |       table: rows=2.88M size=200.96MB
 |  |  |       partitions: 1824/1824 rows=2.88M
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=91(filtered from 1824)
 |  |  |     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
-|  |  |     tuple-ids=0 row-size=32B cardinality=2.88M
+|  |  |     tuple-ids=0 row-size=32B cardinality=143.71K(filtered from 2.88M)
 |  |  |     in pipelines: 00(GETNEXT)
 |  |  |
 |  |  01:SCAN HDFS [tpcds_parquet.store_returns]
@@ -193,7 +193,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=287.51K
 |  |     mem-estimate=120.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=1 row-size=28B cardinality=287.51K
+|  |     tuple-ids=1 row-size=28B cardinality=39.38K(filtered from 287.51K)
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  02:SCAN HDFS [tpcds_parquet.catalog_sales]
@@ -204,7 +204,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |     mem-estimate=192.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=2 row-size=20B cardinality=1.44M
+|     tuple-ids=2 row-size=20B cardinality=215.64K(filtered from 1.44M)
 |     in pipelines: 02(GETNEXT)
 |
 07:SCAN HDFS [tpcds_parquet.item]
@@ -215,7 +215,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=18.00K
    mem-estimate=48.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=7 row-size=148B cardinality=18.00K
+   tuple-ids=7 row-size=148B cardinality=2.03K(filtered from 18.00K)
    in pipelines: 07(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=70.52MB Threads=20
@@ -418,7 +418,7 @@ Per-Host Resources: mem-estimate=206.00MB mem-reservation=19.75MB thread-reserva
 |  |
 |  18:EXCHANGE [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)]
 |  |  mem-estimate=2.65MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3 row-size=54B cardinality=143.71K
+|  |  tuple-ids=0,3 row-size=54B cardinality=143.70K(filtered from 143.71K)
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -428,7 +428,7 @@ Per-Host Resources: mem-estimate=206.00MB mem-reservation=19.75MB thread-reserva
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  runtime filters: RF018[bloom] <- d1.d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=54B cardinality=143.71K
+|  |  tuple-ids=0,3 row-size=54B cardinality=143.70K(filtered from 143.71K)
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--17:EXCHANGE [BROADCAST]
@@ -458,9 +458,9 @@ Per-Host Resources: mem-estimate=206.00MB mem-reservation=19.75MB thread-reserva
 |       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=91(filtered from 1824)
 |     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=0 row-size=32B cardinality=2.88M
+|     tuple-ids=0 row-size=32B cardinality=143.70K(filtered from 2.88M)
 |     in pipelines: 00(GETNEXT)
 |
 02:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
@@ -471,7 +471,7 @@ Per-Host Resources: mem-estimate=206.00MB mem-reservation=19.75MB thread-reserva
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=650.14K
    mem-estimate=192.00MB mem-reservation=8.00MB thread-reservation=1
-   tuple-ids=2 row-size=20B cardinality=1.44M
+   tuple-ids=2 row-size=20B cardinality=215.64K(filtered from 1.44M)
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=93.14MB Threads=22
@@ -724,7 +724,7 @@ Per-Instance Resources: mem-estimate=50.25MB mem-reservation=8.00MB thread-reser
 |  |
 |  18:EXCHANGE [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)]
 |  |  mem-estimate=2.83MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3 row-size=54B cardinality=143.71K
+|  |  tuple-ids=0,3 row-size=54B cardinality=143.70K(filtered from 143.71K)
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -735,7 +735,7 @@ Per-Instance Resources: mem-estimate=50.25MB mem-reservation=8.00MB thread-reser
 |  |  hash predicates: ss_sold_date_sk = d1.d_date_sk
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=54B cardinality=143.71K
+|  |  tuple-ids=0,3 row-size=54B cardinality=143.70K(filtered from 143.71K)
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--F18:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -773,9 +773,9 @@ Per-Instance Resources: mem-estimate=50.25MB mem-reservation=8.00MB thread-reser
 |       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=91(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-|     tuple-ids=0 row-size=32B cardinality=2.88M
+|     tuple-ids=0 row-size=32B cardinality=143.70K(filtered from 2.88M)
 |     in pipelines: 00(GETNEXT)
 |
 02:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
@@ -786,6 +786,6 @@ Per-Instance Resources: mem-estimate=50.25MB mem-reservation=8.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=650.14K
    mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=2 row-size=20B cardinality=1.44M
+   tuple-ids=2 row-size=20B cardinality=215.64K(filtered from 1.44M)
    in pipelines: 02(GETNEXT)
 ====

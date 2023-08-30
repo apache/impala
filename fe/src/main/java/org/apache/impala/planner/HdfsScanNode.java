@@ -238,6 +238,9 @@ public class HdfsScanNode extends ScanNode {
   // Whether all formats scanned are Parquet. Set in computeScanRangeLocations().
   private boolean allParquet_ = false;
 
+  // Whether all formats scanned are columnar format. Set in computeScanRangeLocations().
+  private boolean allColumnarFormat_ = false;
+
   // Number of bytes in the largest scan range (i.e. hdfs split). Set in
   // computeScanRangeLocations().
   private long largestScanRangeBytes_ = 0;
@@ -1135,6 +1138,7 @@ public class HdfsScanNode extends ScanNode {
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
     boolean allParquet = (partitions_.size() > 0) ? true : false;
+    boolean allColumnarFormat = (partitions_.size() > 0) ? true : false;
     long simpleLimitNumRows = 0; // only used for the simple limit case
     boolean isSimpleLimit = sampleParams_ == null &&
         (analyzer.getQueryCtx().client_request.getQuery_options()
@@ -1200,6 +1204,8 @@ public class HdfsScanNode extends ScanNode {
       if (!partition.getFileFormat().isParquetBased()) {
         allParquet = false;
       }
+      allColumnarFormat =
+          allColumnarFormat && VALID_COLUMNAR_FORMATS.contains(partition.getFileFormat());
       Preconditions.checkState(partition.getId() >= 0);
 
       if (!fsHasBlocks) {
@@ -1265,6 +1271,7 @@ public class HdfsScanNode extends ScanNode {
       }
     }
     allParquet_ = allParquet;
+    allColumnarFormat_ = allColumnarFormat;
     if (totalFilesPerFs_.isEmpty() || sumValues(totalFilesPerFs_) == 0) {
       maxScanRangeNumRows_ = 0;
     } else {
@@ -1987,11 +1994,15 @@ public class HdfsScanNode extends ScanNode {
         extrapRows = "disabled";
       }
       output.append(detailPrefix)
-            .append("extrapolated-rows=")
-            .append(extrapRows)
-            .append(" max-scan-range-rows=")
-            .append(PrintUtils.printEstCardinality(maxScanRangeNumRows_))
-            .append("\n");
+          .append("extrapolated-rows=")
+          .append(extrapRows)
+          .append(" max-scan-range-rows=")
+          .append(PrintUtils.printEstCardinality(maxScanRangeNumRows_));
+      if (filteredCardinality_ > -1 && scanRangeSelectivity_ < 1.0) {
+        output.append(String.format(" est-scan-range=%d(filtered from %d)",
+            estScanRangeAfterRuntimeFilter(), getEffectiveNumScanRanges()));
+      }
+      output.append("\n");
       if (numScanRangesNoDiskIds_ > 0) {
         output.append(detailPrefix)
             .append(String.format("missing disk ids: "
@@ -2530,4 +2541,6 @@ public class HdfsScanNode extends ScanNode {
       });
     }
   }
+
+  protected boolean isAllColumnarScanner() { return allColumnarFormat_; }
 }

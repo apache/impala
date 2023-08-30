@@ -593,7 +593,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -637,7 +637,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ====
 # Same as above but with cross join
 select straight_join a.id, b.id
@@ -680,7 +680,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -717,7 +717,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ====
 # no propagation into select block with limit;
 # propagation out of that block is okay;
@@ -761,7 +761,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -813,7 +813,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ====
 # Similar to the above, converts the cross join to a hash join
 select straight_join a.id, b.id
@@ -860,7 +860,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -903,7 +903,7 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.`month`, RF001 -> a.`year`, RF002 -> a.id, RF003 -> a.tinyint_col
-   row-size=13B cardinality=59
+   row-size=13B cardinality=49(filtered from 56)
 ====
 # propagation of z.month=1 to alltypesagg is prevented
 select straight_join x.int_col, z.int_col

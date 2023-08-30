@@ -178,7 +178,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |  |     mem-estimate=384.00MB mem-reservation=16.00MB thread-reservation=1
-|  |     tuple-ids=0 row-size=40B cardinality=1.44M
+|  |     tuple-ids=0 row-size=40B cardinality=294.63K(filtered from 1.44M)
 |  |     in pipelines: 00(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_parquet.customer_demographics cd1]
@@ -192,7 +192,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: cd1.cd_gender = 'M', cd1.cd_education_status = 'College'
 |     parquet dictionary predicates: cd1.cd_gender = 'M', cd1.cd_education_status = 'College'
 |     mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=43B cardinality=194.03K
+|     tuple-ids=1 row-size=43B cardinality=28.95K(filtered from 194.03K)
 |     in pipelines: 01(GETNEXT)
 |
 02:SCAN HDFS [tpcds_parquet.customer_demographics cd2]
@@ -203,7 +203,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=1.92M
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=2 row-size=4B cardinality=1.92M
+   tuple-ids=2 row-size=4B cardinality=28.95K(filtered from 1.92M)
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=166.00MB Threads=18
@@ -468,7 +468,7 @@ Per-Host Resources: mem-estimate=399.42MB mem-reservation=29.62MB thread-reserva
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=650.14K
    mem-estimate=384.00MB mem-reservation=16.00MB thread-reservation=1
-   tuple-ids=0 row-size=40B cardinality=1.44M
+   tuple-ids=0 row-size=40B cardinality=294.63K(filtered from 1.44M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=178.56MB Threads=17
@@ -783,6 +783,6 @@ Per-Instance Resources: mem-estimate=49.79MB mem-reservation=16.00MB thread-rese
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=650.14K
    mem-estimate=48.00MB mem-reservation=16.00MB thread-reservation=0
-   tuple-ids=0 row-size=40B cardinality=1.44M
+   tuple-ids=0 row-size=40B cardinality=294.63K(filtered from 1.44M)
    in pipelines: 00(GETNEXT)
 ====

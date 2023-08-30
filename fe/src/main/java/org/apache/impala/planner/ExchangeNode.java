@@ -17,6 +17,8 @@
 
 package org.apache.impala.planner;
 
+import java.util.Stack;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SortInfo;
@@ -337,5 +339,12 @@ public class ExchangeNode extends PlanNode {
       msg.exchange_node.setSort_info(sortInfo);
       msg.exchange_node.setOffset(offset_);
     }
+  }
+
+  @Override
+  protected void reduceCardinalityByRuntimeFilter(
+      Stack<PlanNode> nodeStack, double reductionScale) {
+    if (!nodeStack.isEmpty()) nodeStack.add(this);
+    getChild(0).reduceCardinalityByRuntimeFilter(nodeStack, reductionScale);
   }
 }

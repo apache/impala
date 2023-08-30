@@ -143,9 +143,9 @@ PLAN-ROOT SINK
 |  |  |       table: rows=2.88M size=200.96MB
 |  |  |       partitions: 1824/1824 rows=2.88M
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
-|  |  |     tuple-ids=24 row-size=12B cardinality=2.88M
+|  |  |     tuple-ids=24 row-size=12B cardinality=2.35M(filtered from 2.88M)
 |  |  |     in pipelines: 27(GETNEXT)
 |  |  |
 |  |  45:HASH JOIN [INNER JOIN]
@@ -177,7 +177,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |  |     mem-estimate=160.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=22 row-size=24B cardinality=719.38K
+|  |     tuple-ids=22 row-size=24B cardinality=42.85K(filtered from 719.38K)
 |  |     in pipelines: 25(GETNEXT)
 |  |
 |  44:NESTED LOOP JOIN [INNER JOIN]
@@ -245,9 +245,9 @@ PLAN-ROOT SINK
 |  |       table: rows=2.88M size=200.96MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=34 row-size=16B cardinality=2.88M
+|  |     tuple-ids=34 row-size=16B cardinality=2.35M(filtered from 2.88M)
 |  |     in pipelines: 37(GETNEXT)
 |  |
 |  36:AGGREGATE [FINALIZE]
@@ -362,9 +362,9 @@ PLAN-ROOT SINK
 |  |       table: rows=2.88M size=200.96MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
-|  |     tuple-ids=2 row-size=12B cardinality=2.88M
+|  |     tuple-ids=2 row-size=12B cardinality=2.35M(filtered from 2.88M)
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  21:HASH JOIN [INNER JOIN]
@@ -396,7 +396,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |     mem-estimate=240.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=0 row-size=24B cardinality=1.44M
+|     tuple-ids=0 row-size=24B cardinality=85.31K(filtered from 1.44M)
 |     in pipelines: 01(GETNEXT)
 |
 20:NESTED LOOP JOIN [INNER JOIN]
@@ -464,9 +464,9 @@ PLAN-ROOT SINK
 |       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=12 row-size=16B cardinality=2.88M
+|     tuple-ids=12 row-size=16B cardinality=2.35M(filtered from 2.88M)
 |     in pipelines: 13(GETNEXT)
 |
 12:AGGREGATE [FINALIZE]
@@ -669,9 +669,9 @@ Per-Host Resources: mem-estimate=16.72MB mem-reservation=7.75MB thread-reservati
 |  |  |       table: rows=2.88M size=200.96MB
 |  |  |       partitions: 1824/1824 rows=2.88M
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
-|  |  |     tuple-ids=24 row-size=12B cardinality=2.88M
+|  |  |     tuple-ids=24 row-size=12B cardinality=2.35M(filtered from 2.88M)
 |  |  |     in pipelines: 27(GETNEXT)
 |  |  |
 |  |  45:HASH JOIN [INNER JOIN, BROADCAST]
@@ -710,7 +710,7 @@ Per-Host Resources: mem-estimate=16.72MB mem-reservation=7.75MB thread-reservati
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |  |     mem-estimate=160.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=22 row-size=24B cardinality=719.38K
+|  |     tuple-ids=22 row-size=24B cardinality=42.85K(filtered from 719.38K)
 |  |     in pipelines: 25(GETNEXT)
 |  |
 |  44:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
@@ -826,9 +826,9 @@ Per-Host Resources: mem-estimate=16.72MB mem-reservation=7.75MB thread-reservati
 |  |       table: rows=2.88M size=200.96MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=34 row-size=16B cardinality=2.88M
+|  |     tuple-ids=34 row-size=16B cardinality=2.35M(filtered from 2.88M)
 |  |     in pipelines: 37(GETNEXT)
 |  |
 |  71:AGGREGATE [FINALIZE]
@@ -1019,9 +1019,9 @@ Per-Host Resources: mem-estimate=16.72MB mem-reservation=7.75MB thread-reservati
 |  |       table: rows=2.88M size=200.96MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
-|  |     tuple-ids=2 row-size=12B cardinality=2.88M
+|  |     tuple-ids=2 row-size=12B cardinality=2.35M(filtered from 2.88M)
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  21:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1060,7 +1060,7 @@ Per-Host Resources: mem-estimate=16.72MB mem-reservation=7.75MB thread-reservati
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |     mem-estimate=240.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=0 row-size=24B cardinality=1.44M
+|     tuple-ids=0 row-size=24B cardinality=85.31K(filtered from 1.44M)
 |     in pipelines: 01(GETNEXT)
 |
 20:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
@@ -1176,9 +1176,9 @@ Per-Host Resources: mem-estimate=16.72MB mem-reservation=7.75MB thread-reservati
 |       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=12 row-size=16B cardinality=2.88M
+|     tuple-ids=12 row-size=16B cardinality=2.35M(filtered from 2.88M)
 |     in pipelines: 13(GETNEXT)
 |
 52:AGGREGATE [FINALIZE]
@@ -1436,9 +1436,9 @@ Per-Instance Resources: mem-estimate=10.79MB mem-reservation=1.94MB thread-reser
 |  |  |       table: rows=2.88M size=200.96MB
 |  |  |       partitions: 1824/1824 rows=2.88M
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |  |     tuple-ids=24 row-size=12B cardinality=2.88M
+|  |  |     tuple-ids=24 row-size=12B cardinality=2.35M(filtered from 2.88M)
 |  |  |     in pipelines: 27(GETNEXT)
 |  |  |
 |  |  45:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1485,7 +1485,7 @@ Per-Instance Resources: mem-estimate=10.79MB mem-reservation=1.94MB thread-reser
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |  |     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
-|  |     tuple-ids=22 row-size=24B cardinality=719.38K
+|  |     tuple-ids=22 row-size=24B cardinality=42.85K(filtered from 719.38K)
 |  |     in pipelines: 25(GETNEXT)
 |  |
 |  44:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
@@ -1625,9 +1625,9 @@ Per-Instance Resources: mem-estimate=10.79MB mem-reservation=1.94MB thread-reser
 |  |       table: rows=2.88M size=200.96MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|  |     tuple-ids=34 row-size=16B cardinality=2.88M
+|  |     tuple-ids=34 row-size=16B cardinality=2.35M(filtered from 2.88M)
 |  |     in pipelines: 37(GETNEXT)
 |  |
 |  71:AGGREGATE [FINALIZE]
@@ -1862,9 +1862,9 @@ Per-Instance Resources: mem-estimate=10.79MB mem-reservation=1.94MB thread-reser
 |  |       table: rows=2.88M size=200.96MB
 |  |       partitions: 1824/1824 rows=2.88M
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |     tuple-ids=2 row-size=12B cardinality=2.88M
+|  |     tuple-ids=2 row-size=12B cardinality=2.35M(filtered from 2.88M)
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  21:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1911,7 +1911,7 @@ Per-Instance Resources: mem-estimate=10.79MB mem-reservation=1.94MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=650.14K
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=0 row-size=24B cardinality=1.44M
+|     tuple-ids=0 row-size=24B cardinality=85.31K(filtered from 1.44M)
 |     in pipelines: 01(GETNEXT)
 |
 20:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
@@ -2051,9 +2051,9 @@ Per-Instance Resources: mem-estimate=10.79MB mem-reservation=1.94MB thread-reser
 |       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=1491(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=12 row-size=16B cardinality=2.88M
+|     tuple-ids=12 row-size=16B cardinality=2.35M(filtered from 2.88M)
 |     in pipelines: 13(GETNEXT)
 |
 52:AGGREGATE [FINALIZE]

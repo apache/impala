@@ -265,7 +265,7 @@ where ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
   and d1.d_fy_week_seq = 1000
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=372.19MB mem-reservation=60.19MB thread-reservation=6 runtime-filters-memory=5.00MB
+|  Per-Host Resources: mem-estimate=370.31MB mem-reservation=58.31MB thread-reservation=6 runtime-filters-memory=5.00MB
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -340,9 +340,9 @@ PLAN-ROOT SINK
 |       table: rows=2.88M size=346.60MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=7(filtered from 1824)
 |     mem-estimate=128.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=0 row-size=24B cardinality=2.88M
+|     tuple-ids=0 row-size=24B cardinality=11.05K(filtered from 2.88M)
 |     in pipelines: 00(GETNEXT)
 |
 01:SCAN HDFS [tpcds.store_returns]

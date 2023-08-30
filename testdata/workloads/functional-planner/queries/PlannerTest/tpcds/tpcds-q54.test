@@ -180,7 +180,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: ca_address_sk = c_current_addr_sk
 |  |  runtime filters: RF006[bloom] <- c_current_addr_sk, RF007[min_max] <- c_current_addr_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=10,9,7 row-size=64B cardinality=3.43K
+|  |  tuple-ids=10,9,7 row-size=64B cardinality=329(filtered from 3.43K)
 |  |  in pipelines: 11(GETNEXT), 10(OPEN)
 |  |
 |  |--20:HASH JOIN [INNER JOIN]
@@ -283,7 +283,7 @@ PLAN-ROOT SINK
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=100.00K
 |  |  |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|  |  |     tuple-ids=6 row-size=8B cardinality=100.00K
+|  |  |     tuple-ids=6 row-size=8B cardinality=108(filtered from 100.00K)
 |  |  |     in pipelines: 05(GETNEXT)
 |  |  |
 |  |  10:SCAN HDFS [tpcds_parquet.store_sales]
@@ -295,7 +295,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K
 |  |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=9 row-size=12B cardinality=2.88M
+|  |     tuple-ids=9 row-size=12B cardinality=3.43K(filtered from 2.88M)
 |  |     in pipelines: 10(GETNEXT)
 |  |
 |  11:SCAN HDFS [tpcds_parquet.customer_address]
@@ -306,7 +306,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=50.00K
 |     mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=1
-|     tuple-ids=10 row-size=44B cardinality=50.00K
+|     tuple-ids=10 row-size=44B cardinality=329(filtered from 50.00K)
 |     in pipelines: 11(GETNEXT)
 |
 13:SCAN HDFS [tpcds_parquet.date_dim]
@@ -317,7 +317,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=73.05K
    mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-   tuple-ids=12 row-size=8B cardinality=73.05K
+   tuple-ids=12 row-size=8B cardinality=329(filtered from 73.05K)
    in pipelines: 13(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=60.39MB Threads=31

@@ -161,13 +161,13 @@ PLAN-ROOT SINK
 |  |  02:SCAN KUDU [tpch_kudu.partsupp]
 |  |     runtime filters: RF016[bloom] -> ps_partkey, RF017[min_max] -> ps_partkey
 |  |     mem-estimate=4.50MB mem-reservation=0B thread-reservation=1
-|  |     tuple-ids=2 row-size=24B cardinality=800.00K
+|  |     tuple-ids=2 row-size=24B cardinality=5.05K(filtered from 800.00K)
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF014[bloom] -> s_suppkey, RF015[min_max] -> s_suppkey, RF012[bloom] -> s_nationkey, RF013[min_max] -> s_nationkey
 |     mem-estimate=10.50MB mem-reservation=0B thread-reservation=1
-|     tuple-ids=1 row-size=203B cardinality=10.00K
+|     tuple-ids=1 row-size=203B cardinality=5.20K(filtered from 10.00K)
 |     in pipelines: 01(GETNEXT)
 |
 12:AGGREGATE [FINALIZE]
@@ -285,7 +285,7 @@ PLAN-ROOT SINK
 02:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate > '1995-03-15'
    runtime filters: RF002 -> l_orderkey, RF003 -> l_orderkey
-   row-size=24B cardinality=600.12K
+   row-size=24B cardinality=575.77K(filtered from 600.12K)
 ====
 # Q4 - Order Priority Checking Query
 select
@@ -424,7 +424,7 @@ PLAN-ROOT SINK
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF010 -> l_orderkey, RF011 -> l_orderkey, RF005 -> l_suppkey, RF007 -> l_suppkey
-   row-size=32B cardinality=6.00M
+   row-size=32B cardinality=575.77K(filtered from 6.00M)
 ====
 # Q6 - Forecasting Revenue Change Query
 select
@@ -661,16 +661,16 @@ PLAN-ROOT SINK
 |  |  |
 |  |  02:SCAN KUDU [tpch_kudu.lineitem]
 |  |     runtime filters: RF012 -> l_partkey, RF013 -> l_partkey, RF008 -> l_suppkey, RF009 -> l_suppkey
-|  |     row-size=40B cardinality=6.00M
+|  |     row-size=40B cardinality=39.66K(filtered from 6.00M)
 |  |
 |  03:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate <= '1996-12-31', o_orderdate >= '1995-01-01'
 |     runtime filters: RF010 -> o_orderkey, RF011 -> o_orderkey
-|     row-size=42B cardinality=150.00K
+|     row-size=42B cardinality=39.66K(filtered from 150.00K)
 |
 04:SCAN KUDU [tpch_kudu.customer]
    runtime filters: RF006 -> c_custkey, RF007 -> c_custkey, RF004 -> c_nationkey, RF005 -> c_nationkey
-   row-size=10B cardinality=150.00K
+   row-size=10B cardinality=3.81K(filtered from 150.00K)
 ====
 # Q9 - Product Type Measure Query
 select
@@ -754,7 +754,7 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  runtime filters: RF010 <- p_partkey, RF011 <- p_partkey
-|  row-size=105B cardinality=598.58K
+|  row-size=105B cardinality=598.58K(filtered from 598.58K)
 |
 |--00:SCAN KUDU [tpch_kudu.part]
 |     predicates: p_name LIKE '%green%'
@@ -763,7 +763,7 @@ PLAN-ROOT SINK
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF010 -> l_partkey, RF011 -> l_partkey, RF008 -> l_orderkey, RF009 -> l_orderkey, RF002 -> l_partkey, RF003 -> l_suppkey, RF004 -> l_partkey, RF005 -> l_suppkey, RF006 -> l_suppkey, RF007 -> l_suppkey
-   row-size=48B cardinality=6.00M
+   row-size=48B cardinality=598.58K(filtered from 6.00M)
 ====
 # Q10 - Returned Item Reporting Query
 # Converted select from multiple tables to joins
@@ -838,7 +838,7 @@ PLAN-ROOT SINK
 |  02:SCAN KUDU [tpch_kudu.lineitem]
 |     kudu predicates: l_returnflag = 'R'
 |     runtime filters: RF004 -> l_orderkey, RF005 -> l_orderkey
-|     row-size=24B cardinality=2.00M
+|     row-size=24B cardinality=575.77K(filtered from 2.00M)
 |
 00:SCAN KUDU [tpch_kudu.customer]
    runtime filters: RF000 -> c_nationkey, RF001 -> c_nationkey, RF002 -> c_custkey, RF003 -> c_custkey
@@ -999,7 +999,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [tpch_kudu.orders]
    runtime filters: RF000 -> o_orderkey, RF001 -> o_orderkey
-   row-size=32B cardinality=1.50M
+   row-size=32B cardinality=320.78K(filtered from 1.50M)
 ====
 # Q13 - Customer Distribution Query
 select
@@ -1203,20 +1203,20 @@ PLAN-ROOT SINK
 |
 07:SORT
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 06:AGGREGATE [FINALIZE]
 |  output: count(ps_suppkey)
 |  group by: p_brand, p_type, p_size
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 05:AGGREGATE
 |  group by: p_brand, p_type, p_size, ps_suppkey
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
-|  row-size=89B cardinality=31.92K
+|  row-size=89B cardinality=31.49K
 |
 |--02:SCAN KUDU [tpch_kudu.supplier]
 |     predicates: s_comment LIKE '%Customer%Complaints%'
@@ -1225,16 +1225,16 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_partkey = p_partkey
 |  runtime filters: RF000 <- p_partkey, RF001 <- p_partkey
-|  row-size=89B cardinality=31.92K
+|  row-size=89B cardinality=31.49K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
 |     predicates: NOT p_type LIKE 'MEDIUM POLISHED%', p_brand != 'Brand#45'
 |     kudu predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
-|     row-size=73B cardinality=8.00K
+|     row-size=73B cardinality=7.89K
 |
 00:SCAN KUDU [tpch_kudu.partsupp]
    runtime filters: RF000 -> ps_partkey, RF001 -> ps_partkey
-   row-size=16B cardinality=800.00K
+   row-size=16B cardinality=31.49K(filtered from 800.00K)
 ====
 # Q17 - Small-Quantity-Order Revenue Query
 select
@@ -1280,7 +1280,7 @@ PLAN-ROOT SINK
 |  |
 |  00:SCAN KUDU [tpch_kudu.lineitem]
 |     runtime filters: RF002 -> l_partkey, RF003 -> l_partkey
-|     row-size=24B cardinality=6.00M
+|     row-size=24B cardinality=29.93K(filtered from 6.00M)
 |
 03:AGGREGATE [FINALIZE]
 |  output: avg(l_quantity)
@@ -1357,7 +1357,7 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |  runtime filters: RF002 <- c_custkey, RF003 <- c_custkey
-|  row-size=108B cardinality=5.76M
+|  row-size=108B cardinality=600.12K(filtered from 5.76M)
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
 |     row-size=42B cardinality=150.00K
@@ -1365,7 +1365,7 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |  runtime filters: RF004 <- o_orderkey, RF005 <- o_orderkey
-|  row-size=66B cardinality=5.76M
+|  row-size=66B cardinality=600.12K(filtered from 5.76M)
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
 |     runtime filters: RF000 -> o_orderkey, RF001 -> o_orderkey, RF002 -> o_custkey, RF003 -> o_custkey
@@ -1373,7 +1373,7 @@ PLAN-ROOT SINK
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF000 -> tpch_kudu.lineitem.l_orderkey, RF001 -> tpch_kudu.lineitem.l_orderkey, RF004 -> l_orderkey, RF005 -> l_orderkey
-   row-size=16B cardinality=6.00M
+   row-size=16B cardinality=600.12K(filtered from 6.00M)
 ====
 # Q19 - Discounted Revenue Query
 select
@@ -1435,7 +1435,7 @@ PLAN-ROOT SINK
    predicates: l_quantity <= 11 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity >= 20
    kudu predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF000 -> l_partkey, RF001 -> l_partkey
-   row-size=32B cardinality=197.63K
+   row-size=32B cardinality=42.86K(filtered from 197.63K)
 ====
 # Q20 - Potential Part Promotion Query
 select
@@ -1499,7 +1499,7 @@ PLAN-ROOT SINK
 |  |
 |  00:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF008 -> s_nationkey, RF009 -> s_nationkey
-|     row-size=85B cardinality=10.00K
+|     row-size=85B cardinality=400(filtered from 10.00K)
 |
 09:AGGREGATE [FINALIZE]
 |  group by: tpch_kudu.partsupp.ps_suppkey
@@ -1522,7 +1522,7 @@ PLAN-ROOT SINK
 |  |
 |  02:SCAN KUDU [tpch_kudu.partsupp]
 |     runtime filters: RF000 -> tpch_kudu.partsupp.ps_suppkey, RF001 -> tpch_kudu.partsupp.ps_suppkey, RF006 -> ps_partkey, RF007 -> ps_partkey
-|     row-size=24B cardinality=800.00K
+|     row-size=24B cardinality=79.79K(filtered from 800.00K)
 |
 05:AGGREGATE [FINALIZE]
 |  output: sum(l_quantity)

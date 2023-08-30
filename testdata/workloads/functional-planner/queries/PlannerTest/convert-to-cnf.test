@@ -27,7 +27,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey > 10 OR l_suppkey > 30
    runtime filters: RF000 -> l_orderkey
-   row-size=24B cardinality=600.12K
+   row-size=24B cardinality=575.77K(filtered from 600.12K)
 ====
 
 # outer join
@@ -87,7 +87,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey <= 30 OR l_suppkey >= 30 AND l_suppkey <= 50, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 50
    runtime filters: RF000 -> l_orderkey
-   row-size=24B cardinality=600.12K
+   row-size=24B cardinality=575.77K(filtered from 600.12K)
 ====
 
 # equality predicates on l_suppkey should eventually be converted to IN
@@ -121,7 +121,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey IN (10, 30, 50)
    runtime filters: RF000 -> l_orderkey
-   row-size=24B cardinality=586
+   row-size=24B cardinality=349(filtered from 586)
 ====
 
 # NOT predicate
@@ -151,7 +151,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpch_parquet.orders]
    HDFS partitions=1/1 files=2 size=54.21MB
    runtime filters: RF000 -> o_orderkey
-   row-size=16B cardinality=1.50M
+   row-size=16B cardinality=600.12K(filtered from 1.50M)
 ====
 
 # set the max_cnf_exprs limit
@@ -185,7 +185,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0
    runtime filters: RF000 -> l_orderkey
-   row-size=24B cardinality=600.12K
+   row-size=24B cardinality=575.77K(filtered from 600.12K)
 ====
 
 # reset the max_cnf_exprs limit to unlimited (-1)
@@ -219,7 +219,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey <= 50 OR l_suppkey >= 30 AND l_suppkey <= 90, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 90
    runtime filters: RF000 -> l_orderkey
-   row-size=24B cardinality=600.12K
+   row-size=24B cardinality=575.77K(filtered from 600.12K)
 ====
 
 # same as above, but set max_cnf_exprs to 0 (also implies unlimited)
@@ -253,7 +253,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey <= 50 OR l_suppkey >= 30 AND l_suppkey <= 90, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 90
    runtime filters: RF000 -> l_orderkey
-   row-size=24B cardinality=600.12K
+   row-size=24B cardinality=575.77K(filtered from 600.12K)
 ====
 
 # disable the rewrite, so no conversion is expected
@@ -285,7 +285,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpch_parquet.orders]
    HDFS partitions=1/1 files=2 size=54.21MB
    runtime filters: RF000 -> o_orderkey
-   row-size=16B cardinality=1.50M
+   row-size=16B cardinality=600.12K(filtered from 1.50M)
 ====
 # IMPALA-9620: query1
 # Test predicates in the SELECT and GROUP-BY
@@ -402,7 +402,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpch_parquet.orders]
    HDFS partitions=1/1 files=2 size=54.21MB
    runtime filters: RF000 -> o_orderkey
-   row-size=28B cardinality=1.50M
+   row-size=28B cardinality=600.12K(filtered from 1.50M)
 ====
 
 # IMPALA-11274: Functions like CAST should still be eligible for CNF
@@ -433,7 +433,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=3 size=193.99MB
    predicates: l_partkey > 0, CAST(l_returnflag AS VARCHAR(2)) IN ('Y', 'N')
    runtime filters: RF000 -> l_orderkey
-   row-size=29B cardinality=600.12K
+   row-size=29B cardinality=575.77K(filtered from 600.12K)
 ====
 
 # IMPALA-11274: Simple arithmetic expressions should still be eligible for CNF

@@ -154,7 +154,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=6.66M
 |     mem-estimate=128.00MB mem-reservation=16.00MB thread-reservation=1
-|     tuple-ids=8 row-size=20B cardinality=11.74M
+|     tuple-ids=8 row-size=20B cardinality=4.82M(filtered from 11.74M)
 |     in pipelines: 08(GETNEXT)
 |
 07:AGGREGATE [FINALIZE]
@@ -232,7 +232,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=6.66M
    mem-estimate=128.00MB mem-reservation=16.00MB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=11.74M
+   tuple-ids=0 row-size=20B cardinality=4.82M(filtered from 11.74M)
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=237.16MB Threads=20
@@ -380,7 +380,7 @@ Per-Host Resources: mem-estimate=59.29MB mem-reservation=42.00MB thread-reservat
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=6.66M
 |     mem-estimate=128.00MB mem-reservation=16.00MB thread-reservation=1
-|     tuple-ids=8 row-size=20B cardinality=11.74M
+|     tuple-ids=8 row-size=20B cardinality=4.82M(filtered from 11.74M)
 |     in pipelines: 08(GETNEXT)
 |
 28:EXCHANGE [HASH(i_item_sk,w_warehouse_sk)]
@@ -500,7 +500,7 @@ Per-Host Resources: mem-estimate=266.10MB mem-reservation=60.81MB thread-reserva
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=6.66M
    mem-estimate=128.00MB mem-reservation=16.00MB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=11.74M
+   tuple-ids=0 row-size=20B cardinality=4.82M(filtered from 11.74M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=254.78MB Threads=19
@@ -681,7 +681,7 @@ Per-Instance Resources: mem-estimate=23.29MB mem-reservation=6.00MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=6.66M
 |     mem-estimate=32.00MB mem-reservation=16.00MB thread-reservation=0
-|     tuple-ids=8 row-size=20B cardinality=11.74M
+|     tuple-ids=8 row-size=20B cardinality=4.82M(filtered from 11.74M)
 |     in pipelines: 08(GETNEXT)
 |
 28:EXCHANGE [HASH(i_item_sk,w_warehouse_sk)]
@@ -828,6 +828,6 @@ Per-Instance Resources: mem-estimate=159.29MB mem-reservation=50.00MB thread-res
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=6.66M
    mem-estimate=32.00MB mem-reservation=16.00MB thread-reservation=0
-   tuple-ids=0 row-size=20B cardinality=11.74M
+   tuple-ids=0 row-size=20B cardinality=4.82M(filtered from 11.74M)
    in pipelines: 00(GETNEXT)
 ====

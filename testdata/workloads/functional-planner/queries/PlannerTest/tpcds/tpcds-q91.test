@@ -168,7 +168,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.92M
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=5 row-size=39B cardinality=108.19K
+|     tuple-ids=5 row-size=39B cardinality=100.00K(filtered from 108.19K)
 |     in pipelines: 05(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.catalog_returns]
@@ -179,7 +179,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=144.07K
    mem-estimate=96.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=1 row-size=16B cardinality=144.07K
+   tuple-ids=1 row-size=16B cardinality=3.50K(filtered from 144.07K)
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=58.97MB Threads=16
@@ -383,7 +383,7 @@ Per-Host Resources: mem-estimate=115.32MB mem-reservation=12.81MB thread-reserva
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.92M
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=5 row-size=39B cardinality=108.19K
+|     tuple-ids=5 row-size=39B cardinality=100.00K(filtered from 108.19K)
 |     in pipelines: 05(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.catalog_returns, RANDOM]
@@ -394,7 +394,7 @@ Per-Host Resources: mem-estimate=115.32MB mem-reservation=12.81MB thread-reserva
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=144.07K
    mem-estimate=96.00MB mem-reservation=2.00MB thread-reservation=1
-   tuple-ids=1 row-size=16B cardinality=144.07K
+   tuple-ids=1 row-size=16B cardinality=3.50K(filtered from 144.07K)
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=81.16MB Threads=15
@@ -649,7 +649,7 @@ Per-Instance Resources: mem-estimate=34.51MB mem-reservation=4.00MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.92M
 |     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=5 row-size=39B cardinality=108.19K
+|     tuple-ids=5 row-size=39B cardinality=100.00K(filtered from 108.19K)
 |     in pipelines: 05(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.catalog_returns, RANDOM]
@@ -660,6 +660,6 @@ Per-Instance Resources: mem-estimate=34.51MB mem-reservation=4.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=144.07K
    mem-estimate=24.00MB mem-reservation=2.00MB thread-reservation=0
-   tuple-ids=1 row-size=16B cardinality=144.07K
+   tuple-ids=1 row-size=16B cardinality=3.50K(filtered from 144.07K)
    in pipelines: 01(GETNEXT)
 ====

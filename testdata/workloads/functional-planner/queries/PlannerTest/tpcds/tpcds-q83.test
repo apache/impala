@@ -135,7 +135,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=12 row-size=26B cardinality=73.05K
+|  |     tuple-ids=12 row-size=26B cardinality=21(filtered from 73.05K)
 |  |     in pipelines: 13(GETNEXT)
 |  |
 |  17:HASH JOIN [INNER JOIN]
@@ -236,7 +236,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=21 row-size=26B cardinality=73.05K
+|  |     tuple-ids=21 row-size=26B cardinality=21(filtered from 73.05K)
 |  |     in pipelines: 23(GETNEXT)
 |  |
 |  27:HASH JOIN [INNER JOIN]
@@ -244,7 +244,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: wr_item_sk = i_item_sk
 |  |  runtime filters: RF015[min_max] <- i_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=20,18,19 row-size=78B cardinality=71.76K
+|  |  tuple-ids=20,18,19 row-size=78B cardinality=21(filtered from 71.76K)
 |  |  in pipelines: 22(GETNEXT), 21(OPEN)
 |  |
 |  |--21:SCAN HDFS [tpcds_parquet.item]
@@ -263,7 +263,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: none
 |  |  runtime filters: RF016[bloom] <- wr_returned_date_sk, RF017[min_max] <- wr_returned_date_sk
 |  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=20,18 row-size=42B cardinality=71.76K
+|  |  tuple-ids=20,18 row-size=42B cardinality=21(filtered from 71.76K)
 |  |  in pipelines: 22(GETNEXT), 20(OPEN)
 |  |
 |  |--20:SCAN HDFS [tpcds_parquet.web_returns]
@@ -285,7 +285,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=20 row-size=26B cardinality=73.05K
+|     tuple-ids=20 row-size=26B cardinality=21(filtered from 73.05K)
 |     in pipelines: 22(GETNEXT)
 |
 09:AGGREGATE [FINALIZE]
@@ -330,7 +330,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=3 row-size=26B cardinality=73.05K
+|     tuple-ids=3 row-size=26B cardinality=21(filtered from 73.05K)
 |     in pipelines: 03(GETNEXT)
 |
 07:HASH JOIN [INNER JOIN]
@@ -483,7 +483,7 @@ Per-Host Resources: mem-estimate=34.89MB mem-reservation=10.69MB thread-reservat
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=12 row-size=26B cardinality=73.05K
+|  |     tuple-ids=12 row-size=26B cardinality=21(filtered from 73.05K)
 |  |     in pipelines: 13(GETNEXT)
 |  |
 |  17:HASH JOIN [INNER JOIN, BROADCAST]
@@ -626,7 +626,7 @@ Per-Host Resources: mem-estimate=34.89MB mem-reservation=10.69MB thread-reservat
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=21 row-size=26B cardinality=73.05K
+|  |     tuple-ids=21 row-size=26B cardinality=21(filtered from 73.05K)
 |  |     in pipelines: 23(GETNEXT)
 |  |
 |  27:HASH JOIN [INNER JOIN, BROADCAST]
@@ -634,7 +634,7 @@ Per-Host Resources: mem-estimate=34.89MB mem-reservation=10.69MB thread-reservat
 |  |  fk/pk conjuncts: wr_item_sk = i_item_sk
 |  |  runtime filters: RF015[min_max] <- i_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=20,18,19 row-size=78B cardinality=71.76K
+|  |  tuple-ids=20,18,19 row-size=78B cardinality=21(filtered from 71.76K)
 |  |  in pipelines: 22(GETNEXT), 21(OPEN)
 |  |
 |  |--40:EXCHANGE [BROADCAST]
@@ -660,7 +660,7 @@ Per-Host Resources: mem-estimate=34.89MB mem-reservation=10.69MB thread-reservat
 |  |  fk/pk conjuncts: none
 |  |  runtime filters: RF016[bloom] <- wr_returned_date_sk, RF017[min_max] <- wr_returned_date_sk
 |  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=20,18 row-size=42B cardinality=71.76K
+|  |  tuple-ids=20,18 row-size=42B cardinality=21(filtered from 71.76K)
 |  |  in pipelines: 22(GETNEXT), 20(OPEN)
 |  |
 |  |--39:EXCHANGE [BROADCAST]
@@ -689,7 +689,7 @@ Per-Host Resources: mem-estimate=34.89MB mem-reservation=10.69MB thread-reservat
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=20 row-size=26B cardinality=73.05K
+|     tuple-ids=20 row-size=26B cardinality=21(filtered from 73.05K)
 |     in pipelines: 22(GETNEXT)
 |
 38:AGGREGATE [FINALIZE]
@@ -762,7 +762,7 @@ Per-Host Resources: mem-estimate=96.14MB mem-reservation=15.62MB thread-reservat
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=3 row-size=26B cardinality=73.05K
+|     tuple-ids=3 row-size=26B cardinality=21(filtered from 73.05K)
 |     in pipelines: 03(GETNEXT)
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
@@ -954,7 +954,7 @@ Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reser
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|  |     tuple-ids=12 row-size=26B cardinality=73.05K
+|  |     tuple-ids=12 row-size=26B cardinality=21(filtered from 73.05K)
 |  |     in pipelines: 13(GETNEXT)
 |  |
 |  17:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1140,7 +1140,7 @@ Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reser
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|  |     tuple-ids=21 row-size=26B cardinality=73.05K
+|  |     tuple-ids=21 row-size=26B cardinality=21(filtered from 73.05K)
 |  |     in pipelines: 23(GETNEXT)
 |  |
 |  27:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1148,7 +1148,7 @@ Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reser
 |  |  hash predicates: wr_item_sk = i_item_sk
 |  |  fk/pk conjuncts: wr_item_sk = i_item_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=20,18,19 row-size=78B cardinality=71.76K
+|  |  tuple-ids=20,18,19 row-size=78B cardinality=21(filtered from 71.76K)
 |  |  in pipelines: 22(GETNEXT), 21(OPEN)
 |  |
 |  |--F27:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1182,7 +1182,7 @@ Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reser
 |  |  hash predicates: d_date_sk = wr_returned_date_sk
 |  |  fk/pk conjuncts: none
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=20,18 row-size=42B cardinality=71.76K
+|  |  tuple-ids=20,18 row-size=42B cardinality=21(filtered from 71.76K)
 |  |  in pipelines: 22(GETNEXT), 20(OPEN)
 |  |
 |  |--F28:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1219,7 +1219,7 @@ Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=20 row-size=26B cardinality=73.05K
+|     tuple-ids=20 row-size=26B cardinality=21(filtered from 73.05K)
 |     in pipelines: 22(GETNEXT)
 |
 38:AGGREGATE [FINALIZE]
@@ -1310,7 +1310,7 @@ Per-Instance Resources: mem-estimate=34.16MB mem-reservation=4.00MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=3 row-size=26B cardinality=73.05K
+|     tuple-ids=3 row-size=26B cardinality=21(filtered from 73.05K)
 |     in pipelines: 03(GETNEXT)
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]

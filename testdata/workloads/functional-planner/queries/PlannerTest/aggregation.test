@@ -1489,7 +1489,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.60MB
    runtime filters: RF004 -> l_orderkey, RF005 -> l_returnflag
-   row-size=21B cardinality=6.00M
+   row-size=21B cardinality=5.76M(filtered from 6.00M)
 ====
 # IMPALA-4263: Grouping agg needs a merge step because the grouping exprs reference a
 # tuple that is made nullable in the join fragment.

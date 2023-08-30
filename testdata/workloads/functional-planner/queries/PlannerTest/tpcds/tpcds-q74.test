@@ -137,7 +137,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |  |     mem-estimate=96.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=35 row-size=12B cardinality=719.38K
+|  |     tuple-ids=35 row-size=12B cardinality=148.00K(filtered from 719.38K)
 |  |     in pipelines: 23(GETNEXT)
 |  |
 |  22:SCAN HDFS [tpcds_parquet.customer]
@@ -219,9 +219,9 @@ PLAN-ROOT SINK
 |       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=1 row-size=12B cardinality=2.88M
+|     tuple-ids=1 row-size=12B cardinality=589.03K(filtered from 2.88M)
 |     in pipelines: 02(GETNEXT)
 |
 28:HASH JOIN [INNER JOIN]
@@ -282,7 +282,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |  |     mem-estimate=96.00MB mem-reservation=8.00MB thread-reservation=1
-|  |     tuple-ids=25 row-size=12B cardinality=719.38K
+|  |     tuple-ids=25 row-size=12B cardinality=148.00K(filtered from 719.38K)
 |  |     in pipelines: 16(GETNEXT)
 |  |
 |  15:SCAN HDFS [tpcds_parquet.customer]
@@ -355,9 +355,9 @@ PLAN-ROOT SINK
      table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
    mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=11 row-size=12B cardinality=2.88M
+   tuple-ids=11 row-size=12B cardinality=589.03K(filtered from 2.88M)
    in pipelines: 09(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=239.69MB Threads=34
@@ -493,7 +493,7 @@ Per-Host Resources: mem-estimate=11.62MB mem-reservation=4.75MB thread-reservati
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=96.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=35 row-size=12B cardinality=719.38K
+|     tuple-ids=35 row-size=12B cardinality=148.00K(filtered from 719.38K)
 |     in pipelines: 23(GETNEXT)
 |
 54:EXCHANGE [HASH(customer_id)]
@@ -613,9 +613,9 @@ Per-Host Resources: mem-estimate=56.27MB mem-reservation=42.69MB thread-reservat
 |       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
 |     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=1 row-size=12B cardinality=2.88M
+|     tuple-ids=1 row-size=12B cardinality=589.03K(filtered from 2.88M)
 |     in pipelines: 02(GETNEXT)
 |
 28:HASH JOIN [INNER JOIN, BROADCAST]
@@ -729,7 +729,7 @@ Per-Host Resources: mem-estimate=56.27MB mem-reservation=42.69MB thread-reservat
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=96.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=25 row-size=12B cardinality=719.38K
+|     tuple-ids=25 row-size=12B cardinality=148.00K(filtered from 719.38K)
 |     in pipelines: 16(GETNEXT)
 |
 07:UNION
@@ -826,9 +826,9 @@ Per-Host Resources: mem-estimate=36.27MB mem-reservation=4.94MB thread-reservati
      table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
    mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=11 row-size=12B cardinality=2.88M
+   tuple-ids=11 row-size=12B cardinality=589.03K(filtered from 2.88M)
    in pipelines: 09(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=267.12MB Threads=43
@@ -989,7 +989,7 @@ Per-Instance Resources: mem-estimate=4.21MB mem-reservation=0B thread-reservatio
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=35 row-size=12B cardinality=719.38K
+|     tuple-ids=35 row-size=12B cardinality=148.00K(filtered from 719.38K)
 |     in pipelines: 23(GETNEXT)
 |
 54:EXCHANGE [HASH(customer_id)]
@@ -1134,9 +1134,9 @@ Per-Instance Resources: mem-estimate=31.73MB mem-reservation=17.00MB thread-rese
 |       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=1 row-size=12B cardinality=2.88M
+|     tuple-ids=1 row-size=12B cardinality=589.03K(filtered from 2.88M)
 |     in pipelines: 02(GETNEXT)
 |
 28:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1276,7 +1276,7 @@ Per-Instance Resources: mem-estimate=31.73MB mem-reservation=17.00MB thread-rese
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=644.77K
 |     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=25 row-size=12B cardinality=719.38K
+|     tuple-ids=25 row-size=12B cardinality=148.00K(filtered from 719.38K)
 |     in pipelines: 16(GETNEXT)
 |
 07:UNION
@@ -1391,8 +1391,8 @@ Per-Instance Resources: mem-estimate=16.66MB mem-reservation=1.00MB thread-reser
      table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=11 row-size=12B cardinality=2.88M
+   tuple-ids=11 row-size=12B cardinality=589.03K(filtered from 2.88M)
    in pipelines: 09(GETNEXT)
 ====

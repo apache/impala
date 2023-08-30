@@ -643,6 +643,15 @@ public final class RuntimeFilterGenerator {
       return null;
     }
 
+    public boolean isPartitionFilterAt(PlanNodeId targetPlanNodeId) {
+      for (RuntimeFilterTarget target : targets_) {
+        if (target.node.getId() == targetPlanNodeId) {
+          return target.isBoundByPartitionColumns;
+        }
+      }
+      return false;
+    }
+
     public List<RuntimeFilterTarget> getTargets() { return targets_; }
     public boolean hasTargets() { return !targets_.isEmpty(); }
     public Expr getSrcExpr() { return srcExpr_; }
@@ -653,6 +662,25 @@ public final class RuntimeFilterGenerator {
     public Operator getExprCompOp() { return exprCmpOp_; }
     public long getFilterSize() { return filterSizeBytes_; }
     public boolean isTimestampTruncation() { return isTimestampTruncation_; }
+    public PlanNode getSrc() { return src_; }
+
+    private long getBuildKeyNumRowStats() {
+      long minNumRows = src_.getChild(1).getCardinality();
+      SlotRef buildSlotRef = srcExpr_.unwrapSlotRef(true);
+      if (buildSlotRef == null || !buildSlotRef.hasDesc()
+          || buildSlotRef.getDesc().getParent() == null
+          || buildSlotRef.getDesc().getParent().getTable() == null
+          || buildSlotRef.getDesc().getParent().getTable().getNumRows() <= -1) {
+        return minNumRows;
+      }
+      return buildSlotRef.getDesc().getParent().getTable().getNumRows();
+    }
+
+    /**
+     * Return the estimated false-positive probability of this filter.
+     * Bloom filter type will return value in [0.0 - 1.0] range. Otherwise, return 0.
+     */
+    public double getEstFpp() { return est_fpp_; }
 
     /**
      * Return TIMESTAMP if the isTimestampTruncation_ is set as true so that
@@ -672,14 +700,7 @@ public final class RuntimeFilterGenerator {
      * associated source join node over the cardinality of that join node's left
      * child.
      */
-    public double getSelectivity() {
-      if (src_.getCardinality() == -1
-          || src_.getChild(0).getCardinality() == -1
-          || src_.getChild(0).getCardinality() == 0) {
-        return -1;
-      }
-      return src_.getCardinality() / (double) src_.getChild(0).getCardinality();
-    }
+    public double getSelectivity() { return getJoinNodeSelectivity(src_); }
 
     public void addTarget(RuntimeFilterTarget target) { targets_.add(target); }
 
@@ -750,6 +771,62 @@ public final class RuntimeFilterGenerator {
       Preconditions.checkState(hasTargets());
       src_.addRuntimeFilter(this);
       for (RuntimeFilterTarget target: targets_) target.node.addRuntimeFilter(this);
+    }
+
+    /**
+     * Return true if this filter is deemed highly selective, will arrive on-time, and
+     * applied for all rows without ever being disabled by the scanner node.
+     * Mainly used by {@link ScanNode#reduceCardinalityByRuntimeFilter(java.util.Stack)}
+     * to lower the scan cardinality estimation. These properties are hard to predict
+     * during planning, so this method is set very conservative to avoid severe
+     * underestimation.
+     */
+    public boolean isHighlySelective() {
+      return level_ <= 3 && (type_ != TRuntimeFilterType.BLOOM || est_fpp_ < 0.33);
+    }
+
+    /**
+     * Return a reduced cardinality estimate for given scanNode.
+     * @param scanNode the ScanNode to inspect.
+     * @param scanCardinality the cardinality estimate before reducing through this
+     *                        filter. This can be lower than scanNode.inputCardinality_.
+     * @param partitionSelectivities a map of column name to selectivity on that column.
+     *                               Will be populated if this filter target a partition
+     *                               column.
+     * @return a reduced cardinality estimate or -1 if unknown.
+     */
+    public long reducedCardinalityForScanNode(ScanNode scanNode, long scanCardinality,
+        Map<String, Double> partitionSelectivities) {
+      PlanNodeId scanNodeId = scanNode.getId();
+      long scanColumnNdv = getTargetExpr(scanNodeId).getNumDistinctValues();
+      if (scanColumnNdv < 0) {
+        // For cardinality reduction, it is OK to skip this filter if 'scanColumnNdv'
+        // is unknown rather than trying to estimate it.
+        return -1;
+      }
+      long buildKeyNdv = ndvEstimate_;
+      long buildKeyCard = src_.getChild(1).getCardinality();
+      long buildKeyNumRows = getBuildKeyNumRowStats();
+      // The raw input cardinality without applying scan conjuct and limits.
+      long scanNumRows = scanNode.inputCardinality_;
+
+      long estCardAfterFilter = JoinNode.computeGenericJoinCardinality(scanColumnNdv,
+          buildKeyNdv, scanNumRows, buildKeyNumRows, scanCardinality, buildKeyCard);
+
+      if (isPartitionFilterAt(scanNodeId)) {
+        // Partition filter can apply at file-level filtering.
+        // Keep the most selective partition filter per column to reduce
+        // inputCardinality_. Ignore a column if its name is unknown.
+        double thisPartSel = (double) buildKeyNdv / scanColumnNdv;
+        SlotRef targetSlot = getTargetExpr(scanNodeId).unwrapSlotRef(true);
+        if (targetSlot != null && targetSlot.hasDesc()
+            && targetSlot.getDesc().getColumn() != null) {
+          String colName = targetSlot.getDesc().getColumn().getName();
+          double currentSel = partitionSelectivities.computeIfAbsent(colName, c -> 1.0);
+          if (thisPartSel < currentSel) partitionSelectivities.put(colName, thisPartSel);
+        }
+      }
+      return estCardAfterFilter;
     }
 
     public String debugString() {
@@ -1281,6 +1358,17 @@ public final class RuntimeFilterGenerator {
     // files.
     if (tbl instanceof FeIcebergTable) return true;
     return false;
+  }
+
+  /**
+   * Get selectivity of joinNode.
+   */
+  public static double getJoinNodeSelectivity(JoinNode joinNode) {
+    if (joinNode.getCardinality() == -1 || joinNode.getChild(0).getCardinality() == -1
+        || joinNode.getChild(0).getCardinality() == 0) {
+      return -1;
+    }
+    return joinNode.getCardinality() / (double) joinNode.getChild(0).getCardinality();
   }
 
   /**

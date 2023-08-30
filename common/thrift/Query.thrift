@@ -687,6 +687,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   171: optional bool disable_kudu_local_timestamp_bloom_filter = true;
+
+  // See comment in ImpalaService.thrift
+  172: optional double runtime_filter_cardinality_reduction_scale = 1.0
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
