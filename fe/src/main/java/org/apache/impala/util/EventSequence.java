@@ -42,6 +42,15 @@ public class EventSequence {
   }
 
   /**
+   * Returns a new EventSequence instance that won't be used. Some code paths
+   * (e.g. event-processor) don't have catalog profiles so don't provide a timeline to
+   * update. Use this to avoid passing in a null value.
+   */
+  public static EventSequence getUnusedTimeline() {
+    return NoOpEventSequence.INSTANCE;
+  }
+
+  /**
    * Saves an event at the current time with the given label.
    * It returns the duration in nano seconds between the last and the current event.
    */

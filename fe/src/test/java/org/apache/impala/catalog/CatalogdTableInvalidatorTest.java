@@ -21,6 +21,7 @@ import com.google.common.base.Ticker;
 import org.apache.impala.common.Reference;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.NoOpEventSequence;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -56,7 +57,8 @@ public class CatalogdTableInvalidatorTest {
     Reference<Boolean> dbWasAdded = new Reference<>();
     String dbName = "functional";
     String tblName = "alltypes";
-    catalog_.invalidateTable(new TTableName(dbName, tblName), tblWasRemoved, dbWasAdded);
+    catalog_.invalidateTable(new TTableName(dbName, tblName), tblWasRemoved, dbWasAdded,
+        NoOpEventSequence.INSTANCE);
     MockTicker ticker = new MockTicker();
     CatalogdTableInvalidator.TIME_SOURCE = ticker;
     catalog_.setCatalogdTableInvalidator(

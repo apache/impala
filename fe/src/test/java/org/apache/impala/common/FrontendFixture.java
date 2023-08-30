@@ -60,6 +60,7 @@ import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.EventSequence;
+import org.apache.impala.util.NoOpEventSequence;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -215,7 +216,7 @@ public class FrontendFixture {
       }
       try {
         KuduTable kuduTable = (KuduTable) dummyTable;
-        kuduTable.loadSchemaFromKudu();
+        kuduTable.loadSchemaFromKudu(NoOpEventSequence.INSTANCE);
       } catch (ImpalaRuntimeException e) {
         e.printStackTrace();
         fail("Failed to add test table:\n" + createTableSql);

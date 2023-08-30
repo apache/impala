@@ -102,6 +102,10 @@ class CatalogOpExecutor {
     return catalog_update_result_.get();
   }
 
+  /// Set in Exec(), for operations that are executed using the CatalogServer. Returns
+  /// a pointer to the profile of the execution in catalogd.
+  const TRuntimeProfileNode* catalog_profile() const { return catalog_profile_.get(); }
+
  private:
   /// Helper functions used in ExecComputeStats() for setting the thrift structs in params
   /// for the table/column stats based on the results of the corresponding child query.
@@ -120,6 +124,9 @@ class CatalogOpExecutor {
 
   /// Result of executing a DDL request using the CatalogService
   boost::scoped_ptr<TCatalogUpdateResult> catalog_update_result_;
+
+  /// Profile of the execution on Catalog Server side
+  std::unique_ptr<TRuntimeProfileNode> catalog_profile_;
 
   ExecEnv* env_;
   Frontend* fe_;

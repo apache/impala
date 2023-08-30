@@ -60,6 +60,7 @@ import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.HdfsCachingUtil;
 
 import com.codahale.metrics.Gauge;
@@ -434,8 +435,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * valid existing metadata.
    */
   public abstract void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
-      throws TableLoadingException;
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
+      EventSequence catalogTimeline) throws TableLoadingException;
 
   /**
    * Sets 'tableStats_' by extracting the table statistics from the given HMS table.
@@ -488,7 +489,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * errors are logged and ignored, since the absence of column stats is not critical to
    * the correctness of the system.
    */
-  protected void loadAllColumnStats(IMetaStoreClient client) {
+  protected void loadAllColumnStats(IMetaStoreClient client,
+      EventSequence catalogTimeline) {
     final Timer.Context columnStatsLdContext =
         getMetrics().getTimer(LOAD_DURATION_ALL_COLUMN_STATS).time();
     try {
@@ -509,6 +511,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         return;
       }
       FeCatalogUtils.injectColumnStats(colStats, this, testStats_);
+      catalogTimeline.markEvent("Loaded all column stats");
     } finally {
       columnStatsLdContext.stop();
     }

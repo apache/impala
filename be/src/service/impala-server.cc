@@ -2228,9 +2228,9 @@ void ImpalaServer::WaitForCatalogUpdate(const int64_t catalog_update_version,
     timeline->MarkEvent("Detected change in catalog service ID");
     VLOG_QUERY << "Detected change in catalog service ID";
   } else {
-    timeline->MarkEvent(Substitute("Received catalog version $0",
+    timeline->MarkEvent(Substitute("Applied catalog version $0",
         catalog_update_version));
-    VLOG_QUERY << "Received catalog version: " << catalog_update_version;
+    VLOG_QUERY << "Applied catalog version: " << catalog_update_version;
   }
 }
 
@@ -2251,9 +2251,9 @@ void ImpalaServer::WaitForCatalogUpdateTopicPropagation(
     timeline->MarkEvent("Detected change in catalog service ID");
     VLOG_QUERY << "Detected change in catalog service ID";
   } else {
-    timeline->MarkEvent(Substitute("Received min subscriber topic version $0",
+    timeline->MarkEvent(Substitute("Min catalog topic version of coordinators reached $0",
         min_req_subscriber_topic_version));
-    VLOG_QUERY << "Received min subscriber topic version: "
+    VLOG_QUERY << "Min catalog topic version of coordinators: "
         << min_req_subscriber_topic_version;
   }
 }

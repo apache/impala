@@ -114,9 +114,9 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
               FLAGS_catalog_client_rpc_retry_interval_ms,
               [&attempt]() { return CatalogRpcDebugFn(&attempt); }, exec_response_.get());
       RETURN_IF_ERROR(rpc_status.status);
-      if (FLAGS_use_local_catalog) VerifyMinimalResponse(exec_response_.get()->result);
+      if (FLAGS_use_local_catalog) VerifyMinimalResponse(exec_response_->result);
       catalog_update_result_.reset(
-          new TCatalogUpdateResult(exec_response_.get()->result));
+          new TCatalogUpdateResult(exec_response_->result));
       Status status(exec_response_->result.status);
       if (status.ok()) {
         if (request.ddl_params.ddl_type == TDdlType::DROP_FUNCTION) {
@@ -124,6 +124,9 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
         } else if (request.ddl_params.ddl_type == TDdlType::DROP_DATA_SOURCE) {
           HandleDropDataSource(request.ddl_params.drop_data_source_params);
         }
+      }
+      if (exec_response_->__isset.profile) {
+        catalog_profile_ = make_unique<TRuntimeProfileNode>(exec_response_->profile);
       }
       return status;
     }
@@ -139,6 +142,9 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
               [&attempt]() { return CatalogRpcDebugFn(&attempt); }, &response);
       RETURN_IF_ERROR(rpc_status.status);
       if (FLAGS_use_local_catalog) VerifyMinimalResponse(response.result);
+      if (response.__isset.profile) {
+        catalog_profile_ = make_unique<TRuntimeProfileNode>(response.profile);
+      }
       catalog_update_result_.reset(new TCatalogUpdateResult(response.result));
       return Status(response.result.status);
     }

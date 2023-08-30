@@ -34,6 +34,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.hive.executor.TestHiveJavaFunctionFactory;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.util.NoOpEventSequence;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -92,7 +93,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
           new TestHiveJavaFunctionFactory()));
       cs.setEventFactoryForSyncToLatestEvent(
           new EventFactoryForSyncToLatestEvent(cs.getCatalogOpExecutor()));
-      cs.reset();
+      cs.reset(NoOpEventSequence.INSTANCE);
     } catch (ImpalaException e) {
       throw new IllegalStateException(e.getMessage(), e);
     }
@@ -121,7 +122,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
         new TestHiveJavaFunctionFactory()));
     cs.setEventFactoryForSyncToLatestEvent(
         new EventFactoryForSyncToLatestEvent(cs.getCatalogOpExecutor()));
-    cs.reset();
+    cs.reset(NoOpEventSequence.INSTANCE);
     return cs;
   }
 

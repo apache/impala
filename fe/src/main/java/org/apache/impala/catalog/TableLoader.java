@@ -31,6 +31,7 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.util.EventSequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.thrift.TException;
@@ -39,6 +40,9 @@ import com.google.common.base.Stopwatch;
 
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.util.ThreadNameAnnotator;
+
+import static org.apache.impala.service.CatalogOpExecutor.FETCHED_HMS_EVENT_BATCH;
+import static org.apache.impala.service.CatalogOpExecutor.FETCHED_HMS_TABLE;
 
 /**
  * Class that implements the logic for how a table's metadata should be loaded from
@@ -69,7 +73,8 @@ public class TableLoader {
    * Returns new instance of Table, If there were any errors loading the table metadata
    * an IncompleteTable will be returned that contains details on the error.
    */
-  public Table load(Db db, String tblName, long eventId, String reason) {
+  public Table load(Db db, String tblName, long eventId, String reason,
+      EventSequence catalogTimeline) {
     Stopwatch sw = Stopwatch.createStarted();
     String fullTblName = db.getName() + "." + tblName;
     String annotation = "Loading metadata for: " + fullTblName + " (" + reason + ")";
@@ -80,12 +85,13 @@ public class TableLoader {
     // turn all exceptions into TableLoadingException
     List<NotificationEvent> events = null;
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation);
-         MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+         MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = null;
       // All calls to getTable() need to be serialized due to HIVE-5457.
       Stopwatch hmsLoadSW = Stopwatch.createStarted();
       synchronized (metastoreAccessLock_) {
         msTbl = msClient.getHiveClient().getTable(db.getName(), tblName);
+        catalogTimeline.markEvent(FETCHED_HMS_TABLE);
       }
       if (eventId != -1 && catalog_.isEventProcessingActive()) {
         // If the eventId is not -1 it means this table was likely created by Impala.
@@ -100,6 +106,7 @@ public class TableLoader {
                 .equals(notificationEvent.getEventType())
                 && notificationEvent.getDbName().equalsIgnoreCase(db.getName())
                 && notificationEvent.getTableName().equalsIgnoreCase(tblName));
+        catalogTimeline.markEvent(FETCHED_HMS_EVENT_BATCH);
       }
       if (events != null && !events.isEmpty()) {
         // if the table was recreated after the table was initially created in the
@@ -127,7 +134,7 @@ public class TableLoader {
       if (syncToLatestEventId) {
         // acquire write lock on table since MetastoreEventProcessor.syncToLatestEventId
         // expects current thread to have write lock on the table
-        if (!catalog_.tryWriteLock(table)) {
+        if (!catalog_.tryWriteLock(table, catalogTimeline)) {
           throw new CatalogException("Couldn't acquire write lock on new table object"
               + " created when doing a full table reload of " + table.getFullName());
         }
@@ -140,8 +147,7 @@ public class TableLoader {
               + "while loading table: " + table.getFullName(), e);
         }
       }
-
-      table.load(false, msClient.getHiveClient(), msTbl, reason);
+      table.load(false, msClient.getHiveClient(), msTbl, reason, catalogTimeline);
       table.validate();
       if (syncToLatestEventId) {
         LOG.debug("After full reload, table {} is synced atleast till event id {}. "

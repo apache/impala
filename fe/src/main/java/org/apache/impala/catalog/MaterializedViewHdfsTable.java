@@ -26,6 +26,7 @@ import org.apache.impala.authorization.TableMask;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TTable;
+import org.apache.impala.util.EventSequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,9 +88,9 @@ public class MaterializedViewHdfsTable extends HdfsTable {
 
   @Override
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
-      throws TableLoadingException {
-    super.load(reuseMetadata, client, msTbl, reason);
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
+      EventSequence catalogTimeline) throws TableLoadingException {
+    super.load(reuseMetadata, client, msTbl, reason, catalogTimeline);
     initQueryStmt();
   }
 

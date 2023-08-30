@@ -42,6 +42,7 @@ import org.apache.impala.thrift.TKuduTable;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
@@ -55,6 +56,8 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+
+import static org.apache.impala.service.KuduCatalogOpExecutor.OPENED_KUDU_TABLE;
 
 /**
  * Representation of a Kudu table in the catalog cache.
@@ -296,16 +299,18 @@ public class KuduTable extends Table implements FeKuduTable {
   /**
    * Load schema and partitioning schemes directly from Kudu.
    */
-  public void loadSchemaFromKudu() throws ImpalaRuntimeException {
+  public void loadSchemaFromKudu(EventSequence catalogTimeline)
+      throws ImpalaRuntimeException {
     // This is set to 0 for Kudu tables.
     // TODO: Change this to reflect the number of pk columns and modify all the
     // places (e.g. insert stmt) that currently make use of this parameter.
     numClusteringCols_ = 0;
     org.apache.kudu.client.KuduTable kuduTable = null;
     // Connect to Kudu to retrieve table metadata
-    KuduClient kuduClient = KuduUtil.getKuduClient(getKuduMasterHosts());
+    KuduClient kuduClient = KuduUtil.getKuduClient(getKuduMasterHosts(), catalogTimeline);
     try {
       kuduTable = kuduClient.openTable(kuduTableName_);
+      catalogTimeline.markEvent(OPENED_KUDU_TABLE);
     } catch (KuduException e) {
       throw new ImpalaRuntimeException(
           String.format("Error opening Kudu table '%s', Kudu error: %s", kuduTableName_,
@@ -316,6 +321,7 @@ public class KuduTable extends Table implements FeKuduTable {
     loadSchema(kuduTable);
     Preconditions.checkState(!colsByPos_.isEmpty());
     partitionBy_ = Utils.loadPartitionByParams(kuduTable);
+    catalogTimeline.markEvent("Loaded Kudu table schema");
   }
 
   /**
@@ -327,8 +333,8 @@ public class KuduTable extends Table implements FeKuduTable {
    */
   @Override
   public void load(boolean dummy /* not used */, IMetaStoreClient msClient,
-      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
-      throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
+      EventSequence catalogTimeline) throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     Table.LOADING_TABLES.incrementAndGet();
@@ -346,7 +352,7 @@ public class KuduTable extends Table implements FeKuduTable {
       final Timer.Context ctxStorageLdTime =
           getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
       try {
-        loadSchemaFromKudu();
+        loadSchemaFromKudu(catalogTimeline);
       } catch (ImpalaRuntimeException e) {
         throw new TableLoadingException("Error loading metadata for Kudu table " +
             kuduTableName_, e);
@@ -354,7 +360,7 @@ public class KuduTable extends Table implements FeKuduTable {
         storageMetadataLoadTime_ = ctxStorageLdTime.stop();
       }
       // Load from HMS
-      loadAllColumnStats(msClient);
+      loadAllColumnStats(msClient, catalogTimeline);
       refreshLastUsedTime();
       // Avoid updating HMS if the schema didn't change.
       if (msTable_.equals(msTbl)) return;
@@ -368,6 +374,7 @@ public class KuduTable extends Table implements FeKuduTable {
         msTable_.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS,
             StatsSetupConst.TRUE);
         msClient.alter_table(msTable_.getDbName(), msTable_.getTableName(), msTable_);
+        catalogTimeline.markEvent("Updated table schema in Metastore");
       } catch (TException e) {
         throw new TableLoadingException(e.getMessage());
       }

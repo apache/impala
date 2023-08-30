@@ -924,5 +924,8 @@ class ClientRequestState {
   /// hints about how to reset the original table name. 'params' holds the SQL query
   /// string the user should run.
   void AddTableResetHints(const TConvertTableRequest& params, Status* status) const;
+
+  /// Adds the catalog execution timeline returned from catalog RPCs into the profile.
+  void AddCatalogTimeline();
 };
 }

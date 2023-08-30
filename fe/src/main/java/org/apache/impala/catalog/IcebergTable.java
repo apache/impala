@@ -52,6 +52,7 @@ import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.thrift.TException;
@@ -381,8 +382,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
    */
   @Override
   public void load(boolean reuseMetadata, IMetaStoreClient msClient,
-      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
-      throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
+      EventSequence catalogTimeline) throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     verifyTable(msTbl);
@@ -399,8 +400,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
           getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
       try {
         icebergApiTable_ = IcebergUtil.loadTable(this);
+        catalogTimeline.markEvent("Loaded Iceberg API table");
         catalogSnapshotId_ = FeIcebergTable.super.snapshotId();
         loadSchemaFromIceberg();
+        catalogTimeline.markEvent("Loaded schema from Iceberg");
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
         icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTbl);
@@ -410,15 +413,16 @@ public class IcebergTable extends Table implements FeIcebergTable {
         icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
         GroupedContentFiles icebergFiles = IcebergUtil.getIcebergFiles(this,
             new ArrayList<>(), /*timeTravelSpec=*/null);
+        catalogTimeline.markEvent("Loaded Iceberg files");
         hdfsTable_.setIcebergFiles(icebergFiles);
         hdfsTable_.setCanDataBeOutsideOfTableLocation(
             !Utils.requiresDataFilesInTableLocation(this));
-        hdfsTable_.load(reuseMetadata, msClient, msTable_, reason);
+        hdfsTable_.load(reuseMetadata, msClient, msTable_, reason, catalogTimeline);
         fileStore_ = Utils.loadAllPartition(this, icebergFiles);
         partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();
-        loadAllColumnStats(msClient);
-        setAvroSchema(msClient, msTbl, fileStore_);
+        loadAllColumnStats(msClient, catalogTimeline);
+        setAvroSchema(msClient, msTbl, fileStore_, catalogTimeline);
       } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
             + icebergTableLocation_, e);
@@ -439,6 +443,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         msTable_.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS,
             StatsSetupConst.TRUE);
         msClient.alter_table(msTable_.getDbName(), msTable_.getTableName(), msTable_);
+        catalogTimeline.markEvent("Updated table schema in Metastore");
       } catch (TException e) {
         throw new TableLoadingException(e.getMessage());
       }
@@ -504,9 +509,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
    */
   private void setAvroSchema(IMetaStoreClient msClient,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
-      IcebergContentFileStore fileStore) throws Exception {
+      IcebergContentFileStore fileStore, EventSequence catalogTimeline) throws Exception {
     if (fileStore.hasAvro()) {
-      hdfsTable_.setAvroSchemaInternal(msClient, msTbl);
+      hdfsTable_.setAvroSchemaInternal(msClient, msTbl, catalogTimeline);
     }
   }
 

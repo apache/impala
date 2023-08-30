@@ -64,6 +64,7 @@ import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -1009,7 +1010,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
                || (currentStatus == EventProcessorStatus.NEEDS_INVALIDATE))) {
       try {
         LOG.error("Triggering auto global invalidation");
-        catalog_.reset();
+        catalog_.reset(NoOpEventSequence.INSTANCE);
         eventProcessorErrorMsg_ = null;
       } catch (Exception e) {
         // Catching generic exception so that scheduler thread does not die silently

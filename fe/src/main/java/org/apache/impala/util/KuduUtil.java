@@ -18,6 +18,7 @@
 package org.apache.impala.util;
 
 import static java.lang.String.format;
+import static org.apache.impala.service.KuduCatalogOpExecutor.GOT_KUDU_CLIENT;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -96,6 +97,16 @@ public class KuduUtil {
       return b.build();
     });
     return client;
+  }
+
+  /**
+   * Wrapper to get kudu client and mark the given 'catalogTimeline' when it finishes.
+   */
+  public static KuduClient getKuduClient(String masterHosts,
+      EventSequence catalogTimeline) {
+    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    catalogTimeline.markEvent(GOT_KUDU_CLIENT);
+    return kudu;
   }
 
   /**

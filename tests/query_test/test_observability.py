@@ -440,13 +440,33 @@ class TestObservability(ImpalaTestSuite):
       r'Query Timeline:',
       r'Planning finished'
     ]
-    # Events for DDLs. Currently just CreateTable has them.
-    ddl_event_regexes = [
+    # Events for CreateTable DDLs.
+    create_table_ddl_event_regexes = [
       r'Catalog Server Operation:',
       r'Got metastoreDdlLock:',
       r'Created table in Metastore:',
       r'Created table in catalog cache:',
       r'DDL finished:',
+    ]
+    # Events for AlterTable DDLs.
+    alter_table_ddl_event_regexes = [
+      r'Catalog Server Operation:',
+      r'Got catalog version read lock:',
+      r'Got catalog version write lock and table write lock:',
+      r'Altered table in Metastore:',
+      r'Fetched table from Metastore:',
+      r'Loaded table schema:',
+      r'DDL finished:'
+    ]
+    # Events for LOAD statement.
+    load_data_ddl_event_regexes = [
+      r'Catalog Server Operation:',
+      r'Got catalog version read lock:',
+      r'Got catalog version write lock and table write lock:',
+      r'Fired Metastore events:',
+      r'Fetched table from Metastore:',
+      r'Loaded file metadata for 1 partitions:',
+      r'Finished updateCatalog request:'
     ]
     # queries that explore different code paths in Frontend compilation
     queries = [
@@ -465,7 +485,13 @@ class TestObservability(ImpalaTestSuite):
       # Verify catalogOp timeline
       if query.startswith("create table"):
         self.__verify_profile_contains_every_event(
-            ddl_event_regexes, runtime_profile, query)
+            create_table_ddl_event_regexes, runtime_profile, query)
+      elif query.startswith("alter table"):
+        self.__verify_profile_contains_every_event(
+            alter_table_ddl_event_regexes, runtime_profile, query)
+      elif query.startswith("load data"):
+        self.__verify_profile_contains_every_event(
+            load_data_ddl_event_regexes, runtime_profile, query)
 
   def __verify_profile_contains_every_event(self, event_regexes, runtime_profile, query):
     """Test that all the expected events show up in a given query profile."""
@@ -479,7 +505,7 @@ class TestObservability(ImpalaTestSuite):
        labels of HMS events are not used so this test is expected to pass with or without
        event processor enabled"""
     # Create normal table
-    stmt = "create table %s.t1(id int)" % unique_database
+    stmt = "create table %s.t1(id int) partitioned by (p int)" % unique_database
     self.__verify_event_labels_in_profile(stmt, [
         "Got metastoreDdlLock",
         "Got Metastore client",
@@ -511,6 +537,41 @@ class TestObservability(ImpalaTestSuite):
         "Created table using Iceberg Catalog HIVE_CATALOG",
         "Created table in catalog cache",
         "DDL finished",
+    ])
+    # INSERT into table
+    stmt = "insert into %s.t1 partition(p) values (0,0), (1,1)" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+        "Got Metastore client",
+        "Added 2 partitions in Metastore",
+        "Loaded file metadata for 2 partitions",
+        "Finished updateCatalog request"
+    ])
+    # Compute stats
+    stmt = "compute stats %s.t1" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+        "Got Metastore client",
+        "Updated column stats",
+        "Altered 2 partitions in Metastore",
+        "Altered table in Metastore",
+        "Fetched table from Metastore",
+        "Loaded file metadata for 2 partitions",
+        "DDL finished"
+    ])
+    # REFRESH
+    stmt = "refresh %s.t1" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+      "Got Metastore client",
+      "Fetched table from Metastore",
+      "Loaded file metadata for 2 partitions",
+      "Finished resetMetadata request"
+    ])
+    # Drop table
+    stmt = "drop table %s.t1" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+        "Got Metastore client",
+        "Dropped table in Metastore",
+        "Deleted table in catalog cache",
+        "DDL finished"
     ])
 
   def __verify_event_labels_in_profile(self, stmt, event_labels):

@@ -26,6 +26,7 @@ import com.sun.management.GcInfo;
 import org.apache.impala.common.Reference;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.NoOpEventSequence;
 import org.apache.log4j.Logger;
 
 import javax.management.Notification;
@@ -215,7 +216,8 @@ public class CatalogdTableInvalidator {
       TTableName tTableName = tables.get(i).getTableName().toThrift();
       Reference<Boolean> tblWasRemoved = new Reference<>();
       Reference<Boolean> dbWasAdded = new Reference<>();
-      catalog_.invalidateTable(tTableName, tblWasRemoved, dbWasAdded);
+      catalog_.invalidateTable(tTableName, tblWasRemoved, dbWasAdded,
+          NoOpEventSequence.INSTANCE);
       LOG.info("Table " + tables.get(i).getFullName() + " invalidated due to memory " +
           "pressure.");
     }
@@ -231,7 +233,8 @@ public class CatalogdTableInvalidator {
         Reference<Boolean> tblWasRemoved = new Reference<>();
         Reference<Boolean> dbWasAdded = new Reference<>();
         TTableName tTableName = table.getTableName().toThrift();
-        catalog_.invalidateTable(tTableName, tblWasRemoved, dbWasAdded);
+        catalog_.invalidateTable(tTableName, tblWasRemoved, dbWasAdded,
+            NoOpEventSequence.INSTANCE);
         LOG.info(
             "Invalidated " + table.getFullName() + " due to inactivity for " +
                 TimeUnit.NANOSECONDS.toSeconds(inactivityTime) + " seconds.");

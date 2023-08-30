@@ -165,7 +165,9 @@ import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdatedPartition;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.impala.util.NoOpEventSequence;
 import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -907,8 +909,9 @@ public class MetastoreEventsProcessorTest {
         multiInsertTbl.getFileSystem(),
         new Path(multiInsertTbl.getHdfsBaseDir() + "/year=2009/month=2"), true, null);
     // load the created tables
-    catalog_.reloadTable(multiInsertTbl, "test");
-    catalog_.reloadTable(insertTbl, "test");
+    EventSequence catalogTimeline = NoOpEventSequence.INSTANCE;
+    catalog_.reloadTable(multiInsertTbl, "test", catalogTimeline);
+    catalog_.reloadTable(insertTbl, "test", catalogTimeline);
     eventsProcessor_.processEvents();
   }
 
@@ -1482,7 +1485,7 @@ public class MetastoreEventsProcessorTest {
   public void testEventProcessingAfterReset() throws ImpalaException {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     long syncedIdBefore = eventsProcessor_.getLastSyncedEventId();
-    catalog_.reset();
+    catalog_.reset(NoOpEventSequence.INSTANCE);
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     // nothing changed so event id remains the same
     assertEquals(syncedIdBefore, eventsProcessor_.getLastSyncedEventId());
@@ -1739,7 +1742,8 @@ public class MetastoreEventsProcessorTest {
                 tblTransition.second);
             if (doCreateDrop) {
               catalog_.invalidateTable(new TTableName(TEST_DB_NAME, testTblName),
-                  new Reference<>(), new Reference<>());
+                  new Reference<>(), new Reference<>(),
+                  NoOpEventSequence.INSTANCE);
               dropTableFromImpala(TEST_DB_NAME, testTblName);
               createTableFromImpala(TEST_DB_NAME, testTblName, null, false);
               loadTable(TEST_DB_NAME, testTblName);
@@ -1817,7 +1821,7 @@ public class MetastoreEventsProcessorTest {
             System.getProperty("java.io.tmpdir"), new MetaStoreClientPool(0, 0));
         cs.setAuthzManager(new NoopAuthorizationManager());
         cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
-        cs.reset();
+        cs.reset(NoOpEventSequence.INSTANCE);
       } catch (ImpalaException e) {
         throw new IllegalStateException(e.getMessage(), e);
       }
@@ -2999,14 +3003,18 @@ public class MetastoreEventsProcessorTest {
   }
 
   /**
-   * Some of the the alter table events doesn't require to reload file metadata, this
+   * Some of the alter table events doesn't require to reload file metadata, this
    * test asserts that file metadata is not reloaded for such alter table events
    */
   @Test
   public void testAlterTableNoFileMetadataReload() throws Exception {
     createDatabase(TEST_DB_NAME, null);
     final String testTblName = "testAlterTableNoFileMetadataReload";
+    // Create a non-empty partitioned table.
     createTable(testTblName, true);
+    List<List<String>> partVals = new ArrayList<>();
+    partVals.add(Arrays.asList("1"));
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
     eventsProcessor_.processEvents();
     // load the table first
     loadTable(testTblName);
@@ -3201,7 +3209,7 @@ public class MetastoreEventsProcessorTest {
       catalog_.getLock().writeLock().unlock();
       try {
         tbl.reloadPartitions(metaStoreClient.getHiveClient(), mp,
-            FileMetadataLoadOpts.LOAD_IF_SD_CHANGED);
+            FileMetadataLoadOpts.LOAD_IF_SD_CHANGED, NoOpEventSequence.INSTANCE);
       } finally {
         if (tbl.isWriteLockedByCurrentThread()) {
           tbl.releaseWriteLock();
@@ -3463,7 +3471,7 @@ public class MetastoreEventsProcessorTest {
       testTbl = (HdfsTable) catalog_.getOrLoadTable(TEST_DB_NAME, testUnpartTblName,
           "test", null);
       lastSyncEventIdBefore = testTbl.getLastRefreshEventId();
-      catalog_.reloadTable(testTbl, "test");
+      catalog_.reloadTable(testTbl, "test", NoOpEventSequence.INSTANCE);
       eventsProcessor_.processEvents();
       assertEquals(testTbl.getLastRefreshEventId(), eventsProcessor_.getCurrentEventId());
       assertTrue(testTbl.getLastRefreshEventId() > lastSyncEventIdBefore);

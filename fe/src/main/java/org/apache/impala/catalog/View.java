@@ -32,6 +32,7 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.EventSequence;
 
 import com.google.common.collect.Lists;
 
@@ -83,8 +84,8 @@ public class View extends Table implements FeView {
 
   @Override
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
-      throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
+      EventSequence catalogTimeline) throws TableLoadingException {
     try {
       Table.LOADING_TABLES.incrementAndGet();
       clearColumns();

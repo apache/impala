@@ -22,6 +22,12 @@ import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quanti
 import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P75;
 import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P95;
 import static org.apache.impala.catalog.monitor.TableLoadingTimeHistogram.Quantile.P99;
+import static org.apache.impala.service.CatalogOpExecutor.FETCHED_HMS_DB;
+import static org.apache.impala.service.CatalogOpExecutor.FETCHED_HMS_PARTITION;
+import static org.apache.impala.service.CatalogOpExecutor.FETCHED_HMS_TABLE;
+import static org.apache.impala.service.CatalogOpExecutor.FETCHED_LATEST_HMS_EVENT_ID;
+import static org.apache.impala.service.CatalogOpExecutor.GOT_TABLE_READ_LOCK;
+import static org.apache.impala.service.CatalogOpExecutor.GOT_TABLE_WRITE_LOCK;
 import static org.apache.impala.thrift.TCatalogObjectType.HDFS_PARTITION;
 import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
@@ -128,7 +134,9 @@ import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.CatalogBlacklistUtils;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.FunctionUtils;
+import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.impala.util.ThreadNameAnnotator;
@@ -229,6 +237,11 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  */
 public class CatalogServiceCatalog extends Catalog {
   public static final Logger LOG = LoggerFactory.getLogger(CatalogServiceCatalog.class);
+
+  public static final String GOT_CATALOG_VERSION_READ_LOCK =
+      "Got catalog version read lock";
+  public static final String GOT_CATALOG_VERSION_WRITE_LOCK =
+      "Got catalog version write lock";
 
   public static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private static final int MAX_NUM_SKIPPED_TOPIC_UPDATES = 2;
@@ -468,6 +481,14 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Acquires the table read lock and update the 'catalogTimeline'.
+   */
+  public void readLock(Table tbl, EventSequence catalogTimeline) {
+    tbl.readLock().lock();
+    catalogTimeline.markEvent(GOT_TABLE_READ_LOCK);
+  }
+
+  /**
    * Tries to acquire versionLock_ and the lock of 'tbl' in that order. Returns true if it
    * successfully acquires both within LOCK_RETRY_TIMEOUT_MS millisecs; both locks are
    * held when the function returns. Returns false otherwise and no lock is held in
@@ -475,6 +496,19 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public boolean tryWriteLock(Table tbl) {
     return tryLock(tbl, true, LOCK_RETRY_TIMEOUT_MS);
+  }
+
+  /**
+   * Same as the above but also updates 'catalogTimeline' when the operation finishes.
+   */
+  public boolean tryWriteLock(Table tbl, EventSequence catalogTimeline) {
+    boolean success = tryWriteLock(tbl);
+    if (success) {
+      catalogTimeline.markEvent(GOT_TABLE_WRITE_LOCK);
+    } else {
+      catalogTimeline.markEvent("Failed to acquire table write lock");
+    }
+    return success;
   }
 
   /**
@@ -746,7 +780,8 @@ public class CatalogServiceCatalog extends Catalog {
     }
     long tableId = request.getTable_id();
     Table table = getOrLoadTable(tableName.db_name, tableName.table_name,
-        "needed to fetch partition stats", writeIdList, tableId);
+        "needed to fetch partition stats", writeIdList, tableId,
+        NoOpEventSequence.INSTANCE);
 
     // Table could be null if it does not exist anymore.
     if (table == null) {
@@ -1991,7 +2026,8 @@ public class CatalogServiceCatalog extends Catalog {
    * Returns null if the method encounters an exception during invalidation.
    */
   private Pair<Db, List<TTableName>> invalidateDb(
-      MetaStoreClient msClient, String dbName, Db existingDb) {
+      MetaStoreClient msClient, String dbName, Db existingDb,
+      EventSequence catalogTimeline) {
     try {
       List<org.apache.hadoop.hive.metastore.api.Function> javaFns =
           new ArrayList<>();
@@ -2016,6 +2052,7 @@ public class CatalogServiceCatalog extends Catalog {
       // Reload Java UDFs from HMS.
       loadJavaFunctions(newDb, javaFns);
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
+      catalogTimeline.markEvent("Loaded functions of " + dbName);
 
       LOG.info("Loading table list for database: {}", dbName);
       int numTables = 0;
@@ -2037,6 +2074,8 @@ public class CatalogServiceCatalog extends Catalog {
           tblsToBackgroundLoad.add(new TTableName(dbName, tableName));
         }
       }
+      catalogTimeline.markEvent(String.format(
+          "Loaded %d table names of database %s", numTables, dbName));
       LOG.info("Loaded table list for database: {}. Number of tables: {}",
           dbName, numTables);
 
@@ -2092,7 +2131,7 @@ public class CatalogServiceCatalog extends Catalog {
    * requesting impalad will use that version to determine when the
    * effects of reset have been applied to its local catalog cache.
    */
-  public long reset() throws CatalogException {
+  public long reset(EventSequence catalogTimeline) throws CatalogException {
     long startVersion = getCatalogVersion();
     LOG.info("Invalidating all metadata. Version: " + startVersion);
     // First update the policy metadata.
@@ -2128,6 +2167,7 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.error("Couldn't identify the default FS. Cache Pool reader will be disabled.");
     }
     versionLock_.writeLock().lock();
+    catalogTimeline.markEvent(GOT_CATALOG_VERSION_WRITE_LOCK);
     // In case of an empty new catalog, the version should still change to reflect the
     // reset operation itself and to unblock impalads by making the catalog version >
     // INITIAL_CATALOG_VERSION. See Frontend.waitForCatalog()
@@ -2146,8 +2186,9 @@ public class CatalogServiceCatalog extends Catalog {
       // step.
       Map<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
       List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
-      try (MetaStoreClient msClient = getMetaStoreClient()) {
+      try (MetaStoreClient msClient = getMetaStoreClient(catalogTimeline)) {
         List<String> allDbs = msClient.getHiveClient().getAllDatabases();
+        catalogTimeline.markEvent("Got database list");
         int numComplete = 0;
         for (String dbName: allDbs) {
           if (isBlacklistedDb(dbName)) {
@@ -2160,7 +2201,7 @@ public class CatalogServiceCatalog extends Catalog {
             dbName = dbName.toLowerCase();
             Db oldDb = oldDbCache.get(dbName);
             Pair<Db, List<TTableName>> invalidatedDb = invalidateDb(msClient,
-                dbName, oldDb);
+                dbName, oldDb, catalogTimeline);
             if (invalidatedDb == null) continue;
             newDbCache.put(dbName, invalidatedDb.first);
             tblsToBackgroundLoad.addAll(invalidatedDb.second);
@@ -2168,6 +2209,7 @@ public class CatalogServiceCatalog extends Catalog {
         }
       }
       dbCache_.set(newDbCache);
+      catalogTimeline.markEvent("Updated catalog cache");
 
       // Identify any deleted databases and add them to the delta log.
       Set<String> oldDbNames = oldDbCache.keySet();
@@ -2309,11 +2351,11 @@ public class CatalogServiceCatalog extends Catalog {
     return table;
   }
 
-
   public Table getOrLoadTable(String dbName, String tblName, String reason,
-      ValidWriteIdList validWriteIdList) throws CatalogException {
+      ValidWriteIdList validWriteIdList)
+      throws CatalogException {
     return getOrLoadTable(dbName, tblName, reason, validWriteIdList,
-        TABLE_ID_UNAVAILABLE);
+        TABLE_ID_UNAVAILABLE, NoOpEventSequence.INSTANCE);
   }
 
   /**
@@ -2326,7 +2368,8 @@ public class CatalogServiceCatalog extends Catalog {
    * (not yet loaded table) will be returned.
    */
   public Table getOrLoadTable(String dbName, String tblName, String reason,
-      ValidWriteIdList validWriteIdList, long tableId) throws CatalogException {
+      ValidWriteIdList validWriteIdList, long tableId, EventSequence catalogTimeline)
+      throws CatalogException {
     TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
     Table tbl;
     TableLoadingMgr.LoadRequest loadReq = null;
@@ -2334,7 +2377,7 @@ public class CatalogServiceCatalog extends Catalog {
 
     long previousCatalogVersion = -1;
     // Return the table if it is already loaded or submit a new load request.
-    versionLock_.readLock().lock();
+    acquireVersionReadLock(catalogTimeline);
     try {
       tbl = getTable(dbName, tblName);
       // tbl doesn't exist in the catalog
@@ -2368,7 +2411,7 @@ public class CatalogServiceCatalog extends Catalog {
             AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters()),
             "Compaction id check cannot be done for non-transactional table "
                 + tbl.getFullName());
-        tbl.readLock().lock();
+        readLock(tbl, catalogTimeline);
         try {
           partsToBeRefreshed =
               AcidUtils.getPartitionsForRefreshingFileMetadata(this, (HdfsTable) tbl);
@@ -2392,19 +2435,22 @@ public class CatalogServiceCatalog extends Catalog {
         }
         previousCatalogVersion = tbl.getCatalogVersion();
         LOG.trace("Loading full table {}", tbl.getFullName());
-        loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason);
+        loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason,
+            catalogTimeline);
       }
     } finally {
       versionLock_.readLock().unlock();
     }
     if (!partsToBeRefreshed.isEmpty()) {
-      return refreshFileMetadata((HdfsTable) tbl, partsToBeRefreshed);
+      return refreshFileMetadata((HdfsTable) tbl, partsToBeRefreshed, catalogTimeline);
     }
     Preconditions.checkNotNull(loadReq);
     try {
+      Table t = loadReq.get();
+      catalogTimeline.markEvent("Async loaded table");
       // The table may have been dropped/modified while the load was in progress, so only
       // apply the update if the existing table hasn't changed.
-      return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion, tableId);
+      return replaceTableIfUnchanged(t, previousCatalogVersion, tableId);
     } finally {
       loadReq.close();
     }
@@ -2612,36 +2658,40 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Wrapper around {@link #reloadTable(Table, boolean, CatalogObject.ThriftObjectType,
-   * String, long)} which passes false for {@code refreshUpdatedPartitions} argument
+   * Wrapper around {@link #reloadTable(Table, String, long, boolean, EventSequence)}
+   * which passes false for {@code isSkipFileMetadataReload} argument
    * and ignore the result.
    */
-  public void reloadTable(Table tbl, String reason) throws CatalogException {
-    reloadTable(tbl, reason, -1, false);
+  public void reloadTable(Table tbl, String reason, EventSequence catalogTimeline)
+      throws CatalogException {
+    reloadTable(tbl, reason, -1, false, catalogTimeline);
   }
 
   /**
-   * Wrapper around {@link #reloadTable(Table, boolean, CatalogObject.ThriftObjectType,
-   * String, long)} which passes false for {@code refreshUpdatedPartitions} argument
-   * and ignore the result.
+   * Wrapper around {@link #reloadTable(Table, TResetMetadataRequest,
+   * CatalogObject.ThriftObjectType, String, long, boolean, EventSequence)} which passes
+   * an empty TResetMetadataRequest and NONE for {@code resultType} argument, ignores the
+   * result.
    * eventId: HMS event id which triggered reload
    */
   public void reloadTable(Table tbl, String reason, long eventId,
-      boolean isSkipFileMetadataReload) throws CatalogException {
+      boolean isSkipFileMetadataReload, EventSequence catalogTimeline)
+      throws CatalogException {
     reloadTable(tbl, new TResetMetadataRequest(), CatalogObject.ThriftObjectType.NONE,
-        reason, eventId, isSkipFileMetadataReload);
+        reason, eventId, isSkipFileMetadataReload, catalogTimeline);
   }
 
   /**
-   * Wrapper around {@link #reloadTable(Table, boolean, CatalogObject.ThriftObjectType,
-   * String, long)} which passes false for {@code refreshUpdatedPartitions} argument.
+   * Wrapper around {@link #reloadTable(Table, TResetMetadataRequest,
+   * CatalogObject.ThriftObjectType, String, long, boolean, EventSequence)} which passes
+   * false for {@code isSkipFileMetadataReload} argument.
    * eventId: HMS event id which triggered reload
    */
   public TCatalogObject reloadTable(Table tbl, TResetMetadataRequest request,
-      CatalogObject.ThriftObjectType resultType, String reason, long eventId)
-      throws CatalogException {
+      CatalogObject.ThriftObjectType resultType, String reason, long eventId,
+      EventSequence catalogTimeline) throws CatalogException {
     return reloadTable(tbl, request, resultType, reason, eventId,
-        /*isSkipFileMetadataReload*/false);
+        /*isSkipFileMetadataReload*/false, catalogTimeline);
   }
 
   /**
@@ -2650,22 +2700,20 @@ public class CatalogServiceCatalog extends Catalog {
    * TCatalogObject representing 'tbl'. Applies proper synchronization to protect the
    * metadata load from concurrent table modifications and assigns a new catalog version.
    * Throws a CatalogException if there is an error loading table metadata.
-   * If {@code refreshUpdatedParts} is true, the refresh logic detects updated
-   * partitions in metastore and reloads them too.
-   * if {@code wantMinimalResult} is true, returns the result in the minimal form.
-   * if this reload is triggered while processing some HMS event (from example from
+   * If this reload is triggered while processing some HMS event (for example from
    * MetastoreEventProcessor), then eventId passed would be > -1. In that case
    * check table's last synced event id and if it is >= eventId then skip reloading
-   * table. Otherwise, set the eventId as table's last synced id after reload is done
+   * table. Otherwise, set the eventId as table's last synced id after reload is done.
    */
   public TCatalogObject reloadTable(Table tbl, TResetMetadataRequest request,
       CatalogObject.ThriftObjectType resultType, String reason, long eventId,
-      boolean isSkipFileMetadataReload) throws CatalogException {
+      boolean isSkipFileMetadataReload, EventSequence catalogTimeline)
+      throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
     String tblName = tbl.getName();
-    if (!tryWriteLock(tbl)) {
+    if (!tryWriteLock(tbl, catalogTimeline)) {
       throw new CatalogException(String.format("Error refreshing metadata for table " +
           "%s due to lock contention", tbl.getFullName()));
     }
@@ -2683,11 +2731,12 @@ public class CatalogServiceCatalog extends Catalog {
         return tbl.toTCatalogObject(resultType);
       }
       long currentHmsEventId = -1;
-      try (MetaStoreClient msClient = getMetaStoreClient()) {
+      try (MetaStoreClient msClient = getMetaStoreClient(catalogTimeline)) {
         if (syncToLatestEventId) {
           try {
             currentHmsEventId = msClient.getHiveClient().getCurrentNotificationEventId()
                 .getEventId();
+            catalogTimeline.markEvent(FETCHED_LATEST_HMS_EVENT_ID + currentHmsEventId);
           } catch (TException e) {
             throw new CatalogException("Failed to reload table: " + tbl.getFullName() +
                 " as there was an error in fetching current event id from HMS", e);
@@ -2696,6 +2745,7 @@ public class CatalogServiceCatalog extends Catalog {
         org.apache.hadoop.hive.metastore.api.Table msTbl = null;
         try {
           msTbl = msClient.getHiveClient().getTable(dbName, tblName);
+          catalogTimeline.markEvent(FETCHED_HMS_TABLE);
         } catch (Exception e) {
           throw new TableLoadingException("Error loading metadata for table: " +
               dbName + "." + tblName, e);
@@ -2705,10 +2755,11 @@ public class CatalogServiceCatalog extends Catalog {
               .load(true, msClient.getHiveClient(), msTbl, !isSkipFileMetadataReload,
                   /* loadTableSchema*/true, request.refresh_updated_hms_partitions,
                   /* partitionsToUpdate*/null, request.debug_action,
-                  /*partitionToEventId*/null, reason);
+                  /*partitionToEventId*/null, reason, catalogTimeline);
         } else {
-          tbl.load(true, msClient.getHiveClient(), msTbl, reason);
+          tbl.load(true, msClient.getHiveClient(), msTbl, reason, catalogTimeline);
         }
+        catalogTimeline.markEvent("Loaded table");
       }
       if (currentHmsEventId != -1 && syncToLatestEventId) {
         // fetch latest event id from HMS before starting table load and set that event
@@ -2787,7 +2838,8 @@ public class CatalogServiceCatalog extends Catalog {
    * cache.
    */
   public TCatalogObject invalidateTable(TTableName tableName,
-      Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded) {
+      Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded,
+      EventSequence catalogTimeline) {
     tblWasRemoved.setRef(false);
     dbWasAdded.setRef(false);
     String dbName = tableName.getDb_name();
@@ -2805,11 +2857,12 @@ public class CatalogServiceCatalog extends Catalog {
     List<TableMeta> metaRes = null;
     org.apache.hadoop.hive.metastore.api.Table msTbl = null;
     Db db = null;
-    try (MetaStoreClient msClient = getMetaStoreClient()) {
+    try (MetaStoreClient msClient = getMetaStoreClient(catalogTimeline)) {
       org.apache.hadoop.hive.metastore.api.Database msDb = null;
       try {
         metaRes = getTableMetaFromHive(msClient, dbName, tblName);
         msTbl = msClient.getHiveClient().getTable(dbName, tblName);
+        catalogTimeline.markEvent(FETCHED_HMS_TABLE);
       } catch (UnknownDBException | NoSuchObjectException e) {
         // The parent database does not exist in the metastore. Treat this the same
         // as if the table does not exist.
@@ -2820,6 +2873,7 @@ public class CatalogServiceCatalog extends Catalog {
 
       if (metaRes != null && metaRes.isEmpty()) {
         Table result = removeTable(dbName, tblName);
+        catalogTimeline.markEvent("Removed table in catalog cache");
         if (result == null) return null;
         tblWasRemoved.setRef(true);
         result.takeReadLock();
@@ -2841,8 +2895,10 @@ public class CatalogServiceCatalog extends Catalog {
         // must be valid since tableExistsInMetaStore is true.
         try {
           msDb = msClient.getHiveClient().getDatabase(dbName);
+          catalogTimeline.markEvent(FETCHED_HMS_DB);
           Preconditions.checkNotNull(msDb);
           addDb(dbName, msDb);
+          catalogTimeline.markEvent("Added database in catalog cache");
           dbWasAdded.setRef(true);
         } catch (TException e) {
           // The Metastore database cannot be get. Log the error and return.
@@ -2920,7 +2976,8 @@ public class CatalogServiceCatalog extends Catalog {
             + "event {}.", dbName, tblName, eventId, table.getCreateEventId());
         return false;
       }
-      reloadTable(table, reason, eventId, isSkipFileMetadataReload);
+      reloadTable(table, reason, eventId, isSkipFileMetadataReload,
+          NoOpEventSequence.INSTANCE);
     } catch (DatabaseNotFoundException | TableLoadingException e) {
       LOG.info(String.format("Reload table if exists failed with: %s", e.getMessage()));
       return false;
@@ -3234,6 +3291,11 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
+  private void acquireVersionReadLock(EventSequence catalogTimeline) {
+    versionLock_.readLock().lock();
+    catalogTimeline.markEvent(GOT_CATALOG_VERSION_READ_LOCK);
+  }
+
   public ReentrantReadWriteLock getLock() { return versionLock_; }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
 
@@ -3244,8 +3306,8 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TCatalogObject reloadPartition(Table tbl, List<TPartitionKeyValue> partitionSpec,
       Reference<Boolean> wasPartitionReloaded, CatalogObject.ThriftObjectType resultType,
-      String reason) throws CatalogException {
-    if (!tryWriteLock(tbl)) {
+      String reason, EventSequence catalogTimeline) throws CatalogException {
+    if (!tryWriteLock(tbl, catalogTimeline)) {
       throw new CatalogException(String.format("Error reloading partition of table %s " +
           "due to lock contention", tbl.getFullName()));
     }
@@ -3262,7 +3324,7 @@ public class CatalogServiceCatalog extends Catalog {
           ? HdfsTable.constructPartitionName(partitionSpec)
           : hdfsPartition.getPartitionName();
       return reloadHdfsPartition(hdfsTable, partitionName, wasPartitionReloaded,
-          resultType, reason, newCatalogVersion, hdfsPartition);
+          resultType, reason, newCatalogVersion, hdfsPartition, catalogTimeline);
     } finally {
       UnlockWriteLockIfErroneouslyLocked();
       tbl.releaseWriteLock();
@@ -3278,16 +3340,17 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TCatalogObject reloadHdfsPartition(HdfsTable hdfsTable, String partitionName,
       Reference<Boolean> wasPartitionReloaded, CatalogObject.ThriftObjectType resultType,
-      String reason, long newCatalogVersion, @Nullable HdfsPartition hdfsPartition)
-      throws CatalogException {
+      String reason, long newCatalogVersion, @Nullable HdfsPartition hdfsPartition,
+      EventSequence catalogTimeline) throws CatalogException {
     Preconditions.checkState(hdfsTable.isWriteLockedByCurrentThread());
     LOG.info(String.format("Refreshing partition metadata: %s %s (%s)",
         hdfsTable.getFullName(), partitionName, reason));
-    try (MetaStoreClient msClient = getMetaStoreClient()) {
+    try (MetaStoreClient msClient = getMetaStoreClient(catalogTimeline)) {
       org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
       try {
         hmsPartition = msClient.getHiveClient().getPartition(
             hdfsTable.getDb().getName(), hdfsTable.getName(), partitionName);
+        catalogTimeline.markEvent(FETCHED_HMS_PARTITION);
       } catch (NoSuchObjectException e) {
         // If partition does not exist in Hive Metastore, remove it from the
         // catalog
@@ -3310,7 +3373,8 @@ public class CatalogServiceCatalog extends Catalog {
       // note that hdfsPartition can be null here which is a valid input argument
       // in such a case a new hdfsPartition is added and nothing is removed.
       hmsPartToHdfsPart.put(hmsPartition, hdfsPartition);
-      hdfsTable.reloadPartitions(msClient.getHiveClient(), hmsPartToHdfsPart, true);
+      hdfsTable.reloadPartitions(msClient.getHiveClient(), hmsPartToHdfsPart, true,
+          catalogTimeline);
     }
     hdfsTable.setCatalogVersion(newCatalogVersion);
     wasPartitionReloaded.setRef(true);
@@ -3694,7 +3758,7 @@ public class CatalogServiceCatalog extends Catalog {
         }
         table = getOrLoadTable(
             objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name(),
-            tableLoadReason, writeIdList, tableId);
+            tableLoadReason, writeIdList, tableId, NoOpEventSequence.INSTANCE);
       } catch (DatabaseNotFoundException e) {
         return createGetPartialCatalogObjectError(req, CatalogLookupStatus.DB_NOT_FOUND);
       }
@@ -3848,10 +3912,11 @@ public class CatalogServiceCatalog extends Catalog {
    * @return the updated table
    */
   private Table refreshFileMetadata(HdfsTable hdfsTable,
-      List<HdfsPartition.Builder> partBuilders) throws CatalogException {
+      List<HdfsPartition.Builder> partBuilders, EventSequence catalogTimeline)
+      throws CatalogException {
     Preconditions.checkState(!partBuilders.isEmpty());
 
-    if (!tryWriteLock(hdfsTable)) {
+    if (!tryWriteLock(hdfsTable, catalogTimeline)) {
       throw new CatalogException(String.format(
           "Error during refreshing file metadata for table %s due to lock contention",
           hdfsTable.getFullName()));
@@ -3859,9 +3924,9 @@ public class CatalogServiceCatalog extends Catalog {
     long newVersion = incrementAndGetCatalogVersion();
     versionLock_.writeLock().unlock();
     try {
-      try (MetaStoreClient client = getMetaStoreClient()) {
+      try (MetaStoreClient client = getMetaStoreClient(catalogTimeline)) {
         hdfsTable.loadFileMetadataForPartitions(
-            client.getHiveClient(), partBuilders, true);
+            client.getHiveClient(), partBuilders, true, catalogTimeline);
       }
       hdfsTable.updatePartitions(partBuilders);
       hdfsTable.setCatalogVersion(newVersion);
