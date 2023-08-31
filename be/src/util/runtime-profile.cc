@@ -47,6 +47,7 @@
 #include "util/redactor.h"
 #include "util/scope-exit-trigger.h"
 #include "util/ubsan.h"
+#include "gutil/strings/strcat.h"
 
 #include "common/names.h"
 
@@ -1041,7 +1042,7 @@ void RuntimeProfileBase::AddSkewInfo(RuntimeProfileBase* root, double threshold)
             root->AddInfoStringInternal(SKEW_SUMMARY, name(), true);
             // Log the counter name and skew details in 'this' profile
             this->AddInfoStringInternal(
-                SKEW_DETAILS, counter_name_it + " " + details, true);
+                SKEW_DETAILS, StrCat(counter_name_it, " ", details), true);
           }
         }
       }

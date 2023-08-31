@@ -40,6 +40,7 @@
 #include "util/histogram-metric.h"
 #include "util/thread.h"
 #include "util/time.h"
+#include "gutil/strings/strcat.h"
 
 #include "common/names.h"
 
@@ -1848,10 +1849,10 @@ TEST_F(DiskIoMgrTest, MetricsOfWriteSizeAndLatency) {
     string i_str = std::to_string(i);
     auto write_size_org =
         ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
-            key_prefix + i_str + write_size_postfix);
+            StrCat(key_prefix, i_str, write_size_postfix));
     auto write_latency_org =
         ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
-            key_prefix + i_str + write_latency_postfix);
+            StrCat(key_prefix, i_str, write_latency_postfix));
     if (write_size_org != nullptr) write_size_org->Reset();
     if (write_latency_org != nullptr) write_latency_org->Reset();
   }

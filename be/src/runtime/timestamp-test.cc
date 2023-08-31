@@ -29,6 +29,7 @@
 #include "runtime/timestamp-value.inline.h"
 #include "testutil/gtest-util.h"
 #include "util/string-parser.h"
+#include "gutil/strings/strcat.h"
 
 #include "common/names.h"
 
@@ -182,7 +183,7 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
           val.append(lexical_cast<string>((*toks)[i].val));
         }
       }
-      string fmt_val = "Format: " + fmt + ", Val: " + val;
+      string fmt_val = StrCat("Format: ", fmt, ", Val: ",  val);
       DateTimeFormatContext dt_ctx(fmt.c_str());
       ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE)) << fmt_val;
       TimestampValue tv =
@@ -211,7 +212,8 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
           }
           if (i + 1 < toks_len) val.push_back(*separator);
         }
-        string fmt_val = "Format: " + fmt + ", Val: " + val;
+
+        string fmt_val = StrCat("Format: ", fmt, ", Val: ",  val);
         DateTimeFormatContext dt_ctx(fmt.c_str());
         ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE)) << fmt_val;
         TimestampValue tv =

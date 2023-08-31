@@ -21,6 +21,7 @@
 #include "scheduling/executor-group.h"
 #include "service/impala-server.h"
 #include "util/uid-util.h"
+#include "gutil/strings/strcat.h"
 
 static const int BACKEND_PORT = 1000;
 static const int KRPC_PORT = 2000;
@@ -38,7 +39,7 @@ string HostIdxToIpAddr(int host_idx) {
   DCHECK_LT(host_idx, (1 << 24));
   string suffix;
   for (int i = 0; i < 3; ++i) {
-    suffix = "." + std::to_string(host_idx % 256) + suffix; // prepend
+    suffix = StrCat(".", std::to_string(host_idx % 256), suffix); // prepend
     host_idx /= 256;
   }
   DCHECK_EQ(0, host_idx);

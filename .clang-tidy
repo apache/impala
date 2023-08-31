@@ -75,7 +75,6 @@ Checks: "-*,clang*,\
 -clang-diagnostic-weak-template-vtables,\
 -clang-diagnostic-weak-vtables,\
 performance-*,\
--performance-inefficient-string-concatenation,\
 -performance-unnecessary-copy-initialization,\
 -performance-unnecessary-value-param"
 

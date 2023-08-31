@@ -59,9 +59,13 @@ export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/share
 :${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin/\
 :$PATH"
 TMP_STDERR=$(mktemp)
+STRCAT_MESSAGE="Impala-specific note: This can also be fixed using the StrCat() function \
+from be/src/gutil/strings strcat.h)"
+CLANG_STRING_CONCAT="performance-inefficient-string-concatenation"
 trap "rm $TMP_STDERR" EXIT
 if ! run-clang-tidy.py -quiet -header-filter "${PIPE_DIRS%?}" \
-                       -j"${CORES}" ${DIRS} 2> ${TMP_STDERR};
+                       -j"${CORES}" ${DIRS} 2> ${TMP_STDERR} | \
+  sed "/${CLANG_STRING_CONCAT}/ s#\$# ${STRCAT_MESSAGE}#";
 then
   echo "run-clang-tidy.py hit an error, dumping stderr output"
   cat ${TMP_STDERR} >&2

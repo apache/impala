@@ -75,6 +75,7 @@
 #include "util/string-util.h"
 #include "util/test-info.h"
 #include "utility-functions.h"
+#include "gutil/strings/strcat.h"
 
 #include "common/names.h"
 
@@ -909,7 +910,8 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
       // Everything IS NOT DISTINCT FROM itself.
       for (int j = 0; j < sizeof(types) / sizeof(string); ++j) {
         const string operand = "cast(NULL as " + types[j] + ")";
-        TestValue(operand + ' ' + operators[i] + ' ' + operand, TYPE_BOOLEAN, is_equal);
+        TestValue(StrCat(operand, " ", operators[i], " ", operand), TYPE_BOOLEAN,
+                  is_equal);
       }
       for (int j = 0; j < sizeof(operands1) / sizeof(string); ++j) {
         TestValue(operands1[j] + ' ' + operators[i] + ' ' + operands1[j], TYPE_BOOLEAN,
@@ -4084,10 +4086,10 @@ TEST_P(ExprTest, InPredicate) {
   for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
       ++int_iter) {
     string& val = default_type_strs_[int_iter->first];
-    TestValue(val + " in (2, 3, " + val + ")", TYPE_BOOLEAN, true);
-    TestValue(val + " in (2, 3, 4)", TYPE_BOOLEAN, false);
-    TestValue(val + " not in (2, 3, " + val + ")", TYPE_BOOLEAN, false);
-    TestValue(val + " not in (2, 3, 4)", TYPE_BOOLEAN, true);
+    TestValue(StrCat(val, " in (2, 3, ", val, ")"), TYPE_BOOLEAN, true);
+    TestValue(StrCat(val, " in (2, 3, 4)"), TYPE_BOOLEAN, false);
+    TestValue(StrCat(val, " not in (2, 3, ", val, ")"), TYPE_BOOLEAN, false);
+    TestValue(StrCat(val, " not in (2, 3, 4)"), TYPE_BOOLEAN, true);
   }
 
   // Test floats.
@@ -4095,10 +4097,10 @@ TEST_P(ExprTest, InPredicate) {
   for(float_iter = min_float_values_.begin(); float_iter != min_float_values_.end();
       ++float_iter) {
     string& val = default_type_strs_[float_iter->first];
-    TestValue(val + " in (2, 3, " + val + ")", TYPE_BOOLEAN, true);
-    TestValue(val + " in (2, 3, 4)", TYPE_BOOLEAN, false);
-    TestValue(val + " not in (2, 3, " + val + ")", TYPE_BOOLEAN, false);
-    TestValue(val + " not in (2, 3, 4)", TYPE_BOOLEAN, true);
+    TestValue(StrCat(val, " in (2, 3, ", val, ")"), TYPE_BOOLEAN, true);
+    TestValue(StrCat(val, " in (2, 3, 4)"), TYPE_BOOLEAN, false);
+    TestValue(StrCat(val, " not in (2, 3, ", val, ")"), TYPE_BOOLEAN, false);
+    TestValue(StrCat(val, " not in (2, 3, 4)"), TYPE_BOOLEAN, true);
   }
 
   // Test bools.
@@ -5000,10 +5002,10 @@ TEST_P(ExprTest, StringBase64Coding) {
       string raw(length, ' ');
       for (int j = 0; j < length; ++j) raw[j] = rand() % 128;
       const string as_octal = StringToOctalLiteral(raw);
-      TestValue("length(base64encode('" + as_octal + "')) > length('" + as_octal + "')",
-          TYPE_BOOLEAN, true);
-      TestValue("base64decode(base64encode('" + as_octal + "')) = '" + as_octal + "'",
-          TYPE_BOOLEAN, true);
+      TestValue(StrCat("length(base64encode('", as_octal, "')) > length('", as_octal,
+           "')"), TYPE_BOOLEAN, true);
+      TestValue(StrCat("base64decode(base64encode('", as_octal + "')) = '", as_octal,
+           "'"), TYPE_BOOLEAN, true);
     }
   }
 }
@@ -6017,50 +6019,52 @@ TEST_P(ExprTest, MathConversionFunctions) {
     // First iteration is with bigint, second with string parameter.
     string q = (i == 0) ? "" : "'";
     // Invalid input: Base below -36 or above 36.
-    TestIsNull("conv(" + q + "10" + q + ", 10, 37)", TYPE_STRING);
-    TestIsNull("conv(" + q + "10" + q + ", 37, 10)", TYPE_STRING);
-    TestIsNull("conv(" + q + "10" + q + ", 10, -37)", TYPE_STRING);
-    TestIsNull("conv(" + q + "10" + q + ", -37, 10)", TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", 10, 37)"), TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", 37, 10)"), TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", 10, -37)"), TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", -37, 10)"), TYPE_STRING);
     // Invalid input: Base between -2 and 2.
-    TestIsNull("conv(" + q + "10" + q + ", 10, 1)", TYPE_STRING);
-    TestIsNull("conv(" + q + "10" + q + ", 1, 10)", TYPE_STRING);
-    TestIsNull("conv(" + q + "10" + q + ", 10, -1)", TYPE_STRING);
-    TestIsNull("conv(" + q + "10" + q + ", -1, 10)", TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", 10, 1)"), TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", 1, 10)"), TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", 10, -1)"), TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", -1, 10)"), TYPE_STRING);
     // Invalid input: Positive number but negative src base.
-    TestIsNull("conv(" + q + "10" + q + ", -10, 10)", TYPE_STRING);
+    TestIsNull(StrCat("conv(", q, "10", q, ", -10, 10)"), TYPE_STRING);
     // Test positive numbers.
-    TestStringValue("conv(" + q + "10" + q + ", 10, 10)", "10");
-    TestStringValue("conv(" + q + "10" + q + ", 2, 10)", "2");
-    TestStringValue("conv(" + q + "11" + q + ", 36, 10)", "37");
-    TestStringValue("conv(" + q + "11" + q + ", 36, 2)", "100101");
-    TestStringValue("conv(" + q + "100101" + q + ", 2, 36)", "11");
-    TestStringValue("conv(" + q + "0" + q + ", 10, 2)", "0");
+    TestStringValue(StrCat("conv(", q, "10", q, ", 10, 10)"), "10");
+    TestStringValue(StrCat("conv(", q, "10", q, ", 2, 10)"), "2");
+    TestStringValue(StrCat("conv(", q, "11", q, ", 36, 10)"), "37");
+    TestStringValue(StrCat("conv(", q, "11", q, ", 36, 2)"), "100101");
+    TestStringValue(StrCat("conv(", q, "100101", q, ", 2, 36)"), "11");
+    TestStringValue(StrCat("conv(", q, "0", q, ", 10, 2)"), "0");
     // Test for very large big int
-    TestStringValue("conv(" + q + "2061013007" + q + ", 16, 10)", "139066421255");
+    TestStringValue(StrCat("conv(", q, "2061013007", q, ", 16, 10)"), "139066421255");
     // Test negative numbers (tests from Hive).
     // If to_base is positive, the number should be handled as a 2's complement (64-bit).
-    TestStringValue("conv(" + q + "-641" + q + ", 10, -10)", "-641");
-    TestStringValue("conv(" + q + "1011" + q + ", 2, -16)", "B");
-    TestStringValue("conv(" + q + "-1" + q + ", 10, 16)", "FFFFFFFFFFFFFFFF");
-    TestStringValue("conv(" + q + "-15" + q + ", 10, 16)", "FFFFFFFFFFFFFFF1");
+    TestStringValue(StrCat("conv(", q, "-641", q, ", 10, -10)"), "-641");
+    TestStringValue(StrCat("conv(", q, "1011", q, ", 2, -16)"), "B");
+    TestStringValue(StrCat("conv(", q, "-1", q, ", 10, 16)"), "FFFFFFFFFFFFFFFF");
+    TestStringValue(StrCat("conv(", q, "-15", q, ", 10, 16)"), "FFFFFFFFFFFFFFF1");
     // Test digits that are not available in srcbase. We expect those digits
     // from left-to-right that can be interpreted in srcbase to form the result
     // (i.e., the paring bails only when it encounters a digit not in srcbase).
-    TestStringValue("conv(" + q + "17" + q + ", 7, 10)", "1");
-    TestStringValue("conv(" + q + "371" + q + ", 7, 10)", "3");
-    TestStringValue("conv(" + q + "371" + q + ", 7, 10)", "3");
-    TestStringValue("conv(" + q + "445" + q + ", 5, 10)", "24");
+    TestStringValue(StrCat("conv(", q, "17", q, ", 7, 10)"), "1");
+    TestStringValue(StrCat("conv(", q, "371", q, ", 7, 10)"), "3");
+    TestStringValue(StrCat("conv(", q, "371", q, ", 7, 10)"), "3");
+    TestStringValue(StrCat("conv(", q, "445", q, ", 5, 10)"), "24");
     // Test overflow (tests from Hive).
     // If a number is two large, the result should be -1 (if signed),
     // or MAX_LONG (if unsigned).
-    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::max())
-        + q + ", 36, 16)", "FFFFFFFFFFFFFFFF");
-    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::max())
-        + q + ", 36, -16)", "-1");
-    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::min()+1)
-        + q + ", 36, 16)", "FFFFFFFFFFFFFFFF");
-    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::min()+1)
-        + q + ", 36, -16)", "-1");
+    TestStringValue(StrCat("conv(", q,
+       lexical_cast<string>(numeric_limits<int64_t>::max()), q, ", 36, 16)"),
+       "FFFFFFFFFFFFFFFF");
+    TestStringValue(StrCat("conv(", q,
+       lexical_cast<string>(numeric_limits<int64_t>::max()), q, ", 36, -16)"), "-1");
+    TestStringValue(StrCat("conv(", q,
+       lexical_cast<string>(numeric_limits<int64_t>::min()+1), q, ", 36, 16)"),
+       "FFFFFFFFFFFFFFFF");
+    TestStringValue(StrCat("conv(", q,
+       lexical_cast<string>(numeric_limits<int64_t>::min()+1), q, ", 36, -16)"), "-1");
   }
   // Test invalid input strings that start with an invalid digit.
   // Hive returns "0" in such cases.
@@ -6943,38 +6947,38 @@ TEST_P(ExprTest, TimestampFunctions) {
     const string& lt_max_interval =
         lexical_cast<string>(static_cast<int64_t>(0.9 * it->second));
     // Test that pushing a value beyond the max/min values results in a NULL.
-    TestIsNull(unit + "_add(cast('9999-12-31 23:59:59' as timestamp), "
-        + lt_max_interval + ")", TYPE_TIMESTAMP);
-    TestIsNull(unit + "_sub(cast('1400-01-01 00:00:00' as timestamp), "
-        + lt_max_interval + ")", TYPE_TIMESTAMP);
+    TestIsNull(StrCat(unit, "_add(cast('9999-12-31 23:59:59' as timestamp), "
+       , lt_max_interval, ")"), TYPE_TIMESTAMP);
+    TestIsNull(StrCat(unit, "_sub(cast('1400-01-01 00:00:00' as timestamp), "
+       , lt_max_interval, ")"), TYPE_TIMESTAMP);
 
     // Same as above but with edge case values of max int/long.
-    TestIsNull(unit + "_add(years_add(cast('9999-12-31 23:59:59' as timestamp), 1), "
-        + max_int + ")", TYPE_TIMESTAMP);
-    TestIsNull(unit + "_sub(cast('1400-01-01 00:00:00' as timestamp), " + max_int + ")",
-        TYPE_TIMESTAMP);
-    TestIsNull(unit + "_add(years_add(cast('9999-12-31 23:59:59' as timestamp), 1), "
-        + max_long + ")", TYPE_TIMESTAMP);
-    TestIsNull(unit + "_sub(cast('1400-01-01 00:00:00' as timestamp), " + max_long
-        + ")", TYPE_TIMESTAMP);
+    TestIsNull(StrCat(unit,"_add(years_add(cast('9999-12-31 23:59:59' as timestamp), 1), "
+       , max_int, ")"), TYPE_TIMESTAMP);
+    TestIsNull(StrCat(unit, "_sub(cast('1400-01-01 00:00:00' as timestamp), ",
+        max_int, ")"), TYPE_TIMESTAMP);
+    TestIsNull(StrCat(unit,"_add(years_add(cast('9999-12-31 23:59:59' as timestamp), 1), "
+       , max_long, ")"), TYPE_TIMESTAMP);
+    TestIsNull(StrCat(unit, "_sub(cast('1400-01-01 00:00:00' as timestamp), ", max_long
+       , ")"), TYPE_TIMESTAMP);
 
     // Test that adding/subtracting a value slightly less than the MAX_*_INTERVAL
     // can result in a non-NULL.
-    TestIsNotNull(unit + "_add(cast('1400-01-01 00:00:00' as timestamp), "
-        + lt_max_interval + ")", TYPE_TIMESTAMP);
-    TestIsNotNull(unit + "_sub(cast('9999-12-31 23:59:59' as timestamp), "
-        + lt_max_interval + ")", TYPE_TIMESTAMP);
+    TestIsNotNull(StrCat(unit, "_add(cast('1400-01-01 00:00:00' as timestamp), "
+       , lt_max_interval, ")"), TYPE_TIMESTAMP);
+    TestIsNotNull(StrCat(unit, "_sub(cast('9999-12-31 23:59:59' as timestamp), "
+       , lt_max_interval, ")"), TYPE_TIMESTAMP);
 
     // Test that adding/subtracting either results in NULL or a value more/less than
     // the original value.
-    TestValue("isnull(" + unit + "_add(" + year_5000 + ", " + max_int
-        + "), " + gt_year_5000 + ") > " + year_5000, TYPE_BOOLEAN, true);
-    TestValue("isnull(" + unit + "_sub(" + year_5000 + ", " + max_int
-        + "), " + lt_year_5000 + ") < " + year_5000, TYPE_BOOLEAN, true);
-    TestValue("isnull(" + unit + "_add(" + year_5000 + ", " + max_long
-        + "), " + gt_year_5000 + ") > " + year_5000, TYPE_BOOLEAN, true);
-    TestValue("isnull(" + unit + "_sub(" + year_5000 + ", " + max_long
-        + "), " + lt_year_5000 + ") < " + year_5000, TYPE_BOOLEAN, true);
+    TestValue(StrCat("isnull(", unit, "_add(", year_5000, ", ", max_int
+       , "), ", gt_year_5000, ") > ", year_5000), TYPE_BOOLEAN, true);
+    TestValue(StrCat("isnull(", unit, "_sub(", year_5000, ", ", max_int
+       , "), ", lt_year_5000, ") < ", year_5000), TYPE_BOOLEAN, true);
+    TestValue(StrCat("isnull(", unit, "_add(", year_5000, ", ", max_long
+       , "), ", gt_year_5000, ") > ", year_5000), TYPE_BOOLEAN, true);
+    TestValue(StrCat("isnull(", unit, "_sub(", year_5000, ", ", max_long
+       , "), ", lt_year_5000, ") < ", year_5000), TYPE_BOOLEAN, true);
   }
 
   // Regression test for IMPALA-2260, a seemingly non-edge case value results in an
@@ -6988,10 +6992,10 @@ TEST_P(ExprTest, TimestampFunctions) {
     // magnitude of the real max values so testing can start at max / 10.
     for (int64_t interval = it->second / 10; interval > 0; interval /= 10) {
       const string& sql_interval = lexical_cast<string>(interval);
-      TestIsNotNull(unit + "_add(cast('1400-01-01 00:00:00' as timestamp), "
-          + sql_interval + ")", TYPE_TIMESTAMP);
-      TestIsNotNull(unit + "_sub(cast('9999-12-31 23:59:59' as timestamp), "
-          + sql_interval + ")", TYPE_TIMESTAMP);
+      TestIsNotNull(StrCat(unit, "_add(cast('1400-01-01 00:00:00' as timestamp), "
+         , sql_interval, ")"), TYPE_TIMESTAMP);
+      TestIsNotNull(StrCat(unit, "_sub(cast('9999-12-31 23:59:59' as timestamp), "
+         , sql_interval, ")"), TYPE_TIMESTAMP);
     }
   }
 
