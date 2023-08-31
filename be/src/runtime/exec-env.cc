@@ -123,6 +123,10 @@ DEFINE_int32(local_catalog_max_fetch_retries, 40,
     "If --use_local_catalog is enabled, configures the maximum number of times "
     "the frontend retries when fetching a metadata object from the impalad "
     "coordinator's local catalog cache.");
+DEFINE_int32(local_catalog_cache_concurrency_level, 4,
+    "If --use_local_catalog is enabled, configures the local cache's concurrency "
+    "level to avoid lock contention, the default value 4 is consistent with the "
+    "default value of the original cache.");
 
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);

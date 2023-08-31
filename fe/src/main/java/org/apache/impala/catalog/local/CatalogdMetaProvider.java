@@ -363,12 +363,19 @@ public class CatalogdMetaProvider implements MetaProvider {
       cacheSizeBytes = flags.local_catalog_cache_mb * 1024 * 1024;
     }
     int expirationSecs = flags.local_catalog_cache_expiration_s;
-    LOG.info("Metadata cache configuration: capacity={} MB, expiration={} sec",
-        cacheSizeBytes/1024/1024, expirationSecs);
+    int concurrencyLevel = flags.local_catalog_cache_concurrency_level;
+    if (concurrencyLevel <= 0) {
+      // 4 is the default value of the local cache
+      concurrencyLevel = 4;
+    }
+    LOG.info("Metadata cache configuration: capacity={} MB, expiration={} sec, " +
+        "concurrencyLevel={}", cacheSizeBytes/1024/1024, expirationSecs,
+        concurrencyLevel);
 
     // TODO(todd) add end-to-end test cases which stress cache eviction (both time
     // and size-triggered) and make sure results are still correct.
     cache_ = CacheBuilder.newBuilder()
+        .concurrencyLevel(concurrencyLevel)
         .maximumWeight(cacheSizeBytes)
         .expireAfterAccess(expirationSecs, TimeUnit.SECONDS)
         .weigher(new SizeOfWeigher(

@@ -34,6 +34,7 @@ DECLARE_bool(enable_stats_extrapolation);
 DECLARE_bool(use_local_catalog);
 DECLARE_int32(local_catalog_cache_expiration_s);
 DECLARE_int32(local_catalog_cache_mb);
+DECLARE_int32(local_catalog_cache_concurrency_level);
 DECLARE_int32(non_impala_java_vlog);
 DECLARE_int32(num_metadata_loading_threads);
 DECLARE_int32(max_hdfs_partitions_parallel_load);
@@ -291,6 +292,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_local_catalog_cache_mb(FLAGS_local_catalog_cache_mb);
   cfg.__set_local_catalog_cache_expiration_s(
     FLAGS_local_catalog_cache_expiration_s);
+  cfg.__set_local_catalog_cache_concurrency_level(
+    FLAGS_local_catalog_cache_concurrency_level);
   cfg.__set_server_name(FLAGS_server_name);
   cfg.__set_kudu_master_hosts(FLAGS_kudu_master_hosts);
   cfg.__set_enable_kudu_impala_hms_check(FLAGS_enable_kudu_impala_hms_check);

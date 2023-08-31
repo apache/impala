@@ -266,4 +266,6 @@ struct TBackendGflags {
   117: required bool enable_json_scanner
 
   118: required double max_filter_error_rate_from_full_scan
+
+  119: required i32 local_catalog_cache_concurrency_level
 }
