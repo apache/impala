@@ -324,7 +324,7 @@ string MetricGroup::ImpalaToPrometheusName(const string& impala_metric_name) {
   // Substitute characters as needed to match prometheus conventions. The string is
   // already the right size so we can do this in place.
   for (size_t i = 0; i < result.size(); ++i) {
-    if (result[i] == '.' || result[i] == '-') result[i] = '_';
+    if (result[i] == '.' || result[i] == '-' || result[i] == '\'') result[i] = '_';
   }
   if (result.compare(0, 7, "impala_") != 0) {
     result.insert(0, "impala_");
