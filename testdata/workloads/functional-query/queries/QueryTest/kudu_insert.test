@@ -569,14 +569,14 @@ NumRowErrors: 0
 insert into insert_non_unique_key_test_tbl1
 (id, auto_incrementing_id, vali, valv) values (4, 4, 4, 'four')
 ---- CATCH
-auto-incrementing column is incorrectly set
+Auto-Incrementing column should not be specified for INSERT operation
 ====
 ---- QUERY
 # Try to insert a row with value for auto_incrementing_id column
 insert into insert_non_unique_key_test_tbl1
 (id, auto_incrementing_id) values (5, 50000)
 ---- CATCH
-auto-incrementing column is incorrectly set
+Auto-Incrementing column should not be specified for INSERT operation
 ====
 ---- QUERY
 # Try to insert a row without value for key column
