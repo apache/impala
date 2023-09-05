@@ -375,6 +375,23 @@ public interface FeIcebergTable extends FeFsTable {
     getTTableStats().setTotal_file_bytes(Utils.calculateFileSizeInBytes(this));
   }
 
+  static void setIcebergStorageDescriptor(
+      org.apache.hadoop.hive.metastore.api.Table hmsTable) {
+    hmsTable.getSd().setInputFormat(HdfsFileFormat.ICEBERG.inputFormat());
+    hmsTable.getSd().setOutputFormat(HdfsFileFormat.ICEBERG.outputFormat());
+    hmsTable.getSd().getSerdeInfo().setSerializationLib(
+        HdfsFileFormat.ICEBERG.serializationLib());
+  }
+
+  static void resetIcebergStorageDescriptor(
+      org.apache.hadoop.hive.metastore.api.Table modifiedTable,
+      org.apache.hadoop.hive.metastore.api.Table originalTable) {
+    modifiedTable.getSd().setInputFormat(originalTable.getSd().getInputFormat());
+    modifiedTable.getSd().setOutputFormat(originalTable.getSd().getOutputFormat());
+    modifiedTable.getSd().getSerdeInfo().setSerializationLib(
+        originalTable.getSd().getSerdeInfo().getSerializationLib());
+  }
+
   /**
    * Utility functions
    */

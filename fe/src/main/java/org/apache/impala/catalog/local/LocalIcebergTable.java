@@ -85,6 +85,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     Preconditions.checkNotNull(db);
     Preconditions.checkNotNull(msTable);
     try {
+      FeIcebergTable.setIcebergStorageDescriptor(msTable);
       TableParams tableParams = new TableParams(msTable);
       TPartialTableInfo tableInfo = db.getCatalog().getMetaProvider()
           .loadIcebergTable(ref);

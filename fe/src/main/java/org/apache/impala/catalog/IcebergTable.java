@@ -29,8 +29,6 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.iceberg.TableProperties;
-import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.analysis.IcebergPartitionField;
@@ -247,7 +245,14 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   public static boolean isIcebergTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    return isIcebergStorageHandler(msTbl.getParameters().get(KEY_STORAGE_HANDLER));
+    String inputFormat = msTbl.getSd().getInputFormat();
+    HdfsFileFormat hdfsFileFormat = inputFormat != null ?
+        HdfsFileFormat.fromHdfsInputFormatClass(inputFormat, null) :
+        null;
+    return isIcebergStorageHandler(msTbl.getParameters().get(KEY_STORAGE_HANDLER)) ||
+        hdfsFileFormat == HdfsFileFormat.ICEBERG ||
+        (hdfsFileFormat == null &&
+         "ICEBERG".equals(msTbl.getParameters().get("table_type")));
   }
 
   @Override
@@ -347,6 +352,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     try {
       // Copy the table to check later if anything has changed.
       msTable_ = msTbl.deepCopy();
+      // Other engines might create Iceberg tables without setting the HiveIceberg*
+      // storage descriptors. Impala relies on the storage descriptors being set to
+      // certain classes, so we set it here for the in-memory metastore table.
+      FeIcebergTable.setIcebergStorageDescriptor(msTable_);
       setTableStats(msTable_);
       // Load metadata from Iceberg
       final Timer.Context ctxStorageLdTime =
@@ -382,6 +391,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
       refreshLastUsedTime();
 
+      // Let's reset the storage descriptors, so we don't update the table unnecessarily.
+      FeIcebergTable.resetIcebergStorageDescriptor(msTable_, msTbl);
       // Avoid updating HMS if the schema didn't change.
       if (msTable_.equals(msTbl)) return;
 
