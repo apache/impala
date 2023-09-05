@@ -312,7 +312,7 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
   @CustomClusterTestSuite.with_args(
-    catalogd_args="--hms_event_polling_interval_s=5"
+    catalogd_args="--hms_event_polling_interval_s=10"
                   " --enable_skipping_older_events=true"
                   " --enable_sync_to_latest_event_on_ddls=true")
   def test_skipping_older_events(self, unique_database):
@@ -360,11 +360,11 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
         complete_query += query.format(unique_database, table_name)
       verify_skipping_hive_stmt_events(complete_query, table_name)
       # Dynamic partitions test
-      query = " ".join(["create", "transactional" if is_transactional else '',
-        "table `{}`.`{}` (i int)",
-        "partitioned by (year int)" if is_partitioned else '', ";"])
-      complete_query = query.format(unique_database, "new_table")
-      complete_query += "insert overwrite table `{db}`.`{tbl1}` " \
+      query = " ".join(["create", "table `{}`.`{}` (i int)",
+        " partitioned by (year int) " if is_partitioned else '',
+        self.__get_transactional_tblproperties(is_transactional)])
+      self.client.execute(query.format(unique_database, "new_table"))
+      complete_query = "insert overwrite table `{db}`.`{tbl1}` " \
         "select * from `{db}`.`{tbl2}`"\
         .format(db=unique_database, tbl1="new_table", tbl2=table_name)
       verify_skipping_hive_stmt_events(complete_query, "new_table")
