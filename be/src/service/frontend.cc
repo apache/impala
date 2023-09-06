@@ -84,6 +84,12 @@ DEFINE_string(kudu_master_hosts, "", "Specifies the default Kudu master(s). The 
     "optional.");
 DEFINE_bool(enable_kudu_impala_hms_check, true, "By default this flag is true. If "
     "enabled checks that Kudu and Impala are using the same HMS instance(s).");
+DEFINE_string(jni_frontend_class, "org/apache/impala/service/JniFrontend", "By default "
+    "the JniFrontend class included in the repository is used as the frontend interface. "
+    "This option allows the class to be overridden by a third party module. The "
+    "overridden class needs to contain all the methods in the methods[] variable, so "
+    "most implementations should make their class a child of JniFrontend and "
+    "override only relevant methods.");
 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {
@@ -133,7 +139,7 @@ Frontend::Frontend() {
   ABORT_IF_ERROR(jni_frame.push(jni_env));
 
   // create instance of java class JniFrontend
-  jclass fe_class = jni_env->FindClass("org/apache/impala/service/JniFrontend");
+  jclass fe_class = jni_env->FindClass(FLAGS_jni_frontend_class.c_str());
   ABORT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);

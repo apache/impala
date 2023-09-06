@@ -155,6 +155,9 @@ parser.add_option("--enable_catalogd_ha", dest="enable_catalogd_ha",
                   action="store_true", default=False,
                   help="If true, enables CatalogD HA - the cluster will be launched "
                   "with two catalogd instances as Active-Passive HA pair.")
+parser.add_option("--jni_frontend_class", dest="jni_frontend_class",
+                  action="store", default="org/apache/impala/service/JniFrontend",
+                  help="Use a custom java frontend interface.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -484,6 +487,10 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if "geospatial_library" not in args:
       args = "{args} -geospatial_library={geospatial_library}".format(
           args=args, geospatial_library=options.geospatial_library)
+
+    if options.jni_frontend_class:
+      args = "-jni_frontend_class={jni_frontend_class} {args}".format(
+          jni_frontend_class=options.jni_frontend_class, args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):
