@@ -86,6 +86,24 @@ public class IcebergDeleteNode extends JoinNode {
   }
 
   @Override
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
+    // Compute cardinality differently. Let's assume all position delete records apply to
+    // a data record (Concurrent DELETEs should be extremely rare).
+    // Also assume that the left side's selectivity applies to the delete records as well.
+    // Please note that left side's cardinality already takes the selectivity into
+    // account (i.e. no need to do leftSelectivity * leftCard).
+    long leftCardWithSelectivity = getChild(0).cardinality_;
+    long rightCard = getChild(1).cardinality_;
+    // Both sides should have non-zero cardinalities.
+    Preconditions.checkState(leftCardWithSelectivity > 0);
+    Preconditions.checkState(rightCard > 0);
+    double leftSelectivity = getChild(0).computeSelectivity();
+    long rightCardWithSelectivity = (long)(leftSelectivity * rightCard);
+    cardinality_ = Math.max(1, leftCardWithSelectivity - rightCardWithSelectivity);
+  }
+
+  @Override
   protected String debugString() {
     return MoreObjects.toStringHelper(this)
         .add("eqJoinConjuncts_", eqJoinConjunctsDebugString())

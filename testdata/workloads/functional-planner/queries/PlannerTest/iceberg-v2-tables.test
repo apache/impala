@@ -51,7 +51,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=20B cardinality=3
+|  row-size=20B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
@@ -74,7 +74,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
-|  row-size=20B cardinality=3
+|  row-size=20B cardinality=2
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -91,7 +91,7 @@ SELECT * from iceberg_v2_delete_positional;
 PLAN-ROOT SINK
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=40B cardinality=3
+|  row-size=40B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
@@ -106,7 +106,7 @@ PLAN-ROOT SINK
 04:EXCHANGE [UNPARTITIONED]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
-|  row-size=40B cardinality=3
+|  row-size=40B cardinality=2
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -123,7 +123,7 @@ SELECT * from iceberg_v2_positional_delete_all_rows;
 PLAN-ROOT SINK
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=36B cardinality=3
+|  row-size=36B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_delete_all_rows-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_delete_all_rows-position-delete]
 |     HDFS partitions=1/1 files=1 size=2.60KB
@@ -138,7 +138,7 @@ PLAN-ROOT SINK
 04:EXCHANGE [UNPARTITIONED]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
-|  row-size=36B cardinality=3
+|  row-size=36B cardinality=1
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -214,7 +214,7 @@ PLAN-ROOT SINK
 |  row-size=36B cardinality=1
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |  |     HDFS partitions=1/1 files=2 size=5.33KB
@@ -239,7 +239,7 @@ PLAN-ROOT SINK
 |  row-size=36B cardinality=1
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--06:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
 |  |  |
@@ -263,10 +263,10 @@ PLAN-ROOT SINK
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |  |     HDFS partitions=1/1 files=2 size=5.33KB
@@ -286,10 +286,10 @@ PLAN-ROOT SINK
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--06:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
 |  |  |
@@ -330,7 +330,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=20B cardinality=3
+|  row-size=20B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |     HDFS partitions=1/1 files=1 size=2.63KB
@@ -353,7 +353,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
-|  row-size=20B cardinality=3
+|  row-size=20B cardinality=2
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -374,7 +374,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=20B cardinality=6
+|  row-size=20B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |     HDFS partitions=1/1 files=2 size=5.33KB
@@ -397,7 +397,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  row-size=20B cardinality=6
+|  row-size=20B cardinality=2
 |
 |--05:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
 |  |
@@ -417,10 +417,10 @@ PLAN-ROOT SINK
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=6
+|  row-size=36B cardinality=4
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  |  row-size=36B cardinality=3
+|  |  row-size=36B cardinality=1
 |  |
 |  |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_update_all_rows-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_update_all_rows-position-delete]
 |  |     HDFS partitions=1/1 files=1 size=2.60KB
@@ -440,10 +440,10 @@ PLAN-ROOT SINK
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=6
+|  row-size=36B cardinality=4
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
-|  |  row-size=36B cardinality=3
+|  |  row-size=36B cardinality=1
 |  |
 |  |--05:EXCHANGE [BROADCAST]
 |  |  |
@@ -464,7 +464,7 @@ SELECT * from iceberg_v2_partitioned_position_deletes
 PLAN-ROOT SINK
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=64B cardinality=20
+|  row-size=64B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
@@ -479,7 +479,7 @@ PLAN-ROOT SINK
 05:EXCHANGE [UNPARTITIONED]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  row-size=64B cardinality=20
+|  row-size=64B cardinality=10
 |
 |--04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path)]
 |  |
@@ -556,7 +556,7 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=6
 |
 |--06:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]
 |     HDFS partitions=1/1 files=1 size=625B
@@ -564,14 +564,14 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=6
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |  |     HDFS partitions=1/1 files=2 size=5.33KB
@@ -591,7 +591,7 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  hash predicates: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=6
 |
 |--12:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s)]
 |  |
@@ -601,20 +601,20 @@ PLAN-ROOT SINK
 |
 11:AGGREGATE [FINALIZE]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=6
 |
 10:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s)]
 |
 05:AGGREGATE [STREAMING]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=6
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--09:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
 |  |  |
@@ -696,7 +696,7 @@ PLAN-ROOT SINK
 11:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: i = max(i)
 |  runtime filters: RF000 <- max(i)
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--10:AGGREGATE [FINALIZE]
 |  |  output: max(i)
@@ -704,10 +704,10 @@ PLAN-ROOT SINK
 |  |
 |  09:UNION
 |  |  pass-through-operands: all
-|  |  row-size=24B cardinality=6
+|  |  row-size=24B cardinality=4
 |  |
 |  |--07:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  |  |  row-size=24B cardinality=3
+|  |  |  row-size=24B cardinality=1
 |  |  |
 |  |  |--06:SCAN HDFS [functional_parquet.iceberg_v2_positional_update_all_rows-POSITION-DELETE-06 functional_parquet.iceberg_v2_positional_update_all_rows-position-delete]
 |  |  |     HDFS partitions=1/1 files=1 size=2.60KB
@@ -723,10 +723,10 @@ PLAN-ROOT SINK
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |  |     HDFS partitions=1/1 files=2 size=5.33KB
@@ -749,7 +749,7 @@ PLAN-ROOT SINK
 11:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: i = max(i)
 |  runtime filters: RF000 <- max(i)
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--17:EXCHANGE [BROADCAST]
 |  |
@@ -765,10 +765,10 @@ PLAN-ROOT SINK
 |  |
 |  09:UNION
 |  |  pass-through-operands: all
-|  |  row-size=24B cardinality=6
+|  |  row-size=24B cardinality=4
 |  |
 |  |--07:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
-|  |  |  row-size=24B cardinality=3
+|  |  |  row-size=24B cardinality=1
 |  |  |
 |  |  |--14:EXCHANGE [BROADCAST]
 |  |  |  |
@@ -786,10 +786,10 @@ PLAN-ROOT SINK
 |
 04:UNION
 |  pass-through-operands: all
-|  row-size=36B cardinality=10
+|  row-size=36B cardinality=6
 |
 |--02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  |  row-size=36B cardinality=6
+|  |  row-size=36B cardinality=2
 |  |
 |  |--13:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
 |  |  |
@@ -1011,7 +1011,7 @@ select * from iceberg_v2_partitioned_position_deletes where action = 'download';
 PLAN-ROOT SINK
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=64B cardinality=6
+|  row-size=64B cardinality=4
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=1 size=3.18KB
@@ -1027,7 +1027,7 @@ PLAN-ROOT SINK
 04:EXCHANGE [UNPARTITIONED]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, BROADCAST]
-|  row-size=64B cardinality=6
+|  row-size=64B cardinality=4
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -1054,7 +1054,7 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  07:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  |  row-size=20B cardinality=6
+|  |  row-size=20B cardinality=2
 |  |
 |  |--06:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-06 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |  |     HDFS partitions=1/1 files=2 size=5.33KB
@@ -1076,7 +1076,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=20B cardinality=6
+|  row-size=20B cardinality=2
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-POSITION-DELETE-01 functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete]
 |     HDFS partitions=1/1 files=2 size=5.33KB
@@ -1104,7 +1104,7 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  07:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  |  row-size=20B cardinality=6
+|  |  row-size=20B cardinality=2
 |  |
 |  |--17:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
 |  |  |
@@ -1138,7 +1138,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, PARTITIONED]
-|  row-size=20B cardinality=6
+|  row-size=20B cardinality=2
 |
 |--12:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files-position-delete.file_path)]
 |  |
