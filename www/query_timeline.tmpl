@@ -272,6 +272,10 @@ function collectFragmentEventsFromProfile(ignored_arg) {
 
         // Build list of timestamps that spans instances for each event
         for (var en = 0; en < fevents.length; ++en) {
+          if (fevents[en].label.includes("AsyncCodegen")) {
+            fevents[en].no_bar = true;
+            continue;
+          }
           fevents[en].tslist = [ fevents[en].timestamp ];
           for (var instance = 1; instance < fp.child_profiles.length; ++instance) {
             if (fp.child_profiles[instance].event_sequences != undefined) {
