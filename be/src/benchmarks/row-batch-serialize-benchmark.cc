@@ -21,6 +21,7 @@
 
 #include "common/init.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/outbound-row-batch.h"
 #include "runtime/raw-value.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"

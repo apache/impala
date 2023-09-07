@@ -22,6 +22,7 @@
 #include "runtime/collection-value.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/outbound-row-batch.h"
 #include "runtime/raw-value.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"

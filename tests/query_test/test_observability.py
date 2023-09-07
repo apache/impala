@@ -549,15 +549,19 @@ class TestObservability(ImpalaTestSuite):
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_global_exchange_counters(self):
     """Test that global exchange counters are set correctly."""
-    query = """select count(*) from tpch_parquet.orders o inner join tpch_parquet.lineitem
-        l on o.o_orderkey = l.l_orderkey group by o.o_clerk limit 10"""
+
+    # periodic_counter_update_period_ms is 500 ms by default. Use sleep(50) with limit 10
+    # to ensure that there is at least one sample in sampling counters.
+    query = """select count(*), sleep(50) from tpch_parquet.orders o
+        inner join tpch_parquet.lineitem l on o.o_orderkey = l.l_orderkey
+        group by o.o_clerk limit 10"""
     profile = self.execute_query(query).runtime_profile
 
     # TimeSeriesCounter should be prefixed with a hyphen.
     assert "  MemoryUsage" not in profile
     assert "- MemoryUsage" in profile
 
-    assert "ExchangeScanRatio: 3.19" in profile
+    assert "ExchangeScanRatio: 4.63" in profile
 
     keys = ["TotalBytesSent", "TotalScanBytesSent", "TotalInnerBytesSent"]
     counters = defaultdict(int)

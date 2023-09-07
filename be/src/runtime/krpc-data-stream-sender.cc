@@ -149,13 +149,15 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // AddRow() and not sent directly via SendBatch().
   Channel(KrpcDataStreamSender* parent, const RowDescriptor* row_desc,
       const std::string& hostname, const NetworkAddressPB& destination,
-      const UniqueIdPB& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size)
+      const UniqueIdPB& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size,
+      bool is_local)
     : parent_(parent),
       row_desc_(row_desc),
       hostname_(hostname),
       address_(destination),
       fragment_instance_id_(fragment_instance_id),
-      dest_node_id_(dest_node_id) {
+      dest_node_id_(dest_node_id),
+      is_local_(is_local) {
     DCHECK(IsResolvedAddress(address_));
   }
 
@@ -206,6 +208,8 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // The type for a RPC worker function.
   typedef boost::function<Status()> DoRpcFn;
 
+  bool IsLocal() const { return is_local_; }
+
  private:
   // The parent data stream sender owning this channel. Not owned.
   KrpcDataStreamSender* parent_;
@@ -219,6 +223,9 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   const NetworkAddressPB address_;
   const UniqueIdPB fragment_instance_id_;
   const PlanNodeId dest_node_id_;
+
+  // True if the target fragment instance runs within the same process.
+  const bool is_local_;
 
   // The row batch for accumulating rows copied from AddRow().
   // Only used if the partitioning scheme is "KUDU" or "HASH_PARTITIONED".
@@ -378,7 +385,7 @@ Status KrpcDataStreamSender::Channel::Init(
 
   // Init outbound_batches_.
   for (int i = 0; i < NUM_OUTBOUND_BATCHES; ++i) {
-    outbound_batches_.emplace_back(allocator);
+    outbound_batches_.emplace_back(allocator, is_local_);
   }
   return Status::OK();
 }
@@ -738,10 +745,14 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
       || sink.output_partition.type == TPartitionType::RANDOM
       || sink.output_partition.type == TPartitionType::KUDU);
 
+  string process_address =
+      NetworkAddressPBToString(ExecEnv::GetInstance()->krpc_address());
   for (const auto& destination : destinations) {
+    bool is_local =
+        process_address == NetworkAddressPBToString(destination.krpc_backend());
     channels_.emplace_back(new Channel(this, row_desc_, destination.address().hostname(),
         destination.krpc_backend(), destination.fragment_instance_id(), sink.dest_node_id,
-        per_channel_buffer_size));
+        per_channel_buffer_size, is_local));
   }
 
   if (partition_type_ == TPartitionType::UNPARTITIONED
@@ -786,9 +797,14 @@ Status KrpcDataStreamSender::Prepare(
       new MemTracker(-1, "RowBatchSerialization", mem_tracker_.get()));
   char_mem_tracker_allocator_.reset(
       new CharMemTrackerAllocator(outbound_rb_mem_tracker_));
-
+  string process_address =
+       NetworkAddressPBToString(ExecEnv::GetInstance()->krpc_address());
   for (int i = 0; i < NUM_OUTBOUND_BATCHES; ++i) {
-    outbound_batches_.emplace_back(char_mem_tracker_allocator_);
+    // Only skip compression if there is a single channel and destination is in the same
+    // process. TODO: could be optimized to send the uncompressed buffer to the local
+    // targets to avoid decompression cost at the receiver.
+    bool is_local = channels_.size() == 1 && channels_[0]->IsLocal();
+    outbound_batches_.emplace_back(char_mem_tracker_allocator_, is_local);
   }
 
   for (int i = 0; i < channels_.size(); ++i) {

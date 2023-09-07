@@ -29,13 +29,14 @@
 #include "exec/data-sink.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/row-batch.h"
+#include "runtime/outbound-row-batch.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
 
 class KrpcDataStreamSender;
 class MemTracker;
+class RowBatch;
 class RowDescriptor;
 class TDataStreamSink;
 class TNetworkAddress;

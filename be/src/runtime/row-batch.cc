@@ -23,6 +23,7 @@
 
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/outbound-row-batch.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "util/compress.h"
@@ -273,7 +274,7 @@ Status RowBatch::Serialize(DedupMap* distinct_tuples, OutboundRowBatch* output_b
 
   *is_compressed = false;
 
-  if (size > 0) {
+  if (size > 0 && !output_batch->skip_compression_) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
     // smaller
     Lz4Compressor compressor(nullptr, false);
