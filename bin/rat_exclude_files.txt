@@ -225,7 +225,7 @@ cmake_modules/FindJNI.cmake
 
 # http://www.apache.org/legal/resolved.html#category-a : Python Software Foundation
 # License is allowed.
-shell/pkg_resources.py
+shell/legacy/pkg_resources.py
 
 # Notices in Impala as required by ASF rules:
 DISCLAIMER

@@ -28,7 +28,7 @@ for file in $(git ls-files '**/*.py'); do
         continue
     fi
     # Skip the shell's pkg_resources.py
-    if [[ "${file}" == "shell/pkg_resources.py" ]]; then
+    if [[ "${file}" == "shell/legacy/pkg_resources.py" ]]; then
         continue
     fi
 

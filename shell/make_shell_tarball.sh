@@ -186,7 +186,7 @@ cp ${SHELL_HOME}/impala_shell.py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/compatibility.py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/thrift_printer.py ${TARBALL_ROOT}
 
-cp ${SHELL_HOME}/pkg_resources.py ${TARBALL_ROOT}/legacy
+cp ${SHELL_HOME}/legacy/pkg_resources.py ${TARBALL_ROOT}/legacy
 
 pushd ${BUILD_DIR} > /dev/null
 echo "Making tarball in ${BUILD_DIR}"
