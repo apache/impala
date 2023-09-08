@@ -268,6 +268,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   // number of batch events generated
   public static final String NUMBER_OF_BATCH_EVENTS = "batch-events-created";
 
+  // metric to measure the delay in msec, between the event created in metastore and time
+  // it took to be consumed by the event processor
+  public static final String AVG_DELAY_IN_CONSUMING_EVENTS = "events-consuming" +
+      "-delay";
+
   private static final long SECOND_IN_NANOS = 1000 * 1000 * 1000L;
 
   // List of event types to skip while fetching notification events from metastore
@@ -647,6 +652,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     metrics_
         .addGauge(DELETE_EVENT_LOG_SIZE, (Gauge<Integer>) deleteEventLog_::size);
     metrics_.addCounter(NUMBER_OF_BATCH_EVENTS);
+    metrics_.addTimer(AVG_DELAY_IN_CONSUMING_EVENTS);
   }
 
   /**
@@ -1162,6 +1168,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           deleteEventLog_.garbageCollect(event.getEventId());
           lastSyncedEventId_.set(event.getEventId());
           lastSyncedEventTimeSecs_.set(event.getEventTime());
+          metrics_.getTimer(AVG_DELAY_IN_CONSUMING_EVENTS).update(
+              (System.currentTimeMillis() / 1000) - event.getEventTime(),
+                  TimeUnit.SECONDS);
         }
       }
     } catch (CatalogException e) {

@@ -61,6 +61,7 @@ import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -195,6 +196,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public static final String TBL_PROP_EXTERNAL_TABLE_PURGE_DEFAULT = "TRUE";
 
   public static final AtomicInteger LOADING_TABLES = new AtomicInteger(0);
+
+  // Table property key to determine the table's events process duration
+  public static final String TBL_EVENTS_PROCESS_DURATION = "events-process-duration";
+
+  // The last sync event id of the table
+  public static final String LAST_SYNC_EVENT_ID = "last-sync-event-id";
 
   // this field represents the last event id in metastore upto which this table is
   // synced. It is used if the flag sync_to_latest_event_on_ddls is set to true.
@@ -382,6 +389,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     metrics_.addTimer(HMS_LOAD_TBL_SCHEMA);
     metrics_.addTimer(LOAD_DURATION_ALL_COLUMN_STATS);
     metrics_.addCounter(NUMBER_OF_INFLIGHT_EVENTS);
+    metrics_.addTimer(TBL_EVENTS_PROCESS_DURATION);
+    metrics_.addGauge(LAST_SYNC_EVENT_ID,
+        (Gauge<Long>) () -> Long.valueOf(lastSyncedEventId_));
   }
 
   public Metrics getMetrics() { return metrics_; }

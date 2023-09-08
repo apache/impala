@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.events;
 
+import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -69,6 +70,8 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.hive.common.MutableValidWriteIdList;
+
+import static org.apache.impala.catalog.Table.TBL_EVENTS_PROCESS_DURATION;
 
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -1092,6 +1095,25 @@ public class MetastoreEvents {
       }
       return false;
     }
+
+    @Override
+    protected void process() throws MetastoreNotificationException, CatalogException {
+      Timer.Context context = null;
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl != null) {
+        context = tbl.getMetrics().getTimer(TBL_EVENTS_PROCESS_DURATION).time();
+      }
+      try {
+        processTableEvent();
+      } finally {
+        if (context != null) {
+          context.stop();
+        }
+      }
+    }
+
+    protected abstract void processTableEvent() throws MetastoreNotificationException,
+        CatalogException;
   }
 
   /**
@@ -1199,7 +1221,7 @@ public class MetastoreEvents {
      * overridden. Else, it will ignore the event
      */
     @Override
-    public void process() throws MetastoreNotificationException {
+    public void processTableEvent() throws MetastoreNotificationException {
       // check if the table exists already. This could happen in corner cases of the
       // table being dropped and recreated with the same name or in case this event is
       // a self-event (see description of self-event in the class documentation of
@@ -1348,7 +1370,7 @@ public class MetastoreEvents {
     }
 
     @Override
-    public void process() throws MetastoreNotificationException {
+    public void processTableEvent() throws MetastoreNotificationException {
       if (isSelfEvent()) {
         infoLog("Not processing the insert event as it is a self-event");
         return;
@@ -1515,7 +1537,8 @@ public class MetastoreEvents {
      * table on the tblName from the event
      */
     @Override
-    public void process() throws MetastoreNotificationException, CatalogException {
+    public void processTableEvent() throws MetastoreNotificationException,
+        CatalogException {
       if (isRename_) {
         processRename();
         return;
@@ -1778,9 +1801,10 @@ public class MetastoreEvents {
      * not a huge problem since the tables will eventually be created when the
      * create events are processed but there will be a non-zero amount of time when the
      * table will not be existing in catalog.
+     * TODO: IMPALA-12646, to track average process time for drop operations.
      */
     @Override
-    public void process() throws MetastoreNotificationException {
+    public void processTableEvent() throws MetastoreNotificationException {
       Reference<Boolean> tblRemovedLater = new Reference<>();
       boolean removedTable;
       removedTable = catalogOpExecutor_
@@ -2105,9 +2129,11 @@ public class MetastoreEvents {
     }
 
     @Override
-    public void process() throws MetastoreNotificationException, CatalogException {
+    public void processTableEvent() throws MetastoreNotificationException,
+        CatalogException {
       // bail out early if there are not partitions to process
       if (addedPartitions_.isEmpty()) {
+        metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         infoLog("Partition list is empty. Ignoring this event.");
         return;
       }
@@ -2241,7 +2267,8 @@ public class MetastoreEvents {
     }
 
     @Override
-    public void process() throws MetastoreNotificationException, CatalogException {
+    public void processTableEvent() throws MetastoreNotificationException,
+        CatalogException {
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
@@ -2260,11 +2287,11 @@ public class MetastoreEvents {
             + "parameters which can be ignored.");
         return;
       }
-
       // Reload the whole table if it's a transactional table or materialized view.
-      // Materialized views are treated as a special case because it's possible to receive
-      // partition event on MVs, but they are regular views in Impala. That cause problems
-      // on the reloading partition logic which expects it to be a HdfsTable.
+      // Materialized views are treated as a special case because it's possible to
+      // receive partition event on MVs, but they are regular views in Impala. That
+      // cause problems on the reloading partition logic which expects it to be a
+      // HdfsTable.
       if (AcidUtils.isTransactionalTable(msTbl_.getParameters())
           || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
         reloadTransactionalTable();
@@ -2279,11 +2306,11 @@ public class MetastoreEvents {
           reloadPartitions(Arrays.asList(partitionAfter_),
               FileMetadataLoadOpts.LOAD_IF_SD_CHANGED, "ALTER_PARTITION event");
         } catch (CatalogException e) {
-          throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
-                  + "partition on table {} partition {} failed. Event processing cannot "
-                  + "continue. Issue an invalidate command to reset the event processor "
-                  + "state.", getFullyQualifiedTblName(),
-              HdfsTable.constructPartitionName(tPartSpec)), e);
+          throw new MetastoreNotificationNeedsInvalidateException(
+              debugString("Refresh partition on table {} partition {} failed. Event " +
+                  "processing cannot continue. Issue an invalidate command to reset " +
+                  "the event processor state.", getFullyQualifiedTblName(),
+                  HdfsTable.constructPartitionName(tPartSpec)), e);
         }
       }
     }
@@ -2381,12 +2408,12 @@ public class MetastoreEvents {
     List<T> getBatchEvents() { return batchedEvents_; }
 
     @Override
-    protected void process() throws MetastoreNotificationException, CatalogException {
+    protected void processTableEvent() throws MetastoreNotificationException,
+        CatalogException {
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
       }
-
       // Ignore the event if this is a trivial event. See javadoc for
       // isTrivialAlterPartitionEvent() for examples.
       List<T> eventsToProcess = new ArrayList<>();
@@ -2503,12 +2530,15 @@ public class MetastoreEvents {
     }
 
     @Override
-    public void process() throws MetastoreNotificationException, CatalogException {
+    public void processTableEvent() throws MetastoreNotificationException,
+        CatalogException {
       // we have seen cases where a add_partition event is generated with empty
       // partition list (see IMPALA-8547 for details. Make sure that droppedPartitions
       // list is not empty
       if (droppedPartitions_.isEmpty()) {
+        metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         infoLog("Partition list is empty. Ignoring this event.");
+        return;
       }
       try {
         // Reload the whole table if it's a transactional table or materialized view.
@@ -2587,7 +2617,7 @@ public class MetastoreEvents {
     }
 
     @Override
-    protected void process() throws MetastoreNotificationException {
+    protected void processTableEvent() throws MetastoreNotificationException {
       if (msTbl_ == null) {
         debugLog("Ignoring the event since table {} is not found",
             getFullyQualifiedTblName());
@@ -2686,7 +2716,7 @@ public class MetastoreEvents {
     }
 
     @Override
-    public void process() throws MetastoreNotificationException {
+    public void processTableEvent() throws MetastoreNotificationException {
       if (isSelfEvent() || isOlderEvent()) {
         metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .inc(getNumberOfEvents());
@@ -2695,7 +2725,6 @@ public class MetastoreEvents {
                 .getCount());
         return;
       }
-
       if (isRefresh_) {
         if (reloadPartition_ != null) {
           processPartitionReload();
@@ -2875,7 +2904,7 @@ public class MetastoreEvents {
     }
 
     @Override
-    protected void process() throws MetastoreNotificationException {
+    protected void processTableEvent() throws MetastoreNotificationException {
       try {
         if (partitionName_ == null) {
           reloadTableFromCatalog("Commit Compaction event", true);

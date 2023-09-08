@@ -54,6 +54,7 @@ class TestWebPage(ImpalaTestSuite):
   PROMETHEUS_METRICS_URL = "http://localhost:{0}/metrics_prometheus"
   QUERIES_URL = "http://localhost:{0}/queries"
   HEALTHZ_URL = "http://localhost:{0}/healthz"
+  EVENT_PROCESSOR_URL = "http://localhost:{0}/events"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -339,8 +340,11 @@ class TestWebPage(ImpalaTestSuite):
     self.__test_table_metrics(unique_database, "foo_part", "total-file-size-bytes")
     self.__test_table_metrics(unique_database, "foo_part", "num-files")
     self.__test_table_metrics(unique_database, "foo_part", "alter-duration")
+    self.__test_table_metrics(unique_database, "foo_part", "events-process-duration")
     self.__test_catalog_tablesfilesusage(unique_database, "foo_part", "1")
     self.__test_catalog_tables_loading_time(unique_database, "foo_part")
+    self.get_and_check_status(self.EVENT_PROCESSOR_URL, "events-consuming-delay",
+        ports_to_test=self.CATALOG_TEST_PORT)
 
   def __test_catalog_object(self, db_name, tbl_name, cluster_properties):
     """Tests the /catalog_object endpoint for the given db/table. Runs

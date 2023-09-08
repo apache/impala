@@ -992,8 +992,8 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
         "Failing query(impala={}): {}".format(use_impala_client, stmt)
     else:
       # hive was used to run the stmts, any events generated should not have been deemed
-      # as self events
-      assert events_skipped == events_skipped_after
+      # as self events unless there are empty partition add/drop events
+      assert events_skipped <= events_skipped_after
 
   def __get_tbl_location(self, db_name, tbl_name):
     assert self.hive_client is not None
