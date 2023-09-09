@@ -52,16 +52,16 @@ public class LdapKerberosImpalaShellTestBase extends LdapImpalaShellTest {
     String ldapUri = String.format("ldap://localhost:%s",
             serverRule.getLdapServer().getPort());
     String passwordCommand = String.format("'echo -n %s'", TEST_PASSWORD_1);
-    return ImmutableMap.of(
-            "enable_ldap_auth", "true",
-            "ldap_uri", ldapUri,
-            "ldap_passwords_in_clear_ok", "true",
-            "ldap_user_search_basedn", userSearchBaseDn,
-            "ldap_group_search_basedn", groupSearchBaseDn,
-            "ldap_search_bind_authentication", "true",
-            "ldap_bind_dn", TEST_USER_DN_1,
-            "ldap_bind_password_cmd", passwordCommand
-    );
+    return ImmutableMap.<String, String>builder()
+        .put("enable_ldap_auth", "true")
+        .put("ldap_uri", ldapUri)
+        .put("ldap_passwords_in_clear_ok", "true")
+        .put("ldap_user_search_basedn", userSearchBaseDn)
+        .put("ldap_group_search_basedn", groupSearchBaseDn)
+        .put("ldap_search_bind_authentication", "true")
+        .put("ldap_bind_dn", TEST_USER_DN_1)
+        .put("ldap_bind_password_cmd", passwordCommand)
+        .build();
   }
 
   protected Map<String, String> getCustomLdapFilterFlags() {

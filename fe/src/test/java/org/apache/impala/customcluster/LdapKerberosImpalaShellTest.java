@@ -155,17 +155,17 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
             // define custom LDAP user filter corresponding to the values
             // in fe/src/test/resources/users.ldif,
             // and allow using custom filters with Kerberos authentication
-            ImmutableMap.of(
-                    "enable_ldap_auth", "true",
-                    "ldap_uri", ldapUri,
-                    "ldap_passwords_in_clear_ok", "true",
-                    "ldap_user_search_basedn", defaultUserSearchBaseDn,
-                    "ldap_user_filter", "(cn={0})",
-                    "ldap_search_bind_authentication", "true",
-                    "ldap_bind_dn", TEST_USER_DN_1,
-                    "ldap_bind_password_cmd", passwordCommand,
-                    "allow_custom_ldap_filters_with_kerberos_auth", "true"
-            ),
+            ImmutableMap.<String, String>builder()
+                .put("enable_ldap_auth", "true")
+                .put("ldap_uri", ldapUri)
+                .put("ldap_passwords_in_clear_ok", "true")
+                .put("ldap_user_search_basedn", defaultUserSearchBaseDn)
+                .put("ldap_user_filter", "(cn={0})")
+                .put("ldap_search_bind_authentication", "true")
+                .put("ldap_bind_dn", TEST_USER_DN_1)
+                .put("ldap_bind_password_cmd", passwordCommand)
+                .put("allow_custom_ldap_filters_with_kerberos_auth", "true")
+                .build(),
 
             // set proxy user: allow TEST_USER_1 to act as a proxy for delegateUser_
             ImmutableMap.of(
@@ -614,17 +614,17 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
     String ldapUri = String.format("ldap://localhost:%s",
             serverRule.getLdapServer().getPort());
     String passwordCommand = String.format("'echo -n %s'", TEST_PASSWORD_1);
-    return ImmutableMap.of(
-            "enable_ldap_auth", "true",
-            "ldap_uri", ldapUri,
-            "ldap_passwords_in_clear_ok", "true",
-            "ldap_bind_pattern","'cn=#UID,ou=Users,dc=myorg,dc=com'",
-            "ldap_group_dn_pattern", GROUP_DN_PATTERN,
-            "ldap_group_membership_key", "uniqueMember",
-            "ldap_group_class_key", "groupOfUniqueNames",
-            "ldap_bind_dn", TEST_USER_DN_1,
-            "ldap_bind_password_cmd", passwordCommand
-    );
+    return ImmutableMap.<String, String>builder()
+        .put("enable_ldap_auth", "true")
+        .put("ldap_uri", ldapUri)
+        .put("ldap_passwords_in_clear_ok", "true")
+        .put("ldap_bind_pattern","'cn=#UID,ou=Users,dc=myorg,dc=com'")
+        .put("ldap_group_dn_pattern", GROUP_DN_PATTERN)
+        .put("ldap_group_membership_key", "uniqueMember")
+        .put("ldap_group_class_key", "groupOfUniqueNames")
+        .put("ldap_bind_dn", TEST_USER_DN_1)
+        .put("ldap_bind_password_cmd", passwordCommand)
+        .build();
   }
 
   private Map<String, String> getCustomLdapSimpleBindSearchFilterFlags() {
