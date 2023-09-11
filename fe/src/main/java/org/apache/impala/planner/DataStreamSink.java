@@ -67,6 +67,8 @@ public class DataStreamSink extends DataSink {
    * equal to avgOutboundRowBatchSize. If outputPartiton_ is partitioned, all of the
    * channel's OutboundRowBatches are used. Otherwise, only a pair of OutboundRowBatches
    * in KrpcDataStreamSender class are used.
+   * TODO: this function can both over and under estimate the memory need
+   *       see IMPALA-12594 + IMPALA-12433
    */
   private long estimateOutboundRowBatchBuffers(TQueryOptions queryOptions) {
     int numChannels =

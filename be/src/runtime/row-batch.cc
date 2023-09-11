@@ -220,11 +220,13 @@ RowBatch::~RowBatch() {
   tuple_ptrs_ = nullptr;
 }
 
-Status RowBatch::Serialize(OutboundRowBatch* output_batch) {
-  return Serialize(output_batch, UseFullDedup());
+Status RowBatch::Serialize(
+     OutboundRowBatch* output_batch, TrackedString* compression_scratch) {
+  return Serialize(output_batch, UseFullDedup(), compression_scratch);
 }
 
-Status RowBatch::Serialize(OutboundRowBatch* output_batch, bool full_dedup) {
+Status RowBatch::Serialize(
+    OutboundRowBatch* output_batch, bool full_dedup, TrackedString* compression_scratch) {
   bool is_compressed;
   output_batch->tuple_offsets_.clear();
 
@@ -251,8 +253,8 @@ Status RowBatch::Serialize(OutboundRowBatch* output_batch, bool full_dedup) {
   }
   output_batch->tuple_data_.resize(size);
 
-  RETURN_IF_ERROR(Serialize(
-      full_dedup ? &distinct_tuples : nullptr, output_batch, &is_compressed, size));
+  RETURN_IF_ERROR(Serialize(full_dedup ? &distinct_tuples : nullptr,
+      output_batch, &is_compressed, size, compression_scratch));
 
   // Initialize the RowBatchHeaderPB
   RowBatchHeaderPB* header = &output_batch->header_;
@@ -266,7 +268,7 @@ Status RowBatch::Serialize(OutboundRowBatch* output_batch, bool full_dedup) {
 }
 
 Status RowBatch::Serialize(DedupMap* distinct_tuples, OutboundRowBatch* output_batch,
-    bool* is_compressed, int64_t size) {
+    bool* is_compressed, int64_t size, TrackedString* compression_scratch) {
   char* tuple_data = const_cast<char*>(output_batch->tuple_data_.data());
   std::vector<int32_t>* tuple_offsets = &output_batch->tuple_offsets_;
 
@@ -274,9 +276,9 @@ Status RowBatch::Serialize(DedupMap* distinct_tuples, OutboundRowBatch* output_b
 
   *is_compressed = false;
 
-  if (size > 0 && !output_batch->skip_compression_) {
-    // Try compressing tuple_data to compression_scratch_, swap if compressed data is
-    // smaller
+  if (size > 0 && compression_scratch != nullptr) {
+    // Try compressing tuple_data to compression_scratch, swap if compressed data is
+    // smaller.
     Lz4Compressor compressor(nullptr, false);
     RETURN_IF_ERROR(compressor.Init());
     auto compressor_cleanup =
@@ -288,19 +290,21 @@ Status RowBatch::Serialize(DedupMap* distinct_tuples, OutboundRowBatch* output_b
       return Status(TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE, size);
     }
     DCHECK_GT(compressed_size, 0);
-    if (output_batch->compression_scratch_.size() < compressed_size) {
-      output_batch->compression_scratch_.resize(compressed_size);
+    if (compression_scratch->size() < compressed_size) {
+      compression_scratch->resize(compressed_size);
     }
 
     uint8_t* input = reinterpret_cast<uint8_t*>(tuple_data);
     uint8_t* compressed_output = const_cast<uint8_t*>(
-        reinterpret_cast<const uint8_t*>(output_batch->compression_scratch_.data()));
+        reinterpret_cast<const uint8_t*>(compression_scratch->data()));
     RETURN_IF_ERROR(
         compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output));
     if (LIKELY(compressed_size < size)) {
-      output_batch->compression_scratch_.resize(compressed_size);
-      output_batch->tuple_data_.swap(output_batch->compression_scratch_);
+      compression_scratch->resize(compressed_size);
+      output_batch->tuple_data_.swap(*compression_scratch);
       *is_compressed = true;
+      // TODO: could copy to a smaller buffer if compressed data is much smaller to
+      //       save memory
     }
     VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
   }

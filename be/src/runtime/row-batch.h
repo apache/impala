@@ -331,7 +331,7 @@ class RowBatch {
   /// larger than the uncompressed data. Use output_batch.compression_type to determine
   /// whether tuple_data is compressed. If an in-flight row is present in this row batch,
   /// it is ignored. This function does not Reset().
-  Status Serialize(OutboundRowBatch* output_batch);
+  Status Serialize(OutboundRowBatch* output_batch, TrackedString* compression_scratch);
 
   /// Utility function: returns total byte size of a batch in either serialized or
   /// deserialized form. If a row batch is compressed, its serialized size can be much
@@ -411,7 +411,8 @@ class RowBatch {
   bool UseFullDedup();
 
   /// Overload for testing that allows the test to force the deduplication level.
-  Status Serialize(OutboundRowBatch* output_batch, bool full_dedup);
+  Status Serialize(OutboundRowBatch* output_batch, bool full_dedup,
+      TrackedString* compression_scratch);
 
   typedef FixedSizeHashTable<Tuple*, int> DedupMap;
 
@@ -435,7 +436,7 @@ class RowBatch {
   ///
   /// Returns error status if serialization failed. Returns OK otherwise.
   Status Serialize(DedupMap* distinct_tuples, OutboundRowBatch* output_batch,
-      bool* is_compressed, int64_t size);
+      bool* is_compressed, int64_t size, TrackedString* compression_scratch);
 
   /// Implementation for protobuf to deserialize a row batch.
   ///
