@@ -97,7 +97,7 @@ namespace impala {
 // Use this timezone in tests where DST changes may cause problems.
 const char* TEST_TZ_WITHOUT_DST = "America/Anguilla";
 
-ImpaladQueryExecutor* executor_;
+scoped_ptr<ImpaladQueryExecutor> executor_;
 scoped_ptr<MetricGroup> statestore_metrics(new MetricGroup("statestore_metrics"));
 Statestore* statestore;
 
@@ -232,8 +232,15 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
         FLAGS_hostname, statestore->port(), &impala_server));
     IGNORE_LEAKING_OBJECT(impala_server);
 
-    executor_ = new ImpaladQueryExecutor(FLAGS_hostname, impala_server->GetBeeswaxPort());
+    executor_.reset(
+        new ImpaladQueryExecutor(FLAGS_hostname, impala_server->GetBeeswaxPort()));
     ABORT_IF_ERROR(executor_->Setup());
+  }
+
+  static void TearDownTestCase() {
+    // Teardown before global destructors to avoid a race where JvmMetricCache is
+    // destroyed before the last query is closed.
+    executor_.reset();
   }
 
  protected:
@@ -7003,7 +7010,7 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Test Unix epoch conversions again but now converting into local timestamp values.
   {
     ScopedTimeZoneOverride time_zone("PST8PDT");
-    ScopedExecOption use_local(executor_,
+    ScopedExecOption use_local(executor_.get(),
         "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     // Determine what the local time would have been when it was 1970-01-01 GMT
     ptime local_time_at_epoch = c_local_adjustor<ptime>::utc_to_local(from_time_t(0));
@@ -7242,7 +7249,7 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Tests from Hive. When casting from timestamp to numeric, timestamps are considered
   // to be local values.
   {
-    ScopedExecOption use_local(executor_,
+    ScopedExecOption use_local(executor_.get(),
         "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     ScopedTimeZoneOverride time_zone("PST8PDT");
     TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as boolean)", TYPE_BOOLEAN,
@@ -7316,7 +7323,7 @@ TEST_P(ExprTest, TimestampFunctions) {
 
     // Check again with the flag enabled.
     {
-      ScopedExecOption use_local(executor_,
+      ScopedExecOption use_local(executor_.get(),
           "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
       tm before = to_tm(posix_time::microsec_clock::local_time());
       unix_start_time = mktime(&before);
@@ -7331,7 +7338,7 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Test that now() and current_timestamp() are reasonable.
   {
     ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
-    ScopedExecOption use_local(executor_,
+    ScopedExecOption use_local(executor_.get(),
         "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     const Timezone& local_tz = time_zone.GetTimezone();
 
@@ -7358,7 +7365,7 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Test cast(unix_timestamp() as timestamp).
   {
     ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
-    ScopedExecOption use_local(executor_,
+    ScopedExecOption use_local(executor_.get(),
         "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     const Timezone& local_tz = time_zone.GetTimezone();
 
@@ -8511,7 +8518,7 @@ TEST_P(ExprTest, DateFunctions) {
   // Test that current_date() is reasonable.
   {
     ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
-    ScopedExecOption use_local(executor_,
+    ScopedExecOption use_local(executor_.get(),
         "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     const Timezone& local_tz = time_zone.GetTimezone();
 
