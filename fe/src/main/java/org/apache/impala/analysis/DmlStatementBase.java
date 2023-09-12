@@ -53,6 +53,8 @@ public abstract class DmlStatementBase extends StatementBase {
   }
 
   public FeTable getTargetTable() { return table_; }
+
+  protected void setTargetTable(FeTable tbl) { table_ = tbl; }
   public void setMaxTableSinks(int maxTableSinks) { this.maxTableSinks_ = maxTableSinks; }
 
   public boolean hasShuffleHint() { return false; }

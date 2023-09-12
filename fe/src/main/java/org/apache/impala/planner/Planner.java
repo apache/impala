@@ -175,7 +175,7 @@ public class Planner {
       if (ctx_.isUpdate()) {
         // Set up update sink for root fragment
         rootFragment.setSink(
-            ctx_.getAnalysisResult().getUpdateStmt().createDataSink(resultExprs));
+            ctx_.getAnalysisResult().getUpdateStmt().createDataSink());
       } else if (ctx_.isDelete()) {
         // Set up delete sink for root fragment
         DeleteStmt deleteStmt = ctx_.getAnalysisResult().getDeleteStmt();

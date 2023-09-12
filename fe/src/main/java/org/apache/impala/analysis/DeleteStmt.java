@@ -20,6 +20,9 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.TableSink;
@@ -52,21 +55,21 @@ public class DeleteStmt extends ModifyStmt {
         new ArrayList<>(), other.wherePredicate_.clone());
   }
 
+  @Override
+  protected void createModifyImpl() {
+    if (table_ instanceof FeKuduTable) {
+      modifyImpl_ = new KuduDeleteImpl(this);
+    } else if (table_ instanceof FeIcebergTable) {
+      modifyImpl_ = new IcebergDeleteImpl(this);
+    }
+  }
+
   public DataSink createDataSink() {
-    // analyze() must have been called before.
-    Preconditions.checkState(table_ != null);
-    TableSink tableSink = TableSink.create(table_, TableSink.Op.DELETE,
-        partitionKeyExprs_, resultExprs_, referencedColumns_, false, false,
-        new Pair<>(ImmutableList.<Integer>of(), TSortingOrder.LEXICAL), -1,
-        getKuduTransactionToken(),
-        maxTableSinks_);
-    Preconditions.checkState(!referencedColumns_.isEmpty());
-    return tableSink;
+    return modifyImpl_.createDataSink();
   }
 
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
-    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
-    partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
+    modifyImpl_.substituteResultExprs(smap, analyzer);
   }
 
   @Override

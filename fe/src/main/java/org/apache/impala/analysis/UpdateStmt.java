@@ -22,13 +22,12 @@ import static java.lang.String.format;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
-import org.apache.impala.planner.TableSink;
-import org.apache.impala.thrift.TSortingOrder;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 
 /**
  * Representation of an Update statement.
@@ -58,19 +57,19 @@ public class UpdateStmt extends ModifyStmt {
         new ArrayList<>(), other.wherePredicate_);
   }
 
+  @Override
+  protected void createModifyImpl() {
+    // Currently only Kudu tables are supported.
+    Preconditions.checkState(table_ instanceof FeKuduTable);
+    modifyImpl_ = new KuduUpdateImpl(this);
+  }
+
   /**
    * Return an instance of a KuduTableSink specialized as an Update operation.
    */
-  public DataSink createDataSink(List<Expr> resultExprs) {
+  public DataSink createDataSink() {
     // analyze() must have been called before.
-    Preconditions.checkState(table_ != null);
-    DataSink dataSink = TableSink.create(table_, TableSink.Op.UPDATE,
-        ImmutableList.<Expr>of(), resultExprs, referencedColumns_, false, false,
-        new Pair<>(ImmutableList.<Integer>of(), TSortingOrder.LEXICAL), -1,
-        getKuduTransactionToken(),
-        0);
-    Preconditions.checkState(!referencedColumns_.isEmpty());
-    return dataSink;
+    return modifyImpl_.createDataSink();
   }
 
   @Override
