@@ -79,10 +79,7 @@ class HdfsJsonScanner : public HdfsScanner {
   /// Return true if we have builtin support for scanning text files compressed with this
   /// codec.
   static bool HasBuiltinSupport(THdfsCompression::type compression) {
-    // TODO: Support scanning compressed json file.
-    DCHECK_EQ(compression, THdfsCompression::NONE);
-    if (compression == THdfsCompression::NONE) return true;
-    return false;
+    return HdfsTextScanner::HasBuiltinSupport(compression);
   }
 
  private:
@@ -106,6 +103,11 @@ class HdfsJsonScanner : public HdfsScanner {
   /// Called when adding a value to the tuple fails. Sets the target slot to null and
   /// reports the error message. Returns false if necessary to abort the scan.
   bool HandleConvertError(const SlotDescriptor* desc, const char* data, int len);
+
+  /// Fills bytes to buffer from the context. If 'scanner_state_' is PAST_SCANNING, the
+  /// scanner will read a small block data, otherwise it will just read whatever is the
+  /// io mgr buffer size.
+  Status FillBytesToBuffer(uint8_t** buffer, int64_t* bytes_read) WARN_UNUSED_RESULT;
 
   /// Scanner state, advances as the scanning process progresses.
   enum ScannerState {

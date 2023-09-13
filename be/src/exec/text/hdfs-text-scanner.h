@@ -172,7 +172,7 @@ class HdfsTextScanner : public HdfsScanner {
   /// If num_bytes is 0, the scanner will read whatever is the io mgr buffer size,
   /// otherwise it will just read num_bytes. If we are reading compressed text, num_bytes
   /// must be 0. Internally, calls the appropriate streaming or non-streaming
-  /// decompression functions FillByteBufferCompressedFile/Stream().
+  /// decompression functions DecompressFileToBuffer()/DecompressStreamToBuffer().
   /// If applicable, attaches decompression buffers from previous calls that might still
   /// be referenced by returned batches to 'pool'. If 'pool' is nullptr the buffers are
   /// freed instead.
@@ -182,25 +182,6 @@ class HdfsTextScanner : public HdfsScanner {
   /// variables is brittle.
   virtual Status FillByteBuffer(MemPool* pool, bool* eosr, int num_bytes = 0)
       WARN_UNUSED_RESULT;
-
-  /// Fills the next byte buffer from the compressed data in stream_ by reading the entire
-  /// file, decompressing it, and setting the byte_buffer_ptr_ to the decompressed buffer.
-  Status FillByteBufferCompressedFile(bool* eosr) WARN_UNUSED_RESULT;
-
-  /// Fills the next byte buffer from the compressed data in stream_. Unlike
-  /// FillByteBufferCompressedFile(), the entire file does not need to be read at once.
-  /// Buffers from stream_ are decompressed as they are read and byte_buffer_ptr_ is set
-  /// to available decompressed data.
-  /// Attaches decompression buffers from previous calls that might still be referenced
-  /// by returned batches to 'pool'. If 'pool' is nullptr the buffers are freed instead.
-  Status FillByteBufferCompressedStream(MemPool* pool, bool* eosr) WARN_UNUSED_RESULT;
-
-  /// Used by FillByteBufferCompressedStream() to decompress data from 'stream_'.
-  /// Returns COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS if it needs more input.
-  /// If bytes_to_read > 0, will read specified size.
-  /// If bytes_to_read = -1, will call GetBuffer().
-  Status DecompressBufferStream(int64_t bytes_to_read, uint8_t** decompressed_buffer,
-      int64_t* decompressed_len, bool *eosr) WARN_UNUSED_RESULT;
 
   /// Checks if the current buffer ends with a row delimiter spanning this and the next
   /// buffer (i.e. a "\r\n" delimiter). Does not modify byte_buffer_ptr_, etc. Always

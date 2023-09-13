@@ -483,11 +483,6 @@ public class HdfsScanNode extends ScanNode {
         throw new NotImplementedException(
             "JSON scans are disabled by --enable_json_scanner flag.");
       }
-      for (FileDescriptor fd: part.getFileDescriptors()) {
-        if (fd.getFileCompression() == HdfsCompression.NONE) continue;
-        throw new NotImplementedException(
-            "Scanning compressed Json file is not implemented yet: " + fd.getPath());
-      }
     }
 
     Column firstComplexTypedCol = null;

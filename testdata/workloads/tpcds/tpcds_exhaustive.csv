@@ -23,4 +23,4 @@ file_format: parquet, dataset: tpcds, compression_codec: snap, compression_type:
 file_format: orc, dataset: tpcds, compression_codec: none, compression_type: none
 file_format: orc, dataset: tpcds, compression_codec: def, compression_type: block
 file_format: orc, dataset: tpcds, compression_codec: snap, compression_type: block
-file_format: json, dataset: tpcds, compression_codec: none, compression_type: none
+file_format: json, dataset: tpcds, compression_codec: bzip, compression_type: block

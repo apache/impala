@@ -68,6 +68,14 @@ Status HdfsJsonScanner::Open(ScannerContext* context) {
 
 void HdfsJsonScanner::Close(RowBatch* row_batch) {
   DCHECK(!is_closed_);
+  // Need to close the decompressor before transferring the remaining resources to
+  // 'row_batch' because in some cases there is memory allocated in the decompressor_'s
+  // temp_memory_pool_.
+  if (decompressor_ != nullptr) {
+    decompressor_->Close();
+    decompressor_.reset();
+  }
+
   if (row_batch != nullptr) {
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     if (scan_node_->HasRowBatchQueue()) {
@@ -77,6 +85,10 @@ void HdfsJsonScanner::Close(RowBatch* row_batch) {
   } else {
     template_tuple_pool_->FreeAll();
   }
+  // The JsonParser always copies values instead of referencing them, so it doesn't
+  // reference the data in the data_buffer_pool_. Therefore, we don't need
+  // row_batch to acquire data from the data_buffer_pool_, so we could always
+  // call FreeAll().
   data_buffer_pool_->FreeAll();
   context_->ReleaseCompletedResources(true);
 
@@ -91,7 +103,21 @@ void HdfsJsonScanner::Close(RowBatch* row_batch) {
 Status HdfsJsonScanner::InitNewRange() {
   DCHECK_EQ(scanner_state_, CREATED);
 
-  // TODO: Optmize for empty projection.
+  auto compression_type = stream_ ->file_desc()->file_compression;
+  // Update the decompressor based on the compression type of the file in the context.
+  DCHECK(compression_type != THdfsCompression::SNAPPY)
+      << "FE should have generated SNAPPY_BLOCKED instead.";
+  // In Hadoop, text files compressed into .DEFLATE files contain
+  // deflate with zlib wrappings as opposed to raw deflate, which
+  // is what THdfsCompression::DEFLATE implies. Since deflate is
+  // the default compression algorithm used in Hadoop, it makes
+  // sense to map it to type DEFAULT in Impala instead
+  if (compression_type == THdfsCompression::DEFLATE) {
+    compression_type = THdfsCompression::DEFAULT;
+  }
+  RETURN_IF_ERROR(UpdateDecompressor(compression_type));
+
+  // TODO: Optmize for zero slots scan (e.g. count(*)).
   vector<string> schema;
   schema.reserve(scan_node_->materialized_slots().size());
   for (const SlotDescriptor* slot : scan_node_->materialized_slots()) {
@@ -231,9 +257,35 @@ static bool AllWhitespaceBeforeNewline(uint8_t* begin, int64_t len) {
   return false;
 }
 
+Status HdfsJsonScanner::FillBytesToBuffer(uint8_t** buffer, int64_t* bytes_read) {
+  if (scanner_state_ == PAST_SCANNING) {
+    // In the PAST_SCANNING state, we only read a small block data at a time for scanning.
+    // If the parser completes the parsing of the last json object, it will exit the loop
+    // due to BreakParse().
+    Status status;
+    if (UNLIKELY(!stream_->GetBytes(NEXT_BLOCK_READ_SIZE, buffer, bytes_read, &status))) {
+      DCHECK(!status.ok());
+      return status;
+    }
+
+    // A special case is when the first character of the next scan range is a newline
+    // character (perhaps with other whitespace characters before it). Our scan should
+    // stop at the first newline character in the next range, while the parser skips
+    // whitespace characters. If we don't handle this case, the first line of the next
+    // range will be scanned twice. Therefore, we need to return directly here to inform
+    // the parser that eos has been reached.
+    if (UNLIKELY(AllWhitespaceBeforeNewline(*buffer, *bytes_read))) {
+      scanner_state_ = FINISHED;
+      *bytes_read = 0;
+    }
+  } else {
+    RETURN_IF_ERROR(stream_->GetBuffer(false, buffer, bytes_read));
+  }
+  return Status::OK();
+}
+
 void HdfsJsonScanner::GetNextBuffer(const char** begin, const char** end) {
   DCHECK(*begin == *end);
-  DCHECK(decompressor_.get() == nullptr) << "Not support decompress json yet.";
   SCOPED_TIMER(get_buffer_timer_);
 
   // The eosr indicates that we have scanned all data within the scan range. If the
@@ -249,32 +301,24 @@ void HdfsJsonScanner::GetNextBuffer(const char** begin, const char** end) {
 
   if (stream_->eof() || scanner_state_ == FINISHED) return;
 
-  uint8_t* next_buffer_begin;
-  int64_t next_buffer_size;
-  if (scanner_state_ == PAST_SCANNING) {
-    // In the PAST_SCANNING state, we only read a small block data at a time for scanning.
-    // If the parser completes the parsing of the last json object, it will exit the loop
-    // due to BreakParse().
-    if (!stream_->GetBytes(NEXT_BLOCK_READ_SIZE, &next_buffer_begin, &next_buffer_size,
-        &buffer_status_)) {
-      DCHECK(!buffer_status_.ok());
-      return;
-    }
-
-    // A special case is when the first character of the next scan range is a newline
-    // character (perhaps with other whitespace characters before it). Our scan should
-    // stop at the first newline character in the next range, while the parser skips
-    // whitespace characters. If we don't handle this case, the first line of the next
-    // range will be scanned twice. Therefore, we need to return directly here to inform
-    // the parser that eos has been reached.
-    if (AllWhitespaceBeforeNewline(next_buffer_begin, next_buffer_size)) {
-      scanner_state_ = FINISHED;
-      return;
-    }
+  uint8_t* next_buffer_begin = nullptr;
+  int64_t next_buffer_size = 0;
+  if (decompressor_ == nullptr) {
+    buffer_status_ = FillBytesToBuffer(&next_buffer_begin, &next_buffer_size);
+  } else if (decompressor_->supports_streaming()) {
+    bool eosr = false;
+    // The JsonParser always copies values instead of referencing them, so it doesn't
+    // reference the data in the data_buffer_pool_. Therefore, we don't need current_pool_
+    // to acquire data from the data_buffer_pool_, so we pass nullptr to
+    // DecompressStreamToBuffer().
+    buffer_status_ = DecompressStreamToBuffer(&next_buffer_begin, &next_buffer_size,
+        nullptr, &eosr);
   } else {
-    buffer_status_ = stream_->GetBuffer(false, &next_buffer_begin, &next_buffer_size);
-    RETURN_VOID_IF_ERROR(buffer_status_);
+    buffer_status_ = DecompressFileToBuffer(&next_buffer_begin, &next_buffer_size);
+    if (next_buffer_size == 0) scanner_state_ = FINISHED;
   }
+  RETURN_VOID_IF_ERROR(buffer_status_);
+  if (UNLIKELY(next_buffer_size == 0)) return;
 
   *begin = reinterpret_cast<char*>(next_buffer_begin);
   *end = *begin + next_buffer_size;

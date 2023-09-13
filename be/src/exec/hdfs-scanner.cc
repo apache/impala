@@ -24,6 +24,7 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/read-write-util.h"
+#include "exec/scanner-context.inline.h"
 #include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/scalar-expr-evaluator.h"
@@ -787,6 +788,150 @@ Status HdfsScanner::UpdateDecompressor(const string& codec) {
     return Status(ss.str());
   }
   RETURN_IF_ERROR(UpdateDecompressor(type->second));
+  return Status::OK();
+}
+
+Status HdfsScanner::DecompressFileToBuffer(uint8_t** buffer, int64_t* bytes_read) {
+  // For other compressed file: attempt to read and decompress the entire file, point
+  // to the decompressed buffer, and then continue normal processing.
+  DCHECK(decompression_type_ != THdfsCompression::SNAPPY);
+  const HdfsFileDesc* desc = scan_node_->GetFileDesc(
+      context_->partition_descriptor()->id(), stream_->filename());
+  int64_t file_size = desc->file_length;
+  DCHECK_GT(file_size, 0);
+
+  Status status;
+  if (!stream_->GetBytes(file_size, buffer, bytes_read, &status)) {
+    DCHECK(!status.ok());
+    return status;
+  }
+
+  // If didn't read anything, return.
+  if (*bytes_read == 0) return Status::OK();
+
+  // Need to read the entire file.
+  if (file_size > *bytes_read) {
+    return Status(Substitute("Expected to read a compressed text file of size $0 bytes. "
+        "But only read $1 bytes. This may indicate data file corruption. (file: $3).",
+        file_size, *bytes_read, stream_->filename()));
+  }
+
+  // Decompress and adjust the buffer and bytes_read accordingly.
+  int64_t decompressed_len = 0;
+  uint8_t* decompressed_buffer = nullptr;
+  SCOPED_TIMER(decompress_timer_);
+  // TODO: Once the writers are in, add tests with very large compressed files (4GB)
+  // that could overflow.
+  RETURN_IF_ERROR(decompressor_->ProcessBlock(false, *bytes_read, *buffer,
+      &decompressed_len, &decompressed_buffer));
+
+  // Inform 'stream_' that the buffer with the compressed text can be released.
+  context_->ReleaseCompletedResources(true);
+
+  VLOG_FILE << "Decompressed " << *bytes_read << " to " << decompressed_len;
+  *buffer = decompressed_buffer;
+  *bytes_read = decompressed_len;
+  return Status::OK();
+}
+
+Status HdfsScanner::DecompressStreamToBuffer(uint8_t** buffer, int64_t* bytes_read,
+    MemPool* pool, bool* eosr) {
+  // We're about to create a new decompression buffer (if we can't reuse). Attach the
+  // memory from previous decompression rounds to 'pool'.
+  if (!decompressor_->reuse_output_buffer()) {
+    if (pool != nullptr) {
+      pool->AcquireData(data_buffer_pool_.get(), false);
+    } else {
+      data_buffer_pool_->FreeAll();
+    }
+  }
+
+  uint8_t* decompressed_buffer = nullptr;
+  int64_t decompressed_len = 0;
+  // Set bytes_to_read = -1 because we don't know how much data decompressor need.
+  // Just read the first available buffer within the scan range.
+  Status status = DecompressStream(-1, &decompressed_buffer, &decompressed_len,
+      eosr);
+  if (status.code() == TErrorCode::COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS) {
+    // It's possible (but very unlikely) that ProcessBlockStreaming() wasn't able to
+    // make progress if the compressed buffer returned by GetBytes() is too small.
+    // (Note that this did not even occur in simple experiments where the input buffer
+    // is always 1 byte, but we need to handle this case to be defensive.) In this
+    // case, try again with a reasonably large fixed size buffer. If we still did not
+    // make progress, then return an error.
+    LOG(INFO) << status.GetDetail();
+    // Number of bytes to read when the previous attempt to streaming decompress did not
+    // make progress.
+    constexpr int64_t COMPRESSED_DATA_FIXED_READ_SIZE = 1 * 1024 * 1024;
+    status = DecompressStream(COMPRESSED_DATA_FIXED_READ_SIZE, &decompressed_buffer,
+        &decompressed_len, eosr);
+  }
+  RETURN_IF_ERROR(status);
+  *buffer = decompressed_buffer;
+  *bytes_read = decompressed_len;
+
+  if (*eosr) {
+    DCHECK(stream_->eosr());
+    context_->ReleaseCompletedResources(true);
+  }
+
+  return Status::OK();
+}
+
+Status HdfsScanner::DecompressStream(int64_t bytes_to_read,
+    uint8_t** decompressed_buffer, int64_t* decompressed_len, bool *eosr) {
+  // Some decompressors, such as Bzip2 API (version 0.9 and later) and Gzip can
+  // decompress buffers that are read from stream_, so we don't need to read the
+  // whole file in once. A compressed buffer is passed to ProcessBlockStreaming
+  // but it may not consume all of the input.
+  uint8_t* compressed_buffer_ptr = nullptr;
+  int64_t compressed_buffer_size = 0;
+  // We don't know how many bytes ProcessBlockStreaming() will consume so we set
+  // peek=true and then later advance the stream using SkipBytes().
+  if (bytes_to_read == -1) {
+    RETURN_IF_ERROR(stream_->GetBuffer(true, &compressed_buffer_ptr,
+        &compressed_buffer_size));
+  } else {
+    DCHECK_GT(bytes_to_read, 0);
+    Status status;
+    if (!stream_->GetBytes(bytes_to_read, &compressed_buffer_ptr, &compressed_buffer_size,
+        &status, true)) {
+      DCHECK(!status.ok());
+      return status;
+    }
+  }
+  int64_t compressed_buffer_bytes_read = 0;
+  bool stream_end = false;
+  {
+    SCOPED_TIMER(decompress_timer_);
+    Status status = decompressor_->ProcessBlockStreaming(compressed_buffer_size,
+        compressed_buffer_ptr, &compressed_buffer_bytes_read, decompressed_len,
+        decompressed_buffer, &stream_end);
+    if (!status.ok()) {
+      status.AddDetail(Substitute("$0file=$1, offset=$2", status.GetDetail(),
+          stream_->filename(), stream_->file_offset()));
+      return status;
+    }
+    DCHECK_GE(compressed_buffer_size, compressed_buffer_bytes_read);
+  }
+  // Skip the bytes in stream_ that were decompressed.
+  Status status;
+  if (!stream_->SkipBytes(compressed_buffer_bytes_read, &status)) {
+    DCHECK(!status.ok());
+    return status;
+  }
+
+  if (stream_->eosr()) {
+    if (stream_end) {
+      *eosr = true;
+    } else {
+      return Status(TErrorCode::COMPRESSED_FILE_TRUNCATED, stream_->filename());
+    }
+  } else if (*decompressed_len == 0) {
+    return Status(TErrorCode::COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS,
+        stream_->filename());
+  }
+
   return Status::OK();
 }
 

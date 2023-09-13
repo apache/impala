@@ -531,6 +531,26 @@ class HdfsScanner {
   Status UpdateDecompressor(const THdfsCompression::type& compression) WARN_UNUSED_RESULT;
   Status UpdateDecompressor(const std::string& codec) WARN_UNUSED_RESULT;
 
+  /// Fills bytes to buffer from the compressed data in 'stream_' by reading the entire
+  /// file, decompressing it, and setting the 'buffer' to the decompressed buffer.
+  Status DecompressFileToBuffer(uint8_t** buffer, int64_t* bytes_read) WARN_UNUSED_RESULT;
+
+  /// Fills bytes to buffer from the compressed data in 'stream_'. Unlike
+  /// DecompressFileToBuffer(), the entire file does not need to be read at once.
+  /// Buffers from 'stream_' are decompressed as they are read and 'buffer' is set to
+  /// available decompressed data.
+  /// Attaches decompression buffers from previous calls that might still be referenced
+  /// by returned batches to 'pool'. If 'pool' is nullptr the buffers are freed instead.
+  Status DecompressStreamToBuffer(uint8_t** buffer, int64_t* bytes_read, MemPool* pool,
+      bool* eosr) WARN_UNUSED_RESULT;
+
+  /// Used by DecompressStreamToBuffer() to decompress data from 'stream_'.
+  /// Returns COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS if it needs more input.
+  /// If bytes_to_read > 0, will read specified size.
+  /// If bytes_to_read = -1, will call GetBuffer().
+  Status DecompressStream(int64_t bytes_to_read, uint8_t** decompressed_buffer,
+      int64_t* decompressed_len, bool *eosr) WARN_UNUSED_RESULT;
+
   /// Utility function to report parse errors for each field.
   /// If errors[i] is nonzero, fields[i] had a parse error.
   /// Returns false if parsing should be aborted.  In this case parse_status_ is set

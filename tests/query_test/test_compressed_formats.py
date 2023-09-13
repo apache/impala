@@ -155,7 +155,7 @@ class TestCompressedText(TestCompressedFormatsBase):
     super(TestCompressedText, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.clear()
     cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('file_format', *['text']))
+        ImpalaTestDimension('file_format', *['text', 'json']))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('compression_format', *compression_formats))
 
