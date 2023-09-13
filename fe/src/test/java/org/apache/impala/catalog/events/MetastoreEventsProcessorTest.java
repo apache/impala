@@ -2486,11 +2486,15 @@ public class MetastoreEventsProcessorTest {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   private void runEventBatchingTest(String testTblName,
-      Map<String, String> eventTypeToMessage) throws MetastoreNotificationException {
+      Map<String, String> eventTypeToMessage) throws DatabaseNotFoundException,
+      MetastoreNotificationException {
+    Table tbl = catalog_.getTable(TEST_DB_NAME, testTblName);
+    long lastSyncedEventId = tbl.getLastSyncedEventId();
     for (String eventType : eventTypeToMessage.keySet()) {
       String eventMessage = eventTypeToMessage.get(eventType);
-      // we have 10 mock batchable events which should be batched into 1
-      List<MetastoreEvent> mockEvents = createMockEvents(100, 10,
+      // we have 10 mock batchable events which should be batched into 1. Always create
+      // mock events with start event id much greater than table's lastSyncEventId
+      List<MetastoreEvent> mockEvents = createMockEvents(lastSyncedEventId + 100, 10,
           eventType, TEST_DB_NAME, testTblName, eventMessage);
       MetastoreEventFactory eventFactory = eventsProcessor_.getEventsFactory();
       List<MetastoreEvent> batch = eventFactory.createBatchEvents(mockEvents,
@@ -2502,16 +2506,16 @@ public class MetastoreEventsProcessorTest {
       // create a batch which consists of some other events
       // only contiguous events should be batched
       // 13-15 mock events which can be batched
-      mockEvents = createMockEvents(13, 3,
+      mockEvents = createMockEvents(lastSyncedEventId + 113, 3,
           eventType, TEST_DB_NAME, testTblName, eventMessage);
       // 17-18 can be batched
-      mockEvents.addAll(createMockEvents(17, 2,
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 117, 2,
           eventType, TEST_DB_NAME, testTblName, eventMessage));
       // event id 20 should not be batched
-      mockEvents.addAll(createMockEvents(20, 1,
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 120, 1,
           eventType, TEST_DB_NAME, testTblName, eventMessage));
       // events 22-24 should be batched
-      mockEvents.addAll(createMockEvents(22, 3,
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 122, 3,
           eventType, TEST_DB_NAME, testTblName, eventMessage));
 
       batch = eventFactory.createBatchEvents(mockEvents, eventsProcessor_.getMetrics());
@@ -2530,9 +2534,9 @@ public class MetastoreEventsProcessorTest {
       assertEquals(3, ((BatchPartitionEvent) batch4).getBatchEvents().size());
       // test to make sure that events which have different database name are not
       // batched
-      mockEvents = createMockEvents(100, 1, eventType, TEST_DB_NAME,
+      mockEvents = createMockEvents(lastSyncedEventId + 100, 1, eventType, TEST_DB_NAME,
           testTblName, eventMessage);
-      mockEvents.addAll(createMockEvents(101, 1, eventType, "db1",
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 101, 1, eventType, "db1",
           testTblName, eventMessage));
 
       List<MetastoreEvent> batchEvents = eventFactory.createBatchEvents(mockEvents,
@@ -2547,10 +2551,10 @@ public class MetastoreEventsProcessorTest {
       }
 
       // test no batching when table name is different
-      mockEvents = createMockEvents(100, 1, eventType, TEST_DB_NAME,
+      mockEvents = createMockEvents(lastSyncedEventId + 100, 1, eventType, TEST_DB_NAME,
           testTblName, eventMessage);
-      mockEvents.addAll(createMockEvents(101, 1, eventType, TEST_DB_NAME,
-          "testtbl", eventMessage));
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 101, 1, eventType,
+          TEST_DB_NAME, "testtbl", eventMessage));
       batchEvents = eventFactory.createBatchEvents(mockEvents,
           eventsProcessor_.getMetrics());
       assertEquals(2, batchEvents.size());
@@ -2563,7 +2567,7 @@ public class MetastoreEventsProcessorTest {
       }
     }
     // make sure 2 events of different event types are not batched together
-    long startEventId = 17;
+    long startEventId = lastSyncedEventId + 117;
     // batch 1
     List<MetastoreEvent> mockEvents = createMockEvents(startEventId, 3,
         "ALTER_PARTITION", TEST_DB_NAME, testTblName,

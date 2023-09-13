@@ -737,6 +737,14 @@ public class MetastoreEvents {
     public String toString() {
       return String.format(STR_FORMAT_EVENT_ID_TYPE, eventId_, eventType_);
     }
+
+    protected boolean isOlderThanLastSyncEventId(MetastoreEvent event) {
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl != null && tbl.getLastSyncedEventId() >= event.getEventId()) {
+        return true;
+      }
+      return false;
+    }
   }
 
   public static String getStringProperty(
@@ -1297,6 +1305,7 @@ public class MetastoreEvents {
     @Override
     public boolean canBeBatched(MetastoreEvent event) {
       if (!(event instanceof InsertEvent)) return false;
+      if (isOlderThanLastSyncEventId(event)) return false;
       InsertEvent insertEvent = (InsertEvent) event;
       // batched events must have consecutive event ids
       if (event.getEventId() != 1 + getEventId()) return false;
@@ -2197,6 +2206,7 @@ public class MetastoreEvents {
     @Override
     public boolean canBeBatched(MetastoreEvent event) {
       if (!(event instanceof AlterPartitionEvent)) return false;
+      if (isOlderThanLastSyncEventId(event)) return false;
       AlterPartitionEvent alterPartitionEvent = (AlterPartitionEvent) event;
       if (event.getEventId() != 1 + getEventId()) return false;
       // make sure that the event is on the same table

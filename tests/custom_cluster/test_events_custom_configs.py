@@ -377,6 +377,37 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     verify_skipping_older_events(test_old_table, False, True)
     verify_skipping_older_events(test_old_table, True, True)
 
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=5"
+                  " --enable_sync_to_latest_event_on_ddls=true")
+  def test_skipping_batching_events(self, unique_database):
+    """Test to verify IMPALA-10949, improving batching logic for partition events.
+    Before batching the events, each event is checked if the event id is greater than
+    table's lastSyncEventId then the event can be batched else it can be skipped."""
+    test_batch_table = "test_batch_table"
+    self.client.execute(
+      "create table {}.{} like functional.alltypes"
+      .format(unique_database, test_batch_table))
+    self.client.execute(
+      "insert into {}.{} partition (year,month) select * from functional.alltypes"
+      .format(unique_database, test_batch_table))
+    # Generate batch ALTER_PARTITION events
+    self.run_stmt_in_hive(
+      "analyze table {}.{} compute statistics".format(unique_database, test_batch_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_metric = "batch-events-created"
+    batch_events_1 = EventProcessorUtils.get_int_metric(batch_events_metric)
+    prev_skipped_events = EventProcessorUtils.get_int_metric("events-skipped")
+    self.run_stmt_in_hive(
+      "analyze table {}.{} compute statistics".format(unique_database, test_batch_table))
+    self.client.execute("refresh {0}.{1}".format(unique_database, test_batch_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_2 = EventProcessorUtils.get_int_metric(batch_events_metric)
+    current_skipped_events = EventProcessorUtils.get_int_metric("events-skipped")
+    # Make sure no new batch events are created
+    assert batch_events_2 == batch_events_1
+    assert current_skipped_events - prev_skipped_events >= 24
+
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_commit_compaction_events(self, unique_database):
     """Test is to verify Impala-11626, commit compaction events triggered in HMS would
