@@ -33,7 +33,10 @@ import org.apache.hadoop.security.JniBasedUnixGroupsNetgroupMappingWithFallback;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TStringLiteral;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -121,6 +124,28 @@ public class JniFrontendTest {
       socketDir.getParentFile().setExecutable(true);
       socketDir.delete();
       socketDir.getParentFile().delete();
+    }
+  }
+
+  /**
+   * This test validates that JniFrontend::getSecretFromKeyStore function can return
+   * the secret from the configured Jceks KeyStore
+   */
+  @Test
+  public void testGetSecretFromKeyStore() throws ImpalaException {
+    // valid secret-key returns the correct secret
+    TStringLiteral secretKey = new TStringLiteral("openai-api-key-secret");
+    byte[] secretKeyBytes = JniUtil.serializeToThrift(secretKey);
+    String secret = JniFrontend.getSecretFromKeyStore(secretKeyBytes);
+    assertEquals(secret, "secret");
+    // invalid secret-key returns error
+    secretKey = new TStringLiteral("dummy-secret");
+    secretKeyBytes = JniUtil.serializeToThrift(secretKey);
+    try {
+      secret = JniFrontend.getSecretFromKeyStore(secretKeyBytes);
+    } catch (InternalException e) {
+      assertEquals(e.getMessage(),
+          String.format(JniFrontend.KEYSTORE_ERROR_MSG, secretKey.getValue()));
     }
   }
 }

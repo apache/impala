@@ -17,6 +17,8 @@
 
 #include "udf-sample.h"
 
+#include <string>
+
 // In this sample we are declaring a UDF that adds two ints and returns an int.
 IMPALA_UDF_EXPORT
 IntVal AddUdf(FunctionContext* context, const IntVal& arg1, const IntVal& arg2) {
@@ -26,3 +28,29 @@ IntVal AddUdf(FunctionContext* context, const IntVal& arg1, const IntVal& arg2) 
 
 // Multiple UDFs can be defined in the same file
 
+// Classify input customer reviews.
+IMPALA_UDF_EXPORT
+StringVal ClassifyReviewsDefault(FunctionContext* context, const StringVal& input) {
+  std::string request =
+      std::string("Classify the following review as positive, neutral, or negative")
+      + std::string(" and only include the uncapitalized category in the response: ")
+      + std::string(reinterpret_cast<const char*>(input.ptr), input.len);
+  StringVal prompt(request.c_str());
+  return context->Functions()->ai_generate_text_default(context, prompt);
+}
+
+// Classify input customer reviews.
+IMPALA_UDF_EXPORT
+StringVal ClassifyReviews(FunctionContext* context, const StringVal& input) {
+  std::string request =
+      std::string("Classify the following review as positive, neutral, or negative")
+      + std::string(" and only include the uncapitalized category in the response: ")
+      + std::string(reinterpret_cast<const char*>(input.ptr), input.len);
+  StringVal prompt(request.c_str());
+  const StringVal endpoint("https://api.openai.com/v1/chat/completions");
+  const StringVal model("gpt-3.5-turbo");
+  const StringVal api_key_jceks_secret("open-ai-key");
+  const StringVal params("{\"temperature\": 0.9, \"model\": \"gpt-4\"}");
+  return context->Functions()->ai_generate_text(
+      context, endpoint, prompt, model, api_key_jceks_secret, params);
+}

@@ -24,6 +24,9 @@ import sys
 kerberize = os.environ.get('IMPALA_KERBERIZE') == 'true'
 target_filesystem = os.environ.get('TARGET_FILESYSTEM')
 
+jceks_keystore = ("localjceks://file" +
+    os.path.join(os.environ['IMPALA_HOME'], 'testdata/jceks/test.jceks'))
+
 compression_codecs = [
   'org.apache.hadoop.io.compress.GzipCodec',
   'org.apache.hadoop.io.compress.DefaultCodec',
@@ -58,6 +61,9 @@ CONFIG = {
 
   # Location of the KMS key provider
   'hadoop.security.key.provider.path': 'kms://http@${INTERNAL_LISTEN_HOST}:9600/kms',
+
+  # Location of Jceks KeyStore
+  'hadoop.security.credential.provider.path': jceks_keystore,
 
   # Needed as long as multiple nodes are running on the same address. For Impala
   # testing only.

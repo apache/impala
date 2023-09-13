@@ -22,6 +22,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/aggregate-functions.h"
+#include "exprs/ai-functions.h"
 #include "exprs/anyval-util.h"
 #include "exprs/bit-byte-functions.h"
 #include "exprs/case-expr.h"
@@ -449,6 +450,7 @@ DateVal ScalarExprEvaluator::GetDateVal(const TupleRow* row) {
 void ScalarExprEvaluator::InitBuiltinsDummy() {
   // Call one function from each of the classes to pull all the symbols
   // from that class in.
+  AiFunctions::is_api_endpoint_supported("");
   AggregateFunctions::InitNull(nullptr, nullptr);
   BitByteFunctions::CountSet(nullptr, TinyIntVal::null());
   CastFunctions::CastToBooleanVal(nullptr, TinyIntVal::null());

@@ -246,7 +246,11 @@ class Frontend {
   /// Convert external Hdfs tables to Iceberg tables
   Status Convert(const TExecRequest& request);
 
+  /// Get secret from jceks key store for the input secret_key.
+  Status GetSecretFromKeyStore(const string& secret_key, string* secret);
+
  private:
+  jclass fe_class_; // org.apache.impala.service.JniFrontend class
   jobject fe_;  // instance of org.apache.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
@@ -287,6 +291,7 @@ class Frontend {
   jmethodID abort_kudu_txn_; // JniFrontend.abortKuduTransaction()
   jmethodID commit_kudu_txn_; // JniFrontend.commitKuduTransaction()
   jmethodID convertTable; // JniFrontend.convertTable
+  jmethodID get_secret_from_key_store_; // JniFrontend.getSecretFromKeyStore()
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()

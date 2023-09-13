@@ -377,6 +377,10 @@ class JniUtil {
     return JniCall::static_method(cls, method).Call();
   }
 
+  template <typename T, typename R>
+  static Status CallStaticJniMethod(const jclass& cls, const jmethodID& method,
+      const T& arg, R* response) WARN_UNUSED_RESULT;
+
   template <typename T>
   static Status CallJniMethod(const jobject& obj, const jmethodID& method,
       const T& arg) WARN_UNUSED_RESULT;
@@ -433,6 +437,12 @@ SPECIALIZE_PRIMITIVE_TO_VALUE(int64_t, j);
 SPECIALIZE_PRIMITIVE_TO_VALUE(float, f);
 SPECIALIZE_PRIMITIVE_TO_VALUE(double, d);
 #undef SPECIALIZE_PRIMITIVE_TO_VALUE
+
+template <typename T, typename R>
+inline Status JniUtil::CallStaticJniMethod(const jclass& cls, const jmethodID& method,
+    const T& arg, R* response) {
+  return JniCall::static_method(cls, method).with_thrift_arg(arg).Call(response);
+}
 
 template <typename T>
 inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method,

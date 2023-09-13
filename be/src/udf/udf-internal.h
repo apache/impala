@@ -29,7 +29,7 @@
 #include "udf/udf.h"
 
 namespace impala {
-
+using impala_udf::BuiltInFunctions;
 #define RETURN_IF_NULL(ctx, ptr)                            \
   do {                                                      \
     if (UNLIKELY(ptr == NULL)) {                            \
@@ -287,6 +287,9 @@ class FunctionContextImpl {
 
   /// Indicates whether this context has been closed. Used for verification/debugging.
   bool closed_;
+
+  /// Built-in functions exposed to UDFs
+  BuiltInFunctions functions_;
 };
 
 }

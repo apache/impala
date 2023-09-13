@@ -87,6 +87,7 @@ WORKLOAD_DIR = options.workload_dir
 DATASET_DIR = options.dataset_dir
 TESTDATA_BIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin')
 AVRO_SCHEMA_DIR = "avro_schemas"
+TESTDATA_JCEKS_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/jceks')
 
 GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "\
                       "--workload=%s --scale_factor=%s --verbose"
@@ -299,6 +300,14 @@ def hive_exec_query_files_parallel(thread_pool, query_files, step_name):
   exec_query_files_parallel(thread_pool, query_files, 'hive', step_name)
 
 
+def exec_hadoop_credential_cmd(secret_key, secret, provider_path, exit_on_error=True):
+  cmd = ("%s credential create %s -value %s -provider %s"
+      % (HADOOP_CMD, secret_key, secret, provider_path))
+  LOG.info("Executing Hadoop command: " + cmd)
+  exec_cmd(cmd, error_msg="Error executing Hadoop command, exiting",
+      exit_on_error=exit_on_error)
+
+
 def main():
   logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%H:%M:%S')
   LOG.setLevel(logging.DEBUG)
@@ -307,6 +316,12 @@ def main():
   # when debugging dataload issues.
   #
   LOG.debug(' '.join(sys.argv))
+
+  jceks_path = TESTDATA_JCEKS_DIR + "/test.jceks"
+  if os.path.exists(jceks_path):
+    os.remove(jceks_path)
+  exec_hadoop_credential_cmd("openai-api-key-secret", "secret",
+      "localjceks://file" + jceks_path)
 
   all_workloads = available_workloads(WORKLOAD_DIR)
   workloads = []

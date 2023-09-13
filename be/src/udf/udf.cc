@@ -116,10 +116,26 @@ class RuntimeState {
   const std::string user_string_ = "";
 };
 
+// Dummy AiFunctions class for UDF SDK
+static const std::string AI_FUNCTIONS_DUMMY_RESPONSE = "dummy response";
+using impala_udf::StringVal;
+using impala_udf::FunctionContext;
+class AiFunctions {
+ public:
+  static StringVal AiGenerateText(FunctionContext* ctx, const StringVal& endpoint,
+      const StringVal& prompt, const StringVal& model,
+      const StringVal& api_key_jceks_secret, const StringVal& params) {
+    return StringVal(AI_FUNCTIONS_DUMMY_RESPONSE.c_str());
+  }
+  static StringVal AiGenerateTextDefault(FunctionContext* ctx, const StringVal& prompt) {
+    return StringVal(AI_FUNCTIONS_DUMMY_RESPONSE.c_str());
+  }
+};
 }
 
 #else
 #include "common/atomic.h"
+#include "exprs/ai-functions.h"
 #include "exprs/anyval-util.h"
 #include "runtime/free-pool.h"
 #include "runtime/mem-pool.h"
@@ -190,6 +206,9 @@ FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state,
       aligned_malloc(varargs_buffer_size, VARARGS_BUFFER_ALIGNMENT));
   ctx->impl_->varargs_buffer_size_ = varargs_buffer_size;
   ctx->impl_->debug_ = debug;
+  ctx->impl_->functions_.ai_generate_text = impala::AiFunctions::AiGenerateText;
+  ctx->impl_->functions_.ai_generate_text_default =
+      impala::AiFunctions::AiGenerateTextDefault;
   VLOG_ROW << "Created FunctionContext: " << ctx;
   return ctx;
 }
@@ -204,8 +223,7 @@ FunctionContext* FunctionContextImpl::Clone(
   return new_context;
 }
 
-FunctionContext::FunctionContext() : impl_(new FunctionContextImpl(this)) {
-}
+FunctionContext::FunctionContext() : impl_(new FunctionContextImpl(this)) {}
 
 FunctionContext::~FunctionContext() {
   assert(impl_->closed_ && "FunctionContext wasn't closed!");
@@ -473,6 +491,10 @@ void FunctionContext::SetFunctionState(FunctionStateScope scope, void* ptr) {
       ss << "Unknown FunctionStateScope: " << scope;
       SetError(ss.str().c_str());
   }
+}
+
+const BuiltInFunctions* FunctionContext::Functions() const {
+  return &impl_->functions_;
 }
 
 uint8_t* FunctionContextImpl::AllocateForResults(int64_t byte_size) noexcept {

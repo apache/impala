@@ -25,4 +25,7 @@ using namespace impala_udf;
 
 IntVal AddUdf(FunctionContext* context, const IntVal& arg1, const IntVal& arg2);
 
+StringVal ClassifyReviewsDefault(FunctionContext* context, const StringVal& input);
+
+StringVal ClassifyReviews(FunctionContext* context, const StringVal& input);
 #endif

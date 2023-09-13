@@ -143,17 +143,26 @@ Frontend::Frontend() {
     {"commitKuduTransaction", "([B)V", &commit_kudu_txn_}
   };
 
+  JniMethodDescriptor staticMethods[] = {
+    {"getSecretFromKeyStore", "([B)Ljava/lang/String;", &get_secret_from_key_store_}
+  };
+
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
   JniLocalFrame jni_frame;
   ABORT_IF_ERROR(jni_frame.push(jni_env));
 
   // create instance of java class JniFrontend
-  jclass fe_class = jni_env->FindClass(FLAGS_jni_frontend_class.c_str());
+  fe_class_ = jni_env->FindClass(FLAGS_jni_frontend_class.c_str());
   ABORT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, fe_class, &(methods[i])));
+    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, fe_class_, &(methods[i])));
+  };
+
+  num_methods = sizeof(staticMethods) / sizeof(staticMethods[0]);
+  for (int i = 0; i < num_methods; ++i) {
+    ABORT_IF_ERROR(JniUtil::LoadStaticJniMethod(jni_env, fe_class_, &(staticMethods[i])));
   };
 
   jbyteArray cfg_bytes;
@@ -162,7 +171,7 @@ Frontend::Frontend() {
   // Pass in whether this is a backend test, so that the Frontend can avoid certain
   // unnecessary initialization that introduces dependencies on a running minicluster.
   jboolean is_be_test = TestInfo::is_be_test();
-  jobject fe = jni_env->NewObject(fe_class, fe_ctor_, cfg_bytes, is_be_test);
+  jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, cfg_bytes, is_be_test);
   ABORT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }
@@ -406,4 +415,11 @@ Status Frontend::CommitKuduTransaction(const TUniqueId& query_id) {
 
 Status Frontend::Convert(const TExecRequest& request) {
   return JniUtil::CallJniMethod(fe_, convertTable, request);
+}
+
+Status Frontend::GetSecretFromKeyStore(const string& secret_key, string* secret) {
+  TStringLiteral secret_key_t;
+  secret_key_t.__set_value(secret_key);
+  return JniUtil::CallStaticJniMethod(fe_class_, get_secret_from_key_store_, secret_key_t,
+      secret);
 }

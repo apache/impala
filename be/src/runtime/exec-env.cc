@@ -28,6 +28,7 @@
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/kudu/kudu-util.h"
+#include "exprs/ai-functions.h"
 #include "kudu/rpc/service_if.h"
 #include "rpc/rpc-mgr.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -151,6 +152,8 @@ DECLARE_int32(state_store_2_port);
 
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
+
+DECLARE_string(ai_api_key_jceks_secret);
 
 DEFINE_int32(backend_client_connection_num_retries, 3, "Retry backend connections.");
 // When network is unstable, TCP will retry and sending could take longer time.
@@ -517,6 +520,16 @@ Status ExecEnv::Init() {
 
   RETURN_IF_ERROR(admission_controller_->Init());
   RETURN_IF_ERROR(InitHadoopConfig());
+
+  // If 'ai_api_key_jceks_secret' is set then extract the api_key and populate
+  // AIFunctions::ai_api_key_
+  if (frontend_ != nullptr && FLAGS_ai_api_key_jceks_secret != "") {
+    string api_key;
+    RETURN_IF_ERROR(
+        frontend_->GetSecretFromKeyStore(FLAGS_ai_api_key_jceks_secret, &api_key));
+    AiFunctions::set_api_key(api_key);
+  }
+
   return Status::OK();
 }
 

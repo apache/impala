@@ -94,6 +94,7 @@ import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
+import org.apache.impala.thrift.TStringLiteral;
 import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TTableName;
@@ -133,6 +134,8 @@ public class JniFrontend {
   private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
   private final Frontend frontend_;
+  public final static String KEYSTORE_ERROR_MSG = "Failed to get password from" +
+      "keystore, error: invalid key '%s' or password doesn't exist";
 
   /**
    * Create a new instance of the Jni Frontend.
@@ -803,6 +806,31 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Returns secret from the configured KeyStore.
+   * @param secretKeyRequest the serialized secret key to be used for extracting secret.
+   */
+  public static String getSecretFromKeyStore(byte[] secretKeyRequest)
+      throws ImpalaException {
+    final TStringLiteral secretKey = new TStringLiteral();
+    JniUtil.deserializeThrift(protocolFactory_, secretKey, secretKeyRequest);
+    String secret = null;
+    try {
+      char[] secretCharArray = CONF.getPassword(secretKey.getValue());
+      if (secretCharArray != null) {
+        secret = new String(secretCharArray);
+      } else {
+        String errMsg = String.format(KEYSTORE_ERROR_MSG, secretKey.getValue());
+        LOG.error(errMsg);
+        throw new InternalException(errMsg);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to get password from keystore, error: " + e);
+      throw new InternalException(e.getMessage());
+    }
+    return secret;
   }
 
   public String validateSaml2Bearer(byte[] serializedRequest) throws ImpalaException{
