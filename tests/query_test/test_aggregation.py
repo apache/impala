@@ -92,7 +92,7 @@ class TestAggregation(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestAggregation, cls).add_test_dimensions(ALL_CLUSTER_SIZES)
+    super(TestAggregation, cls).add_test_dimensions(cluster_sizes=ALL_CLUSTER_SIZES)
 
     # Add two more dimensions
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('agg_func', *AGG_FUNCTIONS))
