@@ -1431,7 +1431,7 @@ public class MetastoreEventsProcessorTest {
 
     @Override
     public List<NotificationEvent> getNextMetastoreEvents()
-        throws MetastoreNotificationFetchException {
+        throws MetastoreNotificationFetchException, CatalogException {
       // Throw exception roughly half of the time
       Random rand = new Random();
       if (rand.nextInt(10) % 2 == 0){
@@ -1513,14 +1513,16 @@ public class MetastoreEventsProcessorTest {
     assertNotNull("Table should have been found after create table statement",
         catalog_.getTable(TEST_DB_NAME, testTblName));
     loadTable(testTblName);
-    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    long currentEventId = eventsProcessor_.getCurrentEventId();
+    List<NotificationEvent> events =
+        eventsProcessor_.getNextMetastoreEvents(currentEventId);
     // the first create table event should not change anything to the catalogd's
     // created table
     assertEquals(3, events.size());
     Table existingTable = catalog_.getTable(TEST_DB_NAME, testTblName);
     long id = MetastoreShim.getTableId(existingTable.getMetaStoreTable());
     assertEquals("CREATE_TABLE", events.get(0).getEventType());
-    eventsProcessor_.processEvents(Lists.newArrayList(events.get(0)));
+    eventsProcessor_.processEvents(currentEventId, Lists.newArrayList(events.get(0)));
     // after processing the create_table the original table should still remain the same
     long testId = MetastoreShim.getTableId(catalog_.getTable(TEST_DB_NAME,
         testTblName).getMetaStoreTable());
@@ -1531,7 +1533,7 @@ public class MetastoreEventsProcessorTest {
     long numFilteredEvents =
         eventsProcessor_.getMetrics()
             .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
-    eventsProcessor_.processEvents(Lists.newArrayList(events.get(1)));
+    eventsProcessor_.processEvents(currentEventId, Lists.newArrayList(events.get(1)));
     // Verify that the drop_table event is skipped and the metric is incremented.
     assertEquals(numFilteredEvents + 1, eventsProcessor_.getMetrics()
         .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount());
@@ -1540,7 +1542,7 @@ public class MetastoreEventsProcessorTest {
         + "is stale", catalog_.getTable(TEST_DB_NAME, testTblName));
     // the final create table event should also be ignored since its a self-event
     assertEquals("CREATE_TABLE", events.get(2).getEventType());
-    eventsProcessor_.processEvents(Lists.newArrayList(events.get(2)));
+    eventsProcessor_.processEvents(currentEventId, Lists.newArrayList(events.get(2)));
     assertFalse(
         "Table should have been loaded since the create_table should be " + "ignored",
         catalog_.getTable(TEST_DB_NAME,
@@ -1566,7 +1568,7 @@ public class MetastoreEventsProcessorTest {
     List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
     assertEquals(2, events.size());
 
-    eventsProcessor_.processEvents(events);
+    eventsProcessor_.processEvents();
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
     assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
     assertFalse("Table should have been loaded since it was already latest", catalog_
@@ -1577,7 +1579,7 @@ public class MetastoreEventsProcessorTest {
     events = eventsProcessor_.getNextMetastoreEvents();
     // should have 1 drop_table event
     assertEquals(1, events.size());
-    eventsProcessor_.processEvents(events);
+    eventsProcessor_.processEvents();
     // dropping a non-existant table should cause event processor to go into error state
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
@@ -1606,12 +1608,14 @@ public class MetastoreEventsProcessorTest {
     assertNull(catalog_.getDb(TEST_DB_NAME));
     createDatabaseFromImpala(TEST_DB_NAME, "second");
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
-    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    long currentEventId = eventsProcessor_.getCurrentEventId();
+    List<NotificationEvent> events =
+        eventsProcessor_.getNextMetastoreEvents(currentEventId);
     // should have 3 events for create,drop and create database
     assertEquals(3, events.size());
 
     assertEquals("CREATE_DATABASE", events.get(0).getEventType());
-    eventsProcessor_.processEvents(Lists.newArrayList(events.get(0)));
+    eventsProcessor_.processEvents(currentEventId, Lists.newArrayList(events.get(0)));
     // create_database event should have no effect since catalogD has already a later
     // version of database with the same name.
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
@@ -1620,7 +1624,7 @@ public class MetastoreEventsProcessorTest {
 
     // now process drop_database event
     assertEquals("DROP_DATABASE", events.get(1).getEventType());
-    eventsProcessor_.processEvents(Lists.newArrayList(events.get(1)));
+    eventsProcessor_.processEvents(currentEventId, Lists.newArrayList(events.get(1)));
     // database should not be dropped since catalogD is at the latest state
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
     assertEquals("second",
@@ -1628,7 +1632,7 @@ public class MetastoreEventsProcessorTest {
 
     // the third create_database event should have no effect too
     assertEquals("CREATE_DATABASE", events.get(2).getEventType());
-    eventsProcessor_.processEvents(Lists.newArrayList(events.get(2)));
+    eventsProcessor_.processEvents(currentEventId, Lists.newArrayList(events.get(2)));
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
     assertEquals("second",
         catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().getDescription());
@@ -2074,7 +2078,7 @@ public class MetastoreEventsProcessorTest {
   }
 
   private void cleanUpTblsForFlagTests(String dbName)
-      throws TException, MetastoreNotificationFetchException {
+      throws TException, MetastoreNotificationFetchException, CatalogException {
     if (catalog_.getDb(dbName) == null) return;
 
     dropDatabaseCascade(dbName);
@@ -3265,15 +3269,65 @@ public class MetastoreEventsProcessorTest {
    */
   @Test
   public void testSkipFetchOpenTransactionEvent() throws Exception {
+    long currentEventId = eventsProcessor_.getCurrentEventId();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      // Make an empty transaction
+      // 1. Fetch notification events after open and commit transaction
       long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      assertEquals(currentEventId + 1, eventsProcessor_.getCurrentEventId());
+      // Verify latest event id
+      eventsProcessor_.updateLatestEventId();
+      assertEquals(currentEventId + 1, eventsProcessor_.getLatestEventId());
+
       MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+      assertEquals(currentEventId + 2, eventsProcessor_.getCurrentEventId());
+      // Verify the latest event id again
+      eventsProcessor_.updateLatestEventId();
+      assertEquals(currentEventId + 2, eventsProcessor_.getLatestEventId());
+      // Commit transaction event alone is returned from metastore
+      List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+      assertEquals(1, events.size());
+      assertEquals(MetastoreEventType.COMMIT_TXN,
+          MetastoreEventType.from(events.get(0).getEventType()));
+      // Verify last synced event id before and after processEvents
+      assertEquals(currentEventId, eventsProcessor_.getLastSyncedEventId());
+      eventsProcessor_.processEvents();
+      assertEquals(currentEventId + 2, eventsProcessor_.getLastSyncedEventId());
+
+      // 2. Fetch notification events right after open transaction
+      currentEventId = eventsProcessor_.getCurrentEventId();
+      txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      assertEquals(currentEventId + 1, eventsProcessor_.getCurrentEventId());
+      // Open transaction event is not returned from metastore
+      events = eventsProcessor_.getNextMetastoreEvents();
+      assertEquals(0, events.size());
+      // Verify last synced event id before and after processEvents
+      assertEquals(currentEventId, eventsProcessor_.getLastSyncedEventId());
+      eventsProcessor_.processEvents();
+      assertEquals(currentEventId + 1, eventsProcessor_.getLastSyncedEventId());
+
+      MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+      assertEquals(currentEventId + 2, eventsProcessor_.getCurrentEventId());
     }
-    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
-    assertEquals(1, events.size());
-    assertEquals(MetastoreEventType.COMMIT_TXN,
-        MetastoreEventType.from(events.get(0).getEventType()));
+  }
+
+  /**
+   * Test fetching events in batch when last occurred event is open transaction
+   * @throws Exception
+   */
+  @Test
+  public void testFetchEventsInBatchWithOpenTxnAsLastEvent() throws Exception {
+    long currentEventId = eventsProcessor_.getCurrentEventId();
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      assertEquals(currentEventId + 1, eventsProcessor_.getCurrentEventId());
+      List<NotificationEvent> events =
+          MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
+              eventsProcessor_.catalog_, currentEventId, null);
+      // Open transaction event is not returned from metastore
+      assertEquals(0, events.size());
+      MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+      assertEquals(currentEventId + 2, eventsProcessor_.getCurrentEventId());
+    }
   }
 
   private void createDatabase(String catName, String dbName,

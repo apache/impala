@@ -318,8 +318,12 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         NotificationEventRequest eventRequest = new NotificationEventRequest();
         eventRequest.setMaxEvents(batchSize);
         eventRequest.setLastEvent(currentEventId);
-        NotificationEventResponse notificationEventResponse = MetastoreShim
-            .getNextNotification(msc.getHiveClient(), eventRequest);
+        NotificationEventResponse notificationEventResponse =
+            MetastoreShim.getNextNotification(msc.getHiveClient(), eventRequest, true);
+        if (notificationEventResponse.getEvents().isEmpty()) {
+          // Possible to receive empty list due to event skip list in request
+          return result;
+        }
         for (NotificationEvent event : notificationEventResponse.getEvents()) {
           // if no filter is provided we add all the events
           if (filter == null || filter.accept(event)) result.add(event);
@@ -689,6 +693,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     return lastSyncedEventId_.get();
   }
 
+  /**
+   * Returns the current value of latestEventId_. This method is not thread-safe and
+   * only to be used for testing purposes
+   */
+  @VisibleForTesting
+  public long getLatestEventId() {
+    return latestEventId_.get();
+  }
+
   @VisibleForTesting
   void startScheduler() {
     Preconditions.checkState(pollingFrequencyInSec_ > 0);
@@ -813,6 +826,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * NotificationEvents are filtered using the NotificationFilter provided if it is not
    * null.
    * @param eventId The returned events are all after this given event id.
+   * @param currentEventId Current event id on metastore
    * @param getAllEvents If this is true all the events since eventId are returned.
    *                     Note that Hive MetaStore can limit the response to a specific
    *                     maximum number of limit based on the value of configuration
@@ -826,22 +840,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * @throws MetastoreNotificationFetchException In case of exceptions from HMS.
    */
   public List<NotificationEvent> getNextMetastoreEvents(final long eventId,
-      final boolean getAllEvents, @Nullable final NotificationFilter filter)
+      final long currentEventId, final boolean getAllEvents,
+      @Nullable final NotificationFilter filter)
       throws MetastoreNotificationFetchException {
+    // no new events since we last polled
+    if (currentEventId <= eventId) {
+      return Collections.emptyList();
+    }
     final Timer.Context context = metrics_.getTimer(EVENTS_FETCH_DURATION_METRIC).time();
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      // fetch the current notification event id. We assume that the polling interval
-      // is small enough that most of these polling operations result in zero new
-      // events. In such a case, fetching current notification event id is much faster
-      // (and cheaper on HMS side) instead of polling for events directly
-      CurrentNotificationEventId currentNotificationEventId =
-          msClient.getHiveClient().getCurrentNotificationEventId();
-      long currentEventId = currentNotificationEventId.getEventId();
-
-      // no new events since we last polled
-      if (currentEventId <= eventId) {
-        return Collections.emptyList();
-      }
       int batchSize = getAllEvents ? -1 : EVENTS_BATCH_SIZE_PER_RPC;
       // we use the thrift API directly instead of
       // HiveMetastoreClient#getNextNotification because the HMS client can throw an
@@ -849,8 +856,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEventRequest eventRequest = new NotificationEventRequest();
       eventRequest.setLastEvent(eventId);
       eventRequest.setMaxEvents(batchSize);
-      NotificationEventResponse response = MetastoreShim
-          .getNextNotification(msClient.getHiveClient(), eventRequest);
+      NotificationEventResponse response =
+          MetastoreShim.getNextNotification(msClient.getHiveClient(), eventRequest, true);
       LOG.info(String.format("Received %d events. Start event id : %d",
           response.getEvents().size(), eventId));
       if (filter == null) return response.getEvents();
@@ -874,8 +881,21 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   @VisibleForTesting
   protected List<NotificationEvent> getNextMetastoreEvents()
+      throws MetastoreNotificationFetchException, CatalogException {
+    return getNextMetastoreEvents(getCurrentEventId());
+  }
+
+  /**
+   * Fetch the next batch of NotificationEvents from metastore. The default batch size is
+   * <code>EVENTS_BATCH_SIZE_PER_RPC</code>
+   * @param currentEventId Current event id on metastore
+   * @return List of NotificationEvents from metastore since lastSyncedEventId
+   * @throws MetastoreNotificationFetchException
+   */
+  @VisibleForTesting
+  public List<NotificationEvent> getNextMetastoreEvents(long currentEventId)
       throws MetastoreNotificationFetchException {
-    return getNextMetastoreEvents(lastSyncedEventId_.get(), false, null);
+    return getNextMetastoreEvents(lastSyncedEventId_.get(), currentEventId, false, null);
   }
 
   /**
@@ -895,9 +915,13 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
             currentStatus, lastSyncedEventId_.get()));
         return;
       }
-
-      List<NotificationEvent> events = getNextMetastoreEvents();
-      processEvents(events);
+      // fetch the current notification event id. We assume that the polling interval
+      // is small enough that most of these polling operations result in zero new
+      // events. In such a case, fetching current notification event id is much faster
+      // (and cheaper on HMS side) instead of polling for events directly
+      long currentEventId = getCurrentEventId();
+      List<NotificationEvent> events = getNextMetastoreEvents(currentEventId);
+      processEvents(currentEventId, events);
     } catch (MetastoreNotificationFetchException ex) {
       // No need to change the EventProcessor state to error since we want the
       // EventProcessor to continue getting new events after HMS is back up.
@@ -925,7 +949,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   /**
    * Update the latest event id regularly so we know how far we are lagging behind.
    */
-  private void updateLatestEventId() {
+  @VisibleForTesting
+  public void updateLatestEventId() {
     EventProcessorStatus currentStatus = eventProcessorStatus_;
     if (currentStatus != EventProcessorStatus.ACTIVE) {
       return;
@@ -942,8 +967,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEventRequest eventRequest = new NotificationEventRequest();
       eventRequest.setLastEvent(currentEventId - 1);
       eventRequest.setMaxEvents(1);
-      NotificationEventResponse response = MetastoreShim
-          .getNextNotification(msClient.getHiveClient(), eventRequest);
+      NotificationEventResponse response = MetastoreShim.getNextNotification(
+          msClient.getHiveClient(), eventRequest, false);
       Iterator<NotificationEvent> eventIter = response.getEventsIterator();
       // Events could be empty if they are just cleaned up.
       if (!eventIter.hasNext()) return;
@@ -1050,14 +1075,24 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   /**
    * Process the given list of notification events. Useful for tests which provide a list
    * of events
+   * @param currentEventId Current event id on metastore
+   * @param events List of NotificationEvents
+   * @throws MetastoreNotificationException
    */
   @VisibleForTesting
-  protected void processEvents(List<NotificationEvent> events)
+  protected void processEvents(long currentEventId, List<NotificationEvent> events)
       throws MetastoreNotificationException {
     currentEvent_ = null;
     // update the events received metric before returning
     metrics_.getMeter(EVENTS_RECEIVED_METRIC).mark(events.size());
-    if (events.isEmpty()) return;
+    if (events.isEmpty()) {
+      if (lastSyncedEventId_.get() < currentEventId) {
+        // Possible to receive empty list due to event skip list in notification event
+        // request. Update the last synced event id with current event id on metastore
+        lastSyncedEventId_.set(currentEventId);
+      }
+      return;
+    }
     final Timer.Context context =
         metrics_.getTimer(EVENTS_PROCESS_DURATION_METRIC).time();
     Map<MetastoreEvent, Long> eventProcessingTime = new HashMap<>();

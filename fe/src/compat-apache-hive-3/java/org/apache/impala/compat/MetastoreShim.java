@@ -457,9 +457,15 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    * eventIds returned.
    *
    * @see org.apache.hadoop.hive.metastore.HiveMetaStoreClient#getNextNotification
+   * @param msClient Metastore client
+   * @param eventRequest Notification event request
+   * @param isSkipUnwantedEventTypes Whether to set skip event types in request
+   * @return NotificationEventResponse
+   * @throws TException
    */
   public static NotificationEventResponse getNextNotification(IMetaStoreClient msClient,
-      NotificationEventRequest eventRequest) throws TException {
+      NotificationEventRequest eventRequest, boolean isSkipUnwantedEventTypes)
+      throws TException {
     return getThriftClient(msClient).get_next_notification(eventRequest);
   }
 
