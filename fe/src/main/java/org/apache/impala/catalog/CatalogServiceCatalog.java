@@ -4025,9 +4025,7 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.info("Partition {} of table {}.{} has last refresh id as {}. " +
           "Comparing it with {}.", hdfsPartition.getPartitionName(), dbName, tableName,
           hdfsPartition.getLastRefreshEventId(), eventId);
-      if (hdfsPartition.getLastRefreshEventId() > eventId) {
-        return true;
-      }
+      if (hdfsPartition.getLastRefreshEventId() >= eventId) return true;
     } catch (CatalogException ex) {
       LOG.warn("Encountered an exception while the partition's last refresh event id: "
           + dbName + "." + tableName + ". Ignoring further processing and try to " +

@@ -1786,9 +1786,9 @@ public class HdfsPartition extends CatalogObjectImpl
           && hmsParameters_.equals(oldInstance.hmsParameters_)
           && partitionStats_ == oldInstance.partitionStats_
           && hasIncrementalStats_ == oldInstance.hasIncrementalStats_
-          && numRows_ == oldInstance.numRows_
-          && writeId_ == oldInstance.writeId_
-          && lastCompactionId_ == oldInstance.lastCompactionId_);
+          && numRows_ == oldInstance.numRows_ && writeId_ == oldInstance.writeId_
+          && lastCompactionId_ == oldInstance.lastCompactionId_
+          && lastRefreshEventId_ == oldInstance_.lastRefreshEventId_);
     }
   }
 

@@ -235,13 +235,22 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
       catalogd_args="--hms_event_polling_interval_s=5"
+                    " --enable_reload_events=true")
+  def test_refresh_invalidate_events(self, unique_database):
+    self.run_test_refresh_invalidate_events(unique_database, "reload_table")
+
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--hms_event_polling_interval_s=5"
                     " --enable_reload_events=true"
                     " --enable_sync_to_latest_event_on_ddls=true")
-  def test_refresh_invalidate_events(self, unique_database):
+  def test_refresh_invalidate_events_enable_sync_to_latest_events(self, unique_database):
+    self.run_test_refresh_invalidate_events(unique_database, "reload_table_sync", True)
+
+  def run_test_refresh_invalidate_events(self, unique_database, test_reload_table,
+    enable_sync_to_latest_event_on_ddls=False):
     """Test is to verify Impala-11808, refresh/invalidate commands should generate a
     Reload event in HMS and CatalogD's event processor should process this event.
     """
-    test_reload_table = "test_reload_table"
     self.client.execute(
       "create table {}.{} (i int) partitioned by (year int) "
         .format(unique_database, test_reload_table))
@@ -275,28 +284,29 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     check_self_events("refresh {}.{}".format(unique_database, test_reload_table))
     EventProcessorUtils.wait_for_event_processing(self)
 
-    # Test to verify if older events are being skipped in event processor
-    data = FireEventRequestData()
-    data.refreshEvent = True
-    req = FireEventRequest(True, data)
-    req.dbName = unique_database
-    req.tableName = test_reload_table
-    # table level reload events
-    tbl_events_skipped_before = EventProcessorUtils.get_num_skipped_events()
-    for i in range(10):
-      self.hive_client.fire_listener_event(req)
-    EventProcessorUtils.wait_for_event_processing(self)
-    tbl_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
-    assert tbl_events_skipped_after > tbl_events_skipped_before
-    # partition level reload events
-    EventProcessorUtils.wait_for_event_processing(self)
-    part_events_skipped_before = EventProcessorUtils.get_num_skipped_events()
-    req.partitionVals = ["2022"]
-    for i in range(10):
-      self.hive_client.fire_listener_event(req)
-    EventProcessorUtils.wait_for_event_processing(self)
-    part_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
-    assert part_events_skipped_after > part_events_skipped_before
+    if enable_sync_to_latest_event_on_ddls:
+      # Test to verify if older events are being skipped in event processor
+      data = FireEventRequestData()
+      data.refreshEvent = True
+      req = FireEventRequest(True, data)
+      req.dbName = unique_database
+      req.tableName = test_reload_table
+      # table level reload events
+      tbl_events_skipped_before = EventProcessorUtils.get_num_skipped_events()
+      for i in range(10):
+        self.hive_client.fire_listener_event(req)
+      EventProcessorUtils.wait_for_event_processing(self)
+      tbl_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
+      assert tbl_events_skipped_after > tbl_events_skipped_before
+      # partition level reload events
+      EventProcessorUtils.wait_for_event_processing(self)
+      part_events_skipped_before = EventProcessorUtils.get_num_skipped_events()
+      req.partitionVals = ["2022"]
+      for i in range(10):
+        self.hive_client.fire_listener_event(req)
+      EventProcessorUtils.wait_for_event_processing(self)
+      part_events_skipped_after = EventProcessorUtils.get_num_skipped_events()
+      assert part_events_skipped_after > part_events_skipped_before
 
     # Test to verify IMPALA-12213
     table = self.hive_client.get_table(unique_database, test_reload_table)

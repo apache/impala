@@ -432,6 +432,50 @@ class TestEventProcessing(ImpalaTestSuite):
     finally:
       check_call(["hdfs", "dfs", "-rm", "-r", "-skipTrash", staging_dir])
 
+  def test_transact_partition_location_change_from_hive(self, unique_database):
+    """IMPALA-12356: Verify alter partition from hive on transactional table"""
+    self.run_test_partition_location_change_from_hive(unique_database,
+                                                      "transact_alter_part_hive", True)
+
+  def test_partition_location_change_from_hive(self, unique_database):
+    """IMPALA-12356: Verify alter partition from hive on non-transactional table"""
+    self.run_test_partition_location_change_from_hive(unique_database, "alter_part_hive")
+
+  def run_test_partition_location_change_from_hive(self, unique_database, tbl_name,
+    is_transactional=False):
+    fq_tbl_name = unique_database + "." + tbl_name
+    TBLPROPERTIES = self.__get_transactional_tblproperties(is_transactional)
+    # Create the table
+    self.client.execute(
+      "create table %s (i int) partitioned by(j int) stored as parquet %s"
+      % (fq_tbl_name, TBLPROPERTIES))
+    # Insert some data to a partition
+    p1 = "j=1"
+    self.client.execute("insert into table %s partition(%s) values (0),(1),(2)"
+                        % (fq_tbl_name, p1))
+    tbl_location = self._get_table_property("Location:", fq_tbl_name)
+    partitions = self.get_impala_partition_info(fq_tbl_name, 'Location')
+    assert [("{0}/{1}".format(tbl_location, p1),)] == partitions
+    # Alter partition location from hive
+    new_part_location = tbl_location + "/j=2"
+    self.run_stmt_in_hive("alter table %s partition(%s) set location '%s'"
+                          % (fq_tbl_name, p1, new_part_location))
+    EventProcessorUtils.wait_for_event_processing(self)
+    # Verify if the location is updated
+    partitions = self.get_impala_partition_info(fq_tbl_name, 'Location')
+    assert [(new_part_location,)] == partitions
+
+  def _get_table_property(self, property_name, table_name):
+    """Extract the table property value from output of DESCRIBE FORMATTED."""
+    result = self.client.execute("describe formatted {0}".format(table_name))
+    for row in result.data:
+      if property_name in row:
+        row = row.split('\t')
+        if row[1] == 'NULL':
+          break
+        return row[1].rstrip()
+    return None
+
   def __get_transactional_tblproperties(self, is_transactional):
     """
     Util method to generate the tblproperties for transactional tables

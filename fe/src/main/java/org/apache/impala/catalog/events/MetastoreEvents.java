@@ -2711,22 +2711,13 @@ public class MetastoreEvents {
 
     @Override
     public SelfEventContext getSelfEventContext() {
-      if (reloadPartition_ != null) {
-        // create selfEventContext for reload partition event
-        List<TPartitionKeyValue> tPartSpec =
-            getTPartitionSpecFromHmsPartition(msTbl_, reloadPartition_);
-        return new SelfEventContext(dbName_, tblName_, Arrays.asList(tPartSpec),
-            reloadPartition_.getParameters(), null);
-      } else {
-        // create selfEventContext for reload table event
-        return new SelfEventContext(
-            dbName_, tblName_, null, msTbl_.getParameters());
-      }
+      throw new UnsupportedOperationException("Self-event evaluation is unnecessary for"
+          + " this event type");
     }
 
     @Override
     public void processTableEvent() throws MetastoreNotificationException {
-      if (isSelfEvent() || isOlderEvent()) {
+      if (isOlderEvent()) {
         metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .inc(getNumberOfEvents());
         infoLog("Incremented events skipped counter to {}",
@@ -2750,9 +2741,10 @@ public class MetastoreEvents {
         return false;
       }
       // Always check the lastRefreshEventId on the table first for table level refresh
-      if (tbl_.getLastRefreshEventId() > getEventId() || (reloadPartition_ != null &&
-          catalog_.isPartitionLoadedAfterEvent(dbName_, tblName_, reloadPartition_,
-              getEventId()))) {
+      if (tbl_.getLastRefreshEventId() >= getEventId()
+          || (reloadPartition_ != null
+                 && catalog_.isPartitionLoadedAfterEvent(
+                        dbName_, tblName_, reloadPartition_, getEventId()))) {
         return true;
       }
       return false;

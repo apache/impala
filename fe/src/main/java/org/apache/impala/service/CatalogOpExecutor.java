@@ -4556,7 +4556,8 @@ public class CatalogOpExecutor {
         if (removed) {
           LOG.info(
               "EventId: {} Skipping addition of partition {} since it was removed later"
-                  + "in catalog for table {}", eventId,
+                  + " in catalog for table {}",
+              eventId,
               FileUtils.makePartName(hdfsTable.getClusteringColNames(), part.getValues()),
               hdfsTable.getFullName());
         } else {
@@ -6737,7 +6738,7 @@ public class CatalogOpExecutor {
         }
         Preconditions.checkNotNull(tbl, "tbl is null in " + cmdString);
         // fire event for refresh event and update the last refresh event id
-        fireReloadEventAndUpdateRefreshEventId(req, updatedThriftTable, tblName, tbl);
+        fireReloadEventAndUpdateRefreshEventId(req, tblName, tbl);
       }
 
       // Return the TCatalogObject in the result to indicate this request can be
@@ -6783,31 +6784,22 @@ public class CatalogOpExecutor {
    * This class invokes metastore shim's fireReloadEvent to fire event to HMS
    * and update the last refresh event id in the cache
    * @param req - request object for TResetMetadataRequest.
-   * @param updatedThriftTable - updated thrift table after refresh query
    * @param tblName
    * @param tbl
    */
-  private void fireReloadEventAndUpdateRefreshEventId(TResetMetadataRequest req,
-      TCatalogObject updatedThriftTable, TableName tblName, Table tbl) {
+  private void fireReloadEventAndUpdateRefreshEventId(
+      TResetMetadataRequest req, TableName tblName, Table tbl) {
     List<String> partVals = null;
     if (req.isSetPartition_spec()) {
       partVals = req.getPartition_spec().stream().
           map(partSpec -> partSpec.getValue()).collect(Collectors.toList());
     }
     try {
-      // Get new catalog version for table refresh/invalidate.
-      long newCatalogVersion = updatedThriftTable.getCatalog_version();
-      Map<String, String> tableParams = new HashMap<>();
-      tableParams.put(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
-          catalog_.getCatalogServiceId());
-      tableParams.put(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
-          String.valueOf(newCatalogVersion));
       List<Long> eventIds = MetastoreShim.fireReloadEventHelper(
           catalog_.getMetaStoreClient(), req.isIs_refresh(), partVals, tblName.getDb(),
-          tblName.getTbl(), tableParams);
+          tblName.getTbl(), Collections.emptyMap());
       if (req.isIs_refresh()) {
         if (catalog_.tryLock(tbl, true, 600000)) {
-          catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
           if (!eventIds.isEmpty()) {
             if (req.isSetPartition_spec()) {
               HdfsPartition partition = ((HdfsTable) tbl)
@@ -6982,7 +6974,12 @@ public class CatalogOpExecutor {
               partition.setValues(MetaStoreUtil.getPartValsFromName(msTbl, partName));
               partition.setSd(MetaStoreUtil.shallowCopyStorageDescriptor(msTbl.getSd()));
               partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" + partName);
-              addCatalogServiceIdentifiers(msTbl, partition);
+              if (AcidUtils.isTransactionalTable(msTbl.getParameters())) {
+                // Self event detection is deprecated for non-transactional tables add
+                // partition. So we add catalog service identifiers only for
+                // transactional tables
+                addCatalogServiceIdentifiers(msTbl, partition);
+              }
               MetastoreShim.updatePartitionStatsFast(partition, msTbl, warehouse);
             }
 
