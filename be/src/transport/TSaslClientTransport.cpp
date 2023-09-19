@@ -34,7 +34,7 @@ namespace apache { namespace thrift { namespace transport {
 
 TSaslClientTransport::TSaslClientTransport(std::shared_ptr<sasl::TSasl> saslClient,
                                            std::shared_ptr<TTransport> transport)
-   : TSaslTransport(saslClient, transport) {
+   : TSaslTransport(move(saslClient), move(transport)) {
 }
 
 void TSaslClientTransport::setupSaslNegotiationState() {

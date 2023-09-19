@@ -331,7 +331,7 @@ Status Thread::StartThread(const std::string& category, const std::string& name,
 }
 
 void Thread::SuperviseThread(const string& name, const string& category,
-    Thread::ThreadFunctor functor, const ThreadDebugInfo* parent_thread_info,
+    const Thread::ThreadFunctor& functor, const ThreadDebugInfo* parent_thread_info,
     Promise<int64_t>* thread_started) {
   int64_t system_tid = syscall(SYS_gettid);
   if (system_tid == -1) {

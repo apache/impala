@@ -86,15 +86,14 @@ enum class WorkloadManagementState {
 /// Represents one query that has completed.
 struct CompletedQuery {
   // Contains information about the completed query.
-  const std::shared_ptr<QueryStateExpanded> query;
+  std::shared_ptr<QueryStateExpanded> query;
 
   // Count of the number of times the completed query has attempted to be inserted into
   // the completed queries table. The count is tracked so that the number of attempts can
   // be limited and failing inserts do not retry indefinitely.
   uint8_t insert_attempts_count;
 
-  CompletedQuery(const std::shared_ptr<QueryStateExpanded> query) :
-      query(std::move(query)) {
+  CompletedQuery(std::shared_ptr<QueryStateExpanded> query) : query(std::move(query)) {
     insert_attempts_count = 0;
   }
 };

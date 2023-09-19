@@ -482,13 +482,13 @@ class Result {
   AssignmentFilter IsHost(int host_idx) const;
 
   /// Filter to only match assignments of cached reads.
-  AssignmentFilter IsCached(AssignmentFilter filter) const;
+  AssignmentFilter IsCached(const AssignmentFilter& filter) const;
 
   /// Filter to only match assignments of non-cached, local disk reads.
-  AssignmentFilter IsDisk(AssignmentFilter filter) const;
+  AssignmentFilter IsDisk(const AssignmentFilter& filter) const;
 
   /// Filter to only match assignments of remote reads.
-  AssignmentFilter IsRemote(AssignmentFilter filter) const;
+  AssignmentFilter IsRemote(const AssignmentFilter& filter) const;
 
   /// Process all recorded assignments and call the supplied callback on each tuple of IP
   /// address and scan_range it iterates over.

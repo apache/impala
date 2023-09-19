@@ -238,7 +238,7 @@ public:
   // the provided lambda in a loop until the compare and swap succeeds.
   // The lambda is required to mutate the AtomicState argument passed to it.
   // This returns a structure containing the old atomic value and new atomic value.
-  AtomicStateTransition modify_atomic_state(std::function<void(AtomicState&)> fn) {
+  AtomicStateTransition modify_atomic_state(const std::function<void(AtomicState&)>& fn) {
     AtomicState old_atomic_state = atomic_state_.load();
     AtomicState new_atomic_state = old_atomic_state;
     while (true) {

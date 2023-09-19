@@ -107,10 +107,9 @@ class StatestoreSubscriber {
   typedef boost::function<void (const TopicDeltaMap& state,
                                 std::vector<TTopicDelta>* topic_updates)> UpdateCallback;
 
-  /// Adds a topic to the set of topics that updates will be received
-  /// for.
+  /// Adds a topic to the set of topics that updates will be received for.
   Status AddTopic(const Statestore::TopicId& topic_id, bool is_transient,
-      bool populate_min_subscriber_topic_version, std::string filter_prefix,
+      bool populate_min_subscriber_topic_version, const std::string& filter_prefix,
       const UpdateCallback& callback);
 
   /// UpdateCatalogdCallback is invoked every time that a notification of updating
@@ -335,7 +334,7 @@ class StatestoreSubscriber {
 
     /// Check if the given statestore ID is matching with the statestore ID of this
     /// statestore.
-    bool IsMatchingStatestoreId(const TUniqueId statestore_id);
+    bool IsMatchingStatestoreId(const TUniqueId& statestore_id);
 
     int64_t MilliSecondsSinceLastRegistration() const {
       return MonotonicMillis() - last_registration_ms_.Load();

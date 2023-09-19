@@ -85,11 +85,12 @@ class TAcceptQueueServer : public TServer {
   // This is the work function for the thread pool, which does the work of setting up the
   // connection and starting a thread to handle it. Will block if there are currently
   // maxTasks_ connections and maxTasks_ is non-zero.
-  void SetupConnection(std::shared_ptr<TAcceptQueueEntry> entry);
+  void SetupConnection(const std::shared_ptr<TAcceptQueueEntry>& entry);
 
   // Helper function to close a client connection in case of server side errors.
-  void CleanupAndClose(const std::string& error, std::shared_ptr<TTransport> io_transport,
-      std::shared_ptr<TTransport> client);
+  void CleanupAndClose(const std::string& error,
+      const std::shared_ptr<TTransport>& io_transport,
+      const std::shared_ptr<TTransport>& client);
 
   std::shared_ptr<ThreadFactory> threadFactory_;
   volatile bool stop_ = false;

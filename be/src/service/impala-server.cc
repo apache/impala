@@ -891,7 +891,7 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
 }
 
 Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
-    shared_ptr<QueryStateRecord> query_record, RuntimeProfileOutput* profile) {
+    const shared_ptr<QueryStateRecord>& query_record, RuntimeProfileOutput* profile) {
   if (format == TRuntimeProfileFormat::BASE64) {
     Base64Encode(query_record->compressed_profile, profile->string_output);
   } else if (format == TRuntimeProfileFormat::THRIFT) {
@@ -914,8 +914,8 @@ Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
   return Status::OK();
 }
 
-void ImpalaServer::WaitForNewCatalogServiceId(TUniqueId cur_service_id,
-    unique_lock<mutex>* ver_lock) {
+void ImpalaServer::WaitForNewCatalogServiceId(
+    const TUniqueId& cur_service_id, unique_lock<mutex>* ver_lock) {
   DCHECK(ver_lock != nullptr);
   // The catalog service ID of 'catalog_update_result' does not match the current catalog
   // service ID. It is possible that catalogd has been restarted and
@@ -1255,9 +1255,9 @@ void ImpalaServer::EnforceMaxMtDop(TQueryCtx* query_ctx, int64_t max_mt_dop) {
   }
 }
 
-Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> session_state,
-    QueryHandle* query_handle, const TExecRequest* external_exec_request,
-    const bool include_in_query_log) {
+Status ImpalaServer::Execute(TQueryCtx* query_ctx,
+    const shared_ptr<SessionState>& session_state, QueryHandle* query_handle,
+    const TExecRequest* external_exec_request, const bool include_in_query_log) {
   PrepareQueryContext(query_ctx);
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
 
@@ -1279,8 +1279,9 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> sess
 }
 
 Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
-    const TExecRequest* external_exec_request, shared_ptr<SessionState> session_state,
-    bool* registered_query, QueryHandle* query_handle) {
+    const TExecRequest* external_exec_request,
+    const shared_ptr<SessionState>& session_state, bool* registered_query,
+    QueryHandle* query_handle) {
   DCHECK(session_state != nullptr);
   DCHECK(query_handle != nullptr);
   DCHECK(registered_query != nullptr);
@@ -1426,7 +1427,7 @@ void ImpalaServer::PrepareQueryContext(const std::string& hostname,
 }
 
 Status ImpalaServer::RegisterQuery(const TUniqueId& query_id,
-    shared_ptr<SessionState> session_state, QueryHandle* query_handle) {
+    const shared_ptr<SessionState>& session_state, QueryHandle* query_handle) {
   lock_guard<mutex> l2(session_state->lock);
   // The session wasn't expired at the time it was checked out and it isn't allowed to
   // expire while checked out, so it must not be expired.
@@ -1457,7 +1458,7 @@ static inline int32_t GetIdleTimeout(const TQueryOptions& query_options) {
 }
 
 Status ImpalaServer::SetQueryInflight(
-    shared_ptr<SessionState> session_state, const QueryHandle& query_handle) {
+    const shared_ptr<SessionState>& session_state, const QueryHandle& query_handle) {
   DebugActionNoFail(query_handle->query_options(), "SET_QUERY_INFLIGHT");
   const TUniqueId& query_id = query_handle->query_id();
   {

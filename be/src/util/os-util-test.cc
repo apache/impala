@@ -25,7 +25,8 @@
 using namespace std;
 using namespace impala;
 
-void UseEnvironment(const unordered_map<string, string>& env, function<void(void)> fn) {
+void UseEnvironment(
+    const unordered_map<string, string>& env, const function<void(void)>& fn) {
   for (const auto& e: env) {
     setenv(e.first.c_str(), e.second.c_str(), true);
   }

@@ -709,7 +709,7 @@ MinMaxFilter* RuntimeFilterBank::AllocateScratchMinMaxFilter(
   if (closed_) return nullptr;
 
   MinMaxFilter* min_max_filter =
-      MinMaxFilter::Create(type, &obj_pool_, filter_mem_tracker_);
+      MinMaxFilter::Create(move(type), &obj_pool_, filter_mem_tracker_);
   fs->min_max_filters.push_back(min_max_filter);
   return min_max_filter;
 }
@@ -725,7 +725,7 @@ InListFilter* RuntimeFilterBank::AllocateScratchInListFilter(
   DCHECK(query_state_->query_options().__isset.runtime_in_list_filter_entry_limit);
   int32_t entry_limit = query_state_->query_options().runtime_in_list_filter_entry_limit;
   InListFilter* in_list_filter =
-      InListFilter::Create(type, entry_limit, &obj_pool_, filter_mem_tracker_);
+      InListFilter::Create(move(type), entry_limit, &obj_pool_, filter_mem_tracker_);
   fs->in_list_filters.push_back(in_list_filter);
   return in_list_filter;
 }

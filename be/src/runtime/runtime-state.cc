@@ -367,7 +367,7 @@ void RuntimeState::SetRPCErrorInfo(NetworkAddressPB dest_node, int16_t posix_err
   if (aux_error_info_ == nullptr && !reported_aux_error_info_) {
     aux_error_info_.reset(new AuxErrorInfoPB());
     RPCErrorInfoPB* rpc_error_info = aux_error_info_->mutable_rpc_error_info();
-    *rpc_error_info->mutable_dest_node() = dest_node;
+    *rpc_error_info->mutable_dest_node() = move(dest_node);
     rpc_error_info->set_posix_error_code(posix_error_code);
   }
 }

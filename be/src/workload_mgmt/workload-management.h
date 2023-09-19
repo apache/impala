@@ -82,7 +82,7 @@ class FieldDefinition {
   const int16_t precision;
   const int16_t scale;
 
-  FieldDefinition(const TPrimitiveType::type db_col_type, const kudu::Version schema_ver,
+  FieldDefinition(TPrimitiveType::type db_col_type, kudu::Version schema_ver,
       const int16_t precision = 0, const int16_t scale = 0)
     : db_column_type(std::move(db_col_type)),
       schema_version(std::move(schema_ver)),

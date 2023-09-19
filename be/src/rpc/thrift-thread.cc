@@ -32,6 +32,9 @@ namespace atc = apache::thrift::concurrency;
 
 void ThriftThread::start() {
   Promise<atc::Thread::id_t> promise;
+  // As noted in https://en.cppreference.com/w/cpp/utility/functional/bind, std::bind
+  // makes a copy of its arguments, notably runnable() which is a shared_ptr. That ensures
+  // it will live as long as the thread despite passing to RunRunnable by reference.
   Status status = impala::Thread::Create(group_, name_,
       bind(&ThriftThread::RunRunnable, this, runnable(), &promise), &impala_thread_);
 
@@ -64,13 +67,13 @@ std::shared_ptr<atc::Thread> ThriftThreadFactory::newThread(
   return result;
 }
 
-void ThriftThread::RunRunnable(std::shared_ptr<atc::Runnable> runnable,
-    Promise<atc::Thread::id_t>* promise) {
+void ThriftThread::RunRunnable(
+    const std::shared_ptr<atc::Runnable>& runnable, Promise<atc::Thread::id_t>* promise) {
   promise->Set(get_current());
-  // Passing runnable in to this method (rather than reading from this->runnable())
-  // ensures that it will live as long as this method, otherwise the ThriftThread could be
-  // destroyed between the previous statement and this one (according to my reading of
-  // PosixThread)
+  // Passing runnable in to this method (rather than reading from this->runnable()) -
+  // preserved as a copy via std::bind - ensures that it will live as long as this
+  // method, otherwise the ThriftThread could be destroyed between the previous
+  // statement and this one (according to my reading of PosixThread).
   runnable->run();
 }
 
@@ -78,6 +81,6 @@ atc::Thread::id_t ThriftThreadFactory::getCurrentThreadId() const {
   return atc::Thread::get_current();
 }
 
-ThriftThread::ThriftThread(const string& group, const string& name, bool detached,
-    std::shared_ptr<atc::Runnable> runnable)
-  : atc::Thread(detached, runnable), group_(group), name_(name) {}
+ThriftThread::ThriftThread(
+    string group, string name, bool detached, std::shared_ptr<atc::Runnable> runnable)
+  : atc::Thread(detached, move(runnable)), group_(move(group)), name_(move(name)) {}

@@ -62,7 +62,7 @@ void PeriodicCounterUpdater::Init() {
 void PeriodicCounterUpdater::RegisterUpdateFunction(UpdateFn update_fn, bool is_system) {
   PeriodicCounterUpdater* instance = is_system ? system_instance_ : instance_;
   lock_guard<SpinLock> l(instance->update_fns_lock_);
-  instance->update_fns_.push_back(update_fn);
+  instance->update_fns_.push_back(std::move(update_fn));
 }
 
 void PeriodicCounterUpdater::RegisterPeriodicCounter(
@@ -78,7 +78,7 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
     case RATE_COUNTER: {
       RateCounterInfo counter;
       counter.src_counter = src_counter;
-      counter.sample_fn = sample_fn;
+      counter.sample_fn = std::move(sample_fn);
       counter.elapsed_ms = 0;
       lock_guard<SpinLock> ratelock(instance->rate_lock_);
       instance->rate_counters_[dst_counter] = counter;
@@ -87,7 +87,7 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
     case SAMPLING_COUNTER: {
       SamplingCounterInfo counter;
       counter.src_counter = src_counter;
-      counter.sample_fn = sample_fn;
+      counter.sample_fn = std::move(sample_fn);
       counter.num_sampled = 0;
       counter.total_sampled_value = 0;
       lock_guard<SpinLock> samplinglock(instance->sampling_lock_);

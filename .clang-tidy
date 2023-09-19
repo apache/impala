@@ -34,8 +34,7 @@ Checks: "-*,clang*,\
 -clang-diagnostic-return-type-c-linkage,\
 -clang-diagnostic-unused-local-typedef,\
 -clang-diagnostic-unused-parameter,\
-performance-*,\
--performance-unnecessary-value-param"
+performance-*"
 
 # Ignore warnings in gutil
 

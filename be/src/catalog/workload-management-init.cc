@@ -153,7 +153,7 @@ static Status _setupDb(CatalogServiceIf* svc, const string& ip_addr, const strin
 /// a TColumn object for each column if the provided function returns true for that column
 /// returning a vector of all columns that were included.
 static vector<TColumn> _buildCols(
-    function<bool(const FieldDefinition& item)> shouldIncludeCol) {
+    const function<bool(const FieldDefinition& item)>& shouldIncludeCol) {
   vector<TColumn> cols;
 
   for (const auto& field : FIELD_DEFINITIONS) {

@@ -135,7 +135,7 @@ void BoostProduceThread(int64_t n, int64_t* value) {
   }
 }
 
-void LaunchThreads(void* d, Fn consume_fn, Fn produce_fn, int64_t scale) {
+void LaunchThreads(void* d, const Fn& consume_fn, const Fn& produce_fn, int64_t scale) {
   TestData* data = reinterpret_cast<TestData*>(d);
   data->value = 0;
   int64_t num_per_consumer = 0;

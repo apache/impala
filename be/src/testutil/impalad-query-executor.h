@@ -83,8 +83,8 @@ class ImpaladQueryExecutor {
   bool eos() { return eos_; }
 
   /// Add a query option, preserving the existing set of query options.
-  void PushExecOption(const std::string& exec_option) {
-    exec_options_.push_back(exec_option);
+  void PushExecOption(std::string exec_option) {
+    exec_options_.emplace_back(std::move(exec_option));
   }
 
   /// Remove the last query option that was added by pushExecOption().

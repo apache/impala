@@ -582,7 +582,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// FE could populate stats-predicates that can't be evaluated here if the table
   /// contains both Parquet and ORC format partitions. Here we only pick min-max
   /// predicates, i.e. <, >, <=, and >=.
-  bool IsSupportedStatsConjunct(std::string fn_name) {
+  bool IsSupportedStatsConjunct(const std::string& fn_name) {
     return fn_name == "lt" || fn_name == "gt" || fn_name == "le" || fn_name == "ge";
   }
 

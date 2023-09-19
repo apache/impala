@@ -342,7 +342,7 @@ Status LlvmCodeGen::LoadModuleFromFile(
 }
 
 Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<llvm::MemoryBuffer> module_ir_buf,
-    string module_name, unique_ptr<llvm::Module>* module) {
+    const string& module_name, unique_ptr<llvm::Module>* module) {
   DCHECK(!module_name.empty());
   COUNTER_ADD(module_bitcode_size_, module_ir_buf->getMemBufferRef().getBufferSize());
   llvm::Expected<unique_ptr<llvm::Module>> tmp_module =
@@ -696,10 +696,9 @@ void LlvmCodeGen::CreateIfElseBlocks(llvm::Function* fn, const string& if_name,
 
 llvm::PHINode* LlvmCodeGen::CreateBinaryPhiNode(LlvmBuilder* builder, llvm::Value* value1,
     llvm::Value* value2, llvm::BasicBlock* incoming_block1,
-    llvm::BasicBlock* incoming_block2, std::string name) {
-  std::string node_name = name == "" ? (value1->getName().str() + "_phi") : name;
-
-  llvm::PHINode* res = builder->CreatePHI(value1->getType(), 2, node_name);
+    llvm::BasicBlock* incoming_block2, const string& name) {
+  llvm::PHINode* res = builder->CreatePHI(
+      value1->getType(), 2, name.empty() ? (value1->getName().str() + "_phi") : name);
 
   res->addIncoming(value1, incoming_block1);
   res->addIncoming(value2, incoming_block2);

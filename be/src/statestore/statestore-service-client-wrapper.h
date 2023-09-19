@@ -27,14 +27,12 @@ class StatestoreServiceClientWrapper : public StatestoreServiceClient {
  public:
   StatestoreServiceClientWrapper(
       std::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
-    : StatestoreServiceClient(prot) {
-  }
+    : StatestoreServiceClient(move(prot)) {}
 
   StatestoreServiceClientWrapper(
       std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
       std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
-    : StatestoreServiceClient(iprot, oprot) {
-  }
+    : StatestoreServiceClient(move(iprot), move(oprot)) {}
 
 /// We intentionally disable this clang warning as we intend to hide the
 /// the same-named functions defined in the base class.
@@ -71,14 +69,12 @@ class StatestoreHaServiceClientWrapper : public StatestoreHaServiceClient {
  public:
   StatestoreHaServiceClientWrapper(
       std::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
-    : StatestoreHaServiceClient(prot) {
-  }
+    : StatestoreHaServiceClient(std::move(prot)) {}
 
   StatestoreHaServiceClientWrapper(
       std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
       std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
-    : StatestoreHaServiceClient(iprot, oprot) {
-  }
+    : StatestoreHaServiceClient(std::move(iprot), std::move(oprot)) {}
 
 /// We intentionally disable this clang warning as we intend to hide the
 /// the same-named functions defined in the base class.

@@ -52,7 +52,7 @@ class DecimalUtil {
     return result;
   }
 
-  static int256_t SafeMultiply(int256_t a, int256_t b, bool may_overflow) {
+  static int256_t SafeMultiply(const int256_t& a, const int256_t& b, bool may_overflow) {
     int256_t result = a * b;
     DCHECK(may_overflow || a == 0 || result / a == b);
     return result;

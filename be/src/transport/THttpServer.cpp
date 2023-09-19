@@ -49,7 +49,7 @@ namespace transport {
 using namespace std;
 using strings::Substitute;
 
-THttpServerTransportFactory::THttpServerTransportFactory(const std::string server_name,
+THttpServerTransportFactory::THttpServerTransportFactory(const std::string& server_name,
     impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos, bool use_cookies,
     bool check_trusted_domain, bool check_trusted_auth_header, bool has_saml,
     bool has_jwt)
@@ -107,7 +107,7 @@ THttpServer::THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap,
     bool has_kerberos, bool has_saml, bool use_cookies, bool check_trusted_domain,
     bool check_trusted_auth_header, bool has_jwt, bool metrics_enabled,
     HttpMetrics* http_metrics)
-  : THttpTransport(transport),
+  : THttpTransport(move(transport)),
     has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     has_saml_(has_saml),

@@ -36,7 +36,7 @@ const int THttpTransport::CRLF_LEN = 2;
 
 THttpTransport::THttpTransport(std::shared_ptr<TTransport> transport)
   : TVirtualTransport(transport->getConfiguration()),
-    transport_(transport),
+    transport_(move(transport)),
     origin_(""),
     readHeaders_(true),
     readWholeBodyForAuth_(false),

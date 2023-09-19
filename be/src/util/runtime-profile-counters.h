@@ -258,7 +258,7 @@ class SamplingCounterPrototype : public ProfileEntryPrototype {
 
   RuntimeProfileBase::Counter* Instantiate(
       RuntimeProfile* profile, boost::function<int64_t()> sample_fn) {
-    return profile->AddSamplingCounter(name(), sample_fn);
+    return profile->AddSamplingCounter(name(), std::move(sample_fn));
   }
 };
 
@@ -798,9 +798,9 @@ class RuntimeProfile::TimeSeriesCounter {
   virtual void Clear() {}
 
  protected:
-  TimeSeriesCounter(const std::string& name, TUnit::type unit,
-      SampleFunction fn = SampleFunction())
-    : name_(name), unit_(unit), sample_fn_(fn), is_system_(false) {}
+  TimeSeriesCounter(
+      const std::string& name, TUnit::type unit, SampleFunction fn = SampleFunction())
+    : name_(name), unit_(unit), sample_fn_(std::move(fn)), is_system_(false) {}
 
   std::string name_;
   TUnit::type unit_;
@@ -820,7 +820,7 @@ class RuntimeProfile::SamplingTimeSeriesCounter
 
   SamplingTimeSeriesCounter(
       const std::string& name, TUnit::type unit, SampleFunction fn, int initial_period)
-    : TimeSeriesCounter(name, unit, fn), samples_(initial_period) {}
+    : TimeSeriesCounter(name, unit, std::move(fn)), samples_(initial_period) {}
 
   virtual void AddSampleLocked(int64_t sample, int ms_elapsed) override;
   virtual const int64_t* GetSamplesLocked( int* num_samples, int* period) const override;

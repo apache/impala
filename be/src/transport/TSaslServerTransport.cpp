@@ -43,28 +43,26 @@ using namespace sasl;
 
 namespace apache { namespace thrift { namespace transport {
 TSaslServerTransport::TSaslServerTransport(std::shared_ptr<TTransport> transport)
-   : TSaslTransport(transport) {
+   : TSaslTransport(move(transport)) {
 }
 
-TSaslServerTransport::TSaslServerTransport(const string& mechanism,
-                                           const string& protocol,
-                                           const string& serverName,
-                                           const string& realm,
+TSaslServerTransport::TSaslServerTransport(string mechanism,
+                                           string protocol,
+                                           string serverName,
+                                           string realm,
                                            unsigned flags,
-                                           const map<string, string>& props,
-                                           const vector<struct sasl_callback>& callbacks,
+                                           map<string, string> props,
+                                           vector<struct sasl_callback> callbacks,
                                            std::shared_ptr<TTransport> transport)
-     : TSaslTransport(transport) {
-  addServerDefinition(mechanism, protocol, serverName, realm, flags,
-      props, callbacks);
+     : TSaslTransport(move(transport)) {
+  addServerDefinition(move(mechanism), move(protocol), move(serverName), move(realm),
+      flags, move(props), move(callbacks));
 }
 
 TSaslServerTransport:: TSaslServerTransport(
-    const std::map<std::string, TSaslServerDefinition*>& serverMap,
+    std::map<std::string, TSaslServerDefinition*> serverMap,
     std::shared_ptr<TTransport> transport)
-    : TSaslTransport(transport) {
-  serverDefinitionMap_.insert(serverMap.begin(), serverMap.end());
-}
+    : TSaslTransport(move(transport)), serverDefinitionMap_(move(serverMap)) { }
 
 /**
  * Set the server for this transport

@@ -59,14 +59,19 @@ enum class EventType {
 };
 
 // Functions to convert EventType to a string representation and back
-EventType StringToEventType(std::string s);
+EventType StringToEventType(const std::string& s);
 std::string EventTypeToString(EventType s);
 
 struct TraceEvent {
   TraceEvent(EventType type, double timestamp, std::string filename, int64_t mtime,
-             int64_t offset, int64_t entry_length, int64_t lookup_length)
-   : type(type), timestamp(timestamp), filename(filename), mtime(mtime),
-     offset(offset), entry_length(entry_length), lookup_length(lookup_length) {}
+      int64_t offset, int64_t entry_length, int64_t lookup_length)
+    : type(type),
+      timestamp(timestamp),
+      filename(std::move(filename)),
+      mtime(mtime),
+      offset(offset),
+      entry_length(entry_length),
+      lookup_length(lookup_length) {}
 
   TraceEvent() = default;
 
@@ -100,7 +105,7 @@ struct TraceEvent {
 };
 
 // Parse the json input and fill in a TraceEvent representing the data
-Status JsonToTraceEvent(std::string json, TraceEvent* event);
+Status JsonToTraceEvent(const std::string& json, TraceEvent* event);
 
 // Construct a JSON entry from the provided TraceEvent
 std::string TraceEventToJson(const TraceEvent& event);
@@ -164,8 +169,7 @@ struct CacheHitStatistics {
 // class to iterate over the TraceEvents from a single file.
 class TraceFileIterator {
  public:
-  TraceFileIterator(std::string filename)
-    : filename_(filename) {}
+  TraceFileIterator(std::string filename) : filename_(std::move(filename)) {}
 
   // Initialize the iterator
   Status Init();

@@ -186,8 +186,9 @@ class DataCache::CacheFile {
   }
 
   static Status Create(std::string path, std::unique_ptr<CacheFile>* cache_file_ptr) {
-    unique_ptr<CacheFile> cache_file(new CacheFile(path));
-    KUDU_RETURN_IF_ERROR(kudu::Env::Default()->NewRWFile(path, &cache_file->file_),
+    unique_ptr<CacheFile> cache_file(new CacheFile(move(path)));
+    KUDU_RETURN_IF_ERROR(
+        kudu::Env::Default()->NewRWFile(cache_file->path_, &cache_file->file_),
         "Failed to create cache file");
     *cache_file_ptr = std::move(cache_file);
     return Status::OK();
@@ -195,11 +196,11 @@ class DataCache::CacheFile {
 
   static Status Open(std::string path, bool allow_append, int64_t current_offset,
       std::unique_ptr<CacheFile>* cache_file_ptr) {
-    unique_ptr<CacheFile> cache_file(new CacheFile(path));
+    unique_ptr<CacheFile> cache_file(new CacheFile(move(path)));
     kudu::RWFileOptions opts;
     opts.mode = kudu::Env::OpenMode::MUST_EXIST;
     KUDU_RETURN_IF_ERROR(
-        kudu::Env::Default()->NewRWFile(opts, path, &cache_file->file_),
+        kudu::Env::Default()->NewRWFile(opts, cache_file->path_, &cache_file->file_),
         "Failed to open cache file");
     cache_file->allow_append_ = allow_append;
     cache_file->current_offset_.Store(current_offset);
@@ -486,8 +487,10 @@ class DataCache::Partition::DumpData {
     CacheFileData() = default;
 
     CacheFileData(string path, bool allow_append, int64_t current_offset, int64_t mtime)
-      : path(path), allow_append(allow_append), current_offset(current_offset),
-        mtime(mtime) { }
+      : path(move(path)),
+        allow_append(allow_append),
+        current_offset(current_offset),
+        mtime(mtime) {}
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version) {
@@ -515,9 +518,9 @@ class DataCache::Partition::DumpData {
   struct CacheKeyEntryData {
     CacheKeyEntryData() = default;
 
-    CacheKeyEntryData(string key, int64_t index, int64_t offset, int64_t len,
-        uint64_t checksum)
-      : key(key), index(index), offset(offset), len(len), checksum(checksum) { }
+    CacheKeyEntryData(
+        string key, int64_t index, int64_t offset, int64_t len, uint64_t checksum)
+      : key(move(key)), index(index), offset(offset), len(len), checksum(checksum) {}
 
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version) {
@@ -1222,11 +1225,11 @@ bool DataCache::Partition::VerifyChecksum(const string& ops_name, const CacheEnt
   return true;
 }
 
-DataCache::DataCache(const std::string config, int32_t num_async_write_threads,
-    bool trace_replay)
-  : config_(config),
+DataCache::DataCache(
+    std::string config, int32_t num_async_write_threads, bool trace_replay)
+  : config_(move(config)),
     trace_replay_(trace_replay),
-    num_async_write_threads_(num_async_write_threads) { }
+    num_async_write_threads_(num_async_write_threads) {}
 
 DataCache::~DataCache() { ReleaseResources(); }
 

@@ -96,6 +96,6 @@ void RuntimeFilter::SetIntermediateAggregation(bool is_intermediate_aggregator,
   DCHECK(!intermediate_krpc_hostname.empty());
   DCHECK(IsResolvedAddress(intermediate_krpc_backend));
   is_intermediate_aggregator_ = is_intermediate_aggregator;
-  intermediate_krpc_hostname_ = intermediate_krpc_hostname;
-  intermediate_krpc_backend_ = intermediate_krpc_backend;
+  intermediate_krpc_hostname_ = move(intermediate_krpc_hostname);
+  intermediate_krpc_backend_ = move(intermediate_krpc_backend);
 }

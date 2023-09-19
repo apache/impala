@@ -55,7 +55,7 @@ class SimpleLoggerTest : public ::testing::Test {
 
   // Create a SimpleLogger with standard log prefix, max entries per file, and
   // max files.
-  unique_ptr<SimpleLogger> CreateSimpleLogger(path directory) {
+  unique_ptr<SimpleLogger> CreateSimpleLogger(const path& directory) {
     return std::make_unique<SimpleLogger>(directory.string(), LOG_FILE_PREFIX,
         MAX_ENTRIES_PER_FILE, MAX_LOG_FILES);
   }
@@ -72,7 +72,7 @@ TEST_F(SimpleLoggerTest, CreateDirectories) {
   logger.reset();
 
   // Test that it also works if the directory already exists
-  logger = CreateSimpleLogger(tmp_dir().string());
+  logger = CreateSimpleLogger(tmp_dir());
   EXPECT_OK(logger->Init());
 }
 

@@ -50,8 +50,8 @@ static TExecStats buildExecStats(int64_t latency, int64_t mem_used,
 }
 
 static TPlanNodeExecSummary buildPlanNode(TPlanNodeId node_id, TFragmentIdx fragment_idx,
-    string label, string detail, int32_t num_hosts, int32_t num_children,
-    bool is_broadcast, TExecStats estimates) {
+    const string& label, const string& detail, int32_t num_hosts, int32_t num_children,
+    bool is_broadcast, const TExecStats& estimates) {
   TPlanNodeExecSummary node;
 
   node.__set_node_id(node_id);

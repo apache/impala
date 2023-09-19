@@ -408,14 +408,15 @@ class AdmissionController {
   /// admission control service. Returns a list of the queries that had their resources
   /// released.
   std::vector<UniqueIdPB> CleanupQueriesForHost(
-      const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB> query_ids);
+      const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB>& query_ids);
 
   /// Relases the resources for any queries currently running on coordinators that do not
   /// appear in 'current_backends'. Called in response to statestore updates. Returns a
   /// map from the backend id of any coordinator detected to have failed to a list of
   /// queries that were released for that coordinator.
   std::unordered_map<UniqueIdPB, std::vector<UniqueIdPB>>
-  CancelQueriesOnFailedCoordinators(std::unordered_set<UniqueIdPB> current_backends);
+  CancelQueriesOnFailedCoordinators(
+      const std::unordered_set<UniqueIdPB>& current_backends);
 
   /// Registers the request queue topic with the statestore, starts up the dequeue thread
   /// and registers a callback with the cluster membership manager to receive updates for
@@ -959,7 +960,8 @@ class AdmissionController {
   /// If the associated TQueryExecRequest sets include_all_coordinators, an extra group
   /// containing all active coordinators will be added to ExecutorConfig for scheduling.
   Status ComputeGroupScheduleStates(
-      ClusterMembershipMgr::SnapshotPtr membership_snapshot, QueueNode* queue_node);
+      const ClusterMembershipMgr::SnapshotPtr& membership_snapshot,
+      QueueNode* queue_node);
 
   /// Reschedules the query if necessary using 'membership_snapshot' and tries to find an
   /// executor group that the query can be admitted to. If the query is unable to run on
@@ -970,7 +972,8 @@ class AdmissionController {
   /// method returns false and sets queue_node->not_admitted_reason.
   /// The is_trivial is set to true when is_trivial is not null if the query is admitted
   /// as a trivial query.
-  bool FindGroupToAdmitOrReject(ClusterMembershipMgr::SnapshotPtr membership_snapshot,
+  bool FindGroupToAdmitOrReject(
+      const ClusterMembershipMgr::SnapshotPtr& membership_snapshot,
       const TPoolConfig& pool_config, bool admit_from_queue, PoolStats* pool_stats,
       QueueNode* queue_node, bool& coordinator_resource_limited,
       bool* is_trivial = nullptr);
@@ -1170,7 +1173,7 @@ class AdmissionController {
   /// Updates the list of executor groups for which we maintain the query load metrics.
   /// Removes the metrics of the groups that no longer exist from the metric group and
   /// adds new ones for the newly added groups.
-  void UpdateExecGroupMetricMap(ClusterMembershipMgr::SnapshotPtr snapshot);
+  void UpdateExecGroupMetricMap(const ClusterMembershipMgr::SnapshotPtr& snapshot);
 
   /// Updates the num queries executing metric of the 'grp_name' executor group by
   /// 'delta'. Only updates it if the metric exists ('grp_name' has non-zero executors).

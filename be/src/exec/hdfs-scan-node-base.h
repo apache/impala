@@ -184,7 +184,7 @@ class ScanRangeSharedState {
   /// for which initial scan ranges need to be issued. Returns nullptr if the instance
   /// has not been assigned anything.
   std::vector<HdfsFileDesc*>* GetFilesForIssuingScanRangesForInstance(
-      const TUniqueId fragment_instance_id) {
+      const TUniqueId& fragment_instance_id) {
     auto it = file_assignment_per_instance_.find(fragment_instance_id);
     if (it == file_assignment_per_instance_.end()) return nullptr;
     return &it->second;

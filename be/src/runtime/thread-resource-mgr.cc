@@ -76,7 +76,7 @@ int ThreadResourcePool::AddThreadAvailableCb(ThreadAvailableCb fn) {
   unique_lock<mutex> l(lock_);
   // The id is unique for each callback and is monotonically increasing.
   int id = thread_callbacks_.size();
-  thread_callbacks_.push_back(fn);
+  thread_callbacks_.emplace_back(move(fn));
   num_callbacks_.Add(1);
   return id;
 }

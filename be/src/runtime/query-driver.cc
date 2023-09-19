@@ -52,9 +52,8 @@ void QueryDriver::CreateClientRequestState(const TQueryCtx& query_ctx,
   DCHECK(client_request_state_ == nullptr);
   ExecEnv* exec_env = ExecEnv::GetInstance();
   lock_guard<SpinLock> l(client_request_state_lock_);
-  client_request_state_ =
-      make_unique<ClientRequestState>(query_ctx, exec_env->frontend(), parent_server_,
-          session_state, query_handle->query_driver().get());
+  client_request_state_ = make_unique<ClientRequestState>(query_ctx, exec_env->frontend(),
+      parent_server_, move(session_state), query_handle->query_driver().get());
   DCHECK(query_handle != nullptr);
   (*query_handle).SetClientRequestState(client_request_state_.get());
 }
@@ -266,7 +265,7 @@ void QueryDriver::TryQueryRetry(
 }
 
 void QueryDriver::RetryQueryFromThread(
-    const Status& error, shared_ptr<QueryDriver> query_driver) {
+    const Status& error, const shared_ptr<QueryDriver>& query_driver) {
   // This method does not require holding the ClientRequestState::lock_ for the original
   // query. This ensures that the client can still interact (e.g. poll the state) of the
   // original query while the new query is being created. This is necessary as it might
@@ -559,6 +558,6 @@ void QueryDriver::CreateNewDriver(ImpalaServer* impala_server, QueryHandle* quer
     const TQueryCtx& query_ctx, shared_ptr<ImpalaServer::SessionState> session_state) {
   query_handle->query_driver_ = std::make_shared<QueryDriver>(impala_server);
   query_handle->query_driver_->CreateClientRequestState(
-      query_ctx, session_state, query_handle);
+      query_ctx, move(session_state), query_handle);
 }
 }

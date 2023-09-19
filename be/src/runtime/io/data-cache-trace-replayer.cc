@@ -115,7 +115,7 @@ void DumpStatisticsToLog(const CacheHitStatistics& stats) {
 // Write a JSON structure with both the original trace cache hit statistics and
 // the replay cache hit statistics.
 void DumpStatisticsToJSON(const CacheHitStatistics& trace_stats,
-    const CacheHitStatistics& replay_stats, std::string filename) {
+    const CacheHitStatistics& replay_stats, const std::string& filename) {
   Document document;
   document.SetObject();
 

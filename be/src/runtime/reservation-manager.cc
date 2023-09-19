@@ -30,13 +30,13 @@ namespace impala {
 
 void ReservationManager::Init(string name, RuntimeProfile* runtime_profile,
     ReservationTracker* parent_reservation, MemTracker* mem_tracker,
-    const TBackendResourceProfile& resource_profile, const TDebugOptions& debug_options) {
-  name_ = name;
+    TBackendResourceProfile resource_profile, TDebugOptions debug_options) {
+  name_ = std::move(name);
   runtime_profile_ = runtime_profile;
   parent_reservation_ = parent_reservation;
   mem_tracker_ = mem_tracker;
-  resource_profile_ = resource_profile;
-  debug_options_ = debug_options;
+  resource_profile_ = std::move(resource_profile);
+  debug_options_ = std::move(debug_options);
 }
 
 void ReservationManager::Close(RuntimeState* state) {

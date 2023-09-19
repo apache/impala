@@ -182,7 +182,7 @@ const std::map<TQueryTableColumn::type, FieldDefinition> FIELD_DEFINITIONS = {
 optional<Version> parsed_target_schema_version;
 
 /// Determines if the provided Version matches one of the known schema versions.
-static Status _isVersionKnown(Version v) {
+static Status _isVersionKnown(const Version& v) {
   if (auto iter = KNOWN_VERSIONS.find(v); UNLIKELY(iter == KNOWN_VERSIONS.end())) {
     vector<string> transformed(KNOWN_VERSIONS.size());
 

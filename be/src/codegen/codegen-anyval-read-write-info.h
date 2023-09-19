@@ -172,12 +172,12 @@ class CodegenAnyValReadWriteInfo {
 
   // Creates a PHI node that will have the value 'non_null_value' if the incoming block is
   // 'non_null_block_' and the value 'null_value' if it is 'null_block_'.
-  llvm::PHINode* CodegenNullPhiNode(llvm::Value* non_null_value, llvm::Value* null_value,
-      std::string name = "");
+  llvm::PHINode* CodegenNullPhiNode(
+      llvm::Value* non_null_value, llvm::Value* null_value, const std::string& name = "");
 
   // Creates a PHI node the value of which tells whether it was reached from the non-null
   // or the null path, i.e. whether this CodegenAnyValReadWriteInfo is null.
-  llvm::PHINode* CodegenIsNullPhiNode(std::string name = "");
+  llvm::PHINode* CodegenIsNullPhiNode(const std::string& name = "");
 
  private:
   LlvmCodeGen* const codegen_;

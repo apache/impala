@@ -182,12 +182,12 @@ typedef std::function<void(RpcContext*)> ServiceCB;
 class PingServiceImpl : public PingServiceIf {
  public:
   // 'cb' is a callback used by tests to inject custom behaviour into the RPC handler.
-  PingServiceImpl(RpcMgr* rpc_mgr,
-      ServiceCB cb = [](RpcContext* ctx) { ctx->RespondSuccess(); })
+  PingServiceImpl(
+      RpcMgr* rpc_mgr, ServiceCB cb = [](RpcContext* ctx) { ctx->RespondSuccess(); })
     : PingServiceIf(rpc_mgr->metric_entity(), rpc_mgr->result_tracker()),
       rpc_mgr_(rpc_mgr),
       mem_tracker_(-1, "Ping Service"),
-      cb_(cb) {}
+      cb_(std::move(cb)) {}
 
   Status GetProxy(const NetworkAddressPB& address, const std::string& hostname,
       std::unique_ptr<PingServiceProxy>* proxy) {

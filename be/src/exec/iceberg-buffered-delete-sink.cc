@@ -357,7 +357,7 @@ Status IcebergBufferedDeleteSink::GetNextRowBatch(
 }
 
 void IcebergBufferedDeleteSink::WriteRow(
-    StringValue filepath, int64_t offset, TupleRow* row) {
+    const StringValue& filepath, int64_t offset, TupleRow* row) {
   SlotRef* filepath_ref = DCHECK_NOTNULL(dynamic_cast<SlotRef*>(output_exprs_[0]));
   SlotRef* position_ref = DCHECK_NOTNULL(dynamic_cast<SlotRef*>(output_exprs_[1]));
 

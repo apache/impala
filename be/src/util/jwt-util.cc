@@ -173,7 +173,7 @@ class JWKSetParser {
     if (it_kty == kv_map.end()) return Status("'kty' property is required");
     auto it_kid = kv_map.find("kid");
     if (it_kid == kv_map.end()) return Status("'kid' property is required");
-    string key_id = it_kid->second;
+    const string& key_id = it_kid->second;
     if (key_id.empty()) {
       return Status(Substitute("'kid' property must be a non-empty string"));
     }
@@ -695,7 +695,7 @@ Status JWKSSnapshot::LoadKeysFromUrl(
   return status;
 }
 
-void JWKSSnapshot::AddHSKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
+void JWKSSnapshot::AddHSKey(const std::string& key_id, JWTPublicKey* jwk_pub_key) {
   if (hs_key_map_.find(key_id) == hs_key_map_.end()) {
     hs_key_map_[key_id].reset(jwk_pub_key);
   } else {
@@ -703,7 +703,7 @@ void JWKSSnapshot::AddHSKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
   }
 }
 
-void JWKSSnapshot::AddRSAPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
+void JWKSSnapshot::AddRSAPublicKey(const std::string& key_id, JWTPublicKey* jwk_pub_key) {
   if (rsa_pub_key_map_.find(key_id) == rsa_pub_key_map_.end()) {
     rsa_pub_key_map_[key_id].reset(jwk_pub_key);
   } else {
@@ -711,7 +711,7 @@ void JWKSSnapshot::AddRSAPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key
   }
 }
 
-void JWKSSnapshot::AddECPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
+void JWKSSnapshot::AddECPublicKey(const std::string& key_id, JWTPublicKey* jwk_pub_key) {
   if (ec_pub_key_map_.find(key_id) == ec_pub_key_map_.end()) {
     ec_pub_key_map_[key_id].reset(jwk_pub_key);
   } else {

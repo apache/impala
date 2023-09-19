@@ -48,7 +48,7 @@ namespace impala {
 /// Note that we don't translate the kudu::Status error code to Impala error code
 /// so the returned status' type is always of TErrorCode::GENERAL.
 inline Status FromKuduStatus(
-    const kudu::Status& k_status, const std::string prepend = "") {
+    const kudu::Status& k_status, const std::string& prepend = "") {
   if (LIKELY(k_status.ok())) return Status::OK();
   const std::string& err_msg = prepend.empty() ? k_status.ToString() :
       strings::Substitute("$0: $1", prepend, k_status.ToString());

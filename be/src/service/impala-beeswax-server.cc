@@ -630,7 +630,7 @@ inline void ImpalaServer::BeeswaxHandleToTUniqueId(
   throw exc;
 }
 
-Status ImpalaServer::FetchInternal(TUniqueId query_id, const bool start_over,
+Status ImpalaServer::FetchInternal(const TUniqueId& query_id, const bool start_over,
     const int32_t fetch_size, beeswax::Results* query_results) {
   bool timed_out = false;
   int64_t block_on_wait_time_us = 0;

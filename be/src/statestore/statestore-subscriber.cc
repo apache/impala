@@ -254,7 +254,7 @@ StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
 
 Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
     bool is_transient, bool populate_min_subscriber_topic_version,
-    string filter_prefix, const UpdateCallback& callback) {
+    const string& filter_prefix, const UpdateCallback& callback) {
   RETURN_IF_ERROR(statestore_->AddTopic(topic_id, is_transient,
       populate_min_subscriber_topic_version, filter_prefix, callback));
   if (statestore2_ != nullptr) {
@@ -903,7 +903,7 @@ Status StatestoreSubscriber::StatestoreStub::CheckRegistrationId(
 }
 
 bool StatestoreSubscriber::StatestoreStub::IsMatchingStatestoreId(
-    const TUniqueId statestore_id) {
+    const TUniqueId& statestore_id) {
   lock_guard<mutex> r(id_lock_);
   // It's possible the topic update messages are received before receiving the
   // registration response. In the case, statestore_id_ and is_registered_ are not set.

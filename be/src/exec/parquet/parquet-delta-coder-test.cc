@@ -62,7 +62,8 @@ class DeltaCoderTest {
     return buffer;
   }
 
-  static std::vector<uint8_t> decode_all(const std::vector<uint8_t> encoded, int stride) {
+  static std::vector<uint8_t> decode_all(
+      const std::vector<uint8_t>& encoded, int stride) {
     DCHECK_GE(stride, sizeof(INT_T));
     ParquetDeltaDecoder<INT_T> decoder;
     Status page_init_success = decoder.NewPage(encoded.data(), encoded.size());
@@ -78,8 +79,8 @@ class DeltaCoderTest {
   }
 
   template <typename OutType>
-  static std::vector<uint8_t> decode_and_convert_all(const std::vector<uint8_t> encoded,
-      int stride) {
+  static std::vector<uint8_t> decode_and_convert_all(
+      const std::vector<uint8_t>& encoded, int stride) {
     DCHECK_GE(stride, sizeof(OutType));
     ParquetDeltaDecoder<INT_T> decoder;
     Status page_init_success = decoder.NewPage(encoded.data(), encoded.size());

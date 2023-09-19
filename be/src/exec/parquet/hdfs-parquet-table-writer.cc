@@ -120,10 +120,10 @@ class HdfsParquetTableWriter::BaseColumnWriter {
  public:
   // expr - the expression to generate output values for this column.
   BaseColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* expr_eval,
-      const Codec::CodecInfo& codec_info, const string column_name)
+      Codec::CodecInfo codec_info, string column_name)
     : parent_(parent),
       expr_eval_(expr_eval),
-      codec_info_(codec_info),
+      codec_info_(move(codec_info)),
       plain_page_size_(parent->default_plain_page_size()),
       current_page_(nullptr),
       num_values_(0),
@@ -135,7 +135,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       page_stats_base_(nullptr),
       row_group_stats_base_(nullptr),
       table_sink_mem_tracker_(parent_->parent_->mem_tracker()),
-      column_name_(std::move(column_name)) {
+      column_name_(move(column_name)) {
     static_assert(std::is_base_of_v<TableSinkBase,
                                     std::remove_reference_t<decltype(*parent_->parent_)>>,
         "'table_sink_mem_tracker_' must point to the mem tracker of a TableSinkBase");

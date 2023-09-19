@@ -97,7 +97,7 @@ void PrintIdCompromised(const TUniqueId& id, char out[TUniqueIdBufferSize],
   my_i64tohex(id.lo, out+17);
 }
 
-string PrintIdSet(const std::set<TUniqueId>& ids, std::string separator) {
+string PrintIdSet(const std::set<TUniqueId>& ids, const std::string& separator) {
   stringstream out;
   auto it = ids.begin();
   while (it != ids.end()) {

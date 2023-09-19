@@ -89,8 +89,8 @@ class HashRingTest : public ::testing::Test {
     addresses.push_back("hostname3");
   }
 
-  void GetMultipleNetworkAddresses(string basename, uint32_t num_nodes,
-      vector<IpAddr>& addresses) {
+  void GetMultipleNetworkAddresses(
+      const string& basename, uint32_t num_nodes, vector<IpAddr>& addresses) {
     for (uint32_t i = 0; i < num_nodes; i++) {
       addresses.push_back(basename + std::to_string(i));
     }

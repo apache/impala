@@ -188,7 +188,7 @@ class ScopedExecOption {
  public:
   ScopedExecOption(ImpaladQueryExecutor* executor, string option_string)
       : executor_(executor) {
-    executor->PushExecOption(option_string);
+    executor->PushExecOption(move(option_string));
   }
 
   ~ScopedExecOption() {
@@ -555,8 +555,8 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   // 'unix_time_at_local_epoch' should be the expected value of the Unix time when it
   // was 1970-01-01 in the current time zone. 'local_time_at_unix_epoch' should be the
   // local time at the Unix epoch (1970-01-01 UTC).
-  void TestTimestampUnixEpochConversions(int64_t unix_time_at_local_epoch,
-      string local_time_at_unix_epoch) {
+  void TestTimestampUnixEpochConversions(
+      int64_t unix_time_at_local_epoch, const string& local_time_at_unix_epoch) {
     TestValue("unix_timestamp(cast('" + local_time_at_unix_epoch + "' as timestamp))",
         TYPE_BIGINT, 0);
     TestValue("unix_timestamp('" + local_time_at_unix_epoch + "')", TYPE_BIGINT, 0);
@@ -798,7 +798,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     TestValue("0/0 < 1/0", TYPE_BOOLEAN, false);
   }
 
-  void TestStringComparisons(string string_type) {
+  void TestStringComparisons(const string& string_type) {
     string abc = "cast('abc' as " + string_type + ")";
     string abcd = "cast('abcd' as " + string_type + ")";
     string empty = "cast('' as " + string_type + ")";

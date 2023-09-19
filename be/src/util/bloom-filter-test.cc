@@ -237,7 +237,8 @@ class BloomFilterTest : public testing::Test {
     return bloom_filter;
   }
 
-  BloomFilter* CreateBloomFilter(BloomFilterPB filter_pb, const std::string& directory) {
+  BloomFilter* CreateBloomFilter(
+      const BloomFilterPB& filter_pb, const std::string& directory) {
     int64_t filter_size =
         BloomFilter::GetExpectedMemoryUsed(filter_pb.log_bufferpool_space());
     EXPECT_TRUE(buffer_pool_client_->IncreaseReservation(filter_size));

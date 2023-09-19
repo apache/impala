@@ -447,7 +447,7 @@ static inline bool _maxRecordsExceeded(size_t record_count) noexcept {
 /// Return:
 ///   `string` - Contains the insert sql statement.
 static const string _queryStateToSql(
-    const QueryStateExpanded* rec, const Version target_schema_version) noexcept {
+    const QueryStateExpanded* rec, const Version& target_schema_version) noexcept {
   DCHECK(rec != nullptr);
   StringStreamPop sql;
   FieldParserContext ctx(rec, FLAGS_cluster_id, sql);
@@ -515,7 +515,7 @@ void ImpalaServer::ShutdownWorkloadManagement() {
 } // function ImpalaServer::ShutdownWorkloadManagement
 
 void ImpalaServer::EnqueueCompletedQuery(
-    const QueryHandle& query_handle, const shared_ptr<QueryStateRecord> qs_rec) {
+    const QueryHandle& query_handle, shared_ptr<QueryStateRecord> qs_rec) {
   // Do not enqueue queries that are not written to the table or if workload management is
   // not enabled.
   if (query_handle->stmt_type() == TStmtType::SET
@@ -585,7 +585,7 @@ void ImpalaServer::EnqueueCompletedQuery(
              << PrintId(query_handle->query_id()) << "'";
 } // ImpalaServer::EnqueueCompletedQuery
 
-static string _dmlPrefix(const string& table_name, const Version target_schema_version) {
+static string _dmlPrefix(const string& table_name, const Version& target_schema_version) {
   StringStreamPop fields;
   fields << "INSERT INTO " << table_name << "(";
   for (const auto& field : FIELD_DEFINITIONS) {

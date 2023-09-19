@@ -36,7 +36,7 @@ namespace impala {
 class DiskInfo {
  public:
   /// Initialize DiskInfo.  Just be called before any other functions.
-  static void Init(std::string proc = "/proc", std::string sys = "/sys");
+  static void Init(const std::string& proc = "/proc", const std::string& sys = "/sys");
 
   /// Returns the number of (logical) disks on the system
   static int num_disks() {

@@ -553,19 +553,19 @@ Result::AssignmentFilter Result::IsHost(int host_idx) const {
   };
 }
 
-Result::AssignmentFilter Result::IsCached(AssignmentFilter filter) const {
+Result::AssignmentFilter Result::IsCached(const AssignmentFilter& filter) const {
   return [filter](const AssignmentInfo& assignment) {
     return filter(assignment) && assignment.is_cached;
   };
 }
 
-Result::AssignmentFilter Result::IsDisk(AssignmentFilter filter) const {
+Result::AssignmentFilter Result::IsDisk(const AssignmentFilter& filter) const {
   return [filter](const AssignmentInfo& assignment) {
     return filter(assignment) && !assignment.is_cached && !assignment.is_remote;
   };
 }
 
-Result::AssignmentFilter Result::IsRemote(AssignmentFilter filter) const {
+Result::AssignmentFilter Result::IsRemote(const AssignmentFilter& filter) const {
   return [filter](const AssignmentInfo& assignment) {
     return filter(assignment) && assignment.is_remote;
   };

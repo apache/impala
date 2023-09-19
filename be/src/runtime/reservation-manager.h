@@ -42,8 +42,7 @@ class ReservationManager {
   /// called before ClaimBufferReservation().
   void Init(std::string name, RuntimeProfile* runtime_profile,
       ReservationTracker* parent_reservation, MemTracker* mem_tracker,
-      const TBackendResourceProfile& resource_profile,
-      const TDebugOptions& debug_options);
+      TBackendResourceProfile resource_profile, TDebugOptions debug_options);
   void Close(RuntimeState* state);
 
   BufferPool::ClientHandle* buffer_pool_client() { return &buffer_pool_client_; }

@@ -168,7 +168,7 @@ TEST(NetworkUtil, NetAddrAllMissUDSAddr) {
       == 0);
 }
 
-void CheckTranslation(TNetworkAddress thrift_address) {
+void CheckTranslation(const TNetworkAddress& thrift_address) {
   NetworkAddressPB proto_address = FromTNetworkAddress(thrift_address);
   TNetworkAddress thrift_address2 = FromNetworkAddressPB(proto_address);
   NetworkAddressPB proto_address2 = FromTNetworkAddress(thrift_address2);

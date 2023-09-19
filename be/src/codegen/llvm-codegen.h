@@ -539,7 +539,7 @@ class LlvmCodeGen {
   // 'incoming_block2'.
   static llvm::PHINode* CreateBinaryPhiNode(LlvmBuilder* builder, llvm::Value* value1,
       llvm::Value* value2, llvm::BasicBlock* incoming_block1,
-      llvm::BasicBlock* incoming_block2, std::string name = "");
+      llvm::BasicBlock* incoming_block2, const std::string& name = "");
 
   /// Returns a constant int of 'byte_size' bytes based on 'low_bits' and 'high_bits'
   /// which stand for the lower and upper 64-bits of the constant respectively. For
@@ -689,7 +689,7 @@ class LlvmCodeGen {
   /// materialized. Getting a reference to the functiom via GetFunction() will materialize
   /// the function and its callees recursively.
   Status LoadModuleFromMemory(std::unique_ptr<llvm::MemoryBuffer> module_ir_buf,
-      std::string module_name, std::unique_ptr<llvm::Module>* module);
+      const std::string& module_name, std::unique_ptr<llvm::Module>* module);
 
   /// Loads a module at 'file' and links it to the module associated with this
   /// LlvmCodeGen object. The 'file' must be on the local filesystem.

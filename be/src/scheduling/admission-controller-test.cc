@@ -94,13 +94,13 @@ class AdmissionControllerTest : public testing::Test {
   /// Make a ScheduleState with dummy parameters that can be used to test admission and
   /// rejection in AdmissionController.
   ScheduleState* MakeScheduleState(string request_pool_name, int64_t mem_limit,
-      TPoolConfig& config, const int num_hosts, const int64_t per_host_mem_estimate,
+      const TPoolConfig& config, const int num_hosts, const int64_t per_host_mem_estimate,
       const int64_t coord_mem_estimate, bool is_dedicated_coord,
       const string& executor_group = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME,
       int64_t mem_limit_executors = -1, int64_t mem_limit_coordinators = -1) {
     DCHECK_GT(num_hosts, 0);
     TQueryExecRequest* request = pool_.Add(new TQueryExecRequest());
-    request->query_ctx.request_pool = request_pool_name;
+    request->query_ctx.request_pool = move(request_pool_name);
     request->__set_per_host_mem_estimate(per_host_mem_estimate);
     request->__set_dedicated_coord_mem_estimate(coord_mem_estimate);
     request->__set_stmt_type(TStmtType::QUERY);
@@ -127,10 +127,10 @@ class AdmissionControllerTest : public testing::Test {
   }
 
   /// Same as previous MakeScheduleState with fewer input (more default params).
-  ScheduleState* MakeScheduleState(string request_pool_name, TPoolConfig& config,
+  ScheduleState* MakeScheduleState(string request_pool_name, const TPoolConfig& config,
       const int num_hosts, const int per_host_mem_estimate,
       const string& executor_group = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME) {
-    return MakeScheduleState(request_pool_name, 0, config, num_hosts,
+    return MakeScheduleState(move(request_pool_name), 0, config, num_hosts,
         per_host_mem_estimate, per_host_mem_estimate, false, executor_group);
   }
 
@@ -231,7 +231,7 @@ class AdmissionControllerTest : public testing::Test {
   /// query is composed of the pool id and a sequence number. The memory consumed by the
   /// query is a number randomly chosen between 1MB and 20MB.
   static std::vector<THeavyMemoryQuery> MakeHeavyMemoryQueryList(
-      const std::string pool, const int queries) {
+      const std::string& pool, const int queries) {
     // Generate the query list
     std::vector<THeavyMemoryQuery> query_list;
     int64_t hi = FormQueryIdHi(pool);
@@ -267,7 +267,7 @@ class AdmissionControllerTest : public testing::Test {
   /// Add a TPoolStats to the TTopicDelta 'delta' with a key created from 'host' and
   /// 'pool_name'
   static void AddStatsToTopic(
-      TTopicDelta* topic, const string host, const string pool_name, TPoolStats stats) {
+      TTopicDelta* topic, const string& host, const string& pool_name, TPoolStats stats) {
     // Build topic item.
     TTopicItem item;
     item.key = AdmissionController::MakePoolTopicKey(pool_name, host);
@@ -282,9 +282,10 @@ class AdmissionControllerTest : public testing::Test {
   /// Check that PoolConfig can be read from a RequestPoolService, and that the
   /// configured values are as expected.
   static void CheckPoolConfig(RequestPoolService& request_pool_service,
-      const string pool_name, const int64_t max_requests, const int64_t max_mem_resources,
-      const int64_t queue_timeout_ms, const bool clamp_mem_limit_query_option,
-      const int64_t min_query_mem_limit = 0, const int64_t max_query_mem_limit = 0) {
+      const string& pool_name, const int64_t max_requests,
+      const int64_t max_mem_resources, const int64_t queue_timeout_ms,
+      const bool clamp_mem_limit_query_option, const int64_t min_query_mem_limit = 0,
+      const int64_t max_query_mem_limit = 0) {
     TPoolConfig config;
     ASSERT_OK(request_pool_service.GetPoolConfig(pool_name, &config));
 

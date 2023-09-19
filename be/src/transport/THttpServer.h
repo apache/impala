@@ -103,19 +103,19 @@ public:
     // header respectively and returns true if it determines that the connection
     // originated from a trusted domain and if the basic auth header contains a valid
     // username.
-    std::function<bool(const std::string&, std::string)> trusted_domain_check_fn =
-        [&](const std::string&, std::string) { return false; };
+    std::function<bool(const std::string&, const std::string&)> trusted_domain_check_fn =
+        [&](const std::string&, const std::string&) { return false; };
 
     // Function that stores the connection's 'X-Forwarded-For' header in the Connection
     // Context so that it can be tracked.
-    std::function<bool(std::string)> set_http_origin_fn =
-        [&](const std::string) { return false; };
+    std::function<bool(std::string)> set_http_origin_fn = [&](const std::string&) {
+      return false;
+    };
 
     // Function that takes the connection's 'Authorization' header and returns true if
     // the basic auth header contains a valid username.
-    std::function<bool(std::string)> trusted_auth_header_handle_fn = [&](std::string) {
-      return false;
-    };
+    std::function<bool(const std::string&)> trusted_auth_header_handle_fn =
+        [&](const std::string&) { return false; };
 
     // Does the first step of SAML2 SSO browser authenticaton and sets the response to
     // redirect to the SSO service.
@@ -266,7 +266,7 @@ class THttpServerTransportFactory : public TTransportFactory {
 public:
  THttpServerTransportFactory() {}
 
- THttpServerTransportFactory(const std::string server_name, impala::MetricGroup* metrics,
+ THttpServerTransportFactory(const std::string& server_name, impala::MetricGroup* metrics,
      bool has_ldap, bool has_kerberos, bool use_cookies, bool check_trusted_domain,
      bool check_trusted_auth_header, bool has_saml, bool has_jwt);
 

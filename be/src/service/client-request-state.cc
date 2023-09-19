@@ -106,7 +106,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   : query_ctx_(query_ctx),
     last_active_time_ms_(numeric_limits<int64_t>::max()),
     child_query_executor_(new ChildQueryExecutor),
-    session_(session),
+    session_(move(session)),
     coord_exec_called_(false),
     // Profile is assigned name w/ id after planning
     profile_(RuntimeProfile::Create(&profile_pool_, "Query", false)),
@@ -156,8 +156,8 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   summary_profile_->AddInfoString("Session Type", PrintValue(session_type()));
   if (session_type() == TSessionType::HIVESERVER2 ||
       session_type() == TSessionType::EXTERNAL_FRONTEND) {
-    summary_profile_->AddInfoString("HiveServer2 Protocol Version",
-        Substitute("V$0", 1 + session->hs2_version));
+    summary_profile_->AddInfoString(
+        "HiveServer2 Protocol Version", Substitute("V$0", 1 + session_->hs2_version));
   }
   // Certain API clients expect Start Time and End Time to be date-time strings
   // of nanosecond precision, so we explicitly specify the precision here.

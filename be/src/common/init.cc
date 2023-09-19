@@ -455,7 +455,7 @@ static Status InitializeJavaWeigher() {
   return Status::OK();
 }
 
-static Status JavaSetProcessName(string name) {
+static Status JavaSetProcessName(const string& name) {
   string current_val;
   char* current_val_c = getenv("JAVA_TOOL_OPTIONS");
   if (current_val_c != NULL) {

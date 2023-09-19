@@ -324,9 +324,10 @@ template <typename INT_T>
 struct DeltaData {
   DeltaData(INT_T base_value, INT_T delta_offset, std::size_t num_values,
       std::vector<uint8_t> packed_deltas)
-      : base_value(base_value), delta_offset(delta_offset), num_values(num_values),
-      packed_deltas(packed_deltas)
-  {}
+    : base_value(base_value),
+      delta_offset(delta_offset),
+      num_values(num_values),
+      packed_deltas(move(packed_deltas)) {}
 
   INT_T base_value;
   INT_T delta_offset;

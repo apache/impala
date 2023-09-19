@@ -665,7 +665,7 @@ AdmissionController::AdmissionController(ClusterMembershipMgr* cluster_membershi
     thrift_serializer_(false),
     done_(false) {
   cluster_membership_mgr_->RegisterUpdateCallbackFn(
-      [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
+      [this](const ClusterMembershipMgr::SnapshotPtr& snapshot) {
         this->UpdateExecGroupMetricMap(snapshot);
       });
   total_dequeue_failed_coordinator_limited_ =
@@ -1627,7 +1627,7 @@ void AdmissionController::ReleaseQueryBackendsLocked(const UniqueIdPB& query_id,
 }
 
 vector<UniqueIdPB> AdmissionController::CleanupQueriesForHost(
-    const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB> query_ids) {
+    const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB>& query_ids) {
   vector<UniqueIdPB> to_clean_up;
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
@@ -1659,7 +1659,7 @@ vector<UniqueIdPB> AdmissionController::CleanupQueriesForHost(
 
 std::unordered_map<UniqueIdPB, vector<UniqueIdPB>>
 AdmissionController::CancelQueriesOnFailedCoordinators(
-    std::unordered_set<UniqueIdPB> current_backends) {
+    const std::unordered_set<UniqueIdPB>& current_backends) {
   std::unordered_map<UniqueIdPB, vector<UniqueIdPB>> to_clean_up;
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
@@ -1905,7 +1905,7 @@ void AdmissionController::UpdateClusterAggregates(const set<string>& removed_nod
 }
 
 Status AdmissionController::ComputeGroupScheduleStates(
-    ClusterMembershipMgr::SnapshotPtr membership_snapshot, QueueNode* queue_node) {
+    const ClusterMembershipMgr::SnapshotPtr& membership_snapshot, QueueNode* queue_node) {
   int64_t previous_membership_version = 0;
   if (queue_node->membership_snapshot.get() != nullptr) {
     previous_membership_version = queue_node->membership_snapshot->version;
@@ -2000,9 +2000,9 @@ Status AdmissionController::ComputeGroupScheduleStates(
 }
 
 bool AdmissionController::FindGroupToAdmitOrReject(
-    ClusterMembershipMgr::SnapshotPtr membership_snapshot, const TPoolConfig& pool_config,
-    bool admit_from_queue, PoolStats* pool_stats, QueueNode* queue_node,
-    bool& coordinator_resource_limited, bool* is_trivial) {
+    const ClusterMembershipMgr::SnapshotPtr& membership_snapshot,
+    const TPoolConfig& pool_config, bool admit_from_queue, PoolStats* pool_stats,
+    QueueNode* queue_node, bool& coordinator_resource_limited, bool* is_trivial) {
   // Check for rejection based on current cluster size
   const string& pool_name = pool_stats->name();
   string rejection_reason;
@@ -2773,7 +2773,7 @@ int64_t AdmissionController::GetMemToAdmit(
 }
 
 void AdmissionController::UpdateExecGroupMetricMap(
-    ClusterMembershipMgr::SnapshotPtr snapshot) {
+    const ClusterMembershipMgr::SnapshotPtr& snapshot) {
   std::unordered_set<string> grp_names;
   for (const auto& group : snapshot->executor_groups) {
     if (group.second.NumHosts() > 0) grp_names.insert(group.first);

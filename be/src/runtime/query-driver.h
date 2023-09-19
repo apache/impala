@@ -212,7 +212,7 @@ class QueryDriver {
   /// QueryDriver. The pointer is necessary to ensure that 'this' QueryDriver is not
   /// deleted while the thread is running.
   void RetryQueryFromThread(
-      const Status& error, std::shared_ptr<QueryDriver> query_driver);
+      const Status& error, const std::shared_ptr<QueryDriver>& query_driver);
 
   /// Creates the initial ClientRequestState for the given TQueryCtx. Should only be
   /// called once by the ImpalaServer. Additional ClientRequestStates are created by

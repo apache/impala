@@ -24,16 +24,13 @@ namespace impala {
 
 class CatalogServiceClientWrapper : public CatalogServiceClient {
  public:
-  CatalogServiceClientWrapper(
-      std::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
-    : CatalogServiceClient(prot) {
-  }
+  CatalogServiceClientWrapper(std::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
+    : CatalogServiceClient(move(prot)) {}
 
   CatalogServiceClientWrapper(
       std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
       std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
-    : CatalogServiceClient(iprot, oprot) {
-  }
+    : CatalogServiceClient(move(iprot), move(oprot)) {}
 
 /// We intentionally disable this clang warning as we intend to hide the
 /// the same-named functions defined in the base class.

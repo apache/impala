@@ -41,7 +41,7 @@ void TestDemanglingNameOnly(const string& mangled, const string& expected_demang
 
 // Test mangling (name, var_args, args, ret_arg_type), validating the mangled
 // string and then the unmangled (~function signature) results.
-void TestMangling(const string& name, bool var_args, const vector<ColumnType> args,
+void TestMangling(const string& name, bool var_args, const vector<ColumnType>& args,
     ColumnType* ret_arg_type, const string& expected_mangled,
     const string& expected_demangled) {
   string mangled = SymbolsUtil::MangleUserFunction(name, args, var_args, ret_arg_type);

@@ -73,7 +73,7 @@ namespace internalservertest {
 
 // Retrieves the json representation of the coordinator's queries and asserts the state
 // of the specified query matches the provided expected state.
-void assertQueryState(const TUniqueId& query_id, const string expected_state) {
+void assertQueryState(const TUniqueId& query_id, const string& expected_state) {
   // Give the Impala web server a second to refresh its completed queries list.
   SleepForMs(1000);
 
@@ -123,12 +123,12 @@ void assertQueryState(const TUniqueId& query_id, const string expected_state) {
 // DO NOT provide a value for record_count that is less than 5.
 class DatabaseTest {
   public:
-    DatabaseTest(const shared_ptr<ImpalaServer> impala_server, const string name_prefix,
+    DatabaseTest(shared_ptr<ImpalaServer> impala_server, const string& name_prefix,
         const bool create_table = false, const int record_count = 5000) {
       // See the warning on the category_count_ class member definition.
       EXPECT_LE(category_count_, 11);
 
-      impala_server_ = impala_server;
+      impala_server_ = move(impala_server);
       database_name_ = StrCat(name_prefix, "_", GetCurrentTimeMicros());
       TUniqueId query_id;
       EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", StrCat("create database ",

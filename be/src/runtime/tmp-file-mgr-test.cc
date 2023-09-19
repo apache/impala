@@ -342,7 +342,7 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   // Write callback, which signals 'cb_cv_' and increments 'cb_counter_'.
-  void SignalCallback(Status write_status) {
+  void SignalCallback(const Status& write_status) {
     {
       lock_guard<mutex> lock(cb_cv_lock_);
       ++cb_counter_;

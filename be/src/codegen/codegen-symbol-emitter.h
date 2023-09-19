@@ -42,8 +42,7 @@ namespace impala {
 class CodegenSymbolEmitter : public llvm::JITEventListener {
  public:
   CodegenSymbolEmitter(std::string id)
-      : id_(id), emit_perf_map_(false), non_freed_objects_(0)
-  { }
+    : id_(move(id)), emit_perf_map_(false), non_freed_objects_(0) {}
 
   ~CodegenSymbolEmitter();
 

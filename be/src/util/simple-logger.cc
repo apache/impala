@@ -70,14 +70,13 @@ string SimpleLogger::GenerateLogFileName() {
   return ss.str();
 }
 
-SimpleLogger::SimpleLogger(const string& log_dir, const string& log_file_name_prefix,
+SimpleLogger::SimpleLogger(string log_dir, string log_file_name_prefix,
     uint64_t max_entries_per_file, int max_log_files)
-    : log_dir_(log_dir),
-      log_file_name_prefix_(log_file_name_prefix),
-      num_log_file_entries_(0),
-      max_entries_per_file_(max_entries_per_file),
-      max_log_files_(max_log_files) {
-}
+  : log_dir_(move(log_dir)),
+    log_file_name_prefix_(move(log_file_name_prefix)),
+    num_log_file_entries_(0),
+    max_entries_per_file_(max_entries_per_file),
+    max_log_files_(max_log_files) {}
 
 Status SimpleLogger::Init() {
   // Check that Init hasn't already been called by verifying the log_file_name_ is still

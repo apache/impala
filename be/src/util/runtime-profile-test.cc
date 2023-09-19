@@ -1606,7 +1606,7 @@ TEST(CountersTest, PartialUpdate) {
 /// printing with a varying number of test samples.
 struct TimeSeriesTestParam {
   TimeSeriesTestParam(int num_samples, vector<const char*> expected)
-    : num_samples(num_samples), expected(expected) {}
+    : num_samples(num_samples), expected(move(expected)) {}
   int num_samples;
   vector<const char*> expected;
 

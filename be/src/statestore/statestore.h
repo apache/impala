@@ -688,9 +688,11 @@ class Statestore : public CacheLineAligned {
 
     ScheduledSubscriberUpdate() {}
 
-    ScheduledSubscriberUpdate(int64_t next_update_time, SubscriberId s_id,
-        RegistrationId r_id): deadline(next_update_time), subscriber_id(s_id),
-        registration_id(r_id) {}
+    ScheduledSubscriberUpdate(
+        int64_t next_update_time, SubscriberId s_id, RegistrationId r_id)
+      : deadline(next_update_time),
+        subscriber_id(std::move(s_id)),
+        registration_id(std::move(r_id)) {}
   };
 
   /// The statestore has three pools of threads that send messages to subscribers

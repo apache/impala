@@ -23,9 +23,13 @@ using namespace impala;
 using std::string;
 using std::function;
 
-ObjectiveFunction::ObjectiveFunction(string name, int num_params,
-    function<double (double, const double*)> fn)
-  : name_(name), num_params_(num_params), fn_(fn), num_points_(0), xs_(nullptr),
+ObjectiveFunction::ObjectiveFunction(
+    string name, int num_params, function<double(double, const double*)> fn)
+  : name_(move(name)),
+    num_params_(num_params),
+    fn_(move(fn)),
+    num_points_(0),
+    xs_(nullptr),
     ys_(nullptr) {
   DCHECK_GT(num_params, 0);
 }

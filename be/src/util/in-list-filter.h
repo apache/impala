@@ -149,8 +149,8 @@ struct StringSetWithTotalLen {
   /// in the set, and a bool denoting whether the insertion took place (true if insertion
   /// happened, false if it did not, i.e. already exists).
   inline pair<iterator, bool> insert(StringValue v) {
-    const auto& res = values.emplace(v);
-    total_len += (res.second && !v.IsSmall() ? v.Len() : 0);
+    const auto& res = values.emplace(std::move(v));
+    total_len += (res.second && !res.first->IsSmall() ? res.first->Len() : 0);
     return res;
   }
 
@@ -161,9 +161,7 @@ struct StringSetWithTotalLen {
     return res;
   }
 
-  inline bool find(StringValue v) const {
-    return values.find(v) != values.end();
-  }
+  inline bool find(const StringValue& v) const { return values.find(v) != values.end(); }
 
   inline void clear() {
     values.clear();

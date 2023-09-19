@@ -92,7 +92,7 @@ class ClientCacheHelper {
   /// returned client will not be present in the per-host cache.
   //
   /// If there is an error creating the new client, *client_key will be NULL.
-  Status GetClient(const TNetworkAddress& address, ClientFactory factory_method,
+  Status GetClient(const TNetworkAddress& address, const ClientFactory& factory_method,
       ClientKey* client_key) WARN_UNUSED_RESULT;
 
   /// Returns a newly-opened client in client_key. May reopen the existing client, or may
@@ -101,7 +101,7 @@ class ClientCacheHelper {
   /// Returns an error status and sets 'client_key' to NULL if a new client cannot
   /// created.
   Status ReopenClient(
-      ClientFactory factory_method, ClientKey* client_key) WARN_UNUSED_RESULT;
+      const ClientFactory& factory_method, ClientKey* client_key) WARN_UNUSED_RESULT;
 
   /// Returns a client to the cache. Upon return, *client_key will be NULL, and the
   /// associated client will be available in the per-host cache.
@@ -209,7 +209,7 @@ class ClientCacheHelper {
   IntGauge* total_clients_metric_;
 
   /// Create a new client for specific address in 'client' and put it in client_map_
-  Status CreateClient(const TNetworkAddress& address, ClientFactory factory_method,
+  Status CreateClient(const TNetworkAddress& address, const ClientFactory& factory_method,
       ClientKey* client_key) WARN_UNUSED_RESULT;
 };
 

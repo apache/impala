@@ -124,8 +124,8 @@ class DataCache {
   /// an optimized mode that skips all file operations and only does the metadata
   /// operations. This is used to replay the access trace and compare different cache
   /// configurations. See data-cache-trace.h
-  explicit DataCache(const std::string config, int32_t num_async_write_threads = 0,
-      bool trace_replay = false);
+  explicit DataCache(
+      std::string config, int32_t num_async_write_threads = 0, bool trace_replay = false);
 
   ~DataCache();
 

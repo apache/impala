@@ -189,7 +189,7 @@ class Thread {
   /// info object to its own TDI object. This way the TDI objects can preserve the thread
   /// creation graph.
   static void SuperviseThread(const std::string& name, const std::string& category,
-      Thread::ThreadFunctor functor, const ThreadDebugInfo* parent_thread_info,
+      const ThreadFunctor& functor, const ThreadDebugInfo* parent_thread_info,
       Promise<int64_t>* thread_started);
 };
 

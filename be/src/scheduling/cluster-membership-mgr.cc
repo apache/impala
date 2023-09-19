@@ -103,8 +103,9 @@ ClusterMembershipMgr::ClusterMembershipMgr(
   }
   InitMetrics(metrics);
   // Register the metric update function as a callback.
-  RegisterUpdateCallbackFn([this](
-      ClusterMembershipMgr::SnapshotPtr snapshot) { this->UpdateMetrics(snapshot); });
+  RegisterUpdateCallbackFn([this](const ClusterMembershipMgr::SnapshotPtr& snapshot) {
+    this->UpdateMetrics(snapshot);
+  });
 }
 
 void ClusterMembershipMgr::InitMetrics(MetricGroup* metrics) {
@@ -554,7 +555,7 @@ ClusterMembershipMgr::BeDescSharedPtr ClusterMembershipMgr::GetLocalBackendDescr
   return local_be_desc_fn_ ? local_be_desc_fn_() : nullptr;
 }
 
-void ClusterMembershipMgr::NotifyListeners(SnapshotPtr snapshot) {
+void ClusterMembershipMgr::NotifyListeners(const SnapshotPtr& snapshot) {
   lock_guard<mutex> l(callback_fn_lock_);
   for (const auto& fn : update_callback_fns_) fn(snapshot);
 }
@@ -687,7 +688,7 @@ bool ClusterMembershipMgr::IsBackendInExecutorGroups(
 /// executor groups, we assume that we will read data remotely and will only send the
 /// number of executors in the largest healthy group. When expected exec group sets are
 /// specified we apply the aforementioned steps for each group set.
-void PopulateExecutorMembershipRequest(ClusterMembershipMgr::SnapshotPtr& snapshot,
+void PopulateExecutorMembershipRequest(const ClusterMembershipMgr::SnapshotPtr& snapshot,
     const vector<TExecutorGroupSet>& expected_exec_group_sets,
     TUpdateExecutorMembershipRequest& update_req) {
   vector<TExecutorGroupSet> exec_group_sets;

@@ -45,18 +45,16 @@ static bool RequiresSkippedDictionaryHeaderCheck(
 }
 
 ParquetColumnChunkReader::ParquetColumnChunkReader(HdfsParquetScanner* parent,
-    string schema_name, int slot_id, ValueMemoryType value_mem_type,
-    bool has_rep_level, bool has_def_level)
+    string schema_name, int slot_id, ValueMemoryType value_mem_type, bool has_rep_level,
+    bool has_def_level)
   : parent_(parent),
-    schema_name_(schema_name),
-    page_reader_(parent, schema_name),
+    schema_name_(move(schema_name)),
+    page_reader_(parent, schema_name_),
     slot_id_(slot_id),
     data_page_pool_(new MemPool(parent->scan_node_->mem_tracker())),
     value_mem_type_(value_mem_type),
     has_rep_level_(has_rep_level),
-    has_def_level_(has_def_level)
-{
-}
+    has_def_level_(has_def_level) {}
 
 ParquetColumnChunkReader::~ParquetColumnChunkReader() {}
 

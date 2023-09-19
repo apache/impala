@@ -35,8 +35,7 @@ class RuntimeState;
 /// for holding the tuple offsets and tuple data.
 class OutboundRowBatch {
  public:
-
-  OutboundRowBatch(std::shared_ptr<CharMemTrackerAllocator> allocator)
+  OutboundRowBatch(const std::shared_ptr<CharMemTrackerAllocator>& allocator)
     : tuple_data_(*allocator.get()) {}
 
   const RowBatchHeaderPB* header() const { return &header_; }

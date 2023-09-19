@@ -533,7 +533,7 @@ Status MemTracker::MemLimitExceeded(MemTracker* mtracker, RuntimeState* state,
 }
 
 void MemTracker::AddGcFunction(GcFunction f) {
-  gc_functions_.push_back(f);
+  gc_functions_.emplace_back(move(f));
 }
 
 bool MemTracker::LimitExceededSlow(MemLimit mode) {

@@ -23,8 +23,8 @@
 
 using namespace impala;
 
-template<typename T>
-void VerifyItems(InListFilter* f, ColumnType col_type, T min_value, T max_value,
+template <typename T>
+void VerifyItems(InListFilter* f, const ColumnType& col_type, T min_value, T max_value,
     bool contains_null) {
   int num_items = max_value - min_value + 1;
   if (contains_null) ++num_items;
@@ -46,7 +46,7 @@ InListFilter* CloneFromProtobuf(InListFilter* filter, ColumnType col_type,
     uint32_t entry_limit, ObjectPool* pool, MemTracker* mem_tracker) {
   InListFilterPB pb;
   InListFilter::ToProtobuf(filter, &pb);
-  return InListFilter::Create(pb, col_type, entry_limit, pool, mem_tracker);
+  return InListFilter::Create(pb, std::move(col_type), entry_limit, pool, mem_tracker);
 }
 
 template<typename T, PrimitiveType SLOT_TYPE>

@@ -648,13 +648,13 @@ class WriteRange : public RequestRange {
   /// WriteRange was successfully added (i.e. AddWriteRange() succeeded). No locks are
   /// held while the callback is invoked.
   typedef std::function<void(const Status&)> WriteDoneCallback;
-  WriteRange(const std::string& file, int64_t file_offset, int disk_id,
-      WriteDoneCallback callback);
+  WriteRange(
+      std::string file, int64_t file_offset, int disk_id, WriteDoneCallback callback);
 
   /// Change the file and offset of this write range. Data and callbacks are unchanged.
   /// Can only be called when the write is not in flight (i.e. before AddWriteRange()
   /// is called or after the write callback was called).
-  void SetRange(const std::string& file, int64_t file_offset, int disk_id);
+  void SetRange(std::string file, int64_t file_offset, int disk_id);
 
   /// Set the data and number of bytes to be written for this WriteRange.
   /// Can only be called when the write is not in flight (i.e. before AddWriteRange()

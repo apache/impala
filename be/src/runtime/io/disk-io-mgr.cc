@@ -237,14 +237,13 @@ string DiskIoMgr::DebugString() {
 }
 
 WriteRange::WriteRange(
-    const string& file, int64_t file_offset, int disk_id, WriteDoneCallback callback)
-  : RequestRange(RequestType::WRITE), callback_(callback) {
-  SetRange(file, file_offset, disk_id);
+    string file, int64_t file_offset, int disk_id, WriteDoneCallback callback)
+  : RequestRange(RequestType::WRITE), callback_(move(callback)) {
+  SetRange(move(file), file_offset, disk_id);
 }
 
-void WriteRange::SetRange(
-    const std::string& file, int64_t file_offset, int disk_id) {
-  file_ = file;
+void WriteRange::SetRange(std::string file, int64_t file_offset, int disk_id) {
+  file_ = move(file);
   offset_ = file_offset;
   disk_id_ = disk_id;
 }
@@ -315,7 +314,7 @@ RemoteOperRange::RemoteOperRange(DiskFile* src_file, DiskFile* dst_file,
     int64_t block_size, int disk_id, RequestType::type type, DiskIoMgr* io_mgr,
     RemoteOperDoneCallback callback, int64_t file_offset)
   : RequestRange(type, disk_id, file_offset),
-    callback_(callback),
+    callback_(move(callback)),
     io_mgr_(io_mgr),
     disk_file_src_(src_file),
     disk_file_dst_(dst_file),

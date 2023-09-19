@@ -26,10 +26,12 @@ namespace impala {
 // TODO: This can be tuned further with real world tests
 static const uint32_t NUM_HASH_RING_REPLICAS = 25;
 
-ExecutorGroup::ExecutorGroup(string name) : ExecutorGroup(name, 1) {}
+ExecutorGroup::ExecutorGroup(string name) : ExecutorGroup(move(name), 1) {}
 
 ExecutorGroup::ExecutorGroup(string name, int64_t min_size)
-  : name_(name), min_size_(min_size), executor_ip_hash_ring_(NUM_HASH_RING_REPLICAS),
+  : name_(move(name)),
+    min_size_(min_size),
+    executor_ip_hash_ring_(NUM_HASH_RING_REPLICAS),
     per_executor_admit_mem_limit_(0) {
   DCHECK_GT(min_size_, 0);
 }

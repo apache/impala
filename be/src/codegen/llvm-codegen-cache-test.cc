@@ -123,7 +123,7 @@ class LlvmCodeGenCacheTest : public testing::Test {
   void CheckInUseMetrics(CodeGenCache*, int, int64_t);
   void CheckEvictMetrics(CodeGenCache*, int);
   void CheckObjCacheExists(LlvmCodeGen*);
-  int64_t GetMemCharge(LlvmCodeGen* codegen, string key_str, bool is_normal_mode);
+  int64_t GetMemCharge(LlvmCodeGen* codegen, const string& key_str, bool is_normal_mode);
   void CheckEngineCacheCount(LlvmCodeGen*, int expect_count);
   void CheckToInsertMap();
   void TestSwitchModeHelper(TCodeGenCacheMode::type mode, string key,
@@ -338,7 +338,7 @@ void LlvmCodeGenCacheTest::CheckObjCacheExists(LlvmCodeGen* codegen) {
 }
 
 int64_t LlvmCodeGenCacheTest::GetMemCharge(
-    LlvmCodeGen* codegen, string key_str, bool is_normal_mode) {
+    LlvmCodeGen* codegen, const string& key_str, bool is_normal_mode) {
   if (is_normal_mode) {
     return codegen->engine_cache()->objSize() + key_str.size()
         + sizeof(CodeGenCacheEntry);

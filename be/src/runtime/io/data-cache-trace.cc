@@ -47,7 +47,7 @@ namespace trace {
 
 const string TRACE_FILE_PREFIX = "impala_cache_trace-";
 
-EventType StringToEventType(std::string s) {
+EventType StringToEventType(const std::string& s) {
   if (s == "H") return EventType::HIT;
   if (s == "M") return EventType::MISS;
   if (s == "S") return EventType::STORE;
@@ -75,7 +75,7 @@ std::string EventTypeToString(EventType s) {
   }
 }
 
-Status JsonToTraceEvent(std::string json, TraceEvent* event) {
+Status JsonToTraceEvent(const std::string& json, TraceEvent* event) {
   rapidjson::Document d;
   d.Parse<0>(json.c_str());
   // Check for any parse failure
@@ -160,7 +160,8 @@ class SimpleLoggerWrapper : public google::base::Logger {
  public:
   explicit SimpleLoggerWrapper(string log_dir, string log_file_name_prefix,
       uint64_t max_entries_per_file, int32_t max_log_files)
-    : logger_(log_dir, log_file_name_prefix, max_entries_per_file, max_log_files) {}
+    : logger_(move(log_dir), move(log_file_name_prefix), max_entries_per_file,
+          max_log_files) {}
 
   virtual ~SimpleLoggerWrapper() {
     Flush();
@@ -204,8 +205,8 @@ class SimpleLoggerWrapper : public google::base::Logger {
 
 Tracer::Tracer(string log_dir, uint64_t max_entries_per_file, int32_t max_log_files,
     bool anonymize_trace)
-  : underlying_logger_(new SimpleLoggerWrapper(log_dir, TRACE_FILE_PREFIX,
-        max_entries_per_file, max_log_files)),
+  : underlying_logger_(new SimpleLoggerWrapper(
+        move(log_dir), TRACE_FILE_PREFIX, max_entries_per_file, max_log_files)),
     anonymize_trace_(anonymize_trace) {}
 
 Tracer::~Tracer() {
@@ -261,7 +262,7 @@ string Tracer::AnonymizeFilename(Slice filename) {
 }
 
 TraceReplayer::TraceReplayer(string trace_configuration)
-  : trace_configuration_(trace_configuration) {}
+  : trace_configuration_(move(trace_configuration)) {}
 
 TraceReplayer::~TraceReplayer() {}
 
@@ -275,7 +276,7 @@ Status TraceReplayer::Init() {
 
 Status TraceReplayer::ReplayFile(string filename) {
   DCHECK(initialized_);
-  TraceFileIterator file_iter(filename);
+  TraceFileIterator file_iter(move(filename));
   RETURN_IF_ERROR(file_iter.Init());
   while (true) {
     bool done = false;
@@ -290,7 +291,8 @@ Status TraceReplayer::ReplayFile(string filename) {
 Status TraceReplayer::ReplayDirectory(string directory) {
   DCHECK(initialized_);
   vector<string> trace_files;
-  RETURN_IF_ERROR(SimpleLogger::GetLogFiles(directory, TRACE_FILE_PREFIX, &trace_files));
+  RETURN_IF_ERROR(
+      SimpleLogger::GetLogFiles(move(directory), TRACE_FILE_PREFIX, &trace_files));
   for (const string& trace_file : trace_files) {
     RETURN_IF_ERROR(ReplayFile(trace_file));
   }

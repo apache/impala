@@ -36,7 +36,7 @@ void ValidateRanges(RangeVec skip_ranges, int num_rows, const RangeVec& expected
 }
 
 void ValidateRangesError(RangeVec skip_ranges, int num_rows, const RangeVec& expected) {
-  ValidateRanges(skip_ranges, num_rows, expected, false);
+  ValidateRanges(move(skip_ranges), num_rows, expected, false);
 }
 
 /// This test exercises the logic of ComputeCandidateRanges() with various

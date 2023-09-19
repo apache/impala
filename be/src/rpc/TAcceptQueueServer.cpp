@@ -81,8 +81,8 @@ class TAcceptQueueServer::Task : public Runnable {
         }
         // Setting a socket timeout for process() may lead to false positive
         // and prematurely closes a slow client's connection.
-        if (!processor_->process(input_, output_, connectionContext) ||
-            !Peek(input_, connectionContext, eventHandler)) {
+        if (!processor_->process(input_, output_, connectionContext)
+            || !Peek(connectionContext, eventHandler.get())) {
           break;
         }
       }
@@ -145,8 +145,7 @@ class TAcceptQueueServer::Task : public Runnable {
   // if the sessions associated with the connection have all expired
   // due to inactivity. If so, it will return false and the connection
   // will be closed by the caller.
-  bool Peek(shared_ptr<TProtocol> input, void* connectionContext,
-      shared_ptr<TServerEventHandler> eventHandler) {
+  bool Peek(void* connectionContext, TServerEventHandler* eventHandler) {
     // Set a timeout on input socket if idle_poll_period_ms_ is non-zero.
     TSocket* socket = static_cast<TSocket*>(transport_.get());
     if (server_.idle_poll_period_ms_ > 0) {
@@ -160,7 +159,7 @@ class TAcceptQueueServer::Task : public Runnable {
         bytes_pending = input_->getTransport()->peek();
         break;
       } catch (const TTransportException& ttx) {
-        // Implementaion of the underlying transport's peek() may call either
+        // Implementation of the underlying transport's peek() may call either
         // read() or peek() of the socket.
         if (eventHandler != nullptr && server_.idle_poll_period_ms_ > 0 &&
             (IsReadTimeoutTException(ttx) || IsPeekTimeoutTException(ttx))) {
@@ -168,7 +167,7 @@ class TAcceptQueueServer::Task : public Runnable {
                                 "(idle_poll_period_ms_=$0). $1",
               server_.idle_poll_period_ms_, ttx.what());
           ThriftServer::ThriftServerEventProcessor* thriftServerHandler =
-              static_cast<ThriftServer::ThriftServerEventProcessor*>(eventHandler.get());
+              static_cast<ThriftServer::ThriftServerEventProcessor*>(eventHandler);
           if (thriftServerHandler->IsIdleContext(connectionContext)) {
             const string& client = socket->getSocketInfo();
             GlobalOutput.printf(
@@ -217,7 +216,7 @@ void TAcceptQueueServer::init() {
 }
 
 void TAcceptQueueServer::CleanupAndClose(const string& error,
-    shared_ptr<TTransport> io_transport, shared_ptr<TTransport> client) {
+    const shared_ptr<TTransport>& io_transport, const shared_ptr<TTransport>& client) {
   if (io_transport != nullptr) {
     io_transport->close();
   }
@@ -228,7 +227,8 @@ void TAcceptQueueServer::CleanupAndClose(const string& error,
 }
 
 // New.
-void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
+void TAcceptQueueServer::SetupConnection(const shared_ptr<TAcceptQueueEntry>& entry) {
+  DCHECK(entry != nullptr);
   if (metrics_enabled_) queue_size_metric_->Increment(-1);
   shared_ptr<TTransport> io_transport;
   shared_ptr<TTransport> client = entry->client_;

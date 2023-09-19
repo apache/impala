@@ -26,7 +26,7 @@ using namespace impala;
 namespace filesystem = boost::filesystem;
 using filesystem::path;
 
-void CreateFile(path p, time_t last_modified) {
+void CreateFile(const path& p, time_t last_modified) {
   EXPECT_TRUE(FileSystemUtil::CreateFile(p.string()).ok());
   // We modify the timestamps to guarantee that they are unique.
   filesystem::last_write_time(p, last_modified);

@@ -176,7 +176,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
   // Initializes the channel.
   // Returns OK if successful, error indication otherwise.
-  Status Init(RuntimeState* state, std::shared_ptr<CharMemTrackerAllocator> allocator);
+  Status Init(RuntimeState* state, const shared_ptr<CharMemTrackerAllocator>& allocator);
 
   // Serializes the given row batch and send it to the destination. If the preceding
   // RPC is in progress, this function may block until the previous RPC finishes.
@@ -339,7 +339,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // In which case, MarkDone() will be called with the error status and the RPC is
   // considered complete. 'status' is the error status passed by KRPC code in case the
   // callback was aborted.
-  void RetryCb(DoRpcFn rpc_fn, const kudu::Status& status);
+  void RetryCb(const DoRpcFn& rpc_fn, const kudu::Status& status);
 
   // A callback function called from KRPC reactor threads upon completion of an in-flight
   // TransmitData() RPC. This is called when the remote server responds to the RPC or
@@ -390,7 +390,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 };
 
 Status KrpcDataStreamSender::Channel::Init(
-    RuntimeState* state, std::shared_ptr<CharMemTrackerAllocator> allocator) {
+    RuntimeState* state, const shared_ptr<CharMemTrackerAllocator>& allocator) {
   batch_.reset(new RowBatch(row_desc_, RowBatchCapacity(), parent_->mem_tracker()));
 
   // Create a DataStreamService proxy to the destination.
@@ -478,7 +478,7 @@ Status KrpcDataStreamSender::Channel::WaitForRpcLocked(std::unique_lock<SpinLock
 }
 
 void KrpcDataStreamSender::Channel::RetryCb(
-    DoRpcFn rpc_fn, const kudu::Status& cb_status) {
+    const DoRpcFn& rpc_fn, const kudu::Status& cb_status) {
   COUNTER_ADD(parent_->rpc_retry_counter_, 1);
   std::unique_lock<SpinLock> l(lock_);
   DCHECK(rpc_in_flight_);

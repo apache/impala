@@ -197,9 +197,9 @@ static bool find_averaged(RuntimeProfileBase* prof) {
   return boost::algorithm::istarts_with(prof->name(), "Averaged Fragment");
 }
 
-QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
-    const std::shared_ptr<QueryStateRecord> base) :
-    base_state(base ? move(base) : make_shared<QueryStateRecord>(exec_state)) {
+QueryStateExpanded::QueryStateExpanded(
+    const ClientRequestState& exec_state, std::shared_ptr<QueryStateRecord> base)
+  : base_state(base ? move(base) : make_shared<QueryStateRecord>(exec_state)) {
   if (exec_state.session()->session_type == TSessionType::HIVESERVER2){
     hiveserver2_protocol_version = exec_state.session()->hs2_version;
   }

@@ -150,7 +150,7 @@ class HdfsAvroScannerTest : public testing::Test {
   }
 
   void TestReadAvroChar(int max_len, uint8_t* data, int64_t data_len,
-      StringValue expected_val, int expected_encoded_len,
+      const StringValue& expected_val, int expected_encoded_len,
       TErrorCode::type expected_error = TErrorCode::OK) {
     // Reset parse_status_
     scanner_.parse_status_ = Status::OK();
@@ -165,7 +165,7 @@ class HdfsAvroScannerTest : public testing::Test {
   }
 
   void TestReadAvroVarchar(int max_len, uint8_t* data, int64_t data_len,
-      StringValue expected_val, int expected_encoded_len,
+      const StringValue& expected_val, int expected_encoded_len,
       TErrorCode::type expected_error = TErrorCode::OK) {
     // Reset parse_status_
     scanner_.parse_status_ = Status::OK();
@@ -178,8 +178,9 @@ class HdfsAvroScannerTest : public testing::Test {
         new_data - data);
   }
 
-  void TestReadAvroString(uint8_t* data, int64_t data_len, StringValue expected_val,
-      int expected_encoded_len, TErrorCode::type expected_error = TErrorCode::OK) {
+  void TestReadAvroString(uint8_t* data, int64_t data_len,
+      const StringValue& expected_val, int expected_encoded_len,
+      TErrorCode::type expected_error = TErrorCode::OK) {
     TestReadAvroType(&HdfsAvroScanner::ReadAvroString, TYPE_STRING, data, data_len,
         expected_val, expected_encoded_len, expected_error);
   }

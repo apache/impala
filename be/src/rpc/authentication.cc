@@ -625,8 +625,8 @@ bool CookieAuth(ThriftServer::ConnectionContext* connection_context,
   return false;
 }
 
-bool GetUsernameFromBasicAuthHeader(
-    ThriftServer::ConnectionContext* connection_context, string& auth_header) {
+static bool GetUsernameFromBasicAuthHeader(
+    ThriftServer::ConnectionContext* connection_context, string auth_header) {
   string stripped_basic_auth_token;
   StripWhiteSpace(&auth_header);
   bool got_basic_auth =
@@ -659,23 +659,28 @@ bool SetOrigin(
   return false;
 }
 
-bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
-    const AuthenticationHash& hash, const std::string& origin, string auth_header) {
+static bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const std::string& origin,
+    const string& auth_header) {
   if (!IsTrustedDomain(origin, FLAGS_trusted_domain,
           FLAGS_trusted_domain_strict_localhost)) {
     return false;
   }
 
-  if (!GetUsernameFromBasicAuthHeader(connection_context, auth_header)) return false;
+  if (!GetUsernameFromBasicAuthHeader(connection_context, auth_header)) {
+    return false;
+  }
   // Create a cookie to return.
   connection_context->return_headers.push_back(
       Substitute("Set-Cookie: $0", GenerateCookie(connection_context->username, hash)));
   return true;
 }
 
-bool HandleTrustedAuthHeader(ThriftServer::ConnectionContext* connection_context,
-    const AuthenticationHash& hash, string auth_header) {
-  if (!GetUsernameFromBasicAuthHeader(connection_context, auth_header)) return false;
+static bool HandleTrustedAuthHeader(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const string& auth_header) {
+  if (!GetUsernameFromBasicAuthHeader(connection_context, auth_header)) {
+    return false;
+  }
   // Create a cookie to return.
   connection_context->return_headers.push_back(
       Substitute("Set-Cookie: $0", GenerateCookie(connection_context->username, hash)));

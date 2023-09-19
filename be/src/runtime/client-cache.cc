@@ -39,7 +39,7 @@ using namespace apache::thrift::protocol;
 namespace impala {
 
 Status ClientCacheHelper::GetClient(const TNetworkAddress& address,
-    ClientFactory factory_method, ClientKey* client_key) {
+    const ClientFactory& factory_method, ClientKey* client_key) {
   shared_ptr<PerHostCache> host_cache;
   {
     lock_guard<mutex> lock(cache_lock_);
@@ -67,8 +67,8 @@ Status ClientCacheHelper::GetClient(const TNetworkAddress& address,
   return Status::OK();
 }
 
-Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
-    ClientKey* client_key) {
+Status ClientCacheHelper::ReopenClient(
+    const ClientFactory& factory_method, ClientKey* client_key) {
   // Clients are not ordinarily removed from the cache completely (in the future, they may
   // be); this is the only method where a client may be deleted and replaced with another.
   shared_ptr<ThriftClientImpl> client_impl;
@@ -109,7 +109,7 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
 }
 
 Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,
-    ClientFactory factory_method, ClientKey* client_key) {
+    const ClientFactory& factory_method, ClientKey* client_key) {
   shared_ptr<ThriftClientImpl> client_impl(factory_method(address, client_key));
   VLOG(2) << "CreateClient(): creating new client for " <<
       TNetworkAddressToString(client_impl->address());

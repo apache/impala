@@ -101,7 +101,7 @@ class IcebergBufferedDeleteSink : public IcebergDeleteSinkBase {
   Status GetNextRowBatch(RowBatch* batch, FilePositionsIterator* iterator);
 
   /// Writes a single delete record <filepah, offset> to 'row'.
-  void WriteRow(StringValue filepath, int64_t offset, TupleRow* row);
+  void WriteRow(const StringValue& filepath, int64_t offset, TupleRow* row);
 
   /// Tries to allocate a buffer with size 'buffer_size'. Returns error when cannot
   /// serve the request.

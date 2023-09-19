@@ -30,7 +30,7 @@ namespace impala {
 /// threshold number of files is exceeded.
 class SimpleLogger {
  public:
-  SimpleLogger(const std::string& log_dir_, const std::string& log_file_name_prefix_,
+  SimpleLogger(std::string log_dir_, std::string log_file_name_prefix_,
       uint64_t max_entries_per_file, int max_log_files = 0);
 
   /// Initializes the logging directory and creates the initial log file. If the log dir

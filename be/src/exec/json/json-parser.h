@@ -318,7 +318,7 @@ public:
   using GetBufferFunc = std::function<void(const char**, const char**)>;
 
   SimpleJsonScanner(const std::vector<std::string>& schema, GetBufferFunc get_buffer)
-     : row_count_(0), parser_(schema, this), get_buffer_(get_buffer) {
+    : row_count_(0), parser_(schema, this), get_buffer_(std::move(get_buffer)) {
     parser_.ResetParser();
     current_row_.resize(schema.size());
   }

@@ -124,7 +124,7 @@ class DiskIoMgrTest : public testing::Test {
 
   void WriteValidateCallback(int num_writes, WriteRange** written_range,
       DiskIoMgr* io_mgr, RequestContext* reader, BufferPool::ClientHandle* client,
-      int32_t* data, Status expected_status, const Status& status) {
+      int32_t* data, const Status& expected_status, const Status& status) {
     if (expected_status.code() == TErrorCode::CANCELLED_INTERNALLY) {
       EXPECT_TRUE(status.ok() || status.IsCancelled()) << "Error: " << status.GetDetail();
     } else {
@@ -336,11 +336,11 @@ class DiskIoMgrTest : public testing::Test {
       RequestContext* writer, const string& expected_output, TmpFileGroup* file_group);
 
   void SingleReaderTestBody(const char* data, const char* expected_result,
-      vector<ScanRange::SubRange> sub_ranges = {});
+      const vector<ScanRange::SubRange>& sub_ranges = {});
 
   void CachedReadsTestBody(const char* data, const char* expected,
       HdfsCachingScenario scenario, int offset,
-      vector<ScanRange::SubRange> sub_ranges = {});
+      const vector<ScanRange::SubRange>& sub_ranges = {});
 
   /// Convenience function to get a reference to the buffer pool.
   BufferPool* buffer_pool() const { return ExecEnv::GetInstance()->buffer_pool(); }
@@ -698,7 +698,7 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
 }
 
 void DiskIoMgrTest::SingleReaderTestBody(const char* data, const char* expected_result,
-    vector<ScanRange::SubRange> sub_ranges) {
+    const vector<ScanRange::SubRange>& sub_ranges) {
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
   int data_len = strlen(data);
   int expected_result_len = strlen(expected_result);
@@ -1068,7 +1068,8 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
 }
 
 void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
-    HdfsCachingScenario scenario, int offset, vector<ScanRange::SubRange> sub_ranges) {
+    HdfsCachingScenario scenario, int offset,
+    const vector<ScanRange::SubRange>& sub_ranges) {
   // The data passed in is the full data with any extra initial offset. This
   // is necessary to make the file on disk able to service the data at the
   // appropriate offset.

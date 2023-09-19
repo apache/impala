@@ -39,8 +39,8 @@ namespace apache { namespace thrift { namespace transport {
 
   TSaslTransport::TSaslTransport(std::shared_ptr<TTransport> transport)
       : TVirtualTransport(transport->getConfiguration()),
-        transport_(transport),
-        memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE, transport->getConfiguration())),
+        transport_(move(transport)),
+        memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE, transport_->getConfiguration())),
         sasl_(NULL),
         shouldWrap_(false),
         isClient_(false) {
@@ -49,9 +49,9 @@ namespace apache { namespace thrift { namespace transport {
   TSaslTransport::TSaslTransport(std::shared_ptr<sasl::TSasl> saslClient,
                                  std::shared_ptr<TTransport> transport)
     : TVirtualTransport(transport->getConfiguration()),
-        transport_(transport),
-        memBuf_(new TMemoryBuffer(transport->getConfiguration())),
-        sasl_(saslClient),
+        transport_(move(transport)),
+        memBuf_(new TMemoryBuffer(transport_->getConfiguration())),
+        sasl_(move(saslClient)),
         shouldWrap_(false),
         isClient_(true) {
   }

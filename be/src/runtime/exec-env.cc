@@ -201,7 +201,7 @@ using namespace impala;
 /// Helper method to forward cluster membership updates to the frontend.
 /// For additional details see comments for PopulateExecutorMembershipRequest()
 /// in cluster-membership-mgr.cc
-void SendClusterMembershipToFrontend(ClusterMembershipMgr::SnapshotPtr& snapshot,
+void SendClusterMembershipToFrontend(const ClusterMembershipMgr::SnapshotPtr& snapshot,
     const vector<TExecutorGroupSet>& expected_exec_group_sets, Frontend* frontend) {
   TUpdateExecutorMembershipRequest update_req;
 
@@ -515,7 +515,7 @@ Status ExecEnv::Init() {
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());
   if (FLAGS_is_coordinator && frontend_ != nullptr) {
     cluster_membership_mgr_->RegisterUpdateCallbackFn(
-        [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
+        [this](const ClusterMembershipMgr::SnapshotPtr& snapshot) {
           SendClusterMembershipToFrontend(snapshot,
               this->cluster_membership_mgr()->GetExpectedExecGroupSets(),
               this->frontend());
@@ -586,7 +586,7 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   });
   if (FLAGS_is_coordinator) {
     cluster_membership_mgr_->RegisterUpdateCallbackFn(
-        [server](ClusterMembershipMgr::SnapshotPtr snapshot) {
+        [server](const ClusterMembershipMgr::SnapshotPtr& snapshot) {
           std::unordered_set<BackendIdPB> current_backend_set;
           for (const auto& it : snapshot->current_backends) {
             current_backend_set.insert(it.second.backend_id());
@@ -596,7 +596,7 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   }
   if (FLAGS_is_executor && !TestInfo::is_test()) {
     cluster_membership_mgr_->RegisterUpdateCallbackFn(
-        [](ClusterMembershipMgr::SnapshotPtr snapshot) {
+        [](const ClusterMembershipMgr::SnapshotPtr& snapshot) {
           std::unordered_set<BackendIdPB> current_backend_set;
           for (const auto& it : snapshot->current_backends) {
             current_backend_set.insert(it.second.backend_id());

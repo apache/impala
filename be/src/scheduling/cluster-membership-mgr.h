@@ -125,7 +125,7 @@ class ClusterMembershipMgr {
 
   /// A callback to provide the latest snapshot of cluster membership whenever there are
   /// any changes to the membership.
-  typedef std::function<void(SnapshotPtr)> UpdateCallbackFn;
+  typedef std::function<void(const SnapshotPtr&)> UpdateCallbackFn;
 
   ClusterMembershipMgr(std::string local_backend_id, StatestoreSubscriber* subscriber,
       MetricGroup* metrics);
@@ -194,7 +194,7 @@ class ClusterMembershipMgr {
 
   /// Notifies all registered callbacks of the latest changes to the membership by sending
   /// them the latest cluster membership snapshot.
-  void NotifyListeners(SnapshotPtr snapshot);
+  void NotifyListeners(const SnapshotPtr& snapshot);
 
   /// Atomically replaces a membership snapshot with a new copy.
   void SetState(const SnapshotPtr& new_state);
@@ -298,7 +298,7 @@ class ClusterMembershipMgr {
 /// The frontend uses cluster membership information to determine whether it expects the
 /// scheduler to assign local or remote reads. It also uses the number of executors to
 /// determine the join type (partitioned vs broadcast).
-void PopulateExecutorMembershipRequest(ClusterMembershipMgr::SnapshotPtr& snapshot,
+void PopulateExecutorMembershipRequest(const ClusterMembershipMgr::SnapshotPtr& snapshot,
     const std::vector<TExecutorGroupSet>& expected_exec_group_sets,
     TUpdateExecutorMembershipRequest& update_req);
 

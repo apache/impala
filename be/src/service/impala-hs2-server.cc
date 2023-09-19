@@ -198,7 +198,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   status->__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
-Status ImpalaServer::FetchInternal(TUniqueId query_id, SessionState* session,
+Status ImpalaServer::FetchInternal(const TUniqueId& query_id, SessionState* session,
     int32_t fetch_size, bool fetch_first, TFetchResultsResp* fetch_results,
     int32_t* num_results) {
   bool timed_out = false;
@@ -658,7 +658,7 @@ void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
 }
 
 Status ImpalaServer::SetupResultsCacheing(const QueryHandle& query_handle,
-    shared_ptr<SessionState> session, int64_t cache_num_rows) {
+    const shared_ptr<SessionState>& session, int64_t cache_num_rows) {
   // Optionally enable result caching on the ClientRequestState.
   if (cache_num_rows > 0) {
     const TResultSetMetadata* result_set_md = query_handle->result_metadata();

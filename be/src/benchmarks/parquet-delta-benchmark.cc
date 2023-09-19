@@ -231,15 +231,13 @@ struct DeltaBenchmarkData {
   int dict_len;
 
   DeltaBenchmarkData(std::shared_ptr<const std::vector<uint8_t>> input,
-      std::shared_ptr<std::vector<uint8_t>> output,
-      int num_values, int stride, int dict_len = 0):
-    input(input),
-    output(output),
-    num_values(num_values),
-    stride(stride),
-    dict_len(dict_len)
-  {
-  }
+      std::shared_ptr<std::vector<uint8_t>> output, int num_values, int stride,
+      int dict_len = 0)
+    : input(move(input)),
+      output(move(output)),
+      num_values(num_values),
+      stride(stride),
+      dict_len(dict_len) {}
 
   const uint8_t* input_begin() const {
     return input->data();
@@ -401,13 +399,11 @@ struct BenchmarkUnit {
 
   BenchmarkUnit(const Config config, const Benchmark::BenchmarkFunction function,
       DeltaBenchmarkData benchmark_data,
-      std::shared_ptr<const std::vector<uint8_t>> plain):
-    config(config),
-    function(function),
-    benchmark_data(std::make_shared<DeltaBenchmarkData>(benchmark_data)),
-    plain(plain)
-  {
-  }
+      std::shared_ptr<const std::vector<uint8_t>> plain)
+    : config(config),
+      function(function),
+      benchmark_data(std::make_shared<DeltaBenchmarkData>(benchmark_data)),
+      plain(move(plain)) {}
 };
 
 /// Benchmark functions come in versions according to the encoding type and the reading
@@ -991,7 +987,7 @@ template <typename INT_T, typename OutType>
 std::vector<Config> GenerateConfigs(const std::vector<int>& mean_deltas,
     const std::vector<Config::Encoding>& encodings,
     const std::vector<Config::Access>& accesses, const std::vector<int>& strides,
-    std::function<bool(const Config&)> filter) {
+    const std::function<bool(const Config&)>& filter) {
   constexpr Config::ParquetType parquet_type
       = IntToConfigParquetType<INT_T>::parquet_type;
   constexpr Config::OutType out_type = IntToConfigOutType<OutType>::out_type;
@@ -1069,7 +1065,7 @@ std::vector<BenchmarkUnit> GenerateBenchmarkUnitsRuntime(std::mt19937& gen,
     const std::vector<Config::OutType>& out_types, const std::vector<int>& mean_deltas,
     const std::vector<Config::Encoding>& encodings,
     const std::vector<Config::Access>& accesses, const std::vector<int>& strides,
-    std::function<bool(const Config& config)> filter) {
+    const std::function<bool(const Config& config)>& filter) {
   std::vector<BenchmarkUnit> units;
   if (VecContains(parquet_types, Config::INT32)) {
     using INT_T = int32_t;

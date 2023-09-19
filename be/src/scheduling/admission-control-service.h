@@ -72,7 +72,8 @@ class AdmissionControlService : public AdmissionControlServiceIf,
 
   /// Relases the resources for any queries currently running on coordinators that do not
   /// appear in 'current_backends'. Called in response to statestore updates.
-  void CancelQueriesOnFailedCoordinators(std::unordered_set<UniqueIdPB> current_backends);
+  void CancelQueriesOnFailedCoordinators(
+      const std::unordered_set<UniqueIdPB>& current_backends);
 
   /// Returns whether AdmissionControlService is healthy and is able to accept admission
   /// related RPCs.
@@ -147,7 +148,7 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   std::unordered_map<UniqueIdPB, int64_t> coord_id_to_heartbeat_;
 
   /// Callback for 'admission_thread_pool_'.
-  void AdmitFromThreadPool(UniqueIdPB query_id);
+  void AdmitFromThreadPool(const UniqueIdPB& query_id);
 
   /// Helper for serializing 'status' as part of 'response'. Also releases memory
   /// of the RPC payload previously accounted towards the internal memory tracker.

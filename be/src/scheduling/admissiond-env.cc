@@ -115,7 +115,7 @@ Status AdmissiondEnv::Init() {
 
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());
   cluster_membership_mgr_->RegisterUpdateCallbackFn(
-      [&](ClusterMembershipMgr::SnapshotPtr snapshot) {
+      [&](const ClusterMembershipMgr::SnapshotPtr& snapshot) {
         std::unordered_set<BackendIdPB> current_backends;
         for (const auto& it : snapshot->current_backends) {
           current_backends.insert(it.second.backend_id());

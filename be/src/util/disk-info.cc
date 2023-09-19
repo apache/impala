@@ -157,7 +157,7 @@ void DiskInfo::GetDeviceNames(const std::string &proc, const std::string &sys) {
   }
 }
 
-void DiskInfo::Init(std::string proc, std::string sys) {
+void DiskInfo::Init(const std::string& proc, const std::string& sys) {
   GetDeviceNames(proc, sys);
   initialized_ = true;
 }

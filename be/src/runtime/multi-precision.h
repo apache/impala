@@ -153,13 +153,13 @@ struct DoubleWidth<int128_t> {
 /// positive integers (and zero), -1 for negative integers.
 /// The extra shift is to silence GCC warnings about full width shift on
 /// unsigned types. It compiles out in optimized builds into the expected increment.
-template<typename T>
-constexpr static inline T Sign(T value) {
+template <typename T>
+constexpr static inline T Sign(const T& value) {
   return 1 | ((value >> (ArithmeticUtil::UnsignedWidth<T>() - 1)) >> 1);
 }
 
-template<>
-inline int256_t Sign(int256_t value) {
+template <>
+inline int256_t Sign(const int256_t& value) {
   return value < 0 ? -1 : 1;
 }
 

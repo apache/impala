@@ -181,8 +181,8 @@ class BufferPool::PageList {
     return page;
   }
 
-  void Iterate(boost::function<bool(Page*)> fn) { list_.Iterate(fn); }
-  void IterateFirstN(boost::function<bool(Page*)> fn, int n) {
+  void Iterate(const boost::function<bool(Page*)>& fn) { list_.Iterate(fn); }
+  void IterateFirstN(const boost::function<bool(Page*)>& fn, int n) {
     list_.IterateFirstN(fn, n);
   }
   bool Contains(Page* page) { return list_.Contains(page); }

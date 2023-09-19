@@ -170,7 +170,7 @@ void TestMaxMessageSize(std::string subscriber_id, bool expect_throw,
   TRegisterSubscriberResponse resp;
   bool send_done = false;
 
-  req.subscriber_id = subscriber_id;
+  req.subscriber_id = move(subscriber_id);
   if (expect_throw) {
     EXPECT_THROW(
         client.iface()->RegisterSubscriber(resp, req, &send_done), TTransportException);

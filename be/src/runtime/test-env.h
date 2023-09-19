@@ -87,7 +87,7 @@ class TestEnv {
   }
 
   /// Get a full URI for the provided path based on the default filesystem.
-  std::string GetDefaultFsPath(std::string path);
+  std::string GetDefaultFsPath(const std::string& path);
 
   ExecEnv* exec_env() { return exec_env_.get(); }
   MetricGroup* metrics() { return exec_env_->metrics(); }

@@ -55,7 +55,8 @@ protected:
 
   // Helper function to create a tracer without thinking about the number of files
   // or entries per file.
-  unique_ptr<Tracer> CreateSimpleTracer(path directory, bool anonymize_trace = false) {
+  unique_ptr<Tracer> CreateSimpleTracer(
+      const path& directory, bool anonymize_trace = false) {
     return std::make_unique<Tracer>(directory.string(), MAX_ENTRIES_PER_FILE,
         MAX_LOG_FILES, anonymize_trace);
   }

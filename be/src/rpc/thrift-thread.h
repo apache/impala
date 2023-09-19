@@ -63,7 +63,7 @@ class ThriftThreadFactory : public apache::thrift::concurrency::ThreadFactory {
 /// server threads are registered with the global ThreadManager.
 class ThriftThread : public apache::thrift::concurrency::Thread {
  public:
-  ThriftThread(const std::string& group, const std::string& name, bool detached,
+  ThriftThread(std::string group, std::string name, bool detached,
       std::shared_ptr<apache::thrift::concurrency::Runnable> runnable);
 
   /// (From Thread) - starts execution of the runnable in a separate thread, returning once
@@ -82,7 +82,7 @@ class ThriftThread : public apache::thrift::concurrency::Thread {
   /// Method executed on impala_thread_. Runs the Runnable once promise has been set to the
   /// current thread ID. The runnable parameter is a shared_ptr so that is always valid
   /// even after the ThriftThread may have been terminated.
-  void RunRunnable(std::shared_ptr<apache::thrift::concurrency::Runnable> runnable,
+  void RunRunnable(const std::shared_ptr<apache::thrift::concurrency::Runnable>& runnable,
       Promise<apache::thrift::concurrency::Thread::id_t>* promise);
 
   /// Impala thread that runs the runnable and registers itself with the global

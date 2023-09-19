@@ -146,7 +146,7 @@ int64_t TestEnv::TotalQueryMemoryConsumption() {
   return total;
 }
 
-std::string TestEnv::GetDefaultFsPath(std::string path) {
+std::string TestEnv::GetDefaultFsPath(const std::string& path) {
   const char* filesystem_prefix = getenv("FILESYSTEM_PREFIX");
   if (filesystem_prefix != nullptr && filesystem_prefix[0] != '\0') {
     return Substitute("$0$1", filesystem_prefix, path);

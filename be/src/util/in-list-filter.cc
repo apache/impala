@@ -71,8 +71,8 @@ InListFilter* InListFilter::Create(ColumnType type, uint32_t entry_limit,
 
 InListFilter* InListFilter::Create(const InListFilterPB& protobuf, ColumnType type,
     uint32_t entry_limit, ObjectPool* pool, MemTracker* mem_tracker) {
-  InListFilter* filter = InListFilter::Create(type, entry_limit, pool, mem_tracker,
-      protobuf.contains_null());
+  InListFilter* filter = InListFilter::Create(
+      std::move(type), entry_limit, pool, mem_tracker, protobuf.contains_null());
   filter->always_true_ = protobuf.always_true();
   filter->InsertBatch(protobuf.value());
   filter->MaterializeValues();

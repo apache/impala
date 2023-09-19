@@ -46,13 +46,13 @@ public:
     ASSERT_OK(FileSystemUtil::RemovePaths({cache_dir_}));
   }
 
-  TupleCacheMgr GetCache(string cache_dir, string capacity = "1MB",
-    string eviction_policy = "LRU", uint8_t debug_pos = 0) {
+  TupleCacheMgr GetCache(const string& cache_dir, const string& capacity = "1MB",
+      string eviction_policy = "LRU", uint8_t debug_pos = 0) {
     string cache_config;
     if (!cache_dir.empty()) {
       cache_config = Substitute("$0:$1", cache_dir, capacity);
     }
-    return TupleCacheMgr{cache_config, eviction_policy, &metrics_, debug_pos};
+    return TupleCacheMgr{move(cache_config), move(eviction_policy), &metrics_, debug_pos};
   }
 
   TupleCacheMgr GetCache() {

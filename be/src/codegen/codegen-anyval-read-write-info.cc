@@ -148,14 +148,14 @@ llvm::Value* CodegenAnyValReadWriteInfo::CodegenGetFnCtx() const {
       {eval_, codegen_->GetI32Constant(fn_ctx_idx_)}, "fn_ctx");
 }
 
-llvm::PHINode* CodegenAnyValReadWriteInfo::CodegenNullPhiNode(llvm::Value* non_null_value,
-    llvm::Value* null_value, std::string name) {
-  return LlvmCodeGen::CreateBinaryPhiNode(builder_, non_null_value, null_value,
-      non_null_block_, null_block_);
+llvm::PHINode* CodegenAnyValReadWriteInfo::CodegenNullPhiNode(
+    llvm::Value* non_null_value, llvm::Value* null_value, const std::string& name) {
+  return LlvmCodeGen::CreateBinaryPhiNode(
+      builder_, non_null_value, null_value, non_null_block_, null_block_, name);
 }
 
-llvm::PHINode* CodegenAnyValReadWriteInfo::CodegenIsNullPhiNode(std::string name) {
-  return CodegenNullPhiNode(codegen_->false_value(), codegen_->true_value());
+llvm::PHINode* CodegenAnyValReadWriteInfo::CodegenIsNullPhiNode(const std::string& name) {
+  return CodegenNullPhiNode(codegen_->false_value(), codegen_->true_value(), name);
 }
 
 bool CodegenAnyValReadWriteInfo::is_data_initialized() const {

@@ -776,14 +776,14 @@ class ImpalaServer : public ImpalaServiceIf,
   /// have been checked out.
   /// external_exec_request is a statement that was prepared by an external frontend using
   /// Impala PlanNodes or null if the external frontend isn't being used.
-  Status Execute(TQueryCtx* query_ctx, std::shared_ptr<SessionState> session_state,
+  Status Execute(TQueryCtx* query_ctx, const std::shared_ptr<SessionState>& session_state,
       QueryHandle* query_handle, const TExecRequest* external_exec_request,
       const bool include_in_query_log = true) WARN_UNUSED_RESULT;
 
   /// Implements Execute() logic, but doesn't unregister query on error.
   Status ExecuteInternal(const TQueryCtx& query_ctx,
       const TExecRequest* external_exec_request,
-      std::shared_ptr<SessionState> session_state, bool* registered_query,
+      const std::shared_ptr<SessionState>& session_state, bool* registered_query,
       QueryHandle* query_handle);
 
   /// Common execution logic factored out from Execute to be shared with
@@ -797,7 +797,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Registers the query with query_driver_map_ using the globally unique query_id. The
   /// caller must have checked out the session state.
   Status RegisterQuery(const TUniqueId& query_id,
-      std::shared_ptr<SessionState> session_state,
+      const std::shared_ptr<SessionState>& session_state,
       QueryHandle* query_handle) WARN_UNUSED_RESULT;
 
   /// Adds the query to the set of in-flight queries for the session. The query remains
@@ -814,7 +814,7 @@ class ImpalaServer : public ImpalaServiceIf,
   ///
   /// The query must have already been registered using RegisterQuery(). The caller
   /// must have checked out the session state.
-  Status SetQueryInflight(std::shared_ptr<SessionState> session_state,
+  Status SetQueryInflight(const std::shared_ptr<SessionState>& session_state,
       const QueryHandle& query_handle) WARN_UNUSED_RESULT;
 
   /// Starts the process of unregistering the query. The query is cancelled on the
@@ -983,8 +983,8 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Places a completed query into the in-memory queue of completed queries.
   /// (implemented in workload-management-worker.cc)
-  void EnqueueCompletedQuery(const QueryHandle& query_handle,
-      const std::shared_ptr<QueryStateRecord> qs_rec);
+  void EnqueueCompletedQuery(
+      const QueryHandle& query_handle, std::shared_ptr<QueryStateRecord> qs_rec);
 
   /// Returns the active QueryHandle for this query id. The QueryHandle contains the
   /// active ClientRequestState. Returns an error Status if the query id cannot be found.
@@ -1033,8 +1033,8 @@ class ImpalaServer : public ImpalaServiceIf,
   [[noreturn]] void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
 
   /// Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(TUniqueId query_id, bool start_over,
-      int32_t fetch_size, beeswax::Results* query_results) WARN_UNUSED_RESULT;
+  Status FetchInternal(const TUniqueId& query_id, bool start_over, int32_t fetch_size,
+      beeswax::Results* query_results) WARN_UNUSED_RESULT;
 
   /// Populate dml_result and clean up exec state. If the query
   /// status is an error, dml_result is not populated and the status is returned.
@@ -1062,8 +1062,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// 'num_results'. If fetch_first is true, then the query's state should be reset to
   /// fetch from the beginning of the result set. Doesn't clean up exec state if an
   /// error occurs.
-  Status FetchInternal(TUniqueId query_id, SessionState* session, int32_t fetch_size,
-      bool fetch_first,
+  Status FetchInternal(const TUniqueId& query_id, SessionState* session,
+      int32_t fetch_size, bool fetch_first,
       apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results,
       int32_t* num_results) WARN_UNUSED_RESULT;
 
@@ -1075,7 +1075,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// dynamically scroll through the results, but also allow users to download a file
   /// containing all the results for a query.
   Status SetupResultsCacheing(const QueryHandle& query_handle,
-      std::shared_ptr<SessionState> session, int64_t cache_num_rows) WARN_UNUSED_RESULT;
+      const std::shared_ptr<SessionState>& session,
+      int64_t cache_num_rows) WARN_UNUSED_RESULT;
 
   /// Helper functions to translate between HiveServer2 and Impala structs
 
@@ -1231,10 +1232,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Decompresses the profile in the given QueryStateRecord into the specified format.
   /// The decompressed profile is added to the given RuntimeProfileOutput.
   Status DecompressToProfile(TRuntimeProfileFormat::type format,
-      std::shared_ptr<QueryStateRecord> query_record, RuntimeProfileOutput* profile);
+      const std::shared_ptr<QueryStateRecord>& query_record,
+      RuntimeProfileOutput* profile);
 
-  void WaitForNewCatalogServiceId(TUniqueId cur_service_id,
-      std::unique_lock<std::mutex>* ver_lock);
+  void WaitForNewCatalogServiceId(
+      const TUniqueId& cur_service_id, std::unique_lock<std::mutex>* ver_lock);
 
   /// Random `impala::TUniqueID` generator. Use wherever a new `TUniqueId` is needed.
   TUniqueId RandomUniqueID();
@@ -1478,7 +1480,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Decrement the session's reference counter and mark last_accessed_ms so that state
   /// expiration can proceed.
-  inline void MarkSessionInactive(std::shared_ptr<SessionState> session) {
+  inline void MarkSessionInactive(const std::shared_ptr<SessionState>& session) {
     std::lock_guard<std::mutex> l(session->lock);
     DCHECK_GT(session->ref_count, 0);
     --session->ref_count;
@@ -1486,7 +1488,7 @@ class ImpalaServer : public ImpalaServiceIf,
   }
 
   /// Increment the session's reference counter.
-  inline void MarkSessionActive(std::shared_ptr<SessionState> session) {
+  inline void MarkSessionActive(const std::shared_ptr<SessionState>& session) {
     std::lock_guard<std::mutex> l(session->lock);
     ++session->ref_count;
   }
@@ -1500,8 +1502,9 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Entries in the 'query_locations' map.
   struct QueryLocationInfo {
-    QueryLocationInfo(NetworkAddressPB address, TUniqueId query_id) : address(address) {
-      query_ids.insert(query_id);
+    QueryLocationInfo(NetworkAddressPB address, TUniqueId query_id)
+      : address(std::move(address)) {
+      query_ids.insert(std::move(query_id));
     }
 
     /// Used for logging and error messages so that users don't have to translate between

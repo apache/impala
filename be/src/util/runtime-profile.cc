@@ -1921,8 +1921,8 @@ RuntimeProfileBase::Counter* RuntimeProfile::AddRateCounter(
   Counter* dst_counter = AddCounterLocked(name, dst_unit, ROOT_COUNTER, &created);
   if (!created) return dst_counter;
   rate_counters_.push_back(dst_counter);
-  PeriodicCounterUpdater::RegisterPeriodicCounter(NULL, fn, dst_counter,
-      PeriodicCounterUpdater::RATE_COUNTER);
+  PeriodicCounterUpdater::RegisterPeriodicCounter(
+      NULL, std::move(fn), dst_counter, PeriodicCounterUpdater::RATE_COUNTER);
   has_active_periodic_counters_ = true;
   return dst_counter;
 }
@@ -1950,8 +1950,8 @@ RuntimeProfileBase::Counter* RuntimeProfile::AddSamplingCounter(
       AddCounterLocked(name, TUnit::DOUBLE_VALUE, ROOT_COUNTER, &created);
   if (!created) return dst_counter;
   sampling_counters_.push_back(dst_counter);
-  PeriodicCounterUpdater::RegisterPeriodicCounter(NULL, sample_fn, dst_counter,
-      PeriodicCounterUpdater::SAMPLING_COUNTER);
+  PeriodicCounterUpdater::RegisterPeriodicCounter(
+      NULL, std::move(sample_fn), dst_counter, PeriodicCounterUpdater::SAMPLING_COUNTER);
   has_active_periodic_counters_ = true;
   return dst_counter;
 }
@@ -2027,8 +2027,8 @@ RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
   int32_t update_interval = is_system ?
       FLAGS_periodic_system_counter_update_period_ms :
       FLAGS_periodic_counter_update_period_ms;
-  TimeSeriesCounter* counter = pool_->Add(new SamplingTimeSeriesCounter(name,
-      unit, fn, update_interval));
+  TimeSeriesCounter* counter = pool_->Add(
+      new SamplingTimeSeriesCounter(name, unit, std::move(fn), update_interval));
   if (is_system) {
     counter->SetIsSystem();
   }
@@ -2077,9 +2077,9 @@ void RuntimeProfile::SamplingTimeSeriesCounter::Reset() {
 
 RuntimeProfile::ChunkedTimeSeriesCounter::ChunkedTimeSeriesCounter(
     const string& name, TUnit::type unit, SampleFunction fn)
-  : TimeSeriesCounter(name, unit, fn)
-  , period_(FLAGS_periodic_counter_update_period_ms)
-  , max_size_(10 * FLAGS_status_report_interval_ms / period_) {}
+  : TimeSeriesCounter(name, unit, std::move(fn)),
+    period_(FLAGS_periodic_counter_update_period_ms),
+    max_size_(10 * FLAGS_status_report_interval_ms / period_) {}
 
 void RuntimeProfile::ChunkedTimeSeriesCounter::Clear() {
   lock_guard<SpinLock> l(lock_);
@@ -2145,7 +2145,8 @@ RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddChunkedTimeSeriesCounter(
   lock_guard<SpinLock> l(counter_map_lock_);
   TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
   if (it != time_series_counter_map_.end()) return it->second;
-  TimeSeriesCounter* counter = pool_->Add(new ChunkedTimeSeriesCounter(name, unit, fn));
+  TimeSeriesCounter* counter =
+      pool_->Add(new ChunkedTimeSeriesCounter(name, unit, std::move(fn)));
   time_series_counter_map_[name] = counter;
   PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
   has_active_periodic_counters_ = true;

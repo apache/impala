@@ -1567,7 +1567,7 @@ Status TmpFileGroup::Write(MemRange buffer, WriteDoneCallback cb,
     unique_ptr<TmpWriteHandle>* handle, const BufferPoolClientCounters* counters) {
   DCHECK_GE(buffer.len(), 0);
 
-  unique_ptr<TmpWriteHandle> tmp_handle(new TmpWriteHandle(this, cb));
+  unique_ptr<TmpWriteHandle> tmp_handle(new TmpWriteHandle(this, move(cb)));
   TmpWriteHandle* tmp_handle_ptr = tmp_handle.get(); // Pass ptr by value into lambda.
   WriteRange::WriteDoneCallback callback = [this, tmp_handle_ptr](
                                                const Status& write_status) {
@@ -1864,7 +1864,7 @@ string TmpFileGroup::DebugString() {
 TmpWriteHandle::TmpWriteHandle(
     TmpFileGroup* const parent, WriteRange::WriteDoneCallback cb)
   : parent_(parent),
-    cb_(cb),
+    cb_(move(cb)),
     compressed_(parent_->tmp_file_mgr_->compressed_buffer_tracker()) {}
 
 TmpWriteHandle::~TmpWriteHandle() {
@@ -1921,7 +1921,7 @@ Status TmpWriteHandle::Write(RequestContext* io_ctx, MemRange buffer,
   data_len_ = buffer.len();
   file_ = tmp_file;
   write_range_.reset(new WriteRange(tmp_file->path(), file_offset,
-      tmp_file->AssignDiskQueue(!tmp_file->is_local()), callback));
+      tmp_file->AssignDiskQueue(!tmp_file->is_local()), move(callback)));
   write_range_->SetData(buffer_to_write.data(), buffer_to_write.len());
   // For remote files, we write the range to the local buffer.
   write_range_->SetDiskFile(tmp_file->GetWriteFile());

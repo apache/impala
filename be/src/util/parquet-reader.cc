@@ -59,10 +59,10 @@ std::shared_ptr<TProtocol> CreateDeserializeProtocol(
     std::shared_ptr<TMemoryBuffer> mem, bool compact) {
   if (compact) {
     TCompactProtocolFactoryT<TMemoryBuffer> tproto_factory;
-    return tproto_factory.getProtocol(mem);
+    return tproto_factory.getProtocol(move(mem));
   } else {
     TBinaryProtocolFactoryT<TMemoryBuffer> tproto_factory;
-    return tproto_factory.getProtocol(mem);
+    return tproto_factory.getProtocol(move(mem));
   }
 }
 

@@ -32,10 +32,7 @@ class ParquetPageReader {
   uint64_t PageHeadersRead() const { return page_headers_read_; }
 
   ParquetPageReader(HdfsParquetScanner* parent, std::string schema_name)
-      : parent_(parent),
-        schema_name_(schema_name)
-  {
-  }
+    : parent_(parent), schema_name_(move(schema_name)) {}
 
   /// Resets the reader for each row group in the file and creates the scan range for the
   /// column, but does not start it. To start scanning, call StartScan().

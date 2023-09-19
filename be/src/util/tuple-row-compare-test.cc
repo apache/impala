@@ -79,7 +79,7 @@ class TupleRowCompareTest : public testing::Test {
 
   // Only ColumnType should be passed as template parameter.
   template <typename... Types>
-  void LoadComperator(int offset, ColumnType type, Types... types) {
+  void LoadComperator(int offset, const ColumnType& type, Types... types) {
     //We are trying to fit into one slot, so the offset has to be < sizeof(int)*8.
     DCHECK_LT(offset, sizeof(int) * 8) << "Too many columns added.";
     SlotRef* build_expr = pool_.Add(new SlotRef(type, offset, true /* nullable */));
@@ -231,7 +231,8 @@ class TupleRowCompareTest : public testing::Test {
   int TimestampTimestampTest(TimestampValue lval1, TimestampValue lval2,
       TimestampValue rval1, TimestampValue rval2) {
     CreateComperator(ColumnType(TYPE_TIMESTAMP), ColumnType(TYPE_TIMESTAMP));
-    return CompareTest<TimestampValue>(lval1, lval2, rval1, rval2);
+    return CompareTest<TimestampValue>(
+        move(lval1), move(lval2), move(rval1), move(rval2));
   }
 
   template<typename DECIMAL_T>
