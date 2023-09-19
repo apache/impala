@@ -1169,7 +1169,7 @@ Status Coordinator::UpdateBlacklistWithAuxErrorInfo(
   // that contains a valid RPCErrorInfoPB object.
   for (const auto& aux_error : *aux_error_info) {
     if (aux_error.has_rpc_error_info()) {
-      RPCErrorInfoPB rpc_error_info = aux_error.rpc_error_info();
+      const RPCErrorInfoPB& rpc_error_info = aux_error.rpc_error_info();
       DCHECK(rpc_error_info.has_dest_node());
       DCHECK(rpc_error_info.has_posix_error_code());
       const NetworkAddressPB& dest_node = rpc_error_info.dest_node();
