@@ -480,15 +480,6 @@ SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
 echo -e "\n$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
 
-if [[ $ARCH_NAME == 'aarch64' ]]; then
-  SET_TOOLCHAIN_HOME="export NATIVE_TOOLCHAIN_HOME=${IMPALA_HOME}/../native-toolchain"
-  echo -e "\n$SET_TOOLCHAIN_HOME" >> ~/.bashrc
-  echo -e "\n$SET_TOOLCHAIN_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
-  eval "$SET_TOOLCHAIN_HOME"
-  # Provide access to ~/.cache on build machines so we can use ccache.
-  sudo chmod 755 ~/.cache
-fi
-
 # Try to prepopulate the m2 directory to save time
 if [[ "${PREPOPULATE_M2_REPOSITORY:-true}" == true ]] ; then
   echo ">>> Populating m2 directory..."

@@ -424,7 +424,7 @@ bootstrap_dependencies() {
         git remote add toolchain "${IMPALA_TOOLCHAIN_REPO}"
         git fetch toolchain "${IMPALA_TOOLCHAIN_BRANCH}"
         # Specifying a branch avoids a large message from git about detached HEADs.
-        git checkout "${IMPALA_TOOLCHAIN_COMMIT_HASH}" -b "${IMPALA_TOOLCHAIN_BUILD_ID}"
+        git checkout "${IMPALA_TOOLCHAIN_COMMIT_HASH}" -b "${IMPALA_TOOLCHAIN_BRANCH}"
       else
         pushd "${NATIVE_TOOLCHAIN_HOME}"
       fi

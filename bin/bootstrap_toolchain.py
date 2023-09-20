@@ -253,12 +253,17 @@ class ToolchainPackage(EnvVersionedPackage):
       target_comp = parts[1]
     compiler = get_toolchain_compiler()
     label = get_platform_release_label(release=platform_release).toolchain
-    toolchain_build_id = os.environ["IMPALA_TOOLCHAIN_BUILD_ID"]
+    # Most common return values for machine are x86_64 or aarch64
+    arch = platform.machine()
+    if arch not in ['aarch64', 'x86_64']:
+      raise Exception("Unsupported architecture '{}' for pre-built native-toolchain. "
+          "Fetch and build it locally by setting NATIVE_TOOLCHAIN_HOME".format(arch))
+    toolchain_build_id = os.environ["IMPALA_TOOLCHAIN_BUILD_ID_{}".format(arch.upper())]
     toolchain_host = os.environ["IMPALA_TOOLCHAIN_HOST"]
-    template_subs = {'compiler': compiler, 'label': label,
+    template_subs = {'compiler': compiler, 'label': label, 'arch': arch,
                      'toolchain_build_id': toolchain_build_id,
                      'toolchain_host': toolchain_host}
-    archive_basename_tmpl = "${name}-${version}-${compiler}-${label}"
+    archive_basename_tmpl = "${name}-${version}-${compiler}-${label}-${arch}"
     url_prefix_tmpl = "https://${toolchain_host}/build/${toolchain_build_id}/" + \
         "${name}/${version}-${compiler}/"
     unpack_directory_tmpl = "${name}-${version}"
