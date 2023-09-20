@@ -279,6 +279,12 @@ class SlotDescriptor {
   static void CodegenWriteStringOrCollectionToSlot(
       const CodegenAnyValReadWriteInfo& read_write_info,
       llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc);
+  static void CodegenWriteCollectionToSlot(
+      const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc);
+  static void CodegenWriteStringToSlot(
+      const CodegenAnyValReadWriteInfo& read_write_info,
+      llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc);
 
   static llvm::Value* CodegenToTimestampValue(
       const CodegenAnyValReadWriteInfo& read_write_info);

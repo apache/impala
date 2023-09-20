@@ -75,7 +75,7 @@ void LikePredicate::LikePrepareInternal(FunctionContext* context,
     re2::RE2 starts_with_re("([^%_]*)(?:%+)");
     re2::RE2 equals_re("([^%_]*)");
     re2::RE2 ends_with_escaped_wildcard(".*\\\\%$");
-    string pattern_str(pattern.ptr, pattern.len);
+    string pattern_str(pattern.Ptr(), pattern.Len());
     string search_string;
     if (case_sensitive && RE2::FullMatch(pattern_str, substring_re, &search_string)) {
       state->SetSearchString(search_string);
@@ -266,7 +266,7 @@ BooleanVal LikePredicate::ConstantSubstringFn(FunctionContext* context,
   if (val.is_null) return BooleanVal::null();
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
-  if (state->search_string_sv_.len == 0) return BooleanVal(true);
+  if (state->search_string_sv_.Len() == 0) return BooleanVal(true);
   StringValue pattern_value = StringValue::FromStringVal(val);
   return BooleanVal(state->substring_pattern_.Search(&pattern_value) != -1);
 }
@@ -276,11 +276,11 @@ BooleanVal LikePredicate::ConstantStartsWithFn(FunctionContext* context,
   if (val.is_null) return BooleanVal::null();
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
-  if (val.len < state->search_string_sv_.len) {
+  if (val.len < state->search_string_sv_.Len()) {
     return BooleanVal(false);
   } else {
     StringValue v =
-        StringValue(reinterpret_cast<char*>(val.ptr), state->search_string_sv_.len);
+        StringValue(reinterpret_cast<char*>(val.ptr), state->search_string_sv_.Len());
     return BooleanVal(state->search_string_sv_.Eq((v)));
   }
 }
@@ -290,12 +290,11 @@ BooleanVal LikePredicate::ConstantEndsWithFn(FunctionContext* context,
   if (val.is_null) return BooleanVal::null();
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
-  if (val.len < state->search_string_sv_.len) {
+  int len = state->search_string_sv_.Len();
+  if (val.len < len) {
     return BooleanVal(false);
   } else {
-    char* ptr =
-        reinterpret_cast<char*>(val.ptr) + val.len - state->search_string_sv_.len;
-    int len = state->search_string_sv_.len;
+    char* ptr = reinterpret_cast<char*>(val.ptr) + val.len - len;
     StringValue v = StringValue(ptr, len);
     return BooleanVal(state->search_string_sv_.Eq(v));
   }

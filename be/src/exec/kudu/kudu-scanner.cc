@@ -415,10 +415,10 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
       }
       StringValue* sv = reinterpret_cast<StringValue*>(
           kudu_tuple->GetSlot(slot->tuple_offset()));
-      int src_len = sv->len;
+      int src_len = sv->Len();
       int dst_len = slot->type().len;
       if (src_len > dst_len) {
-        sv->len = dst_len;
+        sv->SetLen(dst_len);
       }
     }
 

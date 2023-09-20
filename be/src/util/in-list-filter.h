@@ -150,7 +150,7 @@ struct StringSetWithTotalLen {
   /// happened, false if it did not, i.e. already exists).
   inline pair<iterator, bool> insert(StringValue v) {
     const auto& res = values.emplace(v);
-    total_len += (res.second? v.len : 0);
+    total_len += (res.second && !v.IsSmall() ? v.Len() : 0);
     return res;
   }
 

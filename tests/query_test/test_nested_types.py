@@ -156,6 +156,15 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
     """Queries where structs and (file/collection) positions are used together"""
     self.run_test_case('QueryTest/struct-positions', vector)
 
+  def test_tpch_nested(self, vector):
+    """Add some tests from tpch nested that have a very complex column and large number
+       of records, and deeply nested small/long strings."""
+    if vector.get_value('table_format').file_format == 'parquet':
+      db = 'tpch_nested_parquet'
+    else:
+      db = 'tpch_nested_orc_def'
+    self.run_test_case('QueryTest/complex-tpch-nested', vector, use_db=db)
+
 
 class TestNestedCollectionsInSelectList(ImpalaTestSuite):
   """Functional tests for nested arrays provided in the select list."""

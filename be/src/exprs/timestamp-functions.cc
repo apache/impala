@@ -92,7 +92,7 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
   const Timezone* timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.ptr, tz_string_value.len));
+      string(tz_string_value.Ptr(), tz_string_value.Len()));
   if (UNLIKELY(timezone == nullptr)) {
     // Although this is an error, Hive ignores it. We will issue a warning but otherwise
     // ignore the error too.
@@ -125,7 +125,7 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
   const Timezone* timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.ptr, tz_string_value.len));
+      string(tz_string_value.Ptr(), tz_string_value.Len()));
   if (UNLIKELY(timezone == nullptr)) {
     // Although this is an error, Hive ignores it. We will issue a warning but otherwise
     // ignore the error too.
@@ -159,11 +159,11 @@ void UnixAndFromUnixPrepare(FunctionContext* context,
   if (context->IsArgConstant(1)) {
     StringVal fmt_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     const StringValue& fmt_ref = StringValue::FromStringVal(fmt_val);
-    if (fmt_val.is_null || fmt_ref.len == 0) {
+    if (fmt_val.is_null || fmt_ref.Len() == 0) {
       ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt_val, true);
       return;
     }
-    dt_ctx = new DateTimeFormatContext(fmt_ref.ptr, fmt_ref.len);
+    dt_ctx = new DateTimeFormatContext(fmt_ref.Ptr(), fmt_ref.Len());
     bool parse_result = SimpleDateFormatTokenizer::Tokenize(dt_ctx, cast_mode);
     if (!parse_result) {
       delete dt_ctx;

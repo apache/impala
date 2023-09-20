@@ -84,7 +84,7 @@ void TestImpala(int batch_size, void* d) {
       const StringValue& str = data->data[j];
       StringParser::ParseResult dummy;
       val = StringParser::StringToDecimal<Storage>(
-          str.ptr, str.len, column_type, false, &dummy);
+          str.Ptr(), str.Len(), column_type, false, &dummy);
       data->result[j] = val;
     }
   }

@@ -303,8 +303,8 @@ class StringMinMaxFilter : public MinMaxFilter {
 
  private:
   /// Copies the contents of 'value' into 'buffer', up to 'len', and reassignes 'value' to
-  /// point to 'buffer'. If an oom is hit, disables the filter by setting 'always_true_'
-  /// to true.
+  /// point to 'buffer', except for small strings which are not modified.
+  /// If an oom is hit, disables the filter by setting 'always_true_' to true.
   void CopyToBuffer(StringBuffer* buffer, StringValue* value, int64_t len);
 
   /// The maximum length of string to store in 'min_str_' or 'max_str_'. Strings inserted

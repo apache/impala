@@ -50,10 +50,10 @@ void TestLibc(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     data->matches = 0;
     for (int n = 0; n < data->needles.size(); ++n) {
-      char* needle = data->needles[n].ptr;
+      char* needle = data->needles[n].Ptr();
       for (int iters = 0; iters < 10; ++iters) {
         for (int h = 0; h < data->haystacks.size(); ++h) {
-          if (strstr(data->haystacks[h].ptr, needle) != NULL) {
+          if (strstr(data->haystacks[h].Ptr(), needle) != NULL) {
             ++data->matches;
           }
         }
@@ -85,7 +85,7 @@ void TestImpalaNullTerminated(int batch_size, void* d) {
     data->matches = 0;
     for (int n = 0; n < data->needles.size(); ++n) {
       // Exercise the null-terminated path.
-      StringSearchSSE needle(data->needles[n].ptr);
+      StringSearchSSE needle(data->needles[n].Ptr());
       for (int iters = 0; iters < 10; ++iters) {
         for (int h = 0; h < data->haystacks.size(); ++h) {
           if (needle.Search(data->haystacks[h]) != -1) {

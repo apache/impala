@@ -151,7 +151,7 @@ TEST(PlainEncoding, Basic) {
   TestType<int64_t, parquet::Type::INT64>(i64, sizeof(int64_t));
   TestType<float, parquet::Type::FLOAT>(f, sizeof(float));
   TestType<double, parquet::Type::DOUBLE>(d, sizeof(double));
-  TestType<StringValue, parquet::Type::BYTE_ARRAY>(sv, sizeof(int32_t) + sv.len);
+  TestType<StringValue, parquet::Type::BYTE_ARRAY>(sv, sizeof(int32_t) + sv.Len());
   TestType<TimestampValue, parquet::Type::INT96>(tv, 12);
 
   // Test type widening.

@@ -181,8 +181,8 @@ void BytesToParquetString(const void* value, const ColumnType& impala_type,
 
   // Here we do not use the plain encoder because we do not include the length in the
   // hash of the string.
-  *ptr = reinterpret_cast<uint8_t*>(str_val->ptr);
-  *len = str_val->len;
+  *ptr = reinterpret_cast<uint8_t*>(const_cast<char*>(str_val->Ptr()));
+  *len = str_val->Len();
 }
 
 Status BytesToParquetType(const void* value, const ColumnType& impala_type,

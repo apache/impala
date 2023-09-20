@@ -22,10 +22,10 @@
 
 namespace impala {
 
-const char* StringValue::LLVM_CLASS_NAME = "struct.impala::StringValue";
+const char* StringValue::LLVM_CLASS_NAME = "class.impala::StringValue";
 
 string StringValue::DebugString() const {
-  return string(ptr, len);
+  return string(Ptr(), Len());
 }
 
 ostream& operator<<(ostream& os, const StringValue& string_value) {
@@ -35,9 +35,10 @@ ostream& operator<<(ostream& os, const StringValue& string_value) {
 uint64_t StringValue::ToUInt64() const {
   unsigned char bytes[8];
   *((uint64_t*)bytes) = 0;
+  uint32_t len = Len();
   int chars_to_copy = (len < 8) ? len : 8;
   for (int i = 0; i < chars_to_copy; i++) {
-    bytes[i] = static_cast<unsigned char>(ptr[i]);
+    bytes[i] = static_cast<unsigned char>(Ptr()[i]);
   }
   return static_cast<uint64_t>(bytes[0]) << 56 | static_cast<uint64_t>(bytes[1]) << 48
       | static_cast<uint64_t>(bytes[2]) << 40 | static_cast<uint64_t>(bytes[3]) << 32
@@ -46,7 +47,9 @@ uint64_t StringValue::ToUInt64() const {
 }
 
 string StringValue::LargestSmallerString() const {
+  uint32_t len = Len();
   if (len == 0) return "";
+  const char* ptr = Ptr();
   if (len == 1 && ptr[0] == 0x00) return "";
 
   int i = len - 1;
@@ -75,6 +78,8 @@ string StringValue::LargestSmallerString() const {
 }
 
 string StringValue::LeastLargerString() const {
+  uint32_t len = Len();
+  const char* ptr = Ptr();
   if (len == 0) return string("\00", 1);
   int i = len - 1;
   while (i >= 0 && ptr[i] == (int8_t)0xff) i--;

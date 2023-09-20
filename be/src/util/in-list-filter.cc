@@ -135,12 +135,16 @@ void InListFilterImpl<StringValue, SLOT_TYPE>::MaterializeValues() {
     Reset();
     return;
   }
-  // Transfer values to the finial set. Don't need to update total_entries_ since it's
+  // Transfer values to the final set. Don't need to update total_entries_ since it's
   // already done in Insert().
   for (const StringValue& s : newly_inserted_values_.values) {
-    Ubsan::MemCpy(buffer, s.ptr, s.len);
-    values_.insert(StringValue(reinterpret_cast<char*>(buffer), s.len));
-    buffer += s.len;
+    if (s.IsSmall()) {
+      values_.insert(s);
+    } else {
+      Ubsan::MemCpy(buffer, s.Ptr(), s.Len());
+      values_.insert(StringValue(reinterpret_cast<char*>(buffer), s.Len()));
+      buffer += s.Len();
+    }
   }
   newly_inserted_values_.clear();
 }
@@ -198,7 +202,7 @@ NUMERIC_IN_LIST_FILTER_TO_PROTOBUF(int32_t, TYPE_DATE, int_val)
     protobuf->set_contains_null(contains_null_);                                       \
     for (const StringValue& v : values_.values) {                                      \
       ColumnValuePB* proto = protobuf->add_value();                                    \
-      proto->set_string_val(v.ptr, v.len);                                             \
+      proto->set_string_val(v.Ptr(), v.Len());                                         \
     }                                                                                  \
   }
 
@@ -219,7 +223,7 @@ void InListFilterImpl<int32_t, TYPE_DATE>::ToOrcLiteralList(
   void InListFilterImpl<StringValue, SLOT_TYPE>::ToOrcLiteralList(      \
       vector<orc::Literal>* in_list) {                                  \
     for (const StringValue& s : values_.values) {                       \
-      in_list->emplace_back(s.ptr, s.len);                              \
+      in_list->emplace_back(s.Ptr(), s.Len());                              \
     }                                                                   \
   }
 

@@ -400,9 +400,9 @@ TEST_F(HdfsAvroScannerTest, StringLengthOverflowTest) {
     memcpy(large_buffer.data() + zlong_len, s, strlen(s));
 
     // CHAR and VARCHAR truncation should still work in this case.
-    TestReadAvroChar(sv.len, large_buffer.data(), large_buffer.size(), sv,
+    TestReadAvroChar(sv.Len(), large_buffer.data(), large_buffer.size(), sv,
         zlong_len + large_string_len);
-    TestReadAvroVarchar(sv.len, large_buffer.data(), large_buffer.size(), sv,
+    TestReadAvroVarchar(sv.Len(), large_buffer.data(), large_buffer.size(), sv,
         zlong_len + large_string_len);
 
     // Interpreting as a string would overflow length field.
@@ -428,7 +428,7 @@ TEST_F(HdfsAvroScannerTest, StringTest) {
   TestReadAvroString(data, 10, sv, -1, TErrorCode::AVRO_INVALID_LENGTH);
 
   data[0] = 0; // decodes to 0
-  sv.len = 0;
+  sv.SetLen(0);
   TestReadAvroString(data, 1, sv, 1);
   TestReadAvroString(data, 10, sv, 1);
 }

@@ -41,6 +41,11 @@ struct __attribute__((__packed__)) CollectionValue {
       num_tuples(val.num_tuples)
   {}
 
+  uint8_t* Ptr() { return ptr; }
+  const uint8_t* Ptr() const { return ptr; }
+
+  void SetPtr(uint8_t* p) { ptr = p; }
+
   /// Returns the size of this collection in bytes, i.e. the number of bytes written to
   /// ptr.
   inline int64_t ByteSize(const TupleDescriptor& item_tuple_desc) const {

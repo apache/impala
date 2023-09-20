@@ -412,8 +412,8 @@ StringMinMaxFilter::StringMinMaxFilter(
     DCHECK(protobuf.max().has_string_val());
     min_ = StringValue(protobuf.min().string_val());
     max_ = StringValue(protobuf.max().string_val());
-    CopyToBuffer(&min_buffer_, &min_, min_.len);
-    CopyToBuffer(&max_buffer_, &max_, max_.len);
+    CopyToBuffer(&min_buffer_, &min_, min_.Len());
+    CopyToBuffer(&max_buffer_, &max_, max_.Len());
   }
 }
 
@@ -422,16 +422,16 @@ PrimitiveType StringMinMaxFilter::type() const {
 }
 
 void StringMinMaxFilter::MaterializeMinValue() {
-  if (min_.len > MAX_BOUND_LENGTH) {
+  if (min_.Len() > MAX_BOUND_LENGTH) {
     // Truncating 'value' gives a valid min bound as the result will be <= 'value'.
     CopyToBuffer(&min_buffer_, &min_, MAX_BOUND_LENGTH);
   } else {
-    CopyToBuffer(&min_buffer_, &min_, min_.len);
+    CopyToBuffer(&min_buffer_, &min_, min_.Len());
   }
 }
 
 void StringMinMaxFilter::MaterializeMaxValue() {
-  if (max_.len > MAX_BOUND_LENGTH) {
+  if (max_.Len() > MAX_BOUND_LENGTH) {
     CopyToBuffer(&max_buffer_, &max_, MAX_BOUND_LENGTH);
     if (always_true_) return;
     // After truncating 'value', to still have a valid max bound we add 1 to one char in
@@ -448,7 +448,7 @@ void StringMinMaxFilter::MaterializeMaxValue() {
     }
     max_buffer_.buffer()[i] = max_buffer_.buffer()[i] + 1;
   } else {
-    CopyToBuffer(&max_buffer_, &max_, max_.len);
+    CopyToBuffer(&max_buffer_, &max_, max_.Len());
   }
 }
 
@@ -460,8 +460,8 @@ void StringMinMaxFilter::MaterializeValues() {
 
 void StringMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
   if (!always_true_ && !always_false_) {
-    protobuf->mutable_min()->set_string_val(static_cast<char*>(min_.ptr), min_.len);
-    protobuf->mutable_max()->set_string_val(static_cast<char*>(max_.ptr), max_.len);
+    protobuf->mutable_min()->set_string_val(min_.Ptr(), min_.Len());
+    protobuf->mutable_max()->set_string_val(max_.Ptr(), max_.Len());
   }
   protobuf->set_always_false(always_false_);
   protobuf->set_always_true(always_true_);
@@ -503,15 +503,18 @@ void StringMinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
 
 void StringMinMaxFilter::CopyToBuffer(
     StringBuffer* buffer, StringValue* value, int64_t len) {
-  if (value->ptr == buffer->buffer()) return;
+  if (value->Ptr() == buffer->buffer()) return;
+  if (value->IsSmall()) {
+    DCHECK_LE(value->Len(), len);
+    return;
+  }
   buffer->Clear();
-  if (!buffer->Append(value->ptr, len).ok()) {
+  if (!buffer->Append(value->Ptr(), len).ok()) {
     // If Append() fails, for example because we're out of memory, disable the filter.
     SetAlwaysTrue();
     return;
   }
-  value->ptr = buffer->buffer();
-  value->len = len;
+  value->Assign(buffer->buffer(), len);
 }
 
 void StringMinMaxFilter::SetAlwaysTrue() {
@@ -519,10 +522,8 @@ void StringMinMaxFilter::SetAlwaysTrue() {
   always_false_ = false;
   max_buffer_.Clear();
   min_buffer_.Clear();
-  min_.ptr = nullptr;
-  min_.len = 0;
-  max_.ptr = nullptr;
-  max_.len = 0;
+  min_.Clear();
+  max_.Clear();
 }
 
 bool StringMinMaxFilter::EvalOverlap(

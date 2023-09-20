@@ -56,7 +56,7 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
   switch (type) {
     case TYPE_VARCHAR: {
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
-      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
+      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->Ptr()), sv->Len());
       if (copy_strings) {
         KUDU_RETURN_IF_ERROR(row->SetVarchar(col, slice),
             "Could not set Kudu row value.");
@@ -68,7 +68,7 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
     }
     case TYPE_STRING: {
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
-      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
+      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->Ptr()), sv->Len());
       if (copy_strings) {
         KUDU_RETURN_IF_ERROR(row->SetString(col, slice), "Could not set Kudu row value.");
       } else {

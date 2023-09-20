@@ -209,10 +209,10 @@ void TestFnvMixedHashTemplate(int batch, void* d) {
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      if (handle_empty && str->len == 0) {
+      if (handle_empty && str->Len() == 0) {
         hash = HashUtil::HashCombine32(0, hash);
       } else {
-        hash = HashUtil::FnvHash64to32(str->ptr, str->len, hash);
+        hash = HashUtil::FnvHash64to32(str->Ptr(), str->Len(), hash);
       }
       values += sizeof(StringValue);
 
@@ -247,7 +247,7 @@ void TestCrcMixedHash(int batch, void* d) {
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      hash = HashUtil::CrcHash(str->ptr, str->len, hash);
+      hash = HashUtil::CrcHash(str->Ptr(), str->Len(), hash);
       values += sizeof(StringValue);
 
       data->results[j] = hash;
@@ -273,7 +273,7 @@ void TestFastHashMixedHash(int batch, void* d) {
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      hash = HashUtil::FastHash64(str->ptr, str->len, hash);
+      hash = HashUtil::FastHash64(str->Ptr(), str->Len(), hash);
       values += sizeof(StringValue);
 
       data->results[j] = hash;
@@ -312,7 +312,7 @@ void TestBoostMixedHash(int batch, void* d) {
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      hash_value = hash_range<char*>(str->ptr, str->ptr + str->len);
+      hash_value = hash_range<char*>(str->Ptr(), str->Ptr() + str->Len());
       hash_combine(h, hash_value);
       values += sizeof(StringValue);
 
@@ -339,7 +339,7 @@ void TestMurmur2_64MixedHash(int batch, void* d) {
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      hash = HashUtil::MurmurHash2_64(str->ptr, str->len, hash);
+      hash = HashUtil::MurmurHash2_64(str->Ptr(), str->Len(), hash);
       values += sizeof(StringValue);
 
       data->results[j] = hash;
@@ -443,8 +443,17 @@ llvm::Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
         builder.CreateGEP(data, codegen->GetI32Constant(fixed_byte_size));
     llvm::Value* string_val = builder.CreateBitCast(string_data,
             codegen->GetSlotPtrType(ColumnType(TYPE_STRING)));
-    llvm::Value* str_ptr = builder.CreateStructGEP(NULL, string_val, 0);
-    llvm::Value* str_len = builder.CreateStructGEP(NULL, string_val, 1);
+
+    llvm::Function* str_ptr_fn = codegen->GetFunction(
+        IRFunction::STRING_VALUE_PTR, false);
+    llvm::Function* str_len_fn = codegen->GetFunction(
+        IRFunction::STRING_VALUE_LEN, false);
+
+    llvm::Value* str_ptr = builder.CreateCall(str_ptr_fn,
+        llvm::ArrayRef<llvm::Value*>({string_val}), "ptr");
+    llvm::Value* str_len = builder.CreateCall(str_len_fn,
+        llvm::ArrayRef<llvm::Value*>({string_val}), "len");
+
     str_ptr = builder.CreateLoad(str_ptr);
     str_len = builder.CreateLoad(str_len);
     seed = builder.CreateCall(

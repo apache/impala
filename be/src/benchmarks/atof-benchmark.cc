@@ -84,7 +84,7 @@ void TestAtof(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = atof(data->data[j].ptr);
+      data->result[j] = atof(data->data[j].Ptr());
     }
   }
 }
@@ -96,7 +96,7 @@ void TestImpala(int batch_size, void* d) {
     for (int j = 0; j < n; ++j) {
       const StringValue& str = data->data[j];
       StringParser::ParseResult dummy;
-      double val = StringParser::StringToFloat<double>(str.ptr, str.len, &dummy);
+      double val = StringParser::StringToFloat<double>(str.Ptr(), str.Len(), &dummy);
       VALIDATE_RESULT(val, data->result[j], str.ptr);
       data->result[j] = val;
     }
@@ -108,7 +108,7 @@ void TestStrtod(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = strtod(data->data[j].ptr, NULL);
+      data->result[j] = strtod(data->data[j].Ptr(), NULL);
     }
   }
 }

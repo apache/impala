@@ -225,8 +225,7 @@ bool HdfsAvroScanner::ReadAvroVarchar(PrimitiveType type, int max_len, uint8_t**
     // We need to be careful not to truncate the length before evaluating min().
     int str_len = static_cast<int>(std::min<int64_t>(len.val, max_len));
     DCHECK_GE(str_len, 0);
-    sv->len = str_len;
-    sv->ptr = reinterpret_cast<char*>(*data);
+    sv->Assign(reinterpret_cast<char*>(*data), str_len);
   }
   *data += len.val;
   return true;
@@ -262,8 +261,7 @@ bool HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data,
       return false;
     }
     StringValue* sv = reinterpret_cast<StringValue*>(slot);
-    sv->len = len.val;
-    sv->ptr = reinterpret_cast<char*>(*data);
+    sv->Assign(reinterpret_cast<char*>(*data), len.val);
   }
   *data += len.val;
   return true;

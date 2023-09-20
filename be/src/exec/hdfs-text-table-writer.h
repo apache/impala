@@ -34,7 +34,7 @@ class Expr;
 class MemPool;
 struct OutputPartition;
 class RuntimeState;
-struct StringValue;
+class StringValue;
 class TupleDescriptor;
 class TupleRow;
 

@@ -456,7 +456,7 @@ inline uint32_t DictEncoder<T>::Hash(const T& value) const {
 
 template<>
 inline uint32_t DictEncoder<StringValue>::Hash(const StringValue& value) const {
-  return HashUtil::Hash(value.ptr, value.len, 0);
+  return HashUtil::Hash(value.Ptr(), value.Len(), 0);
 }
 
 template<>
@@ -481,9 +481,10 @@ inline int DictEncoder<T>::AddToTable(const T& value, NodeIndex* bucket) {
 template<>
 inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
     NodeIndex* bucket) {
-  char* ptr_copy = reinterpret_cast<char*>(pool_->Allocate(value.len));
-  Ubsan::MemCpy(ptr_copy, value.ptr, value.len);
-  StringValue sv(ptr_copy, value.len);
+  StringValue::SimpleString value_s = value.ToSimpleString();
+  char* ptr_copy = reinterpret_cast<char*>(pool_->Allocate(value_s.len));
+  Ubsan::MemCpy(ptr_copy, value_s.ptr, value_s.len);
+  StringValue sv(ptr_copy, value_s.len);
   Node node(sv, *bucket);
   ConsumeBytes(sizeof(node));
   // Prepend the new node to this bucket's chain.

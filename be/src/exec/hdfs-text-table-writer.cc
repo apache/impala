@@ -106,7 +106,7 @@ Status HdfsTextTableWriter::AppendRows(
             if (col_desc.auxType().IsBinaryStringSubtype()) {
               // TODO: try to find a more efficient imlementation
               Base64Encode(
-                  string_value->ptr , string_value->len, &rowbatch_stringstream_);
+                  string_value->Ptr() , string_value->Len(), &rowbatch_stringstream_);
             } else {
               PrintEscaped(string_value);
             }
@@ -164,14 +164,15 @@ Status HdfsTextTableWriter::Flush() {
 }
 
 inline void HdfsTextTableWriter::PrintEscaped(const StringValue* str_val) {
-  for (int i = 0; i < str_val->len; ++i) {
+  StringValue::SimpleString s = str_val->ToSimpleString();
+  for (int i = 0; i < s.len; ++i) {
     if (escape_char_ == '\0') {
-      rowbatch_stringstream_ << str_val->ptr[i];
+      rowbatch_stringstream_ << s.ptr[i];
     } else {
-      if (UNLIKELY(str_val->ptr[i] == field_delim_ || str_val->ptr[i] == escape_char_)) {
+      if (UNLIKELY(s.ptr[i] == field_delim_ || s.ptr[i] == escape_char_)) {
         rowbatch_stringstream_ << escape_char_;
       }
-      rowbatch_stringstream_ << str_val->ptr[i];
+      rowbatch_stringstream_ << s.ptr[i];
     }
   }
 }

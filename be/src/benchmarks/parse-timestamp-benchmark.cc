@@ -137,8 +137,8 @@ void TestImpalaSimpleDateFormat(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].ptr,
-          data->data[j].len);
+      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].Ptr(),
+          data->data[j].Len());
     }
   }
 }
@@ -158,7 +158,7 @@ void TestBoostDate(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      string s(data->data[j].ptr, data->data[j].len);
+      string s(data->data[j].Ptr(), data->data[j].Len());
       data->result[j].set_date(gregorian::from_string(s));
     }
   }
@@ -169,7 +169,7 @@ void TestBoostTime(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      string s(data->data[j].ptr, data->data[j].len);
+      string s(data->data[j].Ptr(), data->data[j].Len());
       data->result[j].set_time(duration_from_string(s));
     }
   }
@@ -180,8 +180,8 @@ void TestImpalaSimpleDateFormatTimestamp(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].ptr,
-          data->data[j].len, dt_ctx_simple_date_format);
+      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].Ptr(),
+          data->data[j].Len(), dt_ctx_simple_date_format);
     }
   }
 }
@@ -191,8 +191,8 @@ void TestImpalaIsoSqlFormatTimestamp(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::ParseIsoSqlFormat(data->data[j].ptr,
-          data->data[j].len, dt_ctx_iso_sql_format);
+      data->result[j] = TimestampValue::ParseIsoSqlFormat(data->data[j].Ptr(),
+          data->data[j].Len(), dt_ctx_iso_sql_format);
     }
   }
 }
@@ -202,8 +202,8 @@ void TestImpalaIsoSqlFormatTZTimestamp(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::ParseIsoSqlFormat(data->data[j].ptr,
-          data->data[j].len, dt_ctx_tz_iso_sql_format);
+      data->result[j] = TimestampValue::ParseIsoSqlFormat(data->data[j].Ptr(),
+          data->data[j].Len(), dt_ctx_tz_iso_sql_format);
     }
   }
 }
@@ -213,8 +213,8 @@ void TestImpalaSimpleDateFormatTZTimestamp(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].ptr,
-          data->data[j].len, dt_ctx_tz_simple_date_format);
+      data->result[j] = TimestampValue::ParseSimpleDateFormat(data->data[j].Ptr(),
+          data->data[j].Len(), dt_ctx_tz_simple_date_format);
     }
   }
 }
@@ -224,7 +224,7 @@ void TestBoostDateTime(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      string s(data->data[j].ptr, data->data[j].len);
+      string s(data->data[j].Ptr(), data->data[j].Len());
       data->result[j] = TimestampValue(boost::posix_time::time_from_string(s));
     }
   }

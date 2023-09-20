@@ -74,7 +74,7 @@ void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
     case TYPE_STRING:
     case TYPE_VARCHAR:
       string_val = reinterpret_cast<const StringValue*>(value);
-      stream->write(string_val->ptr, string_val->len);
+      stream->write(string_val->Ptr(), string_val->Len());
       break;
     case TYPE_TIMESTAMP:
       stream->write(chars, TimestampValue::Size());
@@ -110,7 +110,7 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
     case TYPE_STRING:
     case TYPE_VARCHAR:
       string_val = reinterpret_cast<const StringValue*>(value);
-      tmp.assign(string_val->ptr, string_val->len);
+      tmp.assign(string_val->Ptr(), string_val->Len());
       str->swap(tmp);
       return;
     case TYPE_CHAR:
@@ -179,16 +179,14 @@ void RawValue::WriteNonNullPrimitive(const void* value, void* dst, const ColumnT
     case TYPE_VARCHAR: {
       const StringValue* src = reinterpret_cast<const StringValue*>(value);
       StringValue* dest = reinterpret_cast<StringValue*>(dst);
-      dest->len = src->len;
-      if (type.type == TYPE_VARCHAR) DCHECK_LE(dest->len, type.len);
+      dest->Assign(*src);
+      if (type.type == TYPE_VARCHAR) DCHECK_LE(dest->Len(), type.len);
       if (pool != NULL) {
         // Note: if this changes to TryAllocate(), SlotDescriptor::CodegenWriteToSlot()
         // will need to reflect this change as well (the codegen'd Allocate() call is
         // actually generated in SlotDescriptor::CodegenWriteStringOrCollectionToSlot()).
-        dest->ptr = reinterpret_cast<char*>(pool->Allocate(dest->len));
-        Ubsan::MemCpy(dest->ptr, src->ptr, dest->len);
-      } else {
-        dest->ptr = src->ptr;
+        dest->Assign(reinterpret_cast<char*>(pool->Allocate(dest->Len())), dest->Len());
+        Ubsan::MemCpy(dest->Ptr(), src->Ptr(), dest->Len());
       }
       break;
     }
@@ -403,15 +401,15 @@ void RawValue::PrintValue(
     case TYPE_VARCHAR:
     case TYPE_STRING:
       string_val = reinterpret_cast<const StringValue*>(value);
-      if (type.type == TYPE_VARCHAR) DCHECK(string_val->len <= type.len);
+      if (type.type == TYPE_VARCHAR) DCHECK(string_val->Len() <= type.len);
       if (quote_val) {
-        string str(string_val->ptr, string_val->len);
+        string str(string_val->Ptr(), string_val->Len());
         str = strings::Utf8SafeCEscape(str);
         *stream << "\"";
         stream->write(str.c_str(), str.size());
         *stream << "\"";
       } else {
-        stream->write(string_val->ptr, string_val->len);
+        stream->write(string_val->Ptr(), string_val->Len());
       }
       break;
     case TYPE_TIMESTAMP:

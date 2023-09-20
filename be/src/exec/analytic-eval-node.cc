@@ -393,15 +393,17 @@ Status AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
   for (const SlotDescriptor* slot_desc : result_tuple_desc_->string_slots()) {
     if (result_tuple->IsNull(slot_desc->null_indicator_offset())) continue;
     StringValue* sv = result_tuple->GetStringSlot(slot_desc->tuple_offset());
-    if (sv->len == 0) continue;
+    if (sv->IsSmall()) continue;
+    StringValue::SimpleString s = sv->ToSimpleString();
+    if (s.len == 0) continue;
     char* new_ptr = reinterpret_cast<char*>(
-        curr_tuple_pool->TryAllocateUnaligned(sv->len));
+        curr_tuple_pool->TryAllocateUnaligned(s.len));
     if (UNLIKELY(new_ptr == nullptr)) {
       return curr_tuple_pool->mem_tracker()->MemLimitExceeded(nullptr,
-          "Failed to allocate memory for analytic function's result.", sv->len);
+          "Failed to allocate memory for analytic function's result.", s.len);
     }
-    memcpy(new_ptr, sv->ptr, sv->len);
-    sv->ptr = new_ptr;
+    memcpy(new_ptr, s.ptr, s.len);
+    sv->SetPtr(new_ptr);
   }
 
   DCHECK_GT(stream_idx, last_result_idx_);

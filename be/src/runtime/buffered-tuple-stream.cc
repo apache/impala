@@ -915,8 +915,9 @@ void BufferedTupleStream::FixUpStringsForRead(const vector<SlotDescriptor*>& str
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
     StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-    sv->ptr = reinterpret_cast<char*>(read_iter->read_ptr_);
-    read_iter->AdvanceReadPtr(sv->len);
+    if (sv->IsSmall()) continue;
+    sv->SetPtr(reinterpret_cast<char*>(read_iter->read_ptr_));
+    read_iter->AdvanceReadPtr(sv->Len());
   }
 }
 
@@ -944,7 +945,8 @@ void BufferedTupleStream::FixUpCollectionsForRead(
   }
 }
 
-int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const noexcept {
+int64_t BufferedTupleStream::ComputeRowSizeAndSmallifyStrings(TupleRow* row)
+    const noexcept {
   int64_t size = 0;
   if (has_nullable_tuple_) {
     size += NullIndicatorBytesPerRow();
@@ -962,7 +964,9 @@ int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const noexcept {
     const vector<SlotDescriptor*>& slots = inlined_string_slots_[i].second;
     for (auto it = slots.begin(); it != slots.end(); ++it) {
       if (tuple->IsNull((*it)->null_indicator_offset())) continue;
-      size += tuple->GetStringSlot((*it)->tuple_offset())->len;
+      StringValue* sv = tuple->GetStringSlot((*it)->tuple_offset());
+      if (sv->Smallify()) continue;
+      size += sv->Len();
     }
   }
 
@@ -988,7 +992,7 @@ int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const noexcept {
 
 bool BufferedTupleStream::AddRowSlow(TupleRow* row, Status* status) noexcept {
   // Use AddRowCustom*() to do the work of advancing the page.
-  int64_t row_size = ComputeRowSize(row);
+  int64_t row_size = ComputeRowSizeAndSmallifyStrings(row);
   uint8_t* data = AddRowCustomBeginSlow(row_size, status);
   if (data == nullptr) return false;
   bool success = DeepCopy(row, &data, data + row_size);
@@ -1111,11 +1115,12 @@ bool BufferedTupleStream::CopyStrings(const Tuple* tuple,
   for (const SlotDescriptor* slot_desc : string_slots) {
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
     const StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-    if (LIKELY(sv->len > 0)) {
-      if (UNLIKELY(*data + sv->len > data_end)) return false;
+    if (LIKELY(sv->Len() > 0) && !sv->IsSmall()) {
+      StringValue::SimpleString s = sv->ToSimpleString();
+      if (UNLIKELY(*data + s.len > data_end)) return false;
 
-      memcpy(*data, sv->ptr, sv->len);
-      *data += sv->len;
+      memcpy(*data, s.ptr, s.len);
+      *data += s.len;
     }
   }
   return true;

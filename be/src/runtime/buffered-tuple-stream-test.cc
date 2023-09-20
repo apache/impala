@@ -230,9 +230,11 @@ class SimpleTupleStreamTest : public testing::Test {
       results->push_back(StringValue());
     } else {
       StringValue sv = *reinterpret_cast<StringValue*>(ptr);
-      uint8_t* copy = mem_pool_->Allocate(sv.len);
-      memcpy(copy, sv.ptr, sv.len);
-      sv.ptr = reinterpret_cast<char*>(copy);
+      if (!sv.IsSmall()) {
+        uint8_t* copy = mem_pool_->Allocate(sv.Len());
+        memcpy(copy, sv.Ptr(), sv.Len());
+        sv.SetPtr(reinterpret_cast<char*>(copy));
+      }
       results->push_back(sv);
     }
   }
@@ -1207,13 +1209,12 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
   // Make the string large enough to fill a page.
   const int64_t string_len = BIG_ROW_BYTES - tuple_desc->byte_size();
   vector<char> data(string_len);
-  write_str->len = string_len;
-  write_str->ptr = data.data();
+  write_str->Assign(data.data(), string_len);
 
   // We should be able to append MAX_BUFFERS without problem.
   for (int i = 0; i < MAX_BUFFERS; ++i) {
     // Fill the string with the value i.
-    memset(write_str->ptr, i, write_str->len);
+    memset(write_str->Ptr(), i, write_str->Len());
     bool success = stream.AddRow(write_row, &status);
     ASSERT_TRUE(success);
     // We should have one large page per row, plus a default-size read/write page, plus
@@ -1230,14 +1231,14 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
     EXPECT_TRUE(eos) << i << " " << stream.DebugString();
     Tuple* tuple = read_batch.GetRow(0)->GetTuple(0);
     StringValue* str = tuple->GetStringSlot(tuple_desc->slots()[0]->tuple_offset());
-    EXPECT_EQ(string_len, str->len);
+    EXPECT_EQ(string_len, str->Len());
     for (int j = 0; j < string_len; ++j) {
-      EXPECT_EQ(i, str->ptr[j]) << j;
+      EXPECT_EQ(i, str->Ptr()[j]) << j;
     }
   }
 
   // We can't fit another row in memory - need to unpin to make progress.
-  memset(write_str->ptr, MAX_BUFFERS, write_str->len);
+  memset(write_str->Ptr(), MAX_BUFFERS, write_str->Len());
   bool success = stream.AddRow(write_row, &status);
   ASSERT_FALSE(success);
   ASSERT_OK(status);
@@ -1256,9 +1257,9 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
     EXPECT_EQ(eos, i == MAX_BUFFERS) << i;
     Tuple* tuple = read_batch.GetRow(0)->GetTuple(0);
     StringValue* str = tuple->GetStringSlot(tuple_desc->slots()[0]->tuple_offset());
-    EXPECT_EQ(string_len, str->len);
+    EXPECT_EQ(string_len, str->Len());
     for (int j = 0; j < string_len; ++j) {
-      ASSERT_EQ(i, str->ptr[j]) << j;
+      ASSERT_EQ(i, str->Ptr()[j]) << j;
     }
   }
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
@@ -1879,10 +1880,11 @@ void SimpleTupleStreamTest::WriteStringRow(const RowDescriptor* row_desc, TupleR
     memcpy(dst, src, tuple_desc->byte_size());
     for (SlotDescriptor* slot : tuple_desc->slots()) {
       StringValue* src_string = src->GetStringSlot(slot->tuple_offset());
+      if (src_string->IsSmall()) continue;
       StringValue* dst_string = dst->GetStringSlot(slot->tuple_offset());
-      dst_string->ptr = reinterpret_cast<char*>(varlen_write_ptr);
-      memcpy(dst_string->ptr, src_string->ptr, src_string->len);
-      varlen_write_ptr += src_string->len;
+      dst_string->Assign(reinterpret_cast<char*>(varlen_write_ptr), src_string->Len());
+      memcpy(dst_string->Ptr(), src_string->Ptr(), src_string->Len());
+      varlen_write_ptr += src_string->Len();
     }
   }
   ASSERT_EQ(data + fixed_size + varlen_size, varlen_write_ptr);
@@ -1937,7 +1939,7 @@ TEST_F(MultiNullableTupleStreamTest, MultiNullableTupleManyBufferSpill) {
   TestIntValuesInterleaved(100, 15, true, buffer_size);
 }
 
-/// Test that ComputeRowSize handles nulls
+/// Test that ComputeRowSizeAndSmallifyStrings handles nulls
 TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
   Init(BUFFER_POOL_LIMIT);
   const vector<TupleDescriptor*>& tuple_descs = string_desc_->tuple_descriptors();
@@ -1966,27 +1968,28 @@ TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
   row->SetTuple(1, nullptr);
   row->SetTuple(2, nullptr);
   EXPECT_EQ(tuple_null_indicator_bytes + tuple_descs[0]->byte_size(),
-      stream.ComputeRowSize(row.get()));
+      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   // Tuples are initialized to empty and have no var-len data.
   row->SetTuple(1, tuple1.get());
   row->SetTuple(2, tuple2.get());
   EXPECT_EQ(tuple_null_indicator_bytes + string_desc_->GetRowSize(),
-      stream.ComputeRowSize(row.get()));
+      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   // Tuple 0 has some data.
   const SlotDescriptor* string_slot = tuple_descs[0]->slots()[0];
   StringValue* sv = tuple0->GetStringSlot(string_slot->tuple_offset());
   *sv = STRINGS[0];
+  sv->Smallify();
   int64_t expected_len =
-      tuple_null_indicator_bytes + string_desc_->GetRowSize() + sv->len;
-  EXPECT_EQ(expected_len, stream.ComputeRowSize(row.get()));
+      tuple_null_indicator_bytes + string_desc_->GetRowSize() +
+      (sv->IsSmall() ? 0 : sv->Len());
+  EXPECT_EQ(expected_len, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   // Check that external slots aren't included in count.
   sv = tuple1->GetStringSlot(external_string_slot->tuple_offset());
-  sv->ptr = reinterpret_cast<char*>(1234);
-  sv->len = 1234;
-  EXPECT_EQ(expected_len, stream.ComputeRowSize(row.get()));
+  sv->Assign(reinterpret_cast<char*>(1234), 1234);
+  EXPECT_EQ(expected_len, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
@@ -2047,12 +2050,12 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
       array_data->SetNotNull(item_desc->slots()[0]->null_indicator_offset());
       RawValue::Write(string, array_data, item_desc->slots()[0], mem_pool_.get());
       array_data += item_desc->byte_size();
-      expected_row_size += string->len;
+      expected_row_size += string->Len();
     }
     builder.CommitTuples(array_len);
 
     // Check that internal row size computation gives correct result.
-    EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
+    EXPECT_EQ(expected_row_size, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
     bool b = stream.AddRow(row.get(), &status);
     ASSERT_TRUE(b);
     ASSERT_OK(status);
@@ -2101,7 +2104,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
-/// Test that ComputeRowSize handles nulls
+/// Test that ComputeRowSizeAndSmallifyStrings handles nulls
 TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   Init(BUFFER_POOL_LIMIT);
   const vector<TupleDescriptor*>& tuple_descs = array_desc_->tuple_descriptors();
@@ -2126,13 +2129,14 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   // All tuples are NULL - only need null indicators.
   row->SetTuple(0, nullptr);
   row->SetTuple(1, nullptr);
-  EXPECT_EQ(tuple_null_indicator_bytes, stream.ComputeRowSize(row.get()));
+  EXPECT_EQ(tuple_null_indicator_bytes,
+      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   // Tuples are initialized to empty and have no var-len data.
   row->SetTuple(0, tuple0.get());
   row->SetTuple(1, tuple1.get());
   EXPECT_EQ(tuple_null_indicator_bytes + array_desc_->GetRowSize(),
-      stream.ComputeRowSize(row.get()));
+      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   // Tuple 0 has an array.
   int expected_row_size = tuple_null_indicator_bytes + array_desc_->GetRowSize();
@@ -2153,22 +2157,22 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
     array_data->SetNotNull(item_desc->slots()[0]->null_indicator_offset());
     RawValue::Write(str, array_data, item_desc->slots()[0], mem_pool_.get());
     array_data += item_desc->byte_size();
-    expected_row_size += str->len;
+    expected_row_size += str->Len();
   }
   builder.CommitTuples(array_len);
-  EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
+  EXPECT_EQ(expected_row_size, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   // Check that the external slot isn't included in size.
   cv = tuple0->GetCollectionSlot(external_array_slot->tuple_offset());
   // ptr of external slot shouldn't be dereferenced when computing size.
   cv->ptr = reinterpret_cast<uint8_t*>(1234);
   cv->num_tuples = 1234;
-  EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
+  EXPECT_EQ(expected_row_size, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   // Check that the array is excluded if tuple 0's array has its null indicator set.
   tuple0->SetNull(array_slot->null_indicator_offset());
   EXPECT_EQ(tuple_null_indicator_bytes + array_desc_->GetRowSize(),
-      stream.ComputeRowSize(row.get()));
+      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
 
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }

@@ -1086,16 +1086,16 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
       Tuple* row = batch->GetRow(row_idx)->GetTuple(0);
       StringValue* filename_value = row->GetStringSlot(0);
       DCHECK(filename_value != nullptr);
-
-      if (filename_value->ptr == prev_filename_ptr) {
+      StringValue::SimpleString filename_value_ss = filename_value->ToSimpleString();
+      if (filename_value_ss.ptr == prev_filename_ptr) {
         // If the filename pointer is the same as the previous one then we can instantly
         // send the row to the same channels as the previous row.
         DCHECK(skipped_prev_row || !prev_channels.empty());
         for (Channel* ch : prev_channels) RETURN_IF_ERROR(ch->AddRow(tuple_row));
         continue;
       }
-      prev_filename_ptr = filename_value->ptr;
-      string filename(filename_value->ptr, filename_value->len);
+      prev_filename_ptr = filename_value_ss.ptr;
+      string filename(filename_value_ss.ptr, filename_value_ss.len);
 
       const auto filepath_to_hosts_it = filepath_to_hosts_.find(filename);
       if (filepath_to_hosts_it == filepath_to_hosts_.end()) {

@@ -136,7 +136,7 @@ static void SetTColumnValue(
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       const StringValue* string_val = reinterpret_cast<const StringValue*>(value);
-      tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
+      tmp.assign(string_val->Ptr(), string_val->Len());
       col_val->binary_val.swap(tmp);
       col_val->__isset.binary_val = true;
       break;
@@ -256,9 +256,9 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
     if (type.IsVarLenStringType()) {
       const StringValue* string_val = reinterpret_cast<const StringValue*>(result);
       if (string_val != nullptr) {
-        if (string_val->len > max_result_size) {
+        if (string_val->Len() > max_result_size) {
           status = Status(TErrorCode::EXPR_REWRITE_RESULT_LIMIT_EXCEEDED,
-              string_val->len, max_result_size);
+              string_val->Len(), max_result_size);
           goto error;
         }
       }

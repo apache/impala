@@ -414,7 +414,7 @@ inline int ParquetPlainEncoder::ByteSize(const int16_t& v) { return sizeof(int32
 
 template <>
 inline int ParquetPlainEncoder::ByteSize(const StringValue& v) {
-  return sizeof(int32_t) + v.len;
+  return sizeof(int32_t) + v.Len();
 }
 
 template <>
@@ -557,8 +557,9 @@ inline int ParquetPlainEncoder::Encode(
 template <>
 inline int ParquetPlainEncoder::Encode(
     const StringValue& v, int fixed_len_size, uint8_t* buffer) {
-  memcpy(buffer, &v.len, sizeof(int32_t));
-  memcpy(buffer + sizeof(int32_t), v.ptr, v.len);
+  StringValue::SimpleString s = v.ToSimpleString();
+  memcpy(buffer, &s.len, sizeof(int32_t));
+  memcpy(buffer + sizeof(int32_t), s.ptr, s.len);
   return ByteSize(v);
 }
 
@@ -567,11 +568,13 @@ inline int ParquetPlainEncoder::Decode<StringValue, parquet::Type::BYTE_ARRAY>(
     const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
     StringValue* v) {
   if (UNLIKELY(buffer_end - buffer < sizeof(int32_t))) return -1;
-  memcpy(&v->len, buffer, sizeof(int32_t));
+  int str_len;
+  memcpy(&str_len, buffer, sizeof(int32_t));
+  v->Assign(reinterpret_cast<char*>(const_cast<uint8_t*>(buffer)) + sizeof(int32_t),
+      str_len);
   int byte_size = ByteSize(*v);
-  if (UNLIKELY(v->len < 0 || buffer_end - buffer < byte_size)) return -1;
-  v->ptr = reinterpret_cast<char*>(const_cast<uint8_t*>(buffer)) + sizeof(int32_t);
-  if (fixed_len_size > 0) v->len = std::min(v->len, fixed_len_size);
+  if (UNLIKELY(str_len < 0 || buffer_end - buffer < byte_size)) return -1;
+  if (fixed_len_size > 0 && fixed_len_size < str_len) v->SetLen(fixed_len_size);
   // we still read byte_size bytes, even if we truncate
   return byte_size;
 }

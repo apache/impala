@@ -75,16 +75,14 @@ IR_ALWAYS_INLINE void* ScalarExprEvaluator::StoreResult(const AnyVal& val,
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       const StringVal& v = reinterpret_cast<const StringVal&>(val);
-      result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
-      result_.string_val.len = v.len;
+      result_.string_val.Assign(reinterpret_cast<char*>(v.ptr), v.len);
       return &result_.string_val;
     }
     case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE: {
       const StringVal& v = reinterpret_cast<const StringVal&>(val);
-      result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
-      result_.string_val.len = v.len;
-      return result_.string_val.ptr;
+      result_.string_val.Assign(reinterpret_cast<char*>(v.ptr), v.len);
+      return result_.string_val.Ptr();
     }
     case TYPE_TIMESTAMP: {
       const TimestampVal& v = reinterpret_cast<const TimestampVal&>(val);

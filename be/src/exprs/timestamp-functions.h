@@ -41,7 +41,7 @@ using impala_udf::DecimalVal;
 
 class Expr;
 class OpcodeRegistry;
-struct StringValue;
+class StringValue;
 class TimestampValue;
 class TupleRow;
 

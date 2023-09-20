@@ -522,28 +522,30 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
   // No match?  Skip everything.
   if (match_pos < 0) return str;
 
+  StringValue::SimpleString haystack_s = haystack.ToSimpleString();
+
   DCHECK_GT(pattern.len, 0);
-  DCHECK_GE(haystack.len, pattern.len);
+  DCHECK_GE(haystack_s.len, pattern.len);
   int buffer_space;
   const int delta = replace.len - pattern.len;
   // MAX_LENGTH is unsigned, so convert back to int to do correctly signed compare
   DCHECK_LE(delta, static_cast<int>(StringVal::MAX_LENGTH) - 1);
-  if ((delta > 0 && delta < 128) && haystack.len <= 128) {
+  if ((delta > 0 && delta < 128) && haystack_s.len <= 128) {
     // Quick estimate for potential matches - this heuristic is needed to win
     // over regexp_replace on expanding patterns.  128 is arbitrarily chosen so
     // we can't massively over-estimate the buffer size.
     int matches_possible = 0;
     char c = pattern.ptr[0];
-    for (int i = 0; i <= haystack.len - pattern.len; ++i) {
-      if (haystack.ptr[i] == c) ++matches_possible;
+    for (int i = 0; i <= haystack_s.len - pattern.len; ++i) {
+      if (haystack_s.ptr[i] == c) ++matches_possible;
     }
-    buffer_space = haystack.len + matches_possible * delta;
+    buffer_space = haystack_s.len + matches_possible * delta;
   } else {
     // Note - cannot overflow because pattern.len is at least one
     static_assert(StringVal::MAX_LENGTH - 1 + StringVal::MAX_LENGTH <=
         std::numeric_limits<decltype(buffer_space)>::max(),
         "Buffer space computation can overflow");
-    buffer_space = haystack.len + delta;
+    buffer_space = haystack_s.len + delta;
   }
 
   StringVal result(context, buffer_space);
@@ -552,10 +554,10 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
 
   uint8_t* ptr = result.ptr;
   int consumed = 0;
-  while (match_pos + pattern.len <= haystack.len) {
+  while (match_pos + pattern.len <= haystack_s.len) {
     // Copy in original string
     const int unmatched_bytes = match_pos - consumed;
-    memcpy(ptr, &haystack.ptr[consumed], unmatched_bytes);
+    memcpy(ptr, &haystack_s.ptr[consumed], unmatched_bytes);
     DCHECK_LE(ptr - result.ptr + unmatched_bytes, buffer_space);
     ptr += unmatched_bytes;
 
@@ -577,7 +579,7 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
     // If we had an enlarging pattern, we may need more space
     if (delta > 0) {
       const int bytes_produced = ptr - result.ptr;
-      const int bytes_remaining = haystack.len - consumed;
+      const int bytes_remaining = haystack_s.len - consumed;
       DCHECK_LE(bytes_produced, StringVal::MAX_LENGTH);
       DCHECK_LE(bytes_remaining, StringVal::MAX_LENGTH - 1);
       // Note: by above, cannot overflow
@@ -610,10 +612,10 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
   }
 
   // Copy in remainder and re-adjust size
-  const int bytes_remaining = haystack.len - consumed;
+  const int bytes_remaining = haystack_s.len - consumed;
   result.len = ptr - result.ptr + bytes_remaining;
   DCHECK_LE(result.len, buffer_space);
-  memcpy(ptr, &haystack.ptr[consumed], bytes_remaining);
+  memcpy(ptr, &haystack_s.ptr[consumed], bytes_remaining);
 
   return result;
 }
@@ -803,7 +805,9 @@ IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
 
   bool utf8_mode = context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE);
   StringValue haystack = StringValue::FromStringVal(str);
+  StringValue::SimpleString haystack_s = haystack.ToSimpleString();
   StringValue needle = StringValue::FromStringVal(substr);
+  StringValue::SimpleString needle_s = needle.ToSimpleString();
   StringSearch search(&needle);
   int match_pos = -1;
   if (start_position.val > 0) {
@@ -812,9 +816,9 @@ IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
     if (utf8_mode) {
       search_start_pos = FindUtf8PosForward(str.ptr, str.len, search_start_pos);
     }
-    if (search_start_pos >= haystack.len) return IntVal(0);
+    if (search_start_pos >= haystack_s.len) return IntVal(0);
     for (int match_num = 0; match_num < occurrence.val; ++match_num) {
-      DCHECK_LE(search_start_pos, haystack.len);
+      DCHECK_LE(search_start_pos, haystack_s.len);
       StringValue haystack_substring = haystack.Substring(search_start_pos);
       int match_pos_in_substring = search.Search(&haystack_substring);
       if (match_pos_in_substring < 0) return IntVal(0);
@@ -825,17 +829,17 @@ IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
     // A negative starting position indicates searching from the right.
     int search_start_pos = utf8_mode ?
         FindUtf8PosBackward(str.ptr, str.len, -start_position.val - 1) :
-        haystack.len + start_position.val;
+        haystack_s.len + start_position.val;
     // The needle must fit between search_start_pos and the end of the string
-    if (search_start_pos + needle.len > haystack.len) {
-      search_start_pos = haystack.len - needle.len;
+    if (search_start_pos + needle_s.len > haystack_s.len) {
+      search_start_pos = haystack_s.len - needle_s.len;
     }
     if (search_start_pos < 0) return IntVal(0);
     for (int match_num = 0; match_num < occurrence.val; ++match_num) {
-      DCHECK_GE(search_start_pos + needle.len, 0);
-      DCHECK_LE(search_start_pos + needle.len, haystack.len);
+      DCHECK_GE(search_start_pos + needle_s.len, 0);
+      DCHECK_LE(search_start_pos + needle_s.len, haystack_s.len);
       StringValue haystack_substring =
-          haystack.Substring(0, search_start_pos + needle.len);
+          haystack.Substring(0, search_start_pos + needle_s.len);
       match_pos = search.RSearch(&haystack_substring);
       if (match_pos < 0) return IntVal(0);
       search_start_pos = match_pos - 1;

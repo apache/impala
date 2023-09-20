@@ -65,16 +65,15 @@ void DataProvider::SetSeed(int seed) {
 void RandString(MemPool* pool, StringValue* result,
     const StringValue& min, const StringValue& max, double r,
     variate_generator<minstd_rand&, uniform_real<>>& rand) {
-  int min_len = min.len;
-  int max_len = max.len;
+  int min_len = min.Len();
+  int max_len = max.Len();
   int len = r * (max_len - min_len) + min_len;
   char* ptr = reinterpret_cast<char*>(pool->Allocate(len));
-  result->len = len;
-  result->ptr = ptr;
+  result->Assign(ptr, len);
 
   for (int i = 0; i < len; ++i) {
-    int min_char = i < min_len ? min.ptr[i] : 'a';
-    int max_char = (i < max_len ? max.ptr[i] : 'z') + 1;
+    int min_char = i < min_len ? min.Ptr()[i] : 'a';
+    int max_char = (i < max_len ? max.Ptr()[i] : 'z') + 1;
     ptr[i] = rand() * (max_char - min_char) + min_char;
   }
 }

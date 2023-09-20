@@ -65,8 +65,7 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
       int len = strlen(filename);
       char* filename_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
       Ubsan::MemCpy(filename_copy, filename, len);
-      slot->ptr = filename_copy;
-      slot->len = len;
+    slot->Assign(filename_copy, len);
       template_tuple->SetNotNull(slot_desc->null_indicator_offset());
     } else if (slot_desc->virtual_column_type() ==
         TVirtualColumnType::ICEBERG_DATA_SEQUENCE_NUMBER) {
@@ -191,8 +190,7 @@ void FileMetadataUtils::AddVirtualIcebergColumn(MemPool* mem_pool, Tuple* templa
     int len = partitions.length();
     char* partition_serialized_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
     Ubsan::MemCpy(partition_serialized_copy, partitions.c_str(), len);
-    slot->ptr = partition_serialized_copy;
-    slot->len = len;
+    slot->Assign(partition_serialized_copy, len);
     template_tuple->SetNotNull(slot_desc->null_indicator_offset());
   }
 }

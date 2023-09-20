@@ -76,7 +76,8 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc,
         buffer_len = out_len;
       }
 
-      StringValue str;
+      StringValue::SimpleString str;
+      str.ptr = nullptr;
       str.len = std::min(buffer_len, len);
       if (reuse_data) {
         str.ptr = const_cast<char*>(data);
@@ -92,7 +93,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc,
         str.ptr = type.IsVarLenStringType() ?
             reinterpret_cast<char*>(pool->TryAllocateUnaligned(buffer_len)) :
             reinterpret_cast<char*>(slot);
-        if (UNLIKELY(str.ptr == NULL)) return false;
+        if (UNLIKELY(str.ptr == nullptr)) return false;
         if (base64_decode) {
           int64_t out_len;
           if(!Base64Decode(data, len, buffer_len, str.ptr, &out_len)) return false;
@@ -108,6 +109,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc,
           memcpy(str.ptr, data, str.len);
         }
       }
+      DCHECK_NE(str.ptr, nullptr);
 
       if (type.type == TYPE_CHAR) {
         StringValue::PadWithSpaces(str.ptr, buffer_len, str.len);
@@ -116,7 +118,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc,
       // write back to the slot, if !IsVarLenStringType() we already wrote to the slot
       if (type.IsVarLenStringType()) {
         StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
-        *str_slot = str;
+        str_slot->Assign(str.ptr, str.len);
       }
       break;
     }

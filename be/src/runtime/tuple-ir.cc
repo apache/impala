@@ -27,17 +27,21 @@ bool Tuple::CopyStrings(const char* err_ctx, RuntimeState* state,
   int64_t total_len = 0;
   for (int i = 0; i < num_string_slots; ++i) {
     if (IsNull(string_slot_offsets[i].null_indicator_offset)) continue;
-    total_len += GetStringSlot(string_slot_offsets[i].tuple_offset)->len;
+    StringValue* sv = GetStringSlot(string_slot_offsets[i].tuple_offset);
+    if (sv->IsSmall()) continue;
+    total_len += sv->Len();
   }
   char* buf = AllocateStrings(err_ctx, state, total_len, pool, status);
   if (UNLIKELY(buf == nullptr)) return false;
   for (int i = 0; i < num_string_slots; ++i) {
     if (IsNull(string_slot_offsets[i].null_indicator_offset)) continue;
     StringValue* sv = GetStringSlot(string_slot_offsets[i].tuple_offset);
-    int str_len = sv->len;
-    memcpy(buf, sv->ptr, str_len);
-    sv->ptr = buf;
-    buf += str_len;
+    if (sv->IsSmall()) continue;
+    StringValue::SimpleString s = sv->ToSimpleString();
+    if (s.len == 0) continue;
+    memcpy(buf, s.ptr, s.len);
+    sv->SetPtr(buf);
+    buf += s.len;
   }
   return true;
 }

@@ -34,7 +34,7 @@ class LlvmCodeGen;
 class MemPool;
 class SlotDescriptor;
 class Status;
-struct StringValue;
+class StringValue;
 class Tuple;
 class TupleDescriptor;
 

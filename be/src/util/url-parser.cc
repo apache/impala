@@ -44,8 +44,7 @@ const StringSearch UrlParser::question_search(&question);
 const StringSearch UrlParser::hash_search(&hash);
 
 bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* result) {
-  result->ptr = NULL;
-  result->len = 0;
+  result->Clear();
   // Remove leading and trailing spaces.
   StringValue trimmed_url = url.Trim();
 
@@ -53,7 +52,7 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
   int32_t protocol_pos = protocol_search.Search(&trimmed_url);
   if (protocol_pos < 0) return false;
   // Positioned to first char after '://'.
-  StringValue protocol_end = trimmed_url.Substring(protocol_pos + protocol.len);
+  StringValue protocol_end = trimmed_url.Substring(protocol_pos + protocol.Len());
 
   // Find the end of the authority. The authority ends at the first '/' or '?'.
   int32_t auth_end_pos = -1;
@@ -117,7 +116,7 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
         at_pos = 0;
       } else {
         // Skip '@'.
-        at_pos += at.len;
+        at_pos += at.Len();
       }
       StringValue host_and_port = authority.Substring(at_pos);
 
@@ -139,7 +138,7 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
         // Indicate no query was found.
         return false;
       }
-      StringValue query_start = protocol_end.Substring(start_pos + question.len);
+      StringValue query_start = protocol_end.Substring(start_pos + question.Len());
       // End string at next '#'.
       int32_t end_pos = hash_search.Search(&query_start);
       *result = query_start.Substring(0, end_pos);
@@ -153,7 +152,7 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
         // Indicate no user and pass were given.
         return false;
       }
-      *result = protocol_end.Substring(start_pos + hash.len);
+      *result = protocol_end.Substring(start_pos + hash.Len());
       break;
     }
 
@@ -184,7 +183,7 @@ bool UrlParser::ParseUrlKey(const StringValue& url, UrlPart part,
 
   // Search for the key in the url, ignoring malformed URLs for now.
   StringSearch key_search(&key);
-  while(trimmed_url.len > 0) {
+  while(trimmed_url.Len() > 0) {
     // Search for the key in the current substring.
     int32_t key_pos = key_search.Search(&trimmed_url);
     bool match = true;
@@ -194,25 +193,26 @@ bool UrlParser::ParseUrlKey(const StringValue& url, UrlPart part,
     // Key pos must be != 0 because it must be preceded by a '?' or a '&'.
     // Check that the char before key_pos is either '?' or '&'.
     if (key_pos == 0 ||
-        (trimmed_url.ptr[key_pos - 1] != '?' && trimmed_url.ptr[key_pos - 1] != '&')) {
+        (trimmed_url.Ptr()[key_pos - 1] != '?' &&
+         trimmed_url.Ptr()[key_pos - 1] != '&')) {
       match = false;
     }
     // Advance substring beyond matching key.
-    trimmed_url = trimmed_url.Substring(key_pos + key.len);
+    trimmed_url = trimmed_url.Substring(key_pos + key.Len());
     if (!match) {
       continue;
     }
-    if (trimmed_url.len <= 0) {
+    if (trimmed_url.Len() <= 0) {
       break;
     }
     // Next character must be '=', otherwise the match cannot be a key in the query part.
-    if (trimmed_url.ptr[0] != '=') {
+    if (trimmed_url.Ptr()[0] != '=') {
       continue;
     }
     int32_t pos = 1;
     // Find ending position of key's value by matching '#' or '&'.
-    while(pos < trimmed_url.len) {
-      switch(trimmed_url.ptr[pos]) {
+    while(pos < trimmed_url.Len()) {
+      switch(trimmed_url.Ptr()[pos]) {
         case '#':
         case '&':
           *result = trimmed_url.Substring(1, pos - 1);
@@ -230,7 +230,7 @@ bool UrlParser::ParseUrlKey(const StringValue& url, UrlPart part,
 UrlParser::UrlPart UrlParser::GetUrlPart(const StringValue& part) {
   // Quick filter on requested URL part, based on first character.
   // Hive requires the requested URL part to be all upper case.
-  switch(part.ptr[0]) {
+  switch(part.Ptr()[0]) {
     case 'A': {
       if (!part.Eq(url_authority)) return INVALID;
       return AUTHORITY;

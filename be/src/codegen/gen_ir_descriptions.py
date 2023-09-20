@@ -246,6 +246,12 @@ ir_functions = [
   ["HIVE_UDF_CALL_CALL_JAVA",
    "_ZN6impala11HiveUdfCall22CallJavaAndStoreResultEPKNS_10ColumnTypeEPN10impala_udf15FunctionContextEPNS0_10JniContextE"],
 
+  ["STRING_VALUE_PTR", "_ZNK6impala11StringValue5IrPtrEv"],
+  ["STRING_VALUE_LEN", "_ZNK6impala11StringValue5IrLenEv"],
+  ["STRING_VALUE_SETLEN", "_ZN6impala11StringValue8IrSetLenEi"],
+  ["STRING_VALUE_ASSIGN", "_ZN6impala11StringValue8IrAssignEPci"],
+  ["STRING_VALUE_CLEAR", "_ZN6impala11StringValue7IrClearEv"],
+
   ["BOOL_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala16BoolMinMaxFilter10AlwaysTrueEv"],
   ["TINYINT_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala19TinyIntMinMaxFilter10AlwaysTrueEv"],
   ["SMALLINT_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala20SmallIntMinMaxFilter10AlwaysTrueEv"],

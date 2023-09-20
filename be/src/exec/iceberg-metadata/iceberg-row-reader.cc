@@ -158,8 +158,7 @@ Status IcebergRowReader::WriteStringSlot(JNIEnv* env, jobject accessed_value, vo
     return tuple_data_pool->mem_tracker()->MemLimitExceeded(nullptr, details, str_len);
   }
   memcpy(buffer, str_guard.get(), str_len);
-  reinterpret_cast<StringValue*>(slot)->ptr = buffer;
-  reinterpret_cast<StringValue*>(slot)->len = str_len;
+  reinterpret_cast<StringValue*>(slot)->Assign(buffer, str_len);
   return Status::OK();
 }
 

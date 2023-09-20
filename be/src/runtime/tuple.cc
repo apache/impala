@@ -63,7 +63,9 @@ int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc) const {
     DCHECK((*slot)->type().IsVarLenStringType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
     const StringValue* string_val = GetStringSlot((*slot)->tuple_offset());
-    result += string_val->len;
+    // Small strings don't require extra storage space in the varlen section.
+    if (string_val->IsSmall()) continue;
+    result += string_val->Len();
   }
 
   slot = desc.collection_slots().begin();
@@ -81,6 +83,19 @@ int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc) const {
   return result;
 }
 
+inline void Tuple::SmallifyStrings(const TupleDescriptor& desc) {
+  for (const SlotDescriptor* slot : desc.string_slots()) {
+    DCHECK(slot->type().IsVarLenStringType());
+    if (IsNull(slot->null_indicator_offset())) continue;
+    StringValue* string_v = GetStringSlot(slot->tuple_offset());
+    // StringValues are only smallified on a on-demand basis. And we only smallify
+    // them in batches for whole tuples. I.e. if we encounter the first small string
+    // in a tuple we can assume that the rest of the strings are already smallified.
+    if (string_v->IsSmall()) return;
+    string_v->Smallify();
+  }
+}
+
 Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
   Tuple* result = reinterpret_cast<Tuple*>(pool->Allocate(desc.byte_size()));
   DeepCopy(result, desc, pool);
@@ -91,8 +106,13 @@ Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
 // memory is allocated - can we templatise it somehow to avoid redundancy without runtime
 // overhead.
 void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) {
-  memcpy(dst, this, desc.byte_size());
-  if (desc.HasVarlenSlots()) dst->DeepCopyVarlenData(desc, pool);
+  if (desc.HasVarlenSlots()) {
+    SmallifyStrings(desc);
+    memcpy(dst, this, desc.byte_size());
+    dst->DeepCopyVarlenData(desc, pool);
+  } else {
+    memcpy(dst, this, desc.byte_size());
+  }
 }
 
 void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
@@ -102,9 +122,10 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
     DCHECK((*slot)->type().IsVarLenStringType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
     StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
-    char* string_copy = reinterpret_cast<char*>(pool->Allocate(string_v->len));
-    Ubsan::MemCpy(string_copy, string_v->ptr, string_v->len);
-    string_v->ptr = string_copy;
+    if (string_v->IsSmall()) continue;
+    char* string_copy = reinterpret_cast<char*>(pool->Allocate(string_v->Len()));
+    Ubsan::MemCpy(string_copy, string_v->Ptr(), string_v->Len());
+    string_v->SetPtr(string_copy);
   }
 
   for (vector<SlotDescriptor*>::const_iterator slot = desc.collection_slots().begin();
@@ -144,10 +165,12 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* of
     if (IsNull((*slot)->null_indicator_offset())) continue;
 
     StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
-    Ubsan::MemCpy(*data, string_v->ptr, string_v->len);
-    string_v->ptr = convert_ptrs ? reinterpret_cast<char*>(*offset) : *data;
-    *data += string_v->len;
-    *offset += string_v->len;
+    if (string_v->IsSmall()) continue;
+    unsigned int len = string_v->Len();
+    Ubsan::MemCpy(*data, string_v->Ptr(), len);
+    string_v->SetPtr(convert_ptrs ? reinterpret_cast<char*>(*offset) : *data);
+    *data += len;
+    *offset += len;
   }
 
   slot = desc.collection_slots().begin();
@@ -183,8 +206,9 @@ void Tuple::ConvertOffsetsToPointers(const TupleDescriptor& desc, uint8_t* tuple
     if (IsNull((*slot)->null_indicator_offset())) continue;
 
     StringValue* string_val = GetStringSlot((*slot)->tuple_offset());
-    int offset = reinterpret_cast<intptr_t>(string_val->ptr);
-    string_val->ptr = reinterpret_cast<char*>(tuple_data + offset);
+    if (string_val->IsSmall()) continue;
+    int offset = reinterpret_cast<intptr_t>(string_val->Ptr());
+    string_val->SetPtr(reinterpret_cast<char*>(tuple_data + offset));
   }
 
   slot = desc.collection_slots().begin();
@@ -241,7 +265,8 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
     if (string_values.size() > 0) {
       for (StringValue* string_val : string_values) {
         *(non_null_string_values++) = string_val;
-        *total_varlen_lengths += string_val->len;
+        if (string_val->IsSmall()) continue;
+        *total_varlen_lengths += string_val->Len();
       }
       (*num_non_null_string_values) += string_values.size();
     }

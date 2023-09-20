@@ -576,7 +576,7 @@ int GroupingAggregator::GroupingExprsVarlenSize() {
   for (int expr_idx : string_grouping_exprs_) {
     StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->ExprValue(expr_idx));
     // Avoid branching by multiplying length by null bit.
-    varlen_size += sv->len * !ht_ctx_->ExprValueNull(expr_idx);
+    varlen_size += sv->Len() * !ht_ctx_->ExprValueNull(expr_idx);
   }
   return varlen_size;
 }
@@ -603,9 +603,10 @@ void GroupingAggregator::CopyGroupingValues(
     // ptr and len were already copied to the fixed-len part of string value
     StringValue* sv = reinterpret_cast<StringValue*>(
         intermediate_tuple->GetSlot(slot_desc->tuple_offset()));
-    memcpy(buffer, sv->ptr, sv->len);
-    sv->ptr = reinterpret_cast<char*>(buffer);
-    buffer += sv->len;
+    if (sv->IsSmall()) continue;
+    memcpy(buffer, sv->Ptr(), sv->Len());
+    sv->SetPtr(reinterpret_cast<char*>(buffer));
+    buffer += sv->Len();
   }
 }
 

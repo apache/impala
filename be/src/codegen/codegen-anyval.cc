@@ -1072,21 +1072,34 @@ void CodegenAnyVal::StructChildToReadWriteInfo(
   switch (type.type) {
     case TYPE_STRING:
     case TYPE_VARCHAR:
-    case TYPE_CHAR:
-    case TYPE_ARRAY: // CollectionVal has the same memory layout as StringVal.
-    case TYPE_MAP: { // CollectionVal has the same memory layout as StringVal.
-      llvm::Value* ptr_addr = builder->CreateStructGEP(
-          nullptr, cast_child_ptr, 0, "ptr_addr");
-      llvm::Value* ptr = builder->CreateLoad(ptr_addr, "ptr");
+    case TYPE_CHAR: {
+      llvm::Function* str_ptr_fn = codegen->GetFunction(
+            IRFunction::STRING_VALUE_PTR, false);
+      llvm::Value* ptr = builder->CreateCall(str_ptr_fn,
+            llvm::ArrayRef<llvm::Value*>({cast_child_ptr}), "ptr");
 
       llvm::Value* len;
       if (type.type == TYPE_CHAR) {
         len = codegen->GetI32Constant(type.len);
       } else {
-        llvm::Value* len_addr = builder->CreateStructGEP(
-            nullptr, cast_child_ptr, 1, "len_addr");
-        len = builder->CreateLoad(len_addr, "len");
+        llvm::Function* str_len_fn = codegen->GetFunction(
+            IRFunction::STRING_VALUE_LEN, false);
+        len = builder->CreateCall(str_len_fn,
+            llvm::ArrayRef<llvm::Value*>({cast_child_ptr}), "len");
       }
+      read_write_info->SetPtrAndLen(ptr, len);
+      break;
+    }
+    case TYPE_ARRAY:
+    case TYPE_MAP: { // Arrays and maps have the same memory layout.
+      llvm::Value* ptr_addr = builder->CreateStructGEP(
+          nullptr, cast_child_ptr, 0, "ptr_addr");
+      llvm::Value* ptr = builder->CreateLoad(ptr_addr, "ptr");
+
+      llvm::Value* len;
+      llvm::Value* len_addr = builder->CreateStructGEP(
+          nullptr, cast_child_ptr, 1, "len_addr");
+      len = builder->CreateLoad(len_addr, "len");
       read_write_info->SetPtrAndLen(ptr, len);
       break;
     }

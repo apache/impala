@@ -101,7 +101,8 @@ Status SpillableRowBatchQueue::AddBatch(RowBatch* batch) {
         DCHECK(false) << Substitute("Row with a size of $0 should be added successfully "
                                     "in unpinned mode unless an error occurred. "
                                     "batch_queue_: $1",
-            PrettyPrinter::PrintBytes(batch_queue_->ComputeRowSize(batch_itr.Get())),
+            PrettyPrinter::PrintBytes(
+                batch_queue_->ComputeRowSizeAndSmallifyStrings(batch_itr.Get())),
             batch_queue_->DebugString());
       }
     }

@@ -250,7 +250,7 @@ class Sorter::Run {
   /// are returned in 'string_values' and collections are returned, along with their byte
   /// size, in 'collection_values'. The total length of all var-len values is returned in
   /// 'total_var_len'.
-  void CollectNonNullVarSlots(
+  void CollectNonNullNonSmallVarSlots(
       Tuple* src, vector<StringValue*>* string_values,
       std::vector<CollValueAndSize>* collection_values,
       int* total_var_len);

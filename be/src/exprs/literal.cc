@@ -94,7 +94,7 @@ Literal::Literal(const TExprNode& node)
       DCHECK(node.__isset.string_literal);
       value_.Init(node.string_literal.value);
       if (type_.type == TYPE_VARCHAR) {
-        value_.string_val.len = min(type_.len, value_.string_val.len);
+        value_.string_val.SetLen(min(type_.len, value_.string_val.Len()));
       }
       break;
     }
@@ -420,9 +420,9 @@ Status Literal::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** 
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_CHAR:
-      v.SetLen(builder.getInt32(value_.string_val.len));
+      v.SetLen(builder.getInt32(value_.string_val.Len()));
       v.SetPtr(codegen->GetStringConstant(
-          &builder, value_.string_val.ptr, value_.string_val.len));
+          &builder, value_.string_val.Ptr(), value_.string_val.Len()));
       break;
     case TYPE_DECIMAL:
       switch (type().GetByteSize()) {

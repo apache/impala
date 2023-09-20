@@ -45,23 +45,27 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
 }
 
 inline int StringValue::Compare(const StringValue& other) const {
-  int l = std::min(len, other.len);
+  SimpleString this_s = ToSimpleString();
+  SimpleString other_s = other.ToSimpleString();
+  int l = std::min(this_s.len, other_s.len);
   if (l == 0) {
-    if (len == other.len) {
+    if (this_s.len == other_s.len) {
       return 0;
-    } else if (len == 0) {
+    } else if (this_s.len == 0) {
       return -1;
     } else {
-      DCHECK_EQ(other.len, 0);
+      DCHECK_EQ(other_s.len, 0);
       return 1;
     }
   }
-  return StringCompare(this->ptr, this->len, other.ptr, other.len, l);
+  return StringCompare(this_s.ptr, this_s.len, other_s.ptr, other_s.len, l);
 }
 
 inline bool StringValue::Eq(const StringValue& other) const {
-  if (this->len != other.len) return false;
-  return StringCompare(this->ptr, this->len, other.ptr, other.len, this->len) == 0;
+  SimpleString this_s = ToSimpleString();
+  SimpleString other_s = other.ToSimpleString();
+  if (this_s.len != other_s.len) return false;
+  return StringCompare(this_s.ptr, this_s.len, other_s.ptr, other_s.len, this_s.len) == 0;
 }
 
 inline bool StringValue::operator==(const StringValue& other) const {
@@ -109,24 +113,28 @@ inline bool StringValue::operator>(const StringValue& other) const {
 }
 
 inline StringValue StringValue::Substring(int start_pos) const {
-  return StringValue(ptr + start_pos, len - start_pos);
+  SimpleString this_s = ToSimpleString();
+  return StringValue(this_s.ptr + start_pos, this_s.len - start_pos);
 }
 
 inline StringValue StringValue::Substring(int start_pos, int new_len) const {
-  return StringValue(ptr + start_pos, (new_len < 0) ? (len - start_pos) : new_len);
+  SimpleString this_s = ToSimpleString();
+  return StringValue(this_s.ptr + start_pos,
+      (new_len < 0) ? (this_s.len - start_pos) : new_len);
 }
 
 inline StringValue StringValue::Trim() const {
+  SimpleString this_s = ToSimpleString();
   // Remove leading and trailing spaces.
   int32_t begin = 0;
-  while (begin < len && ptr[begin] == ' ') {
+  while (begin < this_s.len && this_s.ptr[begin] == ' ') {
     ++begin;
   }
-  int32_t end = len - 1;
-  while (end > begin && ptr[end] == ' ') {
+  int32_t end = this_s.len - 1;
+  while (end > begin && this_s.ptr[end] == ' ') {
     --end;
   }
-  return StringValue(ptr + begin, end - begin + 1);
+  return StringValue(this_s.ptr + begin, end - begin + 1);
 }
 
 inline void StringValue::PadWithSpaces(char* cptr, int64_t cptr_len, int64_t num_chars) {

@@ -699,9 +699,18 @@ void SlotDescriptor::CodegenLoadAnyVal(CodegenAnyVal* any_val, llvm::Value* raw_
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       // Convert StringValue to StringVal
-      llvm::Value* string_value = builder->CreateLoad(raw_val_ptr, "string_value");
-      any_val->SetPtr(builder->CreateExtractValue(string_value, 0, "ptr"));
-      any_val->SetLen(builder->CreateExtractValue(string_value, 1, "len"));
+      llvm::Function* str_ptr_fn = codegen->GetFunction(
+          IRFunction::STRING_VALUE_PTR, false);
+      llvm::Function* str_len_fn = codegen->GetFunction(
+          IRFunction::STRING_VALUE_LEN, false);
+
+      llvm::Value* ptr = builder->CreateCall(str_ptr_fn,
+          llvm::ArrayRef<llvm::Value*>({raw_val_ptr}), "ptr");
+      llvm::Value* len = builder->CreateCall(str_len_fn,
+          llvm::ArrayRef<llvm::Value*>({raw_val_ptr}), "len");
+
+      any_val->SetPtr(ptr);
+      any_val->SetLen(len);
       break;
     }
     case TYPE_CHAR:
@@ -1102,39 +1111,73 @@ void SlotDescriptor::CodegenSetToNull(const CodegenAnyValReadWriteInfo& read_wri
 void SlotDescriptor::CodegenWriteStringOrCollectionToSlot(
     const CodegenAnyValReadWriteInfo& read_write_info,
     llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc) {
+  const ColumnType& type = read_write_info.type();
+  if (type.IsStringType()) {
+    CodegenWriteStringToSlot(read_write_info, slot_ptr, pool_val, slot_desc);
+  } else {
+    DCHECK(type.IsCollectionType());
+    CodegenWriteCollectionToSlot(read_write_info, slot_ptr, pool_val, slot_desc);
+  }
+}
+
+void SlotDescriptor::CodegenWriteCollectionToSlot(
+    const CodegenAnyValReadWriteInfo& read_write_info,
+    llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc) {
   LlvmCodeGen* codegen = read_write_info.codegen();
   LlvmBuilder* builder = read_write_info.builder();
   const ColumnType& type = read_write_info.type();
-  DCHECK(type.IsStringType() || type.IsCollectionType());
+  DCHECK(type.IsCollectionType());
 
   // Convert to StringValue/CollectionValue
   llvm::Type* raw_type = codegen->GetSlotType(type);
-  llvm::Value* str_or_coll_value = llvm::Constant::getNullValue(raw_type);
-  str_or_coll_value = builder->CreateInsertValue(
-      str_or_coll_value, read_write_info.GetPtrAndLen().len, 1);
+  llvm::Value* coll_value = llvm::Constant::getNullValue(raw_type);
+  coll_value = builder->CreateInsertValue(
+      coll_value, read_write_info.GetPtrAndLen().len, 1);
   if (pool_val != nullptr) {
     llvm::Value* len = read_write_info.GetPtrAndLen().len;
-    if (type.IsCollectionType()) {
-      DCHECK(slot_desc != nullptr) << "SlotDescriptor needed to calculate the size of "
-          << "the collection for copying.";
-      // For a 'CollectionValue', 'len' is not the byte size of the whole data but the
-      // number of items, so we have to multiply it with the byte size of the item tuple
-      // to get the data size.
-      int item_tuple_byte_size = slot_desc->children_tuple_descriptor()->byte_size();
-      len = builder->CreateMul(len, codegen->GetI32Constant(item_tuple_byte_size));
-    }
+    DCHECK(slot_desc != nullptr) << "SlotDescriptor needed to calculate the size of "
+        << "the collection for copying.";
+    // For a 'CollectionValue', 'len' is not the byte size of the whole data but the
+    // number of items, so we have to multiply it with the byte size of the item tuple
+    // to get the data size.
+    int item_tuple_byte_size = slot_desc->children_tuple_descriptor()->byte_size();
+    len = builder->CreateMul(len, codegen->GetI32Constant(item_tuple_byte_size));
 
     // Allocate a 'new_ptr' from 'pool_val' and copy the data from
     // 'read_write_info->ptr'
     llvm::Value* new_ptr = codegen->CodegenMemPoolAllocate(
         builder, pool_val, len, "new_ptr");
     codegen->CodegenMemcpy(builder, new_ptr, read_write_info.GetPtrAndLen().ptr, len);
-    str_or_coll_value = builder->CreateInsertValue(str_or_coll_value, new_ptr, 0);
+    coll_value = builder->CreateInsertValue(coll_value, new_ptr, 0);
   } else {
-    str_or_coll_value = builder->CreateInsertValue(
-        str_or_coll_value, read_write_info.GetPtrAndLen().ptr, 0);
+    coll_value = builder->CreateInsertValue(
+        coll_value, read_write_info.GetPtrAndLen().ptr, 0);
   }
-  builder->CreateStore(str_or_coll_value, slot_ptr);
+  builder->CreateStore(coll_value, slot_ptr);
+}
+
+void SlotDescriptor::CodegenWriteStringToSlot(
+    const CodegenAnyValReadWriteInfo& read_write_info,
+    llvm::Value* slot_ptr, llvm::Value* pool_val, const SlotDescriptor* slot_desc) {
+  LlvmCodeGen* codegen = read_write_info.codegen();
+  LlvmBuilder* builder = read_write_info.builder();
+  const ColumnType& type = read_write_info.type();
+  DCHECK(type.IsStringType());
+
+  llvm::Value* ptr = read_write_info.GetPtrAndLen().ptr;
+  llvm::Value* len = read_write_info.GetPtrAndLen().len;
+  if (pool_val != nullptr) {
+    // Allocate a 'new_ptr' from 'pool_val' and copy the data from
+    // 'read_write_info->ptr'
+    llvm::Value* new_ptr = codegen->CodegenMemPoolAllocate(
+        builder, pool_val, len, "new_ptr");
+    codegen->CodegenMemcpy(builder, new_ptr, ptr, len);
+    ptr = new_ptr;
+  }
+  llvm::Function* str_assign_fn = codegen->GetFunction(
+      IRFunction::STRING_VALUE_ASSIGN, false);
+  builder->CreateCall(str_assign_fn,
+      llvm::ArrayRef<llvm::Value*>({slot_ptr, ptr, len}));
 }
 
 llvm::Value* SlotDescriptor::CodegenToTimestampValue(

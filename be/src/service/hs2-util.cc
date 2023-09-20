@@ -647,8 +647,7 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       hs2_col_val->stringVal.__isset.value = not_null;
       if (not_null) {
         const StringValue* string_val = reinterpret_cast<const StringValue*>(value);
-        hs2_col_val->stringVal.value.assign(static_cast<char*>(string_val->ptr),
-                                            string_val->len);
+        hs2_col_val->stringVal.value.assign(string_val->Ptr(), string_val->Len());
       }
       break;
     case TPrimitiveType::CHAR:

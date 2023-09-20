@@ -341,18 +341,29 @@ llvm::Function* CodegenStringTest(LlvmCodeGen* codegen) {
   llvm::Function* interop_fn = prototype.GeneratePrototype(&builder, &str);
 
   // strval->ptr[0] = 'A'
-  llvm::Value* str_ptr = builder.CreateStructGEP(NULL, str, 0, "str_ptr");
-  llvm::Value* ptr = builder.CreateLoad(str_ptr, "ptr");
+  llvm::Function* str_ptr_fn = codegen->GetFunction(
+      IRFunction::STRING_VALUE_PTR, false);
+  llvm::Function* str_len_fn = codegen->GetFunction(
+      IRFunction::STRING_VALUE_LEN, false);
+  llvm::Function* str_setlen_fn = codegen->GetFunction(
+      IRFunction::STRING_VALUE_SETLEN, false);
+
+  llvm::Value* str_ptr = builder.CreateCall(str_ptr_fn,
+      llvm::ArrayRef<llvm::Value*>({str}), "ptr");
+
   llvm::Value* first_char_offset[] = {codegen->GetI32Constant(0)};
   llvm::Value* first_char_ptr =
-      builder.CreateGEP(ptr, first_char_offset, "first_char_ptr");
+      builder.CreateGEP(str_ptr, first_char_offset, "first_char_ptr");
   builder.CreateStore(codegen->GetI8Constant('A'), first_char_ptr);
 
   // Update and return old len
-  llvm::Value* len_ptr = builder.CreateStructGEP(NULL, str, 1, "len_ptr");
-  llvm::Value* len = builder.CreateLoad(len_ptr, "len");
-  builder.CreateStore(codegen->GetI32Constant(1), len_ptr);
-  builder.CreateRet(len);
+  llvm::Value* str_len = builder.CreateCall(str_len_fn,
+      llvm::ArrayRef<llvm::Value*>({str}), "len");
+
+  builder.CreateCall(str_setlen_fn,
+      llvm::ArrayRef<llvm::Value*>({str, codegen->GetI32Constant(1)}));
+
+  builder.CreateRet(str_len);
 
   return codegen->FinalizeFunction(interop_fn);
 }
@@ -368,10 +379,7 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   string str("Test");
 
   StringValue str_val;
-  // Call memset to make sure padding bits are zero.
-  memset(&str_val, 0, sizeof(str_val));
-  str_val.ptr = const_cast<char*>(str.c_str());
-  str_val.len = str.length();
+  str_val.Assign(const_cast<char*>(str.c_str()), str.length());
 
   llvm::Function* string_test_fn = CodegenStringTest(codegen.get());
   EXPECT_TRUE(string_test_fn != NULL);
@@ -389,9 +397,9 @@ TEST_F(LlvmCodeGenTest, StringValue) {
 
   // Validate
   EXPECT_EQ(str.length(), result);
-  EXPECT_EQ('A', str_val.ptr[0]);
-  EXPECT_EQ(1, str_val.len);
-  EXPECT_EQ(static_cast<void*>(str_val.ptr), static_cast<const void*>(str.c_str()));
+  EXPECT_EQ('A', str_val.Ptr()[0]);
+  EXPECT_EQ(1, str_val.Len());
+  EXPECT_EQ(static_cast<void*>(str_val.Ptr()), static_cast<const void*>(str.c_str()));
 
   // After IMPALA-7367 removed the padding from the StringValue struct, validate the
   // length byte alone. To avoid warnings about constructing a pointer into a packed

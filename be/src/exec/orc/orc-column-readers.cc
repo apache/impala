@@ -295,12 +295,10 @@ Status OrcStringColumnReader::ReadValueInternal(int row_idx, Tuple* tuple) {
     return Status::OK();
   }
   StringValue* dst = reinterpret_cast<StringValue*>(GetSlot(tuple));
-  if (SLOT_TYPE == TYPE_VARCHAR && src_len > dst_len) {
-    dst->len = dst_len;
-  } else {
-    dst->len = src_len;
+  dst->Assign(src_ptr, src_len);
+  if (SLOT_TYPE == TYPE_VARCHAR && dst_len < src_len) {
+    dst->SetLen(dst_len);
   }
-  dst->ptr = src_ptr;
   return Status::OK();
 }
 

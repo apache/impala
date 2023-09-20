@@ -44,9 +44,9 @@ class StringSearchSSE {
 
   /// Create a search needle from a non-null terminated string.  The caller
   /// owns the memory for the needle.
-  StringSearchSSE(const StringValue* needle) :
+  StringSearchSSE(StringValue* needle) :
       needle_str_val_(needle), needle_cstr_(NULL) {
-    needle_len_ = needle->len;
+    needle_len_ = needle->Len();
   }
 
   StringSearchSSE() : needle_str_val_(NULL), needle_cstr_(NULL), needle_len_(0) {}
@@ -57,28 +57,29 @@ class StringSearchSSE {
   /// str will be temporarily modified for the duration of the function
   int Search(const StringValue& haystack) const {
     // Edge cases
-    if (UNLIKELY(haystack.len == 0 && needle_len_ == 0)) return 0;
-    if (UNLIKELY(haystack.len == 0)) return -1;
+    StringValue::SimpleString haystack_s = haystack.ToSimpleString();
+    if (UNLIKELY(haystack_s.len == 0 && needle_len_ == 0)) return 0;
+    if (UNLIKELY(haystack_s.len == 0)) return -1;
     if (UNLIKELY(needle_len_ == 0)) return 0;
-    if (UNLIKELY(haystack.len < needle_len_)) return -1;
+    if (UNLIKELY(haystack_s.len < needle_len_)) return -1;
 
     int result = -1;
 
     // temporarily null terminated input string
-    char last_char_haystack = haystack.ptr[haystack.len - 1];
-    haystack.ptr[haystack.len - 1] = '\0';
+    char last_char_haystack = haystack_s.ptr[haystack_s.len - 1];
+    haystack_s.ptr[haystack_s.len - 1] = '\0';
 
     // Use strchr if needle_len_ is 1
     if (needle_len_ == 1) {
-      char c = (needle_str_val_ == NULL) ? needle_cstr_[0] : needle_str_val_->ptr[0];
-      char* s = strchr(haystack.ptr, c);
+      char c = (needle_str_val_ == NULL) ? needle_cstr_[0] : needle_str_val_->Ptr()[0];
+      char* s = strchr(haystack_s.ptr, c);
       if (s != NULL) {
-        result = s - haystack.ptr;
+        result = s - haystack_s.ptr;
       } else if (last_char_haystack == c) {
-        result = haystack.len - 1;
+        result = haystack_s.len - 1;
       }
       // Undo change to haystack
-      haystack.ptr[haystack.len - 1] = last_char_haystack;
+      haystack_s.ptr[haystack_s.len - 1] = last_char_haystack;
       return  result;
     }
 
@@ -86,15 +87,15 @@ class StringSearchSSE {
     // null terminated haystack, and if there is no match, try a match
     // on the last needle_len chars.
     if (LIKELY(needle_cstr_ != NULL)) {
-      char* s = strstr(haystack.ptr, needle_cstr_);
+      char* s = strstr(haystack_s.ptr, needle_cstr_);
       // Undo change to haystack
-      haystack.ptr[haystack.len - 1] = last_char_haystack;
+      haystack_s.ptr[haystack_s.len - 1] = last_char_haystack;
 
       if (s != NULL) {
-        result = s - haystack.ptr;
+        result = s - haystack_s.ptr;
       } else {
         // If we didn't find a match, try the last needle->len chars
-        char* end = haystack.ptr + haystack.len - needle_len_;
+        char* end = haystack_s.ptr + haystack_s.len - needle_len_;
         bool match = true;
         for (int i = 0; i < needle_len_; ++i) {
           if (LIKELY(end[i] != needle_cstr_[i])) {
@@ -102,18 +103,18 @@ class StringSearchSSE {
             break;
           }
         }
-        if (UNLIKELY(match)) result = haystack.len - needle_len_;
+        if (UNLIKELY(match)) result = haystack_s.len - needle_len_;
       }
       return result;
     } else {
       // Needle is not null terminated.  Terminate it on the fly.
-      const char last_char_needle = needle_str_val_->ptr[needle_len_ - 1];
-      needle_str_val_->ptr[needle_len_ - 1] = '\0';
+      const char last_char_needle = needle_str_val_->Ptr()[needle_len_ - 1];
+      needle_str_val_->Ptr()[needle_len_ - 1] = '\0';
 
       int offset = 0;
-      char* haystack_pos = haystack.ptr;
-      while (offset <= haystack.len - needle_len_) {
-        char* search = strstr(haystack_pos, needle_str_val_->ptr);
+      char* haystack_pos = haystack_s.ptr;
+      while (offset <= haystack_s.len - needle_len_) {
+        char* search = strstr(haystack_pos, needle_str_val_->Ptr());
 
         // If the shortened strings didn't match, then the full strings
         // must not match
@@ -125,7 +126,7 @@ class StringSearchSSE {
         //   needle = "abc"  (null terminated to "ab")
         //   haystack is "aaabc" (null terminated to "aaab")
         // In this case, we just need to compare the last chars from both.
-        if (offset == haystack.len - needle_len_) {
+        if (offset == haystack_s.len - needle_len_) {
           if (last_char_needle == last_char_haystack) result = offset;
           break;
         } else {
@@ -145,16 +146,16 @@ class StringSearchSSE {
       }
 
       // Undo change to haystack
-      haystack.ptr[haystack.len - 1] = last_char_haystack;
+      haystack_s.ptr[haystack_s.len - 1] = last_char_haystack;
       // Undo changes to needle
-      needle_str_val_->ptr[needle_len_ - 1] = last_char_needle;
+      needle_str_val_->Ptr()[needle_len_ - 1] = last_char_needle;
       return result;
     }
   }
 
  private:
   /// Only one of these two will be non-null.  Both are unowned.
-  const StringValue* needle_str_val_;
+  StringValue* needle_str_val_;
   const char* needle_cstr_;
 
   int needle_len_;

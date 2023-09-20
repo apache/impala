@@ -222,7 +222,8 @@ STRING, STRING, DECIMAL, BIGINT
 ====
 ---- QUERY
 # Partitioned Top-N with a high number of partitions and a larger limit returning many
-# columns. Memory pressure will force in-memory partitions to be evicted.
+# columns. Memory pressure used to force in-memory partitions to be evicted, with Small
+# String Optimization they are not. Keep the test anyway to check the RESULTS.
 select * from (
   select d_date, s_store_name, s_state, i_item_id, ss_list_price,
         ss_wholesale_cost, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price,
@@ -291,6 +292,108 @@ limit 50
 ---- TYPES
 STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, BIGINT
 ---- RUNTIME_PROFILE
+# Confirm that heaps were not evicted thanks to Small String Optimization.
+row_regex: .*InMemoryHeapsEvicted: 0 \(0\)
+====
+---- QUERY
+# Same as above, but calculate aggregates over all the result columns to ensure that the right
+# number of rows are returned for all partitions in the partitioned top-n.
+select min(d_date), min(s_store_name), min(s_state), min(i_item_id), avg(ss_list_price),
+        avg(ss_wholesale_cost), avg(ss_sales_price), avg(ss_ext_discount_amt),
+        avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), avg(ss_ext_list_price),
+        avg(ss_ext_tax), avg(ss_coupon_amt), avg(ss_net_paid), avg(ss_net_paid_inc_tax),
+        avg(ss_net_profit)
+from (
+  select d_date, s_store_name, s_state, i_item_id, ss_list_price,
+        ss_wholesale_cost, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price,
+        ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid,
+        ss_net_paid_inc_tax, ss_net_profit,
+        rank() over (partition by ss_sold_date_sk order by ss_list_price desc) rnk
+  from store_sales ss
+      join item i on ss_item_sk = i_item_sk
+      join date_dim d on ss_sold_date_sk = d_date_sk
+      join store s on ss_store_sk = s_store_sk
+  where ss_list_price is not null) v
+where rnk < 500
+---- RESULTS
+'1998-01-02','able','TN','AAAAAAAAAAABAAAA',120.822125,75.697178,60.469191,305.284017,3058.201402,3824.409840,6104.842416,123.872886,305.284017,2752.882153,2876.854635,-1071.689798
+---- TYPES
+STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+# Confirm that heaps were not evicted thanks to Small String Optimization.
+row_regex: .*InMemoryHeapsEvicted: 0 \(0\)
+====
+---- QUERY
+# Partitioned Top-N with a high number of partitions and a larger limit returning many
+# columns. Memory pressure will force in-memory partitions to be evicted.
+select * from (
+  select d_date, s_store_name, s_state, i_item_id, ss_list_price,
+        ss_wholesale_cost, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price,
+        ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid,
+        ss_net_paid_inc_tax, ss_net_profit,
+        rank() over (partition by ss_sold_date_sk order by ss_list_price desc) rnk
+  from store_sales ss
+      join item i on ss_item_sk = i_item_sk
+      join date_dim d on ss_sold_date_sk = d_date_sk
+      join store s on ss_store_sk = s_store_sk
+  where ss_list_price is not null) v
+where rnk = 700
+order by ss_list_price desc, d_date, s_store_name, s_state, i_item_id
+limit 50
+---- RESULTS
+'2002-01-02','eing','TN','AAAAAAAAAMCAAAAA',121.03,76.12,8.47,0.00,228.69,2055.24,3267.81,18.29,0.00,228.69,246.98,-1826.55,700
+'2000-01-02','able','TN','AAAAAAAAGLIBAAAA',120.82,61.33,119.61,0.00,239.22,122.66,241.64,0.00,0.00,239.22,239.22,116.56,700
+'2000-01-02','ought','TN','AAAAAAAAOLIBAAAA',120.82,69.84,37.45,0.00,1310.75,2444.40,4228.70,117.96,0.00,1310.75,1428.71,-1133.65,700
+'1999-01-02','ought','TN','AAAAAAAAOGJAAAAA',120.21,77.56,50.48,2635.05,4391.76,6747.72,10458.27,0.00,2635.05,1756.71,1756.71,-4991.01,700
+'2002-12-30','ation','TN','AAAAAAAAAJLDAAAA',118.26,61.92,37.84,0.00,340.56,557.28,1064.34,13.62,0.00,340.56,354.18,-216.72,700
+'1998-12-19','ation','TN','AAAAAAAADIFAAAAA',118.20,80.96,67.37,452.72,538.96,647.68,945.60,1.72,452.72,86.24,87.96,-561.44,700
+'1999-12-28','ation','TN','AAAAAAAAGOJAAAAA',117.72,86.56,82.40,0.00,576.80,605.92,824.04,51.91,0.00,576.80,628.71,-29.12,700
+'2001-12-30','bar','TN','AAAAAAAAMOLDAAAA',117.01,81.26,32.76,0.00,3144.96,7800.96,11232.96,94.34,0.00,3144.96,3239.30,-4656.00,700
+'1998-11-27','ought','TN','AAAAAAAAKGEDAAAA',116.47,66.18,67.55,0.00,4525.85,4434.06,7803.49,271.55,0.00,4525.85,4797.40,91.79,700
+'2002-12-01','ation','TN','AAAAAAAAELJCAAAA',116.28,66.07,1.16,12.38,13.92,792.84,1395.36,0.03,12.38,1.54,1.57,-791.30,700
+'1999-12-24','able','TN','AAAAAAAAGOIAAAAA',115.95,68.21,34.78,0.00,1321.64,2591.98,4406.10,13.21,0.00,1321.64,1334.85,-1270.34,700
+'2001-12-04','ought','TN','AAAAAAAAAHGAAAAA',115.79,78.77,100.73,0.00,705.11,551.39,810.53,35.25,0.00,705.11,740.36,153.72,700
+'2001-12-04','ought','TN','AAAAAAAAIEJCAAAA',115.79,78.77,45.15,0.00,1625.40,2835.72,4168.44,16.25,0.00,1625.40,1641.65,-1210.32,700
+'2002-12-23','bar','TN','AAAAAAAAOKACAAAA',115.75,83.28,43.98,0.00,3826.26,7245.36,10070.25,191.31,0.00,3826.26,4017.57,-3419.10,700
+'2001-12-18','eing','TN','AAAAAAAALJLDAAAA',115.70,82.06,114.54,0.00,8246.88,5908.32,8330.40,577.28,0.00,8246.88,8824.16,2338.56,700
+'1998-12-24','ation','TN','AAAAAAAAIFHDAAAA',115.47,64.51,23.09,0.00,2008.83,5612.37,10045.89,140.61,0.00,2008.83,2149.44,-3603.54,700
+'1998-12-26','able','TN','AAAAAAAAEEBBAAAA',115.40,57.99,60.00,0.00,4860.00,4697.19,9347.40,0.00,0.00,4860.00,4860.00,162.81,700
+'1999-12-18','ation','TN','AAAAAAAAPMCCAAAA',115.40,80.14,87.70,0.00,5349.70,4888.54,7039.40,374.47,0.00,5349.70,5724.17,461.16,700
+'2002-11-16','ation','TN','AAAAAAAACGCEAAAA',115.16,72.89,102.49,0.00,6149.40,4373.40,6909.60,122.98,0.00,6149.40,6272.38,1776.00,700
+'2001-11-09','eing','TN','AAAAAAAAMOCBAAAA',115.07,62.20,89.75,0.00,4577.25,3172.20,5868.57,366.18,0.00,4577.25,4943.43,1405.05,700
+'1999-11-05','able','TN','AAAAAAAAEBODAAAA',115.06,63.57,54.07,0.00,3676.76,4322.76,7824.08,257.37,0.00,3676.76,3934.13,-646.00,700
+'2000-11-05','ought','TN','AAAAAAAAOGIBAAAA',115.06,75.70,19.56,390.22,1114.92,4314.90,6558.42,7.24,390.22,724.70,731.94,-3590.20,700
+'2002-12-19','ese','TN','AAAAAAAAOABBAAAA',115.04,57.81,0.00,0.00,0.00,2717.07,5406.88,0.00,0.00,0.00,0.00,-2717.07,700
+'2002-12-19','ought','TN','AAAAAAAADPHAAAAA',115.04,79.89,6.90,0.00,379.50,4393.95,6327.20,18.97,0.00,379.50,398.47,-4014.45,700
+'1999-01-01','eing','TN','AAAAAAAAEBBEAAAA',114.93,70.51,39.07,0.00,703.26,1269.18,2068.74,35.16,0.00,703.26,738.42,-565.92,700
+'1998-11-20','bar','TN','AAAAAAAAGDJBAAAA',114.89,68.80,104.54,0.00,9722.22,NULL,10684.77,NULL,0.00,9722.22,10305.55,NULL,700
+'1998-11-10','eing','TN','AAAAAAAAAFODAAAA',114.82,62.07,57.41,0.00,2124.17,2296.59,4248.34,169.93,0.00,2124.17,2294.10,-172.42,700
+'2001-12-09','ought','TN','AAAAAAAAODIBAAAA',114.78,92.57,65.42,0.00,4383.14,6202.19,7690.26,350.65,0.00,4383.14,4733.79,-1819.05,700
+'2001-12-19','bar','TN','AAAAAAAALCHCAAAA',114.55,88.12,24.05,85.61,96.20,352.48,458.20,0.95,85.61,10.59,11.54,-341.89,700
+'2001-12-19','ought','TN','AAAAAAAAGOMAAAAA',114.55,90.92,36.65,0.00,2785.40,6909.92,8705.80,139.27,0.00,2785.40,2924.67,-4124.52,700
+'2001-11-10','ation','TN','AAAAAAAAKAKDAAAA',114.54,58.44,10.30,0.00,82.40,467.52,916.32,5.76,0.00,82.40,88.16,-385.12,700
+'1998-12-04','ation','TN','AAAAAAAAKNOAAAAA',114.30,90.72,29.71,0.00,980.43,2993.76,3771.90,88.23,0.00,980.43,1068.66,-2013.33,700
+'2000-11-04','bar','TN','AAAAAAAAPPKDAAAA',114.22,57.40,10.27,0.00,534.04,2984.80,5939.44,21.36,0.00,534.04,555.40,-2450.76,700
+'2001-11-20','ation','TN','AAAAAAAAKDGAAAAA',114.22,67.59,109.65,0.00,4057.05,2500.83,4226.14,202.85,0.00,4057.05,4259.90,1556.22,700
+'2002-12-06','able','TN','AAAAAAAAFDODAAAA',114.18,70.05,36.53,305.39,2776.28,5323.80,8677.68,0.00,305.39,2470.89,2470.89,-2852.91,700
+'1999-11-30','able','TN','AAAAAAAAPPICAAAA',114.13,88.48,6.84,0.00,369.36,4777.92,6163.02,3.69,0.00,369.36,373.05,-4408.56,700
+'1999-11-30','ation','TN','AAAAAAAAAJFDAAAA',114.13,72.24,49.07,0.00,1962.80,2889.60,4565.20,0.00,0.00,1962.80,1962.80,-926.80,700
+'2000-12-07','ese','TN','AAAAAAAAGJJBAAAA',114.01,76.01,37.62,0.00,1015.74,2052.27,3078.27,10.15,0.00,1015.74,1025.89,-1036.53,700
+'1999-12-07','eing','TN','AAAAAAAAAINBAAAA',113.88,66.99,35.30,0.00,776.60,1473.78,2505.36,23.29,0.00,776.60,799.89,-697.18,700
+'1998-12-12','bar','TN','AAAAAAAAHDECAAAA',113.86,91.09,31.88,294.57,669.48,1912.89,2391.06,14.99,294.57,374.91,389.90,-1537.98,700
+'1998-12-12','ese','TN','AAAAAAAAEIFAAAAA',113.86,62.91,87.67,0.00,1227.38,880.74,1594.04,49.09,0.00,1227.38,1276.47,346.64,700
+'1998-12-12','ese','TN','AAAAAAAAIJFDAAAA',113.86,81.92,67.17,0.00,3156.99,3850.24,5351.42,0.00,0.00,3156.99,3156.99,-693.25,700
+'2000-12-31','ation','TN','AAAAAAAAHOOCAAAA',113.86,63.26,63.76,10.20,255.04,253.04,455.44,14.69,10.20,244.84,259.53,-8.20,700
+'2000-12-09','ese','TN','AAAAAAAAKCKAAAAA',113.82,77.96,85.36,0.00,1024.32,935.52,1365.84,20.48,0.00,1024.32,1044.80,88.80,700
+'2002-12-31','ation','TN','AAAAAAAAEKNCAAAA',113.73,78.44,102.35,0.00,2558.75,1961.00,2843.25,102.35,0.00,2558.75,2661.10,597.75,700
+'1998-11-08','ese','TN','AAAAAAAAOCFBAAAA',113.60,60.11,78.38,0.00,313.52,240.44,454.40,6.27,0.00,313.52,319.79,73.08,700
+'1998-11-17','ation','TN','AAAAAAAAPKDDAAAA',113.60,83.53,3.40,88.06,119.00,2923.55,3976.00,0.92,88.06,30.94,31.86,-2892.61,700
+'2001-12-05','ese','TN','AAAAAAAAGKPAAAAA',113.57,95.44,10.22,0.00,541.66,5058.32,6019.21,0.00,0.00,541.66,541.66,-4516.66,700
+'1998-12-06','able','TN','AAAAAAAADNNCAAAA',113.44,79.33,97.55,0.00,9657.45,7853.67,11230.56,193.14,0.00,9657.45,9850.59,1803.78,700
+'2000-12-17','ation','TN','AAAAAAAABKLAAAAA',113.38,82.16,107.71,0.00,7755.12,5915.52,8163.36,0.00,0.00,7755.12,7755.12,1839.60,700
+---- TYPES
+STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, BIGINT
+---- RUNTIME_PROFILE
 # Confirm that heaps were actually evicted due to memory pressure.
 row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
 ====
@@ -314,9 +417,9 @@ from (
       join date_dim d on ss_sold_date_sk = d_date_sk
       join store s on ss_store_sk = s_store_sk
   where ss_list_price is not null) v
-where rnk < 500
+where rnk < 700
 ---- RESULTS
-'1998-01-02','able','TN','AAAAAAAAAAABAAAA',120.822125,75.697178,60.469191,305.284017,3058.201402,3824.409840,6104.842416,123.872886,305.284017,2752.882153,2876.854635,-1071.689798
+'1998-01-02','able','TN','AAAAAAAAAAABAAAA',105.985094,67.875054,53.032599,267.655548,2681.851794,3429.577084,5355.557381,108.581372,267.655548,2414.133497,2522.741374,-1015.543602
 ---- TYPES
 STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ---- RUNTIME_PROFILE

@@ -279,15 +279,14 @@ Status IcebergDeleteBuilder::ProcessBuildBatch(RowBatch* build_batch) {
     impala::StringValue* file_path =
         build_row->GetTuple(0)->GetStringSlot(file_path_offset_);
 
-    if (UNLIKELY(file_path->len == 0)) {
+    const int length = file_path->Len();
+    if (UNLIKELY(length == 0)) {
       return Status(Substitute("NULL found as file_path in delete file"));
     }
     int64_t* id = build_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
-    const int length = file_path->len;
     if (is_distributed_mode_) {
       // Distributed mode, deleted_rows_ is empty after init, only the relevant delete
       // files are sent to this fragment, processing everything
-
       auto it = deleted_rows_.find(*file_path);
       if (it == deleted_rows_.end()) {
         char* ptr_copy = reinterpret_cast<char*>(expr_results_pool_->Allocate(length));
@@ -295,7 +294,7 @@ Status IcebergDeleteBuilder::ProcessBuildBatch(RowBatch* build_batch) {
           return Status("Failed to allocate memory.");
         }
 
-        memcpy(ptr_copy, file_path->ptr, length);
+        memcpy(ptr_copy, file_path->Ptr(), length);
 
         std::pair<DeleteRowHashTable::iterator, bool> retval =
             deleted_rows_.emplace(std::piecewise_construct,

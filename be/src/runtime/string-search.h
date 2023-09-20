@@ -45,13 +45,14 @@ class StringSearch {
   /// Initialize/Precompute a StringSearch object from the pattern
   StringSearch(const StringValue* pattern)
     : pattern_(pattern), mask_(0), skip_(0), rskip_(0) {
+    StringValue::SimpleString pattern_s = pattern->ToSimpleString();
     // Special cases
-    if (pattern_->len <= 1) {
+    if (pattern_s.len <= 1) {
       return;
     }
 
     // Build compressed lookup table
-    int mlast = pattern_->len - 1;
+    int mlast = pattern_s.len - 1;
     skip_ = mlast - 1;
     rskip_ = mlast - 1;
 
@@ -60,17 +61,17 @@ class StringSearch {
     // instead, so that the same StringSearch instance can be reused multiple
     // times without rebuilding the bloom filter every time.
     for (int i = 0; i < mlast; ++i) {
-      BloomAdd(pattern_->ptr[i]);
-      if (pattern_->ptr[i] == pattern_->ptr[mlast])
+      BloomAdd(pattern_s.ptr[i]);
+      if (pattern_s.ptr[i] == pattern_s.ptr[mlast])
         skip_ = mlast - i - 1;
     }
-    BloomAdd(pattern_->ptr[mlast]);
+    BloomAdd(pattern_s.ptr[mlast]);
 
     // The order of iteration doesn't have any effect on the bloom filter, but
     // it does on skip_. For this reason we need to calculate a separate rskip_
     // for reverse search.
     for (int i = mlast; i > 0; i--) {
-      if (pattern_->ptr[i] == pattern_->ptr[0]) rskip_ = i - 1;
+      if (pattern_s.ptr[i] == pattern_s.ptr[0]) rskip_ = i - 1;
     }
   }
 
@@ -79,16 +80,18 @@ class StringSearch {
   ///   Returns -1 if the pattern is not found
   int Search(const StringValue* str) const {
     // Special cases
-    if (str == NULL || pattern_ == NULL || pattern_->len == 0) {
+    if (str == NULL || pattern_ == NULL || pattern_->Len() == 0) {
       return -1;
     }
+    StringValue::SimpleString pattern_s = pattern_->ToSimpleString();
+    StringValue::SimpleString str_s = str->ToSimpleString();
 
-    int mlast = pattern_->len - 1;
-    int w = str->len - pattern_->len;
-    int n = str->len;
-    int m = pattern_->len;
-    const char* s = str->ptr;
-    const char* p = pattern_->ptr;
+    int mlast = pattern_s.len - 1;
+    int w = str_s.len - pattern_s.len;
+    int n = str_s.len;
+    int m = pattern_s.len;
+    const char* s = str_s.ptr;
+    const char* p = pattern_s.ptr;
 
     // Special case if pattern->len == 1
     if (m == 1) {
@@ -131,16 +134,18 @@ class StringSearch {
   ///   Returns -1 if the pattern is not found
   int RSearch(const StringValue* str) const {
     // Special cases
-    if (str == NULL || pattern_ == NULL || pattern_->len == 0) {
+    if (str == NULL || pattern_ == NULL || pattern_->Len() == 0) {
       return -1;
     }
+    StringValue::SimpleString pattern_s = pattern_->ToSimpleString();
+    StringValue::SimpleString str_s = str->ToSimpleString();
 
-    int mlast = pattern_->len - 1;
-    int w = str->len - pattern_->len;
-    int n = str->len;
-    int m = pattern_->len;
-    const char* s = str->ptr;
-    const char* p = pattern_->ptr;
+    int mlast = pattern_s.len - 1;
+    int w = str_s.len - pattern_s.len;
+    int n = str_s.len;
+    int m = pattern_s.len;
+    const char* s = str_s.ptr;
+    const char* p = pattern_s.ptr;
 
     // Special case if pattern->len == 1
     if (m == 1) {

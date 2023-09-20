@@ -240,8 +240,7 @@ Status DataSourceScanNode::MaterializeNextRow(const Timezone* local_tz,
             return tuple_pool->mem_tracker()->MemLimitExceeded(NULL, details, val_size);
           }
           memcpy(buffer, val.data(), val_size);
-          reinterpret_cast<StringValue*>(slot)->ptr = buffer;
-          reinterpret_cast<StringValue*>(slot)->len = val_size;
+          reinterpret_cast<StringValue*>(slot)->Assign(buffer, val_size);
           break;
         }
       case TYPE_TINYINT:

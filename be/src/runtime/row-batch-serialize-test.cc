@@ -213,7 +213,7 @@ class RowBatchSerializeTest : public testing::Test {
         StringValue* string_value = reinterpret_cast<StringValue*>(slot);
         StringValue* deserialized_string_value =
             reinterpret_cast<StringValue*>(deserialized_slot);
-        EXPECT_NE(string_value->ptr, deserialized_string_value->ptr);
+        EXPECT_NE(string_value->Ptr(), deserialized_string_value->Ptr());
       }
 
       if (type.IsCollectionType()) {

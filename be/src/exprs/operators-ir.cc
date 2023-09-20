@@ -92,8 +92,8 @@
 #define BINARY_PREDICATE_CHAR_NONNULL(OP, V1, V2) \
   StringValue iv1 = StringValue::FromStringVal(V1);\
   StringValue iv2 = StringValue::FromStringVal(V2);\
-  iv1.len = StringValue::UnpaddedCharLength(iv1.ptr, c->GetArgType(0)->len); \
-  iv2.len = StringValue::UnpaddedCharLength(iv2.ptr, c->GetArgType(1)->len); \
+  iv1.SetLen(StringValue::UnpaddedCharLength(iv1.Ptr(), c->GetArgType(0)->len)); \
+  iv2.SetLen(StringValue::UnpaddedCharLength(iv2.Ptr(), c->GetArgType(1)->len)); \
   return BooleanVal(iv1 OP iv2)
 
 #define BINARY_PREDICATE_NUMERIC_FN(NAME, TYPE, OP) \

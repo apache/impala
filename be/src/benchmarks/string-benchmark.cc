@@ -108,7 +108,7 @@ void TestNormalStringsSequential(int batch_size, void* d) {
     data->hash_normal = 0;
     for (int j = 0; j < data->normal_strings.size(); ++j) {
       const StringValue& str = data->normal_strings[j];
-      data->hash_normal = HashUtil::CrcHash(str.ptr, str.len, data->hash_normal);
+      data->hash_normal = HashUtil::CrcHash(str.Ptr(), str.Len(), data->hash_normal);
     }
   }
 }
@@ -130,7 +130,7 @@ void TestNormalStringsRandom(int batch_size, void* d) {
     data->hash_normal = 0;
     for (int j = 0; j < data->normal_strings.size(); ++j) {
       const StringValue& str = data->normal_strings[data->random_order[j]];
-      data->hash_normal = HashUtil::CrcHash(str.ptr, str.len, data->hash_normal);
+      data->hash_normal = HashUtil::CrcHash(str.Ptr(), str.Len(), data->hash_normal);
     }
   }
 }

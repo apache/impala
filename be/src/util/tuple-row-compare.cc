@@ -438,7 +438,7 @@ U TupleRowZOrderComparator::GetSharedRepresentation(void* val, ColumnType type) 
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       const StringValue* string_value = reinterpret_cast<const StringValue*>(val);
-      return GetSharedStringRepresentation<U>(string_value->ptr, string_value->len);
+      return GetSharedStringRepresentation<U>(string_value->Ptr(), string_value->Len());
     }
     case TYPE_CHAR:
       return GetSharedStringRepresentation<U>(

@@ -33,6 +33,7 @@ add_library(RuntimeIr
   runtime-filter-ir.cc
   sorter-ir.cc
   sorted-run-merger-ir.cc
+  string-value-ir.cc
   tuple-ir.cc
 )
 add_dependencies(RuntimeIr gen-deps)

@@ -28,7 +28,7 @@ namespace impala {
 
 class MemPool;
 class SlotDescriptor;
-struct StringValue;
+class StringValue;
 class Tuple;
 
 /// Useful utility functions for runtime values (which are passed around as void*).

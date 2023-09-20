@@ -121,9 +121,9 @@ inline bool ParquetDataConverter<StringValue, true>::ConvertSlot(
     const StringValue* src, void* slot) const {
   DCHECK_EQ(col_type_->type, TYPE_CHAR);
   int char_len = col_type_->len;
-  int unpadded_len = std::min(char_len, src->len);
+  int unpadded_len = std::min(char_len, src->Len());
   char* dst_char = reinterpret_cast<char*>(slot);
-  memcpy(dst_char, src->ptr, unpadded_len);
+  memcpy(dst_char, src->Ptr(), unpadded_len);
   StringValue::PadWithSpaces(dst_char, char_len, unpadded_len);
   return true;
 }

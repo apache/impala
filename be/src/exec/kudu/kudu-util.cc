@@ -168,7 +168,7 @@ Status CreateKuduValue(const ColumnType& col_type, const void* value, KuduValue*
     case TYPE_VARCHAR:
     case TYPE_STRING: {
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
-      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
+      kudu::Slice slice(reinterpret_cast<const uint8_t*>(sv->Ptr()), sv->Len());
       *out = KuduValue::CopyString(slice);
       break;
     }

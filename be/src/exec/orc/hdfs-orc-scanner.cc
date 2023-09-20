@@ -1160,7 +1160,7 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
     case TYPE_STRING: {
       if (UNLIKELY(!val)) return orc::Literal(predicate_type);
       const StringValue* sv = reinterpret_cast<StringValue*>(val);
-      return orc::Literal(sv->ptr, sv->len);
+      return orc::Literal(sv->Ptr(), sv->Len());
     }
     // Predicates on CHAR/VARCHAR are currently skipped in FE. We will focus on them in
     // IMPALA-10882.
@@ -1172,16 +1172,17 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
       DCHECK(false) << "Char predicate is not supported: IMPALA-10882";
       if (UNLIKELY(!val)) return orc::Literal(predicate_type);
       const StringValue* sv = reinterpret_cast<StringValue*>(val);
+      StringValue::SimpleString s = sv->ToSimpleString();
       char* dst_ptr;
-      if (dst_type.len > sv->len) {
+      if (dst_type.len > s.len) {
         dst_ptr = reinterpret_cast<char*>(search_args_pool_->TryAllocate(dst_type.len));
         if (dst_ptr == nullptr) return orc::Literal(predicate_type);
-        memcpy(dst_ptr, sv->ptr, sv->len);
-        StringValue::PadWithSpaces(dst_ptr, dst_type.len, sv->len);
+        memcpy(dst_ptr, s.ptr, s.len);
+        StringValue::PadWithSpaces(dst_ptr, dst_type.len, s.len);
       } else {
-        dst_ptr = sv->ptr;
+        dst_ptr = s.ptr;
       }
-      return orc::Literal(dst_ptr, sv->len);
+      return orc::Literal(dst_ptr, s.len);
     }
     case TYPE_DECIMAL: {
       if (!val) return orc::Literal(predicate_type);

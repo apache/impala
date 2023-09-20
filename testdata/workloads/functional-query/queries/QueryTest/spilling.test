@@ -366,7 +366,9 @@ ORDER BY o_orderkey
 BIGINT
 ---- RUNTIME_PROFILE
 # Verify that at least one of the joins was spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+# TODO(IMPALA-12549): Make this query spill again after the estimations and
+# min reservations are adjusted.
+# row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Spilling partitioned top-N.

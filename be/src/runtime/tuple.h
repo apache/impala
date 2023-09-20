@@ -36,7 +36,7 @@ namespace impala {
 
 struct CollectionValue;
 class RuntimeState;
-struct StringValue;
+class StringValue;
 class ScalarExpr;
 class ScalarExprEvaluator;
 class TupleDescriptor;
@@ -120,7 +120,8 @@ class Tuple {
   /// string and collection data).
   int64_t TotalByteSize(const TupleDescriptor& desc) const;
 
-  /// The size of all referenced string and collection data.
+  /// The size of all referenced string and collection data. Smallified strings aren't
+  /// counted here as they don't need extra storage space.
   int64_t VarlenByteSize(const TupleDescriptor& desc) const;
 
   /// Create a copy of 'this', including all of its referenced variable-length data
@@ -324,6 +325,8 @@ class Tuple {
         reinterpret_cast<const char*>(this) + offset);
   }
 
+  void SmallifyStrings(const TupleDescriptor& desc);
+
   /// For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 
@@ -356,7 +359,6 @@ class Tuple {
   /// avoid emitting unnecessary code for ~Status() in perf-critical code.
   char* AllocateStrings(const char* err_ctx, RuntimeState* state, int64_t bytes,
       MemPool* pool, Status* status) noexcept;
-
 };
 
 }

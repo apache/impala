@@ -42,8 +42,8 @@ class StringBuffer {
       : pool_(pool), buffer_(NULL), len_(0), buffer_size_(0) {
     DCHECK(pool_ != NULL);
     if (str != NULL) {
-      buffer_ = str->ptr;
-      len_ = buffer_size_ = str->len;
+      buffer_ = str->Ptr();
+      len_ = buffer_size_ = str->Len();
     }
   }
 

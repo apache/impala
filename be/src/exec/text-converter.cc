@@ -184,10 +184,9 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
       builder.CreateStructGEP(NULL, args[0], slot_desc->llvm_field_idx(), "slot");
 
   if (slot_desc->type().IsVarLenStringType()) {
-    llvm::Value* ptr = builder.CreateStructGEP(NULL, slot, 0, "string_ptr");
-    llvm::Value* len = builder.CreateStructGEP(NULL, slot, 1, "string_len");
+    llvm::Function* str_assign_fn = codegen->GetFunction(
+        IRFunction::STRING_VALUE_ASSIGN, false);
 
-    builder.CreateStore(args[1], ptr);
     // TODO codegen memory allocation for CHAR
     DCHECK(slot_desc->type().type != TYPE_CHAR);
     if (slot_desc->type().type == TYPE_VARCHAR) {
@@ -197,9 +196,11 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
           builder.CreateICmpSLT(args[2], maxlen, "len_lt_maxlen");
       llvm::Value* minlen =
           builder.CreateSelect(len_lt_maxlen, args[2], maxlen, "select_min_len");
-      builder.CreateStore(minlen, len);
+      builder.CreateCall(str_assign_fn,
+          llvm::ArrayRef<llvm::Value*>({slot, args[1], minlen}));
     } else {
-      builder.CreateStore(args[2], len);
+      builder.CreateCall(str_assign_fn,
+          llvm::ArrayRef<llvm::Value*>({slot, args[1], args[2]}));
     }
     builder.CreateRet(codegen->true_value());
   } else {

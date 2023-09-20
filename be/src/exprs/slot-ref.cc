@@ -280,7 +280,17 @@ void SlotRef::CodegenNullChecking(LlvmCodeGen* codegen, LlvmBuilder* builder,
 // by 'val_ptr'. Returns the resulting values in '*ptr' and '*len'.
 void CodegenReadingStringOrCollectionVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
     const ColumnType& type, llvm::Value* val_ptr, llvm::Value** ptr, llvm::Value** len) {
-  if (type.IsVarLenStringType() || type.IsCollectionType()) {
+  if (type.IsVarLenStringType()) {
+    llvm::Function* str_ptr_fn = codegen->GetFunction(
+        IRFunction::STRING_VALUE_PTR, false);
+    llvm::Function* str_len_fn = codegen->GetFunction(
+        IRFunction::STRING_VALUE_LEN, false);
+
+    *ptr = builder->CreateCall(str_ptr_fn,
+        llvm::ArrayRef<llvm::Value*>({val_ptr}), "ptr");
+    *len = builder->CreateCall(str_len_fn,
+        llvm::ArrayRef<llvm::Value*>({val_ptr}), "len");
+  } else if (type.IsCollectionType()) {
     llvm::Value* ptr_ptr = builder->CreateStructGEP(nullptr, val_ptr, 0, "ptr_ptr");
     *ptr = builder->CreateLoad(ptr_ptr, "ptr");
     llvm::Value* len_ptr = builder->CreateStructGEP(nullptr, val_ptr, 1, "len_ptr");

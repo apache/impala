@@ -303,7 +303,7 @@ uint32_t HashTableCtx::HashVariableLenRow(const uint8_t* expr_values,
       // Hash the string
       // TODO: when using CRC hash on empty string, this only swaps bytes.
       const StringValue* str = reinterpret_cast<const StringValue*>(loc);
-      hash = Hash(str->ptr, str->len, hash);
+      hash = Hash(str->Ptr(), str->Len(), hash);
     }
   }
   return hash;
@@ -710,12 +710,12 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
   uint64_t fnv_seed = HashUtil::FNV_SEED;
 
   if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR) {
-    llvm::Value* dst_ptr = builder->CreateStructGEP(NULL, dst, 0, "string_ptr");
-    llvm::Value* dst_len = builder->CreateStructGEP(NULL, dst, 1, "string_len");
     llvm::Value* null_len = codegen->GetI32Constant(fnv_seed);
     llvm::Value* null_ptr = builder->CreateIntToPtr(null_len, codegen->ptr_type());
-    builder->CreateStore(null_ptr, dst_ptr);
-    builder->CreateStore(null_len, dst_len);
+    llvm::Function* str_assign_fn = codegen->GetFunction(
+      IRFunction::STRING_VALUE_ASSIGN, false);
+    builder->CreateCall(str_assign_fn,
+        llvm::ArrayRef<llvm::Value*>({dst, null_ptr, null_len}));
   } else {
     llvm::Value* null_value = NULL;
     int byte_size = type.GetByteSize();
@@ -1117,10 +1117,15 @@ Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur,
       llvm::Value* str_val = builder.CreatePointerCast(
           llvm_loc, codegen->GetSlotPtrType(ColumnType(TYPE_STRING)), "str_val");
 
-      llvm::Value* ptr = builder.CreateStructGEP(NULL, str_val, 0);
-      llvm::Value* len = builder.CreateStructGEP(NULL, str_val, 1);
-      ptr = builder.CreateLoad(ptr, "ptr");
-      len = builder.CreateLoad(len, "len");
+      llvm::Function* str_ptr_fn = codegen->GetFunction(
+          IRFunction::STRING_VALUE_PTR, false);
+      llvm::Function* str_len_fn = codegen->GetFunction(
+          IRFunction::STRING_VALUE_LEN, false);
+
+      llvm::Value* ptr = builder.CreateCall(str_ptr_fn,
+          llvm::ArrayRef<llvm::Value*>({str_val}), "ptr");
+      llvm::Value* len = builder.CreateCall(str_len_fn,
+          llvm::ArrayRef<llvm::Value*>({str_val}), "len");
 
       // Call hash(ptr, len, hash_result);
       llvm::Function* general_hash_fn =
