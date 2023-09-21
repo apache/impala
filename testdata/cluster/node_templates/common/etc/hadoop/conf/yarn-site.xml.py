@@ -71,6 +71,11 @@ CONFIG = {
   # to speed up data-loading.
   'yarn.nodemanager.resource.memory-mb': _get_yarn_nm_ram_mb(),
 
+  # Allow YARN to run with at least 3GB disk free. Otherwise it hangs completely.
+  # Avoids disabling YARN disk monitoring completely because otherwise multiple jobs might
+  # use up all the disk in a scenario where otherwise they could complete sequentially.
+  'yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage': 99,
+
   # Increase YARN container resources to 2GB to avoid dataload failures
   'yarn.app.mapreduce.am.resource.mb': 2048,
 
