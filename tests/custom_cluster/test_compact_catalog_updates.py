@@ -43,9 +43,9 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
     try:
       # Check that initial catalop update topic has been received
       impalad1 = self.cluster.impalads[0]
-      assert impalad1.service.get_metric_value("catalog.num-tables") > 0
+      assert impalad1.service.get_metric_value("catalog.curr-version") > 0
       impalad2 = self.cluster.impalads[1]
-      assert impalad2.service.get_metric_value("catalog.num-tables") > 0
+      assert impalad2.service.get_metric_value("catalog.curr-version") > 0
 
       client1 = impalad1.service.create_beeswax_client()
       client2 = impalad2.service.create_beeswax_client()
@@ -55,10 +55,12 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
       result = client2.execute("select count(*) from functional.alltypes")
       assert result.data[0] == "7300"
 
+      prev_v1 = impalad1.service.get_metric_value("catalog.curr-version")
+      prev_v2 = impalad2.service.get_metric_value("catalog.curr-version")
       self.execute_query_expect_success(client1, "invalidate metadata", query_options)
       self.execute_query_expect_success(client2, "show databases")
-      assert impalad1.service.get_metric_value("catalog.num-databases") > 0
-      assert impalad2.service.get_metric_value("catalog.num-databases") > 0
+      assert impalad1.service.get_metric_value("catalog.curr-version") > prev_v1
+      assert impalad2.service.get_metric_value("catalog.curr-version") > prev_v2
     finally:
       client1.close()
       client2.close()

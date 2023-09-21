@@ -1051,13 +1051,20 @@ public class Frontend {
     return planCtx.getExplainString();
   }
 
-  public TGetCatalogMetricsResult getCatalogMetrics() throws ImpalaException {
+  public TGetCatalogMetricsResult getCatalogMetrics() {
     TGetCatalogMetricsResult resp = new TGetCatalogMetricsResult();
-    for (FeDb db : getCatalog().getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
-      resp.num_dbs++;
-      resp.num_tables += db.getAllTableNames().size();
+    if (BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) {
+      // Don't track these two metrics in LocalCatalog mode since they might introduce
+      // catalogd RPCs when the db list or some table lists are not cached.
+      resp.num_dbs = -1;
+      resp.num_tables = -1;
+      FeCatalogUtils.populateCacheMetrics(getCatalog(), resp);
+    } else {
+      for (FeDb db : getCatalog().getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
+        resp.num_dbs++;
+        resp.num_tables += db.getAllTableNames().size();
+      }
     }
-    FeCatalogUtils.populateCacheMetrics(getCatalog(), resp);
     return resp;
   }
 

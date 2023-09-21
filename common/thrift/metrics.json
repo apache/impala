@@ -330,7 +330,7 @@
     "key": "catalog-server.topic-processing-time-s"
   },
   {
-    "description": "The number of databases in the catalog.",
+    "description": "The number of databases in the catalog. Untracked in LocalCatalog mode.",
     "contexts": [
       "IMPALAD"
     ],
@@ -340,7 +340,7 @@
     "key": "catalog.num-databases"
   },
   {
-    "description": "The number of tables in the catalog.",
+    "description": "The number of tables in the catalog. Untracked in LocalCatalog mode.",
     "contexts": [
       "IMPALAD"
     ],
