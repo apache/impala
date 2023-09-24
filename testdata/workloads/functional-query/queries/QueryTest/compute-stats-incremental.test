@@ -207,6 +207,14 @@ compute incremental stats alltypes_incremental partition(year=2010, month=2);
 STRING
 ====
 ---- QUERY
+# Test that no partitions are updated if there are no changes (IMPALA-12462).
+compute incremental stats alltypes_incremental partition(year=2010, month=2);
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
 show table stats alltypes_incremental;
 ---- RESULTS
 '2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'

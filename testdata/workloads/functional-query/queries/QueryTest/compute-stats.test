@@ -13,6 +13,14 @@ compute stats alltypes
 STRING
 ====
 ---- QUERY
+# Test that no partitions are updated if there are no changes (IMPALA-12462).
+compute stats alltypes
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
 show table stats alltypes
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY

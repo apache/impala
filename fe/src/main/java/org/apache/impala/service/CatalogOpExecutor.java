@@ -1881,15 +1881,34 @@ public class CatalogOpExecutor {
         partitionStats.stats.setNum_rows(0L);
       }
 
-      // Unconditionally update the partition stats and row count, even if the partition
-      // already has identical ones. This behavior results in possibly redundant work,
-      // but it is predictable and easy to reason about because it does not depend on the
-      // existing state of the metadata. See IMPALA-2201.
-      long numRows = partitionStats.stats.num_rows;
-      if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format("Updating stats for partition %s: numRows=%d",
-            partition.getValuesAsString(), numRows));
+      // Update the partition in HMS only if something has changed.
+      // Note that previously all partitions were updated to avoid an HMS bug.
+      // See IMPALA-2201.
+      boolean updatedPartition = false;
+      TPartitionStats existingPartStats = partition.getPartitionStats();
+      // Update the partition stats if: either there are no existing stats for this
+      // partition, or they're different.
+      if (existingPartStats == null || !existingPartStats.equals(partitionStats)) {
+        updatedPartition = true;
       }
+
+      long numRows = partitionStats.stats.num_rows;
+      String existingRowCount =
+          partition.getParameters().get(StatsSetupConst.ROW_COUNT);
+      if (existingRowCount == null ||
+          !existingRowCount.equals(String.valueOf(numRows))) {
+        // The existing row count value wasn't set or has changed.
+        updatedPartition = true;
+      }
+
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("{} stats for partition {}: numRows={}",
+            updatedPartition ? "Updating" : "Skip updating",
+            partition.getValuesAsString(), numRows);
+      }
+
+      if (!updatedPartition) continue;
+
       HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
       PartitionStatsUtil.partStatsToPartition(partitionStats, partBuilder);
       partBuilder.setRowCountParam(numRows);
