@@ -376,9 +376,10 @@ static Status JavaAddOpens(bool useSizeOf) {
   }
 
   for (const string& param : {
-    // Needed for jamm and ehcache
+    // Needed for jamm and ehcache (jamm needs it to access lambdas)
     "--add-opens=java.base/java.lang=ALL-UNNAMED",
     "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "--add-opens=java.base/java.util.regex=ALL-UNNAMED",
     "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
   }) {
     val_out << " " << param;
