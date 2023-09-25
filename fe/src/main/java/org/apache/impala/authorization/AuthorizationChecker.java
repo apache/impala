@@ -112,4 +112,9 @@ public interface AuthorizationChecker {
    * This method is to be executed after AnalysisContext#analyze() is completed.
    */
   void postAnalyze(AuthorizationContext authzCtx);
+
+  /**
+   * This method returns whether the role exists for given role
+   */
+  boolean roleExists(String roleName);
 }

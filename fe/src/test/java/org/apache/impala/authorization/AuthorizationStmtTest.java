@@ -2561,6 +2561,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       authzCatalog_.removeRole("foo_owner");
     }
 
+    // check ALTER VIEW SET OWNER ROLE should throw an AnalysisException.
+    // if role is removed
+    boolean exceptionThrown = false;
+    try {
+      parseAndAnalyze("alter view functional.alltypes_view set owner role foo_owner",
+          authzCtx_, frontend_);
+    } catch (AnalysisException e) {
+      exceptionThrown = true;
+      assertEquals("Role 'foo_owner' does not exist.", e.getLocalizedMessage());
+    }
+    assertTrue(exceptionThrown);
+
     // Database does not exist.
     authorize("alter view nodb.alltypes_view as select 1")
         .error(alterError("nodb"))

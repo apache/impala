@@ -441,6 +441,11 @@ public class FrontendTestBase extends AbstractFrontendTest {
           }
 
           @Override
+          public boolean roleExists(String roleName) {
+            return catalog_.getAuthPolicy().getRole(roleName) != null;
+          }
+
+          @Override
           public AuthorizationContext createAuthorizationContext(boolean doAudits,
               String sqlStmt, TSessionState sessionState,
               Optional<EventSequence> timeline) {

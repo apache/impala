@@ -18,6 +18,8 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.authorization.AuthorizationChecker;
+import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterDbParams;
@@ -55,9 +57,13 @@ public class AlterDbSetOwnerStmt extends AlterDbStmt {
     // We don't allow assigning to a non-existent role because Ranger should know about
     // all roles. Ranger does not track all users so we allow assigning to a user
     // that Ranger doesn't know about yet.
-    if (analyzer.isAuthzEnabled() && owner_.getOwnerType() == TOwnerType.ROLE
-        && analyzer.getCatalog().getAuthPolicy().getRole(ownerName) == null) {
-      throw new AnalysisException(String.format("Role '%s' does not exist.", ownerName));
+    if (analyzer.isAuthzEnabled() && owner_.getOwnerType() == TOwnerType.ROLE) {
+      AuthorizationFactory authzFactory = analyzer.getAuthzFactory();
+      AuthorizationChecker authzChecker = authzFactory.newAuthorizationChecker();
+      if (!authzChecker.roleExists(ownerName)) {
+        throw new AnalysisException(
+            String.format("Role '%s' does not exist.", ownerName));
+      }
     }
     // Set the servername here if authorization is enabled because analyzer_ is not
     // available in the toThrift() method.

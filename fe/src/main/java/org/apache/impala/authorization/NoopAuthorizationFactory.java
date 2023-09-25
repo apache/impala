@@ -239,6 +239,12 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
       @Override
       public void postAnalyze(AuthorizationContext authzCtx) {
       }
+
+      @Override
+      public boolean roleExists(String roleName) {
+        throw new UnsupportedOperationException(
+            String.format("%s is not supported", ClassUtil.getMethodName()));
+      }
     };
   }
 

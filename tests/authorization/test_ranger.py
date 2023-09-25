@@ -1290,6 +1290,7 @@ class TestRanger(CustomClusterTestSuite):
     """Tests ownership privileges for databases and tables with ranger along with
     some known quirks in the implementation."""
     test_user = getuser()
+    test_role = 'test_role'
     test_db = "test_ranger_ownership_" + get_random_id(5).lower()
     # Create a test database as "admin" user. Owner is set accordingly.
     self._run_query_as_user("create database {0}".format(test_db), ADMIN, True)
@@ -1335,6 +1336,18 @@ class TestRanger(CustomClusterTestSuite):
       # Change the table owner back to admin.
       self._run_query_as_user(
           "alter table {0}.foo set owner user {1}".format(test_db, ADMIN), ADMIN, True)
+      # create role before test begin.
+      self._run_query_as_user("CREATE ROLE {0}".format(test_role), ADMIN, True)
+      # test alter table owner to role statement, expect success result.
+      stmt = "alter table {0}.foo set owner role {1}".format(test_db, test_role)
+      self._run_query_as_user(stmt, ADMIN, True)
+      # drop the role.
+      self._run_query_as_user("DROP ROLE {0}".format(test_role), ADMIN, True)
+      # alter table to a non-exist role, expect error showing "role doesn't exist".
+      stmt = "alter table {0}.foo set owner role {1}".format(test_db, test_role)
+      result = self._run_query_as_user(stmt, ADMIN, False)
+      err = "Role '{0}' does not exist.".format(test_role)
+      assert err in str(result)
       # test_user should not be authorized to run the queries anymore.
       result = self._run_query_as_user(
           "select * from {0}.foo".format(test_db), test_user, False)

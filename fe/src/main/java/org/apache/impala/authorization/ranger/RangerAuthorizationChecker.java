@@ -754,4 +754,9 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
 
   @VisibleForTesting
   public RangerImpalaPlugin getRangerImpalaPlugin() { return plugin_; }
+
+  @Override
+  public boolean roleExists(String roleName) {
+    return RangerUtil.roleExists(plugin_, roleName);
+  }
 }

@@ -27,13 +27,13 @@ import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
 import org.apache.impala.authorization.ranger.RangerCatalogdAuthorizationManager;
 import org.apache.impala.authorization.ranger.RangerImpalaPlugin;
 import org.apache.impala.authorization.ranger.RangerImpalaResourceBuilder;
-import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.Frontend;
+import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
@@ -112,6 +112,8 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   protected final RangerImpalaPlugin rangerImpalaPlugin_;
   protected final RangerRESTClient rangerRestClient_;
 
+  protected final CatalogServiceTestCatalog testCatalog_;
+
   public AuthorizationTestBase(AuthorizationProvider authzProvider)
       throws ImpalaException {
     authzProvider_ = authzProvider;
@@ -122,7 +124,8 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
             SERVER_NAME, null, null, null);
         authzFactory_ = createAuthorizationFactory(authzProvider);
         authzCtx_ = createAnalysisCtx(authzFactory_, user_.getName());
-        authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
+        testCatalog_ = CatalogServiceTestCatalogWithRanger.createWithAuth(authzFactory_);
+        authzCatalog_ = new ImpaladTestCatalog(testCatalog_);
         authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
         rangerImpalaPlugin_ =
             ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())
