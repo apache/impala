@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2022" />
-<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="copyright" content="(C) Copyright 2023" />
+<meta name="DC.rights.owner" content="(C) Copyright 2023" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using Impala with Iceberg Tables" />
 <meta name="prodname" content="Impala" />
@@ -32,11 +32,6 @@
       analytics over them. Using Impala you can create and write Iceberg tables in different
       Iceberg Catalogs (e.g. HiveCatalog, HadoopCatalog). It also supports location-based
       tables (HadoopTables).
-    </p>
-
-    <p class="p">
-      Currently only Iceberg V1 DML operations are allowed, i.e. INSERT INTO /INSERT OVERWRITE.
-      Iceberg V2 operations like row-level modifications (UPDATE, DELETE) are not supported yet.
     </p>
 
 
@@ -140,37 +135,39 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
         <li class="li">
           Alternatively, you can also use custom catalogs to use existing tables. It means you need to define
           your catalog in hive-site.xml.
-          The adventage of this method is that other engines are more likely to be able to interact with this table.
+          The advantage of this method is that other engines are more likely to be able to interact with this table.
+          Please note that the automatic metadata update will not work for these tables, you will have to manually
+          call REFRESH on the table when it changes outside Impala.
           To globally register different catalogs, set the following Hadoop configurations:
           
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="iceberg_create__iceberg_custom_catalogs" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /></colgroup><thead class="thead" style="text-align:left;">
                 <tr class="row">
-                  <th class="entry cellrowborder" style="vertical-align:top;" id="d98571e158">Config Key</th>
+                  <th class="entry cellrowborder" style="vertical-align:top;" id="d99161e155">Config Key</th>
 
-                  <th class="entry cellrowborder" style="vertical-align:top;" id="d98571e161">Description</th>
+                  <th class="entry cellrowborder" style="vertical-align:top;" id="d99161e158">Description</th>
 
                 </tr>
 
               </thead>
 <tbody class="tbody">
                 <tr class="row">
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e158 ">iceberg.catalog.&lt;catalog_name&gt;.type</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e155 ">iceberg.catalog.&lt;catalog_name&gt;.type</td>
 
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e161 ">type of catalog: hive, hadoop, or left unset if using a custom catalog</td>
-
-                </tr>
-
-                <tr class="row">
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e158 ">iceberg.catalog.&lt;catalog_name&gt;.catalog-impl</td>
-
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e161 ">catalog implementation, must not be null if type is empty</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e158 ">type of catalog: hive, hadoop, or left unset if using a custom catalog</td>
 
                 </tr>
 
                 <tr class="row">
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e158 ">iceberg.catalog.&lt;catalog_name&gt;.&lt;key&gt;</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e155 ">iceberg.catalog.&lt;catalog_name&gt;.catalog-impl</td>
 
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e161 ">any config key and value pairs for the catalog</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e158 ">catalog implementation, must not be null if type is empty</td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e155 ">iceberg.catalog.&lt;catalog_name&gt;.&lt;key&gt;</td>
+
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e158 ">any config key and value pairs for the catalog</td>
 
                 </tr>
 
@@ -213,8 +210,8 @@ CREATE TABLE ice_t (i INT) STORED AS ICEBERG;
       </div>
 
       <p class="p">
-        By default Impala assumes that the Iceberg table uses Parquet data files. ORC is also supported,
-        but we need to tell Impala via setting the table property 'write.format.default' to 'ORC'.
+        By default Impala assumes that the Iceberg table uses Parquet data files. ORC and AVRO are also supported,
+        but we need to tell Impala via setting the table property 'write.format.default' to e.g. 'ORC'.
       </p>
 
       <div class="p">
@@ -233,8 +230,48 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="iceberg_drop">
-    <h2 class="title topictitle2" id="ariaid-title4">Dropping Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="iceberg_v2">
+    <h2 class="title topictitle2" id="ariaid-title4">Iceberg V2 tables</h2>
+
+    <div class="body conbody">
+      <div class="p">
+        Iceberg V2 tables support row-level modifications (DELETE, UPDATE) via "merge-on-read", which means instead
+        of rewriting existing data files, separate so-called delete files are being written that store information
+        about the deleted records. There are two kinds of delete files in Iceberg:
+        <ul class="ul">
+          <li class="li">position deletes</li>
+
+          <li class="li">equality deletes</li>
+
+        </ul>
+
+        Impala only supports position delete files. These files contain the file path and file position of the deleted
+        rows.
+      </div>
+
+      <div class="p">
+        One can create Iceberg V2 tables via the <code class="ph codeph">CREATE TABLE</code> statement, they just need to specify
+        the 'format-version' table property:
+        <pre class="pre codeblock"><code>
+CREATE TABLE ice_v2 (i int) STORED BY ICEBERG TBLPROPERTIES('format-version'='2');
+        </code></pre>
+      </div>
+
+      <div class="p">
+        It is also possible to upgrade existing Iceberg V1 tables to Iceberg V2 tables. One can use the following
+        <code class="ph codeph">ALTER TABLE</code> statement to do so:
+        <pre class="pre codeblock"><code>
+ALTER TABLE ice_v1_to_v2 SET TBLPROPERTIES('format-version'='2');
+        </code></pre>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="iceberg_drop">
+    <h2 class="title topictitle2" id="ariaid-title5">Dropping Iceberg tables</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -259,13 +296,13 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="iceberg_types">
-    <h2 class="title topictitle2" id="ariaid-title5">Supported Data Types for Iceberg Columns</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="iceberg_types">
+    <h2 class="title topictitle2" id="ariaid-title6">Supported Data Types for Iceberg Columns</h2>
 
     <div class="body conbody">
 
       <p class="p">
-        You can get information about the supported Iceberg data tyeps in
+        You can get information about the supported Iceberg data types in
         <a class="xref" href="https://iceberg.apache.org/docs/latest/schemas/" target="_blank">
           the Iceberg spec</a>.
       </p>
@@ -276,130 +313,130 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
         
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="iceberg_types__iceberg_types_sql_types" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /></colgroup><thead class="thead" style="text-align:left;">
               <tr class="row">
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d98571e306">Iceberg type</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d99161e342">Iceberg type</th>
 
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d98571e309">SQL type in Impala</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d99161e345">SQL type in Impala</th>
 
               </tr>
 
             </thead>
 <tbody class="tbody">
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">boolean</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">boolean</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">BOOLEAN</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">int</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">INTEGER</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">BOOLEAN</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">long</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">int</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">BIGINT</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">float</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">FLOAT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">INTEGER</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">double</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">long</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">DOUBLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">decimal(P, S)</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">DECIMAL(P, S)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">BIGINT</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">date</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">float</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">DATE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">time</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">Not supported</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">FLOAT</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">timestamp</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">double</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">TIMESTAMP</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">timestamptz</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">Only read support via TIMESTAMP</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">DOUBLE</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">string</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">decimal(P, S)</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">STRING</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">uuid</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">Not supported</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">DECIMAL(P, S)</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">fixed(L)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">date</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">Not supported</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">binary</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">Not supported</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">DATE</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">struct</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">time</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">STRUCT (read only)</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">list</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">ARRAY (read only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">Not supported</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e306 ">map</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">timestamp</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d98571e309 ">MAP (read only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">TIMESTAMP</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">timestamptz</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">Only read support via TIMESTAMP</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">string</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">STRING</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">uuid</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">Not supported</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">fixed(L)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">Not supported</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">binary</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">Not supported</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">struct</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">STRUCT (read only)</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">list</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">ARRAY (read only)</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e342 ">map</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99161e345 ">MAP (read only)</td>
 
               </tr>
 
@@ -415,8 +452,8 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="iceberg_schema_evolution">
-    <h2 class="title topictitle2" id="ariaid-title6">Schema evolution of Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="iceberg_schema_evolution">
+    <h2 class="title topictitle2" id="ariaid-title7">Schema evolution of Iceberg tables</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -450,6 +487,10 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
       </div>
 
       <p class="p">
+        Impala currently does not support schema evolution for tables with AVRO file format.
+      </p>
+
+      <p class="p">
         See
         <a class="xref" href="https://iceberg.apache.org/docs/latest/evolution/#schema-evolution" target="_blank">
         schema evolution </a> for more details.
@@ -460,8 +501,8 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="iceberg_partitioning">
-    <h2 class="title topictitle2" id="ariaid-title7">Partitioning Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="iceberg_partitioning">
+    <h2 class="title topictitle2" id="ariaid-title8">Partitioning Iceberg tables</h2>
 
     <div class="body conbody">
       <p class="p">
@@ -523,8 +564,8 @@ CREATE TABLE ice_p (i INT, b INT) PARTITIONED BY (p1 INT, p2 STRING) STORED AS I
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="iceberg_inserts">
-    <h2 class="title topictitle2" id="ariaid-title8">Writing Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="iceberg_inserts">
+    <h2 class="title topictitle2" id="ariaid-title9">Inserting data into Iceberg tables</h2>
 
     <div class="body conbody">
       <p class="p">
@@ -560,8 +601,69 @@ INSERT INTO ice_p VALUES (1, 2);
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="iceberg_time_travel">
-    <h2 class="title topictitle2" id="ariaid-title9">Time travel for Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="iceberg_delete">
+    <h2 class="title topictitle2" id="ariaid-title10">Delete data from Iceberg tables</h2>
+
+    <div class="body conbody">
+      <div class="p">
+        Since <span class="keyword">Impala 4.3</span> Impala is able to run <code class="ph codeph">DELETE</code> statements against
+        Iceberg V2 tables. E.g.:
+        <pre class="pre codeblock"><code>
+DELETE FROM ice_t where i = 3;
+        </code></pre>
+      </div>
+
+      <p class="p">
+        More information about the <code class="ph codeph">DELETE</code> statement can be found at <a class="xref" href="impala_delete.html#delete">DELETE Statement (Impala 2.8 or higher only)</a>.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="iceberg_update">
+    <h2 class="title topictitle2" id="ariaid-title11">Updating data int Iceberg tables</h2>
+
+    <div class="body conbody">
+      <p class="p">
+        Impala does not yet support the UPDATE statement. One can mimic its behaviour by calling
+        DELETE + INSERT statements one after the other, but please note that this creates two transactions.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="iceberg_load">
+    <h2 class="title topictitle2" id="ariaid-title12">Loading data into Iceberg tables</h2>
+
+    <div class="body conbody">
+      <div class="p">
+        <code class="ph codeph">LOAD DATA</code> statement can be used to load a single file or directory into
+        an existing Iceberg table. This operation is executed differently compared to HMS tables, the
+        data is being inserted into the table via sequentially executed statements, which has
+        some limitations:
+        <ul class="ul">
+          <li class="li">Only Parquet or ORC files can be loaded.</li>
+
+          <li class="li"><code class="ph codeph">PARTITION</code> clause is not supported, but the partition transformations
+          are respected.</li>
+
+          <li class="li">The loaded files will be re-written as Parquet files.</li>
+
+        </ul>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="iceberg_time_travel">
+    <h2 class="title topictitle2" id="ariaid-title13">Time travel for Iceberg tables</h2>
 
     <div class="body conbody">
 
@@ -601,34 +703,69 @@ DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
 </code></pre>
       </div>
 
-
-      <p class="p">
-        Please note that during time travel, Impala uses the current table schema to query an older
-        snapshot of the table which might have had a different schema in the past.
-      </p>
-
-
-    </div>
-
-  </div>
-
-
-  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="iceberg_table_cloning">
-    <h2 class="title topictitle2" id="ariaid-title10">Cloning Iceberg tables (LIKE clause)</h2>
-
-    <div class="body conbody">
       <div class="p">
-        Use <code class="ph codeph">CREATE TABLE ... LIKE ...</code> to create an empty Iceberg table
-        based on the definition of another Iceberg table, including any column attributes in
-        the original table:
-        <pre class="pre codeblock"><code>
-CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
-        </code></pre>
+        The output of the <code class="ph codeph">DESCRIBE HISTORY</code> statement is formed
+        of the following columns:
+        <ul class="ul">
+          <li class="li"><code class="ph codeph">creation_time</code>: the snapshot's creation timestamp.</li>
+
+          <li class="li"><code class="ph codeph">snapshot_id</code>: the snapshot's ID or null.</li>
+
+          <li class="li"><code class="ph codeph">parent_id</code>: the snapshot's parent ID or null.</li>
+
+          <li class="li"><code class="ph codeph">is_current_ancestor</code>: TRUE if the snapshot is a current ancestor of the table.</li>
+
+        </ul>
+
       </div>
 
+
       <p class="p">
-        Because of the Data Types of Iceberg and Impala do not correspond one by one, Impala
-        can only clone between Iceberg tables.
+        Please note that time travel queries are executed using the old schema of the table
+        from the point specified by the time travel parameters.
+        Prior to Impala 4.3.0 the current table schema is used to query an older
+        snapshot of the table, which might have had a different schema in the past.
+      </p>
+
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="iceberg_execute_rollback">
+    <h2 class="title topictitle2" id="ariaid-title14">Rolling Iceberg tables back to a previous state</h2>
+
+    <div class="body conbody">
+      <p class="p">
+        Iceberg table modifications cause new table snapshots to be created;
+        these snapshots represent an earlier version of the table.
+        The <code class="ph codeph">ALTER TABLE [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> EXECUTE ROLLBACK</code>
+        statement can be used to roll back the table to a previous snapshot.
+      </p>
+
+
+      <div class="p">
+        For example, to roll the table back to the snapshot id <code class="ph codeph">123456</code> use:
+        <pre class="pre codeblock"><code>
+ALTER TABLE ice_tbl EXECUTE ROLLBACK(123456);
+        </code></pre>
+        To roll the table back to the most recent (newest) snapshot
+        that has a creation timestamp that is older than the timestamp '2022-01-04 10:00:00' use:
+        <pre class="pre codeblock"><code>
+ALTER TABLE ice_tbl EXECUTE ROLLBACK('2022-01-04 10:00:00');
+        </code></pre>
+        The timestamp is evaluated using the Timezone for the current session.
+      </div>
+
+
+      <p class="p">
+        It is only possible to roll back to a snapshot that is a current ancestor of the table.
+      </p>
+
+      <p class="p">
+        When a table is rolled back to a snapshot, a new snapshot is
+        created with the same snapshot id, but with a new creation timestamp.
       </p>
 
     </div>
@@ -636,8 +773,8 @@ CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="iceberg_expire_snapshots">
-    <h2 class="title topictitle2" id="ariaid-title11">Expiring snapshots</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="iceberg_expire_snapshots">
+    <h2 class="title topictitle2" id="ariaid-title15">Expiring snapshots</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -678,8 +815,31 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="iceberg_table_properties">
-    <h2 class="title topictitle2" id="ariaid-title12">Iceberg table properties</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="iceberg_table_cloning">
+    <h2 class="title topictitle2" id="ariaid-title16">Cloning Iceberg tables (LIKE clause)</h2>
+
+    <div class="body conbody">
+      <div class="p">
+        Use <code class="ph codeph">CREATE TABLE ... LIKE ...</code> to create an empty Iceberg table
+        based on the definition of another Iceberg table, including any column attributes in
+        the original table:
+        <pre class="pre codeblock"><code>
+          CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
+        </code></pre>
+      </div>
+
+      <p class="p">
+        Because of the Data Types of Iceberg and Impala do not correspond one by one, Impala
+        can only clone between Iceberg tables.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="iceberg_table_properties">
+    <h2 class="title topictitle2" id="ariaid-title17">Iceberg table properties</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -695,7 +855,7 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
 
           <li class="li"><code class="ph codeph">iceberg.table_identifier</code>: Iceberg table identifier. We use &lt;database&gt;.&lt;table&gt; instead if this property is not set</li>
 
-          <li class="li"><code class="ph codeph">write.format.default</code>: data file format of the table. Impala can read ORC and PARQUET data files in Iceberg tables, and can write PARQUET data files only.</li>
+          <li class="li"><code class="ph codeph">write.format.default</code>: data file format of the table. Impala can read AVRO, ORC and PARQUET data files in Iceberg tables, and can write PARQUET data files only.</li>
 
           <li class="li"><code class="ph codeph">write.parquet.compression-codec</code>:
             Parquet compression codec. Supported values are: NONE, GZIP, SNAPPY
@@ -735,6 +895,78 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
         </ul>
 
       </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title18" id="iceberg_manifest_caching">
+    <h2 class="title topictitle2" id="ariaid-title18">Iceberg manifest caching</h2>
+
+    <div class="body conbody">
+      <div class="p">
+        Starting from version 1.1.0, Apache Iceberg provides a mechanism to cache the
+        contents of Iceberg manifest files in memory. This manifest caching feature helps
+        to reduce repeated reads of small Iceberg manifest files from remote storage by
+        Coordinators and Catalogd. This feature can be enabled for Impala Coordinators and
+        Catalogd by setting properties in Hadoop's core-site.xml as in the following:
+        <pre class="pre codeblock"><code>
+iceberg.io-impl=org.apache.iceberg.hadoop.HadoopFileIO;
+iceberg.io.manifest.cache-enabled=true;
+iceberg.io.manifest.cache.max-total-bytes=104857600;
+iceberg.io.manifest.cache.expiration-interval-ms=3600000;
+iceberg.io.manifest.cache.max-content-length=8388608;
+        </code></pre>
+      </div>
+
+      <div class="p">
+        The description of each property is as follows:
+        <ul class="ul">
+          <li class="li">
+            <code class="ph codeph">iceberg.io-impl</code>: custom FileIO implementation to use in a
+            catalog. Must be set to enable manifest caching. Impala defaults to
+            HadoopFileIO. It is recommended to not change this to other than HadoopFileIO.
+          </li>
+
+          <li class="li">
+            <code class="ph codeph">iceberg.io.manifest.cache-enabled</code>: enable/disable the
+            manifest caching feature.
+          </li>
+
+          <li class="li">
+            <code class="ph codeph">iceberg.io.manifest.cache.max-total-bytes</code>: maximum total
+            amount of bytes to cache in the manifest cache. Must be a positive value.
+          </li>
+
+          <li class="li">
+            <code class="ph codeph">iceberg.io.manifest.cache.expiration-interval-ms</code>: maximum
+            duration for which an entry stays in the manifest cache. Must be a
+            non-negative value. Setting zero means cache entries expire only if it gets
+            evicted due to memory pressure from
+            <code class="ph codeph">iceberg.io.manifest.cache.max-total-bytes</code>.
+          </li>
+
+          <li class="li">
+            <code class="ph codeph">iceberg.io.manifest.cache.max-content-length</code>: maximum length
+            of a manifest file to be considered for caching in bytes. Manifest files with
+            a length exceeding this property value will not be cached. Must be set with a
+            positive value and lower than
+            <code class="ph codeph">iceberg.io.manifest.cache.max-total-bytes</code>.
+          </li>
+
+        </ul>
+
+      </div>
+
+      <p class="p">
+        Manifest caching only works for tables that are loaded with either of
+        HadoopCatalogs or HiveCatalogs. Individual HadoopCatalog and HiveCatalog will have
+        separate manifest caches with the same configuration. By default, only 8 catalogs
+        can have their manifest cache active in memory. This number can be raised by
+        setting a higher value in the java system property
+        <code class="ph codeph">iceberg.io.manifest.cache.fileio-max</code>.
+      </p>
 
     </div>
 

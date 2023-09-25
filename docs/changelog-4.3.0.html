@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Impala 4.3.0 Change Log</title>
+</head>
+<body>
+<h1>Impala 4.3.0 Change Log</h1>
+Release Notes - IMPALA - Version Impala 4.3.0
+
+<h2>        New Feature
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1766'>IMPALA-1766</a>] -         Misc. statistical functions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6433'>IMPALA-6433</a>] -         Add read support for PageHeaderV2 to the parquet scanner
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9551'>IMPALA-9551</a>] -         Allow embedding complex types into other complex types
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10262'>IMPALA-10262</a>] -         Linux Packaging Support
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10851'>IMPALA-10851</a>] -         Codegen for structs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11013'>IMPALA-11013</a>] -         Support migrating external tables to Iceberg tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11158'>IMPALA-11158</a>] -         Add support for Iceberg tables with AVRO data files
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11339'>IMPALA-11339</a>] -         Implement LOAD DATA INPATH for Iceberg tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11470'>IMPALA-11470</a>] -         Support Caching Codegen Functions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11482'>IMPALA-11482</a>] -         Implement Iceberg table rollback feature
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11565'>IMPALA-11565</a>] -         Support IF NOT EXISTS in alter table add columns for kudu table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11629'>IMPALA-11629</a>] -         Support Huawei OBS (Object Storage Service) FileSystem
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11728'>IMPALA-11728</a>] -         Set fallback database for functions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11745'>IMPALA-11745</a>] -         Add Hive&#39;s ESRI geospatial functions as builtins
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11809'>IMPALA-11809</a>] -         Support non unique primary key for Kudu
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11877'>IMPALA-11877</a>] -         Add support for DELETE statements for Iceberg tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11922'>IMPALA-11922</a>] -         Add Startup Flag to Select TLS Certificate Verification on JWKS URL
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11961'>IMPALA-11961</a>] -         Add support for Ubuntu 22.04
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11970'>IMPALA-11970</a>] -         Add query timeline display to Impala WebUI
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12053'>IMPALA-12053</a>] -         Expose event-processor error message in catalogd WebUI
+</li>
+</ul>
+
+<h2>        Epic
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11360'>IMPALA-11360</a>] -         Support Java11 in Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11754'>IMPALA-11754</a>] -         Fixes for Impala+Ozone and erasure coding
+</li>
+</ul>
+
+<h2>        Improvement
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3880'>IMPALA-3880</a>] -         Add list of all tables queried to runtime profile
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4052'>IMPALA-4052</a>] -         CREATE TABLE LIKE for Kudu tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6665'>IMPALA-6665</a>] -         Tag CatalogOp logs with query IDs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7003'>IMPALA-7003</a>] -         Support erasure-coding in impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7969'>IMPALA-7969</a>] -         Always admit trivial queries immediately
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8731'>IMPALA-8731</a>] -         Balance queries between executor groups
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10173'>IMPALA-10173</a>] -         Allow implicit casts between numeric and string types when inserting into table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10856'>IMPALA-10856</a>] -         Show connections in the web UI
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11375'>IMPALA-11375</a>] -         impala-shell: log important message for rpc requests/response
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11476'>IMPALA-11476</a>] -         Support for Ozone with Erasure Coding
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11477'>IMPALA-11477</a>] -         Codegen Heapify in SortedRunMerger
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11534'>IMPALA-11534</a>] -         Skip reloading file metadata for some ALTER_TABLE events
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11535'>IMPALA-11535</a>] -         Skip events happen before manual REFRESH
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11563'>IMPALA-11563</a>] -         Optimized /etc/sysconfig/clock to find the time zone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11603'>IMPALA-11603</a>] -         Investigate using cloudflare&#39;s zlib library
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11604'>IMPALA-11604</a>] -         Planner changes for CPU usage
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11617'>IMPALA-11617</a>] -         Pool service should be made aware of cpu-usage limit for each executor group set
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11619'>IMPALA-11619</a>] -         Improve Iceberg V2 reads with a custom Iceberg Position Delete operator
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11624'>IMPALA-11624</a>] -         Update Impyla dependency to 0.18.0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11626'>IMPALA-11626</a>] -         Handle COMMIT_COMPACTION_EVENT from HMS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11658'>IMPALA-11658</a>] -         Implement Iceberg manifest caching configuration for Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11662'>IMPALA-11662</a>] -         Improve &quot;refresh iceberg_tbl_on_oss;&quot; performance
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11694'>IMPALA-11694</a>] -         Use C++ atomics for the implementation of gutil/atomicops.h
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11713'>IMPALA-11713</a>] -         Switch to C++17
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11717'>IMPALA-11717</a>] -         Use rapidjson for printing collections
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11730'>IMPALA-11730</a>] -         Add support for spilling to Ozone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11758'>IMPALA-11758</a>] -         Databases named &quot;iceberg&quot; confuses the parser, throws ParseException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11784'>IMPALA-11784</a>] -         Don&#39;t call Iceberg&#39;s planFiles redundantly during table load
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11785'>IMPALA-11785</a>] -         impala-shell should produce a warning if Thrift&#39;s fastbinary package isn&#39;t working
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11808'>IMPALA-11808</a>] -         Improve catalogD cache performance in a multi service environment for a refresh/invalidate query
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11822'>IMPALA-11822</a>] -         Optimize the Refresh/Invalidate event processing by skipping unnecessary events
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11823'>IMPALA-11823</a>] -         Add more items to Impala web UI queries page
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11850'>IMPALA-11850</a>] -         impala-shell: add tracing headers to hs2-http requests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11859'>IMPALA-11859</a>] -         Metric tracking encrypted bytes read
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11865'>IMPALA-11865</a>] -         Set thread names for Java thread pools
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11869'>IMPALA-11869</a>] -         Use to_string() in PrintValue for printing Thrift types
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11880'>IMPALA-11880</a>] -         JWT Token based auth support for Impala Shell
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11886'>IMPALA-11886</a>] -         Data cache should support asynchronous writes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11891'>IMPALA-11891</a>] -         Update executor group min size without restarting coordinators
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11895'>IMPALA-11895</a>] -         Need accessor methods for third party extension
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11904'>IMPALA-11904</a>] -         Data cache should support dumping metadata for reloading
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11916'>IMPALA-11916</a>] -         base::IsAarch64 should be inlined
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11935'>IMPALA-11935</a>] -         Generate core dumps if ASAN/TSAN/UBSAN built tests crash
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11941'>IMPALA-11941</a>] -         Support Java 17 in Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11966'>IMPALA-11966</a>] -         Enable cache_ozone_file_handles by default
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11992'>IMPALA-11992</a>] -         Support setting query options in JDBC&#39;s connection URL
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12005'>IMPALA-12005</a>] -         Explain executor group set selection criteria in query profile
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12014'>IMPALA-12014</a>] -         Output a warning message on failed KeepAlive RPC for a Kudu scanner
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12024'>IMPALA-12024</a>] -         For CTAS, include time to create the table in the query profile timeline
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12025'>IMPALA-12025</a>] -         Hide misleading TotalTime and InactiveTotalTime
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12029'>IMPALA-12029</a>] -         Query can be under parallelized in multi executor group set setup
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12031'>IMPALA-12031</a>] -         Add security-related HTTP headers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12036'>IMPALA-12036</a>] -         Web UI incorrectly shows root.default resource pool for all queries in /queries page
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12059'>IMPALA-12059</a>] -         Make Thrift compilation stop spewing warnings
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12064'>IMPALA-12064</a>] -         Remove unused toolchain components versions (boost, thrift)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12065'>IMPALA-12065</a>] -         Use pigz when compression the tarballs for native-toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12069'>IMPALA-12069</a>] -         Remove BUILD_HISTORICAL mode from native-toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12070'>IMPALA-12070</a>] -         Don&#39;t build bison and autotools in the native-toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12071'>IMPALA-12071</a>] -         Update ccache archive or disable downloading ccache for toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12085'>IMPALA-12085</a>] -         The description in cluster-membership-mgr.h should be updated
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12091'>IMPALA-12091</a>] -         Control scan fragment parallelism by its processing cost
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12096'>IMPALA-12096</a>] -         Impala Web UI list process start time and version of all backends
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12111'>IMPALA-12111</a>] -         Speed up DATE to STRING conversion
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12116'>IMPALA-12116</a>] -         Bump GBN to get HMS thift API change #hive-25205
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12120'>IMPALA-12120</a>] -         Set appropriate output writer parallelism when using new processing cost planner
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12121'>IMPALA-12121</a>] -         Add non empty check for UDF location in getLastModifiedTime method
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12142'>IMPALA-12142</a>] -         Default fetch_size of 10240 is suboptimal
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12150'>IMPALA-12150</a>] -         Use protocol version to isolate cluster components
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12155'>IMPALA-12155</a>] -         Support Impala CatalogD HA
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12179'>IMPALA-12179</a>] -         Switch from detection via lsb_release to /etc/os-release
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12188'>IMPALA-12188</a>] -         Various build / utility scripts source bin/impala-config.sh without redirecting output
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12198'>IMPALA-12198</a>] -         Create RANGER_LOG_DIR if it doesn&#39;t exist for kill-ranger-server.sh
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12200'>IMPALA-12200</a>] -         Cap stats NDV from SetOperationStmt.createMetadata
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12202'>IMPALA-12202</a>] -         Switch native-toolchain from lsb_release to /etc/os-release
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12203'>IMPALA-12203</a>] -         Use python = python 3 for modern toolchain docker images
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12207'>IMPALA-12207</a>] -         Add support for Redhat 9
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12210'>IMPALA-12210</a>] -         In external frontend mode, catalogd.INFO shows get_table_req() forwarded to HMS and an exception
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12212'>IMPALA-12212</a>] -         Upgrade Maven to 3.9 to enable parallel dependency downloads
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12218'>IMPALA-12218</a>] -         ORC dependency via the Ranger plugin can conflict with Impala&#39;s own ORC dependency
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12231'>IMPALA-12231</a>] -         Bump GBN to get HMS thift API change HIVE-27319
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12246'>IMPALA-12246</a>] -         record client network address in the same line when log open or close session
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12284'>IMPALA-12284</a>] -         Use maven&#39;s batch mode when building jamm
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12286'>IMPALA-12286</a>] -         Make leader election robust for Impala CatalogD HA
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12287'>IMPALA-12287</a>] -         For dataload, use &quot;INSERT OVERWRITE TABLE&quot; syntax rather than &quot;INSERT OVERWRITE&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12288'>IMPALA-12288</a>] -         Avoiding building all the backend tests when running a packaging build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12290'>IMPALA-12290</a>] -         test_cache_metrics is flaky due to tight thresholds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12304'>IMPALA-12304</a>] -         Fix the sequence number issue for update_catalogd RPC when startestore is restarted
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12314'>IMPALA-12314</a>] -         Revisit pre-compiled IR at O1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12321'>IMPALA-12321</a>] -         Fix the race condition for updating active catalogd when CatalogD HA is enabled
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12326'>IMPALA-12326</a>] -         Impala daemons should only subscribe to statestore once rpc services are ready
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12357'>IMPALA-12357</a>] -         Skip scheduling runtime filter from PK-FK join with full build scan
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12360'>IMPALA-12360</a>] -         Switch to using official jamm 0.4.0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12372'>IMPALA-12372</a>] -         Only use -Wno-deprecated / -Wno-deprecated-declaration for OpenSSL3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12387'>IMPALA-12387</a>] -         PartialUpdates is misleading for LOCAL filter
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12408'>IMPALA-12408</a>] -         Planner spends lot of time in HdfsPartition.getLocation()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12420'>IMPALA-12420</a>] -         Bump Kudu to 1.17.0 for Impala 4.3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12424'>IMPALA-12424</a>] -         Allow third party extensibility for JniFrontend
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12430'>IMPALA-12430</a>] -         Optimize sending rows within the same process
+</li>
+</ul>
+
+<h2>        Sub-task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9487'>IMPALA-9487</a>] -         SHOW and DESCRIBE statements should display EC policies
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10798'>IMPALA-10798</a>] -         Prototype a simple JSON File reader
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10893'>IMPALA-10893</a>] -         Use old schema during time travel
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11121'>IMPALA-11121</a>] -         Support loading testdata in JSON format
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11516'>IMPALA-11516</a>] -         Create better cardinality estimates for Iceberg V2 tables with deletes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11660'>IMPALA-11660</a>] -         Add support for AVRO-only Iceberg tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11693'>IMPALA-11693</a>] -         Switch allow_erasure_coded_files default to true
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11701'>IMPALA-11701</a>] -         Skip pushing down Iceberg predicates to Impala scanner if not needed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11708'>IMPALA-11708</a>] -         Add support for mixed Iceberg tables with AVRO file format
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11802'>IMPALA-11802</a>] -         Optimize count(*) queries for Iceberg V2 tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11908'>IMPALA-11908</a>] -         Iceberg Metadata querying parser change
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11950'>IMPALA-11950</a>] -         Iceberg Metadata querying planner change
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11951'>IMPALA-11951</a>] -         Add a script that compiles the python code with Python 2 and Python 3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11952'>IMPALA-11952</a>] -         Fix all syntax errors for Python 3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11956'>IMPALA-11956</a>] -         Update toolchain python 3 to 3.7.16
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11957'>IMPALA-11957</a>] -         Implement Regression functions : regr_slope(), regr_intercept() and regr_r2()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11959'>IMPALA-11959</a>] -         Add impala-python3 virtualenv
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11973'>IMPALA-11973</a>] -         Add absolute_import and division __future__ imports to all python code
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11974'>IMPALA-11974</a>] -         Fix range/xrange/map/filter/ifilter/zip/izip issues regarding iterators being lazy
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11975'>IMPALA-11975</a>] -         Fix dictionary methods that became lazy
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11976'>IMPALA-11976</a>] -         Fix use of deprecated functions / packages in Python3 (long, maxint, file, etc)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11977'>IMPALA-11977</a>] -         Fix broken imports on Python 3 and Python 3 object model differences
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11996'>IMPALA-11996</a>] -         Iceberg Metadata querying executor change
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12019'>IMPALA-12019</a>] -         Support ORDER BY for collections of fixed length types in select list
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12263'>IMPALA-12263</a>] -         Update CMake Avro module with C++ lib
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12407'>IMPALA-12407</a>] -         Create a simple test table with equality deletes
+</li>
+</ul>
+
+<h2>        Bug
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5392'>IMPALA-5392</a>] -         Stack depth for threads printed in the Catalog UI under JVM Threads is not deep enough
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5851'>IMPALA-5851</a>] -         Estimate number of rows for  sum_init_zero scans should be number of files not table cardinality
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6876'>IMPALA-6876</a>] -         Entries in CatalogUsageMonitor are not cleared after invalidation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8054'>IMPALA-8054</a>] -         Implicit cast fails with {const INT} BETWEEN FLOAT and INT
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10086'>IMPALA-10086</a>] -         SqlCastException when comparing char with varchar
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10186'>IMPALA-10186</a>] -         Write invalid parquet PageLocations which table sort by some columns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10399'>IMPALA-10399</a>] -         test_show_grant_hive_privilege() fails in the exhaustive tests if being executed after test_grant_revoke_with_role()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10569'>IMPALA-10569</a>] -         Impala should determine Iceberg data file format from Iceberg metadata
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10829'>IMPALA-10829</a>] -         Memory leak while inserting kudu with rand()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10971'>IMPALA-10971</a>] -         Data cache metrics count error when LIRS is enabled
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10986'>IMPALA-10986</a>] -         Specific privilege should be required to execute a UDF in Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11081'>IMPALA-11081</a>] -         Partition key scan optimization may return incorrect results when partition file have more than one block
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11195'>IMPALA-11195</a>] -         Disable SSL session renegotiation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11223'>IMPALA-11223</a>] -         ASM files from different fragments conflict when using asm_module_dir
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11260'>IMPALA-11260</a>] -         Catalog cache item sizes of CatalogdMetaProvider are underestimated on Java9+
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11282'>IMPALA-11282</a>] -         Toolchain centos 8 docker image no longer builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11284'>IMPALA-11284</a>] -         INSERT query with concat operator fails with &#39;Function not set in thrift node&#39; error
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11285'>IMPALA-11285</a>] -         TestAsyncLoadData.test_async_load timeout on S3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11390'>IMPALA-11390</a>] -         Describe formatted statement on materialized view should show the view definition
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11479'>IMPALA-11479</a>] -         Create unit tests for IcebergUtil
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11509'>IMPALA-11509</a>] -         Dropping files of Iceberg during table loading may cause Impalad to stuck in infinite loop
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11536'>IMPALA-11536</a>] -         Invalid push down predicates in outer join simplification
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11549'>IMPALA-11549</a>] -         Incorrent return type mismatch in Hive generic UDFs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11572'>IMPALA-11572</a>] -         TestHdfsScannerSkew.test_mt_dop_skew_lpt is flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11588'>IMPALA-11588</a>] -         lastProcessedEvent is not updated in MetastoreEventsProcessor.processEvents()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11596'>IMPALA-11596</a>] -         Document EXECUTE ROLLBACK functionality
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11620'>IMPALA-11620</a>] -         Enable setting &#39;write.format.default&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11633'>IMPALA-11633</a>] -         Create table as select (CTAS) tests occasionally timeout for S3, Ozone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11638'>IMPALA-11638</a>] -         Iceberg time travel and column masking/row filtering does not work together
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11696'>IMPALA-11696</a>] -         Incorrect warnings when creating text/sequence table with row format delimiters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11715'>IMPALA-11715</a>] -         test_resource_limits_kudu fails
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11736'>IMPALA-11736</a>] -         LOAD DATA statement with Ozone data can not load data from different bucket
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11738'>IMPALA-11738</a>] -         Data loading failed at load-functional-query-exhaustive-hive-generated-orc-def-block.sql
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11744'>IMPALA-11744</a>] -         Table mask view should preserve the original column order in Hive
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11751'>IMPALA-11751</a>] -         Crash in processing partition columns of Avro table with MT_DOP&gt;1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11753'>IMPALA-11753</a>] -         CatalogD OOMkilled due to natively allocated memory
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11755'>IMPALA-11755</a>] -         Impala-shell ldap_password_cmd fails on Python 3.8
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11766'>IMPALA-11766</a>] -         In HdfsScanNode.buildBinaryStatsPredicate, an Expr needs to be cloned
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11767'>IMPALA-11767</a>] -         Hudi tests fail on Ozone with INVALID_VOLUME_NAME org.apache.hadoop.ozone.om.exceptions.OMException: Bucket or Volume name cannot start with a period or dash
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11768'>IMPALA-11768</a>] -         EventProcessor should ignore failures on non-existing dbs/tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11777'>IMPALA-11777</a>] -         Bump CDP_BUILD_NUMBER to get HIVE-24498
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11779'>IMPALA-11779</a>] -         Codegen crash due to null slots
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11780'>IMPALA-11780</a>] -         Wrong FILE__POSITION values for multi row group Parquet files when page filtering is used
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11787'>IMPALA-11787</a>] -         Cardinality estimate for UNION in Iceberg position-delete plans can double the actual table cardinality
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11788'>IMPALA-11788</a>] -         IMPALA-10986 seems to break test_show_grant_hive_privilege
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11794'>IMPALA-11794</a>] -         TestLoadDataExternal.test_load is flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11795'>IMPALA-11795</a>] -         Failed to load table metadata from catalog due to EXCEPTION:Unsupported type encountered in setLowAndHighValue()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11798'>IMPALA-11798</a>] -         CREATE Iceberg table with external.table.purge=false is ignored
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11801'>IMPALA-11801</a>] -         Catalogd failed to start when compiled with Apache Hive3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11803'>IMPALA-11803</a>] -         impalad hit DCHECK when running union on empty table with MT_DOP&gt;1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11806'>IMPALA-11806</a>] -         TestIcebergTable.test_load failed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11807'>IMPALA-11807</a>] -         TestIcebergTable.test_avro_file_format and TestIcebergTable.test_mixed_file_format failed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11811'>IMPALA-11811</a>] -         Avoid storing unregistered predicate objects in a Map
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11812'>IMPALA-11812</a>] -         Catalogd OOM due to lots of HMS FieldSchema instances
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11818'>IMPALA-11818</a>] -         Flaky TestDdlStatements.test_describe_materialized_view
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11826'>IMPALA-11826</a>] -         Avoid calling planFiles() on Iceberg V2 tables when there are no predicates
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11833'>IMPALA-11833</a>] -         Test iceberg files have wrong length in them
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11834'>IMPALA-11834</a>] -         Iceberg LOAD DATA hdfsDelete can crash JVM
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11842'>IMPALA-11842</a>] -         Improve memory estimation for streaming aggregate operator
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11843'>IMPALA-11843</a>] -         IndexOutOfBoundsException in analytic limit pushdown
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11845'>IMPALA-11845</a>] -         Select STAR with table ref is not resolved correctly on column/row masked views
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11846'>IMPALA-11846</a>] -         impala-shell packaging is broken with python 3.8 and setuptools 66.0.0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11854'>IMPALA-11854</a>] -         ImpalaStringWritable&#39;s underlying array can&#39;t be changed in UDFs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11855'>IMPALA-11855</a>] -         Upgrade jetty to 9.4.47+ due to CVE-2022-2047, CVE-2022-2048
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11856'>IMPALA-11856</a>] -         Loglevel endpoints don&#39;t follow API best practices
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11857'>IMPALA-11857</a>] -         Join build fragments not displaying correctly in graphical plan
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11860'>IMPALA-11860</a>] -         Query failure due to large buffer allocation provides insufficient context
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11862'>IMPALA-11862</a>] -         Document that the default value of ssl_cipher_list is not empty
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11864'>IMPALA-11864</a>] -         LOAD DATA should not try to load hidden files for Iceberg tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11873'>IMPALA-11873</a>] -         run-mini-dfs failed by &quot;OZONE_ERASURECODE_POLICY: unbound variable&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11883'>IMPALA-11883</a>] -         erasure-coded-bytes-read metric doesn&#39;t work for Ozone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11892'>IMPALA-11892</a>] -         impala-shell tarball with Python 2 now requires setuptools
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11900'>IMPALA-11900</a>] -         Test table iceberg_partitioned_orc has wrong metadata
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11901'>IMPALA-11901</a>] -         COPY TESTCASE is broken in LocalCatalog mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11903'>IMPALA-11903</a>] -         Ozone tests failing due to mismatch in ERASURECODE_POLICY
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11911'>IMPALA-11911</a>] -         Incorrect handling of NULL arguments in Hive GenericUDFs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11914'>IMPALA-11914</a>] -         EXPLAIN_LEVEL=VERBOSE is broken by join build fragment (MT_DOP&gt;0)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11920'>IMPALA-11920</a>] -         Spill to HDFS/Ozone can&#39;t address by service name
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11924'>IMPALA-11924</a>] -         Bloom filter size is unaffected by column NDV
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11931'>IMPALA-11931</a>] -         enhance ExecutorBlacklist::IsBlacklisted to avoid null pointer exception
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11939'>IMPALA-11939</a>] -         Catalogd can&#39;t process hms event once creating table contains extra whitespace
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11942'>IMPALA-11942</a>] -         Consider restricting --trusted_domain=localhost to 127.0.0.1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11945'>IMPALA-11945</a>] -         JwtHttpTest.testJwtAuthWithUntrustedJwksHttpsUrl failed in core tests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11953'>IMPALA-11953</a>] -         num_trues and num_falses in TIntermediateColumnStats should be optional
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11954'>IMPALA-11954</a>] -         Partition an Iceberg table on a string col with &#39;/&#39; char gives incorrect results
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11960'>IMPALA-11960</a>] -         Incorrect expression rewrites of date and timestamp conjuncts
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11964'>IMPALA-11964</a>] -         Make sure Impala returns error for Iceberg tables with equality deletes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11965'>IMPALA-11965</a>] -         TestCodegenCache fails in exhaustive runs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11998'>IMPALA-11998</a>] -         The iterator provided by ImpalaServer::GetQueryRecord() may become invalid
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11999'>IMPALA-11999</a>] -         TestIcebergTable.test_execute_rollback fails in Ozone build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12002'>IMPALA-12002</a>] -         COMMIT_COMPACTION_EVENT are not correctly skipped if the db not found
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12006'>IMPALA-12006</a>] -         Outer/inner join cardinality highly overestimated
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12008'>IMPALA-12008</a>] -         End Time in profile is set before DML finishes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12011'>IMPALA-12011</a>] -         Shell command of webserver_private_key_password_cmd doesn&#39;t unset JAVA_TOOL_OPTIONS variable
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12013'>IMPALA-12013</a>] -         Included pkg_resources fails in Python 2 when file in HOME directory contains special character
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12017'>IMPALA-12017</a>] -         Skip memory and cpu limit check if REQUEST_POOL is set
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12023'>IMPALA-12023</a>] -         Consider skipping resource checking on last executor group set.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12032'>IMPALA-12032</a>] -         PROCESSING_COST_MIN_THREADS fail to cap minimum parallelism
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12033'>IMPALA-12033</a>] -         Impalad crashes when --dump_exec_request_path is used
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12034'>IMPALA-12034</a>] -         TestIcebergTable.test_drop_corrupt_table failed in Ozone build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12035'>IMPALA-12035</a>] -         Impala accepts very big numbers but fails to store them correctly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12041'>IMPALA-12041</a>] -         Trivial query fail with &quot;No mapping found for request&quot; error message
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12042'>IMPALA-12042</a>] -         Invalid casts in set operations calculation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12043'>IMPALA-12043</a>] -         Large catalog info triggers &quot;TTransportException: MaxMessageSize reached&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12044'>IMPALA-12044</a>] -         Update Spring Framework to 5.3.26
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12045'>IMPALA-12045</a>] -         generate_junitxml.py fails when the content contains ANSI escape sequences
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12049'>IMPALA-12049</a>] -         test_drop_corrupt_table is flaky, fails with &quot;No failure encountered for query&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12050'>IMPALA-12050</a>] -         Exclude kryo-shaded from the Java build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12056'>IMPALA-12056</a>] -         Child queries could get scheduled on improper executor group sets
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12058'>IMPALA-12058</a>] -         Impala create table as select throws exception for Kudu tables with non unique primary key
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12060'>IMPALA-12060</a>] -         statestore should only allow a single catalog instance to be part of cluster
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12063'>IMPALA-12063</a>] -         Upgrade to a version of zlib with fix for CVE-2022-37434
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12073'>IMPALA-12073</a>] -         If topic_update_tbl_max_wait_time_ms is set to 1 in the catalog, the metadata gathering thread will not work
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12079'>IMPALA-12079</a>] -         NoneType object is not iterable due to uncaught exceptions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12082'>IMPALA-12082</a>] -         INVALIDATE METADATA on new table fail if db is not loaded
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12084'>IMPALA-12084</a>] -         INVALIDATE METADATA under unloaded db hit DCHECK in LocalCatalog mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12086'>IMPALA-12086</a>] -         Fix BitUtil::CountLeadingZeros for zero
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12094'>IMPALA-12094</a>] -         Impala Shell fails to identify &quot;Query id ... not found&quot; messages and return concise message
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12097'>IMPALA-12097</a>] -         AnalysisException for a COUNT(*) query on Iceberg table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12099'>IMPALA-12099</a>] -         Catalogd NPE when refreshing a partitioned table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12100'>IMPALA-12100</a>] -         native-toolchain&#39;s gflags build should use REGISTER_INSTALL_PREFIX=Off
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12102'>IMPALA-12102</a>] -         The JniUtil::GetJniExceptionMsg() method has the risk of memory leakage when handling JNI exceptions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12106'>IMPALA-12106</a>] -         Union fragment without scan node can be overparallelized by backend scheduler by 1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12110'>IMPALA-12110</a>] -         Impala returns parsing error when creating Kudu table in CTAS without specifying primary key 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12113'>IMPALA-12113</a>] -         Elapsed time incorrect in query timeline
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12114'>IMPALA-12114</a>] -         SSL Thrift connections disconnect if idle more than ~150 seconds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12117'>IMPALA-12117</a>] -         Intermittent pip error when building shell&#39;s venv
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12119'>IMPALA-12119</a>] -         compilation fails on arm64
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12123'>IMPALA-12123</a>] -         SIGSEGV in ScanRange::ReadSubRanges() when using HDFS caching
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12128'>IMPALA-12128</a>] -         Bump ORC C++ version
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12129'>IMPALA-12129</a>] -         Query timeline not working for running query
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12131'>IMPALA-12131</a>] -         Execute update catalog request failed cased by Exception:java.util.NoSuchElementException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12133'>IMPALA-12133</a>] -         Fix query timeline&#39;s display height for compact query plans
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12148'>IMPALA-12148</a>] -         Create table as select (CTAS) tests time out
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12153'>IMPALA-12153</a>] -         Parquet STRUCT reader doesn&#39;t fill position slots
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12154'>IMPALA-12154</a>] -         LIRS cache implementation is missing some locations to trim the recency list
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12158'>IMPALA-12158</a>] -         &quot;pgrep impalad&quot; does not work anymore
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12163'>IMPALA-12163</a>] -         Shell RPC Duration Does Not Match Start/End Time
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12164'>IMPALA-12164</a>] -         The query fails with &quot;IllegalStateException: Illegal reference to non-materialized slot: tid=x sid=x&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12167'>IMPALA-12167</a>] -         TestJvmMemTracker.test_jvm_mem_tracking crashing impalad during startup
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12170'>IMPALA-12170</a>] -         TestWebPage.test_webserver_hide_logs_link fails due to new /events link added in catalogd
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12174'>IMPALA-12174</a>] -         Work around Kudu repo.spring.io build issue for native-toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12177'>IMPALA-12177</a>] -         The exception in CatalogOpExecutor.unsetPartitionsColStats() was not thrown
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12183'>IMPALA-12183</a>] -         Maintain cardinality clamping across multi-phase aggregation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12184'>IMPALA-12184</a>] -         Java UDF increment on an empty string is inconsistent
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12185'>IMPALA-12185</a>] -         bootstrap_system.sh fails to install snappy-devel on Redhat 8.4
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12189'>IMPALA-12189</a>] -         updateCatalog not releasing the catalog lock if createTblTransaction() throws exceptions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12192'>IMPALA-12192</a>] -         Scan fragment parallelism is limited by its ScanNode cost.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12193'>IMPALA-12193</a>] -         DataCacheTest.SetReadOnly fails for TSAN builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12194'>IMPALA-12194</a>] -         DataCacheTest.SetReadOnly intermittently fails on debug builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12197'>IMPALA-12197</a>] -         Time Travel Queries on Iceberg tables fail with &quot;ERROR: IllegalArgumentException: null&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12199'>IMPALA-12199</a>] -         Precommit builds break on Maven 3.5.4 download location change
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12204'>IMPALA-12204</a>] -         Redundant codegen info of HashJoinBuilder inside a subplan
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12211'>IMPALA-12211</a>] -         OpenSSL 3 doesn&#39;t provide FIPS_mode()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12213'>IMPALA-12213</a>] -         Not a self-event because service id of this catalog does not match with one in event
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12217'>IMPALA-12217</a>] -         cgroup memory limit detection doesn&#39;t work for cgroups v2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12220'>IMPALA-12220</a>] -         impala-shell tarball&#39;s sasl dependency does not work on Redhat 9 / Ubuntu 22
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12223'>IMPALA-12223</a>] -         Coordinator crash in serializing huge profile
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12224'>IMPALA-12224</a>] -         Interactive shell tests should detect connection failures rather than hanging
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12225'>IMPALA-12225</a>] -         LLVM 5.0.1&#39;s ASAN cannot work with glibc &gt;=2.34
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12228'>IMPALA-12228</a>] -         Extend Java DebugAction to simulate the failure of an iceberg transaction.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12233'>IMPALA-12233</a>] -         Partitioned hash join with a limit can hang when using mt_dop&gt;0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12235'>IMPALA-12235</a>] -         test_multiple_coordinator() failed because _start_impala_cluster() returned non-zero exit status
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12237'>IMPALA-12237</a>] -         Add information about the table type in the lineage log
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12240'>IMPALA-12240</a>] -         On Redhat 9, Impala fails to build the impala-python virtualenv
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12242'>IMPALA-12242</a>] -         bin/cmake_aux/create_py3_virtualenv.sh doesn&#39;t successfully fall back to impala-virtualenv
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12244'>IMPALA-12244</a>] -         CGroupInfo.ErrorHandling test failed in impala-asf-master-core-asan
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12245'>IMPALA-12245</a>] -         TestWebPage::test_query_progress is flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12247'>IMPALA-12247</a>] -         Add unimplemented methods to ModifyStmt
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12249'>IMPALA-12249</a>] -         progress of queries on WebUI has unexpected word wrap
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12252'>IMPALA-12252</a>] -         Support distcc server on Ubuntu 20.04
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12256'>IMPALA-12256</a>] -         Stale DROP_PARTITION events might not be skipped correctly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12257'>IMPALA-12257</a>] -         createInsertEvents failed by NullPointerException: Invalid partition name
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12270'>IMPALA-12270</a>] -         Deserialization failure, because of &#39;InternalException: couldn&#39;t execute a batch of exprs&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12271'>IMPALA-12271</a>] -         Deserialization failure, because of &#39;InternalException: couldn&#39;t execute a batch of exprs&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12272'>IMPALA-12272</a>] -         Deserialization failure, because of &#39;InternalException: couldn&#39;t execute a batch of exprs&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12273'>IMPALA-12273</a>] -         Deserialization failure, because of &#39;InternalException: couldn&#39;t execute a batch of exprs&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12274'>IMPALA-12274</a>] -          Memory leak because of  the local reference created by `NewObject` in class Catalog was not released 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12275'>IMPALA-12275</a>] -         Cannot read Hive tables created with DeflateCodec
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12281'>IMPALA-12281</a>] -         Child queries mistakenly unset REQUEST_POOL if running query through impala-shell
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12294'>IMPALA-12294</a>] -         Cookie handling broken In Impala Shell with python 3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12295'>IMPALA-12295</a>] -         Statestore crashed when restarting catalogd
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12305'>IMPALA-12305</a>] -         Impala server hanging when processing DDL if CatalogD HA is enabled 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12307'>IMPALA-12307</a>] -         test_75_percent_availability fails on object stores
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12319'>IMPALA-12319</a>] -         NullPointerException in UnnestExpr.isBoundByTupleIds()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12323'>IMPALA-12323</a>] -         DDL hang with SYNC_DDL=1 when CatalogD HA enabled
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12327'>IMPALA-12327</a>] -         Iceberg V2 operator wrong results in PARTITIONED mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12331'>IMPALA-12331</a>] -         Installing Maven 3.9.2 at the start of a precommit build fails sometimes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12332'>IMPALA-12332</a>] -         Undo IMPALA-8615 as the corresponding configs have been removed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12340'>IMPALA-12340</a>] -         custom_cluster.test_catalogd_ha.TestCatalogdHA.test_two_catalogd_with_force_active fails in exhaustive tests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12346'>IMPALA-12346</a>] -         ARM core job fails with link error due to Boost locale&#39;s ICU dependency
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12359'>IMPALA-12359</a>] -         Add missing package-info file used by HiveVersionInfo
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12366'>IMPALA-12366</a>] -         If Thrift messages are between 1GB and 2GB, the max message size will trigger
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12383'>IMPALA-12383</a>] -         Aggregation with num_nodes=1 and limit returns too many rows
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12384'>IMPALA-12384</a>] -         Restore NullLiteral&#39;s uncheckedCastTo function signature
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12386'>IMPALA-12386</a>] -         NullExpr substitution failure with unsafe casts enabled
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12393'>IMPALA-12393</a>] -         DictEncoder uses inconsistent hash function for TimestampValue
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12395'>IMPALA-12395</a>] -         Planner overestimates scan cardinality for queries using count star optimization
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12403'>IMPALA-12403</a>] -         Kerberos authentication fails when connecting with a proxy user that passes LDAP user and group filters but does not delegate another user
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12409'>IMPALA-12409</a>] -         Don&#39;t allow EXTERNAL Iceberg tables to point another Iceberg table in Hive catalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12413'>IMPALA-12413</a>] -         Make Iceberg tables created by Trino compatible with Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12416'>IMPALA-12416</a>] -         test_skipping_older_events and some other catlog tests failing
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12417'>IMPALA-12417</a>] -         Query timeline not working when enable asynchronous codegen
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12425'>IMPALA-12425</a>] -         Upgrade json-smart to 2.4.10 due to CVE-2023-1370
+</li>
+</ul>
+
+<h2>        Test
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11253'>IMPALA-11253</a>] -         Add test coverage on JDK11
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11829'>IMPALA-11829</a>] -         Flaky TestCorruptTableStats.test_corrupt_stats
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12028'>IMPALA-12028</a>] -         test_execute_rollback fails if not run with US west coast timezone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12400'>IMPALA-12400</a>] -         Test expected executors used for planning when no executor groups are healthy
+</li>
+</ul>
+
+<h2>        Task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9627'>IMPALA-9627</a>] -         Update Impala utility Python scripts to be Python3 compatible
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10860'>IMPALA-10860</a>] -         Allow setting separate mem_limit for coordinators
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11060'>IMPALA-11060</a>] -         Add option in create-load-data.sh to run setup-ranger only
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11273'>IMPALA-11273</a>] -         Get rid of deprecated API in Java 11
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11478'>IMPALA-11478</a>] -         Cleanup JniCatalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11584'>IMPALA-11584</a>] -         Run some HDFS minicluster-only tests with Ozone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11821'>IMPALA-11821</a>] -         Enable new avro/mixed iceberg tests for Ozone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11827'>IMPALA-11827</a>] -         do not cache admission control service&#39;s IP address in coordinator
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11852'>IMPALA-11852</a>] -         Upgrade postgresql to 42.5.1 due to CVE-2022-41946
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11913'>IMPALA-11913</a>] -         Upgrade datatables js library
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11944'>IMPALA-11944</a>] -         Add SLES 15 support
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11955'>IMPALA-11955</a>] -         Support building without Python 2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11989'>IMPALA-11989</a>] -         ImpalaRuntimeException if Kudu and Impala use different HMS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11990'>IMPALA-11990</a>] -         Output on Ozone test run failure without snapshot is confusing
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11997'>IMPALA-11997</a>] -         impala-shell: base64.encodestring has been removed in python3.9
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12037'>IMPALA-12037</a>] -         Update chart.js
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12052'>IMPALA-12052</a>] -         Update tests for new Ozone EC chunk size format
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12077'>IMPALA-12077</a>] -         Prepare for Avro 1.9+
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12080'>IMPALA-12080</a>] -         Test test_recover_many_partitions is very slow on S3, Ozone
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12081'>IMPALA-12081</a>] -         Build Java 11 Docker containers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12214'>IMPALA-12214</a>] -         Upgrade Spring Framework to 5.3.27
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12227'>IMPALA-12227</a>] -         Ozone: configure datanode client port in minicluster
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12283'>IMPALA-12283</a>] -         Remove HIVE_HOME/lib/py from the PYTHONPATH
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12411'>IMPALA-12411</a>] -         TSAN ThreadSanitizer: data race during expr-test teardown
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12414'>IMPALA-12414</a>] -         Add scripts to run Trino in the dev environment
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12432'>IMPALA-12432</a>] -         Keep LdapKerberosImpalaShellTest* compatible with older guava versions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12434'>IMPALA-12434</a>] -         Isolate shell/pkg_resources.py to keep it off of the PYTHONPATH
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12441'>IMPALA-12441</a>] -         Simplify local toolchain development
+</li>
+</ul>
+
+<h2>        Documentation
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11867'>IMPALA-11867</a>] -         Add Ozone to docs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11906'>IMPALA-11906</a>] -         Impala Doc: Support non unique primary key for Kudu table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11940'>IMPALA-11940</a>] -         Document manifest caching settings for Iceberg tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11985'>IMPALA-11985</a>] -         Impala Doc: Support Kudu&#39;s multi-rows transaction
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12010'>IMPALA-12010</a>] -         Impala Doc: (Addendum) Support non unique primary key for Kudu table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12335'>IMPALA-12335</a>] -         Document Iceberg DELETE
+</li>
+</ul>
+</body>
+</html>

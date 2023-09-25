@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2022" />
-<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="copyright" content="(C) Copyright 2023" />
+<meta name="DC.rights.owner" content="(C) Copyright 2023" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Admission Control and Query Queuing" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html" />
@@ -115,52 +115,24 @@
               safeguard. If queries exceed either the total estimated memory or
               the maximum number of concurrent queries, they are added to the
               queue. </p>
-<p class="p">If <span class="ph uicontrol">Max Running Queries
-                Multiple</span> is set, the <span class="ph uicontrol">Max Running
-                Queries</span> setting is ignored.</p>
 
           </dd>
 
         
-        
-          <dt class="dt dlterm">Max Running Queries Multiple</dt>
+      </dl>
 
-          <dd class="dd">This floating point number is multiplied by the current total
-            number of executors at runtime to give the maximum number of
-            concurrently running queries allowed in the pool. The effect of this
-            setting scales with the number of executors in the resource
-              pool.<p class="p">This calculation is rounded up to the nearest integer, so
-              the result will always be at least one. </p>
-<p class="p">If set to zero or a
-              negative number, the setting is ignored.</p>
-</dd>
-
-        
+      <dl class="dl">
         
           <dt class="dt dlterm"> Max Queued Queries </dt>
 
           <dd class="dd"> Maximum number of queries that can be queued in this pool. The
             default value is 200 for Impala 2.1 or higher and 50 for previous
-            versions of Impala. (optional)<p class="p">If <span class="ph uicontrol">Max Queued Queries
-                Multiple</span> is set, the <span class="ph uicontrol">Max Queued
-                Queries</span> setting is ignored.</p>
-</dd>
+            versions of Impala. (optional)</dd>
 
         
-        
-          <dt class="dt dlterm">Max Queued Queries Multiple</dt>
+      </dl>
 
-          <dd class="dd">This floating point number is multiplied by the current total
-            number of executors at runtime to give the maximum number of queries
-            that can be queued in the pool. The effect of this setting scales
-            with the number of executors in the resource pool.<p class="p">This
-              calculation is rounded up to the nearest integer, so the result
-              will always be at least one. </p>
-<p class="p">If set to zero or a negative
-              number, the setting is ignored.</p>
-</dd>
-
-        
+      <dl class="dl">
         
           <dt class="dt dlterm"> Queue Timeout </dt>
 
@@ -289,21 +261,7 @@ You might also need to increase the value to use Impala with
 
             </div>
 
-            <p class="p">If <span class="ph uicontrol">Max Memory Multiple</span> is set, the
-                <span class="ph uicontrol">Max Memory</span> setting is ignored.</p>
-
           </dd>
-
-        
-        
-          <dt class="dt dlterm">Max Memory Multiple</dt>
-
-          <dd class="dd"> This number of bytes is multiplied by the current total number of
-            executors at runtime to give the maximum memory available across the
-            cluster for the pool. The effect of this setting scales with the
-            number of executors in the resource pool.<p class="p">If set to zero or a
-              negative number, the setting is ignored.</p>
-</dd>
 
         
         

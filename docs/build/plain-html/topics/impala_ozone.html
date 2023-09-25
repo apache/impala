@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2023" />
+<meta name="DC.rights.owner" content="(C) Copyright 2023" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using Impala with Apache Ozone Storage" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_ozone" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using Impala with Apache Ozone Storage</title>
+</head>
+<body id="impala_ozone">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Using Impala with Apache Ozone Storage</h1>
+
+
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      You can use Impala to query data files that reside on Apache Ozone distributed storage,
+      rather than in HDFS. The combination of the Impala query engine and Apache Ozone storage
+      is certified on <span class="keyword">Impala 4.2</span> or higher.
+    </p>
+
+
+    <p class="p">
+      For more information on Ozone, see <a class="xref" href="https://ozone.apache.org" target="_blank">the Apache Ozone site</a>.
+    </p>
+
+
+    <p class="p">
+      The typical use case for Impala and Ozone together is to use Ozone for the default
+      filesystem, replacing HDFS entirely. In this configuration, when you create a database,
+      table, or partition, the data always resides on Ozone storage and you do not need to
+      specify any special <code class="ph codeph">LOCATION</code> attribute. If you do specify a
+      <code class="ph codeph">LOCATION</code> attribute, its value refers to a path within the Ozone
+      filesystem. For example:
+    </p>
+
+
+<pre class="pre codeblock"><code>-- If the default filesystem is Ozone, all Impala data resides there
+-- and all Impala databases and tables are located there.
+CREATE TABLE t1 (x INT, s STRING);
+
+-- You can specify LOCATION for database, table, or partition,
+-- using values from the Ozone filesystem.
+CREATE DATABASE d1 LOCATION '/some/path/on/ozone/server/d1.db';
+CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
+</code></pre>
+
+    <p class="p">
+      Impala can write to, delete, and rename data files and database, table, and partition
+      directories on Ozone storage. Therefore, Impala statements such as <code class="ph codeph">CREATE
+      TABLE</code>, <code class="ph codeph">DROP TABLE</code>, <code class="ph codeph">CREATE DATABASE</code>,
+      <code class="ph codeph">DROP DATABASE</code>, <code class="ph codeph">ALTER TABLE</code>, and <code class="ph codeph">INSERT</code>
+      work the same with Ozone storage as with HDFS.
+    </p>
+
+
+    <p class="p">
+      Ozone supports multiple protocols: <code class="ph codeph">ofs</code>, <code class="ph codeph">o3fs</code>, and
+      <code class="ph codeph">s3a</code>. Impala supports reading <code class="ph codeph">ofs</code> and <code class="ph codeph">o3fs</code>.
+      Impala can also read <code class="ph codeph">s3a</code> (see <a class="xref" href="impala_s3.html#s3">Using Impala with Amazon S3 Object Store</a>). However
+      <code class="ph codeph">ofs</code> is their newer protocol, and the only one Impala supports as a default
+      filesystem. We recommend using it for <a class="xref" href="impala_ddl.html#ddl">DDL Statements</a> to avoid access
+      limitations, and for <a class="xref" href="impala_dml.html#dml">DML Statements</a> and
+      <a class="xref" href="impala_select.html#select">SELECT Statement</a> for performance.
+    </p>
+
+
+    <p class="p">
+        Because Apache Ozone storage buckets use a global value for the block size rather than
+        a configurable value for each file, the <code class="ph codeph">PARQUET_FILE_SIZE</code> query option
+        has no effect when Impala inserts data into a table or partition residing on Ozone
+        storage.
+      </p>
+
+
+    <p class="p">
+      Impala's spill-to-disk feature may be configured to use Ozone storage by specifying a full
+      URI (e.g. <code class="ph codeph">ofs://host:port/volume/bucket/key</code>) for the spill location. See
+      <a class="xref" href="impala_disk_space.html#disk_space">Managing Disk Space for Impala Data</a> for details on configuring remote
+      spill-to-disk.
+    </p>
+
+
+
+
+  </div>
+
+
+</body>
+</html>

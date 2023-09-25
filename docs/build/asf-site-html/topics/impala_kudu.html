@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2022"><meta name="DC.rights.owner" content="(C) Copyright 2022"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_kudu"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Using Impala to Query Kudu Tables</title></head><body id="impala_kudu"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_kudu"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Using Impala to Query Kudu Tables</title></head><body id="impala_kudu"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -12,7 +12,7 @@ Toolkit code.
 --><div class="header">
   <p>Apache Impala</p>
   <hr>
-</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li class="active"><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="impala_kudu__kudu">
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li class="active"><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_ozone.html">Ozone Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="impala_kudu__kudu">
 
   <h1 class="title topictitle1" id="impala_kudu__kudu">Using Impala to Query Kudu Tables</h1>
 
@@ -184,21 +184,114 @@ Toolkit code.
       <p class="p toc inpage"></p>
 
     </div>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="kudu_ddl__non_unique_primary_key">
+      <h3 class="title topictitle3" id="ariaid-title7">Non-unique Primary Keys for Kudu Tables</h3>
+      <div class="body conbody">
+        <p class="p">Kudu now allows a user to create a non-unique primary key for a table when creating a
+          table. The data engine handles this by appending a system generated auto-incrementing
+          column to the non-unique primary key columns. This is done to guarantee the uniqueness of
+          the primary key. This auto-incrementing column is named as 'auto_incrementing_id' with
+          bigint type and this column is only system generated and cannot be explicitly created by
+          the user. This auto_incrementing_id column is unique across a partition/tablet i.e. every
+          partition/tablet would have this column starting from one and incrementing monotonically.
+          The assignment to this column during insertion is automatic.</p>
+      </div>
+    </article>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title8" id="kudu_ddl__create">
+      <h3 class="title topictitle3" id="ariaid-title8">Create a Kudu Table with a non-unique PRIMARY KEY</h3>
+      <div class="body conbody">
+        <p class="p">The following example shows creating a table with a non-unique PRIMARY KEY.</p>
+<pre class="pre codeblock"><code>
+CREATE TABLE kudu_tbl1
+(
+ id INT NON UNIQUE PRIMARY KEY,
+ name STRING
+)
+PARTITION BY HASH (id) PARTITIONS 3 STORED as KUDU;</code></pre>
+        <p class="p">The effective PRIMARY KEY in the above case will be {id, auto_increment_id}</p>
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span> "auto_incrementing_id" column cannot be added, removed or renamed with ALTER TABLE
+          statements.</div>
+      </div>
+    </article>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title9" id="kudu_ddl__verify">
+      <h3 class="title topictitle3" id="ariaid-title9">Verify the PRIMARY KEY is non-unique</h3>
+      <div class="body conbody">
+        <p class="p">You can now check the PRIMARY KEY created is non-unique by running the following DESCRIBE
+          command. A new property "key_unique" shows if the primary key is unique. System generated
+          column "auto_incrementing_id" is shown in the output for the table as a non-unique primary
+          key.</p>
+<pre class="pre codeblock"><code>
+  describe kudu_tbl1
+  +----------------------+--------+---------+-------------+------------+----------+---------------+---------------+---------------------+------------+
+  | name                 | type   | comment | primary_key | key_unique | nullable | default_value | encoding      | compression         | block_size |
+  +----------------------+--------+---------+-------------+------------+----------+---------------+---------------+---------------------+------------+
+  | id                   | int    |         | true        | false      | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+  | auto_incrementing_id | bigint |         | true        | false      | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+  | name                 | string |         | false       |            | true     |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+  +----------------------+--------+---------+-------------+------------+----------+---------------+---------------+---------------------+------------+
+  Fetched 3 row(s) in 4.72s
+</code></pre>
+      </div>
+    </article>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="kudu_ddl__auto_incrementing_col">
+      <h3 class="title topictitle3" id="ariaid-title10">Query Auto Incrementing Column</h3>
+      <div class="body conbody">
+        <p class="p">When you query a table using the SELECT statement, it will not display the system
+          generated auto incrementing column unless the column is explicitly specified in the select
+          list.</p>
+      </div>
+    </article>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title11" id="kudu_ddl__no_primary_key">
+      <h3 class="title topictitle3" id="ariaid-title11">Create a Kudu table without a PRIMARY KEY attribute</h3>
+      <div class="body conbody">
+        <p class="p">You can create a Kudu table without specifying a PRIMARY KEY or a PARTITION KEY since
+          they are optional, however you cannot create a Kudu table without specifying both PRIMARY
+          KEY and PARTITION KEY. If you do not specify the primary key attribute, the partition key
+          columns can be promoted as a non-unique primary key. This is possible only if those
+          columns are the beginning columns of the table.</p>
+        <p class="p">In the following example, 'a' and 'b' will be promoted as a non-unique primary key,
+          'auto_incrementing_id' column will be added by Kudu engine. 'a', 'b' and
+          'auto_incrementing_id' form the effective unique composite primary key.</p>
+        <div class="example">
+<pre class="pre codeblock"><code>
+CREATE TABLE auto_table
+(
+ a BIGINT,
+ b STRING,
+)
+PARTITION BY HASH(a, b) PARTITIONS 2 STORED AS KUDU;
+</code></pre>
+          <p class="p">The effective primary key in this case would be {a, b, auto_incrementing_id}</p>
+        </div>
+      </div>
+    </article>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title12" id="kudu_ddl__limitations">
+      <h3 class="title topictitle3" id="ariaid-title12">Limitations</h3>
+      <div class="body conbody">
+        <ul class="ul">
+          <li class="li">UPSERT operation is not supported for Kudu tables with non-unique primary key. If you
+            run an UPSERT statement for a Kudu table with a non-unique primary key it will fail with
+            an error.</li>
+          <li class="li">Since the auto generated key for each row will be assigned after the row’s data is
+            generated and after the row lands in the tablet, you cannot use this column in the
+            partition key.</li>
+        </ul>
+      </div>
+    </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="kudu_ddl__kudu_primary_key">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title13" id="kudu_ddl__kudu_primary_key">
 
-      <h3 class="title topictitle3" id="ariaid-title7">Primary Key Columns for Kudu Tables</h3>
+      <h3 class="title topictitle3" id="ariaid-title13">Primary Key Columns for Kudu Tables</h3>
 
       <div class="body conbody">
 
-        <p class="p">
-          Kudu tables introduce the notion of primary keys to Impala for the first time. The
+        <p class="p"> Kudu tables introduce the notion of primary keys to Impala for the first time. The
           primary key is made up of one or more columns, whose values are combined and used as a
-          lookup key during queries. The tuple represented by these columns must be unique and cannot contain any
-          <code class="ph codeph">NULL</code> values, and can never be updated once inserted. For a
-          Kudu table, all the partition key columns must come from the set of
-          primary key columns.
-        </p>
+          lookup key during queries. The primary key can be non-unique. The uniqueness of the
+          primary key is guaranteed by appending a system-generated auto-incrementing column to the
+          non-unique primary key columns. The tuple represented by these columns cannot contain any
+          NULL values, and can never be updated once inserted. For a Kudu table, all the partition
+          key columns must come from the set of primary key columns. </p>
 
         <p class="p">
           The primary key has both physical and logical aspects:
@@ -213,14 +306,13 @@ Toolkit code.
             </p>
           </li>
           <li class="li">
-            <p class="p">
-              On the logical side, the uniqueness constraint allows you to avoid duplicate data in a table.
-              For example, if an <code class="ph codeph">INSERT</code> operation fails partway through, only some of the
-              new rows might be present in the table. You can re-run the same <code class="ph codeph">INSERT</code>, and
-              only the missing rows will be added. Or if data in the table is stale, you can run an
-              <code class="ph codeph">UPSERT</code> statement that brings the data up to date, without the possibility
-              of creating duplicate copies of existing rows.
-            </p>
+            <p class="p"> You can insert non-unique data using an INSERT statement but the data saved in Kudu
+              table for each row which will be turned to unique by the system generated
+              auto-incrementing column. If the primary key is non-unique, the uniqueness will not
+              cause insertion failure. However, if the primary key is set as non-unique and if an
+              INSERT operation fails part way through, all rows except the rows with writing errors
+              will be added into the table. The duplicated rows will be added with different values
+              for auto-incrementing columns. </p>
           </li>
         </ul>
 
@@ -235,9 +327,9 @@ Toolkit code.
 
     </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title8" id="kudu_ddl__kudu_column_attributes">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title14" id="kudu_ddl__kudu_column_attributes">
 
-      <h3 class="title topictitle3" id="ariaid-title8">Kudu-Specific Column Attributes for CREATE TABLE</h3>
+      <h3 class="title topictitle3" id="ariaid-title14">Kudu-Specific Column Attributes for CREATE TABLE</h3>
 
       <div class="body conbody">
 
@@ -254,7 +346,7 @@ Toolkit code.
         </p>
 
 <pre class="pre codeblock"><code>
-  PRIMARY KEY
+[NON UNIQUE] PRIMARY KEY
 | [NOT] NULL
 | ENCODING <var class="keyword varname">codec</var>
 | COMPRESSION <var class="keyword varname">algorithm</var>
@@ -268,9 +360,9 @@ Toolkit code.
 
       </div>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title9" id="kudu_column_attributes__kudu_primary_key_attribute">
+      <article class="topic concept nested3" aria-labelledby="ariaid-title15" id="kudu_column_attributes__kudu_primary_key_attribute">
 
-        <h4 class="title topictitle4" id="ariaid-title9">PRIMARY KEY Attribute</h4>
+        <h4 class="title topictitle4" id="ariaid-title15">PRIMARY KEY Attribute</h4>
 
         <div class="body conbody">
 
@@ -281,11 +373,9 @@ Toolkit code.
             combination of values for the columns.
           </p>
 
-          <p class="p">
-        Because all of the primary key columns must have non-null values, specifying a column in
-        the <code class="ph codeph">PRIMARY KEY</code> clause implicitly adds the <code class="ph codeph">NOT NULL</code>
-        attribute to that column.
-      </p>
+          <p class="p">Because all of the primary key columns must have non-null values, specifying a column
+            in the PRIMARY KEY or NON-UNIQUE PRIMARY KEY clause implicitly adds the NOT NULL
+            attribute to that column.</p>
 
           <p class="p">
             The primary key columns must be the first ones specified in the <code class="ph codeph">CREATE
@@ -315,6 +405,21 @@ CREATE TABLE pk_at_end
   col2 STRING,
   col3 BOOLEAN,
   PRIMARY KEY (col1)
+) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
+
+CREATE TABLE pk_inline
+(
+col1 BIGINT [NON UNIQUE] PRIMARY KEY,
+col2 STRING,
+col3 BOOLEAN
+) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
+
+CREATE TABLE pk_at_end
+(
+col1 BIGINT,
+col2 STRING,
+col3 BOOLEAN,
+[NON UNIQUE] PRIMARY KEY (col1)
 ) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
 </code></pre>
 
@@ -358,11 +463,10 @@ SHOW CREATE TABLE inline_pk_rewritten;
 +------------------------------------------------------------------------------+
 </code></pre>
 
-          <p class="p">
-            The notion of primary key only applies to Kudu tables. Every Kudu table requires a
+          <p class="p"> The notion of primary key only applies to Kudu tables. Every Kudu table requires a
             primary key. The primary key consists of one or more columns. You must specify any
-            primary key columns first in the column list.
-          </p>
+            primary key columns first in the column list or specify partition key with the beginning
+            columns of the table. </p>
 
           <p class="p">
             The contents of the primary key columns cannot be changed by an
@@ -381,9 +485,9 @@ SHOW CREATE TABLE inline_pk_rewritten;
 
       </article>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title10" id="kudu_column_attributes__kudu_not_null_attribute">
+      <article class="topic concept nested3" aria-labelledby="ariaid-title16" id="kudu_column_attributes__kudu_not_null_attribute">
 
-        <h4 class="title topictitle4" id="ariaid-title10">NULL | NOT NULL Attribute</h4>
+        <h4 class="title topictitle4" id="ariaid-title16">NULL | NOT NULL Attribute</h4>
 
         <div class="body conbody">
 
@@ -450,9 +554,9 @@ CREATE TABLE required_columns
 
       </article>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title11" id="kudu_column_attributes__kudu_default_attribute">
+      <article class="topic concept nested3" aria-labelledby="ariaid-title17" id="kudu_column_attributes__kudu_default_attribute">
 
-        <h4 class="title topictitle4" id="ariaid-title11">DEFAULT Attribute</h4>
+        <h4 class="title topictitle4" id="ariaid-title17">DEFAULT Attribute</h4>
 
         <div class="body conbody">
 
@@ -502,9 +606,9 @@ CREATE TABLE default_vals
 
       </article>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title12" id="kudu_column_attributes__kudu_encoding_attribute">
+      <article class="topic concept nested3" aria-labelledby="ariaid-title18" id="kudu_column_attributes__kudu_encoding_attribute">
 
-        <h4 class="title topictitle4" id="ariaid-title12">ENCODING Attribute</h4>
+        <h4 class="title topictitle4" id="ariaid-title18">ENCODING Attribute</h4>
 
         <div class="body conbody">
 
@@ -604,9 +708,9 @@ describe various_encodings;
 
       </article>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title13" id="kudu_column_attributes__kudu_compression_attribute">
+      <article class="topic concept nested3" aria-labelledby="ariaid-title19" id="kudu_column_attributes__kudu_compression_attribute">
 
-        <h4 class="title topictitle4" id="ariaid-title13">COMPRESSION Attribute</h4>
+        <h4 class="title topictitle4" id="ariaid-title19">COMPRESSION Attribute</h4>
 
         <div class="body conbody">
 
@@ -664,9 +768,9 @@ CREATE TABLE blog_posts
 
       </article>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title14" id="kudu_column_attributes__kudu_block_size_attribute">
+      <article class="topic concept nested3" aria-labelledby="ariaid-title20" id="kudu_column_attributes__kudu_block_size_attribute">
 
-        <h4 class="title topictitle4" id="ariaid-title14">BLOCK_SIZE Attribute</h4>
+        <h4 class="title topictitle4" id="ariaid-title20">BLOCK_SIZE Attribute</h4>
 
         <div class="body conbody">
 
@@ -691,9 +795,9 @@ CREATE TABLE blog_posts
 
     </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title15" id="kudu_ddl__kudu_partitioning">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title21" id="kudu_ddl__kudu_partitioning">
 
-      <h3 class="title topictitle3" id="ariaid-title15">Partitioning for Kudu Tables</h3>
+      <h3 class="title topictitle3" id="ariaid-title21">Partitioning for Kudu Tables</h3>
 
       <div class="body conbody">
 
@@ -732,8 +836,8 @@ CREATE TABLE blog_posts
 
       </div>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title16" id="kudu_partitioning__kudu_hash_partitioning">
-        <h4 class="title topictitle4" id="ariaid-title16">Hash Partitioning</h4>
+      <article class="topic concept nested3" aria-labelledby="ariaid-title22" id="kudu_partitioning__kudu_hash_partitioning">
+        <h4 class="title topictitle4" id="ariaid-title22">Hash Partitioning</h4>
         <div class="body conbody">
 
           <p class="p">
@@ -775,8 +879,8 @@ INSERT INTO million_rows SELECT * FROM billion_rows ORDER BY id LIMIT 1e6;
         </div>
       </article>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title17" id="kudu_partitioning__kudu_range_partitioning">
-        <h4 class="title topictitle4" id="ariaid-title17">Range Partitioning</h4>
+      <article class="topic concept nested3" aria-labelledby="ariaid-title23" id="kudu_partitioning__kudu_range_partitioning">
+        <h4 class="title topictitle4" id="ariaid-title23">Range Partitioning</h4>
         <div class="body conbody">
 
           <p class="p">
@@ -914,8 +1018,8 @@ partition by hash (school) partitions 10,
         </div>
       </article>
 
-      <article class="topic concept nested3" aria-labelledby="ariaid-title18" id="kudu_partitioning__kudu_partitioning_misc">
-        <h4 class="title topictitle4" id="ariaid-title18">Working with Partitioning in Kudu Tables</h4>
+      <article class="topic concept nested3" aria-labelledby="ariaid-title24" id="kudu_partitioning__kudu_partitioning_misc">
+        <h4 class="title topictitle4" id="ariaid-title24">Working with Partitioning in Kudu Tables</h4>
         <div class="body conbody">
 
           <p class="p">
@@ -936,9 +1040,9 @@ partition by hash (school) partitions 10,
 
     </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title19" id="kudu_ddl__kudu_timestamps">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title25" id="kudu_ddl__kudu_timestamps">
 
-      <h3 class="title topictitle3" id="ariaid-title19">Handling Date, Time, or Timestamp Data with Kudu</h3>
+      <h3 class="title topictitle3" id="ariaid-title25">Handling Date, Time, or Timestamp Data with Kudu</h3>
 
       <div class="body conbody">
 
@@ -1107,9 +1211,9 @@ select microseconds,
 
     </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title20" id="kudu_ddl__kudu_metadata">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title26" id="kudu_ddl__kudu_metadata">
 
-      <h3 class="title topictitle3" id="ariaid-title20">How Impala Handles Kudu Metadata</h3>
+      <h3 class="title topictitle3" id="ariaid-title26">How Impala Handles Kudu Metadata</h3>
 
       <div class="body conbody">
         <div class="note note note_note"><span class="note__title notetitle">Note:</span> This section only applies the Kudu services that are not
@@ -1159,8 +1263,8 @@ kudu.table_name  | impala::some_database.table_name_demo
     </article>
 
   </article>
-  <article class="topic concept nested1" aria-labelledby="ariaid-title21" id="impala_kudu__kudu_hms">
-    <h2 class="title topictitle2" id="ariaid-title21">Working with Kudu Integrated with Hive Metastore</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title27" id="impala_kudu__kudu_hms">
+    <h2 class="title topictitle2" id="ariaid-title27">Working with Kudu Integrated with Hive Metastore</h2>
     <div class="body conbody">
       <p class="p">Starting from Kudu 1.10 and Impala 3.3, Impala supports Kudu services
         integrated with the Hive Metastore (HMS). See <a class="xref" href="https://kudu.apache.org/docs/hive_metastore.html#hive_metastore" target="_blank">the HMS integration
@@ -1184,9 +1288,9 @@ kudu.table_name  | impala::some_database.table_name_demo
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title22" id="impala_kudu__kudu_etl">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title28" id="impala_kudu__kudu_etl">
 
-    <h2 class="title topictitle2" id="ariaid-title22">Loading Data into Kudu Tables</h2>
+    <h2 class="title topictitle2" id="ariaid-title28">Loading Data into Kudu Tables</h2>
 
     <div class="body conbody">
 
@@ -1241,9 +1345,9 @@ kudu.table_name  | impala::some_database.table_name_demo
 
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title23" id="impala_kudu__kudu_dml">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title29" id="impala_kudu__kudu_dml">
 
-    <h2 class="title topictitle2" id="ariaid-title23">Impala DML Support for Kudu Tables (INSERT, UPDATE, DELETE, UPSERT)</h2>
+    <h2 class="title topictitle2" id="ariaid-title29">Impala DML Support for Kudu Tables (INSERT, UPDATE, DELETE, UPSERT)</h2>
 
     
 
@@ -1307,64 +1411,111 @@ kudu.table_name  | impala::some_database.table_name_demo
     </div>
 
   </article>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title30" id="impala_kudu__multi_rows_transaction">
+    <h2 class="title topictitle2" id="ariaid-title30">Multi-row Transactions for Kudu Tables</h2>
+    <div class="body conbody">
+      <p class="p"> When you use Impala to query Kudu tables, you can insert multiple rows into a Kudu table
+        in a single transaction. This broader transactional support between Kudu and Impala is
+        available to you at a query level and at a session level.</p></div>
+  </article>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title31" id="impala_kudu__using_multi_row_transaction">
+    <h2 class="title topictitle2" id="ariaid-title31">Using Multi-row Transaction Capability</h2>
+    <div class="body conbody">
+      <p class="p">You can control this multi-row transaction feature by using the following query option. You
+        may set this option at per-query or per-session level. When the option is enabled for a
+        session, Impala will open one Kudu transaction for each INSERT or CTAS statement.</p>
+      <pre class="pre codeblock"><code>set ENABLE_KUDU_TRANSACTION=true</code></pre>
+      <p class="p">The following example shows how to insert three rows into a table in a single
+        transaction.</p>
+      <p class="p"><strong class="ph b">Example:</strong></p>
+      <div class="p"><ol class="ol">
+          <li class="li">Create table kudu-test-tbl-1.
+            <pre class="pre codeblock"><code>create table kudu-test-tbl-1 (a int primary key, b string) partition by hash(a) partitions 8 stored as kudu;</code></pre></li>
+          <li class="li">Enable the multi-row transaction feature at the query
+            level.<pre class="pre codeblock"><code>set ENABLE_KUDU_TRANSACTION=true;</code></pre></li>
+          <li class="li">Insert three rows into the newly created table in a single transaction.
+            <pre class="pre codeblock"><code>insert into kudu-test-tbl-1 values (0, 'a'), (1, 'b'), (2, 'c');</code></pre></li>
+          <li class="li">Verify the number of rows of this table.
+            <pre class="pre codeblock"><code>select count(*) from kudu-test-tbl-1;</code></pre></li>
+        </ol></div>
+      <p class="p"><strong class="ph b">Note:</strong></p>
+      <p class="p">If you insert multiple rows with duplicate keys into a table, the transaction is aborted.
+        To ignore the conflicts with duplicate keys during the transaction, start Impala daemons
+        with the flag <code class="ph codeph">--kudu_ignore_conflicts_in_transaction=true</code>. This flag is set
+        to False by default. Note that this flag takes effect only if the flag
+          <code class="ph codeph">--kudu_ignore_conflicts</code> is set as True. The flag
+          <code class="ph codeph">--kudu_ignore_conflicts</code> is set to True by default.</p>
+      <p class="p">When you enable the option <code class="ph codeph">ENABLE_KUDU_TRANSACTION</code>, each Impala statement
+        is executed with a new opened transaction. If the statement is executed successfully, then
+        the Impala Coordinator commits the transaction. If there is an error returned by Kudu, then
+        Impala aborts the transaction.</p>
+      <p class="p">This applies to the following statements:</p>
+      <div class="p"><ul class="ul">
+        <li class="li">INSERT</li>
+        <li class="li">CREATE TABLE AS SELECT</li>
+      </ul></div>
+    </div>
+  </article>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title32" id="impala_kudu__advantages">
+    <h2 class="title topictitle2" id="ariaid-title32">Advantages of Using This Capability</h2>
+    <div class="body conbody">
+      <p class="p">You can now easily build and manage Kudu applications, especially when Impala is used to
+        interact with the data in the Kudu table. With multi-row transaction, you can atomically
+        ingest large number of rows into a Kudu table with INSERT-SELECT or CTAS statement.</p></div>
+  </article>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title33" id="impala_kudu__limitation">
+    <h2 class="title topictitle2" id="ariaid-title33">Limitation</h2>
+    <div class="body conbody">
+      <p class="p">INSERT and CTAS statements are supported for Kudu tables in the context of a multi-row
+        transaction, but UPDATE/UPSERT/DELETE statements are not supported in multi-row transaction
+        as of now.</p></div>
+  </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title24" id="impala_kudu__kudu_consistency">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title34" id="impala_kudu__kudu_consistency">
 
-    <h2 class="title topictitle2" id="ariaid-title24">Consistency Considerations for Kudu Tables</h2>
+    <h2 class="title topictitle2" id="ariaid-title34">Consistency Considerations for Kudu Tables</h2>
 
     <div class="body conbody">
 
-      <p class="p">
-        Kudu tables have consistency characteristics such as uniqueness, controlled by the
-        primary key columns, and non-nullable columns. The emphasis for consistency is on
-        preventing duplicate or incomplete data from being stored in a table.
-      </p>
+      <p class="p">Kudu tables have consistency characteristics such as uniqueness, controlled by the primary
+        key columns, and non-nullable columns. The emphasis for consistency is on preventing
+        duplicate or incomplete data from being stored in a table. </p>
 
-      <p class="p">
-        Currently, Kudu does not enforce strong consistency for order of operations, total
-        success or total failure of a multi-row statement, or data that is read while a write
-        operation is in progress. Changes are applied atomically to each row, but not applied
-        as a single unit to all rows affected by a multi-row DML statement. That is, Kudu does
-        not currently have atomic multi-row statements or isolation between statements.
-      </p>
+      <p class="p">Currently, Kudu does not enforce strong consistency for order of operations, or data that
+        is read while a write operation is in progress. If multi-rows transaction is enabled,
+        insertion of multiple rows in one insertion statement will be atomic, i.e. total success or
+        total failure. But if multi-row transaction is not enabled, changes are applied atomically
+        to each row, not applied as a single unit to all rows affected by a multi-row DML statement. </p>
 
-      <p class="p">
-        If some rows are rejected during a DML operation because of a mismatch with duplicate
-        primary key values, <code class="ph codeph">NOT NULL</code> constraints, and so on, the statement
-        succeeds with a warning. Impala still inserts, deletes, or updates the other rows that
-        are not affected by the constraint violation.
-      </p>
+      <p class="p">When multi-row transaction is not enabled and if some rows are rejected during a DML
+        operation because of a mismatch with duplicate primary key values, <code class="ph codeph">NOT NULL</code>
+        constraints, and so on, the statement succeeds with a warning. Impala still inserts,
+        deletes, or updates the other rows that are not affected by the constraint violation. </p>
 
-      <p class="p">
-        Consequently, the number of rows affected by a DML operation on a Kudu table might be
-        different than you expect.
-      </p>
+      <p class="p">Consequently, the number of rows affected by a DML operation on a Kudu table might be
+        different than you expect. </p>
 
-      <p class="p">
-        Because there is no strong consistency guarantee for information being inserted into,
-        deleted from, or updated across multiple tables simultaneously, consider denormalizing
-        the data where practical. That is, if you run separate <code class="ph codeph">INSERT</code>
-        statements to insert related rows into two different tables, one <code class="ph codeph">INSERT</code>
-        might fail while the other succeeds, leaving the data in an inconsistent state. Even if
-        both inserts succeed, a join query might happen during the interval between the
-        completion of the first and second statements, and the query would encounter incomplete
-        inconsistent data. Denormalizing the data into a single wide table can reduce the
-        possibility of inconsistency due to multi-table operations.
-      </p>
+      <p class="p">Because there is no strong consistency guarantee for information being inserted into with
+        separate INSERT statements, deleted from, or updated across multiple tables simultaneously,
+        consider denormalizing the data where practical. That is, if you run separate
+          <code class="ph codeph">INSERT</code> statements to insert related rows into two different tables, one
+          <code class="ph codeph">INSERT</code> might fail while the other succeeds, leaving the data in an
+        inconsistent state. Even if both inserts succeed, a join query might happen during the
+        interval between the completion of the first and second statements, and the query would
+        encounter incomplete inconsistent data. Denormalizing the data into a single wide table can
+        reduce the possibility of inconsistency due to multi-table operations. </p>
 
-      <p class="p">
-        Information about the number of rows affected by a DML operation is reported in
-        <span class="keyword cmdname">impala-shell</span> output, and in the <code class="ph codeph">PROFILE</code> output, but
-        is not currently reported to HiveServer2 clients such as JDBC or ODBC applications.
-      </p>
+      <p class="p">Information about the number of rows affected by a DML operation is reported in
+          <span class="keyword cmdname">impala-shell</span> output, and in the <code class="ph codeph">PROFILE</code> output, but is
+        not currently reported to HiveServer2 clients such as JDBC or ODBC applications. </p>
 
     </div>
 
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title25" id="impala_kudu__kudu_security">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title35" id="impala_kudu__kudu_security">
 
-    <h2 class="title topictitle2" id="ariaid-title25">Security Considerations for Kudu Tables</h2>
+    <h2 class="title topictitle2" id="ariaid-title35">Security Considerations for Kudu Tables</h2>
 
     <div class="body conbody">
 
@@ -1427,9 +1578,9 @@ kudu.table_name  | impala::some_database.table_name_demo
 
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title26" id="impala_kudu__kudu_performance">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title36" id="impala_kudu__kudu_performance">
 
-    <h2 class="title topictitle2" id="ariaid-title26">Impala Query Performance for Kudu Tables</h2>
+    <h2 class="title topictitle2" id="ariaid-title36">Impala Query Performance for Kudu Tables</h2>
 
     <div class="body conbody">
 

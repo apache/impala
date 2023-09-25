@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2022" />
-<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="copyright" content="(C) Copyright 2023" />
+<meta name="DC.rights.owner" content="(C) Copyright 2023" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="MEM_LIMIT Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
@@ -217,11 +217,63 @@ for buffer reservations. Memory reservation needed given the current plan: 38.00
 or the pool config (max-query-mem-limit, min-query-mem-limit) for the query to allow the query memory limit to be
 at least 70.00 MB. Note that changing the mem_limit may also change the plan. See the query profile for more
 information about the per-node memory requirements.</code></pre>
- </div>
+</div>
 
 <div class="related-links">
 <div class="familylinks">
 <div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
 </div>
-</div></body>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="mem_limit_executors">
+  <h2 class="title topictitle2" id="ariaid-title2">MEM_LIMIT_EXECUTORS Query Option</h2>
+
+    <div class="body conbody">
+      <div class="note note"><span class="notetitle">Note:</span> This is an advanced query option. Setting this query option is not recommended
+        unless specifically advised.</div>
+
+      <p class="p">The existing <code class="ph codeph">MEM_LIMIT</code> query option applies to all impala coordinators and
+        executors. This means that the same amount of memory gets reserved but coordinators
+        typically just do the job of coordinating the query and thus do not necessarily need all the
+        estimated memory. Blocking the estimated memory on coordinators blocks the memory to be used
+        for other queries.</p>
+
+      <p class="p">The new <code class="ph codeph">MEM_LIMIT_EXECUTORS</code> query option functions similarly to the
+          <code class="ph codeph">MEM_LIMIT</code> option but sets the query memory limit only on executors. This
+        new option addresses the issue related to <code class="ph codeph">MEM_LIMIT</code> and is recommended in
+        scenarios where the query needs much higher memory on executors compared with
+        coordinators.</p>
+
+      <p class="p">Note that the <code class="ph codeph">MEM_LIMIT_EXECUTORS</code> option does not work with
+          <code class="ph codeph">MEM_LIMIT</code>. If you set both, only <code class="ph codeph">MEM_LIMIT</code> applies.</p>
+
+    </div>
+
+</div>
+
+<div class="topic concept nested1" aria-labelledby="ariaid-title3" id="mem_limit_coordinators">
+  <h2 class="title topictitle2" id="ariaid-title3">MEM_LIMIT_COORDINATORS Query Option</h2>
+
+    <div class="body conbody">
+      <div class="note note"><span class="notetitle">Note:</span> This is an advanced query option. Setting this query option is not recommended
+        unless specifically advised.</div>
+
+      <p class="p">The existing <code class="ph codeph">MEM_LIMIT</code> query option applies to all impala coordinators and
+        executors. This means that the same amount of memory gets reserved but coordinators
+        typically just do the job of coordinating the query and thus do not necessarily need all the
+        estimated memory. Blocking the estimated memory on coordinators blocks the memory to be used
+        for other queries.</p>
+
+      <p class="p">The new <code class="ph codeph">MEM_LIMIT_COORDINATORS</code> query option functions similarly to the
+          <code class="ph codeph">MEM_LIMIT</code> option but sets the query memory limit only on coordinators. This
+        new option addresses the issue related to <code class="ph codeph">MEM_LIMIT</code> and is recommended in
+        scenarios where the query needs higher or lower memory on coordinators compared to the planner
+        estimates.</p>
+
+      <p class="p">Note that the <code class="ph codeph">MEM_LIMIT_COORDINATORS</code> option does not work with
+          <code class="ph codeph">MEM_LIMIT</code>. If you set both, only <code class="ph codeph">MEM_LIMIT</code> applies.</p>
+
+    </div>
+
+</div>
+
+</body>
 </html>

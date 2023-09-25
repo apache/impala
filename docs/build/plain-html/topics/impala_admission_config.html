@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2022" />
-<meta name="DC.rights.owner" content="(C) Copyright 2022" />
+<meta name="copyright" content="(C) Copyright 2023" />
+<meta name="DC.rights.owner" content="(C) Copyright 2023" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Configuring Admission Control" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html" />
@@ -240,6 +240,14 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
   &lt;property&gt;
     &lt;name&gt;impala.admission-control.<strong class="ph b">clamp-mem-limit-query-option</strong>.root.default.regularPool&lt;/name&gt;
     &lt;value&gt;true&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;impala.admission-control.<strong class="ph b">max-query-cpu-core-per-node-limit</strong>.root.default.regularPool&lt;/name&gt;
+    &lt;value&gt;8&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;impala.admission-control.<strong class="ph b">max-query-cpu-core-coordinator-limit</strong>.root.default.regularPool&lt;/name&gt;
+    &lt;value&gt;8&lt;/value&gt;
   &lt;/property&gt;
 &lt;/configuration&gt;
 </code></pre>
