@@ -498,6 +498,12 @@ public class MetastoreEvents {
 
     public String getTableName() { return tblName_; }
 
+    public String getTargetName() {
+      if (dbName_ == null && tblName_ == null) return "CLUSTER_WIDE";
+      if (tblName_ == null) return dbName_;
+      return dbName_ + "." + tblName_;
+    }
+
     /**
      * Process this event if it is enabled based on the flags on this object
      *
