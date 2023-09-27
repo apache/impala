@@ -148,8 +148,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   protected volatile long createEventId_ = -1;
 
   // tracks the in-flight metastore events for this table. Used by Events processor to
-  // avoid unnecessary refresh when the event is received
-  private final InFlightEvents inFlightEvents = new InFlightEvents();
+  // avoid unnecessary refresh when the event is received.
+  // Also used as a monitor object to synchronize access to it to avoid blocking on table
+  // lock during self-event check. If both this and tableLock_ or catalog version lock are
+  // taken, inFlightEvents_ must be the last to avoid deadlock.
+  private final InFlightEvents inFlightEvents_ = new InFlightEvents();
 
   // Table metrics. These metrics are applicable to all table types. Each subclass of
   // Table can define additional metrics specific to that table type.
@@ -981,12 +984,13 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    */
   public boolean removeFromVersionsForInflightEvents(
       boolean isInsertEvent, long versionNumber) {
-    Preconditions.checkState(isWriteLockedByCurrentThread(),
-        "removeFromVersionsForInFlightEvents called without taking the table lock on "
-            + getFullName());
-    boolean removed = inFlightEvents.remove(isInsertEvent, versionNumber);
-    if (removed) {
-      metrics_.getCounter(NUMBER_OF_INFLIGHT_EVENTS).dec();
+    boolean removed = false;
+    synchronized (inFlightEvents_) {
+      removed = inFlightEvents_.remove(isInsertEvent, versionNumber);
+      // Locked updating of counters is not need for correctnes but tests may rely on it.
+      if (removed) {
+        metrics_.getCounter(NUMBER_OF_INFLIGHT_EVENTS).dec();
+      }
     }
     return removed;
   }
@@ -1004,16 +1008,22 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * capacity
    */
   public void addToVersionsForInflightEvents(boolean isInsertEvent, long versionNumber) {
-    // we generally don't take locks on Incomplete tables since they are atomically
-    // replaced during load
+    // We generally don't take locks on Incomplete tables since they are atomically
+    // replaced during load.
+    // The lock is not needed for thread safety, just verifying existing behavior.
     Preconditions.checkState(
         this instanceof IncompleteTable || isWriteLockedByCurrentThread());
-    if (!inFlightEvents.add(isInsertEvent, versionNumber)) {
-      LOG.warn(String.format("Could not add %s version to the table %s. This could "
-          + "cause unnecessary refresh of the table when the event is received by the "
-              + "Events processor.", versionNumber, getFullName()));
-    } else {
-      metrics_.getCounter(NUMBER_OF_INFLIGHT_EVENTS).inc();
+    boolean added = false;
+    synchronized (inFlightEvents_) {
+      added = inFlightEvents_.add(isInsertEvent, versionNumber);
+      // Locked updating of counters is not need for correctnes but tests may rely on it.
+      if (!added) {
+        LOG.warn(String.format("Could not add %s version to the table %s. This could "
+            + "cause unnecessary refresh of the table when the event is received by the "
+                + "Events processor.", versionNumber, getFullName()));
+      } else {
+        metrics_.getCounter(NUMBER_OF_INFLIGHT_EVENTS).inc();
+      }
     }
   }
 

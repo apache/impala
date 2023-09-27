@@ -2017,6 +2017,7 @@ public class HdfsTable extends Table implements FeFsTable {
     return ret;
   }
 
+  // TODO: why is there a single synchronized function?
   @Override
   protected synchronized void loadFromThrift(TTable thriftTable)
       throws TableLoadingException {

@@ -99,6 +99,9 @@ public class Db extends CatalogObjectImpl implements FeDb {
   private boolean isSystemDb_ = false;
 
   // tracks the in-flight metastore events for this db
+  // Also used as a monitor object to synchronize access to it to avoid blocking on table
+  // lock during self-event check. If both this and dbLock_ or catalog version lock are
+  // taken, inFlightEvents_ must be the last to avoid deadlock.
   private final InFlightEvents inFlightEvents_ = new InFlightEvents();
 
   // lock to make sure modifications to the Db object are atomically done along with
@@ -565,10 +568,9 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * @return true if version was successfully removed, false if didn't exist
    */
   public boolean removeFromVersionsForInflightEvents(long versionNumber) {
-    Preconditions.checkState(dbLock_.isHeldByCurrentThread(),
-        "removeFromVersionsForInflightEvents called without getting the db lock for "
-            + getName() + " database.");
-    return inFlightEvents_.remove(false, versionNumber);
+    synchronized (inFlightEvents_) {
+      return inFlightEvents_.remove(false, versionNumber);
+    }
   }
 
   /**
@@ -579,10 +581,15 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * @param versionNumber version number to add
    */
   public void addToVersionsForInflightEvents(long versionNumber) {
+    // The lock is not needed for thread safety, just verifying existing behavior.
     Preconditions.checkState(dbLock_.isHeldByCurrentThread(),
         "addToVersionsForInFlightEvents called without getting the db lock for "
             + getName() + " database.");
-    if (!inFlightEvents_.add(false, versionNumber)) {
+    boolean added = false;
+    synchronized (inFlightEvents_) {
+      added = inFlightEvents_.add(false, versionNumber);
+    }
+    if (!added) {
       LOG.warn(String.format("Could not add version %s to the list of in-flight "
           + "events. This could cause unnecessary database %s invalidation when the "
           + "event is processed", versionNumber, getName()));

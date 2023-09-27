@@ -1046,83 +1046,99 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.debug("Not a self-event because eventId is {}", versionNumber);
       return false;
     }
-    Db db = getDb(ctx.getDbName());
+    Db db = getDb(ctx.getDbName()); // Uses thread-safe hashmap.
     if (db == null) {
       throw new DatabaseNotFoundException("Database " + ctx.getDbName() + " not found");
     }
-    // if the given tblName is null we look db's in-flight events
     if (ctx.getTblName() == null) {
-      //TODO use read/write locks for both table and db
-      if (!tryLockDb(db)) {
-        throw new CatalogException("Could not acquire lock on database object " +
-            db.getName());
-      }
-      versionLock_.writeLock().unlock();
-      try {
-        boolean removed = db.removeFromVersionsForInflightEvents(versionNumber);
-        if (!removed) {
-          LOG.debug("Could not find version {} in the in-flight event list of database "
-              + "{}", versionNumber, db.getName());
-        }
-        return removed;
-      } finally {
-        db.getLock().unlock();
-      }
+      // Not taking lock, rely on Db's internal locking.
+      return evaluateSelfEventForDb(db, versionNumber);
     }
-    Table tbl = db.getTable(ctx.getTblName());
+
+    Table tbl = db.getTable(ctx.getTblName()); // Uses thread-safe hashmap.
     if (tbl == null) {
       throw new TableNotFoundException(
           String.format("Table %s.%s not found", ctx.getDbName(), ctx.getTblName()));
     }
-    // we should acquire the table lock so that we wait for any other updates
-    // happening to this table at the same time
+
+    if (ctx.getPartitionKeyValues() == null) {
+      // Not taking lock, rely on Table's internal locking.
+      return evaluateSelfEventForTable(tbl, isInsertEvent, versionNumber);
+    }
+
+    // TODO: Could be a Precondition? If partitionKeyValues != null, this should be
+    // a HDFS table.
+    if (!(tbl instanceof HdfsTable)) return false;
+
+    // We should acquire the table lock so that we wait for any other updates
+    // happening to this table at the same time, as they could affect the list of
+    // partitions.
+    // TODO: add more fine grained locking to protect partitions without taking
+    //       longly held locks (IMPALA-12461)
+    // Increasing the timeout would not help if the table lock is held by
+    // a concurrent DDL as we would need the lock during the actual processing of the
+    // event.
     if (!tryWriteLock(tbl)) {
       throw new CatalogException(String.format("Error during self-event evaluation "
           + "for table %s due to lock contention", tbl.getFullName()));
     }
     versionLock_.writeLock().unlock();
     try {
-      List<List<TPartitionKeyValue>> partitionKeyValues = ctx.getPartitionKeyValues();
-      // if the partitionKeyValues is null, we look for tbl's in-flight events
-      if (partitionKeyValues == null) {
-        boolean removed =
-            tbl.removeFromVersionsForInflightEvents(isInsertEvent, versionNumber);
-        if (!removed) {
-          LOG.debug("Could not find {} {} in in-flight event list of table {}",
-              isInsertEvent ? "eventId" : "version", versionNumber, tbl.getFullName());
-        }
-        return removed;
-      }
-      if (tbl instanceof HdfsTable) {
-        List<String> failingPartitions = new ArrayList<>();
-        int len = partitionKeyValues.size();
-        for (int i=0; i<len; ++i) {
-          List<TPartitionKeyValue> partitionKeyValue = partitionKeyValues.get(i);
-          versionNumber = isInsertEvent ? ctx.getInsertEventId(i) : versionNumber;
-          HdfsPartition hdfsPartition =
-              ((HdfsTable) tbl).getPartitionFromThriftPartitionSpec(partitionKeyValue);
-          if (hdfsPartition == null
-              || !hdfsPartition.removeFromVersionsForInflightEvents(isInsertEvent,
-                  versionNumber)) {
-            // even if this is an error condition we should not bail out early since we
-            // should clean up the self-event state on the rest of the partitions
-            String partName = HdfsTable.constructPartitionName(partitionKeyValue);
-            if (hdfsPartition == null) {
-              LOG.debug("Partition {} not found during self-event "
-                  + "evaluation for the table {}", partName, tbl.getFullName());
-            } else {
-              LOG.trace("Could not find {} in in-flight event list of the partition {} "
-                  + "of table {}", versionNumber, partName, tbl.getFullName());
-            }
-            failingPartitions.add(partName);
-          }
-        }
-        return failingPartitions.isEmpty();
-      }
+      return evaluateSelfEventForPartition(
+          ctx, (HdfsTable)tbl, isInsertEvent, versionNumber);
     } finally {
       tbl.releaseWriteLock();
     }
-    return false;
+  }
+
+  private boolean evaluateSelfEventForDb(Db db, long versionNumber)
+      throws CatalogException {
+    boolean removed = db.removeFromVersionsForInflightEvents(versionNumber);
+    if (!removed) {
+      LOG.debug("Could not find version {} in the in-flight event list of database "
+          + "{}", versionNumber, db.getName());
+    }
+    return removed;
+  }
+
+  private boolean evaluateSelfEventForTable(Table tbl,
+      boolean isInsertEvent, long versionNumber) throws CatalogException {
+    boolean removed =
+        tbl.removeFromVersionsForInflightEvents(isInsertEvent, versionNumber);
+    if (!removed) {
+      LOG.debug("Could not find {} {} in in-flight event list of table {}",
+          isInsertEvent ? "eventId" : "version", versionNumber, tbl.getFullName());
+    }
+    return removed;
+  }
+
+  private boolean evaluateSelfEventForPartition(SelfEventContext ctx, HdfsTable tbl,
+      boolean isInsertEvent, long versionNumber) throws CatalogException {
+    List<List<TPartitionKeyValue>> partitionKeyValues = ctx.getPartitionKeyValues();
+    List<String> failingPartitions = new ArrayList<>();
+    int len = partitionKeyValues.size();
+    for (int i=0; i<len; ++i) {
+      List<TPartitionKeyValue> partitionKeyValue = partitionKeyValues.get(i);
+      versionNumber = isInsertEvent ? ctx.getInsertEventId(i) : versionNumber;
+      HdfsPartition hdfsPartition =
+          tbl.getPartitionFromThriftPartitionSpec(partitionKeyValue);
+      if (hdfsPartition == null
+          || !hdfsPartition.removeFromVersionsForInflightEvents(isInsertEvent,
+              versionNumber)) {
+        // even if this is an error condition we should not bail out early since we
+        // should clean up the self-event state on the rest of the partitions
+        String partName = HdfsTable.constructPartitionName(partitionKeyValue);
+        if (hdfsPartition == null) {
+          LOG.debug("Partition {} not found during self-event "
+              + "evaluation for the table {}", partName, tbl.getFullName());
+        } else {
+          LOG.trace("Could not find {} in in-flight event list of the partition {} "
+              + "of table {}", versionNumber, partName, tbl.getFullName());
+        }
+        failingPartitions.add(partName);
+      }
+    }
+    return failingPartitions.isEmpty();
   }
 
   /**
