@@ -27,6 +27,8 @@ Language: Java
 BasedOnStyle: Chromium
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine: true
 AlwaysBreakBeforeMultilineStrings: true
 BreakBeforeTernaryOperators: false
 ColumnLimit: 90
