@@ -255,6 +255,7 @@ find_package(LlvmBinaries REQUIRED)
 
 # Find LLVM libraries to link against.
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG"
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG_NOOPT"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
@@ -462,7 +463,7 @@ endif()
 if(NOT $ENV{KUDU_CLIENT_DIR} EQUAL "")
   set(kuduClient_DIR "$ENV{KUDU_CLIENT_DIR}/usr/local/share/kuduClient/cmake")
 else()
-  if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+  if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR "${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG_NOOPT")
     set(kuduClient_DIR "$ENV{IMPALA_KUDU_HOME}/debug/share/kuduClient/cmake")
   else()
     set(kuduClient_DIR "$ENV{IMPALA_KUDU_HOME}/release/share/kuduClient/cmake")
