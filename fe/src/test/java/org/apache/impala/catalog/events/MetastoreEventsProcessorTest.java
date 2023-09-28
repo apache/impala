@@ -88,6 +88,8 @@ import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
+import org.apache.impala.catalog.events.MetastoreEvents.AlterDatabaseEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.DropDatabaseEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterPartitionEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.BatchPartitionEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
@@ -2440,6 +2442,46 @@ public class MetastoreEventsProcessorTest {
     partVals.add(Collections.singletonList("2"));
     addPartitions(TEST_DB_NAME, testTblName, partVals);
     eventsProcessor_.processEvents();
+
+    // Collect some other types of events to test scenarios where an event cuts batching
+    Map<String, String> miscEventTypesToMessage = new HashMap<>();
+    createDatabaseFromImpala("database_to_be_dropped", "whatever");
+    eventsProcessor_.processEvents();
+
+    // Get ALTER_DATABASE event
+    String currentLocation =
+        catalog_.getDb("database_to_be_dropped").getMetaStoreDb().getLocationUri();
+    String newLocation = currentLocation + File.separatorChar + "newTestLocation";
+    Database alteredDb =
+        catalog_.getDb("database_to_be_dropped").getMetaStoreDb().deepCopy();
+    alteredDb.setLocationUri(newLocation);
+    alterDatabase(alteredDb);
+    List<NotificationEvent> alterDbEvents = eventsProcessor_.getNextMetastoreEvents();
+    assertEquals(1, alterDbEvents.size());
+    assertEquals("ALTER_DATABASE", alterDbEvents.get(0).getEventType());
+    miscEventTypesToMessage.put("ALTER_DATABASE", alterDbEvents.get(0).getMessage());
+    eventsProcessor_.processEvents();
+
+    // Get DROP_DATABASE event
+    dropDatabaseCascade("database_to_be_dropped");
+    List<NotificationEvent> dropDbEvents = eventsProcessor_.getNextMetastoreEvents();
+    assertEquals(1, dropDbEvents.size());
+    assertEquals("DROP_DATABASE", dropDbEvents.get(0).getEventType());
+    miscEventTypesToMessage.put("DROP_DATABASE", dropDbEvents.get(0).getMessage());
+    eventsProcessor_.processEvents();
+
+    // Get ALTER_TABLE rename event
+    createTable(TEST_DB_NAME, "table_before_rename", false);
+    eventsProcessor_.processEvents();
+    alterTableRename("table_before_rename", "table_after_rename", null);
+    List<NotificationEvent> alterTblEvents = eventsProcessor_.getNextMetastoreEvents();
+    assertEquals(1, alterTblEvents.size());
+    assertEquals("ALTER_TABLE", alterTblEvents.get(0).getEventType());
+    miscEventTypesToMessage.put("ALTER_TABLE", alterTblEvents.get(0).getMessage());
+    eventsProcessor_.processEvents();
+    dropTable("table_after_rename");
+    eventsProcessor_.processEvents();
+
     alterPartitionsParams(TEST_DB_NAME, testTblName, "testkey", "val", partVals);
     // we fetch a real alter partition event so that we can generate mocks using its
     // contents below
@@ -2482,12 +2524,13 @@ public class MetastoreEventsProcessorTest {
     Map<String, String> eventTypeToMessage = new HashMap<>();
     eventTypeToMessage.put("ALTER_PARTITION", alterPartMessage);
     eventTypeToMessage.put("INSERT", insertEvent.getMessage());
-    runEventBatchingTest(testTblName, eventTypeToMessage);
+    runEventBatchingTest(testTblName, eventTypeToMessage, miscEventTypesToMessage);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   private void runEventBatchingTest(String testTblName,
-      Map<String, String> eventTypeToMessage) throws DatabaseNotFoundException,
+      Map<String, String> eventTypeToMessage,
+      Map<String, String> miscEventTypesToMessage) throws DatabaseNotFoundException,
       MetastoreNotificationException {
     Table tbl = catalog_.getTable(TEST_DB_NAME, testTblName);
     long lastSyncedEventId = tbl.getLastSyncedEventId();
@@ -2504,35 +2547,66 @@ public class MetastoreEventsProcessorTest {
       assertTrue(batch.get(0) instanceof BatchPartitionEvent);
       BatchPartitionEvent batchEvent = (BatchPartitionEvent) batch.get(0);
       assertEquals(10, batchEvent.getBatchEvents().size());
-      // create a batch which consists of some other events
-      // only contiguous events should be batched
-      // 13-15 mock events which can be batched
-      mockEvents = createMockEvents(lastSyncedEventId + 113, 3,
-          eventType, TEST_DB_NAME, testTblName, eventMessage);
-      // 17-18 can be batched
-      mockEvents.addAll(createMockEvents(lastSyncedEventId + 117, 2,
-          eventType, TEST_DB_NAME, testTblName, eventMessage));
-      // event id 20 should not be batched
-      mockEvents.addAll(createMockEvents(lastSyncedEventId + 120, 1,
-          eventType, TEST_DB_NAME, testTblName, eventMessage));
-      // events 22-24 should be batched
-      mockEvents.addAll(createMockEvents(lastSyncedEventId + 122, 3,
-          eventType, TEST_DB_NAME, testTblName, eventMessage));
 
+      // We support batching some non-contiguous events on the same table
+      // as long as the events are independent. Test successful batching
+      // of interleaved events from two tables.
+      // Events on Table 1: 13-15,17-18,20 => 13-20 (batch size = 6)
+      // Events on Table 2: 10-12,16,19,21-22 => 10-22 (batch size = 7)
+      // Table 2
+      mockEvents = createMockEvents(lastSyncedEventId + 110, 3,
+          eventType, TEST_DB_NAME, "table2", eventMessage);
+      // Table 1
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 113, 3,
+          eventType, TEST_DB_NAME, "table1", eventMessage));
+      // Table 2
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 116, 1,
+          eventType, TEST_DB_NAME, "table2", eventMessage));
+      // Table 1
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 117, 2,
+          eventType, TEST_DB_NAME, "table1", eventMessage));
+      // Table 2
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 119, 1,
+          eventType, TEST_DB_NAME, "table2", eventMessage));
+      // Table 1
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 120, 1,
+          eventType, TEST_DB_NAME, "table1", eventMessage));
+      // Table 2
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 121, 2,
+          eventType, TEST_DB_NAME, "table2", eventMessage));
       batch = eventFactory.createBatchEvents(mockEvents, eventsProcessor_.getMetrics());
-      assertEquals(4, batch.size());
-      MetastoreEvent batch1 = batch.get(0);
-      assertEquals(3, ((BatchPartitionEvent) batch1).getBatchEvents().size());
-      MetastoreEvent batch2 = batch.get(1);
-      assertEquals(2, ((BatchPartitionEvent) batch2).getBatchEvents().size());
-      MetastoreEvent batch3 = batch.get(2);
-      if (eventType.equalsIgnoreCase("ALTER_PARTITION")) {
-        assertTrue(batch3 instanceof AlterPartitionEvent);
-      } else {
-        assertTrue(batch3 instanceof InsertEvent);
+      assertEquals(2, batch.size());
+      // Batch 1 must be the batch with the lower Event ID (i.e. table 1)
+      BatchPartitionEvent batch1 = (BatchPartitionEvent) batch.get(0);
+      assertEquals(6, batch1.getNumberOfEvents());
+      assertEquals(lastSyncedEventId + 120, batch1.getEventId());
+      assertEquals("table1", batch1.getTableName());
+      // Batch 2 must be the batch with the higher Event ID (i.e. table 2)
+      BatchPartitionEvent batch2 = (BatchPartitionEvent) batch.get(1);
+      assertEquals(7, batch2.getNumberOfEvents());
+      assertEquals(lastSyncedEventId + 122, batch2.getEventId());
+      assertEquals("table2", batch2.getTableName());
+
+      // test to make sure that events on different tables are still monotonic
+      mockEvents = createMockEvents(lastSyncedEventId + 110, 1,
+          eventType, TEST_DB_NAME, "table1", eventMessage);
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 111, 1,
+          eventType, TEST_DB_NAME, "table2", eventMessage));
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 112, 1,
+          eventType, TEST_DB_NAME, "table3", eventMessage));
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 113, 1,
+          eventType, TEST_DB_NAME, "table4", eventMessage));
+      mockEvents.addAll(createMockEvents(lastSyncedEventId + 114, 1,
+          eventType, TEST_DB_NAME, "table5", eventMessage));
+      batch = eventFactory.createBatchEvents(mockEvents, eventsProcessor_.getMetrics());
+      assertEquals(5, batch.size());
+      for (int i = 0; i < batch.size(); i++) {
+        MetastoreEvent monotonicEvent = batch.get(i);
+        assertEquals(1, monotonicEvent.getNumberOfEvents());
+        assertEquals(lastSyncedEventId + 110+i, monotonicEvent.getEventId());
+        assertEquals("table"+(i+1), monotonicEvent.getTableName());
       }
-      MetastoreEvent batch4 = batch.get(3);
-      assertEquals(3, ((BatchPartitionEvent) batch4).getBatchEvents().size());
+
       // test to make sure that events which have different database name are not
       // batched
       mockEvents = createMockEvents(lastSyncedEventId + 100, 1, eventType, TEST_DB_NAME,
@@ -2566,6 +2640,104 @@ public class MetastoreEventsProcessorTest {
           assertTrue(event instanceof InsertEvent);
         }
       }
+
+      // Test that alter database cuts batches for tables in that database
+      // This test case may not be strictly necessary. Alter database should not
+      // impact batchable events. Out of an abundance of caution, we test it
+      // anyways.
+      mockEvents = createMockEvents(lastSyncedEventId + 100, 1, eventType,
+          "database_to_be_dropped", testTblName, eventMessage);
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 101, 1, eventType, "other_database",
+              testTblName, eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 102, 1, "ALTER_DATABASE",
+              "database_to_be_dropped", null,
+              miscEventTypesToMessage.get("ALTER_DATABASE")));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 103, 1, eventType,
+              "database_to_be_dropped", testTblName, eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 104, 1, eventType, "other_database",
+              testTblName, eventMessage));
+      batchEvents = eventFactory.createBatchEvents(mockEvents,
+          eventsProcessor_.getMetrics());
+      assertEquals(4, batchEvents.size());
+      assertTrue(batchEvents.get(1) instanceof AlterDatabaseEvent);
+      assertEquals("database_to_be_dropped", batchEvents.get(0).getDbName());
+      assertEquals("database_to_be_dropped", batchEvents.get(2).getDbName());
+      assertEquals("other_database", batchEvents.get(3).getDbName());
+
+      // Test that drop database cuts batches for tables in that database
+      // This is a synthetic sequence that should not occur in the wild.
+      mockEvents = createMockEvents(lastSyncedEventId + 100, 1, eventType,
+          "database_to_be_dropped", testTblName, eventMessage);
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 101, 1, eventType, "other_database",
+              testTblName, eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 102, 1, "DROP_DATABASE",
+              "database_to_be_dropped", null,
+              miscEventTypesToMessage.get("DROP_DATABASE")));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 103, 1, eventType,
+              "database_to_be_dropped", testTblName, eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 104, 1, eventType, "other_database",
+              testTblName, eventMessage));
+      batchEvents = eventFactory.createBatchEvents(mockEvents,
+          eventsProcessor_.getMetrics());
+      assertEquals(4, batchEvents.size());
+      assertTrue(batchEvents.get(1) instanceof DropDatabaseEvent);
+      assertEquals("database_to_be_dropped", batchEvents.get(0).getDbName());
+      assertEquals("database_to_be_dropped", batchEvents.get(2).getDbName());
+      assertEquals("other_database", batchEvents.get(3).getDbName());
+
+      // Test that alter table rename cuts batches for the two table
+      // names involved (but not an unrelated table).
+      // This is a synthetic sequence that should not occur in the wild.
+      mockEvents = createMockEvents(lastSyncedEventId + 100, 2, eventType, TEST_DB_NAME,
+          "table_before_rename", eventMessage);
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 102, 2, eventType, TEST_DB_NAME,
+              "table_after_rename", eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 104, 1, eventType, TEST_DB_NAME,
+              "other_table", eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 105, 1, "ALTER_TABLE", TEST_DB_NAME,
+              "table_before_rename", miscEventTypesToMessage.get("ALTER_TABLE")));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 106, 2, eventType, TEST_DB_NAME,
+              "table_before_rename", eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 108, 2, eventType, TEST_DB_NAME,
+              "table_after_rename", eventMessage));
+      mockEvents.addAll(
+          createMockEvents(lastSyncedEventId + 110, 1, eventType, TEST_DB_NAME,
+              "other_table", eventMessage));
+      batchEvents = eventFactory.createBatchEvents(mockEvents,
+          eventsProcessor_.getMetrics());
+      // The table_before_rename and table_after_rename tables keep their
+      // events in order (with batching only for adjacent events).
+      // The other_table can batch across the alter table event.
+      assertEquals(6, batchEvents.size());
+      BatchPartitionEvent altTblBatch0 = (BatchPartitionEvent) batchEvents.get(0);
+      assertEquals(2, altTblBatch0.getNumberOfEvents());
+      assertEquals("table_before_rename", altTblBatch0.getTableName());
+      BatchPartitionEvent altTblBatch1 = (BatchPartitionEvent) batchEvents.get(1);
+      assertEquals(2, altTblBatch1.getNumberOfEvents());
+      assertEquals("table_after_rename", altTblBatch1.getTableName());
+      assertTrue(batchEvents.get(2) instanceof AlterTableEvent);
+      BatchPartitionEvent altTblBatch3 = (BatchPartitionEvent) batchEvents.get(3);
+      assertEquals(2, altTblBatch3.getNumberOfEvents());
+      assertEquals("table_before_rename", altTblBatch3.getTableName());
+      BatchPartitionEvent altTblBatch4 = (BatchPartitionEvent) batchEvents.get(4);
+      assertEquals(2, altTblBatch4.getNumberOfEvents());
+      assertEquals("table_after_rename", altTblBatch4.getTableName());
+      BatchPartitionEvent altTblBatch5 = (BatchPartitionEvent) batchEvents.get(5);
+      assertEquals(2, altTblBatch5.getNumberOfEvents());
+      assertEquals("other_table", altTblBatch5.getTableName());
     }
     // make sure 2 events of different event types are not batched together
     long startEventId = lastSyncedEventId + 117;

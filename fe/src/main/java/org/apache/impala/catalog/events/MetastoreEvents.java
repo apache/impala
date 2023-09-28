@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -299,45 +300,185 @@ public class MetastoreEvents {
     }
 
     /**
-     * This method batches together any eligible consecutive elements from the given
-     * list of {@code MetastoreEvent}. The returned list may or may not contain batch
+     * This method flushes all in-progress batches for tables from the specified
+     * database from the pendingTableEventsMap to the sortedFinalBatches.
+     */
+    void flushBatchesForDb(
+        Map<String, Map<String, MetastoreEvent>> pendingTableEventsMap,
+        TreeMap<Long, MetastoreEvent> sortedFinalBatches, String dbName) {
+      String lowerDbName = dbName.toLowerCase();
+      Map<String, MetastoreEvent> dbMap = pendingTableEventsMap.get(lowerDbName);
+      if (dbMap != null) {
+        // Flush out any pending events in the database map and delete it
+        for (MetastoreEvent event : dbMap.values()) {
+          sortedFinalBatches.put(event.getEventId(), event);
+        }
+        pendingTableEventsMap.remove(lowerDbName);
+      }
+    }
+
+    /**
+     * This method flushes any in-progress batch for the specified table
+     * from the pendingTableEventsMap to the sortedFinalBatches.
+     */
+    void flushBatchForTable(
+        Map<String, Map<String, MetastoreEvent>> pendingTableEventsMap,
+        TreeMap<Long, MetastoreEvent> sortedFinalBatches, Table table) {
+      // Produce the lower-cased fully qualified table name
+      String dbName = table.getDbName().toLowerCase();
+      String tableName = table.getTableName().toLowerCase();
+      Map<String, MetastoreEvent> dbMap = pendingTableEventsMap.get(dbName);
+      if (dbMap != null) {
+        MetastoreEvent tableEvent = dbMap.get(tableName);
+        if (tableEvent != null) {
+          sortedFinalBatches.put(tableEvent.getEventId(), tableEvent);
+          dbMap.remove(tableName);
+          // If this was the last table, delete the DB map
+          if (dbMap.isEmpty()) {
+            pendingTableEventsMap.remove(dbName);
+          }
+        }
+      }
+    }
+
+    /**
+     * Event batching is done on a per-table basis to allow more batching in
+     * interleaved circumstances. Single-table events still follow the same rules
+     * for batching, but certain events cross table boundaries and should cut
+     * batches across multiple tables. This method detects cross-table events and
+     * cuts the appropriate batches. Currently, it handles drop database, alter
+     * database, and alter table rename. It is a no-op for events that are not
+     * cross-table.
+     */
+    void cutBatchesForCrossTableEvents(MetastoreEvent event,
+        Map<String, Map<String, MetastoreEvent>> pendingTableEventsMap,
+        TreeMap<Long, MetastoreEvent> sortedFinalBatches) {
+      // drop database - cuts any existing batches for tables in that database
+      // alter database - cuts any existing batches for tables in the database
+      // alter table rename - cuts any existing batches for the source or destination
+      //   table
+      if (event instanceof DropDatabaseEvent || event instanceof AlterDatabaseEvent) {
+        // Any batched events for tables from this database need to be flushed
+        // before emitting the AlterDatabaseEvent or DropDatabaseEvent.
+        flushBatchesForDb(pendingTableEventsMap, sortedFinalBatches, event.getDbName());
+      } else if (event instanceof AlterTableEvent) {
+        AlterTableEvent alterTable = (AlterTableEvent) event;
+        if (alterTable.isRename()) {
+          // Flush any batched events for the source table.
+          Table beforeTable = alterTable.getBeforeTable();
+          flushBatchForTable(pendingTableEventsMap, sortedFinalBatches, beforeTable);
+
+          // Flush any batched events for the destination table. Given that the
+          // destination table must not exist when doing this rename, valid sequences
+          // are already handled implicitly by the existing batch-breaking logic
+          // (combined with the sorting of the final batches). This does the flushing
+          // explicitly in case there are any edge cases not handled by the existing
+          // mechanisms.
+          Table afterTable = alterTable.getAfterTable();
+          flushBatchForTable(pendingTableEventsMap, sortedFinalBatches, afterTable);
+        }
+      }
+    }
+
+    /**
+     * This method batches together any eligible events from the given list of
+     * {@code MetastoreEvent}. The returned list may or may not contain batch
      * events depending on whether it finds any events which could be batched together.
+     * Events on a table do not need to be contiguous to be batched, but there must
+     * not be an intervening event that cuts the batch.
      */
     @VisibleForTesting
     List<MetastoreEvent> createBatchEvents(List<MetastoreEvent> events, Metrics metrics) {
       if (events.size() < 2) return events;
-      int i = 0, j = 1;
-      List<MetastoreEvent> batchedEventList = new ArrayList<>();
-      MetastoreEvent current = events.get(i);
-      // startEventId points to the current event's or the start of the batch
-      // in case current is a batch event.
-      long startEventId = current.getEventId();
-      while (j < events.size()) {
-        MetastoreEvent next = events.get(j);
-        // check if the current metastore event and the next can be batched together
-        if (!current.canBeBatched(next)) {
-          // events cannot be batched, add the current event under consideration to the
-          // list and update current to the next
-          if (current.getNumberOfEvents() > 1) {
-            current.infoLog("Created a batch event for {} events from {} to {}",
-                current.getNumberOfEvents(), startEventId, current.getEventId());
-            metrics.getCounter(MetastoreEventsProcessor.NUMBER_OF_BATCH_EVENTS).inc();
-          }
-          batchedEventList.add(current);
-          current = next;
-          startEventId = next.getEventId();
-        } else {
-          // next can be batched into current event
-          current = Preconditions.checkNotNull(current.addToBatchEvents(next));
+      // We can batch certain events on the same table as long as there is no
+      // intervening event that cuts the batch. To allow this non-contiguous batching,
+      // we keep state for each table separately. This is a two-level structure with
+      // the first layer keyed on the database name and the second layer keyed on the
+      // table name. This makes it possible to flush all entries for a database
+      // efficiently. Both database name and table name are lowercased to make this case
+      // insensitive.
+      //
+      // Entries in this hash map are still pending and can accept more entries into
+      // a batch when eligible. Each time an event is added a batch, it changes the
+      // ending Event ID, so this holds the pending batches until the batch is finalized.
+      // When the batch is finalized (either by an event that cuts the batch or by
+      // running out of events), it is moved to the sortedFinalBatches.
+      Map<String, Map<String, MetastoreEvent>> pendingTableEventsMap = new HashMap<>();
+
+      // The output events need to be monotonically increasing in their Event IDs,
+      // so we insert the resulting batches into a TreeMap and use that to produce
+      // the output list. Examples:
+      // 1. Basic ordering
+      // Suppose there are inserts on 4 different tables (Event ID in parens):
+      // A(1), B(2), C(3), D(4)
+      // The sorting will emit those in the same order they arrived. This also applies
+      // to any contiguous batching.
+      // 2. Interleaved events
+      // Suppose there are interleaved events that can be batched for different tables:
+      // A(1), B(2), A(3), B(4)
+      // The sorting will emit the batches in order of ascending ending Event ID, i.e.
+      // A(1-3), B(2-4)
+      // Since the ending Event ID of a batch changes each time an extra event is added,
+      // this structure should only contain finalized batches that can't change.
+      TreeMap<Long, MetastoreEvent> sortedFinalBatches = new TreeMap<>();
+
+      for (MetastoreEvent next : events) {
+        // Events that impact multiple tables need special handling to cut event batches
+        // for all impacted tables. This logic is in addition to the regular branch
+        // cutting logic that happens on a single-table basis.
+        cutBatchesForCrossTableEvents(next, pendingTableEventsMap, sortedFinalBatches);
+
+        if (!(next instanceof MetastoreTableEvent)) {
+          // No batching for non-table events
+          sortedFinalBatches.put(next.getEventId(), next);
+          continue;
         }
-        j++;
+        String dbName = next.getDbName().toLowerCase();
+        String tableName = next.getTableName().toLowerCase();
+        // First, lookup the dbMap or create it if it doesn't exist
+        Map<String, MetastoreEvent> dbMap =
+            pendingTableEventsMap.computeIfAbsent(dbName, k -> new HashMap<>());
+        // Second, find the table entry in the dbMap
+        MetastoreEvent current = dbMap.get(tableName);
+        if (current != null) {
+          // Check if the next metastore event for the table can be batched into the
+          // current event for the table.
+          if (!current.canBeBatched(next)) {
+            // Events cannot be batched. Flush the current event in the table map to the
+            // output and put the next element into the table map.
+            sortedFinalBatches.put(current.getEventId(), current);
+            dbMap.put(tableName, next);
+          } else {
+            // next can be batched into current event
+            dbMap.put(tableName,
+                      Preconditions.checkNotNull(current.addToBatchEvents(next)));
+          }
+        } else {
+          // New entry for this table
+          dbMap.put(tableName, next);
+        }
       }
-      if (current.getNumberOfEvents() > 1) {
-        current.infoLog("Created a batch event for {} events from {} to {}",
-            current.getNumberOfEvents(), startEventId, current.getEventId());
-        metrics.getCounter(MetastoreEventsProcessor.NUMBER_OF_BATCH_EVENTS).inc();
+      // Flush out any pending events
+      for (Map<String, MetastoreEvent> dbMap : pendingTableEventsMap.values()) {
+        for (MetastoreEvent event : dbMap.values()) {
+          sortedFinalBatches.put(event.getEventId(), event);
+        }
       }
-      batchedEventList.add(current);
+
+      // We defer logging about the batches created until the end so that we can output
+      // them in the sorted order used for the actual output list.
+      List<MetastoreEvent> batchedEventList =
+          new ArrayList<>(sortedFinalBatches.values());
+      for (MetastoreEvent event : batchedEventList) {
+        if (event.getNumberOfEvents() > 1) {
+          Preconditions.checkState(event instanceof BatchPartitionEvent);
+          BatchPartitionEvent batchEvent = (BatchPartitionEvent) event;
+          batchEvent.infoLog("Created a batch event for {} events between {} and {}",
+              batchEvent.getNumberOfEvents(), batchEvent.getFirstEventId(),
+              batchEvent.getLastEventId());
+          metrics.getCounter(MetastoreEventsProcessor.NUMBER_OF_BATCH_EVENTS).inc();
+        }
+      }
       return batchedEventList;
     }
   }
@@ -1329,8 +1470,6 @@ public class MetastoreEvents {
       if (!(event instanceof InsertEvent)) return false;
       if (isOlderThanLastSyncEventId(event)) return false;
       InsertEvent insertEvent = (InsertEvent) event;
-      // batched events must have consecutive event ids
-      if (event.getEventId() != 1 + getEventId()) return false;
       // make sure that the event is on the same table
       if (!getFullyQualifiedTblName().equalsIgnoreCase(
           insertEvent.getFullyQualifiedTblName())) {
@@ -2246,7 +2385,6 @@ public class MetastoreEvents {
       if (!(event instanceof AlterPartitionEvent)) return false;
       if (isOlderThanLastSyncEventId(event)) return false;
       AlterPartitionEvent alterPartitionEvent = (AlterPartitionEvent) event;
-      if (event.getEventId() != 1 + getEventId()) return false;
       // make sure that the event is on the same table
       if (!getFullyQualifiedTblName().equalsIgnoreCase(
           alterPartitionEvent.getFullyQualifiedTblName())) {
@@ -2464,8 +2602,9 @@ public class MetastoreEvents {
       }
       if (eventsToProcess.isEmpty() && partitionEventsToForceReload.isEmpty()) {
         LOG.info(
-            "Ignoring events from event id {} to {} since they modify parameters "
-            + " which can be ignored", getFirstEventId(), getLastEventId());
+            "Ignoring {} events between event id {} and {} since they modify parameters"
+            + " which can be ignored", getNumberOfEvents(), getFirstEventId(),
+            getLastEventId());
         return;
       }
 
@@ -2499,9 +2638,11 @@ public class MetastoreEvents {
           }
         } catch (CatalogException e) {
           throw new MetastoreNotificationNeedsInvalidateException(String.format(
-              "Refresh partitions on table %s failed when processing event ids %s-%s. "
+              "Refresh partitions on table %s failed when processing a batch of %s "
+              + "events between event ids %s and %s. "
               + "Issue an invalidate command to reset the event processor state.",
-              getFullyQualifiedTblName(), getFirstEventId(), getLastEventId()), e);
+              getFullyQualifiedTblName(), getNumberOfEvents(), getFirstEventId(),
+              getLastEventId()), e);
         }
       }
     }
