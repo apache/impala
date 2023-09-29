@@ -37,6 +37,7 @@
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
 #include "runtime/types.h"
+#include "service/internal-server.h"
 #include "service/query-options.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
@@ -197,6 +198,7 @@ class TQueryExecRequest;
 class ImpalaServer : public ImpalaServiceIf,
                      public ImpalaHiveServer2ServiceIf,
                      public ThriftServer::ConnectionHandlerIf,
+                     public InternalServer,
                      public std::enable_shared_from_this<ImpalaServer>,
                      public CacheLineAligned {
  public:
@@ -382,7 +384,7 @@ class ImpalaServer : public ImpalaServiceIf,
   static void PrepareQueryContext(const std::string& hostname,
       const NetworkAddressPB& krpc_addr, TQueryCtx* query_ctx);
 
-  /// SessionHandlerIf methods
+  /// ThriftServer::ConnectionHandlerIf methods
 
   /// Called when a Beeswax or HS2 connection starts. For Beeswax, registers a new
   /// SessionState associated with the new connection. For HS2, this is a no-op (HS2
@@ -397,6 +399,27 @@ class ImpalaServer : public ImpalaServiceIf,
   /// idle if all the sessions associated with it have expired due to idle timeout.
   /// Called when a client has been inactive for --idle_client_poll_period_s seconds.
   virtual bool IsIdleConnection(const ThriftServer::ConnectionContext& session_context);
+
+  /// InternalServer methods, see internal-server.h for details
+  virtual Status OpenSession(const std::string& user_name, TUniqueId& new_session_id,
+      const TQueryOptions& query_opts = TQueryOptions());
+  virtual bool CloseSession(const impala::TUniqueId& session_id);
+  virtual Status ExecuteIgnoreResults(const std::string& user_name,
+      const std::string& sql, TUniqueId* query_id = nullptr);
+  virtual Status ExecuteAndFetchAllText(const std::string& user_name,
+      const std::string& sql, query_results& results, results_columns* columns = nullptr,
+      TUniqueId* query_id = nullptr);
+  virtual Status SubmitAndWait(const std::string& user_name, const std::string& sql,
+      TUniqueId& new_session_id, TUniqueId& new_query_id);
+  virtual Status WaitForResults(TUniqueId& query_id);
+  virtual Status SubmitQuery(const std::string& sql, const impala::TUniqueId& session_id,
+      TUniqueId& new_query_id);
+  virtual Status FetchAllRows(const TUniqueId& query_id, query_results& results,
+      results_columns* columns = nullptr);
+  virtual void CloseQuery(const TUniqueId& query_id);
+  virtual void GetConnectionContextList(
+      ThriftServer::ConnectionContextList* connection_contexts);
+  /// end of InternalServer methods
 
   void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);
@@ -668,6 +691,7 @@ class ImpalaServer : public ImpalaServiceIf,
   static const string BEESWAX_SERVER_NAME;
   static const string HS2_SERVER_NAME;
   static const string HS2_HTTP_SERVER_NAME;
+  static const string INTERNAL_SERVER_NAME;
   // Used to identify external frontend RPC calls
   static const string EXTERNAL_FRONTEND_SERVER_NAME;
 
@@ -1268,6 +1292,9 @@ class ImpalaServer : public ImpalaServiceIf,
   void WaitForNewCatalogServiceId(TUniqueId cur_service_id,
       std::unique_lock<std::mutex>* ver_lock);
 
+  /// Random `impala::TUniqueID` generator. Use wherever a new `TUniqueId` is needed.
+  TUniqueId RandomUniqueID();
+
   /// Logger for writing encoded query profiles, one per line with the following format:
   /// <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>
   boost::scoped_ptr<SimpleLogger> profile_logger_;
@@ -1487,6 +1514,14 @@ class ImpalaServer : public ImpalaServiceIf,
   /// is not removed from this map to avoid the cost of looking it up.
   typedef boost::unordered_map<TUniqueId, std::set<TUniqueId>> ConnectionToSessionMap;
   ConnectionToSessionMap connection_to_sessions_map_;
+
+  /// Map storing connections opened by the InternalServer functions. Key is the session
+  /// id, value is a shared pointer holding the connection's ConnectionContext. Use the
+  /// `internal_server_connections_lock_` mutex whenever accessing this map
+  typedef std::map<TUniqueId, std::shared_ptr<ThriftServer::ConnectionContext>>
+      SessionToConnectionContext;
+  SessionToConnectionContext internal_server_connections_;
+  std::mutex internal_server_connections_lock_;
 
   /// Returns session state for given session_id.
   /// If not found or validation of 'secret' against the stored secret in the

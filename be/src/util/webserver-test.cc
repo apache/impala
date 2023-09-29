@@ -18,16 +18,14 @@
 #include <array>
 #include <memory>
 #include <string>
-#include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/lexical_cast.hpp>
 #include <gutil/strings/substitute.h>
-#include <map>
 #include <openssl/ssl.h>
 #include <regex>
 
 #include "common/init.h"
+#include "testutil/http-util.h"
 #include "testutil/gtest-util.h"
 #include "testutil/scoped-flag-setter.h"
 
@@ -67,76 +65,6 @@ const string SALUTATION_VALUE = "Hello!";
 const string TO_ESCAPE_KEY = "ToEscape";
 const string TO_ESCAPE_VALUE = "<script language='javascript'>";
 const string ESCAPED_VALUE = "&lt;script language=&apos;javascript&apos;&gt;";
-
-struct HttpRequest {
-  string url_path = "/";
-  string host = "localhost";
-  int32_t port = FLAGS_webserver_port;
-  map<string, string> headers = {};
-
-  // Adapted from:
-  // http://stackoverflow.com/questions/10982717/get-html-without-header-with-boostasio
-  Status Do(ostream* out, int expected_code, const string& method) {
-    try {
-      tcp::iostream request_stream;
-      request_stream.connect(host, lexical_cast<string>(port));
-      if (!request_stream) return Status("Could not connect request_stream");
-
-      request_stream << method << " " << url_path << " HTTP/1.1\r\n";
-      request_stream << "Host: " << host << ":" << port <<  "\r\n";
-      request_stream << "Accept: */*\r\n";
-      request_stream << "Cache-Control: no-cache\r\n";
-      if (method == "POST") {
-        request_stream << "Content-Length: 0\r\n";
-      }
-      for (const auto& header : headers) {
-        request_stream << header.first << ": " << header.second << "\r\n";
-      }
-
-      request_stream << "Connection: close\r\n\r\n";
-      request_stream.flush();
-
-      string line1;
-      getline(request_stream, line1);
-      if (!request_stream) return Status("No response");
-
-      stringstream response_stream(line1);
-      string http_version;
-      response_stream >> http_version;
-
-      unsigned int status_code;
-      response_stream >> status_code;
-
-      string status_message;
-      getline(response_stream, status_message);
-      if (!response_stream || http_version.substr(0,5) != "HTTP/") {
-        return Status("Malformed response");
-      }
-
-      if (status_code != expected_code) {
-        return Status(Substitute("Unexpected status code: $0", status_code));
-      }
-
-      (*out) << request_stream.rdbuf();
-      return Status::OK();
-    } catch (const std::exception& e){
-      return Status(e.what());
-    }
-  }
-
-  Status Get(ostream* out, int expected_code = 200) {
-    return Do(out, expected_code, "GET");
-  }
-
-  Status Post(ostream* out, int expected_code = 200) {
-    return Do(out, expected_code, "POST");
-  }
-};
-
-Status HttpGet(const string& host, const int32_t& port, const string& url_path,
-    ostream* out, int expected_code = 200, const string& method = "GET") {
-  return HttpRequest{url_path, host, port}.Do(out, expected_code, method);
-}
 
 string exec(const char* cmd) {
     std::array<char, 1024> buffer;

@@ -26,8 +26,10 @@ class TestInfo {
  public:
   enum Mode {
     NON_TEST, // Not a test, one of the main daemons
-    BE_TEST,
-    FE_TEST,
+    BE_TEST,         // backend test
+    BE_CLUSTER_TEST, // backend test that instantiates an Impala coordinator which joins
+                     // an existing, running cluster
+    FE_TEST,         // frontend test
   };
 
   /// Called in InitCommonRuntime().
@@ -35,7 +37,9 @@ class TestInfo {
 
   static bool is_be_test() { return mode_ == BE_TEST; }
   static bool is_fe_test() { return mode_ == FE_TEST; }
-  static bool is_test() { return mode_ == BE_TEST || mode_ == FE_TEST; }
+  static bool is_be_cluster_test() { return mode_ == BE_CLUSTER_TEST; }
+  static bool is_test() { return mode_ == BE_TEST || mode_ == FE_TEST ||
+      mode_ == BE_CLUSTER_TEST; }
 
  private:
   static Mode mode_;

@@ -456,6 +456,7 @@ const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 const string ImpalaServer::BEESWAX_SERVER_NAME = "beeswax-frontend";
 const string ImpalaServer::HS2_SERVER_NAME = "hiveserver2-frontend";
 const string ImpalaServer::HS2_HTTP_SERVER_NAME = "hiveserver2-http-frontend";
+const string ImpalaServer::INTERNAL_SERVER_NAME = "internal-server";
 const string ImpalaServer::EXTERNAL_FRONTEND_SERVER_NAME = "external-frontend";
 
 const string ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME = "default";
@@ -549,7 +550,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env_->metrics()));
 
   // Register the catalog update callback if running in a real cluster as a coordinator.
-  if (!TestInfo::is_test() && FLAGS_is_coordinator) {
+  if ((!TestInfo::is_test() || TestInfo::is_be_cluster_test()) && FLAGS_is_coordinator) {
     auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
         vector<TTopicDelta>* topic_updates) {
       this->CatalogUpdateCallback(state, topic_updates);
@@ -2579,19 +2580,14 @@ bool ImpalaServer::QueryStateRecordLessThan::operator() (
 
 void ImpalaServer::ConnectionStart(
     const ThriftServer::ConnectionContext& connection_context) {
-  if (connection_context.server_name == BEESWAX_SERVER_NAME) {
+  if (connection_context.server_name == BEESWAX_SERVER_NAME ||
+      connection_context.server_name == INTERNAL_SERVER_NAME) {
     // Beeswax only allows for one session per connection, so we can share the session ID
     // with the connection ID
     const TUniqueId& session_id = connection_context.connection_id;
     // Generate a secret per Beeswax session so that the HS2 secret validation mechanism
     // prevent accessing of Beeswax sessions from HS2.
-    uuid secret_uuid;
-    {
-      lock_guard<mutex> l(uuid_lock_);
-      secret_uuid = crypto_uuid_generator_();
-    }
-    TUniqueId secret;
-    UUIDToTUniqueId(secret_uuid, &secret);
+    TUniqueId secret = this->RandomUniqueID();
     shared_ptr<SessionState> session_state =
         std::make_shared<SessionState>(this, session_id, secret);
     session_state->closed = false;
@@ -2655,6 +2651,7 @@ void ImpalaServer::ConnectionEnd(
             << " associated session(s).";
 
   bool close = connection_context.server_name == BEESWAX_SERVER_NAME
+      || connection_context.server_name == INTERNAL_SERVER_NAME
       || FLAGS_disconnected_session_timeout <= 0;
   if (close) {
     for (const TUniqueId& session_id : disconnected_sessions) {
@@ -3465,4 +3462,16 @@ void ImpalaServer::GetAllConnectionContexts(
     external_fe_server_->GetConnectionContextList(connection_contexts);
   }
 }
+
+TUniqueId ImpalaServer::RandomUniqueID() {
+  uuid conn_uuid;
+  {
+    lock_guard<mutex> l(this->uuid_lock_);
+    conn_uuid = this->crypto_uuid_generator_();
+  }
+  TUniqueId conn_id;
+  UUIDToTUniqueId(conn_uuid, &conn_id);
+
+  return conn_id;
 }
+} // namespace impala
