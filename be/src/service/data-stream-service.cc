@@ -122,6 +122,28 @@ void DataStreamService::UpdateFilter(
   RespondAndReleaseRpc(Status::OK(), resp, context, mem_tracker_.get());
 }
 
+void DataStreamService::UpdateFilterFromRemote(
+    const UpdateFilterParamsPB* req, UpdateFilterResultPB* resp, RpcContext* context) {
+  DCHECK(req->has_filter_id());
+  DCHECK(req->has_query_id());
+  DCHECK(
+      req->has_bloom_filter() || req->has_min_max_filter() || req->has_in_list_filter());
+  QueryState::ScopedRef qs(ProtoToQueryId(req->query_id()));
+
+  if (qs.get() != nullptr) {
+    qs->UpdateFilterFromRemote(*req, context);
+    RespondAndReleaseRpc(Status::OK(), resp, context, mem_tracker_.get());
+  } else {
+    // Query state for requested query_id might have been cancelled or closed.
+    // i.e., RUNTIME_FILTER_WAIT_TIME_MS has passed and all fragment instances of
+    // query_id has complete their execution.
+    string err_msg = Substitute("Query State not found for query_id=$0",
+        PrintId(ProtoToQueryId(req->query_id())));
+    LOG(INFO) << err_msg;
+    RespondAndReleaseRpc(Status(err_msg), resp, context, mem_tracker_.get());
+  }
+}
+
 void DataStreamService::PublishFilter(
     const PublishFilterParamsPB* req, PublishFilterResultPB* resp, RpcContext* context) {
   // This failpoint is to allow jitter to be injected.

@@ -774,6 +774,10 @@ class ImpalaTestSuite(BaseTestSuite):
         rt_profile_info = 'RUNTIME_PROFILE'
 
       if rt_profile_info is not None:
+        if test_file_vars:
+          # only do test_file_vars replacement if it exist.
+          test_section[rt_profile_info] = self.__do_replacements(
+              test_section[rt_profile_info], extra=test_file_vars)
         rt_profile = verify_runtime_profile(test_section[rt_profile_info],
                                result.runtime_profile,
                                update_section=pytest.config.option.update_results)

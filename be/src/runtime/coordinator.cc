@@ -423,13 +423,6 @@ void Coordinator::AddFilterSource(const FragmentExecParamsPB& src_fragment_param
     int num_instances, int num_backends, const TRuntimeFilterDesc& filter,
     int join_node_id) {
   FilterState* f = filter_routing_table_->GetOrCreateFilterState(filter);
-  // Set the 'pending_count_' to zero to indicate that for a filter with
-  // local-only targets the coordinator does not expect to receive any filter
-  // updates. We expect to receive a single aggregated filter from each backend
-  // for partitioned joins.
-  int pending_count = filter.is_broadcast_join
-      ? (filter.has_remote_targets ? 1 : 0) : num_backends;
-  f->set_pending_count(pending_count);
 
   // Determine which instances will produce the filters.
   // TODO: IMPALA-9333: having a shared RuntimeFilterBank between all fragments on
@@ -457,10 +450,60 @@ void Coordinator::AddFilterSource(const FragmentExecParamsPB& src_fragment_param
     random_shuffle(src_idxs.begin(), src_idxs.end());
     src_idxs.resize(MAX_BROADCAST_FILTER_PRODUCERS);
   }
-  for (int src_idx : src_idxs) {
+
+  bool has_intermediate_aggregator = src_fragment_params.has_filter_agg_info()
+      && !filter.has_local_targets && !filter.is_broadcast_join
+      && filter.type == TRuntimeFilterType::BLOOM;
+
+  if (has_intermediate_aggregator) {
+    const RuntimeFilterAggregatorInfoPB& agg_info = src_fragment_params.filter_agg_info();
+    // Set the 'pending_count_' to num_aggregators from RuntimeFilterAggregatorInfoPB.
+    int num_agg = agg_info.num_aggregators();
+    DCHECK_EQ(
+        src_fragment_params.instances_size(), agg_info.aggregator_idx_to_report_size());
+    DCHECK_EQ(num_agg, agg_info.aggregator_krpc_addresses_size());
+    DCHECK_EQ(num_agg, agg_info.aggregator_krpc_backends_size());
+    DCHECK_EQ(num_agg, agg_info.num_reporter_per_aggregator_size());
+    for (int i = 0; i < num_agg; i++) {
+      VLOG(2) << "Filter " << filter.filter_id << " backend aggregator " << (i + 1)
+              << " krpc_address=" << agg_info.aggregator_krpc_addresses(i)
+              << " krpc_backend=" << agg_info.aggregator_krpc_backends(i);
+    }
+    f->set_pending_count(num_agg);
+  } else {
+    // Set the 'pending_count_' to zero to indicate that for a filter with
+    // local-only targets the coordinator does not expect to receive any filter
+    // updates. We expect to receive a single aggregated filter from each backend
+    // for partitioned joins.
+    int pending_count =
+        filter.is_broadcast_join ? (filter.has_remote_targets ? 1 : 0) : num_backends;
+    f->set_pending_count(pending_count);
+  }
+
+  for (int i = 0; i < src_idxs.size(); i++) {
+    int src_idx = src_idxs[i];
     TRuntimeFilterSource filter_src;
     filter_src.src_node_id = join_node_id;
     filter_src.filter_id = filter.filter_id;
+    if (has_intermediate_aggregator) {
+      // Find target aggregator for fragment instance i.
+      const RuntimeFilterAggregatorInfoPB& agg_info =
+          src_fragment_params.filter_agg_info();
+      int agg_idx = agg_info.aggregator_idx_to_report(i);
+      string agg_hostname = agg_info.aggregator_krpc_addresses(agg_idx).hostname();
+      int num_reporter = agg_info.num_reporter_per_aggregator(agg_idx);
+      TNetworkAddress agg_address =
+          FromNetworkAddressPB(agg_info.aggregator_krpc_backends(agg_idx));
+
+      // Populate TRuntimeFilterAggDesc for fragment instance i.
+      TRuntimeFilterAggDesc agg_desc;
+      agg_desc.__set_krpc_hostname(agg_hostname);
+      agg_desc.__set_krpc_address(agg_address);
+      agg_desc.__set_num_reporting_hosts(num_reporter);
+      filter_src.__set_aggregator_desc(agg_desc);
+      VLOG(3) << "Instance " << src_fragment_params.instances(i)
+              << " report to backend aggregator " << (agg_idx + 1);
+    }
     filter_routing_table_->finstance_filters_produced[src_idx].emplace_back(
         filter_src);
   }

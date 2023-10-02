@@ -69,6 +69,11 @@ class DataStreamService : public DataStreamServiceIf {
   virtual void UpdateFilter(const UpdateFilterParamsPB* req, UpdateFilterResultPB* resp,
       kudu::rpc::RpcContext* context);
 
+  /// Called by fragment instances that produce local runtime filters to deliver them to
+  /// the aggregator backend for intermediate aggregation.
+  virtual void UpdateFilterFromRemote(const UpdateFilterParamsPB* req,
+      UpdateFilterResultPB* resp, kudu::rpc::RpcContext* context);
+
   /// Called by the coordinator to deliver global runtime filters to fragments for
   /// application at plan nodes.
   virtual void PublishFilter(const PublishFilterParamsPB* req,

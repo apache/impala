@@ -171,7 +171,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 aggregation(SUM, FiltersReceived): 0
 ====
 ---- QUERY
-# Global mode. Coordinator should report 1 filter updates per backend.
+# Global mode. Coordinator should report 1 filter updates per backend
+# or exactly 1 if MAX_NUM_FILTERS_AGGREGATED_PER_HOST equals to num executors
+# (excluding coordinator).
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
@@ -180,7 +182,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-aggregation(SUM, FiltersReceived): 3
+aggregation(SUM, FiltersReceived): $NUM_FILTER_UPDATES
 ====
 
 ---- QUERY

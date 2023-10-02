@@ -50,7 +50,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::RUNTIME_FILTER_CARDINALITY_REDUCTION_SCALE + 1);              \
+      TImpalaQueryOptions::MAX_NUM_FILTERS_AGGREGATED_PER_HOST + 1);                     \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -319,6 +319,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       DISABLE_KUDU_LOCAL_TIMESTAMP_BLOOM_FILTER, TQueryOptionLevel::ADVANCED)            \
   QUERY_OPT_FN(runtime_filter_cardinality_reduction_scale,                               \
       RUNTIME_FILTER_CARDINALITY_REDUCTION_SCALE, TQueryOptionLevel::DEVELOPMENT)        \
+  QUERY_OPT_FN(max_num_filters_aggregated_per_host, MAX_NUM_FILTERS_AGGREGATED_PER_HOST, \
+      TQueryOptionLevel::DEVELOPMENT)                                                    \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.

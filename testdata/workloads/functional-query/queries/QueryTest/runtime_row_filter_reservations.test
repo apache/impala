@@ -9,6 +9,7 @@ SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
+SET MAX_NUM_FILTERS_AGGREGATED_PER_HOST=0;
 # Query would have been admitted if memory for runtime filters was not accounted for.
 SET BUFFER_POOL_LIMIT=290MB;
 select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
@@ -20,6 +21,7 @@ SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
+SET MAX_NUM_FILTERS_AGGREGATED_PER_HOST=0;
 # Disable the estimation of cardinality for an hdfs table withot stats.
 SET DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
 # Query would have been admitted if memory for runtime filters was not accounted for.
@@ -38,8 +40,44 @@ SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
+SET MAX_NUM_FILTERS_AGGREGATED_PER_HOST=0;
 # This would run perfectly with just enough memory provided by the buffer pool.
 SET BUFFER_POOL_LIMIT=295MB;
+select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
+    on a.month = b.id and b.int_col = -3
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 \(128.00 MB\).*
+aggregation(SUM, Files processed): 24
+aggregation(SUM, Files rejected): 24
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET RUNTIME_FILTER_MIN_SIZE=128MB;
+SET RUNTIME_FILTER_MAX_SIZE=500MB;
+# Enable distributed aggregation.
+SET MAX_NUM_FILTERS_AGGREGATED_PER_HOST=2;
+# Query would have been admitted if memory for runtime filters was not accounted for.
+SET BUFFER_POOL_LIMIT=390MB;
+select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
+    on a.month = b.id and b.int_col = -3
+---- RESULTS
+---- CATCH
+row_regex:.*minimum memory reservation on backend '.*' is greater than memory available to
+ the query for buffer reservations\. Increase the buffer_pool_limit to 390.11 MB\. See
+ the query profile for more information about the per-node memory requirements\.
+====
+---- QUERY
+# Confirm that with broadcast join, memory limit is not hit.
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET RUNTIME_FILTER_MIN_SIZE=128MB;
+SET RUNTIME_FILTER_MAX_SIZE=500MB;
+# Enable distributed aggregation.
+SET MAX_NUM_FILTERS_AGGREGATED_PER_HOST=2;
+# This would run perfectly with just enough memory provided by the buffer pool.
+SET BUFFER_POOL_LIMIT=391MB;
 select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS

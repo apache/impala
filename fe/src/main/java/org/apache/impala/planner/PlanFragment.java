@@ -465,6 +465,13 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
     for (RuntimeFilter f : producedFilters.values()) {
       producedRuntimeFiltersMemReservationBytes_ += f.getFilterSize();
+      if (analyzer.getQueryOptions().max_num_filters_aggregated_per_host > 1
+          && !f.isBroadcast()) {
+        // If distributed aggregation is enabled, any backend can be selected as
+        // an intermediate aggregator. Add the same amount of memory per backend to
+        // anticipate for it.
+        consumedGlobalRuntimeFiltersMemReservationBytes_ += f.getFilterSize();
+      }
     }
     for (RuntimeFilter f : consumedFilters.values()) {
       if (!producedFilters.containsKey(f.getFilterId())) {

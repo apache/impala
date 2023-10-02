@@ -379,6 +379,7 @@ bool VerifyFiltersProduced(const vector<TPlanFragmentInstanceCtx>& instance_ctxs
 }
 
 Status QueryState::InitFilterBank() {
+  const NetworkAddressPB& this_krpc_address = ExecEnv::GetInstance()->krpc_address();
   int64_t runtime_filters_reservation_bytes = 0;
   int fragment_ctx_idx = -1;
   const vector<TPlanFragment>& fragments = fragment_info_.fragments;
@@ -428,9 +429,32 @@ Status QueryState::InitFilterBank() {
     for (const TRuntimeFilterSource& produced_filter : instance_ctx.filters_produced) {
       auto it = filters.find(produced_filter.filter_id);
       DCHECK(it != filters.end());
-      ++it->second.num_producers;
+      FilterRegistration& reg = it->second;
+      ++reg.num_producers;
+
+      if (produced_filter.__isset.aggregator_desc) {
+        TRuntimeFilterAggDesc agg_desc = produced_filter.aggregator_desc;
+        if (reg.need_subaggregation) {
+          // This filter registration is already set before.
+          // Do sanity check to make sure it match with the rest of TRuntimeFilterSource.
+          DCHECK_EQ(reg.num_reporting_hosts, agg_desc.num_reporting_hosts);
+          DCHECK_EQ(reg.krpc_hostname_to_report, agg_desc.krpc_hostname);
+          DCHECK_EQ(reg.krpc_backend_to_report, agg_desc.krpc_address);
+        } else {
+          // This filter bank is a backend aggregator for 'filter'.
+          reg.need_subaggregation = true;
+          reg.num_reporting_hosts = agg_desc.num_reporting_hosts;
+          reg.krpc_hostname_to_report = agg_desc.krpc_hostname;
+          reg.krpc_backend_to_report = agg_desc.krpc_address;
+          if (KrpcAddressEqual(
+                  this_krpc_address, FromTNetworkAddress(agg_desc.krpc_address))) {
+            reg.is_intermediate_aggregator = true;
+          }
+        }
+      }
     }
   }
+
   filter_bank_.reset(
       new RuntimeFilterBank(this, filters, runtime_filters_reservation_bytes));
   return filter_bank_->ClaimBufferReservation();
@@ -1002,6 +1026,12 @@ void QueryState::Cancel() {
 void QueryState::PublishFilter(const PublishFilterParamsPB& params, RpcContext* context) {
   if (!WaitForPrepare().ok()) return;
   filter_bank_->PublishGlobalFilter(params, context);
+}
+
+void QueryState::UpdateFilterFromRemote(
+    const UpdateFilterParamsPB& params, RpcContext* context) {
+  if (!WaitForPrepare().ok()) return;
+  filter_bank_->UpdateFilterFromRemote(params, context);
 }
 
 Status QueryState::StartSpilling(RuntimeState* runtime_state, MemTracker* mem_tracker) {

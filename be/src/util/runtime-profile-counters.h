@@ -659,10 +659,11 @@ class RuntimeProfile::EventSequence {
 
   /// Stores an event in sequence with the given label and the current time
   /// (relative to the first time Start() was called) as the timestamp.
-  void MarkEvent(std::string label) {
+  int64_t MarkEvent(std::string label) {
     Event event = make_pair(move(label), sw_.ElapsedTime() + offset_);
     std::lock_guard<SpinLock> event_lock(lock_);
     events_.emplace_back(move(event));
+    return event.second;
   }
 
   int64_t ElapsedTime() { return sw_.ElapsedTime(); }

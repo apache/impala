@@ -900,6 +900,13 @@ enum TImpalaQueryOptions {
   // estimated to reduce cardinality to 500K, setting value 0.25 will result in an 875K
   // cardinality estimate. Default to 1.0.
   RUNTIME_FILTER_CARDINALITY_REDUCTION_SCALE = 171
+
+  // Maximum number of backend executor that can send bloom runtime filter updates to
+  // one intermediate aggregator. Given N as number of backend executor excluding
+  // coordinator, the selected number of designated intermediate aggregator is
+  // ceil(N / MAX_NUM_FILTERS_AGGREGATED_PER_HOST). Setting 1, 0, or negative value
+  // will disable the intermediate aggregator feature. Default to -1 (disabled).
+  MAX_NUM_FILTERS_AGGREGATED_PER_HOST = 172
 }
 
 // The summary of a DML statement.

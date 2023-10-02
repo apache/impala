@@ -56,6 +56,13 @@ class RuntimeFilter {
   bool HasFilter() const { return has_filter_.Load(); }
 
   const TRuntimeFilterDesc& filter_desc() const { return filter_desc_; }
+  const std::string& krpc_hostname_to_report() const {
+    return intermediate_krpc_hostname_;
+  }
+  const NetworkAddressPB& krpc_backend_to_report() const {
+    return intermediate_krpc_backend_;
+  }
+  bool is_intermediate_aggregator() const { return is_intermediate_aggregator_; }
   int32_t id() const { return filter_desc().filter_id; }
   int64_t filter_size() const { return filter_size_; }
   ColumnType type() const {
@@ -109,8 +116,13 @@ class RuntimeFilter {
   /// filter and its arrival. If the filter has not yet arrived, it returns the time
   /// elapsed since registration.
   int32_t arrival_delay_ms() const {
-    if (arrival_time_.Load() == 0L) return MonotonicMillis() - registration_time_;
+    if (arrival_time_.Load() == 0L) return TimeSinceRegistrationMs();
     return arrival_time_.Load() - registration_time_;
+  }
+
+  /// Return the amount of time since 'registration_time_'.
+  int32_t TimeSinceRegistrationMs() const {
+    return MonotonicMillis() - registration_time_;
   }
 
   /// Periodically (every 20ms) checks to see if the global filter has arrived. Waits for
@@ -132,6 +144,21 @@ class RuntimeFilter {
     int target_ndx = filter_desc().planid_to_target_ndx.at(plan_id);
     return filter_desc().targets[target_ndx].is_column_in_data_file;
   }
+
+  /// Set intermediate aggregation info for this runtime filter.
+  void SetIntermediateAggregation(bool is_intermediate_aggregator,
+      std::string intermediate_krpc_hostname, NetworkAddressPB intermediate_krpc_backend);
+
+  /// Return true if runtime filter update from this fragment instance should report
+  /// filter update to intermediate aggregator rather than coordinator.
+  /// Otherwise, return false, which means filter update report should go to coordinator.
+  bool IsReportToSubAggregator() const {
+    return !intermediate_krpc_hostname_.empty() && !is_intermediate_aggregator_;
+  }
+
+  /// Return true if this runtime filter is scheduled with subaggregation strategy.
+  /// Otherwise, return false (all filter updates aggregation happen in coordinator).
+  bool RequireSubAggregation() const { return !intermediate_krpc_hostname_.empty(); }
 
   /// Frequency with which to check for filter arrival in WaitForArrival()
   static const int SLEEP_PERIOD_MS;
@@ -180,5 +207,11 @@ class RuntimeFilter {
   /// Injection delay for WaitForArrival. Used in testing only.
   /// See IMPALA-9612.
   int64_t injection_delay_ = 0;
+
+  bool is_intermediate_aggregator_ = false;
+
+  std::string intermediate_krpc_hostname_;
+
+  NetworkAddressPB intermediate_krpc_backend_;
 };
 }

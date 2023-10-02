@@ -16,7 +16,7 @@
 // under the License.
 
 #include "runtime/runtime-filter.inline.h"
-
+#include "util/network-util.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -89,4 +89,13 @@ bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {
     arrival_cv_.WaitFor(l, ms_remaining * MICROS_PER_MILLI);
   }
   return arrival_time_.Load() != 0;
+}
+
+void RuntimeFilter::SetIntermediateAggregation(bool is_intermediate_aggregator,
+    std::string intermediate_krpc_hostname, NetworkAddressPB intermediate_krpc_backend) {
+  DCHECK(!intermediate_krpc_hostname.empty());
+  DCHECK(IsResolvedAddress(intermediate_krpc_backend));
+  is_intermediate_aggregator_ = is_intermediate_aggregator;
+  intermediate_krpc_hostname_ = intermediate_krpc_hostname;
+  intermediate_krpc_backend_ = intermediate_krpc_backend;
 }

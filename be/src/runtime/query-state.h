@@ -64,6 +64,7 @@ class ScalarExpr;
 class ScannerMemLimiter;
 class TmpFileGroup;
 class TRuntimeProfileForest;
+class UpdateFilterParamsPB;
 
 /// Central class for all backend execution state (example: the FragmentInstanceStates
 /// of the individual fragment instances) created for a particular query.
@@ -234,6 +235,10 @@ class QueryState {
 
   /// Blocks until all fragment instances have finished their Prepare phase.
   void PublishFilter(const PublishFilterParamsPB& params, kudu::rpc::RpcContext* context);
+
+  /// Handle filter update that comes from remote backend executor.
+  void UpdateFilterFromRemote(
+      const UpdateFilterParamsPB& params, kudu::rpc::RpcContext* context);
 
   /// Cancels all actively executing fragment instances. Blocks until all fragment
   /// instances have finished their Prepare phase. Idempotent.

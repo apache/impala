@@ -2,8 +2,7 @@
 ---- QUERY
 ####################################################
 # Test case 1: broadcast join.
-# Without filtering, expect 7300 / 3 = 2433 rows per scan fragment.
-# With filtering, expect 618 / 3 = 206 rows to be read from 3 files (one per scan).
+# Expect 7300 from scan node id=0 without filtering and 620 with filtering.
 ####################################################
 
 # Basic filtering use case: filter p's partition columns thanks to an implicit
@@ -14,7 +13,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: .*RowsRead: 2.43K .*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
 ====
 ---- QUERY
 # Now turn on local filtering: we expect to see a reduction in scan volume.
@@ -26,17 +25,16 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 7 \(7\).*
+aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 206 .*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+7.30K.*
 ====
 
 
 ---- QUERY
 ####################################################
 # Test case 2: shuffle join - test for filter propagation (or lack thereof in LOCAL mode).
-# Without filtering, expect 7300 / 3 = 2433 rows per scan fragment.
-# With filtering, expect 618 / 3 = 206 rows to be read from 3 files (one per scan).
+# Expect 7300 from scan node id=0 without filtering and 620 with filtering.
 ####################################################
 
 # Local mode. Filters won't be propagated to scan, so scans will read all rows.
@@ -48,7 +46,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: .*RowsRead: 2.43K .*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
 ====
 ---- QUERY
 # Shuffle join, global mode. Expect filters to be propagated.
@@ -59,9 +57,9 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 7 \(7\).*
+aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 206 .*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+7.30K.*
 ====
 
 
@@ -69,7 +67,7 @@ row_regex: .*RowsRead: 206 .*
 ####################################################
 # Test case 3: two-hop filter chain with BROADCAST
 # joins.
-# Without filtering in left-most scan, expect 7300 / 3 = 2433 rows.
+# Without filtering in left-most scan, expect 7300 rows.
 # With filtering, expect 0 rows as all files are rejected by the partition
 # column filter.
 ####################################################
@@ -85,9 +83,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 0 .*
+aggregation(SUM, Files rejected): 0
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 2.43K .*
+row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K.*
 ====
 ---- QUERY
 # Global mode. Scan of 'b' will receive highly effective filter, and will propagate that
@@ -101,10 +99,10 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 8 .*
+aggregation(SUM, Files rejected): 48
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 0 .*
-row_regex: .*ScanRangesComplete: 0 .*
+aggregation(SUM, RowsRead): 0
+row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K.*
 ====
 
 
@@ -124,10 +122,10 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*RowsRead: 0 .*
-row_regex: .*Files rejected: 8 .*
+aggregation(SUM, RowsRead): 8
+aggregation(SUM, Files rejected): 24
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 2.43K .*
+row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K.*
 ====
 
 
@@ -145,7 +143,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*FiltersReceived: 0 .*
+aggregation(SUM, FiltersReceived): 0
 ====
 ---- QUERY
 # Global mode. Coordinator should report 0 filter updates received.
@@ -157,11 +155,11 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*FiltersReceived: 0 .*
-row_regex: .*Files rejected: 8 .*
+aggregation(SUM, FiltersReceived): 0
+aggregation(SUM, Files rejected): 24
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*FiltersReceived: 0 .*
-row_regex: .*RowsRead: 0 .*
+aggregation(SUM, FiltersReceived): 0
+row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K.*
 ====
 
 
@@ -179,10 +177,12 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*FiltersReceived: 0 .*
+aggregation(SUM, FiltersReceived): 0
 ====
 ---- QUERY
-# Global mode. Coordinator should report 1 filter update per backend.
+# Global mode. Coordinator should report 1 filter update per backend
+# or exactly 1 if MAX_NUM_FILTERS_AGGREGATED_PER_HOST equals to num executors
+# (excluding coordinator).
 # For Kudu, join expr has implicit casting so no bloom filter will
 # be created, only min-max filter will be created.
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -194,10 +194,10 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*FiltersReceived: 3 .*
+aggregation(SUM, FiltersReceived): $NUM_FILTER_UPDATES
 row_regex: .*REMOTE.*ms.*ms.*true
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*FiltersReceived: 3 .*
+aggregation(SUM, FiltersReceived): 3
 row_regex: .*REMOTE.*ms.*ms.*true
 ====
 
@@ -217,9 +217,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 2480
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 7 .*
+aggregation(SUM, Files rejected): 23
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 2.43K .*
+row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K.*
 ====
 
 
@@ -236,7 +236,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*RowsReturned: 2.43K .*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
 ====
 
 
@@ -254,9 +254,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 8 .*
+aggregation(SUM, Files rejected): 24
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 0 .*
+row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K.*
 ====
 
 ---- QUERY
@@ -272,7 +272,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 7308
 ---- RUNTIME_PROFILE
-row_regex: .*RowsReturned: 2.43K .*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
 ====
 
 
@@ -297,9 +297,9 @@ select STRAIGHT_JOIN count(*) from alltypesagg a
 ---- RESULTS
 1000
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 3 .*
+aggregation(SUM, Files rejected): 10
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 3.67K .*
+row_regex: 00:SCAN KUDU.*s[ ]+11.00K[ ]+11.00K.*
 ====
 
 
@@ -319,9 +319,9 @@ with t1 as (select month x, bigint_col y from alltypes limit 7301),
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 7 .*
+aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: .*RowsRead: 206 .*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+7.30K.*
 ====
 
 

@@ -88,6 +88,18 @@ class ImpalaTestVector(object):
         return vector_value.value
     raise ValueError("Test vector does not contain value '%s'" % name)
 
+  def get_exec_option_dict(self):
+    return self.get_value(EXEC_OPTION_KEY)
+
+  def get_exec_option(self, option_name):
+    return self.get_value(EXEC_OPTION_KEY)[option_name]
+
+  def set_exec_option(self, option_name, option_value):
+    self.get_value(EXEC_OPTION_KEY)[option_name] = option_value
+
+  def unset_exec_option(self, option_name):
+    del self.get_value(EXEC_OPTION_KEY)[option_name]
+
   def __str__(self):
       return ' | '.join(['%s' % vector_value for vector_value in self.vector_values])
 

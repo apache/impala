@@ -380,6 +380,12 @@ class Scheduler {
       const TPlanExecInfo& plan_exec_info, FragmentScheduleState* fragment_state,
       ScheduleState* state);
 
+  /// For a given 'src_state' and 'num_filters_per_host', select few backend as
+  /// intermediate filter aggregator before final aggregation in coordinator.
+  /// Do nothing if 'num_filters_per_host' <= 1.
+  void ComputeRandomKrpcForAggregation(const ExecutorConfig& executor_config,
+      ScheduleState* state, FragmentScheduleState* src_state, int num_filters_per_host);
+
   /// Create instances of the fragment corresponding to fragment_state, which contains
   /// either a Union node, one or more scan nodes, or both.
   ///

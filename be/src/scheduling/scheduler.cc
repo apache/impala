@@ -226,12 +226,23 @@ Status Scheduler::ComputeFragmentExecParams(
     // Set destinations, per_exch_num_senders, sender_id.
     for (const TPlanFragment& src_fragment : plan_exec_info.fragments) {
       VLOG(3) << "Computing exec params for fragment " << src_fragment.display_name;
+      if (!src_fragment.output_sink.__isset.stream_sink
+          && !src_fragment.output_sink.__isset.join_build_sink) {
+        continue;
+      }
+
+      FragmentScheduleState* src_state =
+          state->GetFragmentScheduleState(src_fragment.idx);
+      if (state->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL
+          && src_fragment.produced_runtime_filters_reservation_bytes > 0) {
+        ComputeRandomKrpcForAggregation(executor_config, state, src_state,
+            state->query_options().max_num_filters_aggregated_per_host);
+      }
+
       if (!src_fragment.output_sink.__isset.stream_sink) continue;
       FragmentIdx dest_idx =
           state->GetFragmentIdx(src_fragment.output_sink.stream_sink.dest_node_id);
       FragmentScheduleState* dest_state = state->GetFragmentScheduleState(dest_idx);
-      FragmentScheduleState* src_state =
-          state->GetFragmentScheduleState(src_fragment.idx);
 
       // populate src_state->destinations
       for (int i = 0; i < dest_state->instance_states.size(); ++i) {
@@ -266,6 +277,94 @@ Status Scheduler::ComputeFragmentExecParams(
     }
   }
   return Status::OK();
+}
+
+// Helper type to map instance indexes to aggregator indexes.
+typedef vector<pair<int, int>> InstanceToAggPairs;
+
+void Scheduler::ComputeRandomKrpcForAggregation(const ExecutorConfig& executor_config,
+    ScheduleState* state, FragmentScheduleState* src_state, int num_filters_per_host) {
+  if (num_filters_per_host <= 1) return;
+  // src_state->instance_states organize fragment instances as one dimension vector
+  // where instances scheduled in same host is placed in adjacent indices.
+  // Group instance indices from common host to 'instance_groups' by comparing
+  // krpc address between adjacent element of instance_states.
+  const NetworkAddressPB& coord_address = executor_config.coord_desc.krpc_address();
+  vector<InstanceToAggPairs> instance_groups;
+  InstanceToAggPairs coordinator_instances;
+  for (int i = 0; i < src_state->instance_states.size(); ++i) {
+    const NetworkAddressPB& krpc_address = src_state->instance_states[i].krpc_host;
+    if (KrpcAddressEqual(krpc_address, coord_address)) {
+      coordinator_instances.emplace_back(i, 0);
+    } else {
+      if (i == 0
+          || !KrpcAddressEqual(
+              krpc_address, src_state->instance_states[i - 1].krpc_host)) {
+        // This is the first fragment instance scheduled in a host.
+        // Append empty InstanceToAggPairs to 'instance_groups'.
+        instance_groups.emplace_back();
+      }
+      instance_groups.back().emplace_back(i, 0);
+    }
+  }
+
+  int num_non_coordinator_host = instance_groups.size();
+  if (num_non_coordinator_host == 0) return;
+
+  // Select number of intermediate aggregator so that each aggregator will receive
+  // runtime filter update from at most 'num_filters_per_host' executors.
+  int num_agg = (int)ceil((double)num_non_coordinator_host / num_filters_per_host);
+  DCHECK_GT(num_agg, 0);
+
+  std::shuffle(instance_groups.begin(), instance_groups.end(), *state->rng());
+  if (coordinator_instances.size() > 0) {
+    // Put coordinator group behind so that coordinator won't be selected as intermediate
+    // aggregator.
+    instance_groups.push_back(coordinator_instances);
+  }
+
+  RuntimeFilterAggregatorInfoPB* agg_info =
+      src_state->exec_params->mutable_filter_agg_info();
+  agg_info->set_num_aggregators(num_agg);
+
+  int group_idx = 0;
+  int agg_idx = -1;
+  InstanceToAggPairs instance_to_agg;
+  vector<int> num_reporting_hosts(num_agg, 0);
+  for (auto group : instance_groups) {
+    const NetworkAddressPB& host = src_state->instance_states[group[0].first].host;
+    if (group_idx < num_agg) {
+      // First 'num_agg' of 'instance_groups' host selected as intermediate aggregator.
+      const BackendDescriptorPB& desc = LookUpBackendDesc(executor_config, host);
+      NetworkAddressPB* address = agg_info->add_aggregator_krpc_addresses();
+      *address = desc.address();
+      DCHECK(desc.has_krpc_address());
+      DCHECK(IsResolvedAddress(desc.krpc_address()));
+      NetworkAddressPB* krpc_address = agg_info->add_aggregator_krpc_backends();
+      *krpc_address = desc.krpc_address();
+    }
+    agg_idx = (agg_idx + 1) % num_agg;
+    num_reporting_hosts[agg_idx] += 1;
+    for (auto entry : group) {
+      entry.second = agg_idx;
+      instance_to_agg.push_back(entry);
+    }
+    ++group_idx;
+  }
+
+  // Sort 'instance_to_agg' based on the original instance order to populate
+  // 'aggregator_idx_to_report'.
+  sort(instance_to_agg.begin(), instance_to_agg.end());
+  DCHECK_EQ(src_state->instance_states.size(), instance_to_agg.size());
+  for (auto entry : instance_to_agg) {
+    agg_info->add_aggregator_idx_to_report(entry.second);
+  }
+
+  // Write how many host is expected to report to each intermediate aggregator,
+  // including the aggregator host itself.
+  for (auto num_reporters : num_reporting_hosts) {
+    agg_info->add_num_reporter_per_aggregator(num_reporters);
+  }
 }
 
 Status Scheduler::CheckEffectiveInstanceCount(

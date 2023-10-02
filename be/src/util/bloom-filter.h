@@ -99,7 +99,11 @@ class BloomFilter {
   static void ToProtobuf(const BloomFilter* filter, kudu::rpc::RpcController* controller,
       BloomFilterPB* protobuf);
 
-  bool AlwaysFalse() const { return block_bloom_filter_.always_false(); }
+  bool AlwaysFalse() const {
+    return block_bloom_filter_.always_false() && !not_always_false_;
+  }
+
+  void MarkNotAlwaysFalse() { not_always_false_ = true; }
 
   /// Adds an element to the BloomFilter. The function used to generate 'hash' need not
   /// have good uniformity, but it should have low collision probability. For instance, if
@@ -117,6 +121,16 @@ class BloomFilter {
   /// Computes the logical OR of this filter with 'other' and stores the result in this
   /// filter.
   void Or(const BloomFilter& other);
+
+  /// Computes the logical OR of this filter with 'other' and stores the result in this
+  /// filter. Different from Or(), the operation happen straight in the raw bytes rather
+  /// than goes through kudu::BlockBloomFilter::Or() method. The logical OR operation
+  /// still happen even if other.AlwaysFalse() is true.
+  void RawOr(const BloomFilter& other);
+
+  /// Computes the logical OR of this filter with 'in' and its corresponding
+  /// 'input_slice' and stores the result in this filter.
+  void Or(const BloomFilterPB& in, const kudu::Slice& input_slice);
 
   /// This function computes the logical OR of 'directory_in' with 'directory_out'
   /// and stores the result in 'directory_out'. 'in' must be a valid filter object
@@ -178,6 +192,9 @@ class BloomFilter {
 
   /// Embedded Kudu BlockBloomFilter object
   kudu::BlockBloomFilter block_bloom_filter_;
+
+  /// Flag to override block_bloom_filter_.always_false() in AlwaysFalse() method.
+  bool not_always_false_ = false;
 
   /// Serializes this filter as Protobuf.
   void ToProtobuf(BloomFilterPB* protobuf, kudu::rpc::RpcController* controller) const;

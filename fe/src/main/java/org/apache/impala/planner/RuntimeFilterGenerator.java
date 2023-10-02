@@ -662,6 +662,7 @@ public final class RuntimeFilterGenerator {
     public Operator getExprCompOp() { return exprCmpOp_; }
     public long getFilterSize() { return filterSizeBytes_; }
     public boolean isTimestampTruncation() { return isTimestampTruncation_; }
+    public boolean isBroadcast() { return isBroadcastJoin_; }
     public PlanNode getSrc() { return src_; }
 
     private long getBuildKeyNumRowStats() {

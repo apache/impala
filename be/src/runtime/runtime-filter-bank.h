@@ -50,6 +50,7 @@ class InListFilter;
 class RuntimeFilter;
 class QueryState;
 class TBloomFilter;
+class TNetworkAddress;
 class TRuntimeFilterDesc;
 class TQueryCtx;
 
@@ -65,6 +66,22 @@ struct FilterRegistration {
 
   // The number of producers of this filter executing on the backend.
   int num_producers = 0;
+
+  // True means this filter is planned for intermediate aggregation.
+  bool need_subaggregation = false;
+
+  // True if this Impala backend is the intermediate aggregator for this filter.
+  bool is_intermediate_aggregator = false;
+
+  // Num hosts that will send filter update to the intermediate aggregator backend
+  // (including the aggregator backend itself) if 'need_subaggregation' is True.
+  int num_reporting_hosts = 0;
+
+  // ip and port of the aggregator backend.
+  TNetworkAddress krpc_backend_to_report;
+
+  // Hostname of the aggregator backend.
+  std::string krpc_hostname_to_report;
 };
 
 /// RuntimeFilters are produced and consumed by plan nodes at run time to propagate
@@ -84,6 +101,14 @@ struct FilterRegistration {
 /// producers, and then made available to consumers after PublishGlobalFilter() has been
 /// called. The expected number of filters to be produced locally must be specified ahead
 /// of time so that RuntimeFilterBank knows when the filter is complete.
+///
+/// If distributed runtime filter aggregation is enabled
+/// (MAX_NUM_FILTERS_AGGREGATED_PER_HOST>1), few number of backend executors will be
+/// selected as intermediate filter aggregator to help coordinator. Besides doing
+/// local aggregation, each intermediate aggregator will also listen and aggregate
+/// filter updates from at most MAX_NUM_FILTERS_AGGREGATED_PER_HOST-1 other executors.
+/// Intermediate aggregator then sends the aggregated filter update to coordinator for
+/// final aggregation and publishing.
 ///
 /// After PublishGlobalFilter() has been called (at most once per filter_id), the
 /// RuntimeFilter object associated with filter_id will have a valid bloom_filter,
@@ -129,6 +154,10 @@ class RuntimeFilterBank {
   void UpdateFilterFromLocal(int32_t filter_id, BloomFilter* bloom_filter,
       MinMaxFilter* min_max_filter, InListFilter* in_list_filter);
 
+  /// Update filter received from remote hosts.
+  void UpdateFilterFromRemote(
+      const UpdateFilterParamsPB& params, kudu::rpc::RpcContext* context);
+
   /// Makes a filter (aggregated globally from all producer fragments) available for
   /// consumption by operators that wish to use it for filtering.
   void PublishGlobalFilter(
@@ -172,25 +201,61 @@ class RuntimeFilterBank {
   /// Acquire locks for all filters, returning them to the caller.
   std::vector<std::unique_lock<SpinLock>> LockAllFilters();
 
+  /// For each filter, acquire its lock and check whether aggregation has completed or
+  /// not. If there is a runtime filter has not completed aggregation, unlock and wait
+  /// for RUNTIME_FILTER_WAIT_TIME_MS for aggregation to happen for that incomplete
+  /// filter. If aggregation still does not happen, send the incomplete filter to
+  /// Coordinator.
+  void SendIncompleteFilters();
+
   /// Implementation of Cancel(). All filter locks must be held by caller.
   void CancelLocked();
 
+  /// Wait for in-flight RPC to complete.
+  void WaitForInFlightRpc();
+
   /// Data tracked for each produced filter in the filter bank.
   struct ProducedFilter {
-    ProducedFilter(int pending_producers, RuntimeFilter* result_filter);
+    ProducedFilter(
+        int pending_producers, int pending_remotes, RuntimeFilter* result_filter);
 
     /// The initial filter returned from RegisterProducer() metadata about the filter.
     /// Not modified by producers. Owned by 'obj_pool_'.
     RuntimeFilter* const result_filter;
 
-    // The expected number of instances of the filter yet to arrive, i.e. additional
-    // UpdateFilterFromLocal() calls expected.
+    /// The expected number of instances of the filter yet to arrive, i.e. additional
+    /// UpdateFilterFromLocal() calls expected.
     int pending_producers;
 
-    // A temporary filter that needs to be merged into the final filter. See
-    // UpdateFilterFromLocal() for details on the algorithm for merging.
-    // Only used for partitioned join filters.
+    /// The expected number of remote host to send their filter update to this backend.
+    int pending_remotes;
+
+    /// Total number of all producers for this ProducedFilter.
+    int total_producers;
+
+    /// Pointer to runtime filter that holds the merge result of all remote updates.
+    std::unique_ptr<RuntimeFilter> pending_remote_filter;
+
+    /// A temporary filter that needs to be merged into the final filter. See
+    /// UpdateFilterFromLocal() for details on the algorithm for merging.
+    /// Only used for partitioned join filters.
     std::unique_ptr<RuntimeFilter> pending_merge_filter;
+
+    /// Return number of remaining filter producers, both remote and local.
+    inline int AllRemainingProducers() { return pending_remotes + pending_producers; }
+
+    /// Return true if no filter update has been received.
+    inline bool IsEmpty() {
+      return pending_remotes + pending_producers == total_producers;
+    }
+
+    /// Return true if all filter updates have been received.
+    inline bool IsComplete() { return pending_remotes + pending_producers <= 0; }
+
+    /// Return number of filter updates that have been received.
+    inline int ReceivedUpdate() {
+      return total_producers - (pending_remotes + pending_producers);
+    }
   };
 
   /// All state tracked for a particular filter in this filter bank. PerFilterStates are
@@ -203,8 +268,8 @@ class RuntimeFilterBank {
     ///   there are any producers. Must be owned by 'obj_pool_'.
     /// consumed_filter: the filter that will be returned to consumers. Non-NULL if there
     ///   are any consumers. Must be owned by 'obj_pool_'.
-    PerFilterState(int pending_producers, RuntimeFilter* result_filter,
-        RuntimeFilter* consumed_filter);
+    PerFilterState(int pending_producers, int pending_remotes,
+        RuntimeFilter* result_filter, RuntimeFilter* consumed_filter);
 
     /// Lock protecting the structures in this PerFilterState. If multiple locks are
     /// acquired, they must be acquired in the 'filters_' map iteration order.
@@ -284,10 +349,30 @@ class RuntimeFilterBank {
   /// methods.
   BufferPool::ClientHandle buffer_pool_client_;
 
+  /// Combine both 'pending_merge_filter' and 'pending_remote_filter' into
+  /// 'result_filter'. 'pending_merge_filter' and 'pending_remote_filter' will be
+  /// discarded after this function call. Only valid to call if
+  /// produced_filter.result_filter->is_intermediate_aggregator() == true.
+  void CombinePeerAndLocalUpdates(
+      std::unique_lock<SpinLock>* lock, ProducedFilter& produced_filter);
+
+  /// Distribute 'complete_filter' to local and/or remote target.
+  /// Caller must hold 'lock' (which is over 'PerFilterState.lock').
+  void DistributeCompleteFilter(std::unique_lock<SpinLock>* lock, PerFilterState* fs,
+      RuntimeFilter* complete_filter);
+
   /// This is the callback for the asynchronous rpc UpdateFilterAsync() in
   /// UpdateFilterFromLocal().
-  void UpdateFilterCompleteCb(
-      const kudu::rpc::RpcController* rpc_controller, const UpdateFilterResultPB* res);
+  void UpdateFilterCompleteCb(const kudu::rpc::RpcController* rpc_controller,
+      const UpdateFilterResultPB* res, bool is_remote_update);
+
+  /// A locked implementation of AllocateScratchBloomFilter().
+  BloomFilter* AllocateScratchBloomFilterLocked(
+      std::unique_lock<SpinLock>* lock, PerFilterState* fs);
+
+  /// Disable a bloom filter by replacing it with an ALWAYS_TRUE_FILTER.
+  /// Return a pointer to the new runtime filter.
+  RuntimeFilter* DisableBloomFilter(std::unique_ptr<RuntimeFilter>& bloom_filter);
 };
 
 }

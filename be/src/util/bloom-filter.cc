@@ -108,7 +108,7 @@ void BloomFilter::AddDirectorySidecar(BloomFilterPB* rpc_params,
 void BloomFilter::ToProtobuf(
     BloomFilterPB* protobuf, kudu::rpc::RpcController* controller) const {
   protobuf->set_log_bufferpool_space(block_bloom_filter_.log_space_bytes());
-  if (block_bloom_filter_.always_false()) {
+  if (AlwaysFalse()) {
     protobuf->set_always_false(true);
     protobuf->set_always_true(false);
     return;
@@ -142,6 +142,28 @@ void BloomFilter::Or(const BloomFilter& other) {
   DCHECK_EQ(
       block_bloom_filter_.log_space_bytes(), other.block_bloom_filter_.log_space_bytes());
   block_bloom_filter_.Or(other.block_bloom_filter_);
+}
+
+void BloomFilter::RawOr(const BloomFilter& other) {
+  DCHECK_NE(this, &other);
+  DCHECK_NE(&other, ALWAYS_TRUE_FILTER);
+  DCHECK_EQ(
+      block_bloom_filter_.log_space_bytes(), other.block_bloom_filter_.log_space_bytes());
+  kudu::Slice target_slice = block_bloom_filter_.directory();
+  kudu::Slice input_slice = other.block_bloom_filter_.directory();
+  kudu::BlockBloomFilter::OrEqualArray(
+      target_slice.size(), input_slice.data(), const_cast<uint8_t*>(target_slice.data()));
+}
+
+void BloomFilter::Or(const BloomFilterPB& in, const kudu::Slice& input_slice) {
+  DCHECK_NE(this, BloomFilter::ALWAYS_TRUE_FILTER);
+  DCHECK(!in.always_true());
+  if (in.always_false()) return;
+  DCHECK_EQ(in.log_bufferpool_space(), block_bloom_filter_.log_space_bytes());
+  kudu::Slice target_slice = block_bloom_filter_.directory();
+  DCHECK_EQ(input_slice.size(), target_slice.size());
+  kudu::BlockBloomFilter::OrEqualArray(
+      target_slice.size(), input_slice.data(), const_cast<uint8_t*>(target_slice.data()));
 }
 
 void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,

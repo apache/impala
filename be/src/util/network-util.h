@@ -103,6 +103,12 @@ Status NetworkAddressPBToSockaddr(
 /// a free ephemeral port can't be found after 100 tries.
 int FindUnusedEphemeralPort();
 
+/// Return true if two NetworkAddressPB are match.
+inline bool KrpcAddressEqual(const NetworkAddressPB& lhs, const NetworkAddressPB& rhs) {
+  return lhs.hostname() == rhs.hostname() && lhs.port() == rhs.port()
+      && lhs.uds_address() == rhs.uds_address();
+}
+
 extern const std::string LOCALHOST_IP_STR;
 
 } // namespace impala

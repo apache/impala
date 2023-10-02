@@ -54,6 +54,7 @@
 #define VLOG_FILE       VLOG(2)
 #define VLOG_ROW        VLOG(3)
 #define VLOG_PROGRESS   VLOG(2)
+#define VLOG_FILTER     VLOG(3)
 
 #define VLOG_CONNECTION_IS_ON VLOG_IS_ON(1)
 #define VLOG_RPC_IS_ON VLOG_IS_ON(2)
@@ -61,6 +62,7 @@
 #define VLOG_FILE_IS_ON VLOG_IS_ON(2)
 #define VLOG_ROW_IS_ON VLOG_IS_ON(3)
 #define VLOG_PROGRESS_IS_ON VLOG_IS_ON(2)
+#define VLOG_FILTER_IS_ON VLOG_IS_ON(3)
 
 // Define a range check macro to test x in the inclusive range from low to high.
 #define DCHECK_IN_RANGE(x, low, high) \

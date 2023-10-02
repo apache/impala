@@ -1166,7 +1166,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(QueryOptionParser::Parse<MemSpec>(option, value, &mem_spec_val));
         query_options->__set_hdfs_scanner_non_reserved_bytes(mem_spec_val.value);
         break;
-      };
+      }
       case TImpalaQueryOptions::CODEGEN_OPT_LEVEL: {
         TCodeGenOptLevel::type enum_type;
         RETURN_IF_ERROR(GetThriftEnum(
@@ -1186,6 +1186,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(
             option, value, 0.0, 1.0, &double_val));
         query_options->__set_runtime_filter_cardinality_reduction_scale(double_val);
+        break;
+      }
+      case TImpalaQueryOptions::MAX_NUM_FILTERS_AGGREGATED_PER_HOST: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveLowerBound<int32_t>(
+            option, value, -1, &int32_t_val));
+        query_options->__set_max_num_filters_aggregated_per_host(int32_t_val);
         break;
       }
       default:

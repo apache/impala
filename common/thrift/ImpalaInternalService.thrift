@@ -51,11 +51,25 @@ struct TDebugOptions {
   4: optional string action_param
 }
 
+// Descriptor about impalad address designated as runtime filter aggregator.
+struct TRuntimeFilterAggDesc {
+  // Hostname of aggregator backend.
+  1: required string krpc_hostname
+  // Ip:port of aggregator backend.
+  2: required Types.TNetworkAddress krpc_address
+  // Number of impalad that report filter update to this aggregator backend,
+  // including the aggregator backend itself.
+  3: required i32 num_reporting_hosts
+}
 
 // Descriptor that indicates that a runtime filter is produced by a plan node.
 struct TRuntimeFilterSource {
   1: required Types.TPlanNodeId src_node_id
   2: required i32 filter_id
+
+  // The following field is only set if a filter source need to send filter update
+  // to a designated backend aggregator intead of the coordinator.
+  3: optional TRuntimeFilterAggDesc aggregator_desc
 }
 
 // The Thrift portion of the execution parameters of a single fragment instance. Every

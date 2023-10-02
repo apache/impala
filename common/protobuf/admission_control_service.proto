@@ -97,6 +97,30 @@ message BackendExecParamsPB {
   optional bool is_coord_backend = 7;
 }
 
+// Information about selected backend that designated as runtime filter preaggregator
+// (before final aggregation in the coordinator) and fragment instances that must send
+// filter update to them. This is populated by Scheduler::ComputeRandomKrpcForAggregation
+// only for fragment having partitioned join that produce bloom filter and only if num
+// backend executor (excluding coordinator) is at least 2x num aggregator (which default
+// to 2).
+message RuntimeFilterAggregatorInfoPB {
+  // Number of aggregator.
+  required int32 num_aggregators = 1;
+
+  // hostname:port of designated aggregators.
+  repeated NetworkAddressPB aggregator_krpc_addresses = 2;
+
+  // ip:port of designated aggregators.
+  repeated NetworkAddressPB aggregator_krpc_backends = 3;
+
+  // Number of backend executor that report to each designated aggregator + 1
+  // (including itself).
+  repeated int32 num_reporter_per_aggregator = 4;
+
+  // Size must be equal to the size of FragmentExecParamsPB.instances().
+  repeated int32 aggregator_idx_to_report = 5;
+}
+
 // Execution parameters shared between fragment instances
 message FragmentExecParamsPB {
   // Ordinal number of the corresponding fragment in the query, i.e. TPlanFragment.idx.
@@ -115,6 +139,8 @@ message FragmentExecParamsPB {
   // Total number of backends this fragment is scheduled on. Note that this represents
   // the number of individual impalads, not the number of physical hosts.
   optional int32 num_hosts = 5;
+
+  optional RuntimeFilterAggregatorInfoPB filter_agg_info = 6;
 }
 
 // Contains the output from scheduling and admission control that is used by the

@@ -130,6 +130,9 @@ class ImpalaKRPCTestBackend : public DataStreamServiceIf {
   virtual void UpdateFilter(
       const UpdateFilterParamsPB* req, UpdateFilterResultPB* resp, RpcContext* context) {}
 
+  virtual void UpdateFilterFromRemote(
+      const UpdateFilterParamsPB* req, UpdateFilterResultPB* resp, RpcContext* context) {}
+
   virtual void PublishFilter(const PublishFilterParamsPB* req,
       PublishFilterResultPB* resp, RpcContext* context) {}
 
