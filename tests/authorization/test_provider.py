@@ -45,12 +45,12 @@ class TestAuthorizationProvider(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       expect_cores=True,
       impala_log_dir=LOG_DIR,
-      impalad_args="--minidump_path={0}"
+      impalad_args="--minidump_path={0} "
                    "--server-name=server1 "
                    "--ranger_service_type=hive "
                    "--ranger_app_id=impala "
                    "--authorization_provider={1}".format(MINIDUMP_PATH, BAD_FLAG),
-      catalogd_args="--minidump_path={0}"
+      catalogd_args="--minidump_path={0} "
                     "--server-name=server1 "
                     "--ranger_service_type=hive "
                     "--ranger_app_id=impala "

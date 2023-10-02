@@ -190,6 +190,11 @@ class QueryDriver {
   /// True if Finalize() was called while the query was inflight.
   bool finalized() const { return finalized_.Load(); }
 
+  /// Functions to set/get whether or not the query managed by this class should be
+  /// recorded in the query log table.
+  void IncludeInQueryLog(const bool include) noexcept;
+  bool IncludedInQueryLog() const noexcept;
+
   /// Creates a new QueryDriver instance using the given ImpalaServer. Creates the
   /// ClientRequestState for the given 'query_ctx' and 'session_state'. Sets the given
   /// QueryHandle's QueryDriver.
@@ -273,5 +278,9 @@ class QueryDriver {
   /// True if a thread has called Finalize() and the query is inflight. Threads calling
   /// Finalize() do a compare-and-swap on this so that only one thread can proceed.
   AtomicBool finalized_{false};
+
+  /// True if this query should be recorded in the query log table.
+  /// Default: `true`
+  bool include_in_query_log_ = true;
 };
 }

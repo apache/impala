@@ -208,10 +208,11 @@ class BeeswaxConnection(ImpalaConnection):
     LOG.info("-- closing DML query for operation handle: %s" % operation_handle)
     self.__beeswax_client.close_dml(operation_handle.get_handle())
 
-  def execute(self, sql_stmt, user=None):
+  def execute(self, sql_stmt, user=None, fetch_profile_after_close=False):
     LOG.info("-- executing against %s\n" % (self.__host_port))
     log_sql_stmt(sql_stmt)
-    return self.__beeswax_client.execute(sql_stmt, user=user)
+    return self.__beeswax_client.execute(sql_stmt, user=user,
+        fetch_profile_after_close=fetch_profile_after_close)
 
   def execute_async(self, sql_stmt, user=None):
     LOG.info("-- executing async: %s\n" % (self.__host_port))
@@ -344,7 +345,8 @@ class ImpylaHS2Connection(ImpalaConnection):
     LOG.info("-- closing query for operation handle: {0}".format(operation_handle))
     operation_handle.get_handle().close_operation()
 
-  def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING):
+  def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING,
+      fetch_profile_after_close=False):
     self.__cursor.execute(sql_stmt, configuration=self.__query_options)
     handle = OperationHandle(self.__cursor, sql_stmt)
 
@@ -359,6 +361,14 @@ class ImpylaHS2Connection(ImpalaConnection):
           self.close_query(handle)
         except Exception:
           pass
+      elif fetch_profile_after_close:
+        op_handle = handle.get_handle()._last_operation
+        self.close_query(handle)
+
+        # Match ImpalaBeeswaxResult by placing the full profile including end time and
+        # duration into the return object.
+        r.runtime_profile = op_handle.get_profile(profile_format)
+        return r
       else:
         self.close_query(handle)
         return r
@@ -464,20 +474,22 @@ class ImpylaHS2Connection(ImpalaConnection):
       profile = None
     return ImpylaHS2ResultSet(success=True, result_tuples=result_tuples,
                               column_labels=column_labels, column_types=column_types,
-                              query=handle.sql_stmt(), log=log, profile=profile)
+                              query=handle.sql_stmt(), log=log, profile=profile,
+                              query_id=self.get_query_id(handle))
 
 
 class ImpylaHS2ResultSet(object):
   """This emulates the interface of ImpalaBeeswaxResult so that it can be used in
   place of it. TODO: when we deprecate/remove Beeswax, clean this up."""
   def __init__(self, success, result_tuples, column_labels, column_types, query, log,
-      profile):
+      profile, query_id):
     self.success = success
     self.column_labels = column_labels
     self.column_types = column_types
     self.query = query
     self.log = log
     self.profile = profile
+    self.query_id = query_id
     self.__result_tuples = result_tuples
     # self.data is the data in the ImpalaBeeswaxResult format: a list of rows with each
     # row represented as a tab-separated string.

@@ -3743,5 +3743,55 @@
     "units": "NONE",
     "kind" : "GAUGE",
     "key" : "catalogd.hms.cache.status.api.requests.15min"
+  },
+  {
+    "description": "The number of completed queries queued up and waiting to be written to the query log table.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Queued Completed Queries",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.completed-queries.queued"
+  },
+  {
+    "description": "The number of completed queries successfully written to the query log table.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Completed Queries Successfully Written",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala-server.completed-queries.written"
+  },
+  {
+    "description": "The number of completed queries that failed to be written to the query log table. If the same query fails to be written multiple times, each attempt will increase this counter by 1.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Completed Queries Failed to Write",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala-server.completed-queries.failure"
+  },
+  {
+    "description": "Count of the times that completed queries were written to the query log table at the regularly scheduled time.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Completed Queries Write Attempts",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala-server.completed-queries.scheduled-writes"
+  },
+  {
+    "description": "Count of the times that completed queries were written to the query log table because the max records queued count was reached.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Max Records Hit",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala-server.completed-queries.max-records-writes"
   }
 ]

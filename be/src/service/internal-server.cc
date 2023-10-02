@@ -102,21 +102,25 @@ bool ImpalaServer::CloseSession(const TUniqueId& session_id) {
 } // ImpalaServer::CloseSession
 
 Status ImpalaServer::ExecuteIgnoreResults(const string& user_name, const string& sql,
-    TUniqueId* query_id) {
+    const TQueryOptions& query_opts, const bool persist_in_db, TUniqueId* query_id) {
   TUniqueId session_id;
   TUniqueId internal_query_id;
+  Status result;
 
-  RETURN_IF_ERROR(SubmitAndWait(user_name, sql, session_id, internal_query_id));
+  result = SubmitAndWait(user_name, sql, session_id, internal_query_id, query_opts,
+      persist_in_db);
 
   if (query_id != nullptr) {
     *query_id = internal_query_id;
   }
 
-  CloseQuery(internal_query_id);
+  if (!UUIDEmpty(internal_query_id)) {
+    CloseQuery(internal_query_id);
+  }
 
   CloseSession(session_id);
 
-  return Status::OK();
+  return result;
 } //ImpalaServer::ExecuteIgnoreResults
 
 Status ImpalaServer::ExecuteAndFetchAllText(const std::string& user_name,
@@ -124,26 +128,33 @@ Status ImpalaServer::ExecuteAndFetchAllText(const std::string& user_name,
     TUniqueId* query_id){
   TUniqueId session_id;
   TUniqueId internal_query_id;
+  Status result;
 
-  RETURN_IF_ERROR(SubmitAndWait(user_name, sql, session_id, internal_query_id));
+  result = SubmitAndWait(user_name, sql, session_id, internal_query_id, TQueryOptions());
 
   if (query_id != nullptr) {
     *query_id = internal_query_id;
   }
 
-  RETURN_IF_ERROR(FetchAllRows(internal_query_id, results, columns));
+  if (result.ok()) {
+    result = FetchAllRows(internal_query_id, results, columns);
+  }
 
-  CloseQuery(internal_query_id);
+  if (!UUIDEmpty(internal_query_id)) {
+    CloseQuery(internal_query_id);
+  }
+
   CloseSession(session_id);
 
-  return Status::OK();
+  return result;
 } // ImpalaServer::ExecuteAndFetchAllText
 
 Status ImpalaServer::SubmitAndWait(const string& user_name, const string& sql,
-    TUniqueId& new_session_id, TUniqueId& new_query_id) {
+    TUniqueId& new_session_id, TUniqueId& new_query_id, const TQueryOptions& query_opts,
+    const bool persist_in_db) {
 
-  RETURN_IF_ERROR(OpenSession(user_name, new_session_id));
-  RETURN_IF_ERROR(SubmitQuery(sql, new_session_id, new_query_id));
+  RETURN_IF_ERROR(OpenSession(user_name, new_session_id, query_opts));
+  RETURN_IF_ERROR(SubmitQuery(sql, new_session_id, new_query_id, persist_in_db));
 
   return WaitForResults(new_query_id);
 } // ImpalaServer::SubmitAndWait
@@ -168,7 +179,7 @@ Status ImpalaServer::WaitForResults(TUniqueId& query_id) {
 } // ImpalaServer::WaitForResults
 
 Status ImpalaServer::SubmitQuery(const string& sql, const TUniqueId& session_id,
-    TUniqueId& new_query_id) {
+    TUniqueId& new_query_id, const bool persist_in_db) {
 
   // build a query context
   TQueryCtx query_context;
@@ -196,14 +207,12 @@ Status ImpalaServer::SubmitQuery(const string& sql, const TUniqueId& session_id,
   AddPoolConfiguration(&query_context, ~set_query_options_mask);
 
   QueryHandle query_handle;
-  RETURN_IF_ERROR(Execute(&query_context, session_state, &query_handle, nullptr));
+  RETURN_IF_ERROR(Execute(&query_context, session_state, &query_handle, nullptr,
+      persist_in_db));
   new_query_id = query_handle->query_id();
 
-  RETURN_IF_ERROR(SetQueryInflight(session_state, query_handle));
-
-  return Status::OK();
+  return SetQueryInflight(session_state, query_handle);
 } // ImpalaServer::SubmitQuery
-
 
 Status ImpalaServer::FetchAllRows(const TUniqueId& query_id, query_results& results,
     results_columns* columns) {
@@ -251,11 +260,19 @@ Status ImpalaServer::FetchAllRows(const TUniqueId& query_id, query_results& resu
     RETURN_IF_ERROR(query_handle->FetchRows(10, result_set, block_wait_time));
     results->insert(results->cend(), row_set.cbegin(), row_set.cend());
   }
+
   return Status::OK();
 } // ImpalaServer::FetchAllRows
 
 void ImpalaServer::CloseQuery(const TUniqueId& query_id) {
-  UnregisterQueryDiscardResult(query_id, false);
+  QueryHandle query_handle;
+  Status found = GetActiveQueryHandle(query_id, &query_handle);
+
+  if (!found.ok()) {
+    return;
+  }
+
+  UnregisterQueryDiscardResult(query_handle->query_id(), false);
 } // ImpalaServer::CloseQuery
 
 void ImpalaServer::GetConnectionContextList(

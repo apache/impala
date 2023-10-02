@@ -288,4 +288,8 @@ struct TBackendGflags {
   128: required string inject_process_event_failure_event_types
 
   129: required double inject_process_event_failure_ratio
+
+  130: required bool enable_workload_mgmt
+
+  131: required string query_log_table_name
 }

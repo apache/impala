@@ -547,6 +547,14 @@ Status QueryDriver::Unregister(ImpalaServer::QueryDriverMap* query_driver_map) {
   return Status::OK();
 }
 
+void QueryDriver::IncludeInQueryLog(const bool include) noexcept{
+  include_in_query_log_ = include;
+}
+
+bool QueryDriver::IncludedInQueryLog() const noexcept {
+  return include_in_query_log_;
+}
+
 void QueryDriver::CreateNewDriver(ImpalaServer* impala_server, QueryHandle* query_handle,
     const TQueryCtx& query_ctx, shared_ptr<ImpalaServer::SessionState> session_state) {
   query_handle->query_driver_ = std::make_shared<QueryDriver>(impala_server);

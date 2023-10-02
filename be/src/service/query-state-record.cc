@@ -201,9 +201,11 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
       .query_exec_request.planner_per_host_mem_estimate;
   dedicated_coord_mem_estimate = exec_state.exec_request()
       .query_exec_request.dedicated_coord_mem_estimate;
-  base->num_rows_fetched = exec_state.num_rows_fetched_counter();
   row_materialization_rate = exec_state.row_materialization_rate();
   row_materialization_time = exec_state.row_materialization_timer();
+
+  // Update name_rows_fetched with the final count after query close.
+  base_state->num_rows_fetched = exec_state.num_rows_fetched_counter();
 
   // Fields from the schedule.
   if (exec_state.schedule() != nullptr) {
@@ -343,6 +345,29 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
   }
   executor_groups = exec_group_str.str();
   boost::algorithm::trim_if(executor_groups, boost::algorithm::is_any_of("\n"));
+
+  // Find important events in the events timeline and store them in their own map.
+  for (const auto& event : EventsTimeline()) {
+    if (boost::algorithm::iequals(event.first, "planning finished")) {
+      events.insert_or_assign(PLANNING_FINISHED, event.second);
+    } else if (boost::algorithm::iequals(event.first, "submit for admission")) {
+      events.insert_or_assign(SUBMIT_FOR_ADMISSION, event.second);
+    } else if (boost::algorithm::iequals(event.first, "completed admission")) {
+      events.insert_or_assign(COMPLETED_ADMISSION, event.second);
+    } else if (boost::algorithm::istarts_with(event.first, "all ")
+               && boost::algorithm::icontains(event.first, " execution backends ")
+               && boost::algorithm::iends_with(event.first, " started")) {
+      events.insert_or_assign(ALL_BACKENDS_STARTED, event.second);
+    } else if (boost::algorithm::iequals(event.first, "rows available")) {
+      events.insert_or_assign(ROWS_AVAILABLE, event.second);
+    } else if (boost::algorithm::iequals(event.first, "first row fetched")) {
+      events.insert_or_assign(FIRST_ROW_FETCHED, event.second);
+    } else if (boost::algorithm::iequals(event.first, "last row fetched")) {
+      events.insert_or_assign(LAST_ROW_FETCHED, event.second);
+    } else if (boost::algorithm::iequals(event.first, "unregister query")) {
+      events.insert_or_assign(UNREGISTER_QUERY, event.second);
+    }
+  }
 } // QueryStateExpanded constructor
 
 bool QueryStateExpanded::events_timeline_empty() const {

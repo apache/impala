@@ -1146,7 +1146,6 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
     }
   }
 
-  if (FLAGS_query_log_size == 0 || FLAGS_query_log_size_in_bytes == 0) return;
   // 'fetch_rows_lock()' protects several fields in ClientReqestState that are read
   // during QueryStateRecord creation. There should be no contention on this lock because
   // the query has already been closed (e.g. no more results can be fetched).
@@ -1158,10 +1157,14 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
   if (query_handle->GetCoordinator() != nullptr) {
     query_handle->GetCoordinator()->GetTExecSummary(&record->exec_summary);
   }
-  int64_t record_size = EstimateSize(record.get());
-  VLOG(3) << "QueryStateRecord of " << PrintId(query_handle->query_id()) << " is "
-          << record_size << " bytes";
-  {
+
+  EnqueueCompletedQuery(query_handle, record);
+
+  if (FLAGS_query_log_size != 0 && FLAGS_query_log_size_in_bytes != 0) {
+    int64_t record_size = EstimateSize(record.get());
+    VLOG(3) << "QueryStateRecord of " << PrintId(query_handle->query_id()) << " is "
+            << record_size << " bytes";
+
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
     ImpaladMetrics::QUERY_LOG_EST_TOTAL_BYTES->Increment(record_size);
@@ -1250,8 +1253,8 @@ void ImpalaServer::EnforceMaxMtDop(TQueryCtx* query_ctx, int64_t max_mt_dop) {
 }
 
 Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> session_state,
-    QueryHandle* query_handle,
-    const TExecRequest* external_exec_request) {
+    QueryHandle* query_handle, const TExecRequest* external_exec_request,
+    const bool include_in_query_log) {
   PrepareQueryContext(query_ctx);
   ScopedThreadContext debug_ctx(GetThreadDebugInfo(), query_ctx->query_id);
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
@@ -1264,6 +1267,9 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> sess
   bool registered_query = false;
   Status status = ExecuteInternal(*query_ctx, external_exec_request, session_state,
       &registered_query, query_handle);
+
+  query_handle->query_driver()->IncludeInQueryLog(include_in_query_log);
+
   if (!status.ok() && registered_query) {
     UnregisterQueryDiscardResult((*query_handle)->query_id(), false, &status);
   }
@@ -3165,6 +3171,10 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
       hs2_http_server_.reset(http_server);
       hs2_http_server_->SetConnectionHandler(this);
     }
+
+    internal_server_ = shared_from_this();
+
+    RETURN_IF_ERROR(InitWorkloadManagement());
   }
   LOG(INFO) << "Initialized coordinator/executor Impala server on "
             << TNetworkAddressToString(exec_env_->configured_backend_address());
@@ -3346,6 +3356,10 @@ Status ImpalaServer::StartShutdown(
       break;
     }
   }
+
+  // Drain the completed queries queue to the query log table.
+  ShutdownWorkloadManagement();
+
   LOG(INFO) << "Shutdown complete, going down.";
   // Use _exit here instead since exit() does cleanup which interferes with the shutdown
   // signal handler thread causing a data race.
@@ -3381,6 +3395,10 @@ void ImpalaServer::GetAllConnectionContexts(
   // Get the connection contexts of the external fe server
   if (external_fe_server_.get()) {
     external_fe_server_->GetConnectionContextList(connection_contexts);
+  }
+  // Get the connection contexts of the internal server
+  if (internal_server_.get()) {
+    internal_server_->GetConnectionContextList(connection_contexts);
   }
 }
 

@@ -265,6 +265,25 @@ class ImpaladMetricKeys {
   // Associated metric is modified in ImpalaServer::ArchiveQuery and must hold
   // ImpalaServer::query_log_lock_ on modification.
   static const char* QUERY_LOG_EST_TOTAL_BYTES;
+
+  /// The number of completed queries queued up and waiting to be written to the query
+  /// log table.
+  static const char* COMPLETED_QUERIES_QUEUED;
+
+  /// The number of completed queries successfully written to the query log table.
+  static const char* COMPLETED_QUERIES_WRITTEN;
+
+  /// The number of completed queries that failed to be written to the query log
+  /// table.
+  static const char* COMPLETED_QUERIES_FAIL;
+
+  /// Number of writes to the query log table that happened at the regularly scheduled
+  /// time.
+  static const char* COMPLETED_QUERIES_SCHEDULED_WRITES;
+
+  /// Number of writes to the query log table that happened because the max queued
+  /// completed queries records was reached.
+  static const char* COMPLETED_QUERIES_MAX_RECORDS_WRITES;
 };
 
 /// Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -319,6 +338,10 @@ class ImpaladMetrics {
   static IntCounter* CATALOG_CACHE_REQUEST_COUNT;
   static IntCounter* CATALOG_CACHE_TOTAL_LOAD_TIME;
   static IntCounter* DEBUG_ACTION_NUM_FAIL;
+  static IntCounter* COMPLETED_QUERIES_WRITTEN;
+  static IntCounter* COMPLETED_QUERIES_FAIL;
+  static IntCounter* COMPLETED_QUERIES_SCHEDULED_WRITES;
+  static IntCounter* COMPLETED_QUERIES_MAX_RECORDS_WRITES;
 
   // Gauges
   static IntGauge* CATALOG_NUM_DBS;
@@ -349,6 +372,7 @@ class ImpaladMetrics {
   static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;
   static IntGauge* RESULTSET_CACHE_TOTAL_BYTES;
   static IntGauge* QUERY_LOG_EST_TOTAL_BYTES;
+  static IntGauge* COMPLETED_QUERIES_QUEUED;
 
   // Properties
   static BooleanProperty* CATALOG_READY;

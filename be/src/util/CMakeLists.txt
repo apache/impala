@@ -98,6 +98,7 @@ set(UTIL_SRCS
   runtime-profile.cc
   sharded-query-map-util.cc
   simple-logger.cc
+  sql-util.cc
   string-parser.cc
   string-util.cc
   symbols-util.cc
@@ -207,6 +208,7 @@ add_library(UtilTests STATIC
   rle-test.cc
   runtime-profile-test.cc
   simple-logger-test.cc
+  sql-util-test.cc
   string-parser-test.cc
   string-util-test.cc
   summary-util-test.cc
@@ -270,6 +272,7 @@ ADD_UNIFIED_BE_LSAN_TEST(redactor-unconfigured-test "RedactorUnconfigTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(rle-test "BitArray.*:RleTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(runtime-profile-test "CountersTest.*:TimerCounterTest.*:TimeSeriesCounterTest.*:VariousNumbers/TimeSeriesCounterResampleTest.*:ToThrift.*:ToJson.*")
 ADD_UNIFIED_BE_LSAN_TEST(simple-logger-test "SimpleLoggerTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(sql-util-test "SqlUtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(string-parser-test "StringToInt.*:StringToIntWithBase.*:StringToFloat.*:StringToBool.*:StringToDate.*")
 ADD_UNIFIED_BE_LSAN_TEST(string-util-test "TruncateDownTest.*:TruncateUpTest.*:CommaSeparatedContainsTest.*:FindUtf8PosForwardTest.*:FindUtf8PosBackwardTest.*:RandomFindUtf8PosTest.*:StringStreamPopTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(summary-util-test "PrintTableTest.*")

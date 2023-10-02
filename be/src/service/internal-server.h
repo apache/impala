@@ -21,9 +21,10 @@
 #include <string>
 #include <vector>
 
+#include "common/status.h"
 #include "gen-cpp/Query_types.h"
 #include "gen-cpp/Types_types.h"
-#include "common/status.h"
+#include "rpc/thrift-server.h"
 
 namespace impala {
 
@@ -87,18 +88,25 @@ namespace impala {
       /// never retrieved.
       ///
       /// Parameters:
-      ///   `user_name` Specifies the username that will be reported as running this
-      ///               query.
-      ///   `sql`       Text of the sql query/ddl/dml to run.
-      ///   `query_id`  Optional output parameter, if specified, it will be overwritten
-      ///               with the id of the query that was executed. Since the query is
-      ///               closed by this function, the query id is informational only.
+      ///   `user_name`     Specifies the username that will be reported as running this
+      ///                   query.
+      ///   `sql`           Text of the sql query/ddl/dml to run.
+      ///   `query_opts`    Optional, contains query options that will apply to all
+      ///                   queries executed during this session.
+      ///   `persist_in_db` Optional boolean indicating if the query data should be
+      ///                   written to the completed queries table after it is closed.
+      ///                   Defaults to `true`.
+      ///   `query_id`      Optional output parameter, if specified, it will be
+      ///                   overwritten with the id of the query that was executed. Since
+      ///                   the query is closed by this function, the query id is
+      ///                   informational only.
       ///
       /// Return:
       ///   `impala::Status` Indicates the result of submitting the query and waiting for
       ///                    it to return.
       virtual Status ExecuteIgnoreResults(const std::string& user_name,
-          const std::string& sql, TUniqueId* query_id = nullptr) = 0;
+          const std::string& sql, const TQueryOptions& query_opts = TQueryOptions(),
+          const bool persist_in_db = true, TUniqueId* query_id = nullptr) = 0;
 
       /// Creates a new session under the specified user and submits a query under that
       /// session. No authentication is performed. Blocks until result rows are available.
@@ -140,15 +148,22 @@ namespace impala {
       ///   `user_name`      Specifies the username that will be reported as running this
       ///                    query.
       ///   `sql`            Text of the sql query/ddl/dml to run.
-      ///   `new_session_id` Output parameter that will be set to the id of the newly
-      ///                    created session.
-      ///   `new_query_id`   Output parameter that will be set to the id of the newly
-      //                     started query.
+      ///   `new_session_id` Output parameter that will be set to the id of the
+      ///                          newly created session.
+      ///   `new_query_id`   Output parameter that will be set to the id of the
+      ///                          newly started query.
+      ///   `query_opts`     Optional, contains query options that will apply to all
+      ///                    queries executed by this session opened by this function.
+      ///   `persist_in_db`  Optional boolean indicating if the query data should be
+      ///                    written to the completed queries table after it is closed.
+      ///                    Defaults to `true`.
       ///
       /// Return:
       ///   `impala::Status` Indicates the result of submitting and waiting for the query.
-      virtual Status SubmitAndWait(const std::string& user_name,
-          const std::string& sql, TUniqueId& new_session_id, TUniqueId& new_query_id) = 0;
+      virtual Status SubmitAndWait(const std::string& user_name, const std::string& sql,
+          TUniqueId& new_session_id, TUniqueId& new_query_id,
+          const TQueryOptions& query_opts = TQueryOptions(),
+          const bool persist_in_db = true) = 0;
 
       /// Waits until the given query has results available.
       ///
@@ -162,15 +177,19 @@ namespace impala {
       /// sets the query as in-flight before returning.
       ///
       /// Parameters:
-      ///   `sql`          Text of the sql query/ddl/dml to run.
-      ///   `session_id`   Id of the session that will run the query.
-      ///   `new_query_id` Output parameter that will be set to the id of the newly
-      //                   started query.
+      ///   `sql`           Text of the sql query/ddl/dml to run.
+      ///   `session_id`    Id of the session that will run the query.
+      ///   `new_query_id`  Output parameter that will be set to the id of the newly
+      ///                   started query.
+      ///   `persist_in_db` Optional boolean indicating if the query data should be
+      ///                   written to the completed queries table after it is closed.
+      ///                   Defaults to `true`.
       ///
       /// Return:
       ///   `impala::Status` Indicates the result of submitting the query.
       virtual Status SubmitQuery(const std::string& sql,
-          const impala::TUniqueId& session_id, TUniqueId& new_query_id) = 0;
+          const impala::TUniqueId& session_id, TUniqueId& new_query_id,
+          const bool persist_in_db = true) = 0;
 
       /// Retrieves all result rows for a given query. The query must have already been
       /// submitted and one of the Wait methods called on the query to ensure results are

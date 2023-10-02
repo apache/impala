@@ -479,4 +479,12 @@ public class BackendConfig {
   public double getProcessEventFailureRatio() {
     return backendCfg_.inject_process_event_failure_ratio;
   }
+
+  public boolean enableWorkloadMgmt() {
+    return backendCfg_.enable_workload_mgmt;
+  }
+
+  public String queryLogTableName() {
+    return backendCfg_.query_log_table_name;
+  }
 }

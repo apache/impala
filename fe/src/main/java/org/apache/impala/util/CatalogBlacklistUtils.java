@@ -94,6 +94,10 @@ public class CatalogBlacklistUtils {
   }
 
   public static void verifyDbName(String dbName) throws AnalysisException {
+    if (BackendConfig.INSTANCE.enableWorkloadMgmt() && dbName.equalsIgnoreCase("sys")) {
+      // Override 'sys' for Impala system tables.
+      return;
+    }
     if (BLACKLISTED_DBS.contains(dbName)) {
       throw new AnalysisException("Invalid db name: " + dbName
           + ". It has been blacklisted using --blacklisted_dbs");

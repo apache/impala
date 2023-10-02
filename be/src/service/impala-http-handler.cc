@@ -65,6 +65,7 @@ using namespace rapidjson;
 using namespace strings;
 
 DECLARE_int32(query_log_size);
+DECLARE_int64(query_log_size_in_bytes);
 DECLARE_int32(query_stmt_size);
 DECLARE_bool(use_local_catalog);
 DECLARE_string(admission_service_host);
@@ -674,6 +675,8 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
   }
   document->AddMember("completed_queries", completed_queries, document->GetAllocator());
   document->AddMember("completed_log_size", FLAGS_query_log_size,
+      document->GetAllocator());
+  document->AddMember("completed_log_size_in_bytes", FLAGS_query_log_size_in_bytes,
       document->GetAllocator());
 
   Value query_locations(kArrayType);

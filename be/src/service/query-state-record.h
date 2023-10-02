@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 #include "gen-cpp/ExecStats_types.h"
@@ -229,6 +230,20 @@ private:
   size_t cur_;
 }; // class EventsTimelineIterator
 
+// Enum of all query events that are relevant to workload management.
+// Note: if adding to this enum, also add to the initialization of the events member of
+// the QueryStateExpanded struct.
+enum QueryEvent {
+  PLANNING_FINISHED,
+  SUBMIT_FOR_ADMISSION,
+  COMPLETED_ADMISSION,
+  ALL_BACKENDS_STARTED,
+  ROWS_AVAILABLE,
+  FIRST_ROW_FETCHED,
+  LAST_ROW_FETCHED,
+  UNREGISTER_QUERY
+};
+
 /// Expanded snapshot of the query including its state along with other fields relevant
 /// to workload management. Not mutated after construction.
 struct QueryStateExpanded {
@@ -305,6 +320,19 @@ struct QueryStateExpanded {
 
   /// Executor Groups
   std::string executor_groups;
+
+  /// Events
+  /// Guaranteed to have one element for every member of the QueryEvent enum.
+  std::unordered_map<QueryEvent, std::int64_t> events = {
+    {PLANNING_FINISHED, 0},
+    {SUBMIT_FOR_ADMISSION, 0},
+    {COMPLETED_ADMISSION, 0},
+    {ALL_BACKENDS_STARTED, 0},
+    {ROWS_AVAILABLE, 0},
+    {FIRST_ROW_FETCHED, 0},
+    {LAST_ROW_FETCHED, 0},
+    {UNREGISTER_QUERY, 0}
+  };
 
   /// Events Timeline Empty
   bool events_timeline_empty() const;

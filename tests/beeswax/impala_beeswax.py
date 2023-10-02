@@ -182,7 +182,7 @@ class ImpalaBeeswaxClient(object):
                             service='impala', transport_type=trans_type, user=self.user,
                             password=self.password, use_ssl=self.use_ssl)
 
-  def execute(self, query_string, user=None):
+  def execute(self, query_string, user=None, fetch_profile_after_close=False):
     """Re-directs the query to its appropriate handler, returns ImpalaBeeswaxResult"""
     # Take care of leading/trailing whitespaces.
     query_string = query_string.strip()
@@ -193,13 +193,20 @@ class ImpalaBeeswaxClient(object):
       # DML queries are finished by this point.
       time_taken = time.time() - start
 
-      # fetch_results() will close the query after which there is no guarantee that
-      # profile and log will be available so fetch them first.
-      runtime_profile = self.get_runtime_profile(handle)
+      if not fetch_profile_after_close:
+        # fetch_results() will close the query after which there is no guarantee that
+        # profile and log will be available so fetch them first.
+        runtime_profile = self.get_runtime_profile(handle)
+
       exec_summary = self.get_exec_summary_and_parse(handle)
       log = self.get_log(handle.log_context)
 
       result = self.fetch_results(query_string, handle)
+
+      if fetch_profile_after_close:
+        # Fetch the profile again after the query has closed and the profile is complete.
+        runtime_profile = self.get_runtime_profile(handle)
+
       result.time_taken, result.start_time, result.runtime_profile, result.log = \
           time_taken, start_time, runtime_profile, log
       result.exec_summary = exec_summary
@@ -211,8 +218,16 @@ class ImpalaBeeswaxClient(object):
       result.start_time = start_time
       result.exec_summary = self.get_exec_summary_and_parse(handle)
       result.log = self.get_log(handle.log_context)
-      result.runtime_profile = self.get_runtime_profile(handle)
+
+      if not fetch_profile_after_close:
+        result.runtime_profile = self.get_runtime_profile(handle)
+
       self.close_query(handle)
+
+      if fetch_profile_after_close:
+        # Fetch the profile again after the query has closed and the profile is complete.
+        result.runtime_profile = self.get_runtime_profile(handle)
+
     return result
 
   def get_exec_summary(self, handle):

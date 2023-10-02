@@ -18,6 +18,7 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <boost/random/random_device.hpp>
@@ -34,12 +35,14 @@
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/control_service.pb.h"
+#include "gen-cpp/Query_types.h"
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
 #include "runtime/types.h"
 #include "service/internal-server.h"
 #include "service/query-options.h"
 #include "service/query-state-record.h"
+#include "service/workload-management.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/container-util.h"
@@ -47,6 +50,7 @@
 #include "util/sharded-query-map-util.h"
 #include "util/simple-logger.h"
 #include "util/thread-pool.h"
+#include "util/ticker.h"
 #include "util/time.h"
 
 namespace kudu {
@@ -406,15 +410,18 @@ class ImpalaServer : public ImpalaServiceIf,
       const TQueryOptions& query_opts = TQueryOptions());
   virtual bool CloseSession(const impala::TUniqueId& session_id);
   virtual Status ExecuteIgnoreResults(const std::string& user_name,
-      const std::string& sql, TUniqueId* query_id = nullptr);
+      const std::string& sql, const TQueryOptions& query_opts = TQueryOptions(),
+      const bool persist_in_db = true, TUniqueId* query_id = nullptr);
   virtual Status ExecuteAndFetchAllText(const std::string& user_name,
       const std::string& sql, query_results& results, results_columns* columns = nullptr,
       TUniqueId* query_id = nullptr);
   virtual Status SubmitAndWait(const std::string& user_name, const std::string& sql,
-      TUniqueId& new_session_id, TUniqueId& new_query_id);
+      TUniqueId& new_session_id, TUniqueId& new_query_id,
+      const TQueryOptions& query_opts = TQueryOptions(),
+      const bool persist_in_db = true);
   virtual Status WaitForResults(TUniqueId& query_id);
   virtual Status SubmitQuery(const std::string& sql, const impala::TUniqueId& session_id,
-      TUniqueId& new_query_id);
+      TUniqueId& new_query_id, const bool persist_in_db = true);
   virtual Status FetchAllRows(const TUniqueId& query_id, query_results& results,
       results_columns* columns = nullptr);
   virtual void CloseQuery(const TUniqueId& query_id);
@@ -738,8 +745,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// external_exec_request is a statement that was prepared by an external frontend using
   /// Impala PlanNodes or null if the external frontend isn't being used.
   Status Execute(TQueryCtx* query_ctx, std::shared_ptr<SessionState> session_state,
-      QueryHandle* query_handle,
-      const TExecRequest* external_exec_request) WARN_UNUSED_RESULT;
+      QueryHandle* query_handle, const TExecRequest* external_exec_request,
+      const bool include_in_query_log = true) WARN_UNUSED_RESULT;
 
   /// Implements Execute() logic, but doesn't unregister query on error.
   Status ExecuteInternal(const TQueryCtx& query_ctx,
@@ -942,6 +949,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// which are returned as strings (see IMPALA-11041).
   std::string ColumnTypeToBeeswaxTypeString(const TColumnType& type);
 
+  /// Places a completed query into the in-memory queue of completed queries.
+  /// (implemented in workload-management.cc)
+  void EnqueueCompletedQuery(const QueryHandle& query_handle,
+      const std::shared_ptr<QueryStateRecord> qs_rec);
+
   /// Returns the active QueryHandle for this query id. The QueryHandle contains the
   /// active ClientRequestState. Returns an error Status if the query id cannot be found.
   /// If caller is an RPC thread, RPC context will be registered for time tracking
@@ -1105,6 +1117,18 @@ class ImpalaServer : public ImpalaServiceIf,
   /// If the admission control service is enabled, periodically sends a list of all
   /// current query ids to the admissiond.
   [[noreturn]] void AdmissionHeartbeatThread();
+
+  /// If workload management is enabled, starts workload management threads.
+  /// (implemented in workload-management.cc)
+  Status InitWorkloadManagement();
+
+  /// Blocks until running workload management threads are shut down.
+  /// (implemented in workload-management.cc)
+  void ShutdownWorkloadManagement();
+
+  /// Periodically writes out completed queries (if configured)
+  /// (implemented in workload-management.cc)
+  void CompletedQueriesThread();
 
   /// Called from ExpireQueries() to check query resource limits for 'crs'. If the query
   /// exceeded a resource limit, returns a non-OK status with information about what
@@ -1583,6 +1607,7 @@ class ImpalaServer : public ImpalaServiceIf,
   boost::scoped_ptr<ThriftServer> hs2_server_;
   boost::scoped_ptr<ThriftServer> hs2_http_server_;
   boost::scoped_ptr<ThriftServer> external_fe_server_;
+  std::shared_ptr<InternalServer> internal_server_;
 
   /// Flag that records if backend and/or client services have been started. The flag is
   /// set after all services required for the server have been started.
@@ -1600,5 +1625,31 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Stores the last version number for the admission heartbeat that was sent.
   /// Incremented every time a new admission heartbeat is sent.
   int64_t admission_heartbeat_version_ = 0;
+
+  /// Workload Management Related Declarations.
+  /// Coordinate periodic execution of the completed queries queue processing thread.
+  std::condition_variable completed_queries_cv_;
+
+  /// Coordinate shutdown of the completed queries queue processing thread.
+  std::condition_variable completed_queries_shutdown_cv_;
+
+  /// Tracks the state of the thread that drains the completed queries queue to the table.
+  /// The associated lock must be held before reading/modifying this variable.
+  impala::workload_management::ThreadState completed_queries_thread_state_ =
+      impala::workload_management::NOT_STARTED;
+  std::mutex completed_queries_threadstate_mu_;
+
+  /// Thread that runs CompletedQueriesThread().
+  std::unique_ptr<Thread> completed_queries_thread_;
+
+  /// Ticker that wakes up the completed_queried_thread at set intervals to process the
+  /// queued completed queries. Uses the completed_queries_lock_ to synchonize access to
+  /// the completed_queries_ list.
+  std::unique_ptr<TickerSecondsBool> completed_queries_ticker_;
+
+  /// Queue of completed queries and the lock to synchronize access to it.
+  std::list<impala::workload_management::CompletedQuery> completed_queries_;
+  std::mutex completed_queries_lock_;
+
 };
 }

@@ -44,6 +44,9 @@ add_library(Service
   query-options.cc
   query-result-set.cc
   query-state-record.cc
+  workload-management.cc
+  workload-management-fields.cc
+  workload-management-flags.cc
 )
 add_dependencies(Service gen-deps)
 

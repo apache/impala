@@ -26,6 +26,7 @@ import pipes
 import pytest
 import subprocess
 from impala_py_lib.helpers import find_all_files, is_core_dump
+from signal import SIGRTMIN
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
@@ -57,6 +58,11 @@ IMPALAD_TIMEOUT_S = 'impalad_timeout_s'
 EXPECT_CORES = 'expect_cores'
 # Additional arg to determine whether we should reset the Ranger policy repository.
 RESET_RANGER = 'reset_ranger'
+# By default, Impalad processes are left running at the end of the test. The next test run
+# terminates the processes when calling the `bin/start-impala-cluster.py`` script. Setting
+# this to `True` causes Impalad processes to be sent the SIGRTMIN signal at the end of the
+# test which runs the Impalad shutdown steps instead of abruptly ending the process.
+IMPALAD_GRACEFUL_SHUTDOWN = 'impalad_graceful_shutdown'
 
 # Run with fast topic updates by default to reduce time to first query running.
 DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
@@ -110,7 +116,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       start_args=None, default_query_options=None, jvm_args=None,
       impala_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
-      impalad_timeout_s=None, expect_cores=None, reset_ranger=False):
+      impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
+      impalad_graceful_shutdown=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -143,6 +150,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.__dict__[EXPECT_CORES] = expect_cores
       if reset_ranger is not False:
         func.__dict__[RESET_RANGER] = True
+      if impalad_graceful_shutdown is not False:
+        func.__dict__[IMPALAD_GRACEFUL_SHUTDOWN] = True
       return func
     return decorate
 
@@ -209,6 +218,12 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):
+    if method is not None and method.__dict__.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
+      for impalad in self.cluster.impalads:
+        impalad.kill(SIGRTMIN)
+      for impalad in self.cluster.impalads:
+        impalad.wait_for_exit()
+
     if HIVE_CONF_DIR in method.__dict__:
       self._start_hive_service(None)  # Restart Hive Service using default configs
 
