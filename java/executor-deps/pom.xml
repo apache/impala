@@ -136,7 +136,7 @@ under the License.
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-aliyun</artifactId>
-      <version>${oss.version}</version>
+      <version>${hadoop.version}</version>
     </dependency>
 
     <dependency>

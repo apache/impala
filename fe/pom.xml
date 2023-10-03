@@ -895,6 +895,7 @@ under the License.
                     <exclude>org.apache.parquet:*</exclude>
                     <exclude>org.apache.avro:*</exclude>
                     <exclude>org.apache.orc:*</exclude>
+                    <exclude>org.jdom:jdom</exclude>
                   </excludes>
                   <includes>
                     <!-- ranger-plugins-audit depends on jetty-client, which in turn pulls in jetty-http and jetty-io. -->
