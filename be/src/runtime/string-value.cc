@@ -45,7 +45,8 @@ uint64_t StringValue::ToUInt64() const {
       | static_cast<uint64_t>(bytes[6]) << 8 | static_cast<uint64_t>(bytes[7]);
 }
 
-string StringValue::LeastSmallerString() const {
+string StringValue::LargestSmallerString() const {
+  if (len == 0) return "";
   if (len == 1 && ptr[0] == 0x00) return "";
 
   int i = len - 1;

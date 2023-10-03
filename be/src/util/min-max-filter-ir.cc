@@ -136,7 +136,7 @@ void StringMinMaxFilter::InsertForLE(const void* val) {
 void StringMinMaxFilter::InsertForLT(const void* val) {
   if (LIKELY(val)) {
     std::string result =
-        reinterpret_cast<const StringValue*>(val)->LeastSmallerString();
+        reinterpret_cast<const StringValue*>(val)->LargestSmallerString();
     if (result.size() > 0) {
       UpdateMax(StringValue(result));
     } else {
