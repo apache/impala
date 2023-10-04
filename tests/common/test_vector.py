@@ -119,7 +119,7 @@ class ImpalaTestMatrix(object):
     del self.dimensions[dimension_name]
 
   def has_dimension(self, dimension_name):
-    return self.dimensions.has_key(dimension_name)
+    return dimension_name in self.dimensions
 
   def generate_test_vectors(self, exploration_strategy):
     if not self.dimensions:

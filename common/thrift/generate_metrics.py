@@ -231,7 +231,7 @@ def generate_mdl():
   mdl['version'] = options.output_mdl_version
   for role in mdl['roles']:
     role_metrics = []
-    if metrics_by_role.has_key(role['name']):
+    if role['name'] in metrics_by_role:
       role_metrics = metrics_by_role[role['name']]
     role['metricDefinitions'] = role_metrics
 

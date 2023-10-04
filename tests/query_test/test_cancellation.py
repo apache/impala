@@ -142,7 +142,7 @@ class TestCancellation(ImpalaTestSuite):
       self.cleanup_test_table(vector.get_value('table_format'))
       file_format = vector.get_value('table_format').file_format
       if file_format == 'kudu':
-        assert QUERIES.has_key(query) and QUERIES[query] is not None,\
+        assert query in QUERIES and QUERIES[query] is not None,\
             "PRIMARY KEY for query %s not specified" % query
         query = "create table ctas_cancel primary key (%s) "\
             "partition by hash partitions 3 stored as kudu as %s" %\
