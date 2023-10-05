@@ -157,8 +157,9 @@ void RpcEventHandler::ResetAll() {
   }
 }
 
-RpcEventHandler::RpcEventHandler(const string& server_name, MetricGroup* metrics) :
-    server_name_(server_name), metrics_(metrics) {
+RpcEventHandler::RpcEventHandler(
+    const string& server_name, MetricGroup* metrics, int vlog_level)
+  : server_name_(server_name), metrics_(metrics), vlog_level_(vlog_level) {
   if (handler_manager.get() != nullptr) handler_manager->RegisterEventHandler(this);
 }
 
@@ -233,8 +234,9 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
   InvocationContext* ctxt_ptr =
       new InvocationContext(GetMonoTimeMicros(), cnxn_ctx, it->second);
   SetThreadRPCContext(ctxt_ptr);
-  VLOG_RPC << "RPC call: " << string(fn_name) << "(from "
-           << TNetworkAddressToString(ctxt_ptr->cnxn_ctx->network_address) << ")";
+  VLOG(vlog_level_) << "RPC call: " << string(fn_name) << "(from "
+                    << TNetworkAddressToString(ctxt_ptr->cnxn_ctx->network_address)
+                    << ")";
   return reinterpret_cast<void*>(ctxt_ptr);
 }
 
@@ -253,9 +255,10 @@ void RpcEventHandler::postWrite(void* ctx, const char* fn_name, uint32_t bytes) 
   const int64_t write_time = rpc_ctx->write_end_us - rpc_ctx->write_start_us;
   const string& call_name = string(fn_name);
   // TODO: bytes is always 0 since TTransport does not track write count.
-  VLOG_RPC << "RPC call: " << server_name_ << ":" << call_name << " from "
-           << TNetworkAddressToString(rpc_ctx->cnxn_ctx->network_address) << " took "
-           << PrettyPrinter::Print(elapsed_time * 1000L, TUnit::TIME_NS);
+  VLOG(vlog_level_) << "RPC call: " << server_name_ << ":" << call_name << " from "
+                    << TNetworkAddressToString(rpc_ctx->cnxn_ctx->network_address)
+                    << " took "
+                    << PrettyPrinter::Print(elapsed_time * 1000L, TUnit::TIME_NS);
   MethodDescriptor* descriptor = rpc_ctx->method_descriptor;
   descriptor->num_in_flight.Add(-1);
   descriptor->processing_time_distribution->Update(elapsed_time);

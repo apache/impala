@@ -69,8 +69,13 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
 
   /// Metrics subsystem access
   MetricGroup* metrics_;
+
+  /// Log level for this handler
+  int vlog_level_;
+
  public:
-  RpcEventHandler(const std::string& server_name, MetricGroup* metrics);
+  RpcEventHandler(
+      const std::string& server_name, MetricGroup* metrics, int vlog_level = 2);
 
   /// From TProcessorEventHandler, called initially when an Rpc is invoked. Returns an
   /// InvocationContext*. 'server_context' is a per-connection context object. For our

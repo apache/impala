@@ -217,8 +217,10 @@ Status StatestoreSubscriber::Start() {
   // Backend must be started before registration
   std::shared_ptr<TProcessor> processor(
       new StatestoreSubscriberProcessor(thrift_iface_));
+  // Logging statestore subscriber heartbeats at VLOG(3) to avoid overwhelming lower log
+  // levels.
   std::shared_ptr<TProcessorEventHandler> event_handler(
-      new RpcEventHandler("statestore-subscriber", metrics_));
+      new RpcEventHandler("statestore-subscriber", metrics_, 3 /*vlog_level*/));
   processor->setEventHandler(event_handler);
 
   ThriftServerBuilder builder(
