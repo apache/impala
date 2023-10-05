@@ -22,6 +22,9 @@ import {name_width, page_additional_height, setTimingDiagramDimensions}
     from "./fragment_diagram.js";
 import {aggregateProfileTimeseries, generateTimesamples, clearTimeseriesValues,
     mapTimeseriesCounters, displayWarning, destroyChart} from "./chart_commons.js";
+import "./global_dom.js";
+
+export var exportedForTest;
 
 // #host_utilization_diagram
 export var host_utilization_visible = true;
@@ -224,4 +227,8 @@ export function collectUtilizationFromProfile() {
         host_utilization_diagram);
     console.log(e);
   }
+}
+
+if (typeof process != "undefined" && process.env.NODE_ENV === 'test') {
+  exportedForTest = {initializeUtilizationMetrics};
 }

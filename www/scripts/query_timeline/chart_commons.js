@@ -18,6 +18,8 @@
 import {maxts, set_maxts, clearDOMChildren} from "./global_members.js";
 import {name_width} from "./fragment_diagram.js";
 
+export var exportedForTest;
+
 function accumulateTimeseriesValues(values_array, time_series_counter, max_samples) {
   var samples = time_series_counter.data.split(",").map(el => parseInt(el));
   var max_traverse_len = Math.min(samples.length, values_array.length - 2);
@@ -60,10 +62,15 @@ export function generateTimesamples(timesamples_array, max_samples, extend) {
 
 export function mapTimeseriesCounters(time_series_counters, counters) {
   for (var i = 0; i < counters.length; i++) {
+    var no_change = true;
     for (var j = 0; j < time_series_counters.length; j++) {
       if (time_series_counters[j].counter_name == counters[i][0]) {
         counters[i][2] = j;
+        no_change = false;
       }
+    }
+    if (no_change) {
+      throw new Error(`"${counters[i][0]}" not found within profile`);
     }
   }
 }
@@ -107,4 +114,8 @@ export function destroyChart(chart, chart_dom_obj) {
   }
   clearDOMChildren(chart_dom_obj);
   return null;
+}
+
+if (typeof process != "undefined" && process.env.NODE_ENV === 'test') {
+  exportedForTest = {accumulateTimeseriesValues};
 }

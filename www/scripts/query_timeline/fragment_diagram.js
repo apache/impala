@@ -21,6 +21,9 @@ import {profile, set_maxts, maxts, decimals, set_decimals, diagram_width,
     resizeHorizontalAll} from "./global_members.js";
 import {host_utilization_chart, getUtilizationHeight} from
     "./host_utilization_diagram.js";
+import "./global_dom.js";
+
+export var exportedForTest;
 
 export var name_width;
 export var page_additional_height;
@@ -600,3 +603,7 @@ timeticks_footer.addEventListener('wheel', function(e) {
 });
 
 plan_order.addEventListener('click', renderFragmentDiagram);
+
+if (typeof process != "undefined" && process.env.NODE_ENV === 'test') {
+  exportedForTest = {getSvgRect, getSvgLine, getSvgText, getSvgTitle, getSvgGroup};
+}

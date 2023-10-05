@@ -61,6 +61,8 @@ fi
 # Run Cluster Tests
 : ${CLUSTER_TEST:=true}
 : ${CLUSTER_TEST_FILES:=}
+# Run JS tests
+: ${JS_TEST:=false}
 # Verifiers to run after all tests. Skipped if empty.
 : ${TEST_SUITE_VERIFIERS:=verifiers/test_banned_log_messages.py}
 : ${TEST_SUITE_VERIFIERS_LOG_DIR:=${IMPALA_LOGS_DIR}/verifiers}
@@ -346,6 +348,12 @@ do
         start_impala_cluster
       done
       export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
+    fi
+  fi
+
+  if [[ "$JS_TEST" == true ]]; then
+    if ! "${IMPALA_HOME}/tests/run-js-tests.sh"; then
+      TEST_RET_CODE=1
     fi
   fi
 
