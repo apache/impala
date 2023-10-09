@@ -225,6 +225,11 @@ unset IMPALA_THRIFT_PY_URL
 export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-$(command -v python2)}"
 export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v python3)}"
 
+# Additional Python versions to use when building the impala-shell prebuilt tarball
+# via make_shell_tarball.sh. That tarball includes precompiled packages, so it can be
+# used without additional system dependencies needed for pip install.
+# export IMPALA_EXTRA_PACKAGE_PYTHONS=python3.6;python3.10
+
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26
   unset IMPALA_CYRUS_SASL_URL

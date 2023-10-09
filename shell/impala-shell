@@ -45,10 +45,21 @@ fi
 PYTHONPATH="${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}"
 
 # External dependencies are installed in /ext-py${PYTHON_VERSION}
-PYTHON_VERSION=$("${PYTHON_EXE}" -c 'import sys; print(sys.version_info[0])')
+PYTHON_VERSION=$("${PYTHON_EXE}" -c 'import sys; \
+  print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
+if [ ! -d "${SHELL_HOME}/ext-py${PYTHON_VERSION}" ]; then
+  # List all ext-py* dirs, remove ext-py prefix, and join into a comma-separated string.
+  dirs=( $(cd ${SHELL_HOME} && echo ext-py*) )
+  vers="${dirs[@]#ext-py}"
+  pretty="$(printf "%s, " ${vers[@]})"
+  echo "This impala-shell package was not built to support Python ${PYTHON_VERSION}." \
+       "Supported Python versions are: ${pretty%, }."
+  exit 1
+fi
+
 PYTHONPATH="${SHELL_HOME}/ext-py${PYTHON_VERSION}:${PYTHONPATH}"
 
-if [ ${PYTHON_VERSION} -eq 2 ]; then
+if [ "${PYTHON_VERSION}" = "2.7" ]; then
   # Python 2 requires the legacy pkg_resources.py code
   PYTHONPATH="${PYTHONPATH}:${SHELL_HOME}/legacy"
 fi

@@ -31,6 +31,11 @@ if [ "x${IMPALA_HOME}" == "x" ]; then
   exit 1
 fi
 
+if [ $# -eq 0 ]; then
+  echo "Must specify at least one python interpreter"
+  exit 1
+fi
+
 # Detect whether IMPALA_HOME is a git repository. This is used below to allow extra
 # checks when building ext-py.
 pushd ${IMPALA_HOME}
@@ -66,11 +71,9 @@ THRIFT_GEN_PY_DIR="${SHELL_HOME}/gen-py"
 echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py*,legacy}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/gen-py/* 2>&1 > /dev/null
-rm -rf ${TARBALL_ROOT}/ext-py*/* 2>&1 > /dev/null
+rm -rf ${TARBALL_ROOT}/ext-py* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/legacy/* 2>&1 > /dev/null
 mkdir -p ${TARBALL_ROOT}/lib
-mkdir -p ${TARBALL_ROOT}/ext-py2
-mkdir -p ${TARBALL_ROOT}/ext-py3
 mkdir -p ${TARBALL_ROOT}/legacy
 
 rm -f ${THRIFT_GEN_PY_DIR}/impala_build_version.py
@@ -126,46 +129,29 @@ for MODULE in ${SHELL_HOME}/ext-py/*; do
     continue;
   fi
   pushd ${MODULE} > /dev/null 2>&1
-  if [ ! -z "${IMPALA_SYSTEM_PYTHON2:-}" ]; then
+  for PYTHON_EXE in $*; do
     echo "Cleaning up old build artifacts."
     rm -rf dist 2>&1 > /dev/null
     rm -rf build 2>&1 > /dev/null
-    echo "Building ${MODULE} with Python 2"
-    # Use the py2_venv to get the wheel package needed for bdist_wheel below.
-    # python2 is now the virtualenv's python2, which is $IMPALA_SYSTEM_PYTHON2
-    source ${IMPALA_HOME}/shell/build/py2_venv/bin/activate
+    echo "Building ${MODULE} with ${PYTHON_EXE}"
+    # Use the venv to get the wheel package needed for bdist_wheel below.
+    PYTHON_NAME=$(basename ${PYTHON_EXE})
+    source ${IMPALA_HOME}/shell/build/${PYTHON_NAME}_venv/bin/activate
     if [[ "$MODULE" == *"/bitarray"* ]]; then
       # Need to use setuptools to build wheel for bitarray module
-      python2 -c "import setuptools; exec(open('setup.py').read())" \
-          -q bdist_wheel
+      python -c "import setuptools; exec(open('setup.py').read())" -q bdist_wheel
     else
-      python2 setup.py -q bdist_wheel clean
+      python setup.py -q bdist_wheel clean
     fi
-    # pip install the wheel into the python 2 external dependencies directory
-    PYTHON2_PIP_CACHE="~/.cache/impala_py2_pip"
-    pip install --no-deps --cache "${PYTHON2_PIP_CACHE}" \
-      --target ${TARBALL_ROOT}/ext-py2 dist/*.whl
-  fi
-  if [ ! -z "${IMPALA_SYSTEM_PYTHON3:-}" ]; then
-    echo "Cleaning up old build artifacts."
-    rm -rf dist 2>&1 > /dev/null
-    rm -rf build 2>&1 > /dev/null
-    echo "Building ${MODULE} with Python 3"
-    # Use the py3_venv to get the wheel package needed for bdist_wheel below.
-    # python3 is now the virtualenv's python3, which is $IMPALA_SYSTEM_PYTHON3
-    source ${IMPALA_HOME}/shell/build/py3_venv/bin/activate
-    if [[ "$MODULE" == *"/bitarray"* ]]; then
-      # Need to use setuptools to build wheel for bitarray module
-      python3 -c "import setuptools; exec(open('setup.py').read())" \
-          -q bdist_wheel
-    else
-      python3 setup.py -q bdist_wheel clean
-    fi
-    # pip install the wheel into the python 2 external dependencies directory
-    PYTHON3_PIP_CACHE="~/.cache/impala_py3_pip"
-    pip install --no-deps --cache "${PYTHON3_PIP_CACHE}" \
-      --target ${TARBALL_ROOT}/ext-py3 dist/*.whl
-  fi
+    # pip install the wheel into the external dependencies directory
+    PIP_CACHE="~/.cache/impala_pip/${PYTHON_NAME}"
+    PYTHON_VERSION=$(${PYTHON_EXE} -c 'import sys; \
+      print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
+    # Use --upgrade to suppress warnings about replacement when $* includes duplicate
+    # Python minor versions.
+    pip install --upgrade --no-deps --cache "${PIP_CACHE}" \
+      --target ${TARBALL_ROOT}/ext-py${PYTHON_VERSION} dist/*.whl
+  done
   popd 2>&1 > /dev/null
 done
 
