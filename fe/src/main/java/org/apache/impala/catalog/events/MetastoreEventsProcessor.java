@@ -533,9 +533,20 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   protected final CatalogServiceCatalog catalog_;
 
   // scheduler daemon thread executor for processing events at given frequency
-  private final ScheduledExecutorService scheduler_ = Executors
-      .newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setDaemon(true)
-          .setNameFormat("MetastoreEventsProcessor").build());
+  private final ScheduledExecutorService processEventsScheduler_ =
+      Executors.newSingleThreadScheduledExecutor(
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("MetastoreEventsProcessor-ProcessEvents")
+              .build());
+
+  // scheduler daemon thread executor to update the latest event id at given frequency
+  private final ScheduledExecutorService updateEventIdScheduler_ =
+      Executors.newSingleThreadScheduledExecutor(
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("MetastoreEventsProcessor-UpdateEventId")
+              .build());
 
   // metrics registry to keep track of metrics related to event processing
   //TODO create a separate singleton class which wraps around this so that we don't
@@ -683,12 +694,12 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     Preconditions.checkState(pollingFrequencyInSec_ > 0);
     LOG.info(String.format("Starting metastore event polling with interval %d seconds.",
         pollingFrequencyInSec_));
-    scheduler_.scheduleWithFixedDelay(this::processEvents, pollingFrequencyInSec_,
-        pollingFrequencyInSec_, TimeUnit.SECONDS);
+    processEventsScheduler_.scheduleAtFixedRate(this ::processEvents,
+        pollingFrequencyInSec_, pollingFrequencyInSec_, TimeUnit.SECONDS);
     // Update latestEventId in another thread in case that the processEvents() thread is
     // blocked by slow metadata reloading or waiting for table locks.
-    scheduler_.scheduleWithFixedDelay(this::updateLatestEventId, pollingFrequencyInSec_,
-        pollingFrequencyInSec_, TimeUnit.SECONDS);
+    updateEventIdScheduler_.scheduleAtFixedRate(this ::updateLatestEventId,
+        pollingFrequencyInSec_, pollingFrequencyInSec_, TimeUnit.SECONDS);
   }
 
   /**
@@ -766,10 +777,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   @Override
   public synchronized void shutdown() {
-    Preconditions.checkNotNull(scheduler_);
     Preconditions.checkState(eventProcessorStatus_ != EventProcessorStatus.STOPPED,
         "Event processing is already stopped");
-    shutdownAndAwaitTermination();
+    shutdownAndAwaitTermination(processEventsScheduler_);
+    shutdownAndAwaitTermination(updateEventIdScheduler_);
     updateStatus(EventProcessorStatus.STOPPED);
     LOG.info("Metastore event processing stopped.");
   }
@@ -778,21 +789,22 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * Attempts to cleanly shutdown the scheduler pool. If the pool does not shutdown
    * within timeout, does a force shutdown which might interrupt currently running tasks.
    */
-  private synchronized void shutdownAndAwaitTermination() {
-    scheduler_.shutdown(); // disable new tasks from being submitted
+  private synchronized void shutdownAndAwaitTermination(ScheduledExecutorService ses) {
+    Preconditions.checkNotNull(ses);
+    ses.shutdown(); // disable new tasks from being submitted
     try {
       // wait for 10 secs for scheduler to complete currently running tasks
-      if (!scheduler_.awaitTermination(SCHEDULER_SHUTDOWN_TIMEOUT, TimeUnit.SECONDS)) {
+      if (!ses.awaitTermination(SCHEDULER_SHUTDOWN_TIMEOUT, TimeUnit.SECONDS)) {
         // executor couldn't terminate and timed-out, force the termination
         LOG.info(String.format("Scheduler pool did not terminate within %d seconds. "
             + "Attempting to stop currently running tasks", SCHEDULER_SHUTDOWN_TIMEOUT));
-        scheduler_.shutdownNow();
+        ses.shutdownNow();
       }
     } catch (InterruptedException e) {
       // current thread interrupted while pool was waiting for termination
       // issue a shutdownNow before returning to cancel currently running tasks
       LOG.info("Received interruptedException. Terminating currently running tasks.", e);
-      scheduler_.shutdownNow();
+      ses.shutdownNow();
     }
   }
 
