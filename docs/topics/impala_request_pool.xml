@@ -21,7 +21,7 @@ under the License.
 <concept rev="1.3.0" id="request_pool">
 
   <title>REQUEST_POOL Query Option</title>
-  <titlealts audience="PDF"><navtitle>REQUEST_POOL</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>REQUEST POOL</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

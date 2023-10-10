@@ -21,7 +21,7 @@ under the License.
 <concept rev="IMPALA-3671" id="scratch_limit">
 
   <title>SCRATCH_LIMIT Query Option</title>
-  <titlealts audience="PDF"><navtitle>SCRATCH_LIMIT</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>SCRATCH LIMIT</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

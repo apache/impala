@@ -21,7 +21,7 @@ under the License.
 <concept id="runtime_filter_mode" rev="2.5.0">
 
   <title>RUNTIME_FILTER_MODE Query Option (<keyword keyref="impala25"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>RUNTIME_FILTER_MODE</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>RUNTIME FILTER MODE</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

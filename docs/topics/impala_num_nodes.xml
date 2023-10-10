@@ -21,7 +21,7 @@ under the License.
 <concept id="num_nodes">
 
   <title>NUM_NODES Query Option</title>
-  <titlealts audience="PDF"><navtitle>NUM_NODES</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>NUM NODES</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

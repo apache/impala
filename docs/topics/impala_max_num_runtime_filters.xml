@@ -21,7 +21,7 @@ under the License.
 <concept id="max_num_runtime_filters" rev="2.5.0">
 
   <title>MAX_NUM_RUNTIME_FILTERS Query Option (<keyword keyref="impala25"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>MAX_NUM_RUNTIME_FILTERS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>MAX NUM RUNTIME FILTERS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

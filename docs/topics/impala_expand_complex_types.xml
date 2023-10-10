@@ -21,7 +21,7 @@ under the License.
 <concept id="expand_complex_types">
 
  <title>EXPAND_COMPLEX_TYPES Query Option</title>
- <titlealts audience="PDF"><navtitle>EXPAND_COMPLEX_TYPES</navtitle></titlealts>
+ <titlealts audience="PDF"><navtitle>EXPAND COMPLEX TYPES</navtitle></titlealts>
  <prolog>
   <metadata>
    <data name="Category" value="Impala"/>
@@ -58,4 +58,3 @@ under the License.
   </p>
  </conbody>
 </concept>
-

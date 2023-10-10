@@ -21,7 +21,7 @@ under the License.
 <concept rev="2.0.0" id="exec_single_node_rows_threshold">
 
   <title>EXEC_SINGLE_NODE_ROWS_THRESHOLD Query Option (<keyword keyref="impala21"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>EXEC_SINGLE_NODE_ROWS_THRESHOLD</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>EXEC SINGLE NODE ROWS THRESHOLD</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

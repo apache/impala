@@ -21,7 +21,7 @@ under the License.
 <concept id="decimal_v2" rev="2.9.0">
 
   <title>DECIMAL_V2 Query Option</title>
-  <titlealts audience="PDF"><navtitle>DECIMAL_V2</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>DECIMAL V2</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

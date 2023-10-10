@@ -21,7 +21,7 @@ under the License.
 <concept rev="2.5.0 IMPALA-2499" id="optimize_partition_key_scans">
 
   <title>OPTIMIZE_PARTITION_KEY_SCANS Query Option (<keyword keyref="impala25"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>OPTIMIZE_PARTITION_KEY_SCANS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>OPTIMIZE PARTITION KEY SCANS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

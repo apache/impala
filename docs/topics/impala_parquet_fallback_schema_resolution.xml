@@ -21,7 +21,7 @@ under the License.
 <concept id="parquet_fallback_schema_resolution" rev="2.6.0 IMPALA-2835">
 
   <title>PARQUET_FALLBACK_SCHEMA_RESOLUTION Query Option (<keyword keyref="impala26"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>PARQUET_FALLBACK_SCHEMA_RESOLUTION</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>PARQUET FALLBACK SCHEMA RESOLUTION</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

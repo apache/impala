@@ -21,7 +21,7 @@ under the License.
 <concept rev="parquet_block_size" id="parquet_object_store_split_size">
   <title>PARQUET_OBJECT_STORE_SPLIT_SIZE Query Option</title>
   <titlealts audience="PDF">
-    <navtitle>PARQUET_OBJECT_STORE_SPLIT_SIZE</navtitle>
+    <navtitle>PARQUET OBJECT STORE SPLIT SIZE</navtitle>
   </titlealts>
   <prolog>
     <metadata>

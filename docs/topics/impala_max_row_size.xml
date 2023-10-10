@@ -21,7 +21,7 @@ under the License.
 <concept id="max_row_size" rev="2.10.0 IMPALA-3200">
 
   <title>MAX_ROW_SIZE Query Option</title>
-  <titlealts audience="PDF"><navtitle>MAX_ROW_SIZE</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>MAX ROW SIZE</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

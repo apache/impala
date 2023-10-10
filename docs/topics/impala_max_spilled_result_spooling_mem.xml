@@ -21,7 +21,7 @@ under the License.
 <concept id="MAX_SPILLED_RESULT_SPOOLING_MEM" rev="2.10.0 IMPALA-3200">
   <title>MAX_SPILLED_RESULT_SPOOLING_MEM Query Option</title>
   <titlealts audience="PDF">
-    <navtitle>MAX_SPILLED_RESULT_SPOOLING_MEM</navtitle>
+    <navtitle>MAX SPILLED RESULT SPOOLING MEM</navtitle>
   </titlealts>
   <prolog>
     <metadata>

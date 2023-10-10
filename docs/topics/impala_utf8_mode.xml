@@ -21,7 +21,7 @@ under the License.
 <concept id="utf8_mode">
 
  <title>UTF8_MODE Query Option</title>
- <titlealts audience="PDF"><navtitle>UTF8_MODE</navtitle></titlealts>
+ <titlealts audience="PDF"><navtitle>UTF8 MODE</navtitle></titlealts>
  <prolog>
   <metadata>
    <data name="Category" value="Impala"/>

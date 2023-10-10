@@ -21,7 +21,7 @@ under the License.
 <concept id="abort_on_error">
 
   <title>ABORT_ON_ERROR Query Option</title>
-  <titlealts audience="PDF"><navtitle>ABORT_ON_ERROR</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>ABORT ON ERROR</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

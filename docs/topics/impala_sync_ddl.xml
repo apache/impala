@@ -21,7 +21,7 @@ under the License.
 <concept rev="1.2.1" id="sync_ddl">
 
   <title>SYNC_DDL Query Option</title>
-  <titlealts audience="PDF"><navtitle>SYNC_DDL</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>SYNC DDL</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

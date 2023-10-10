@@ -21,7 +21,7 @@ under the License.
 <concept id="debug_action">
 
   <title>DEBUG_ACTION Query Option</title>
-  <titlealts audience="PDF"><navtitle>DEBUG_ACTION</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>DEBUG ACTION</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

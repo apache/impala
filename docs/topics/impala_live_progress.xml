@@ -21,7 +21,7 @@ under the License.
 <concept rev="2.3.0" id="live_progress">
 
   <title>LIVE_PROGRESS Query Option (<keyword keyref="impala23"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>LIVE_PROGRESS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>LIVE PROGRESS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

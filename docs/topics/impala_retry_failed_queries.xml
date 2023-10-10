@@ -21,7 +21,7 @@ under the License.
 <concept id="RETRY_FAILED_QUERIES" rev="2.10.0 IMPALA-3200">
   <title>RETRY_FAILED_QUERIES Query Option</title>
   <titlealts audience="PDF">
-    <navtitle>RETRY_FAILED_QUERIES</navtitle>
+    <navtitle>RETRY FAILED QUERIES</navtitle>
   </titlealts>
   <prolog>
     <metadata>

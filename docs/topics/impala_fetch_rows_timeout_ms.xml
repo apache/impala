@@ -21,7 +21,7 @@ under the License.
 <concept id="FETCH_ROWS_TIMEOUT_MS">
   <title>FETCH_ROWS_TIMEOUT_MS Query Option</title>
   <titlealts audience="PDF">
-    <navtitle>FETCH_ROWS_TIMEOUT_MS</navtitle>
+    <navtitle>FETCH ROWS TIMEOUT MS</navtitle>
   </titlealts>
   <prolog>
     <metadata>

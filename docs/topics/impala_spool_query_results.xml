@@ -21,7 +21,7 @@ under the License.
 <concept id="SPOOL_QUERY_RESULTS" rev="2.10.0 IMPALA-3200">
   <title>SPOOL_QUERY_RESULTS Query Option</title>
   <titlealts audience="PDF">
-    <navtitle>SPOOL_QUERY_RESULTS</navtitle>
+    <navtitle>SPOOL QUERY RESULTS</navtitle>
   </titlealts>
   <prolog>
     <metadata>

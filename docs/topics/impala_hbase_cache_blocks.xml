@@ -21,7 +21,7 @@ under the License.
 <concept id="hbase_cache_blocks">
 
   <title>HBASE_CACHE_BLOCKS Query Option</title>
-  <titlealts audience="PDF"><navtitle>HBASE_CACHE_BLOCKS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>HBASE CACHE BLOCKS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

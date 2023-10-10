@@ -21,7 +21,7 @@ under the License.
 <concept id="max_errors">
 
   <title>MAX_ERRORS Query Option</title>
-  <titlealts audience="PDF"><navtitle>MAX_ERRORS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>MAX ERRORS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

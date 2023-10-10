@@ -21,7 +21,7 @@ under the License.
 <concept id="disable_streaming_preaggregations" rev="2.5.0 IMPALA-1305">
 
   <title>DISABLE_STREAMING_PREAGGREGATIONS Query Option (<keyword keyref="impala25"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>DISABLE_STREAMING_PREAGGREGATIONS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>DISABLE STREAMING PREAGGREGATIONS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

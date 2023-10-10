@@ -21,7 +21,7 @@ under the License.
 <concept id="max_scan_range_length">
 
   <title>MAX_SCAN_RANGE_LENGTH Query Option</title>
-  <titlealts audience="PDF"><navtitle>MAX_SCAN_RANGE_LENGTH</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>MAX SCAN RANGE LENGTH</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

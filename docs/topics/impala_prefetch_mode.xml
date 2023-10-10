@@ -21,7 +21,7 @@ under the License.
 <concept id="prefetch_mode" rev="2.6.0 IMPALA-3286">
 
   <title>PREFETCH_MODE Query Option (<keyword keyref="impala26"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>PREFETCH_MODE</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>PREFETCH MODE</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

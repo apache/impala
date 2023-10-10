@@ -168,97 +168,95 @@ under the License.
         <topicref href="topics/impala_distinct.xml"/>
       </topicref>
       <topicref href="topics/impala_set.xml">
-        <topicref href="topics/impala_query_options.xml">
-          <topicref href="topics/impala_abort_on_error.xml"/>
-          <topicref href="topics/impala_allow_erasure_coded_files.xml"/>
-          <topicref href="topics/impala_allow_unsupported_formats.xml"/>
-          <topicref href="topics/impala_appx_count_distinct.xml"/>
-          <topicref href="topics/impala_batch_size.xml"/>
-          <topicref href="topics/impala_broadcast_bytes_limit.xml"/>
-          <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_buffer_pool_limit.xml"/>
-          <topicref href="topics/impala_compression_codec.xml"/>
-          <topicref href="topics/impala_compute_stats_min_sample_size.xml"/>
-          <topicref href="topics/impala_debug_action.xml"/>
-          <topicref rev="2.9.0" href="topics/impala_decimal_v2.xml"/>
-          <topicref rev="3.2.0" href="topics/impala_default_file_format.xml"/>
-          <topicref rev="3.3.0" href="topics/impala_default_hints_insert_statement.xml"/>
-          <topicref rev="2.9.0 IMPALA-5381" href="topics/impala_default_join_distribution_mode.xml"/>
-          <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml"/>
-          <topicref rev="3.3.0" href="topics/impala_default_transactional_type.xml"/>
-          <topicref href="topics/impala_delete_stats_in_truncate.xml"/>
-          <topicref href="topics/impala_disable_codegen.xml"/>
-          <topicref rev="2.10.0 IMPALA-5483" href="topics/impala_disable_codegen_rows_threshold.xml"/>
-          <topicref href="topics/impala_disable_hbase_num_rows_estimate.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_disable_row_runtime_filtering.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_disable_streaming_preaggregations.xml"/>
-          <topicref href="topics/impala_disable_unsafe_spills.xml"/>
-          <topicref href="topics/impala_enable_expr_rewrites.xml"/>
-          <topicref href="topics/impala_exec_single_node_rows_threshold.xml"/>
-          <topicref href="topics/impala_exec_time_limit_s.xml"/>
-          <topicref href="topics/impala_explain_level.xml">
-            <topicref rev="2.5.0" href="topics/impala_max_num_runtime_filters.xml"/>
-          </topicref>
-          <topicref href="topics/impala_fetch_rows_timeout_ms.xml"/>
-          <topicref href="topics/impala_join_rows_produced_limit.xml"/>
-          <topicref href="topics/impala_hbase_cache_blocks.xml"/>
-          <topicref href="topics/impala_hbase_caching.xml"/>
-          <topicref href="topics/impala_idle_session_timeout.xml"/>
-          <topicref href="topics/impala_kudu_read_mode.xml"/>
-          <topicref href="topics/impala_live_progress.xml"/>
-          <topicref href="topics/impala_live_summary.xml"/>
-          <topicref href="topics/impala_max_errors.xml"/>
-          <topicref rev="3.1 IMPALA-6847" href="topics/impala_max_mem_estimate_for_admission.xml"/>
-          <topicref href="topics/impala_max_result_spooling_mem.xml"/>
-          <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml"/>
-          <topicref href="topics/impala_max_scan_range_length.xml"/>
-          <topicref href="topics/impala_max_spilled_result_spooling_mem.xml"/>
-          <topicref href="topics/impala_mem_limit.xml"/>
-          <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_min_spillable_buffer_size.xml"/>
-          <topicref rev="2.8.0" href="topics/impala_mt_dop.xml"/>
-          <topicref href="topics/impala_num_nodes.xml"/>
-          <topicref rev="3.2" href="topics/impala_num_rows_produced_limit.xml"/>
-          <topicref href="topics/impala_num_scanner_threads.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_optimize_partition_key_scans.xml"/>
-          <topicref href="topics/impala_parquet_compression_codec.xml"/>
-          <topicref rev="2.6.0 IMPALA-2069" href="topics/impala_parquet_annotate_strings_utf8.xml"/>
-          <topicref rev="2.9.0 IMPALA-4725" href="topics/impala_parquet_array_resolution.xml"/>
-          <topicref href="topics/impala_parquet_dictionary_filtering.xml"/>
-          <topicref rev="2.6.0 IMPALA-2835" href="topics/impala_parquet_fallback_schema_resolution.xml"/>
-          <topicref href="topics/impala_parquet_file_size.xml"/>
-          <topicref href="topics/impala_parquet_object_store_split_size.xml"/>
-          <topicref href="topics/impala_parquet_page_row_count_limit.xml"/>
-          <topicref href="topics/impala_parquet_read_statistics.xml"/>
-          <topicref href="topics/impala_parquet_read_page_index.xml"/>
-          <topicref href="topics/impala_parquet_write_page_index.xml"/>
-          <topicref rev="2.6.0 IMPALA-3286" href="topics/impala_prefetch_mode.xml"/>
-          <topicref href="topics/impala_query_timeout_s.xml"/>
-          <topicref href="topics/impala_refresh_updated_hms.xml"/>
-          <topicref rev="2.7.0" href="topics/impala_replica_preference.xml"/>
-          <topicref href="topics/impala_request_pool.xml"/>
-          <topicref href="topics/impala_resource_trace_ratio.xml"/>
-          <topicref rev="4.0.0" href="topics/impala_retry_failed_queries.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_runtime_bloom_filter_size.xml"/>
-          <topicref rev="2.6.0" href="topics/impala_runtime_filter_max_size.xml"/>
-          <topicref rev="2.6.0" href="topics/impala_runtime_filter_min_size.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_runtime_filter_mode.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_runtime_filter_wait_time_ms.xml"/>
-          <topicref rev="2.6.0" href="topics/impala_s3_skip_insert_staging.xml"/>
-          <topicref rev="3.1" href="topics/impala_scan_bytes_limit.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_schedule_random_replica.xml"/>
-          <topicref rev="2.8.0 IMPALA-3671" href="topics/impala_scratch_limit.xml"/>
-          <!-- This option is for internal use only and might go away without ever being documented. -->
-          <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
-          <topicref href="topics/impala_shuffle_distinct_exprs.xml"/>
-          <topicref href="topics/impala_spool_query_results.xml"/>
-          <topicref href="topics/impala_support_start_over.xml"/>
-          <topicref href="topics/impala_sync_ddl.xml"/>
-          <topicref href="topics/impala_thread_reservation_aggregate_limit.xml"/>
-          <topicref href="topics/impala_thread_reservation_limit.xml"/>
-          <topicref href="topics/impala_timezone.xml"/>
-          <topicref href="topics/impala_topn_bytes_limit.xml"/>
-          <topicref href="topics/impala_utf8_mode.xml"/>
-          <topicref href="topics/impala_expand_complex_types.xml"/>
+        <topicref href="topics/impala_abort_on_error.xml"/>
+        <topicref href="topics/impala_allow_erasure_coded_files.xml"/>
+        <topicref href="topics/impala_allow_unsupported_formats.xml"/>
+        <topicref href="topics/impala_appx_count_distinct.xml"/>
+        <topicref href="topics/impala_batch_size.xml"/>
+        <topicref href="topics/impala_broadcast_bytes_limit.xml"/>
+        <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_buffer_pool_limit.xml"/>
+        <topicref href="topics/impala_compression_codec.xml"/>
+        <topicref href="topics/impala_compute_stats_min_sample_size.xml"/>
+        <topicref href="topics/impala_debug_action.xml"/>
+        <topicref rev="2.9.0" href="topics/impala_decimal_v2.xml"/>
+        <topicref rev="3.2.0" href="topics/impala_default_file_format.xml"/>
+        <topicref rev="3.3.0" href="topics/impala_default_hints_insert_statement.xml"/>
+        <topicref rev="2.9.0 IMPALA-5381" href="topics/impala_default_join_distribution_mode.xml"/>
+        <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml"/>
+        <topicref rev="3.3.0" href="topics/impala_default_transactional_type.xml"/>
+        <topicref href="topics/impala_delete_stats_in_truncate.xml"/>
+        <topicref href="topics/impala_disable_codegen.xml"/>
+        <topicref rev="2.10.0 IMPALA-5483" href="topics/impala_disable_codegen_rows_threshold.xml"/>
+        <topicref href="topics/impala_disable_hbase_num_rows_estimate.xml"/>
+        <topicref rev="2.5.0" href="topics/impala_disable_row_runtime_filtering.xml"/>
+        <topicref rev="2.5.0" href="topics/impala_disable_streaming_preaggregations.xml"/>
+        <topicref href="topics/impala_disable_unsafe_spills.xml"/>
+        <topicref href="topics/impala_enable_expr_rewrites.xml"/>
+        <topicref href="topics/impala_exec_single_node_rows_threshold.xml"/>
+        <topicref href="topics/impala_exec_time_limit_s.xml"/>
+        <topicref href="topics/impala_explain_level.xml">
+          <topicref rev="2.5.0" href="topics/impala_max_num_runtime_filters.xml"/>
         </topicref>
+        <topicref href="topics/impala_fetch_rows_timeout_ms.xml"/>
+        <topicref href="topics/impala_join_rows_produced_limit.xml"/>
+        <topicref href="topics/impala_hbase_cache_blocks.xml"/>
+        <topicref href="topics/impala_hbase_caching.xml"/>
+        <topicref href="topics/impala_idle_session_timeout.xml"/>
+        <topicref href="topics/impala_kudu_read_mode.xml"/>
+        <topicref href="topics/impala_live_progress.xml"/>
+        <topicref href="topics/impala_live_summary.xml"/>
+        <topicref href="topics/impala_max_errors.xml"/>
+        <topicref rev="3.1 IMPALA-6847" href="topics/impala_max_mem_estimate_for_admission.xml"/>
+        <topicref href="topics/impala_max_result_spooling_mem.xml"/>
+        <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml"/>
+        <topicref href="topics/impala_max_scan_range_length.xml"/>
+        <topicref href="topics/impala_max_spilled_result_spooling_mem.xml"/>
+        <topicref href="topics/impala_mem_limit.xml"/>
+        <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_min_spillable_buffer_size.xml"/>
+        <topicref rev="2.8.0" href="topics/impala_mt_dop.xml"/>
+        <topicref href="topics/impala_num_nodes.xml"/>
+        <topicref rev="3.2" href="topics/impala_num_rows_produced_limit.xml"/>
+        <topicref href="topics/impala_num_scanner_threads.xml"/>
+        <topicref rev="2.5.0" href="topics/impala_optimize_partition_key_scans.xml"/>
+        <topicref href="topics/impala_parquet_compression_codec.xml"/>
+        <topicref rev="2.6.0 IMPALA-2069" href="topics/impala_parquet_annotate_strings_utf8.xml"/>
+        <topicref rev="2.9.0 IMPALA-4725" href="topics/impala_parquet_array_resolution.xml"/>
+        <topicref href="topics/impala_parquet_dictionary_filtering.xml"/>
+        <topicref rev="2.6.0 IMPALA-2835" href="topics/impala_parquet_fallback_schema_resolution.xml"/>
+        <topicref href="topics/impala_parquet_file_size.xml"/>
+        <topicref href="topics/impala_parquet_object_store_split_size.xml"/>
+        <topicref href="topics/impala_parquet_page_row_count_limit.xml"/>
+        <topicref href="topics/impala_parquet_read_statistics.xml"/>
+        <topicref href="topics/impala_parquet_read_page_index.xml"/>
+        <topicref href="topics/impala_parquet_write_page_index.xml"/>
+        <topicref rev="2.6.0 IMPALA-3286" href="topics/impala_prefetch_mode.xml"/>
+        <topicref href="topics/impala_query_timeout_s.xml"/>
+        <topicref href="topics/impala_refresh_updated_hms.xml"/>
+        <topicref rev="2.7.0" href="topics/impala_replica_preference.xml"/>
+        <topicref href="topics/impala_request_pool.xml"/>
+        <topicref href="topics/impala_resource_trace_ratio.xml"/>
+        <topicref rev="4.0.0" href="topics/impala_retry_failed_queries.xml"/>
+        <topicref rev="2.5.0" href="topics/impala_runtime_bloom_filter_size.xml"/>
+        <topicref rev="2.6.0" href="topics/impala_runtime_filter_max_size.xml"/>
+        <topicref rev="2.6.0" href="topics/impala_runtime_filter_min_size.xml"/>
+        <topicref rev="2.5.0" href="topics/impala_runtime_filter_mode.xml"/>
+        <topicref rev="2.5.0" href="topics/impala_runtime_filter_wait_time_ms.xml"/>
+        <topicref rev="2.6.0" href="topics/impala_s3_skip_insert_staging.xml"/>
+        <topicref rev="3.1" href="topics/impala_scan_bytes_limit.xml"/>
+        <topicref rev="2.5.0" href="topics/impala_schedule_random_replica.xml"/>
+        <topicref rev="2.8.0 IMPALA-3671" href="topics/impala_scratch_limit.xml"/>
+        <!-- This option is for internal use only and might go away without ever being documented. -->
+        <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
+        <topicref href="topics/impala_shuffle_distinct_exprs.xml"/>
+        <topicref href="topics/impala_spool_query_results.xml"/>
+        <topicref href="topics/impala_support_start_over.xml"/>
+        <topicref href="topics/impala_sync_ddl.xml"/>
+        <topicref href="topics/impala_thread_reservation_aggregate_limit.xml"/>
+        <topicref href="topics/impala_thread_reservation_limit.xml"/>
+        <topicref href="topics/impala_timezone.xml"/>
+        <topicref href="topics/impala_topn_bytes_limit.xml"/>
+        <topicref href="topics/impala_utf8_mode.xml"/>
+        <topicref href="topics/impala_expand_complex_types.xml"/>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
       <topicref href="topics/impala_shutdown.xml"/>

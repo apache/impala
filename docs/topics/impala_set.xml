@@ -87,9 +87,7 @@ SET <varname>query_option</varname>=""
     </p>
 
     <p>
-      Each query option has a specific allowed notation for its arguments. See
-      <xref href="impala_query_options.xml#query_options"/> for the details of each query
-      option.
+      Each query option has a specific allowed notation for its arguments.
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -159,11 +157,49 @@ SET <varname>query_option</varname>=""
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
 
+    <p>
+      <b>Query Options for the SET Statement:</b>
+    </p>
+
+    <p>
+      You can specify the following options using the <codeph>SET</codeph> statement, and those settings affect all
+      queries issued from that session.
+    </p>
+
+    <p>
+      Some query options are useful in day-to-day operations for improving usability, performance, or flexibility.
+    </p>
+
+    <p>
+      Other query options control special-purpose aspects of Impala operation and are intended primarily for
+      advanced debugging or troubleshooting.
+    </p>
+
+    <p>
+      Options with Boolean parameters can be set to 1 or <codeph>true</codeph> to enable, or 0 or <codeph>false</codeph>
+      to turn off.
+    </p>
+
+    <note rev="2.0.0">
+      <p rev="2.0.0">
+        In Impala 2.0 and later, you can set query options directly through the JDBC and ODBC interfaces by using the
+        <codeph>SET</codeph> statement. Formerly, <codeph>SET</codeph> was only available as a command within the
+        <cmdname>impala-shell</cmdname> interpreter.
+      </p>
+      <p rev="2.11.0">
+        In <keyword keyref="impala211_full"/> and later, you can set query options for an <cmdname>impala-shell</cmdname> session
+        by specifying one or more command-line arguments of the form
+        <codeph>--query_option=<varname>option</varname>=<varname>value</varname></codeph>.
+        See <xref keyref="shell_options"/> for details.
+      </p>
+    </note>
+
+    <p outputclass="toc"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
-      See <xref href="impala_query_options.xml#query_options"/> for the query options you can
-      adjust using this statement.
+      <xref href="impala_set.xml#set"/>
     </p>
 
   </conbody>

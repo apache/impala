@@ -21,7 +21,7 @@ under the License.
 <concept rev="2.0.0" id="compression_codec">
 
   <title>COMPRESSION_CODEC Query Option (<keyword keyref="impala20"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>COMPRESSION_CODEC</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>COMPRESSION CODEC</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

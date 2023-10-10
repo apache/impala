@@ -21,7 +21,7 @@ under the License.
 <concept id="disable_row_runtime_filtering" rev="2.5.0">
 
   <title>DISABLE_ROW_RUNTIME_FILTERING Query Option (<keyword keyref="impala25"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>DISABLE_ROW_RUNTIME_FILTERING</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>DISABLE ROW RUNTIME FILTERING</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

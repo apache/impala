@@ -21,7 +21,7 @@ under the License.
 <concept id="mt_dop">
 
   <title>MT_DOP Query Option</title>
-  <titlealts audience="PDF"><navtitle>MT_DOP</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>MT DOP</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

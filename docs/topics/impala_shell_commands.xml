@@ -295,7 +295,7 @@ under the License.
               <p>
                 Manages query options for an <cmdname>impala-shell</cmdname>
                 session. The available options are the ones listed in <xref
-                  href="impala_query_options.xml#query_options"/>. These options
+                  href="impala_set.xml"/>. These options
                 are used for query tuning and troubleshooting. Issue
                   <codeph>SET</codeph> with no arguments to see the current
                 query options, either based on the <cmdname>impalad</cmdname>
@@ -400,7 +400,7 @@ under the License.
             <entry>
               <p>
                 Removes any user-specified value for a query option and returns the option to its default value.
-                See <xref href="impala_query_options.xml#query_options"/> for the available query options.
+                See <xref href="impala_set.xml"/> for the available query options.
               </p>
               <p rev="2.5.0 IMPALA-2180">
                 In <keyword keyref="impala25_full"/> and higher, it can also remove user-specified substitution variables

@@ -21,7 +21,7 @@ under the License.
 <concept id="runtime_bloom_filter_size" rev="2.5.0">
 
   <title>RUNTIME_BLOOM_FILTER_SIZE Query Option (<keyword keyref="impala25"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>RUNTIME_BLOOM_FILTER_SIZE</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>RUNTIME BLOOM FILTER SIZE</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

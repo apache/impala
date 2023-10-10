@@ -21,7 +21,7 @@ under the License.
 <concept id="compute_stats_sample_min_sample_size" rev="2.12.0">
   <title>COMPUTE_STATS_MIN_SAMPLE_SIZE Query Option</title>
   <titlealts audience="PDF">
-    <navtitle>COMPUTE_STATS_MIN_SAMPLE_SIZE</navtitle>
+    <navtitle>COMPUTE STATS MIN SAMPLE SIZE</navtitle>
   </titlealts>
   <prolog>
     <metadata>

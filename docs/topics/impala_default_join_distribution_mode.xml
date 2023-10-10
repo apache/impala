@@ -21,7 +21,7 @@ under the License.
 <concept id="default_join_distribution_mode" rev="2.9.0 IMPALA-5381 IMPALA-5583">
 
   <title>DEFAULT_JOIN_DISTRIBUTION_MODE Query Option</title>
-  <titlealts audience="PDF"><navtitle>DEFAULT_JOIN_DISTRIBUTION_MODE</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>DEFAULT JOIN DISTRIBUTION MODE</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

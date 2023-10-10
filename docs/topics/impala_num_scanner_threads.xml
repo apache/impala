@@ -21,7 +21,7 @@ under the License.
 <concept id="num_scanner_threads">
 
   <title>NUM_SCANNER_THREADS Query Option</title>
-  <titlealts audience="PDF"><navtitle>NUM_SCANNER_THREADS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>NUM SCANNER THREADS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

@@ -23,6 +23,7 @@ under the License.
 <!-- This option is for internal use only and might go away without ever being documented. It's hidden in the DITA map. -->
 
   <title>SEQ_COMPRESSION_MODE Query Option</title>
+  <titlealts audience="PDF"><navtitle>SEQ COMPRESSION MODE</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

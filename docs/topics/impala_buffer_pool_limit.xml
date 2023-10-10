@@ -21,7 +21,7 @@ under the License.
 <concept id="buffer_pool_limit" rev="2.10.0 IMPALA-3200">
 
   <title>BUFFER_POOL_LIMIT Query Option</title>
-  <titlealts audience="PDF"><navtitle>BUFFER_POOL_LIMIT</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>BUFFER POOL LIMIT</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

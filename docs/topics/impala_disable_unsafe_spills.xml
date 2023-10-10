@@ -21,7 +21,7 @@ under the License.
 <concept rev="2.0.0" id="disable_unsafe_spills">
 
   <title>DISABLE_UNSAFE_SPILLS Query Option (<keyword keyref="impala20"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>DISABLE_UNSAFE_SPILLS</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>DISABLE UNSAFE SPILLS</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

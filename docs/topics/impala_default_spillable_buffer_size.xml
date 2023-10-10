@@ -21,7 +21,7 @@ under the License.
 <concept id="default_spillable_buffer_size" rev="2.10.0 IMPALA-3200">
 
   <title>DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</title>
-  <titlealts audience="PDF"><navtitle>DEFAULT_SPILLABLE_BUFFER_SIZE</navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>DEFAULT SPILLABLE BUFFER SIZE</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

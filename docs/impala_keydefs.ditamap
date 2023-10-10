@@ -10792,7 +10792,6 @@ under the License.
   <keydef href="topics/impala_distinct.xml" keys="distinct"/>
   <keydef href="topics/impala_hints.xml" keys="hints"/>
   <keydef href="topics/impala_set.xml" keys="set"/>
-  <keydef href="topics/impala_query_options.xml" keys="query_options"/>
   <keydef href="topics/impala_abort_on_error.xml" keys="abort_on_error"/>
   <keydef href="topics/impala_allow_unsupported_formats.xml" keys="allow_unsupported_formats"/>
   <keydef href="topics/impala_appx_count_distinct.xml" keys="appx_count_distinct"/>
