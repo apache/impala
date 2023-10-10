@@ -185,16 +185,17 @@ def try_compile_regex(row_string):
     return regex
   return None
 
+
 # If comparing against a float or double, don't do a strict comparison
-# See: http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
-def compare_float(x, y, epsilon):
+# See: https://peps.python.org/pep-0485/#proposed-implementation
+def compare_float(x, y, rel_tol=1e-9, abs_tol=0.0):
   # For the purposes of test validation, we want to treat nans as equal.  The
   # floating point spec defines nan != nan.
   if math.isnan(x) and math.isnan(y):
     return True
   if math.isinf(x) or math.isinf(y):
     return x == y
-  return abs(x - y) <= epsilon
+  return abs(x - y) <= max(rel_tol * max(abs(x), abs(y)), abs_tol)
 
 # Represents a column in a row
 class ResultColumn(object):
@@ -227,9 +228,9 @@ class ResultColumn(object):
     if (self.value == 'NULL' or other.value == 'NULL'):
       return self.value == other.value
     elif self.column_type == 'float':
-      return compare_float(float(self.value), float(other.value), 10e-5)
+      return compare_float(float(self.value), float(other.value), abs_tol=10e-5)
     elif self.column_type == 'double':
-      return compare_float(float(self.value), float(other.value), 10e-10)
+      return compare_float(float(self.value), float(other.value), abs_tol=10e-10)
     elif self.column_type == 'boolean':
       return str(self.value).lower() == str(other.value).lower()
     else:
