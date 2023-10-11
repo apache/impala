@@ -70,6 +70,9 @@ string MetastoreEventMetrics::LATEST_EVENT_ID_METRIC_NAME =
     "events-processor.latest-event-id";
 string MetastoreEventMetrics::LATEST_EVENT_TIME_METRIC_NAME =
     "events-processor.latest-event-time";
+string MetastoreEventMetrics::PENDING_EVENTS_METRIC_NAME =
+    "events-processor.pending-events";
+string MetastoreEventMetrics::LAG_TIME_METRIC_NAME = "events-processor.lag-time";
 
 IntCounter* MetastoreEventMetrics::NUM_EVENTS_RECEIVED_COUNTER = nullptr;
 IntCounter* MetastoreEventMetrics::NUM_EVENTS_SKIPPED_COUNTER = nullptr;
@@ -95,6 +98,8 @@ IntCounter* MetastoreEventMetrics::LAST_SYNCED_EVENT_ID = nullptr;
 IntCounter* MetastoreEventMetrics::LAST_SYNCED_EVENT_TIME = nullptr;
 IntCounter* MetastoreEventMetrics::LATEST_EVENT_ID = nullptr;
 IntCounter* MetastoreEventMetrics::LATEST_EVENT_TIME = nullptr;
+IntCounter* MetastoreEventMetrics::PENDING_EVENTS = nullptr;
+IntCounter* MetastoreEventMetrics::LAG_TIME = nullptr;
 
 // Initialize all the metrics for the events metric group
 void MetastoreEventMetrics::InitMetastoreEventMetrics(MetricGroup* metric_group) {
@@ -146,6 +151,8 @@ void MetastoreEventMetrics::InitMetastoreEventMetrics(MetricGroup* metric_group)
       event_metrics->AddCounter(LATEST_EVENT_ID_METRIC_NAME, 0);
   LATEST_EVENT_TIME =
       event_metrics->AddCounter(LATEST_EVENT_TIME_METRIC_NAME, 0);
+  PENDING_EVENTS = event_metrics->AddCounter(PENDING_EVENTS_METRIC_NAME, 0);
+  LAG_TIME = event_metrics->AddCounter(LAG_TIME_METRIC_NAME, 0);
 }
 
 void MetastoreEventMetrics::refresh(TEventProcessorMetrics* response) {
@@ -212,6 +219,28 @@ void MetastoreEventMetrics::refresh(TEventProcessorMetrics* response) {
   }
   if (response->__isset.latest_event_time) {
     LATEST_EVENT_TIME->SetValue(response->latest_event_time);
+  }
+  // last_synced_event_time is 0 at the startup until we have synced any events.
+  if (response->__isset.latest_event_time && response->__isset.last_synced_event_time
+      && response->last_synced_event_time > 0) {
+    // latest_event_time and last_synced_event_time are updated by different threads.
+    // It's possible that latest_event_time is stale and smaller than
+    // last_synced_event_time. Set the lag to 0 in this case.
+    if (response->latest_event_time <= response->last_synced_event_time) {
+      LAG_TIME->SetValue(0);
+    } else {
+      LAG_TIME->SetValue(response->latest_event_time - response->last_synced_event_time);
+    }
+  }
+  if (response->__isset.latest_event_id && response->__isset.last_synced_event_id) {
+    // Same as above, latest_event_id and last_synced_event_id are updated by different
+    // threads. Set the value to 0 if latest_event_id is stale.
+    if (response->latest_event_id <= response->last_synced_event_id) {
+      PENDING_EVENTS->SetValue(0);
+    } else {
+      PENDING_EVENTS->SetValue(
+          response->latest_event_id - response->last_synced_event_id);
+    }
   }
 }
 } // namespace impala

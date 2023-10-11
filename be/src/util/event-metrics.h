@@ -85,6 +85,12 @@ class MetastoreEventMetrics {
   /// Latest metastore event time
   static IntCounter* LATEST_EVENT_TIME;
 
+  /// Number of events pending to be synced
+  static IntCounter* PENDING_EVENTS;
+
+  /// Lag time of the event processing
+  static IntCounter* LAG_TIME;
+
  private:
   /// Following metric names must match with the key in metrics.json
 
@@ -135,6 +141,12 @@ class MetastoreEventMetrics {
 
   /// Metric name for the event time of the latest metastore event
   static std::string LATEST_EVENT_TIME_METRIC_NAME;
+
+  /// Metric name for the number of pending events to be synced
+  static std::string PENDING_EVENTS_METRIC_NAME;
+
+  /// Metric name for the lag time of the event processing
+  static std::string LAG_TIME_METRIC_NAME;
 };
 
 } // namespace impala

@@ -3158,6 +3158,26 @@
     "key" : "events-processor.latest-event-time"
   },
   {
+    "description": "Number of pending events to be synced, i.e. the difference between latest-event-id and last-synced-event-id",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Pending Events",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.pending-events"
+  },
+  {
+    "description": "Lag time of the event processing, i.e. the difference between latest-event-time and last-synced-event-time",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Lag Time",
+    "units": "TIME_S",
+    "kind" : "COUNTER",
+    "key" : "events-processor.lag-time"
+  },
+  {
     "description": "Total number of executor groups that have at least one executor",
     "contexts": [
       "IMPALAD"
