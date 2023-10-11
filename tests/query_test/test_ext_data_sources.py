@@ -18,7 +18,7 @@
 from __future__ import absolute_import, division, print_function
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfCatalogV2
+from tests.common.skip import SkipIfCatalogV2, SkipIf
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 
 
@@ -60,6 +60,7 @@ class TestExtDataSources(ImpalaTestSuite):
     return properties
 
   @SkipIfCatalogV2.data_sources_unsupported()
+  @SkipIf.not_hdfs
   def test_verify_jdbc_table_properties(self, vector):
     jdbc_tbl_name = "functional.alltypes_jdbc_datasource"
     properties = self._get_tbl_properties(jdbc_tbl_name)
@@ -80,5 +81,6 @@ class TestExtDataSources(ImpalaTestSuite):
     self.run_test_case('QueryTest/data-source-tables', vector)
 
   @SkipIfCatalogV2.data_sources_unsupported()
+  @SkipIf.not_hdfs
   def test_jdbc_data_source(self, vector):
     self.run_test_case('QueryTest/jdbc-data-source', vector)
