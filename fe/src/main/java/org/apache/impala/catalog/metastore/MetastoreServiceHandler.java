@@ -238,6 +238,7 @@ import org.apache.hadoop.hive.metastore.api.UniqueConstraintsResponse;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.hadoop.hive.metastore.api.UnlockRequest;
+import org.apache.hadoop.hive.metastore.api.UpdateTransactionalStatsRequest;
 import org.apache.hadoop.hive.metastore.api.WMAlterPoolRequest;
 import org.apache.hadoop.hive.metastore.api.WMAlterPoolResponse;
 import org.apache.hadoop.hive.metastore.api.WMAlterResourcePlanRequest;
@@ -2541,6 +2542,14 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       return client.getHiveClient().getThriftClient()
           .add_write_notification_log(writeNotificationLogRequest);
+    }
+  }
+
+  @Override
+  public void update_transaction_statistics(UpdateTransactionalStatsRequest req)
+      throws MetaException, TException {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      client.getHiveClient().getThriftClient().update_transaction_statistics(req);
     }
   }
 

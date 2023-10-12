@@ -27,6 +27,7 @@ from hive_metastore.ttypes import TruncateTableRequest
 from hive_metastore.ttypes import Table
 from hive_metastore.ttypes import StorageDescriptor
 from hive_metastore.ttypes import SerDeInfo
+from hive_metastore.ttypes import UpdateTransactionalStatsRequest
 from hive_metastore.ttypes import WriteNotificationLogBatchRequest
 
 from tests.util.event_processor_utils import EventProcessorUtils
@@ -990,6 +991,7 @@ class TestMetastoreService(CustomClusterTestSuite):
         MetastoreServiceHandler in impala can talk to HMS through these APIs):
         1.  find_next_compact2
         2.  add_write_notification_log_in_batch
+        3.  update_transaction_statistics
         """
         catalog_hms_client = None
         tbl_name = ImpalaTestSuite.get_random_name(
@@ -1016,6 +1018,17 @@ class TestMetastoreService(CustomClusterTestSuite):
             catalog_hms_client.add_write_notification_log_in_batch(logBatchRequest)
             # If the above call is successful then HMS api
             # add_write_notification_log_in_batch is reachable.
+
+            # Test 3: verify update_transaction_statistics api in HMS
+            stats_obj = UpdateTransactionalStatsRequest()
+            stats_obj.tableId = 1
+            stats_obj.insertCount = 1
+            stats_obj.updatedCount = 1
+            stats_obj.deletedCount = 1
+            catalog_hms_client.update_transaction_statistics(stats_obj)
+            # If the above call is successful the HMS api
+            # update_transaction_statistics is reachable
+
             catalog_hms_client.drop_table("default", tbl_name, True)
         finally:
             if catalog_hms_client is not None:
