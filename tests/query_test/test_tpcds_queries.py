@@ -19,6 +19,7 @@
 #
 from __future__ import absolute_import, division, print_function
 import pytest
+from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfDockerizedCluster
@@ -755,3 +756,15 @@ class TestTpcdsQueryWithProcessingCost(TestTpcdsQuery):
     super(TestTpcdsQueryWithProcessingCost, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_mandatory_exec_option('compute_processing_cost', 1)
     cls.ImpalaTestMatrix.add_mandatory_exec_option('max_fragment_instances_per_node', 4)
+
+  def test_tpcds_q51a(self, vector):
+    """Reduce max_fragment_instances_per_node to lower memory requirement."""
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['max_fragment_instances_per_node'] = 2
+    self.run_test_case(self.get_workload() + '-q51a', new_vector)
+
+  def test_tpcds_q67a(self, vector):
+    """Reduce max_fragment_instances_per_node to lower memory requirement."""
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['max_fragment_instances_per_node'] = 2
+    self.run_test_case(self.get_workload() + '-q67a', new_vector)
