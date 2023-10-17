@@ -67,6 +67,9 @@ public class DebugUtils {
   public static final String UPDATE_CATALOG_ABORT_INSERT_TXN =
       "catalogd_update_catalog_abort_txn";
 
+  // debug action label for introducing delay in loading table metadata.
+  public static final String LOAD_TABLES_DELAY = "impalad_load_tables_delay";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */

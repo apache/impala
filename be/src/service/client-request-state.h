@@ -181,19 +181,13 @@ class ClientRequestState {
   /// until cancellaton of 'coord_' finishes and it is finalized.
   /// 'wait_until_finalized' should only used by the single thread finalizing the query,
   /// to avoid many threads piling up waiting for query cancellation.
-  ///
-  /// Only returns an error if 'check_inflight' is true and the query is not yet
-  /// in-flight. Otherwise, proceed and return Status::OK() even if the query isn't
-  /// in-flight (for cleaning up after an error on the query issuing path).
-  Status Cancel(bool check_inflight, const Status* cause, bool wait_until_finalized=false);
+  void Cancel(const Status* cause, bool wait_until_finalized=false);
 
   /// This is called when the query is done (finished, cancelled, or failed). This runs
   /// synchronously within the last client RPC and does any work that is required before
   /// the query is finished from the client's point of view, including cancelling the
-  /// query with 'cause'. Returns an error if 'check_inflight' is true and the query is
-  /// not yet in-flight, or if another thread has already started finalizing the query.
-  /// Takes lock_: callers must not hold lock() before calling.
-  Status Finalize(bool check_inflight, const Status* cause);
+  /// query with 'cause'. Takes lock_: callers must not hold lock() before calling.
+  void Finalize(const Status* cause);
 
   /// Sets the API-specific (Beeswax, HS2) result cache and its size bound.
   /// The given cache is owned by this client request state, even if an error is returned.
@@ -327,6 +321,15 @@ class ClientRequestState {
   inline bool is_active() const {
     std::lock_guard<std::mutex> l(expiration_data_lock_);
     return ref_count_ > 0;
+  }
+
+  inline bool is_inflight() const {
+    // If the query is in 'inflight_queries' it means that the query has actually started
+    // executing. It is ok if the query is removed from 'inflight_queries' later, so we
+    // can release the session lock before returning.
+    std::lock_guard<std::mutex> session_lock(session_->lock);
+    return session_->inflight_queries.find(query_id())
+        != session_->inflight_queries.end();
   }
 
   bool is_expired() const {

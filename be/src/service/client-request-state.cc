@@ -1041,9 +1041,9 @@ Status ClientRequestState::ExecShutdownRequest() {
   return Status::OK();
 }
 
-Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
+void ClientRequestState::Finalize(const Status* cause) {
   UnRegisterCompletedRPCs();
-  RETURN_IF_ERROR(Cancel(check_inflight, cause, /*wait_until_finalized=*/true));
+  Cancel(cause, /*wait_until_finalized=*/true);
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
   // is destroyed).
@@ -1097,7 +1097,6 @@ Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
   // Update the timeline here so that all of the above work is captured in the timeline.
   query_events_->MarkEvent("Unregister query");
   UnRegisterRemainingRPCs();
-  return Status::OK();
 }
 
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
@@ -1472,19 +1471,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
   return Status::OK();
 }
 
-Status ClientRequestState::Cancel(
-    bool check_inflight, const Status* cause, bool wait_until_finalized) {
-  if (check_inflight) {
-    // If the query is in 'inflight_queries' it means that the query has actually started
-    // executing. It is ok if the query is removed from 'inflight_queries' during
-    // cancellation, so we can release the session lock before starting the cancellation
-    // work.
-    lock_guard<mutex> session_lock(session_->lock);
-    if (session_->inflight_queries.find(query_id()) == session_->inflight_queries.end()) {
-      return Status("Query not yet running");
-    }
-  }
-
+void ClientRequestState::Cancel(const Status* cause, bool wait_until_finalized) {
   {
     lock_guard<mutex> lock(lock_);
     // If the query has reached a terminal state, no need to update the state.
@@ -1514,7 +1501,6 @@ Status ClientRequestState::Cancel(
   // started, cancellation is handled by the 'async-exec-thread' thread). 'lock_' should
   // not be held because cancellation involves RPCs and can block for a long time.
   if (GetCoordinator() != nullptr) GetCoordinator()->Cancel(wait_until_finalized);
-  return Status::OK();
 }
 
 Status ClientRequestState::UpdateCatalog() {

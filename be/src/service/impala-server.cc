@@ -1749,8 +1749,11 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
   QueryHandle query_handle;
   RETURN_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle));
-  RETURN_IF_ERROR(
-      query_handle->Cancel(/*check_inflight=*/ true, /*cause=*/ nullptr));
+  if (!query_handle->is_inflight()) {
+    // Error if the query is not yet inflight as we have no way to cleanly cancel it.
+    return Status("Query not yet running");
+  }
+  query_handle->Cancel(/*cause=*/ nullptr);
   return Status::OK();
 }
 
@@ -2027,10 +2030,11 @@ void ImpalaServer::CancelFromThreadPool(const CancellationWork& cancellation_wor
     // If the query could not be retried, then cancel the query.
     if (!was_retried) {
       VLOG_QUERY << "CancelFromThreadPool(): cancelling query_id=" << PrintId(query_id);
-      Status status = query_handle->Cancel(true, &error);
-      if (!status.ok()) {
+      if (query_handle->is_inflight()) {
+        query_handle->Cancel(&error);
+      } else {
         VLOG_QUERY << "Query cancellation (" << PrintId(cancellation_work.query_id())
-                   << ") did not succeed: " << status.GetDetail();
+                   << ") skipped as query was not running.";
       }
     }
   }

@@ -242,15 +242,10 @@ void QueryDriver::RetryQueryFromThread(
 
   shared_ptr<ImpalaServer::SessionState> session = request_state->session();
 
-  // Cancel the query. 'check_inflight' should be false because (1) a retry can be
-  // triggered when the query is in the INITIALIZED state, and (2) the user could have
+  // Cancel the query. We don't worry about whether it's inflight because (1) a retry can
+  // be triggered when the query is in the INITIALIZED state, and (2) the user could have
   // already cancelled the query.
-  Status status = request_state->Cancel(false, nullptr);
-  if (!status.ok()) {
-    status.AddDetail(Substitute("Failed to retry query $0", PrintId(query_id)));
-    discard_result(request_state->UpdateQueryStatus(status));
-    return;
-  }
+  request_state->Cancel(nullptr);
 
   unique_ptr<ClientRequestState> retry_request_state = nullptr;
   CreateRetriedClientRequestState(request_state, &retry_request_state, &session);
@@ -275,7 +270,8 @@ void QueryDriver::RetryQueryFromThread(
   retry_query_handle.SetHandle(query_driver, retry_request_state.get());
 
   // Register the new query.
-  status = parent_server_->RegisterQuery(retry_query_id, session, &retry_query_handle);
+  Status status =
+      parent_server_->RegisterQuery(retry_query_id, session, &retry_query_handle);
   if (!status.ok()) {
     string error_msg = Substitute(
         "RegisterQuery for new query with id $0 failed", PrintId(retry_query_id));
@@ -330,7 +326,7 @@ void QueryDriver::RetryQueryFromThread(
       // the retried query, it actually finalizes the original ClientRequestState. So we
       // have to explicitly finalize 'retry_request_state', otherwise we'll hit some
       // illegal states in destroying it.
-      RETURN_VOID_IF_ERROR(retry_request_state->Finalize(false, nullptr));
+      retry_request_state->Finalize(nullptr);
       return;
     }
   }
@@ -344,7 +340,7 @@ void QueryDriver::RetryQueryFromThread(
     string error_msg = Substitute(
         "SetQueryInFlight for new query with id $0 failed", PrintId(retry_query_id));
     HandleRetryFailure(&status, &error_msg, request_state, retry_query_id);
-    RETURN_VOID_IF_ERROR(retry_request_state->Finalize(false, nullptr));
+    retry_request_state->Finalize(nullptr);
     return;
   }
 
@@ -359,7 +355,8 @@ void QueryDriver::RetryQueryFromThread(
           "Failed to retry query since the original query was unregistered");
       string error_msg = Substitute("Query was unregistered");
       HandleRetryFailure(&status, &error_msg, request_state, retry_query_id);
-      RETURN_VOID_IF_ERROR(retry_request_state->Finalize(true, nullptr));
+      DCHECK(retry_request_state->is_inflight());
+      retry_request_state->Finalize(nullptr);
       return;
     }
     lock_guard<SpinLock> l(client_request_state_lock_);
@@ -376,7 +373,8 @@ void QueryDriver::RetryQueryFromThread(
   query_handle.SetHandle(query_driver, request_state);
   // Do the work of close that needs to be done synchronously, otherwise we'll
   // hit some illegal states in destroying the request_state.
-  RETURN_VOID_IF_ERROR(query_handle->Finalize(true, nullptr));
+  DCHECK(query_handle->is_inflight());
+  query_handle->Finalize(nullptr);
   parent_server_->CloseClientRequestState(query_handle);
   parent_server_->MarkSessionInactive(session);
 }
@@ -430,6 +428,10 @@ void QueryDriver::HandleRetryFailure(Status* status, string* error_msg,
 
 Status QueryDriver::Finalize(
     QueryHandle* query_handle, bool check_inflight, const Status* cause) {
+  if (check_inflight && !(*query_handle)->is_inflight()) {
+    return Status("Query not yet running");
+  }
+
   if (!finalized_.CompareAndSwap(false, true)) {
     // Return error as-if the query was already unregistered, so that it appears to the
     // client as-if unregistration already happened. We don't need a distinct
@@ -438,7 +440,7 @@ Status QueryDriver::Finalize(
     return Status::Expected(
         TErrorCode::INVALID_QUERY_HANDLE, PrintId(client_request_state_->query_id()));
   }
-  RETURN_IF_ERROR((*query_handle)->Finalize(check_inflight, cause));
+  (*query_handle)->Finalize(cause);
   return Status::OK();
 }
 

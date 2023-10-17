@@ -180,14 +180,14 @@ class QueryDriver {
   /// This indicates that the query should no longer be considered registered from the
   /// client's point of view. Returns an INVALID_QUERY_HANDLE error if finalization
   /// already started. After this method has been called, finalized() will return true.
-  /// 'check_inflight' and 'cause' are passed to
-  /// ClientRequestState::Finalize(bool, Status).
+  /// If 'check_inflight' is true and the query is not yet inflight, Finalize will error.
+  /// 'cause' is passed to ClientRequestState::Finalize(Status).
   Status Finalize(QueryHandle* query_handle, bool check_inflight, const Status* cause);
 
   /// Delete this query from the given QueryDriverMap.
   Status Unregister(ImpalaServer::QueryDriverMap* query_driver_map) WARN_UNUSED_RESULT;
 
-  /// True if Finalize() was called.
+  /// True if Finalize() was called while the query was inflight.
   bool finalized() const { return finalized_.Load(); }
 
   /// Creates a new QueryDriver instance using the given ImpalaServer. Creates the
@@ -264,8 +264,8 @@ class QueryDriver {
   /// query_driver_map.
   TUniqueId registered_retry_query_id_;
 
-  /// True if a thread has called Finalize(). Threads calling Finalize() do a
-  /// compare-and-swap on this so that only one thread can proceed.
+  /// True if a thread has called Finalize() and the query is inflight. Threads calling
+  /// Finalize() do a compare-and-swap on this so that only one thread can proceed.
   AtomicBool finalized_{false};
 };
 }

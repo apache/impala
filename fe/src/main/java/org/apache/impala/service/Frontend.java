@@ -207,6 +207,7 @@ import org.apache.impala.thrift.TUnit;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.IcebergUtil;
@@ -2330,6 +2331,11 @@ public class Frontend {
         this, queryCtx.session.database, timeline, user, queryCtx.getQuery_id());
     //TODO (IMPALA-8788): should load table write ids in transaction context.
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);
+    if (queryCtx.client_request.query_options.isSetDebug_action()) {
+        DebugUtils.executeDebugAction(
+            queryCtx.client_request.query_options.getDebug_action(),
+            DebugUtils.LOAD_TABLES_DELAY);
+    }
 
     // Add referenced tables to frontend profile
     FrontendProfile.getCurrent().addInfoString("Referenced Tables",

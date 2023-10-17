@@ -22,6 +22,8 @@ from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from datetime import datetime
+from multiprocessing import Process, Queue
+from time import sleep, time
 import itertools
 import json
 import os
@@ -897,6 +899,123 @@ class TestWebPage(ImpalaTestSuite):
     for json_part in response_json['in_flight_queries']:
       if query in json_part['stmt']:
         assert json_part["query_progress"] == "0 / 4 ( 0%)"
+
+  def try_until(self, desc, run, check, timeout=10, interval=0.1):
+    start_time = time()
+    while (time() - start_time < timeout):
+      result = run()
+      if check(result):
+        return result
+      sleep(interval)
+    assert False, "Timed out waiting for " + desc
+
+  def get_queries(self):
+    responses = self.get_and_check_status(
+      self.QUERIES_URL + "?json", ports_to_test=[25000])
+    assert len(responses) == 1
+    response_json = json.loads(responses[0].text)
+    return response_json
+
+  @pytest.mark.execute_serially
+  def test_query_cancel_created(self):
+    """Tests that if we cancel a query in the CREATED state, it still finishes and we can
+    cancel it."""
+    query = "select count(*) from functional_parquet.alltypes"
+    delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
+
+    response_json = self.get_queries()
+    assert response_json['num_in_flight_queries'] == 0
+
+    # Start the query completely async. The server doesn't return a response until
+    # the query has exited the CREATED state, so we need to get the query ID another way.
+    self.client.set_configuration(dict(debug_action=delay_created_action))
+    proc = Process(target=lambda cli, q: cli.execute_async(q), args=(self.client, query))
+    proc.start()
+
+    response_json = self.try_until("query creation", self.get_queries,
+        lambda resp: resp['num_in_flight_queries'] > 0)
+    assert len(response_json['in_flight_queries']) == 1
+    assert response_json['in_flight_queries'][0]['state'] == 'CREATED'
+    query_id = response_json['in_flight_queries'][0]['query_id']
+
+    cancel_query_url = "{0}cancel_query?json&query_id={1}".format(self.ROOT_URL.format
+      ("25000"), query_id)
+    response = requests.get(cancel_query_url)
+    assert response.status_code == requests.codes.ok
+    response_json = json.loads(response.text)
+    assert response_json['error'] == "Query not yet running\n"
+
+    # Wait for query to start running. It should finish soon after.
+    proc.join()
+    response_json = self.try_until("query finished", self.get_queries,
+        lambda resp: resp['in_flight_queries'][0]['state'] == 'FINISHED')
+    assert response_json['num_in_flight_queries'] == 1
+
+    # We never fetch results for the async query, so it stays in-flight until cancelled.
+    response = requests.get(cancel_query_url)
+    assert response.status_code == requests.codes.ok
+    response_json = json.loads(response.text)
+    assert response_json['contents'] == "Query cancellation successful"
+
+    response_json = self.get_queries()
+    assert response_json['num_in_flight_queries'] == 0
+    assert response_json['num_waiting_queries'] == 0
+
+    expected_queries = [q for q in response_json['completed_queries']
+                        if q['query_id'] == query_id]
+    assert len(expected_queries) == 1
+
+  @pytest.mark.execute_serially
+  def test_query_cancel_exception(self):
+    """Tests that if we cancel a query in the CREATED state and it has an exception, we
+    can cancel it."""
+    # Trigger UDF ERROR: Cannot divide decimal by zero
+    query = "select *, 1.0/0 from functional_parquet.alltypes limit 10"
+    delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
+
+    response_json = self.get_queries()
+    assert response_json['num_in_flight_queries'] == 0
+
+    def run(queue, client, query):
+      queue.put(client.execute_async(query))
+
+    # Start the query completely async. The server doesn't return a response until
+    # the query has exited the CREATED state, so we need to get the query ID another way.
+    self.client.set_configuration(dict(debug_action=delay_created_action))
+    queue = Queue()
+    proc = Process(target=run, args=(queue, self.client, query))
+    proc.start()
+
+    response_json = self.try_until("query creation", self.get_queries,
+        lambda resp: resp['num_in_flight_queries'] > 0)
+    assert len(response_json['in_flight_queries']) == 1
+    assert response_json['in_flight_queries'][0]['state'] == 'CREATED'
+    query_id = response_json['in_flight_queries'][0]['query_id']
+
+    cancel_query_url = "{0}cancel_query?json&query_id={1}".format(self.ROOT_URL.format
+      ("25000"), query_id)
+    response = requests.get(cancel_query_url)
+    assert response.status_code == requests.codes.ok
+    response_json = json.loads(response.text)
+    assert response_json['error'] == "Query not yet running\n"
+
+    # Fetch query results.
+    query_handle = queue.get()
+    proc.join()
+    assert query_handle
+    try:
+      self.client.fetch(query, query_handle)
+    except Exception as e:
+      re.match("UDF ERROR: Cannot divide decimal by zero", str(e))
+
+    # Failed query should be completed.
+    response_json = self.get_queries()
+    assert response_json['num_in_flight_queries'] == 0
+    assert response_json['num_waiting_queries'] == 0
+
+    expected_queries = [q for q in response_json['completed_queries']
+                        if q['query_id'] == query_id]
+    assert len(expected_queries) == 1
 
 
 class TestWebPageAndCloseSession(ImpalaTestSuite):
