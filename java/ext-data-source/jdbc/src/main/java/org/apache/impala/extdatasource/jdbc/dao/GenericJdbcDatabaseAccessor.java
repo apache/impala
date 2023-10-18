@@ -30,12 +30,16 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 import javax.sql.DataSource;
 
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
+import org.apache.impala.common.InternalException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfig;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfigManager;
 import org.apache.impala.extdatasource.jdbc.exception.JdbcDatabaseAccessException;
@@ -43,12 +47,17 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCacheJarResult;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TStatus;
+import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.service.BackendConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import com.google.common.base.Preconditions;
+
+import java.io.IOException;
 
 /**
  * A data accessor that should in theory work with all JDBC compliant database drivers.
@@ -231,15 +240,18 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
                     BasicDataSourceFactory.createDataSource(props);
                 // Put jdbc driver to cache
                 String driverUrl = props.getProperty("driverUrl");
-                TCacheJarResult cacheResult = FeSupport.CacheJar(driverUrl);
-                TStatus cacheJarStatus = cacheResult.getStatus();
-                if (cacheJarStatus.getStatus_code() != TErrorCode.OK) {
+                String localPath = BackendConfig.INSTANCE.getBackendCfg().local_library_path;
+                
+                // TCacheJarResult cacheResult = FeSupport.CacheJar(driverUrl);
+                String driverLocalPath = getJdbcDriverFromUri(driverUrl, localPath);
+               // TStatus cacheJarStatus = cacheResult.getStatus();
+              //  if (cacheJarStatus.getStatus_code() != TErrorCode.OK) {
+                if (driverLocalPath == null) {
                   throw new JdbcDatabaseAccessException(String.format(
-                      "Unable to cache jdbc driver jar at location '%s'. " +
-                      "Check that the file exists and is readable. Message: %s",
-                      driverUrl, cacheJarStatus.getError_msgs()));
+                      "Unable to fetch jdbc driver jar from location '%s'. ",
+                      driverUrl));
                 }
-                String driverLocalPath = cacheResult.getLocal_path();
+                // String driverLocalPath = cacheResult.getLocal_path();
                 // Create class loader for jdbc driver and set it for the
                 // BasicDataSource object so that the driver class could be loaded
                 // from jar file without searching classpath.
@@ -248,6 +260,9 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
                     URLClassLoader.newInstance( new URL[] { driverJarUrl },
                         getClass().getClassLoader());
                 basicDataSource.setDriverClassLoader(driverLoader);
+                // Delete the jar file once its loaded
+                Path localJarPath = new Path(driverLocalPath);
+                FileSystemUtil.deleteIfExists(localJarPath);
                 return basicDataSource;
               });
         }
@@ -294,6 +309,30 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
   protected int getFetchSize(Configuration conf) {
     return conf
         .getInt(JdbcStorageConfig.JDBC_FETCH_SIZE.getPropertyName(), DEFAULT_FETCH_SIZE);
+  }
+
+  protected String getJdbcDriverFromUri(String driverUrl, String localLibPath)
+ // protected TCacheJarResult createWithLocalPath(String localLibPath, Function fn)
+      throws InternalException {
+    Path localJarPath = null;
+    String uri = driverUrl;
+      String localJarPathString = null;
+      if (uri != null) {
+        localJarPath = new Path("file://" + localLibPath,
+            UUID.randomUUID().toString() + ".jar");
+        Preconditions.checkNotNull(localJarPath);
+        try {
+          FileSystemUtil.copyToLocal(new Path(uri), localJarPath);
+        } catch (IOException e) {
+          String errorMsg = "Couldn't copy " + uri + " to local path: " +
+              localJarPath.toString();
+          LOG.error(errorMsg, e);
+          throw new InternalException(errorMsg);
+        }
+        localJarPathString = localJarPath.toString();
+      }
+   //   return new HiveUdfLoader(localJarPathString, fn.getClassName());
+       return localJarPathString;
   }
 
 }
