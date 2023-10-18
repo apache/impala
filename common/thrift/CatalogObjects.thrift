@@ -79,7 +79,8 @@ enum TVirtualColumnType {
   INPUT_FILE_NAME,
   FILE_POSITION,
   PARTITION_SPEC_ID,
-  ICEBERG_PARTITION_SERIALIZED
+  ICEBERG_PARTITION_SERIALIZED,
+  ICEBERG_DATA_SEQUENCE_NUMBER
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should

@@ -488,6 +488,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     addVirtualColumn(VirtualColumn.FILE_POSITION);
     addVirtualColumn(VirtualColumn.PARTITION_SPEC_ID);
     addVirtualColumn(VirtualColumn.ICEBERG_PARTITION_SERIALIZED);
+    addVirtualColumn(VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER);
   }
 
   @Override

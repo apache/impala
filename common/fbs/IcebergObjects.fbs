@@ -47,6 +47,7 @@ table FbIcebergPartitionTransformValue {
 table FbIcebergMetadata {
   file_format : FbIcebergDataFileFormat;
   record_count : long;
+  data_sequence_number : long;
   spec_id : ushort;
   partition_keys : [FbIcebergPartitionTransformValue];
 }

@@ -59,17 +59,31 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
   if (template_tuple == nullptr) return;
   for (int i = 0; i < scan_node_->virtual_column_slots().size(); ++i) {
     const SlotDescriptor* slot_desc = scan_node_->virtual_column_slots()[i];
-    if (slot_desc->virtual_column_type() != TVirtualColumnType::INPUT_FILE_NAME) {
-      continue;
+    if (slot_desc->virtual_column_type() == TVirtualColumnType::INPUT_FILE_NAME) {
+      StringValue* slot = template_tuple->GetStringSlot(slot_desc->tuple_offset());
+      const char* filename = file_desc_->filename.c_str();
+      int len = strlen(filename);
+      char* filename_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
+      Ubsan::MemCpy(filename_copy, filename, len);
+      slot->ptr = filename_copy;
+      slot->len = len;
+      template_tuple->SetNotNull(slot_desc->null_indicator_offset());
+    } else if (slot_desc->virtual_column_type() ==
+        TVirtualColumnType::ICEBERG_DATA_SEQUENCE_NUMBER) {
+      using namespace org::apache::impala::fb;
+      const FbIcebergMetadata* ice_metadata =
+          file_desc_->file_metadata->iceberg_metadata();
+      DCHECK(ice_metadata != nullptr);
+
+      int64_t data_seq_num = ice_metadata->data_sequence_number();
+      if (data_seq_num > -1) {
+        int64_t* slot = template_tuple->GetBigIntSlot(slot_desc->tuple_offset());
+        *slot = data_seq_num;
+        template_tuple->SetNotNull(slot_desc->null_indicator_offset());
+      } else {
+        template_tuple->SetNull(slot_desc->null_indicator_offset());
+      }
     }
-    StringValue* slot = template_tuple->GetStringSlot(slot_desc->tuple_offset());
-    const char* filename = file_desc_->filename.c_str();
-    int len = strlen(filename);
-    char* filename_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
-    Ubsan::MemCpy(filename_copy, filename, len);
-    slot->ptr = filename_copy;
-    slot->len = len;
-    template_tuple->SetNotNull(slot_desc->null_indicator_offset());
   }
 }
 

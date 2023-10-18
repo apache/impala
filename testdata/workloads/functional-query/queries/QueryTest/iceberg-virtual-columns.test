@@ -37,3 +37,161 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_tbl/data/col_b=true/.*.0.pa
 ---- TYPES
 STRING, BIGINT
 ====
+---- QUERY
+# For a V1 Iceberg table the data sequence number is zero.
+select col_i, ICEBERG__DATA__SEQUENCE__NUMBER from ice_tbl order by col_i;
+---- TYPES
+INT,BIGINT
+---- RESULTS
+0,0
+1,0
+3,0
+5,0
+====
+---- QUERY
+# select virtual colum without selecting any other slots.
+select max(ICEBERG__DATA__SEQUENCE__NUMBER) from ice_tbl;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Testing data sequence number for unpartitioned V2 tables.
+create table ice_tbl_v2 (col_i int, col_str string)
+stored as iceberg
+tblproperties ('format-version'='2');
+insert into ice_tbl_v2 values (1, "str1"), (2, "str2"), (3, "str3");
+select ICEBERG__DATA__SEQUENCE__NUMBER, * from ice_tbl_v2;
+---- RESULTS
+1,1,'str1'
+1,2,'str2'
+1,3,'str3'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+insert into ice_tbl_v2 values (4, "str4"), (5, "str5");
+select ICEBERG__DATA__SEQUENCE__NUMBER, * from ice_tbl_v2;
+---- RESULTS
+1,1,'str1'
+1,2,'str2'
+1,3,'str3'
+2,4,'str4'
+2,5,'str5'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+delete from ice_tbl_v2 where col_i % 2 = 0;
+select ICEBERG__DATA__SEQUENCE__NUMBER, * from ice_tbl_v2;
+---- RESULTS
+1,1,'str1'
+1,3,'str3'
+2,5,'str5'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+insert into ice_tbl_v2 values (6, "str6"), (7, "str7");
+select ICEBERG__DATA__SEQUENCE__NUMBER, * from ice_tbl_v2;
+---- RESULTS
+1,1,'str1'
+1,3,'str3'
+2,5,'str5'
+4,6,'str6'
+4,7,'str7'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+# Testing data sequence number for partitioned V2 tables.
+create table ice_tbl_v2_part (col_i int, col_str string)
+partitioned by spec (col_str)
+stored as iceberg
+tblproperties ('format-version'='2');
+insert into ice_tbl_v2_part values (1, "part1"), (2, "part1"), (3, "part2");
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from ice_tbl_v2_part order by col_i;
+---- RESULTS
+1,'part1',1
+2,'part1',1
+3,'part2',1
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+insert into ice_tbl_v2_part values (4, "part1"), (5, "part2");
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from ice_tbl_v2_part order by col_i;
+---- RESULTS
+1,'part1',1
+2,'part1',1
+3,'part2',1
+4,'part1',2
+5,'part2',2
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Delete from both partitions
+delete from ice_tbl_v2_part where col_i % 2 = 1;
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from ice_tbl_v2_part order by col_i;
+---- RESULTS
+2,'part1',1
+4,'part1',2
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+insert into ice_tbl_v2_part values (6, "part1"), (7, "part2");
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from ice_tbl_v2_part order by col_i;
+---- RESULTS
+2,'part1',1
+4,'part1',2
+6,'part1',4
+7,'part2',4
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Delete from one partition, insert into the other and check the data sequence number
+delete from ice_tbl_v2_part where col_i = 4;
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from ice_tbl_v2_part order by col_i;
+---- RESULTS
+2,'part1',1
+6,'part1',4
+7,'part2',4
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+insert into ice_tbl_v2_part values (8, "part2");
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from ice_tbl_v2_part order by col_i;
+---- RESULTS
+2,'part1',1
+6,'part1',4
+7,'part2',4
+8,'part2',6
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Order by ICEBERG__DATA__SEQUENCE__NUMBER while it's not in the select list.
+select * from ice_tbl_v2_part order by ICEBERG__DATA__SEQUENCE__NUMBER desc, col_i;
+---- RESULTS
+8,'part2'
+6,'part1'
+7,'part2'
+2,'part1'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Test when the sequence number comes from a view and is part of a join condition.
+with w as (select ICEBERG__DATA__SEQUENCE__NUMBER as seq from ice_tbl_v2_part)
+select seq, ap.i, ap.p_bigint from w
+join functional_parquet.iceberg_alltypes_part ap on seq = ap.i;
+---- RESULTS
+1,1,11
+---- TYPES
+BIGINT,INT,BIGINT
+====

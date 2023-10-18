@@ -942,6 +942,17 @@ public class IcebergUtil {
     if (partKeysOffset != -1) {
       FbIcebergMetadata.addPartitionKeys(fbb, partKeysOffset);
     }
+    if (cf.dataSequenceNumber() != null) {
+      FbIcebergMetadata.addDataSequenceNumber(fbb, cf.dataSequenceNumber());
+    } else {
+      // According to comments from the Iceberg code, data sequence numbers could be null
+      // when files were written with "older" Iceberg versions. Quote from the code
+      // comments of Iceberg's ContentFile.dataSequenceNumber():
+      // "This method can return null if the data sequence number is unknown. This may
+      // happen while reading a v2 manifest that did not persist the data sequence number
+      // for manifest entries with status DELETED (older Iceberg versions)."
+      FbIcebergMetadata.addDataSequenceNumber(fbb, -1l);
+    }
     return FbIcebergMetadata.endFbIcebergMetadata(fbb);
   }
 

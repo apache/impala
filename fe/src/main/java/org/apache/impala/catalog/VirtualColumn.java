@@ -45,6 +45,10 @@ public class VirtualColumn extends Column {
   public static VirtualColumn ICEBERG_PARTITION_SERIALIZED = new
       VirtualColumn("ICEBERG__PARTITION__SERIALIZED", Type.BINARY,
       TVirtualColumnType.ICEBERG_PARTITION_SERIALIZED);
+  public static VirtualColumn ICEBERG_DATA_SEQUENCE_NUMBER = new VirtualColumn(
+      "ICEBERG__DATA__SEQUENCE__NUMBER",
+      Type.BIGINT,
+      TVirtualColumnType.ICEBERG_DATA_SEQUENCE_NUMBER);
 
   public static VirtualColumn getVirtualColumn(TVirtualColumnType virtColType) {
     switch (virtColType) {
@@ -52,6 +56,7 @@ public class VirtualColumn extends Column {
       case FILE_POSITION: return FILE_POSITION;
       case PARTITION_SPEC_ID: return PARTITION_SPEC_ID;
       case ICEBERG_PARTITION_SERIALIZED: return ICEBERG_PARTITION_SERIALIZED;
+      case ICEBERG_DATA_SEQUENCE_NUMBER: return ICEBERG_DATA_SEQUENCE_NUMBER;
       default: break;
     }
     return null;

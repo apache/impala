@@ -1125,6 +1125,9 @@ bool HdfsScanPlanNode::HasVirtualColumnInTemplateTuple() const {
     } else if (sd->virtual_column_type() ==
         TVirtualColumnType::ICEBERG_PARTITION_SERIALIZED) {
       return true;
+    } else if (sd->virtual_column_type() ==
+        TVirtualColumnType::ICEBERG_DATA_SEQUENCE_NUMBER) {
+      return true;
     } else {
       // Adding DCHECK here so we don't forget to update this when adding new virtual
       // column.

@@ -801,3 +801,9 @@ optimize table ice_complex;
 ---- CATCH
 AnalysisException: Unable to INSERT into target table ($DATABASE.ice_complex) because the column 'int_array' has a complex type 'ARRAY<INT>' and Impala doesn't support inserting into tables containing complex type columns
 ====
+---- QUERY
+# ICEBERG__DATA__SEQUENCE__NUMBER is not supported for non-Iceberg tables.
+SELECT ICEBERG__DATA__SEQUENCE__NUMBER FROM functional_parquet.alltypes;
+---- CATCH
+AnalysisException: Could not resolve column/field reference: 'iceberg__data__sequence__number'
+====
