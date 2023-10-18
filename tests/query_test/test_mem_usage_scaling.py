@@ -26,7 +26,7 @@ from tests.common.test_dimensions import (create_avro_snappy_dimension,
     create_parquet_dimension)
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfFS
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfFS, SkipIf
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
@@ -374,6 +374,14 @@ class TestScanMemLimit(ImpalaTestSuite):
     # Remove num_nodes setting to allow .test file to set num_nodes.
     del vector.get_value('exec_option')['num_nodes']
     self.run_test_case('QueryTest/hdfs-scanner-thread-mem-scaling', vector)
+
+  @SkipIf.runs_slowly
+  def test_hdfs_scanner_thread_non_reserved_bytes(self, vector):
+    """Test that HDFS_SCANNER_NON_RESERVED_BYTES can limit the scale up of scanner threads
+    properly."""
+    # Remove num_nodes setting to allow .test file to set num_nodes.
+    del vector.get_value('exec_option')['num_nodes']
+    self.run_test_case('QueryTest/hdfs-scanner-thread-non-reserved-bytes', vector)
 
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster

@@ -116,6 +116,8 @@ class SkipIf:
   is_buggy_el6_kernel = pytest.mark.skipif(
       IS_BUGGY_EL6_KERNEL, reason="Kernel is affected by KUDU-1508")
   is_test_jdk = pytest.mark.skipif(IS_TEST_JDK, reason="Testing with different JDK")
+  runs_slowly = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.runs_slowly(),
+      reason="Test cluster runs slowly due to enablement of code coverage or sanitizer")
 
 class SkipIfLocal:
   # These are skipped due to product limitations.
