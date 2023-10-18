@@ -15,11 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-function getReadableSize(bytes) {
-    var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
-    if (bytes <= 0) return bytes + ' B';
-    var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+function getReadableSize(value, precision = 2) {
+  var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  var current_unit = 0;
+  while( value >= 1e3 ) {
+    value = value / 1e3;
+    ++current_unit;
+  }
+  return value.toFixed(precision) + ' ' + units[current_unit];
 }
 
 function getReadableTimeNS(value) {

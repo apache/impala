@@ -27,7 +27,7 @@ under the License.
 
 <div class="container">
 
-<style id="css">
+<style id="page_export-css">
 #fragment_diagram, #phases_header, #timeticks_footer {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
       Arial, "Noto Sans", sans-serif;
@@ -52,7 +52,7 @@ under the License.
     </label>
   </div>
   <label>
-    <input type="checkbox" id="plan_order" onClick="renderFragmentDiagram()"/>
+    <input type="checkbox" id="plan_order"/>
     Print tree in plan order (if unchecked, print in fragment order)
   </label>
 
@@ -93,700 +93,40 @@ under the License.
     <svg id="timeticks_footer"></svg>
   </div>
 </div>
-<div id="utilization_diagram">
-  <!--Utilization metrics is not available. Please make sure to set query option RESOURCE_TRACE_RATIO=true.-->
+<div id="host_utilization_diagram">
+  <!--Utilization metrics is not available. Please make sure to set query option
+    RESOURCE_TRACE_RATIO=true.-->
 </div>
 
 {{/plan_metadata_unavailable}}
 
 {{> www/common-footer.tmpl }}
 
-<script>
-
+<script type="module">
 $("#plan-timing-tab").addClass("active");
 
-var profile = {};
-
-var stroke_fill_colors = { black : "#000000", dark_grey : "#505050",
-    light_grey : "#F0F0F0", transperent : "rgba(0, 0, 0, 0)" };
-
-var row_height = 15;
-var char_width = 6;
-var margin_header_footer = 5;
-var margin_chart_end = 60;
-var border_stroke_width = 2;
-var diagram_width = window.innerWidth - border_stroke_width; // border width
-
-// #phases_header
-var phases = [
-  { color: "#C0C0FF", label: "Prepare" }
-, { color: "#E0E0E0", label: "Open" }
-, { color: "#FFFFC0", label: "Produce First Batch" }
-, { color: "#C0FFFF", label: "Send First Batch" }
-, { color: "#C0FFC0", label: "Process Remaining Batches" }
-, { color: "#FFC0C0", label: "Close" }
-];
-
-// #fragment_diagram
-var fragment_colors = ["#A9A9A9", "#FF8C00", "#8A2BE2", "#A52A2A", "#00008B", "#006400",
-                       "#228B22", "#4B0082", "#DAA520", "#008B8B", "#000000", "#DC143C"];
-var fragments = [];
-var all_nodes = [];
-var receiver_nodes = [];
-var max_namelen = 0;
-var frag_name_width;
-var name_width;
-var chart_width;
-
-// #timeticks_footer
-var ntics = 10;
-var integer_part_estimate = 4;
-var decimals = 2;
-var maxts = 0;
-var last_maxts = -1;
-
-// #utilization_diagram
-var utilization_counter_names = ["avg io wait", "avg sys", "avg user"];
-var cpu_utilization_chart;
-var cpu_nodes_usage_aggregate;
-var sampled_timeseries;
-var timeaxis_name = 'timeticks';
-var prev_num_samples = 0;
-var max_samples = 64;
-var max_samples_available = 0;
-var max_samples_collected = 0;
-var max_samples_period;
-var utilization_style;
-
-var fragment_events_parse_successful = false;
-var utilization_metrics_parse_successful = false;
-
-// binding DOM elements
-var timing_diagram = document.getElementById("timing_diagram");
-var phases_header = document.getElementById("phases_header");
-var fragment_diagram = document.getElementById("fragment_diagram");
-var timeticks_footer = document.getElementById("timeticks_footer");
-var utilization_diagram = document.getElementById("utilization_diagram");
-
-var export_filename = document.getElementById("export_filename");
-var export_format = document.getElementById("export_format");
-
-export_filename.value = export_filename.value.replace(/\W/g,'_');
-
-function get_svg_rect(fill_color, x, y, width, height, dash, stroke_color) {
-  var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  rect.setAttribute("x", `${x}px`);
-  rect.setAttribute("y", `${y}px`);
-  rect.setAttribute("width", `${width}px`);
-  rect.setAttribute("height", `${height}px`);
-  rect.setAttribute("fill", fill_color);
-  if (dash) {
-    rect.setAttribute("stroke", stroke_color);
-    rect.setAttribute("stroke-dasharray", "2 2");
-  }
-  return rect;
-}
-
-function get_svg_text(text, fill_color, x, y, height, container_center, max_width = 0) {
-  var text_el = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  text_el.appendChild(document.createTextNode(text));
-  text_el.setAttribute("x", `${x}px`);
-  text_el.setAttribute("y", `${y}px`);
-  text_el.style.fontSize = `${height / 1.5}px`;
-  if (container_center) {
-    text_el.setAttribute("dominant-baseline", "middle");
-    text_el.setAttribute("text-anchor", "middle");
-  }
-  text_el.setAttribute("fill", fill_color);
-  if (max_width != 0) {
-    text_el.setAttribute("textLength", max_width);
-    text_el.setAttribute("lengthAdjust", "spacingAndGlyphs");
-  }
-  return text_el;
-}
-
-function get_svg_line(stroke_color, x1, y1, x2, y2, dash) {
-  var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  line.setAttribute("x1", `${x1}px`);
-  line.setAttribute("y1", `${y1}px`);
-  line.setAttribute("x2", `${x2}px`);
-  line.setAttribute("y2", `${y2}px`);
-  line.setAttribute("stroke", stroke_color);
-  if (dash) {
-    line.setAttribute("stroke-dasharray", "2 2");
-  }
-  return line;
-}
-
-function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
-  var color_idx = 0;
-  var last_end = xoffset;
-  bar_height = row_height - 2;
-
-  events.forEach(function(ev) {
-    if (ev.no_bar == undefined) {
-      var x = last_end;
-      var y = rownum * row_height;
-
-      var endts = Math.max.apply(null, ev.tslist);
-      var width = xoffset + endts * px_per_ns - last_end;
-      last_end = x + width;
-
-      // Block phase outline
-      svg.appendChild(get_svg_rect(stroke_fill_colors.black, x, y, width, bar_height, false));
-      if (width > 2) {
-        svg.appendChild(get_svg_rect(phases[color_idx].color, x + 1, y + 1,
-            width - 2, bar_height - 2, false));
-      }
-
-      color_idx++;
-
-      // Grey dividers for other instances that finished earlier
-      ev.tslist.forEach(function(ts) {
-        var dx = (endts - ts) * px_per_ns;
-        var ignore_px = 2; // Don't print tiny skews
-        if (Math.abs(dx) > ignore_px) {
-          svg.appendChild(get_svg_line(stroke_fill_colors.dark_grey, last_end - dx, y , last_end - dx,
-              y + bar_height, false));
-        }
-      });
-    }
-  });
-}
-
-function collectFragmentEventsFromProfile(ignored_arg) {
-  rownum = 0;
-  max_namelen = 0;
-  fragments = [];
-  all_nodes = [];
-  receiver_nodes = [];
-  var color_idx = 0;
-  try {
-    // First pass: compute sizes
-    profile.child_profiles[2].child_profiles.forEach(function(fp) {
-
-      if (fp.child_profiles != undefined &&
-          fp.child_profiles[0].event_sequences != undefined) {
-        var cp = fp.child_profiles[0];
-        var fevents = fp.child_profiles[0].event_sequences[0].events;
-
-        // Build list of timestamps that spans instances for each event
-        for (var en = 0; en < fevents.length; ++en) {
-          if (fevents[en].label.includes("AsyncCodegen")) {
-            fevents[en].no_bar = true;
-            continue;
-          }
-          fevents[en].tslist = [ fevents[en].timestamp ];
-          for (var instance = 1; instance < fp.child_profiles.length; ++instance) {
-            if (fp.child_profiles[instance].event_sequences != undefined) {
-              fevents[en].tslist.push(
-                  fp.child_profiles[instance].event_sequences[0].events[en].timestamp);
-            }
-          }
-        }
-
-        fragment = {
-          name: fp.profile_name,
-          events: fevents,
-          nodes: [ ],
-          color: fragment_colors[color_idx]
-        }
-        // Pick a new color for each plan fragment
-        color_idx = (color_idx + 1) % fragment_colors.length;
-        maxts = Math.max(maxts, fevents[fevents.length - 1].timestamp);
-        max_namelen = Math.max(max_namelen, fp.profile_name.length);
-        var node_path = [];
-        var node_stack = [];
-        cp.child_profiles.forEach(function get_plan_nodes(pp, index) {
-          if (pp.node_metadata != undefined) {
-            node_path.push(index);
-            var name_flds = pp.profile_name.split(/[()]/);
-            var node_type = name_flds[0].trim();
-            var node_id = name_flds.length > 1 ? name_flds[1].split(/[=]/)[1] : 0;
-            node_name = pp.profile_name.replace("_NODE", "").replace("_", " ")
-                .replace("KrpcDataStreamSender", "SENDER")
-                .replace("Hash Join Builder", "JOIN BUILD")
-                .replace("join node_", "");
-            if (node_type.indexOf("SCAN_NODE") >= 0) {
-              var table_name = pp.info_strings.find(({ key }) => key === "Table Name")
-                  .value.split(/[.]/);
-              node_name = node_name.replace("SCAN",
-                  `SCAN [${table_name[table_name.length - 1]}]`);
-            }
-
-            var is_receiver = node_type == "EXCHANGE_NODE" ||
-                (node_type == "HASH_JOIN_NODE" && pp.num_children < 3);
-
-            var is_sender = (node_type == "Hash Join Builder" ||
-                             node_type == "KrpcDataStreamSender");
-            var parent_node;
-            if (node_type == "PLAN_ROOT_SINK") {
-              parent_node = undefined;
-            } else if (pp.node_metadata.data_sink_id != undefined) {
-              parent_node = receiver_nodes[node_id]; // Exchange sender dst
-            } else if (pp.node_metadata.join_build_id != undefined) {
-              parent_node = receiver_nodes[node_id]; // Join sender dst
-            } else if (node_stack.length > 0) {
-              parent_node = node_stack[node_stack.length - 1];
-            } else if (all_nodes.length) {
-              parent_node = all_nodes[all_nodes.length - 1];
-            }
-
-            max_namelen = Math.max(max_namelen, node_name.length + node_stack.length + 1);
-
-            if (pp.event_sequences != undefined) {
-              var node_events = pp.event_sequences[0].events;
-
-              // Start the instance event list for each event with timestamps from this instance
-              for (var en = 0; en < node_events.length; ++en) {
-                node_events[en].tslist = [ node_events[en].timestamp ];
-                if (node_type == "HASH_JOIN_NODE" && (en == 1 || en == 2)) {
-                  node_events[en].no_bar = true;
-                }
-              }
-            }
-            var node = {
-                name: node_name,
-                type: node_type,
-                node_id: node_id,
-                num_children: 0,
-                child_index: 0,
-                metadata: pp.node_metadata,
-                parent_node: parent_node,
-                events: node_events,
-                path: node_path.slice(0),
-                is_receiver: is_receiver,
-                is_sender: is_sender
-            }
-
-            if (is_sender) {
-              node.parent_node.sender_frag_index = fragments.length;
-            }
-
-            if (is_receiver) {
-              receiver_nodes[node_id] = node;
-            }
-
-            if (parent_node != undefined) {
-              node.child_index = parent_node.num_children++;
-            }
-
-            all_nodes.push(node);
-
-            fragment.nodes.push(node);
-
-            if (pp.child_profiles != undefined) {
-              node_stack.push(node);
-              pp.child_profiles.forEach(get_plan_nodes);
-              node = node_stack.pop();
-            }
-            rownum++;
-            node_path.pop();
-          }
-        });
-
-
-        // For each node, retrieve the instance timestamps for the remaining instances
-        for (var ni = 0; ni < fragment.nodes.length; ++ni) {
-          var node = fragment.nodes[ni];
-          for (var cpn = 1; cpn < fp.child_profiles.length; ++cpn) {
-            var cp = fp.child_profiles[cpn];
-
-            // Use the saved node path to traverse to the same position in this instance
-            for (var pi = 0; pi < node.path.length; ++pi) {
-              cp = cp.child_profiles[node.path[pi]];
-            }
-            console.assert(cp.node_metadata.data_sink_id == undefined ||
-                           cp.profile_name.indexOf(`(dst_id=${node.node_id})`));
-            console.assert(cp.node_metadata.plan_node_id == undefined ||
-                           cp.node_metadata.plan_node_id == node.node_id);
-
-            // Add instance events to this node
-            if (cp.event_sequences != undefined) {
-              for (var en = 0; en < node.events.length; ++en) {
-                node.events[en].tslist.push(cp.event_sequences[0].events[en].timestamp);
-              }
-            }
-          }
-        }
-
-        fragments.push(fragment);
-      }
-    });
-    frag_name_width = (Math.max(2, (fragments.length - 1).toString().length) + 3) * char_width;
-    name_width = max_namelen * char_width + (frag_name_width + 2);
-    fragment_events_parse_successful = true;
-  } catch(e) {
-    fragment_events_parse_successful = false;
-    console.log(e);
-  }
-}
-
-function setDimensions(ignored_arg) {
-  var display_height = Math.min(window.innerHeight - timing_diagram.offsetTop - 50
-    - (utilization_metrics_parse_successful? getUtilizationHeight() : 0), rownum * row_height);
-
-  chart_width = diagram_width - name_width - margin_chart_end - border_stroke_width;
-
-  phases_header.style.height = `${row_height}px`;
-  fragment_diagram.parentElement.style.height = `${display_height}px`;
-  fragment_diagram.style.height = `${rownum * row_height}px`;
-  timeticks_footer.style.height = `${row_height}px`;
-
-  fragment_diagram.parentElement.style.width = `${diagram_width}px`;
-  phases_header.parentElement.style.width = `${diagram_width}px`;
-  timeticks_footer.parentElement.style.width = `${diagram_width}px`;
-  timing_diagram.parentElement.style.width = `${diagram_width}px`;
-
-  fragment_diagram.style.width = `${diagram_width}px`;
-  phases_header.style.width = `${diagram_width}px`;
-  timeticks_footer.style.width = `${diagram_width}px`;
-}
-
-function clearDOMChildren(element) {
-  while (element.firstChild) {
-    element.removeChild(element.firstChild);
-  }
-}
-
-async function renderPhases() {
-  clearDOMChildren(phases_header);
-  var color_idx = 0;
-  var width = Math.ceil(chart_width / phases.length);
-  phases.forEach(function(p) {
-    var x = name_width + Math.ceil(chart_width * color_idx / phases.length);
-    x = Math.min(x, diagram_width - width);
-
-    phases_header.appendChild(get_svg_rect(stroke_fill_colors.black, x, 0, width, row_height, false));
-    phases_header.appendChild(get_svg_rect(phases[color_idx++].color, x + 1, 1,
-        width - 2, row_height - 2, false));
-    phases_header.appendChild(get_svg_text(p.label, stroke_fill_colors.black, x + width / 2,
-        (row_height + 4) / 2 , row_height, true, Math.min(p.label.length * char_width, width / 1.5)));
-   });
-}
-
-async function renderFragmentDiagram() {
-  clearDOMChildren(fragment_diagram);
-  last_maxts = maxts;
-  var plan_order = document.getElementById('plan_order').checked;
-  var px_per_ns = chart_width / maxts;
-  var rownum_l = 0;
-  var max_indent = 0;
-  var pending_children = 0;
-  var pending_senders = 0;
-  var text_y = row_height - 4;
-  fragments.forEach(function printFragment(fragment) {
-    if (!fragment.printed) {
-      fragment.printed = true;
-
-      var pending_fragments = [];
-      var fevents = fragment.events;
-
-      frag_name = fragment.name.replace("Coordinator ", "").replace("Fragment ", "");
-
-      fragment_diagram.appendChild(get_svg_text(frag_name, fragment.color, 1, text_y,
-          row_height, false));
-
-      // Fragment/sender timing row
-      DrawBars(fragment_diagram, rownum_l, row_height, fevents, name_width, px_per_ns);
-
-      for (var i = 0; i < fragment.nodes.length; ++i) {
-        var node = fragment.nodes[i];
-
-        if (node.events != undefined) {
-          // Plan node timing row
-          DrawBars(fragment_diagram, rownum_l, row_height, node.events, name_width, px_per_ns);
-          if (node.type == "HASH_JOIN_NODE") {
-            fragment_diagram.appendChild(get_svg_text("X", stroke_fill_colors.black,
-                name_width + Math.min.apply(null, node.events[2].tslist) * px_per_ns,
-                text_y, row_height, false));
-            fragment_diagram.appendChild(get_svg_text("O", stroke_fill_colors.black,
-                name_width + Math.min.apply(null, node.events[2].tslist) * px_per_ns,
-                text_y, row_height, false));
-          }
-        }
-
-        if (node.is_receiver) {
-          pending_senders++;
-        } else if (node.is_sender) {
-          pending_senders--;
-        }
-        if (!node.is_sender) {
-          pending_children--;
-        }
-
-        var label_x = frag_name_width + char_width * pending_children;
-        var label_width = Math.min(char_width * node.name.length,
-            name_width - label_x - 2);
-        fragment_diagram.appendChild(get_svg_text(node.name, fragment.color,
-            label_x, text_y, row_height, false));
-
-        if (node.parent_node != undefined) {
-          var y = row_height * node.parent_node.rendering.rownum;
-          if (node.is_sender) {
-            var x = name_width + Math.min.apply(null, fevents[3].tslist) * px_per_ns;
-            // Dotted horizontal connector to received rows
-            fragment_diagram.appendChild(get_svg_line(fragment.color, name_width,
-                y + row_height / 2 - 1, x, y + row_height / 2 - 1, true));
-
-            // Dotted rectangle for received rows
-            var x2 = name_width + Math.max.apply(null,fevents[4].tslist) * px_per_ns;
-            fragment_diagram.appendChild(get_svg_rect(stroke_fill_colors.transperent,
-                x, y + 4, x2 - x, row_height - 10, true, fragment.color));
-          }
-
-          if (node.is_sender && node.parent_node.rendering.rownum != rownum_l - 1) {
-            // DAG edge on right side to distant sender
-            var x = name_width - (pending_senders) * char_width - char_width / 2;
-            fragment_diagram.appendChild(get_svg_line(fragment.color,
-                node.parent_node.rendering.label_end,
-                y + row_height / 2, x , y + row_height / 2, false));
-            fragment_diagram.appendChild(get_svg_line(fragment.color, x, y + row_height / 2,
-                x, text_y - row_height / 2 + 3, false));
-            fragment_diagram.appendChild(get_svg_line(fragment.color, x,
-                text_y - row_height / 2 + 3, label_x + label_width,
-                text_y - row_height / 2 + 3, false));
-
-          } else {
-            // DAG edge from parent to immediate child
-            var x = frag_name_width + (pending_children + 1) * char_width - char_width / 2;
-            fragment_diagram.appendChild(get_svg_line(fragment.color, x, y + row_height - 3,
-                x, text_y - row_height + 6, false));
-          }
-
-        }
-        node.rendering = { rownum: rownum_l, label_end: label_x + label_width };
-        if (node.num_children) // Scan (leaf) node
-          pending_children += (node.num_children - node.is_receiver);
-        text_y += row_height;
-        rownum_l++;
-
-        if (node.is_receiver) {
-          if (plan_order) {
-            printFragment(fragments[node.sender_frag_index])
-          } else {
-            pending_fragments.push(fragments[node.sender_frag_index]);
-          }
-        }
-
-      }
-
-      // Visit sender fragments in reverse order to avoid dag edges crossing
-      pending_fragments.reverse().forEach(printFragment);
-
-    }
-  });
-  fragments.forEach(function(fragment) {
-    fragment.printed = false;
-  });
-}
-
-async function renderTimeticks() {
-  clearDOMChildren(timeticks_footer);
-  var sec_per_tic = maxts / ntics / 1e9;
-  var px_per_tic = chart_width / ntics;
-  var x = name_width;
-  var y = 0;
-  var text_y = row_height - 4;
-  var timetick_label;
-  for (var i = 1; i <= ntics; ++i) {
-    timeticks_footer.appendChild(get_svg_rect(stroke_fill_colors.black, x, y, px_per_tic,
-        row_height, false));
-    timeticks_footer.appendChild(get_svg_rect(stroke_fill_colors.light_grey, x + 1, y + 1, px_per_tic - 2,
-        row_height - 2, false));
-    timetick_label = (i * sec_per_tic).toFixed(decimals);
-    timeticks_footer.appendChild(get_svg_text(timetick_label, stroke_fill_colors.black,
-        x + px_per_tic - timetick_label.length * char_width + 2, text_y, row_height, false));
-    x += px_per_tic;
-  }
-}
-
-function getUtilizationHeight() {
-  return window.innerHeight * 0.3;
-}
-
-function toogleUtilizationVisibility() {
-  if (utilization_metrics_parse_successful) {
-    utilization_diagram.style.display = 'flex';
-  } else {
-    utilization_diagram.style.display = 'none';
-  }
-}
-
-function initializeUtilizationChart() {
-  try {
-    cpu_utilization_chart.destroy();
-  } catch (e) {}
-  cpu_utilization_chart = c3.generate({
-    bindto : "#utilization_diagram",
-    data : {
-      columns : [[timeaxis_name, 0]],
-      type : 'area',
-      groups : [ utilization_counter_names ],
-      order : 'asc',
-      x : timeaxis_name
-    }, size : {
-      height : getUtilizationHeight(),
-      width : diagram_width
-    }, padding : {
-      left : name_width,
-      right : margin_chart_end
-    }, axis : {
-      x :
-      {
-        padding : {
-          left : 0,
-          right : 0
-        },
-        tick : {
-          format : function (x) { return x.toFixed(decimals); }
-        }
-      }
-    }, legend : {
-      show : false
-    }, tooltip : {
-      format : {
-        value : function (value, ratio, id, index) { return value.toFixed(decimals) + '%'; }
-      }
-    }
-  });
-  cpu_utilization_chart.load({
-    unload : true
-  });
-}
-
-function initializeUtilizationMetrics() {
-  // user, sys, io and sampled timeticks
-  cpu_nodes_usage_aggregate = new Array(3);
-  for (var i = 0; i < 3; ++i) {
-    cpu_nodes_usage_aggregate[i] = new Array(max_samples + 2).fill(0);
-    cpu_nodes_usage_aggregate[i][0] = utilization_counter_names[i];
-  }
-  sampled_timeseries = new Array(max_samples + 2).fill(null);
-  sampled_timeseries[0] = timeaxis_name;
-}
-
-function accumulateUtilization(utilization_array, time_series_counter) {
-  var utilization_samples = time_series_counter.data.split(",").map(el => parseInt(el) / 100);
-  if (utilization_samples.length <= 1) return;
-  for (var j = 0; j < utilization_samples.length; ++j) {
-    utilization_array[j + 1] += utilization_samples[j];
-  }
-  if (time_series_counter.num > max_samples_collected) {
-    max_samples_available = utilization_samples.length;
-    max_samples_period = time_series_counter.period;
-    max_samples_collected = time_series_counter.num;
-  }
-}
-
-function clearTimesamples(timesamples_array) {
-  for (var j = 1; j <= max_samples_available + 1; ++j) {
-    timesamples_array[j] = null;
-  }
-}
-
-function clearUtilization(utilization_array) {
-  for (var j = 1; j <= max_samples_available + 1; ++j) {
-    utilization_array[j] = 0;
-  }
-}
-
-function collectUtilizationFromProfile(ignored_arg) {
-  try {
-    var per_node_profiles = profile.child_profiles[2].child_profiles[0];
-    if (cpu_utilization_chart == undefined) {
-      initializeUtilizationMetrics();
-      initializeUtilizationChart();
-    }
-    // Update the plot, only when number of samples in SummaryStatsCounter is updated
-    if (profile.child_profiles[1].summary_stats_counters[0].num_of_samples != prev_num_samples) {
-      // For each node's profile
-      per_node_profiles.child_profiles.forEach(function (cpu_node, cpu_node_i) {
-        for (var i = 0; i < 3; ++i) {// usr, sys and iowait
-          accumulateUtilization(cpu_nodes_usage_aggregate[i],
-              cpu_node.time_series_counters[i]);
-        }
-      });
-      if (max_samples_available <= 2) {
-        cpu_utilization_chart.destroy();
-        cpu_utilization_chart = undefined;
-        clearDOMChildren(utilization_diagram);
-        utilization_diagram.style = "";
-        utilization_diagram.className = "";
-        utilization_diagram.style.height = `${getUtilizationHeight()}px`;
-        utilization_diagram.innerHTML = `<span style="color:#ff0f0f;font-size:20px;">
-            Warning: not enough samples for CPU utilization plot. Please decrease the
-            value of starting flag variable <b></i>periodic_counter_update_period_ms
-            </b></i> to increase the granularity of CPU utilization plot.</span>`;
-        utilization_diagram.style.justifyContent = "center";
-        utilization_diagram.style.alignItems = "center";
-        utilization_metrics_parse_successful = true;
-        return;
-      }
-      cpu_nodes_usage_aggregate.forEach(function (acc_usage) {
-        for (var i = 1; i <= max_samples_available; ++i) {
-          acc_usage[i] = acc_usage[i] / per_node_profiles.child_profiles.length;
-        }
-      });
-      var avg_period = max_samples_collected * max_samples_period / max_samples_available;
-      avg_period = avg_period / 1000;
-      for (var k = 0; k <= max_samples_available; k++) {
-        sampled_timeseries[k + 1] = (k * avg_period);
-      }
-      if (maxts / 1e9 > sampled_timeseries[max_samples_available + 1]) {
-        sampled_timeseries[max_samples_available + 1] = maxts / 1e9;
-      } else {
-        maxts = sampled_timeseries[max_samples_available + 1] * 1e9;
-      }
-      cpu_utilization_chart.load({
-        columns : [...cpu_nodes_usage_aggregate, sampled_timeseries]
-      });
-      cpu_nodes_usage_aggregate.forEach(function (acc_usage) {
-        clearUtilization(acc_usage);
-      });
-      clearTimesamples(sampled_timeseries);
-      prev_num_samples = profile.child_profiles[1].summary_stats_counters[0].num_of_samples;
-    }
-    utilization_metrics_parse_successful = true;
-  } catch (e) {
-    utilization_metrics_parse_successful = false;
-    console.log(e);
-  }
-}
-
-async function renderUtilization() {
-  cpu_utilization_chart.resize({
-    height: getUtilizationHeight(),
-    width: diagram_width
-  });
-  utilization_diagram.style.width = `${diagram_width}px`;
-}
-
-function renderAll() {
-  if (fragment_events_parse_successful) {
-    setDimensions();
-    renderPhases();
-    renderFragmentDiagram();
-    renderTimeticks();
-  }
-  if (utilization_metrics_parse_successful) {
-    renderUtilization();
-  }
-}
-
-function refresh() {
+import {renderTimingDiagram, collectFragmentEventsFromProfile, ntics, set_ntics} from
+    "./www/scripts/query_timeline/fragment_diagram.js";
+import {collectUtilizationFromProfile, toogleUtilizationVisibility} from
+    "/www/scripts/query_timeline/host_utilization_diagram.js";
+import {profile, set_profile, diagram_width, set_diagram_width, border_stroke_width,
+    resizeHorizontalAll, maxts} from "/www/scripts/query_timeline/global_members.js";
+
+var chart_export_style;
+var last_maxts;
+
+window.onload = function refresh() {
   var req = new XMLHttpRequest();
   req.onload = function() {
     if (req.status == 200) {
-      profile = JSON.parse(req.responseText)["profile_json"];
+      set_profile(JSON.parse(req.responseText)["profile_json"]);
       collectFragmentEventsFromProfile();
       collectUtilizationFromProfile();
-      toogleUtilizationVisibility();
-      if (maxts == last_maxts) {
-        renderUtilization();
-      } else {
-        renderAll();
+      if (last_maxts != maxts) {
+        renderTimingDiagram();
+        last_maxts = maxts;
       }
+      toogleUtilizationVisibility();
       if (profile.child_profiles[0].info_strings.find(({key}) =>
           key === "End Time").value == "") {
         setTimeout(refresh, 1000);
@@ -797,10 +137,15 @@ function refresh() {
   req.send();
 }
 
+window.addEventListener('resize', function(event) {
+  set_diagram_width(Math.max(window.innerWidth, diagram_width - border_stroke_width));
+  resizeHorizontalAll();
+}, true);
+
 // Attaches a SVG blob of the complete timeline to the associated link
-export_link.addEventListener('click', function(event) {
+export_link.addEventListener('click', function (event) {
   if (export_format.value == ".html") {
-    var export_style = document.getElementById("css");
+    var export_style = document.getElementById("page_export-css");
 
     // Deep clone 'parentNode's as wrappers to SVG components
     var fragment_diagram_wrapper = fragment_diagram.parentNode.cloneNode(true);
@@ -810,9 +155,9 @@ export_link.addEventListener('click', function(event) {
 
     var html_blob = new Blob(['<!DOCTYPE html><body>',
         '<h1 style=\"font-family:monospace;\">Query {{query_id}}</h1>',
-        `<style>${export_style.innerHTML} ${utilization_style}</style>`,
+        `<style>${export_style.innerHTML} ${chart_export_style}</style>`,
         phases_header.parentNode.outerHTML, fragment_diagram_wrapper.outerHTML,
-        timeticks_footer.parentElement.outerHTML, utilization_diagram.outerHTML,
+        timeticks_footer.parentElement.outerHTML, host_utilization_diagram.outerHTML,
         '</body></html>'], {type: 'text/html;charset=utf-8'});
     export_link.href = URL.createObjectURL(html_blob);
   }
@@ -820,45 +165,9 @@ export_link.addEventListener('click', function(event) {
   export_link.click();
 });
 
-timeticks_footer.addEventListener('wheel', function(e) {
-  var rendering_constraint = char_width * (decimals + integer_part_estimate) >= chart_width / ntics;
-  if (e.shiftKey) {
-    if (e.altKey) {
-      if (decimals <= 1 && e.wheelDelta <= 0) return;
-      if (e.wheelDelta >= 0) {
-        if (rendering_constraint) return;
-        ++decimals;
-      } else {
-        --decimals;
-      }
-    } else {
-      if (ntics <= 10 && e.wheelDelta <= 0) return;
-      if (rendering_constraint && e.wheelDelta >= 0) return;
-      ntics += Math.round(e.wheelDelta / 200);
-    }
-    renderTimeticks();
-  }
-});
+fetch(make_url("/www/c3/c3.v7.min.css"))
+  .then(res => res.text())
+  .then(style => chart_export_style = style);
 
-fragment_diagram.addEventListener('wheel', function(e) {
-  var rendering_constraint = char_width * (decimals + integer_part_estimate) >= chart_width / ntics;
-  if (e.shiftKey) {
-    if (diagram_width <= window.innerWidth && e.wheelDelta <= 0) return;
-    if (rendering_constraint && e.wheelDelta <= 0) return;
-    diagram_width += Math.round(e.wheelDelta * 6 / 10);
-    renderAll();
-  }
-});
-
-window.addEventListener('resize', function(event) {
-  diagram_width = Math.max(window.innerWidth, diagram_width - border_stroke_width);
-  renderAll();
-}, true);
-
-window.onload = function() {
-  refresh();
-  fetch(make_url("/www/c3/c3.v7.min.css"))
-    .then(res => res.text())
-    .then(style => utilization_style = style);
-}
+export_filename.value = export_filename.value.replace(/\W/g,'_');
 </script>
