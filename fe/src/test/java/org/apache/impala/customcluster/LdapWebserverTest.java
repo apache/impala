@@ -321,6 +321,37 @@ public class LdapWebserverTest {
   }
 
   @Test
+  public void testWebserverTrustedDomainEmptyXffHeaderUseOrigin() throws Exception {
+    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true " +
+          "--trusted_domain_empty_xff_header_use_origin=true", "", "", "", "");
+
+    // Case 1: Authenticate as 'Test1Ldap' without password, send X-Forwarded-For header
+    attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.0.1", false);
+
+    // Case 2: Authenticate as 'Test1Ldap' without password, do not send X-Forwarded-For
+    // header
+    attemptConnection("Basic VGVzdDFMZGFwOg==", null, false);
+
+    // Case 3: Authenticate as 'Test1Ldap' without password, send X-Forwarded-For header
+    // that does not match trusted_domain
+    try {
+      attemptConnection("Basic VGVzdDFMZGFwOg==", "126.0.23.1", false);
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
+    }
+
+    // Case 4: Authenticate as 'Test1Ldap' without password, do not send X-Forwarded-For
+    // header and the origin does not match trusted_domain
+    setUp("--trusted_domain=any.domain --trusted_domain_use_xff_header=true " +
+            "--trusted_domain_empty_xff_header_use_origin=true", "", "", "", "");
+    try {
+      attemptConnection("Basic VGVzdDFMZGFwOg==", null, false);
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
+    }
+  }
+
+  @Test
   public void testWebserverTrustedAuthHeader() throws Exception {
     setUp("--trusted_auth_header=X-Trusted-Proxy-Auth-Header", "", "", "", "");
 

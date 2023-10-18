@@ -158,6 +158,7 @@ DECLARE_string(ssl_cipher_list);
 DECLARE_string(tls_ciphersuites);
 DECLARE_string(trusted_domain);
 DECLARE_bool(trusted_domain_use_xff_header);
+DECLARE_bool(trusted_domain_empty_xff_header_use_origin);
 DECLARE_bool(trusted_domain_strict_localhost);
 DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);
@@ -743,6 +744,11 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
         xff_origin_string :
         GetRemoteAddress(request_info).ToString();
     StripWhiteSpace(&origin);
+    if (origin.empty() && FLAGS_trusted_domain_use_xff_header &&
+        FLAGS_trusted_domain_empty_xff_header_use_origin) {
+      origin = GetRemoteAddress(request_info).ToString();
+      StripWhiteSpace(&origin);
+    }
     if (!origin.empty()) {
       if (TrustedDomainCheck(origin, connection, request_info)) {
         total_trusted_domain_check_success_->Increment(1);

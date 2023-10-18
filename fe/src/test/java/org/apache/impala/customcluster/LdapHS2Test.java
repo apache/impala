@@ -494,6 +494,86 @@ public class LdapHS2Test {
     hiveserver2TrustedDomainAuthTestBody(false);
   }
 
+  @Test
+  public void testHiveserver2TrustedDomainEmptyXffHeaderUseOrigin() throws Exception {
+    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true " +
+          "--trusted_domain_empty_xff_header_use_origin=true");
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(0);
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    // Case 1: Authenticate as 'Test1Ldap' without password, send X-Forwarded-For header
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'Test1Ldap'.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(1);
+    // Running a query should succeed.
+    TOperationHandle operationHandle = execAndFetch(
+            client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(3);
+
+    // Case 2: Authenticate as 'Test1Ldap' without password, do not send X-Forwarded-For
+    // header
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.remove("X-Forwarded-For");
+    transport.setCustomHeaders(headers);
+    openResp = client.OpenSession(openReq);
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(4);
+    operationHandle = execAndFetch(client, openResp.getSessionHandle(),
+            "select logged_in_user()", "Test1Ldap");
+    verifyMetrics(0, 0);
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyTrustedDomainMetrics(6);
+
+    // Case 3: Authenticate as 'Test1Ldap' without password, send X-Forwarded-For header
+    // that does not match trusted_domain
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.put("X-Forwarded-For", "126.0.23.1");
+    transport.setCustomHeaders(headers);
+    try {
+      openResp = client.OpenSession(openReq);
+      fail("Authentication should fail without password.");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+      // One basic auth failure
+      verifyMetrics(0, 1);
+      // And no more successful authentication
+      verifyTrustedDomainMetrics(6);
+    }
+
+    // Case 4: Authenticate as 'Test1Ldap' without password, do not send X-Forwarded-For
+    // header and the origin does not match trusted_domain
+    setUp("--trusted_domain=any.domain --trusted_domain_use_xff_header=true " +
+            "--trusted_domain_empty_xff_header_use_origin=true");
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.remove("X-Forwarded-For");
+    transport.setCustomHeaders(headers);
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(0);
+    try {
+      openResp = client.OpenSession(openReq);
+      fail("Authentication should fail without password.");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+      // One basic auth failure
+      verifyMetrics(0, 1);
+      // No successful trusted domain authentications
+      verifyTrustedDomainMetrics(0);
+    }
+  }
+
   /**
    * Tests if authentication is skipped when connections to the HTTP hiveserver2
    * endpoint have trusted auth header.

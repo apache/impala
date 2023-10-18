@@ -132,6 +132,16 @@ DEFINE_bool(trusted_domain_use_xff_header, false,
     "domain. Only used if '--trusted_domain' is specified. Warning: Only use this if you "
     "trust the incoming connection to have this set correctly.");
 
+DEFINE_bool(trusted_domain_empty_xff_header_use_origin, false,
+    "If set to true and the 'X-Forwarded-For' HTML header value is empty in the request, "
+    "then the origin of the the underlying transport is used while attempting to "
+    "verify if the connection request originated from a trusted domain. Only used "
+    "if '--trusted_domain' and '--trusted_domain_use_xff_header' flags are specified. "
+    "Warning: In case the 'X-Forwarded-For' HTML header is empty or not in the request, "
+    "this flag allows a fallback to the default behavior in trusted domain check "
+    "(where '--trusted_domain' flag is specified, but '--trusted_domain_use_xff_header' "
+    "flag is not set).");
+
 DEFINE_bool(trusted_domain_strict_localhost, true,
     "If set to true and trusted_domain='localhost', this will not use reverse DNS to "
     "determine if something is from localhost. It will only match 127.0.0.1. This is "

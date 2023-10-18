@@ -36,6 +36,7 @@
 #include "common/logging.h"
 
 DECLARE_bool(trusted_domain_use_xff_header);
+DECLARE_bool(trusted_domain_empty_xff_header_use_origin);
 DECLARE_bool(saml2_ee_test_mode);
 DECLARE_string(trusted_auth_header);
 
@@ -367,6 +368,11 @@ void THttpServer::headersDone() {
     string origin =
         FLAGS_trusted_domain_use_xff_header ? origin_ : transport_->getOrigin();
     StripWhiteSpace(&origin);
+    if (origin.empty() && FLAGS_trusted_domain_use_xff_header &&
+        FLAGS_trusted_domain_empty_xff_header_use_origin) {
+      origin = transport_->getOrigin();
+      StripWhiteSpace(&origin);
+    }
     if (!origin.empty()) {
       if (callbacks_.trusted_domain_check_fn(origin, auth_value_)) {
         authorized = true;
