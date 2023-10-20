@@ -61,6 +61,7 @@ import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TimeTravelSpec.Kind;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
@@ -329,7 +330,7 @@ public interface FeIcebergTable extends FeFsTable {
     return false;
   }
 
-  THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag);
+  THdfsTable transformToTHdfsTable(boolean updatePartitionFlag, ThriftObjectType type);
 
   /**
    * Returns the current snapshot id of the Iceberg API table if it exists, otherwise
@@ -645,6 +646,11 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     public static TIcebergTable getTIcebergTable(FeIcebergTable icebergTable) {
+      return getTIcebergTable(icebergTable, ThriftObjectType.FULL);
+    }
+
+    public static TIcebergTable getTIcebergTable(FeIcebergTable icebergTable,
+        ThriftObjectType type) {
       TIcebergTable tIcebergTable = new TIcebergTable();
       tIcebergTable.setTable_location(icebergTable.getIcebergTableLocation());
 
@@ -654,7 +660,9 @@ public interface FeIcebergTable extends FeFsTable {
       tIcebergTable.setDefault_partition_spec_id(
           icebergTable.getDefaultPartitionSpecId());
 
-      tIcebergTable.setContent_files(icebergTable.getContentFileStore().toThrift());
+      if (type == ThriftObjectType.FULL) {
+        tIcebergTable.setContent_files(icebergTable.getContentFileStore().toThrift());
+      }
 
       tIcebergTable.setCatalog_snapshot_id(icebergTable.snapshotId());
       tIcebergTable.setParquet_compression_codec(

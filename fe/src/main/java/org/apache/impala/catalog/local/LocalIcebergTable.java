@@ -27,7 +27,7 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.IcebergPartitionSpec;
-import org.apache.impala.catalog.CatalogObject;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
@@ -253,17 +253,14 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
         FeCatalogUtils.getTColumnDescriptors(this),
         getNumClusteringCols(),
         name_, db_.getName());
-    desc.setIcebergTable(Utils.getTIcebergTable(this));
-    desc.setHdfsTable(transfromToTHdfsTable());
+    desc.setIcebergTable(Utils.getTIcebergTable(this, ThriftObjectType.DESCRIPTOR_ONLY));
+    desc.setHdfsTable(transformToTHdfsTable(false, ThriftObjectType.DESCRIPTOR_ONLY));
     return desc;
   }
 
   @Override
-  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
-    return this.transfromToTHdfsTable();
-  }
-
-  private THdfsTable transfromToTHdfsTable() {
+  public THdfsTable transformToTHdfsTable(boolean updatePartitionFlag,
+      ThriftObjectType type) {
     Map<Long, THdfsPartition> idToPartition = new HashMap<>();
     // LocalFsTable transformed from iceberg table only has one partition
     Collection<? extends FeFsPartition> partitions =
@@ -272,11 +269,11 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     FeFsPartition partition = (FeFsPartition) partitions.toArray()[0];
     idToPartition.put(partition.getId(),
         FeCatalogUtils.fsPartitionToThrift(partition,
-            CatalogObject.ThriftObjectType.DESCRIPTOR_ONLY));
+            ThriftObjectType.DESCRIPTOR_ONLY));
 
     THdfsPartition tPrototypePartition = FeCatalogUtils.fsPartitionToThrift(
         localFsTable_.createPrototypePartition(),
-        CatalogObject.ThriftObjectType.DESCRIPTOR_ONLY);
+        ThriftObjectType.DESCRIPTOR_ONLY);
     THdfsTable hdfsTable = new THdfsTable(localFsTable_.getHdfsBaseDir(),
         getColumnNames(), localFsTable_.getNullPartitionKeyValue(),
         FeFsTable.DEFAULT_NULL_COLUMN_VALUE, idToPartition, tPrototypePartition);

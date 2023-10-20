@@ -35,7 +35,7 @@ import org.apache.iceberg.types.TypeUtil;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.CatalogObject;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.CtasTargetTable;
 import org.apache.impala.catalog.Db;
@@ -49,7 +49,6 @@ import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.catalog.IcebergTable;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.local.LocalDb;
 import org.apache.impala.catalog.local.LocalFsTable;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -254,7 +253,8 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   }
 
   @Override
-  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
+  public THdfsTable transformToTHdfsTable(boolean updatePartitionFlag,
+      ThriftObjectType type) {
     throw new IllegalStateException("not implemented here");
   }
 
@@ -290,7 +290,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
         getNumClusteringCols(),
         getName(), db_.getName());
 
-    desc.setIcebergTable(Utils.getTIcebergTable(this));
+    desc.setIcebergTable(Utils.getTIcebergTable(this, ThriftObjectType.DESCRIPTOR_ONLY));
     desc.setHdfsTable(transformToTHdfsTable());
     return desc;
   }
@@ -305,7 +305,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
 
   private THdfsTable transformOldToTHdfsTable() {
     THdfsTable hdfsTable = ((HdfsTable)fsTable_).getTHdfsTable(
-        CatalogObject.ThriftObjectType.FULL, null);
+        ThriftObjectType.FULL, null);
     hdfsTable.setPrototype_partition(createPrototypePartition());
     return hdfsTable;
   }

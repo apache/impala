@@ -438,7 +438,8 @@ public abstract class FeCatalogUtils {
       res.setTable_type(TTableType.ICEBERG_TABLE);
       LocalIcebergTable iceTable = (LocalIcebergTable) table;
       res.setIceberg_table(FeIcebergTable.Utils.getTIcebergTable(iceTable));
-      res.setHdfs_table(iceTable.transfromToTHdfsTable(/*unused*/true));
+      res.setHdfs_table(iceTable.transformToTHdfsTable(/*unused*/true,
+          ThriftObjectType.FULL));
     } else if (table instanceof LocalView) {
       res.setTable_type(TTableType.VIEW);
       // Metadata of the view are stored in msTable. Nothing else need to add here.

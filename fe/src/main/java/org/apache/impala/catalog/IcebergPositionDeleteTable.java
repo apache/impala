@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.iceberg.Table;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.thrift.TColumnStats;
@@ -187,7 +188,8 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
   }
 
   @Override
-  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
+  public THdfsTable transformToTHdfsTable(boolean updatePartitionFlag,
+      ThriftObjectType type) {
     throw new IllegalStateException("not implemented here");
   }
 

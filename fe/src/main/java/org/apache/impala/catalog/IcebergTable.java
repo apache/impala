@@ -331,7 +331,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);
     table.setIceberg_table(Utils.getTIcebergTable(this));
-    table.setHdfs_table(transfromToTHdfsTable(true));
+    table.setHdfs_table(transformToTHdfsTable(true, ThriftObjectType.FULL));
     return table;
   }
 
@@ -545,13 +545,14 @@ public class IcebergTable extends Table implements FeIcebergTable {
       Set<Long> referencedPartitions) {
     TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.ICEBERG_TABLE,
         getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
-    desc.setIcebergTable(Utils.getTIcebergTable(this));
-    desc.setHdfsTable(transfromToTHdfsTable(false));
+    desc.setIcebergTable(Utils.getTIcebergTable(this, ThriftObjectType.DESCRIPTOR_ONLY));
+    desc.setHdfsTable(transformToTHdfsTable(false, ThriftObjectType.DESCRIPTOR_ONLY));
     return desc;
   }
 
-  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
-    THdfsTable hdfsTable = hdfsTable_.getTHdfsTable(ThriftObjectType.FULL, null);
+  public THdfsTable transformToTHdfsTable(boolean updatePartitionFlag,
+      ThriftObjectType type) {
+    THdfsTable hdfsTable = hdfsTable_.getTHdfsTable(type, null);
     if (updatePartitionFlag) {
       // Iceberg table only has one THdfsPartition, we set this partition
       // file format by iceberg file format which depend on table properties

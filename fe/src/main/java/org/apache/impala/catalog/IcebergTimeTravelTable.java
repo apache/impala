@@ -32,6 +32,7 @@ import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TimeTravelSpec;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -166,8 +167,8 @@ public class IcebergTimeTravelTable
       int tableId, Set<Long> referencedPartitions) {
     TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.ICEBERG_TABLE,
         getTColumnDescriptors(), 0, getName(), getDb().getName());
-    desc.setIcebergTable(Utils.getTIcebergTable(this));
-    desc.setHdfsTable(transfromToTHdfsTable(false));
+    desc.setIcebergTable(Utils.getTIcebergTable(this, ThriftObjectType.DESCRIPTOR_ONLY));
+    desc.setHdfsTable(transformToTHdfsTable(false, ThriftObjectType.DESCRIPTOR_ONLY));
     return desc;
   }
 
@@ -192,8 +193,9 @@ public class IcebergTimeTravelTable
   }
 
   @Override
-  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
-    return base_.transfromToTHdfsTable(updatePartitionFlag);
+  public THdfsTable transformToTHdfsTable(boolean updatePartitionFlag,
+      ThriftObjectType type) {
+    return base_.transformToTHdfsTable(updatePartitionFlag, type);
   }
 }
 
@@ -452,8 +454,9 @@ class ForwardingFeIcebergTable implements FeIcebergTable {
   }
 
   @Override
-  public THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
-    return base.transfromToTHdfsTable(updatePartitionFlag);
+  public THdfsTable transformToTHdfsTable(boolean updatePartitionFlag,
+      ThriftObjectType type) {
+    return base.transformToTHdfsTable(updatePartitionFlag, type);
   }
 
   @Override
