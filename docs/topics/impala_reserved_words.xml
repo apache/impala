@@ -413,6 +413,13 @@ See the history, any recent changes, here:
                 <entry>X</entry>
               </row>
               <row>
+                <entry><codeph>buckets</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>bulk</codeph></entry>
                 <entry/>
                 <entry/>
@@ -1050,6 +1057,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>disable</codeph></entry>
+                <entry>X</entry>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>disconnect</codeph></entry>
                 <entry>X</entry>
                 <entry/>
@@ -1135,6 +1149,13 @@ See the history, any recent changes, here:
               </row>
               <row>
                 <entry><codeph>empty</codeph></entry>
+                <entry>X</entry>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>enable</codeph></entry>
                 <entry>X</entry>
                 <entry/>
                 <entry>X</entry>
@@ -1554,6 +1575,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>hudiparquet</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>iceberg</codeph></entry>
                 <entry/>
                 <entry/>
@@ -1750,6 +1778,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>jsonfile</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>json_array</codeph></entry>
                 <entry>X</entry>
                 <entry/>
@@ -1904,6 +1939,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>lexical</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>like</codeph></entry>
                 <entry>X</entry>
                 <entry>X</entry>
@@ -2023,6 +2065,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>managedlocation</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>match</codeph></entry>
                 <entry>X</entry>
                 <entry/>
@@ -2097,6 +2146,13 @@ See the history, any recent changes, here:
                 <entry>X</entry>
                 <entry/>
                 <entry/>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>minus</codeph></entry>
+                <entry>X</entry>
+                <entry/>
+                <entry>X</entry>
                 <entry/>
               </row>
               <row>
@@ -2198,6 +2254,13 @@ See the history, any recent changes, here:
                 <entry>X</entry>
               </row>
               <row>
+                <entry><codeph>non</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>nonclustered</codeph></entry>
                 <entry/>
                 <entry/>
@@ -2207,6 +2270,13 @@ See the history, any recent changes, here:
               <row>
                 <entry><codeph>none</codeph></entry>
                 <entry>X</entry>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>norely</codeph></entry>
+                <entry/>
                 <entry/>
                 <entry>X</entry>
                 <entry/>
@@ -2222,6 +2292,13 @@ See the history, any recent changes, here:
                 <entry><codeph>not</codeph></entry>
                 <entry>X</entry>
                 <entry>X</entry>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>novalidate</codeph></entry>
+                <entry/>
+                <entry/>
                 <entry>X</entry>
                 <entry/>
               </row>
@@ -2352,6 +2429,13 @@ See the history, any recent changes, here:
                 <entry>X</entry>
               </row>
               <row>
+                <entry><codeph>optimize</codeph></entry>
+                <entry>X</entry>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>option</codeph></entry>
                 <entry/>
                 <entry/>
@@ -2362,6 +2446,13 @@ See the history, any recent changes, here:
                 <entry><codeph>or</codeph></entry>
                 <entry>X</entry>
                 <entry>X</entry>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>orc</codeph></entry>
+                <entry/>
+                <entry/>
                 <entry>X</entry>
                 <entry/>
               </row>
@@ -2842,6 +2933,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>rely</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>rename</codeph></entry>
                 <entry/>
                 <entry>X</entry>
@@ -3003,6 +3101,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>rwstorage</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>save</codeph></entry>
                 <entry/>
                 <entry/>
@@ -3080,6 +3185,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>selectivity</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>semi</codeph></entry>
                 <entry/>
                 <entry>X</entry>
@@ -3125,6 +3237,13 @@ See the history, any recent changes, here:
                 <entry><codeph>set</codeph></entry>
                 <entry>X</entry>
                 <entry>X</entry>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>sets</codeph></entry>
+                <entry>X</entry>
+                <entry/>
                 <entry>X</entry>
                 <entry/>
               </row>
@@ -3195,6 +3314,13 @@ See the history, any recent changes, here:
                 <entry><codeph>sort</codeph></entry>
                 <entry/>
                 <entry>X</entry>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>spec</codeph></entry>
+                <entry/>
+                <entry/>
                 <entry>X</entry>
                 <entry/>
               </row>
@@ -3287,6 +3413,13 @@ See the history, any recent changes, here:
                 <entry>X</entry>
                 <entry/>
                 <entry/>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>storagehandler_uri</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
                 <entry/>
               </row>
               <row>
@@ -3390,6 +3523,13 @@ See the history, any recent changes, here:
               <row>
                 <entry><codeph>system_user</codeph></entry>
                 <entry>X</entry>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>system_version</codeph></entry>
+                <entry/>
                 <entry/>
                 <entry>X</entry>
                 <entry/>
@@ -3668,6 +3808,13 @@ See the history, any recent changes, here:
                 <entry>X</entry>
               </row>
               <row>
+                <entry><codeph>unset</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>update</codeph></entry>
                 <entry>X</entry>
                 <entry>X</entry>
@@ -3717,6 +3864,13 @@ See the history, any recent changes, here:
                 <entry>X</entry>
               </row>
               <row>
+                <entry><codeph>user_defined_fn</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>using</codeph></entry>
                 <entry>X</entry>
                 <entry>X</entry>
@@ -3728,6 +3882,13 @@ See the history, any recent changes, here:
                 <entry/>
                 <entry/>
                 <entry/>
+                <entry/>
+              </row>
+              <row>
+                <entry><codeph>validate</codeph></entry>
+                <entry>X</entry>
+                <entry/>
+                <entry>X</entry>
                 <entry/>
               </row>
               <row>
@@ -3891,6 +4052,13 @@ See the history, any recent changes, here:
                 <entry/>
                 <entry/>
               </row>
+              <row>
+                <entry><codeph>zorder</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X</entry>
+                <entry/>
+              </row>
             </tbody>
           </tgroup>
         </table>
@@ -3899,3 +4067,4 @@ See the history, any recent changes, here:
 </concept>
 
 </concept>
+
