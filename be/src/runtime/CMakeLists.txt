@@ -32,6 +32,7 @@ add_library(RuntimeIr
   raw-value-ir.cc
   runtime-filter-ir.cc
   sorter-ir.cc
+  sorted-run-merger-ir.cc
   tuple-ir.cc
 )
 add_dependencies(RuntimeIr gen-deps)
@@ -81,7 +82,6 @@ add_library(Runtime
   runtime-state.cc
   scanner-mem-limiter.cc
   sorted-run-merger.cc
-  sorted-run-merger-ir.cc
   sorter.cc
   spillable-row-batch-queue.cc
   string-value.cc
