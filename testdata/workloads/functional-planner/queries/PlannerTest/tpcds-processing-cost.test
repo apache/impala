@@ -1,3 +1,34 @@
+# Regression test for IMPALA-12510: select star on empty table
+select * from functional.emptytable;
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[0]
+PLAN-ROOT SINK
+|  output exprs: functional.emptytable.field, functional.emptytable.f2
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=20.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=0 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=80.00KB mem-reservation=0B thread-reservation=1
+max-parallelism=1 segment-costs=[0]
+00:SCAN HDFS [functional.emptytable, RANDOM]
+   partitions=0/0 files=0 size=0B
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/0 rows=0
+     columns missing stats: field
+   extrapolated-rows=disabled max-scan-range-rows=0
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=0 cost=0
+   in pipelines: 00(GETNEXT)
+====
 # TPCDS-Q3
 select
   dt.d_year,

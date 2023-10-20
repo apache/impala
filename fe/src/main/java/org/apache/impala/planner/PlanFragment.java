@@ -1000,8 +1000,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    *                         TExecutorGroupSet.num_cores_per_executor)}.
    * @param parentParallelism Number of instance of parent fragment.
    */
-  protected void traverseEffectiveParallelism(
-      int minThreadPerNode, int maxThreadPerNode, int parentParallelism) {
+  protected void traverseEffectiveParallelism(final int minThreadPerNode,
+      final int maxThreadPerNode, final int parentParallelism) {
     Preconditions.checkNotNull(
         rootSegment_, "ProcessingCost Fragment %s has not been computed!", getId());
     int nodeStepCount = getNumInstances() % getNumNodes() == 0 ? getNumNodes() : 1;
@@ -1058,8 +1058,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * @return True if it is possible to lower this fragment's parallelism through
    * ProcessingCost comparison. False if the parallelism should not be changed anymore.
    */
-  private boolean adjustToMaxParallelism(int minThreadPerNode, int maxThreadPerNode,
-      int parentParallelism, int nodeStepCount) {
+  private boolean adjustToMaxParallelism(final int minThreadPerNode,
+      final int maxThreadPerNode, final int parentParallelism, final int nodeStepCount) {
     int maxThreadAllowed = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
     boolean canTryLower = true;
     int maxScannerThreads = Integer.MAX_VALUE;
@@ -1081,6 +1081,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       canTryLower = false; // no need to compute effective parallelism anymore.
     } else {
       int costBasedMaxParallelism = Math.max(nodeStepCount, getCostBasedMaxParallelism());
+      Preconditions.checkState(costBasedMaxParallelism > 0);
 
       if (hasUnionNode()) {
         // We set parallelism of union fragment as a max between its input fragments and
@@ -1134,9 +1135,9 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         collectPlanNodes(Predicates.instanceOf(ScanNode.class), scanNodes);
         if (!scanNodes.isEmpty()) {
           Preconditions.checkState(scanNodes.size() == 1);
-          ScanNode scanNode = scanNodes.get(0);
-          maxScannerThreads = scanNode.maxScannerThreads_;
-          maxParallelism_ = Math.min(maxParallelism_, maxScannerThreads);
+          maxScannerThreads = scanNodes.get(0).maxScannerThreads_;
+          maxParallelism_ = Math.max(ScanNode.MIN_NUM_SCAN_THREADS,
+              Math.min(maxParallelism_, maxScannerThreads));
 
           // Prevent caller from lowering parallelism if fragment has ScanNode
           // because there is no child fragment to compare with.

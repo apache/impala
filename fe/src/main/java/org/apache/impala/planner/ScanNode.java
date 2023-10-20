@@ -57,6 +57,7 @@ abstract public class ScanNode extends PlanNode {
   // scan ranges than would have been estimated assuming a uniform distribution.
   // Used for HDFS and Kudu Scan node estimations.
   protected static final double SCAN_RANGE_SKEW_FACTOR = 1.2;
+  protected static final int MIN_NUM_SCAN_THREADS = 1;
 
   protected final TupleDescriptor desc_;
 
@@ -85,8 +86,9 @@ abstract public class ScanNode extends PlanNode {
   protected long tableNumRowsHint_ = -1;
 
   // Maximum number of scanner threads after considering number of scan ranges
-  // and related query options.Calculated at computeScanProcessingCost.
-  protected int maxScannerThreads_ = -1;
+  // and related query options. Calculated at computeScanProcessingCost.
+  // Default to MIN_NUM_SCAN_THREADS.
+  protected int maxScannerThreads_ = MIN_NUM_SCAN_THREADS;
 
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
@@ -368,8 +370,9 @@ abstract public class ScanNode extends PlanNode {
     // regardless of the core count limit.
     int maxThreadsPerNode = Math.max(queryOptions.getProcessing_cost_min_threads(),
         queryOptions.getMax_fragment_instances_per_node());
-    maxScannerThreads_ = (int) Math.min(getEffectiveNumScanRanges(),
-        IntMath.saturatedMultiply(getNumNodes(), maxThreadsPerNode));
+    int maxThreadsGlobal = IntMath.saturatedMultiply(getNumNodes(), maxThreadsPerNode);
+    maxScannerThreads_ = Math.max(MIN_NUM_SCAN_THREADS,
+        (int) Math.min(getEffectiveNumScanRanges(), maxThreadsGlobal));
     long inputCardinality = getInputCardinality();
 
     if (inputCardinality >= 0) {
