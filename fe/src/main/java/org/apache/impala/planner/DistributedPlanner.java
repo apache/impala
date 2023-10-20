@@ -73,16 +73,13 @@ public class DistributedPlanner {
   public List<PlanFragment> createPlanFragments(
       PlanNode singleNodePlan) throws ImpalaException {
     Preconditions.checkState(!ctx_.isSingleNodeExec());
-    AnalysisContext.AnalysisResult analysisResult = ctx_.getAnalysisResult();
     QueryStmt queryStmt = ctx_.getQueryStmt();
     List<PlanFragment> fragments = new ArrayList<>();
-    // For inserts or CTAS, unless there is a limit, leave the root fragment
+    // For DML statements, unless there is a limit, leave the root fragment
     // partitioned, otherwise merge everything into a single coordinator fragment,
     // so we can pass it back to the client.
     boolean isPartitioned = false;
-    if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt()
-        || analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt())
-        && !singleNodePlan.hasLimit()) {
+    if (ctx_.hasTableSink() && !singleNodePlan.hasLimit()) {
       Preconditions.checkState(!queryStmt.hasOffset());
       isPartitioned = true;
     }

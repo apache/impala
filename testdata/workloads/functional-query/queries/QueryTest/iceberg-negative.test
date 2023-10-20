@@ -765,16 +765,17 @@ optimize table non_iceberg_table;
 AnalysisException: OPTIMIZE is only supported for Iceberg tables.
 ====
 ---- QUERY
-optimize table iceberg_overwrite_bucket;
+optimize table functional_parquet.iceberg_alltypes_part_orc;
 ---- CATCH
-AnalysisException: The Iceberg table has multiple partition specs. This means the outcome of dynamic partition overwrite is unforeseeable. Consider using TRUNCATE then INSERT INTO from the previous snapshot to overwrite your table.
+AnalysisException: Impala can only write Parquet data files, while table 'functional_parquet.iceberg_alltypes_part_orc' expects 'ORC' data files.
 ====
 ---- QUERY
 CREATE TABLE ice_complex (id BIGINT NULL, int_array ARRAY<INT> NULL) STORED AS ICEBERG
 TBLPROPERTIES ('format-version'='2');
+# Empty table cannot be optimized. TODO: IMPALA-12839 Optimizing empty table should be no-op.
 optimize table ice_complex;
 ---- CATCH
-AnalysisException: Unable to INSERT into target table ($DATABASE.ice_complex) because the column 'int_array' has a complex type 'ARRAY<INT>' and Impala doesn't support inserting into tables containing complex type columns
+AnalysisException: Table '$DATABASE.ice_complex' is empty.
 ====
 ---- QUERY
 # ICEBERG__DATA__SEQUENCE__NUMBER is not supported for non-Iceberg tables.
@@ -796,7 +797,7 @@ AnalysisException: Unsupported update mode: 'copy-on-write' for Iceberg table: $
 ---- QUERY
 update ice_complex set id = id + 1;
 ---- CATCH
-AnalysisException: Impala does not support updating tables with complex types. Table '$DATABASE.ice_complex' has column 'int_array' with type: ARRAY<INT>
+AnalysisException: Impala does not support writing tables with complex types. Table '$DATABASE.ice_complex' has column 'int_array' with type: ARRAY<INT>
 ====
 ---- QUERY
 # Cannot update virtual columns

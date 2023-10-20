@@ -607,7 +607,7 @@ public class InsertStmt extends DmlStatementBase {
         }
         validateBucketTransformForOverwrite(iceTable);
       }
-      IcebergUtil.validateIcebergColumnsForInsert(iceTable);
+      IcebergUtil.validateIcebergTableForInsert(iceTable);
     }
 
     if (isHBaseTable && overwrite_) {

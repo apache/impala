@@ -63,29 +63,12 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     deleteTableId_ = analyzer.getDescTbl().addTargetTable(icePosDelTable_);
-    IcebergUtil.validateIcebergColumnsForInsert(originalTargetTable_);
+    IcebergUtil.validateIcebergTableForInsert(originalTargetTable_);
     String updateMode = originalTargetTable_.getIcebergApiTable().properties().get(
         TableProperties.UPDATE_MODE);
     if (updateMode != null && !updateMode.equals("merge-on-read")) {
       throw new AnalysisException(String.format("Unsupported update mode: '%s' for " +
           "Iceberg table: %s", updateMode, originalTargetTable_.getFullName()));
-    }
-    for (Column c : originalTargetTable_.getColumns()) {
-      if (c.getType().isComplexType()) {
-        throw new AnalysisException(String.format("Impala does not support updating " +
-            "tables with complex types. Table '%s' has column '%s' " +
-            "with type: %s", originalTargetTable_.getFullName(), c.getName(),
-            c.getType().toSql()));
-      }
-    }
-    Pair<List<Integer>, TSortingOrder> sortProperties =
-        AlterTableSetTblProperties.analyzeSortColumns(originalTargetTable_,
-            originalTargetTable_.getMetaStoreTable().getParameters());
-    if (originalTargetTable_.getIcebergFileFormat() != TIcebergFileFormat.PARQUET) {
-      throw new AnalysisException(String.format("Impala can only write Parquet data " +
-          "files, while table '%s' expects '%s' data files.",
-          originalTargetTable_.getFullName(),
-          originalTargetTable_.getIcebergFileFormat().toString()));
     }
   }
 

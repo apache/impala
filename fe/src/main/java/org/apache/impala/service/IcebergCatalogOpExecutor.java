@@ -21,8 +21,9 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
@@ -35,6 +36,7 @@ import org.apache.iceberg.ManageSnapshots;
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplacePartitions;
+import org.apache.iceberg.RewriteFiles;
 import org.apache.iceberg.RowDelta;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -53,6 +55,7 @@ import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
+import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -63,7 +66,6 @@ import org.apache.impala.thrift.TAlterTableExecuteExpireSnapshotsParams;
 import org.apache.impala.thrift.TAlterTableExecuteRollbackParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TIcebergCatalog;
-import org.apache.impala.thrift.TIcebergOperation;
 import org.apache.impala.thrift.TIcebergOperationParam;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TRollbackType;
@@ -353,6 +355,7 @@ public class IcebergCatalogOpExecutor {
       case INSERT: appendFiles(feIcebergTable, txn, icebergOp); break;
       case DELETE: deleteRows(feIcebergTable, txn, icebergOp); break;
       case UPDATE: updateRows(feIcebergTable, txn, icebergOp); break;
+      case OPTIMIZE: rewriteTable(feIcebergTable, txn, icebergOp); break;
       default: throw new ImpalaRuntimeException(
           "Unknown Iceberg operation: " + icebergOp.operation);
     }
@@ -360,7 +363,6 @@ public class IcebergCatalogOpExecutor {
 
   private static void deleteRows(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
-    org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
     List<ByteBuffer> deleteFilesFb = icebergOp.getIceberg_delete_files_fb();
     RowDelta rowDelta = txn.newRowDelta();
     for (ByteBuffer buf : deleteFilesFb) {
@@ -381,7 +383,6 @@ public class IcebergCatalogOpExecutor {
 
   private static void updateRows(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
-    org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
     List<ByteBuffer> deleteFilesFb = icebergOp.getIceberg_delete_files_fb();
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     RowDelta rowDelta = txn.newRowDelta();
@@ -458,7 +459,6 @@ public class IcebergCatalogOpExecutor {
    */
   public static void appendFiles(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
-    org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     BatchWrite batchWrite;
     if (icebergOp.isIs_overwrite()) {
@@ -504,11 +504,50 @@ public class IcebergCatalogOpExecutor {
         nullValueCounts, null, lowerBounds, upperBounds);
   }
 
+  private static void rewriteTable(FeIcebergTable feIcebergTable, Transaction txn,
+      TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
+    GroupedContentFiles contentFiles;
+    try {
+      // Get all files from the initial snapshot.
+      contentFiles = IcebergUtil.getIcebergFilesFromSnapshot(
+          feIcebergTable, /*predicates=*/Collections.emptyList(),
+          icebergOp.getInitial_snapshot_id());
+    } catch (TableLoadingException e) {
+      throw new ImpalaRuntimeException(e.getMessage(), e);
+    }
+    RewriteFiles rewrite = txn.newRewrite();
+    // Delete current data files from table.
+    for (DataFile dataFile : contentFiles.dataFilesWithDeletes) {
+      rewrite.deleteFile(dataFile);
+    }
+    for (DataFile dataFile : contentFiles.dataFilesWithoutDeletes) {
+      rewrite.deleteFile(dataFile);
+    }
+    // Delete current delete files from table.
+    for (DeleteFile deleteFile : contentFiles.positionDeleteFiles) {
+      rewrite.deleteFile(deleteFile);
+    }
+    for (DeleteFile deleteFile : contentFiles.equalityDeleteFiles) {
+      rewrite.deleteFile(deleteFile);
+    }
+    // Add newly written files to the table.
+    List<ByteBuffer> dataFilesToAdd = icebergOp.getIceberg_data_files_fb();
+    for (ByteBuffer buf : dataFilesToAdd) {
+      DataFile dataFile = createDataFile(feIcebergTable, buf);
+      rewrite.addFile(dataFile);
+    }
+    try {
+      rewrite.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
+      rewrite.commit();
+    } catch (ValidationException e) {
+      throw new ImpalaRuntimeException(e.getMessage(), e);
+    }
+  }
+
   /**
    * Creates new snapshot for the iceberg table by deleting all data files.
    */
-  public static void truncateTable(Transaction txn)
-      throws ImpalaRuntimeException {
+  public static void truncateTable(Transaction txn) {
     DeleteFiles delete = txn.newDelete();
     delete.deleteFromRowFilter(Expressions.alwaysTrue());
     delete.commit();

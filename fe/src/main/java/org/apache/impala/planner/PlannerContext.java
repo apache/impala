@@ -80,6 +80,8 @@ public class PlannerContext {
       queryStmt_ = analysisResult.getUpdateStmt().getQueryStmt();
     } else if (analysisResult.isDeleteStmt()) {
       queryStmt_ = analysisResult.getDeleteStmt().getQueryStmt();
+    } else if (analysisResult.isOptimizeStmt()) {
+      queryStmt_ = analysisResult.getOptimizeStmt().getQueryStmt();
     } else {
       queryStmt_ = analysisResult.getQueryStmt();
     }
@@ -103,18 +105,17 @@ public class PlannerContext {
   public PlanNodeId getNextNodeId() { return nodeIdGenerator_.getNextId(); }
   public PlanFragmentId getNextFragmentId() { return fragmentIdGenerator_.getNextId(); }
   public boolean isInsertOrCtas() {
-    //TODO: IMPALA-12412: remove isOptimizeStmt().
-    return analysisResult_.isInsertStmt() || analysisResult_.isCreateTableAsSelectStmt()
-        || analysisResult_.isOptimizeStmt();
+    return analysisResult_.isInsertStmt() || analysisResult_.isCreateTableAsSelectStmt();
   }
   public boolean isInsert() { return analysisResult_.isInsertStmt(); }
+  public boolean isOptimize() { return analysisResult_.isOptimizeStmt(); }
   public boolean isCtas() { return analysisResult_.isCreateTableAsSelectStmt(); }
   public boolean isUpdateOrDelete() {
     return analysisResult_.isUpdateStmt() || analysisResult_.isDeleteStmt(); }
   public boolean isQuery() { return analysisResult_.isQueryStmt(); }
   public boolean hasTableSink() {
     return isInsertOrCtas() || analysisResult_.isUpdateStmt()
-        || analysisResult_.isDeleteStmt();
+        || analysisResult_.isDeleteStmt() || analysisResult_.isOptimizeStmt();
   }
   public boolean hasSubplan() { return !subplans_.isEmpty(); }
   public SubplanNode getSubplan() { return subplans_.getFirst(); }

@@ -1330,6 +1330,18 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Test that OPTIMIZE TABLE statements on Iceberg tables work as expected.
+   */
+  @Test
+  public void testIcebergOptimize() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setMax_fs_writers(2);
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("iceberg-optimize", "functional_parquet", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
    * Check that Iceberg metadata table scan plans are as expected.
    */
   @Test

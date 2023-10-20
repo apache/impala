@@ -769,7 +769,7 @@ AuthorizationException: User '$USER' does not have privileges to execute 'ALTER'
 # Optimize statement on masked tables should be blocked, because reading and inserting masked data would result in data loss.
 optimize table functional_parquet.iceberg_partitioned
 ---- CATCH
-AuthorizationException: User '$USER' does not have privileges to execute 'INSERT' on: functional_parquet.iceberg_partitioned
+AuthorizationException: User '$USER' does not have privileges to access: functional_parquet.iceberg_partitioned
 ====
 ---- QUERY
 # Deletes on masked tables should be blocked.

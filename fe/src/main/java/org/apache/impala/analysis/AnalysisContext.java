@@ -307,8 +307,6 @@ public class AnalysisContext {
     public InsertStmt getInsertStmt() {
       if (isCreateTableAsSelectStmt()) {
         return getCreateTableAsSelectStmt().getInsertStmt();
-      } else if (isOptimizeStmt()) {
-        return getOptimizeStmt().getInsertStmt();
       } else {
         Preconditions.checkState(isInsertStmt());
         return (InsertStmt) stmt_;

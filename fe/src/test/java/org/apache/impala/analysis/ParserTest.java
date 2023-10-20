@@ -1965,6 +1965,14 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestOptimize() {
+    ParsesOk("optimize table t");
+    ParserError("optimize t");
+    ParserError("optimize table t for system_time as of now()");
+    ParserError("optimize table t for system_version as of 12345");
+  }
+
+  @Test
   public void TestUse() {
     ParserError("USE");
     ParserError("USE db1 db2");

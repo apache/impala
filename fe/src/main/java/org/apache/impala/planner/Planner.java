@@ -169,29 +169,29 @@ public class Planner {
       createPreInsertSort(insertStmt, rootFragment, ctx_.getRootAnalyzer());
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
-    } else {
-      if (ctx_.isUpdate() || ctx_.isDelete()) {
-        DmlStatementBase stmt;
-        if (ctx_.isUpdate()) {
-          stmt = ctx_.getAnalysisResult().getUpdateStmt();
-        } else {
-          stmt = ctx_.getAnalysisResult().getDeleteStmt();
-        }
-        Preconditions.checkNotNull(stmt);
-        stmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
-        if (stmt.getTargetTable() instanceof FeIcebergTable) {
-          rootFragment = createIcebergDmlPlanFragment(
-              rootFragment, distributedPlanner, stmt, fragments);
-        }
-        // Set up update sink for root fragment
-        rootFragment.setSink(stmt.createDataSink());
-      } else if (ctx_.isQuery()) {
-        QueryStmt queryStmt = ctx_.getQueryStmt();
-        queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
-        List<Expr> resultExprs = queryStmt.getResultExprs();
-        rootFragment.setSink(
-            ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
+    } else if (ctx_.isUpdate() || ctx_.isDelete() || ctx_.isOptimize()) {
+      DmlStatementBase stmt;
+      if (ctx_.isUpdate()) {
+        stmt = ctx_.getAnalysisResult().getUpdateStmt();
+      } else if (ctx_.isDelete()) {
+        stmt = ctx_.getAnalysisResult().getDeleteStmt();
+      } else {
+        stmt = ctx_.getAnalysisResult().getOptimizeStmt();
       }
+      Preconditions.checkNotNull(stmt);
+      stmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
+      if (stmt.getTargetTable() instanceof FeIcebergTable) {
+        rootFragment = createIcebergDmlPlanFragment(
+            rootFragment, distributedPlanner, stmt, fragments);
+      }
+      // Set up update sink for root fragment
+      rootFragment.setSink(stmt.createDataSink());
+    } else if (ctx_.isQuery()) {
+      QueryStmt queryStmt = ctx_.getQueryStmt();
+      queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
+      List<Expr> resultExprs = queryStmt.getResultExprs();
+      rootFragment.setSink(
+          ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
     }
 
     // The check for disabling codegen uses estimates of rows per node so must be done

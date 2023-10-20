@@ -390,30 +390,3 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(b.`year`,
    runtime filters: RF000 -> b.id
    row-size=12B cardinality=7.30K
 ====
-# IMPALA-12293: Verify that OPTIMIZE respects the sorting properties.
-optimize table functional_parquet.iceberg_partition_transforms_zorder
----- PLAN
-WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=true, PARTITION-KEYS=(year(functional_parquet.iceberg_partition_transforms_zorder.ts),iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5))]
-|
-01:SORT
-|  order by: LEXICAL: year(functional_parquet.iceberg_partition_transforms_zorder.ts) ASC NULLS LAST, iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5) ASC NULLS LAST, ZORDER: i, j
-|  row-size=44B cardinality=1
-|
-00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
-   HDFS partitions=1/1 files=1 size=1.08KB
-   Iceberg snapshot id: 7350750578864730166
-   row-size=36B cardinality=1
----- DISTRIBUTEDPLAN
-WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=true, PARTITION-KEYS=(year(functional_parquet.iceberg_partition_transforms_zorder.ts),iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5))]
-|
-02:SORT
-|  order by: LEXICAL: year(functional_parquet.iceberg_partition_transforms_zorder.ts) ASC NULLS LAST, iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5) ASC NULLS LAST, ZORDER: i, j
-|  row-size=44B cardinality=1
-|
-01:EXCHANGE [UNPARTITIONED]
-|
-00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
-   HDFS partitions=1/1 files=1 size=1.08KB
-   Iceberg snapshot id: 7350750578864730166
-   row-size=36B cardinality=1
-====

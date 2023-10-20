@@ -1,0 +1,149 @@
+# IMPALA-12293: Verify that OPTIMIZE respects the sorting properties.
+optimize table iceberg_partition_transforms_zorder
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=76.00MB mem-reservation=12.03MB thread-reservation=2
+WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=false, PARTITION-KEYS=(year(functional_parquet.iceberg_partition_transforms_zorder.ts),iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5))]
+|  output exprs: ts, s, i, j
+|  mem-estimate=44B mem-reservation=0B thread-reservation=0
+|
+01:SORT
+|  order by: LEXICAL: year(functional_parquet.iceberg_partition_transforms_zorder.ts) ASC NULLS LAST, iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5) ASC NULLS LAST, ZORDER: i, j
+|  materialized: year(functional_parquet.iceberg_partition_transforms_zorder.ts), iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=44B cardinality=1
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
+   HDFS partitions=1/1 files=1 size=1.08KB
+   Iceberg snapshot id: 1304838939768391952
+   stored statistics:
+     table: rows=1 size=1.08KB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=1
+   mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=1
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=76.00MB mem-reservation=12.03MB thread-reservation=2
+WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=false, PARTITION-KEYS=(year(functional_parquet.iceberg_partition_transforms_zorder.ts),iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5))]
+|  output exprs: ts, s, i, j
+|  mem-estimate=44B mem-reservation=0B thread-reservation=0
+|
+01:SORT
+|  order by: LEXICAL: year(functional_parquet.iceberg_partition_transforms_zorder.ts) ASC NULLS LAST, iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5) ASC NULLS LAST, ZORDER: i, j
+|  materialized: year(functional_parquet.iceberg_partition_transforms_zorder.ts), iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=44B cardinality=1
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder, RANDOM]
+   HDFS partitions=1/1 files=1 size=1.08KB
+   Iceberg snapshot id: 1304838939768391952
+   stored statistics:
+     table: rows=1 size=1.08KB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=1
+   mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=1
+   in pipelines: 00(GETNEXT)
+====
+# Verify that MAX_FS_WRITERS and the partitioning affect the distributed plan.
+optimize table iceberg_v2_partitioned_position_deletes
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=12.05MB thread-reservation=3
+WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|  output exprs: id, user, action, event_time
+|  mem-estimate=440B mem-reservation=0B thread-reservation=0
+|
+03:SORT
+|  order by: action ASC NULLS LAST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=44B cardinality=10
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  equality predicates: functional_parquet.iceberg_v2_partitioned_position_deletes.file__position = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos, functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path
+|  mem-estimate=692B mem-reservation=692B thread-reservation=0
+|  tuple-ids=0 row-size=64B cardinality=10
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     stored statistics:
+|       table: rows=10 size=9.47KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3
+|     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
+|     tuple-ids=1 row-size=204B cardinality=10
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   stored statistics:
+     table: rows=20 size=12.95KB
+     columns missing stats: id, user, action, event_time
+   extrapolated-rows=disabled max-scan-range-rows=6
+   mem-estimate=96.00MB mem-reservation=48.00KB thread-reservation=1
+   tuple-ids=0 row-size=64B cardinality=20
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.action)] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=12.02MB mem-reservation=12.00MB thread-reservation=1
+WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|  output exprs: id, user, action, event_time
+|  mem-estimate=220B mem-reservation=0B thread-reservation=0
+|
+05:SORT
+|  order by: action ASC NULLS LAST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=44B cardinality=10
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.action)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=64B cardinality=10
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=96.53MB mem-reservation=48.22KB thread-reservation=2
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  equality predicates: functional_parquet.iceberg_v2_partitioned_position_deletes.file__position = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos, functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path
+|  mem-estimate=230B mem-reservation=230B thread-reservation=0
+|  tuple-ids=0 row-size=64B cardinality=10
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--03:EXCHANGE [DIRECTED]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=204B cardinality=10
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=34.44MB mem-reservation=16.00KB thread-reservation=2
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete, RANDOM]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     stored statistics:
+|       table: rows=10 size=9.47KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3
+|     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
+|     tuple-ids=1 row-size=204B cardinality=10
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, RANDOM]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   stored statistics:
+     table: rows=20 size=12.95KB
+     columns missing stats: id, user, action, event_time
+   extrapolated-rows=disabled max-scan-range-rows=6
+   mem-estimate=96.00MB mem-reservation=48.00KB thread-reservation=1
+   tuple-ids=0 row-size=64B cardinality=20
+   in pipelines: 00(GETNEXT)
+====
+

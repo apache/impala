@@ -74,9 +74,9 @@ import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
 import org.apache.impala.analysis.CreateUdfStmt;
-import org.apache.impala.analysis.DeleteStmt;
 import org.apache.impala.analysis.DescribeTableStmt;
 import org.apache.impala.analysis.DescriptorTable;
+import org.apache.impala.analysis.DmlStatementBase;
 import org.apache.impala.analysis.DropDataSrcStmt;
 import org.apache.impala.analysis.DropFunctionStmt;
 import org.apache.impala.analysis.DropStatsStmt;
@@ -95,7 +95,6 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
-import org.apache.impala.analysis.UpdateStmt;
 import org.apache.impala.authentication.saml.ImpalaSamlClient;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
@@ -2430,8 +2429,7 @@ public class Frontend {
         }
       }
       if (!analysisResult.isExplainStmt() &&
-          (analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt()
-          || analysisResult.isOptimizeStmt())) {
+          (analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())) {
         InsertStmt insertStmt = analysisResult.getInsertStmt();
         FeTable targetTable = insertStmt.getTargetTable();
         if (AcidUtils.isTransactionalTable(
@@ -2550,7 +2548,7 @@ public class Frontend {
         result.query_exec_request.stmt_type = result.stmt_type;
         // fill in the metadata
         result.setResult_set_metadata(createQueryResultSetMetadata(analysisResult));
-      } else if (analysisResult.isInsertStmt() || analysisResult.isOptimizeStmt() ||
+      } else if (analysisResult.isInsertStmt() ||
           analysisResult.isCreateTableAsSelectStmt()) {
         // For CTAS the overall TExecRequest statement type is DDL, but the
         // query_exec_request should be DML
@@ -2562,15 +2560,19 @@ public class Frontend {
             queryCtx, queryExecRequest, analysisResult.getInsertStmt());
       } else {
         Preconditions.checkState(
-            analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt());
+            analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt() ||
+                analysisResult.isOptimizeStmt());
         result.stmt_type = TStmtType.DML;
         result.query_exec_request.stmt_type = TStmtType.DML;
         if (analysisResult.isDeleteStmt()) {
-          addFinalizationParamsForDelete(queryCtx, queryExecRequest,
-              analysisResult.getDeleteStmt());
+          addFinalizationParamsForIcebergModify(queryCtx, queryExecRequest,
+              analysisResult.getDeleteStmt(), TIcebergOperation.DELETE);
         } else if (analysisResult.isUpdateStmt()) {
-          addFinalizationParamsForUpdate(queryCtx, queryExecRequest,
-              analysisResult.getUpdateStmt());
+          addFinalizationParamsForIcebergModify(queryCtx, queryExecRequest,
+              analysisResult.getUpdateStmt(), TIcebergOperation.UPDATE);
+        } else if (analysisResult.isOptimizeStmt()) {
+          addFinalizationParamsForIcebergModify(queryCtx, queryExecRequest,
+              analysisResult.getOptimizeStmt(), TIcebergOperation.OPTIMIZE);
         }
       }
       return result;
@@ -2634,28 +2636,24 @@ public class Frontend {
         targetTable, insertStmt.getWriteId(), insertStmt.isOverwrite());
   }
 
-  private static void addFinalizationParamsForDelete(
-    TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, DeleteStmt deleteStmt) {
-      FeTable targetTable = deleteStmt.getTargetTable();
-      if (!(targetTable instanceof FeIcebergTable)) return;
+  /**
+   * Add the finalize params to the queryExecRequest for a non-INSERT Iceberg DML
+   * statement: DELETE, UPDATE and OPTIMIZE.
+   */
+  private static void addFinalizationParamsForIcebergModify(TQueryCtx queryCtx,
+      TQueryExecRequest queryExecRequest, DmlStatementBase dmlStmt,
+      TIcebergOperation iceOperation) {
+    Preconditions.checkState(!(dmlStmt instanceof InsertStmt));
+    FeTable targetTable = dmlStmt.getTargetTable();
+    if (!(targetTable instanceof FeIcebergTable)) return;
+    if (iceOperation == TIcebergOperation.DELETE) {
       Preconditions.checkState(targetTable instanceof IcebergPositionDeleteTable);
       targetTable = ((IcebergPositionDeleteTable)targetTable).getBaseTable();
-      TFinalizeParams finalizeParams = addFinalizationParamsForDml(
-          queryCtx, targetTable, false);
-      TIcebergDmlFinalizeParams iceFinalizeParams = addFinalizationParamsForIcebergDml(
-        (FeIcebergTable)targetTable, TIcebergOperation.DELETE);
-      finalizeParams.setIceberg_params(iceFinalizeParams);
-      queryExecRequest.setFinalize_params(finalizeParams);
-  }
-
-  private static void addFinalizationParamsForUpdate(
-      TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, UpdateStmt updateStmt) {
-    FeTable targetTable = updateStmt.getTargetTable();
-    if (!(targetTable instanceof FeIcebergTable)) return;
+    }
     TFinalizeParams finalizeParams = addFinalizationParamsForDml(
         queryCtx, targetTable, false);
-    TIcebergDmlFinalizeParams iceFinalizeParams = addFinalizationParamsForIcebergDml(
-        (FeIcebergTable)targetTable, TIcebergOperation.UPDATE);
+    TIcebergDmlFinalizeParams iceFinalizeParams =
+        addFinalizationParamsForIcebergDml((FeIcebergTable)targetTable, iceOperation);
     finalizeParams.setIceberg_params(iceFinalizeParams);
     queryExecRequest.setFinalize_params(finalizeParams);
   }
@@ -2683,10 +2681,8 @@ public class Frontend {
         finalizeParams.setWrite_id(writeId);
       } else if (targetTable instanceof FeIcebergTable) {
         FeIcebergTable iceTable = (FeIcebergTable)targetTable;
-        TIcebergDmlFinalizeParams iceFinalizeParams = new TIcebergDmlFinalizeParams();
-        iceFinalizeParams.operation = TIcebergOperation.INSERT;
-        iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
-        iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
+        TIcebergDmlFinalizeParams iceFinalizeParams =
+            addFinalizationParamsForIcebergDml(iceTable, TIcebergOperation.INSERT);
         finalizeParams.setIceberg_params(iceFinalizeParams);
       } else {
         // TODO: Currently this flag only controls the removal of the query-level staging

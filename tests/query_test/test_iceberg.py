@@ -1599,18 +1599,19 @@ class TestIcebergV2Table(IcebergTestSuite):
   def _test_update_basic_snapshots(self, db):
     """Verifies that the tables have the expected number of snapshots, and
     the parent ids match the previous snapshot ids. See IMPALA-12708."""
-    def validate_snapshots(tbl, expected_snapshots):
-      tbl_name = "{}.{}".format(db, tbl)
-      snapshots = get_snapshots(self.client, tbl_name,
-          expected_result_size=expected_snapshots)
-      parent_id = None
-      for s in snapshots:
-        assert s.get_parent_id() == parent_id
-        parent_id = s.get_snapshot_id()
 
-    validate_snapshots("single_col", 3)
-    validate_snapshots("ice_alltypes", 17)
-    validate_snapshots("ice_id_partitioned", 4)
+    self.validate_snapshots(db, "single_col", 3)
+    self.validate_snapshots(db, "ice_alltypes", 17)
+    self.validate_snapshots(db, "ice_id_partitioned", 4)
+
+  def validate_snapshots(self, db, tbl, expected_snapshots):
+    tbl_name = "{}.{}".format(db, tbl)
+    snapshots = get_snapshots(self.client, tbl_name,
+        expected_result_size=expected_snapshots)
+    parent_id = None
+    for s in snapshots:
+      assert s.get_parent_id() == parent_id
+      parent_id = s.get_snapshot_id()
 
   def _update_basic_hive_tests(self, db):
     def get_hive_results(tbl, order_by_col):
@@ -1747,35 +1748,22 @@ class TestIcebergV2Table(IcebergTestSuite):
         "3,true,3,11,1.1,2.222,123.321,2022-05-22,impala"]
 
   def test_optimize(self, vector, unique_database):
-    tbl_name = unique_database + ".optimize_iceberg"
-    self.execute_query("""create table {0} (i int)
-        stored as iceberg""".format(tbl_name))
-    self.execute_query("insert into {0} values (1);".format(tbl_name))
-    self.execute_query("insert into {0} values (2);".format(tbl_name))
-    self.execute_query("insert into {0} values (8);".format(tbl_name))
-    result_before_opt = self.execute_query("SELECT * FROM {}".format(tbl_name))
-    snapshots = get_snapshots(self.client, tbl_name, expected_result_size=3)
-    snapshot_before = snapshots[2]
+    self.run_test_case('QueryTest/iceberg-optimize', vector, unique_database)
+    expected_snapshots = 19
+    self.validate_snapshots(unique_database, "ice_optimize", expected_snapshots)
 
-    # Check that a new snapshot is created after Iceberg table optimization.
-    self.execute_query("optimize table {0};".format(tbl_name))
-    snapshots = get_snapshots(self.client, tbl_name, expected_result_size=4)
-    snapshot_after = snapshots[3]
-    assert(snapshot_before.get_creation_time() < snapshot_after.get_creation_time())
-    # Check that the last snapshot's parent ID is the snapshot ID before 'OPTIMIZE TABLE'.
-    assert(snapshot_before.get_snapshot_id() == snapshot_after.get_parent_id())
+    # The last operation was an OPTIMIZE TABLE statement.
+    # Check that time travel to the previous snapshot returns all results correctly.
+    tbl_name = unique_database + ".ice_optimize"
+    snapshots = get_snapshots(
+        self.client, tbl_name, expected_result_size=expected_snapshots)
+    snapshot_before_last = snapshots[-2]
 
     result_after_opt = self.execute_query("SELECT * FROM {0}".format(tbl_name))
-    # Check that we get the same result from the table before and after 'OPTIMIZE TABLE'.
-    assert result_after_opt.data.sort() == result_before_opt.data.sort()
-
     result_time_travel = self.execute_query(
         "select * from {0} for system_version as of {1};".format(
-            tbl_name, snapshot_before.get_snapshot_id()))
-    # Check that time travel to the previous snapshot returns all results correctly.
+            tbl_name, snapshot_before_last.get_snapshot_id()))
     assert result_after_opt.data.sort() == result_time_travel.data.sort()
-
-    self.run_test_case('QueryTest/iceberg-optimize', vector, unique_database)
 
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most

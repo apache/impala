@@ -1640,6 +1640,9 @@ bool ClientRequestState::CreateIcebergCatalogOps(
       DCHECK(cat_ice_op->iceberg_data_files_fb.empty());
       update_catalog = false;
     }
+  } else if (ice_finalize_params.operation == TIcebergOperation::OPTIMIZE) {
+    cat_ice_op->__set_iceberg_data_files_fb(
+        dml_exec_state->CreateIcebergDataFilesVector());
   }
   if (!update_catalog) query_events_->MarkEvent("No-op Iceberg DML statement");
   return update_catalog;

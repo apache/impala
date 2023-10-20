@@ -680,6 +680,24 @@ public class IcebergUtil {
     return scan;
   }
 
+  public static GroupedContentFiles getIcebergFilesFromSnapshot(
+      FeIcebergTable table, List<Expression> predicates, long snapshotId)
+      throws TableLoadingException {
+    if (table.snapshotId() == -1) {
+      return new GroupedContentFiles(CloseableIterable.empty());
+    }
+    TableScan scan = table.getIcebergApiTable().newScan();
+    scan = scan.useSnapshot(snapshotId);
+    for (Expression predicate : predicates) {
+      scan = scan.filter(predicate);
+    }
+    try (CloseableIterable<FileScanTask> fileScanTasks = scan.planFiles()) {
+      return new GroupedContentFiles(fileScanTasks);
+    } catch (IOException e) {
+      throw new TableLoadingException("Error during reading Iceberg manifest files.", e);
+    }
+  }
+
   /**
    * Use ContentFile path to generate 128-bit Murmur3 hash as map key, cached in memory
    */
@@ -1204,7 +1222,10 @@ public class IcebergUtil {
     return props;
   }
 
-  public static void validateIcebergColumnsForInsert(FeIcebergTable iceTable)
+  /**
+   * Checks the table before insert for unsupported types and file formats.
+   */
+  public static void validateIcebergTableForInsert(FeIcebergTable iceTable)
       throws AnalysisException {
     for (Types.NestedField field : iceTable.getIcebergSchema().columns()) {
       org.apache.iceberg.types.Type iceType = field.type();
@@ -1215,6 +1236,19 @@ public class IcebergUtil {
               "column that Impala cannot write.");
         }
       }
+    }
+    for (Column c : iceTable.getColumns()) {
+      if (c.getType().isComplexType()) {
+        throw new AnalysisException(String.format("Impala does not support writing " +
+                "tables with complex types. Table '%s' has column '%s' " +
+                "with type: %s", iceTable.getFullName(), c.getName(),
+            c.getType().toSql()));
+      }
+    }
+    if (iceTable.getIcebergFileFormat() != TIcebergFileFormat.PARQUET) {
+      throw new AnalysisException(String.format("Impala can only write Parquet data " +
+              "files, while table '%s' expects '%s' data files.",
+          iceTable.getFullName(), iceTable.getIcebergFileFormat().toString()));
     }
   }
 
@@ -1237,7 +1271,7 @@ public class IcebergUtil {
       for (int i = 0; i < selectListExprs.size(); ++i) {
         IcebergColumn targetColumn = (IcebergColumn)selectExprTargetColumns.get(i);
         if (targetColumn.getFieldId() != partField.getSourceId()) continue;
-        // widestTypeExpr is widest type expression for column i
+        // widestTypeExpr is the widest type expression for column i
         Expr widestTypeExpr =
             (widestTypeExprList != null) ? widestTypeExprList.get(i) : null;
         Expr icebergPartitionTransformExpr = getIcebergPartitionTransformExpr(analyzer,
