@@ -92,6 +92,10 @@ under the License.
 <codeblock>--data_cache_eviction_policy=<varname>policy</varname>
 </codeblock>
     </p>
+    <note>The cache item will not expire as long as the same file metadata is used in the query.
+      This is because the cache key consists of the filename, mtime (last modified time of the
+      file), and file offset. If the mtime in the file metadata remains unchanged, the scan request
+      will consistently access the cache (provided that there is enough capacity).</note>
   </conbody>
 
 </concept>
