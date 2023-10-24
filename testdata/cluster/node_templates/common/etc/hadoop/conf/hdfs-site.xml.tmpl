@@ -99,10 +99,11 @@
     <value>1024</value>
   </property>
 
-  <!-- Set the max cached memory to ~64kb. This must be less than ulimit -l -->
+  <!-- Set the max cached memory as configured in the admin script.
+    This must be less than ulimit -l -->
   <property>
     <name>dfs.datanode.max.locked.memory</name>
-    <value>64000</value>
+    <value>${DATANODE_LOCKED_MEM}</value>
   </property>
 
   <!-- Increase the frequency the NN talks to the DNs to update the caching policy.

@@ -471,6 +471,12 @@ sudo chown $(whoami) /var/lib/hadoop-hdfs/
 # TODO: restrict this to only the users it is needed for
 echo -e "\n* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
 
+# Increase memlock for HDFS caching. On RedHat systems this defaults to 64 (KB). Ubuntu
+# uses systemd, which sets its own default. With Ubuntu 18.04 that default is 16 KB,
+# 20.04+ defaults to 64 MB. Set all to 64 MB for the current user; Impala test systems
+# require 10s of GBs of memory, so this setting should not be a problem.
+echo -e "$USER - memlock 65536" | sudo tee /etc/security/limits.d/10-memlock.conf
+
 # Default on CentOS limits a user to 1024 or 4096 processes (threads) , which isn't
 # enough for minicluster with all of its friends.
 redhat7 sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
