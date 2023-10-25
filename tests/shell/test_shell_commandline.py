@@ -1185,6 +1185,31 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "| a    | b     |" in result.stdout, result.stdout
     assert "| true | false |" in result.stdout, result.stdout
 
+  def test_binary_display(self, vector):
+    """Test that binary values are displayed correctly."""
+    query = "select binary_col from functional.binary_tbl"
+    result = run_impala_shell_cmd(vector, ['-q', query])
+    assert "| binary1            |" in result.stdout, result.stdout
+    assert "| NULL               |" in result.stdout, result.stdout
+    assert "|                    |" in result.stdout, result.stdout
+    assert "| árvíztűrőtükörfúró |" in result.stdout, result.stdout
+    assert "| 你好hello          |" in result.stdout, result.stdout
+    assert "| \x00\xef\xbf\xbd\x00\xef\xbf\xbd                 |" in result.stdout, \
+        result.stdout
+    assert '| \xef\xbf\xbdD3"\x11\x00              |' in result.stdout, result.stdout
+
+  def test_binary_as_string(self, vector):
+    query = """select cast(binary_col as string) from functional.binary_tbl
+               where string_col != "invalid utf8" """
+    result = run_impala_shell_cmd(vector, ['-q', query])
+    # Column length omitted because some strict HS2 protocol returns header "binary_col"
+    # while others return "cast(binary_col as string)".
+    assert "| binary1            " in result.stdout, result.stdout
+    assert "| NULL               " in result.stdout, result.stdout
+    assert "|                    " in result.stdout, result.stdout
+    assert "| árvíztűrőtükörfúró " in result.stdout, result.stdout
+    assert "| 你好hello          " in result.stdout, result.stdout
+
   def test_null_values(self, vector):
     """Test that null values are displayed correctly."""
     if vector.get_value('strict_hs2_protocol'):

@@ -17,6 +17,8 @@
 
 from TCLIService.TCLIService import TTypeId
 
+import sys
+
 
 class ValueConverter(object):
 
@@ -29,6 +31,11 @@ class ValueConverter(object):
 
 class HS2ValueConverter(ValueConverter):
 
+  def __get_binary_converter(self):
+      if sys.version_info.major < 3:
+          return str
+      return lambda s: s.decode(errors='replace')
+
   def __init__(self):
       self.value_converters = {
           TTypeId.BOOLEAN_TYPE: lambda b: 'true' if b else 'false',
@@ -36,7 +43,7 @@ class HS2ValueConverter(ValueConverter):
           TTypeId.SMALLINT_TYPE: str,
           TTypeId.INT_TYPE: str,
           TTypeId.BIGINT_TYPE: str,
-          TTypeId.BINARY_TYPE: str,
+          TTypeId.BINARY_TYPE: self.__get_binary_converter(),
           TTypeId.FLOAT_TYPE: str,
           TTypeId.DOUBLE_TYPE: str
       }
