@@ -22,11 +22,21 @@
 
 export IMPALA_HOME=/opt/impala
 
+# Since the Java location includes the CPU architecture, use a glob to find Java home
+export JAVA_HOME=$(compgen -G "/usr/lib/jvm/java-8-openjdk*")
+
 # Add directories containing dynamic libraries required by the daemons that
 # are not on the system library paths.
 export LD_LIBRARY_PATH=/opt/impala/lib
-LD_LIBRARY_PATH+=:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/
-LD_LIBRARY_PATH+=:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/server/
+
+# Given JAVA_HOME, find libjvm.so and add them to LD_LIBRARY_PATH.
+# JAVA_HOME could be a symlink, so follow symlinks when looking for the libraries
+LIB_JVM_DIR=$(find -L "${JAVA_HOME}" -name libjvm.so | head -1 | xargs dirname)
+if [[ -z $LIB_JVM_DIR ]]; then
+  echo "ERROR: Could not find libjvm.so in ${JAVA_HOME}"
+  exit 1
+fi
+LD_LIBRARY_PATH+=:${LIB_JVM_DIR}
 
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 
