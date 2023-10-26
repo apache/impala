@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import add_exec_option_dimension
+from tests.common.test_dimensions import add_mandatory_exec_option
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import extract_event_sequence
 
@@ -90,7 +90,7 @@ limit 10;
         debug_action_options=[cls.DEBUG_ACTION_CODEGEN_FINISH_BEFORE_EXEC_START,
             cls.DEBUG_ACTION_CODEGEN_FINISH_DURING_EXEC,
             cls.DEBUG_ACTION_EXEC_FINISH_BEFORE_CODEGEN]))
-    add_exec_option_dimension(cls, "async_codegen", 1)
+    add_mandatory_exec_option(cls, "async_codegen", 1)
 
     cls.ImpalaTestMatrix.add_constraint(lambda vector: cls.__is_valid_test_vector(vector))
 

@@ -46,7 +46,7 @@ from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu, SkipIfHive2
 from tests.common.test_dimensions import (add_exec_option_dimension,
-    extend_exec_option_dimension)
+    add_mandatory_exec_option)
 from tests.verifiers.metric_verifier import MetricVerifier
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
@@ -65,11 +65,10 @@ class TestKuduBasicDML(KuduTestSuite):
     super(TestKuduBasicDML, cls).add_test_dimensions()
     # The default read mode of READ_LATEST does not provide high enough consistency for
     # these tests.
-    add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
+    add_mandatory_exec_option(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
     # Run with and without multithreading to ensure Kudu DML works with both threading
     # models. E.g. see IMPALA-9782.
-    add_exec_option_dimension(cls, "mt_dop", "0")
-    extend_exec_option_dimension(cls, "mt_dop", "4")
+    add_exec_option_dimension(cls, "mt_dop", [0, 4])
 
   @SkipIfKudu.no_hybrid_clock
   def test_kudu_insert(self, vector, unique_database):
@@ -105,7 +104,7 @@ class TestKuduOperations(KuduTestSuite):
     super(TestKuduOperations, cls).add_test_dimensions()
     # The default read mode of READ_LATEST does not provide high enough consistency for
     # these tests.
-    add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
+    add_mandatory_exec_option(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
   @SkipIfKudu.no_hybrid_clock
   @SkipIfKudu.hms_integration_enabled
@@ -584,8 +583,7 @@ class TestKuduPartitioning(KuduTestSuite):
     super(TestKuduPartitioning, cls).add_test_dimensions()
 
     # Test both the interpreted and the codegen'd path.
-    add_exec_option_dimension(cls, "disable_codegen", "0")
-    extend_exec_option_dimension(cls, "disable_codegen", "1")
+    add_exec_option_dimension(cls, "disable_codegen", [0, 1])
 
   def test_partitions_evenly_distributed(self, vector, cursor,
       kudu_client, unique_database):
@@ -1524,7 +1522,7 @@ class TestKuduReadTokenSplit(KuduTestSuite):
     super(TestKuduReadTokenSplit, cls).add_test_dimensions()
     # The default read mode of READ_LATEST does not provide high enough consistency for
     # these tests.
-    add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
+    add_mandatory_exec_option(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
   @SkipIfKudu.no_hybrid_clock
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster

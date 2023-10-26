@@ -27,7 +27,7 @@ from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperti
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfEC, SkipIfLocal, SkipIfFS
-from tests.common.test_dimensions import add_exec_option_dimension
+from tests.common.test_dimensions import add_mandatory_exec_option
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
 from tests.util.filesystem_utils import WAREHOUSE
@@ -70,7 +70,7 @@ class TestRuntimeFilters(ImpalaTestSuite):
         or v.get_value('mt_dop') == 0)
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
-      add_exec_option_dimension(cls, "async_codegen", 1)
+      add_mandatory_exec_option(cls, "async_codegen", 1)
 
   def test_basic_filters(self, vector):
     new_vector = deepcopy(vector)
@@ -184,7 +184,7 @@ class TestBloomFilters(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format not in ['hbase'])
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
-      add_exec_option_dimension(cls, "async_codegen", 1)
+      add_mandatory_exec_option(cls, "async_codegen", 1)
 
   def test_bloom_filters(self, vector):
     vector.get_value('exec_option')['ENABLED_RUNTIME_FILTER_TYPES'] = 'BLOOM'
@@ -226,11 +226,11 @@ class TestMinMaxFilters(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format in ['kudu'])
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
-      add_exec_option_dimension(cls, "async_codegen", 1)
+      add_mandatory_exec_option(cls, "async_codegen", 1)
     # IMPALA-10715. Enable only min/max since the bloom filters will return
     # rows only satisfying the join predicates. This test requires the return
     # of non-qualifying rows to succeed.
-    add_exec_option_dimension(cls, "ENABLED_RUNTIME_FILTER_TYPES", "MIN_MAX")
+    add_mandatory_exec_option(cls, "ENABLED_RUNTIME_FILTER_TYPES", "MIN_MAX")
 
   def test_min_max_filters(self, vector):
     self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
@@ -303,7 +303,7 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format in ['parquet'])
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
-      add_exec_option_dimension(cls, "async_codegen", 1)
+      add_mandatory_exec_option(cls, "async_codegen", 1)
 
   def test_overlap_min_max_filters(self, vector, unique_database):
     self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
@@ -356,7 +356,7 @@ class TestInListFilters(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format in ['orc'])
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
-      add_exec_option_dimension(cls, "async_codegen", 1)
+      add_mandatory_exec_option(cls, "async_codegen", 1)
 
   def test_in_list_filters(self, vector):
     vector.get_value('exec_option')['enabled_runtime_filter_types'] = 'in_list'
@@ -378,7 +378,7 @@ class TestAllRuntimeFilters(ImpalaTestSuite):
       lambda v: v.get_value('table_format').file_format in ['kudu'])
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
-      add_exec_option_dimension(cls, "async_codegen", 1)
+      add_mandatory_exec_option(cls, "async_codegen", 1)
 
   def test_all_runtime_filters(self, vector):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=ALL")
@@ -410,7 +410,7 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', 0, 4))
     # Enable query option ASYNC_CODEGEN for slow build
     if build_runs_slowly:
-      add_exec_option_dimension(cls, "async_codegen", 1)
+      add_mandatory_exec_option(cls, "async_codegen", 1)
 
   def test_row_filters(self, vector):
     new_vector = deepcopy(vector)

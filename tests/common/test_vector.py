@@ -58,6 +58,10 @@
 
 from __future__ import absolute_import, division, print_function
 from itertools import product
+from copy import deepcopy
+
+EXEC_OPTION_KEY = 'exec_option'
+
 
 # A list of test dimension values.
 class ImpalaTestDimension(list):
@@ -104,19 +108,40 @@ class ImpalaTestMatrix(object):
   def __init__(self, *args):
     self.dimensions = dict((arg.name, arg) for arg in args)
     self.constraint_list = list()
+    self.independent_exec_option_names = set()
 
   def add_dimension(self, dimension):
     self.dimensions[dimension.name] = dimension
 
   def add_mandatory_exec_option(self, exec_option_key, exec_option_value):
-    for vector in self.dimensions['exec_option']:
+    assert EXEC_OPTION_KEY in self.dimensions, (
+      "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
+    for vector in self.dimensions[EXEC_OPTION_KEY]:
       vector.value[exec_option_key] = exec_option_value
+
+  def add_exec_option_dimension(self, dimension):
+    """
+    Add 'dimension' into 'self.dimensions' and memorize the name.
+    During vector generation, all dimensions registered through this method will be
+    embedded into 'exec_option' dimension. This is intended to maintain pairwise and
+    exhaustive combination correct while eliminating the need for individual test method
+    to append the custom exec options into 'exec_option' dimension themself.
+    """
+    assert EXEC_OPTION_KEY in self.dimensions, (
+      "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
+    assert len(dimension) > 1, (
+      "Dimension " + dimension.name + " must have more than 1 possible value! "
+      "Use add_mandatory_exec_option() instead.")
+    self.add_dimension(dimension)
+    self.independent_exec_option_names.add(dimension.name)
 
   def clear(self):
     self.dimensions.clear()
+    self.independent_exec_option_names = set()
 
   def clear_dimension(self, dimension_name):
     del self.dimensions[dimension_name]
+    self.independent_exec_option_names.discard(dimension_name)
 
   def has_dimension(self, dimension_name):
     return dimension_name in self.dimensions
@@ -132,9 +157,29 @@ class ImpalaTestMatrix(object):
     else:
       raise ValueError('Unknown exploration strategy: %s' % exploration_strategy)
 
+  def embed_independent_exec_options(self, vector_values):
+    if not self.independent_exec_option_names:
+      return vector_values
+    values = []
+    exec_values = []
+    exec_option = None
+    for val in vector_values:
+      if val.name == EXEC_OPTION_KEY:
+        exec_option = deepcopy(val.value)
+      elif val.name in self.independent_exec_option_names:
+        exec_values.append(val)
+      else:
+        values.append(val)
+    assert exec_option is not None, (
+      "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
+    for val in exec_values:
+      exec_option[val.name] = val.value
+    values.append(ImpalaTestVector.Value(EXEC_OPTION_KEY, exec_option))
+    return values
+
   def __generate_exhaustive_combinations(self):
-    return [ImpalaTestVector(vec) for vec in product(*self.__extract_vector_values())
-              if self.is_valid(vec)]
+    return [ImpalaTestVector(self.embed_independent_exec_options(vec))
+      for vec in product(*self.__extract_vector_values()) if self.is_valid(vec)]
 
   def __generate_pairwise_combinations(self):
     from allpairspy import AllPairs
@@ -144,8 +189,8 @@ class ImpalaTestMatrix(object):
     # results will be the same.
     if len(self.dimensions) == 1:
       return self.__generate_exhaustive_combinations()
-    return [ImpalaTestVector(vec) for vec in all_pairs(self.__extract_vector_values(),
-                                                 filter_func = self.is_valid)]
+    return [ImpalaTestVector(self.embed_independent_exec_options(vec))
+      for vec in all_pairs(self.__extract_vector_values(), filter_func=self.is_valid)]
 
   def add_constraint(self, constraint_func):
     self.constraint_list.append(constraint_func)

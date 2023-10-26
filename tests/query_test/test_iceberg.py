@@ -38,6 +38,7 @@ import json
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.iceberg_test_suite import IcebergTestSuite
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfDockerizedCluster
+from tests.common.test_dimensions import add_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.file_utils import (
   create_iceberg_table_from_directory,
@@ -1185,8 +1186,8 @@ class TestIcebergV2Table(IcebergTestSuite):
     super(TestIcebergV2Table, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension(
-      'disable_optimized_iceberg_v2_read', 0, 1))
+    add_exec_option_dimension(cls, 'disable_optimized_iceberg_v2_read', [0, 1])
+
   # The test uses pre-written Iceberg tables where the position delete files refer to
   # the data files via full URI, i.e. they start with 'hdfs://localhost:2050/...'. In the
   # dockerised environment the namenode is accessible on a different hostname/port.
