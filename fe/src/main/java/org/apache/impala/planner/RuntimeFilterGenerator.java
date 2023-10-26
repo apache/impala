@@ -1087,7 +1087,8 @@ public final class RuntimeFilterGenerator {
    *    scan node.
    * 3. Only Hdfs and Kudu scan nodes are supported:
    *     a. If the target is an HdfsScanNode, the filter must be type BLOOM/IN_LIST for
-   *        non Parquet tables, or type BLOOM/MIN_MAX/IN_LIST for Parquet tables.
+   *        ORC tables, or type BLOOM/MIN_MAX for Parquet tables, or type BLOOM for other
+   *        kind of tables.
    *     b. If the target is a KuduScanNode, the filter could be type MIN_MAX, and/or
    *        BLOOM, the target must be a slot ref on a column, and the comp op cannot
    *        be 'not distinct'.

@@ -532,11 +532,19 @@ enum TImpalaQueryOptions {
   RETRY_FAILED_QUERIES = 102
 
   // Enabled runtime filter types to be applied to scanner.
-  // This option only apply to Kudu now, will apply to HDFS once we support
-  // min-max filter for HDFS.
+  // This option only apply to Hdfs scan node and Kudu scan node.
+  // Specify the enabled types by a comma-separated list or enable all types by "ALL".
   //     BLOOM   - apply bloom filter only,
   //     MIN_MAX - apply min-max filter only.
-  //     ALL     - apply both bloom filter and min-max filter (default).
+  //     IN_LIST - apply in-list filter only.
+  //     ALL     - apply all types of runtime filters.
+  // Default is [BLOOM, MIN_MAX].
+  // Depending on the scan node type, Planner can schedule compatible runtime filter type
+  // as follows:
+  // Kudu scan: BLOOM, MIN_MAX
+  // Hdfs scan on Parquet file: BLOOM, MIN_MAX
+  // Hdfs scan on ORC file: BLOOM, IN_LIST
+  // Hdfs scan on other kind of file: BLOOM
   ENABLED_RUNTIME_FILTER_TYPES = 103
 
   // Enable asynchronous codegen.
