@@ -1374,7 +1374,7 @@ class TestParquetScanRangeAssigment(ImpalaTestSuite):
 # More tests for text scanner
 # 1. Test file that ends w/o tuple delimiter
 # 2. Test file with escape character
-class TestTextScanRangeLengths(ImpalaTestSuite):
+class TestTextScanRangeLengths1(ImpalaTestSuite):
   ESCAPE_TABLE_LIST = ["testescape_16_lf", "testescape_16_crlf",
       "testescape_17_lf", "testescape_17_crlf",
       "testescape_32_lf", "testescape_32_crlf"]
@@ -1385,7 +1385,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestTextScanRangeLengths, cls).add_test_dimensions()
+    super(TestTextScanRangeLengths1, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -1490,15 +1490,16 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
 
     assert sorted(result.data) == sorted(expected_result)
 
+
 # Test for IMPALA-1740: Support for skip.header.line.count
-class TestTextScanRangeLengths(ImpalaTestSuite):
+class TestTextScanRangeLengths2(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestTextScanRangeLengths, cls).add_test_dimensions()
+    super(TestTextScanRangeLengths2, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec in ['none', 'gzip'])

@@ -36,7 +36,7 @@ RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
 CATALOG_VERSION_LOWER_BOUND = 'catalog.catalog-object-version-lower-bound'
 
 
-class TestCompactCatalogUpdates(CustomClusterTestSuite):
+class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -449,7 +449,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     for i in t.imap_unordered(do_table, range(NUM_ITERS)):
       pass
 
-class TestObservability(CustomClusterTestSuite):
+
+class TestLocalCatalogObservability(CustomClusterTestSuite):
   def get_catalog_cache_metrics(self, impalad):
     """ Returns catalog cache metrics as a dict by scraping the json metrics page on the
     given impalad"""
