@@ -22,13 +22,32 @@ import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TIcebergFileFormat;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+
+import com.google.common.collect.Lists;
 
 abstract class IcebergModifyImpl extends ModifyImpl {
   FeIcebergTable originalTargetTable_;
   IcebergPositionDeleteTable icePosDelTable_;
+
+  /////////////////////////////////////////
+  // START: Members that are set in buildAndValidateSelectExprs().
+
+  // All Iceberg modify statements (DELETE, UPDATE) need delete exprs.
+  protected List<Expr> deleteResultExprs_ = new ArrayList<>();
+  protected List<Expr> deletePartitionKeyExprs_ = new ArrayList<>();
+
+  // For every column of the target table that is referenced in the optional
+  // 'sort.columns' table property, this list will contain the corresponding result expr
+  // from 'resultExprs_'. Before insertion, all rows will be sorted by these exprs. If the
+  // list is empty, no additional sorting by non-partitioning columns will be performed.
+  // The column list must not contain partition columns and must be empty for non-Hdfs
+  // tables.
+  protected List<Expr> sortExprs_ = new ArrayList<>();
+  // END: Members that are set in buildAndValidateSelectExprs().
+  /////////////////////////////////////////
 
   public IcebergModifyImpl(ModifyStmt modifyStmt) {
     super(modifyStmt);
@@ -38,24 +57,11 @@ abstract class IcebergModifyImpl extends ModifyImpl {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    // Make the virtual position delete table the new target table.
-    modifyStmt_.setTargetTable(icePosDelTable_);
     modifyStmt_.setMaxTableSinks(analyzer.getQueryOptions().getMax_fs_writers());
-    if (modifyStmt_ instanceof UpdateStmt) {
-      throw new AnalysisException("UPDATE is not supported for Iceberg table " +
-          originalTargetTable_.getFullName());
-    }
 
     if (icePosDelTable_.getFormatVersion() == 1) {
       throw new AnalysisException("Iceberg V1 table do not support DELETE/UPDATE " +
           "operations: " + originalTargetTable_.getFullName());
-    }
-
-    String deleteMode = originalTargetTable_.getIcebergApiTable().properties().get(
-        org.apache.iceberg.TableProperties.DELETE_MODE);
-    if (deleteMode != null && !deleteMode.equals("merge-on-read")) {
-      throw new AnalysisException(String.format("Unsupported delete mode: '%s' for " +
-          "Iceberg table: %s", deleteMode, originalTargetTable_.getFullName()));
     }
 
     if (originalTargetTable_.getDeleteFileFormat() != TIcebergFileFormat.PARQUET) {
@@ -63,39 +69,47 @@ abstract class IcebergModifyImpl extends ModifyImpl {
           "but the given table uses a different file format: " +
           originalTargetTable_.getFullName());
     }
-
-    Expr wherePredicate = modifyStmt_.getWherePredicate();
-    if (wherePredicate == null ||
-        org.apache.impala.analysis.Expr.IS_TRUE_LITERAL.apply(wherePredicate)) {
-      // TODO (IMPALA-12136): rewrite DELETE FROM t; statements to TRUNCATE TABLE t;
-      throw new AnalysisException("For deleting every row, please use TRUNCATE.");
-    }
   }
 
   @Override
-  public void addCastsToAssignmentsInSourceStmt(Analyzer analyzer)
+  public List<Expr> getSortExprs() {
+    return sortExprs_;
+  }
+
+  @Override
+  public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    sortExprs_ = Expr.substituteList(sortExprs_, smap, analyzer, true);
+    deleteResultExprs_ = Expr.substituteList(deleteResultExprs_, smap, analyzer, true);
+    deletePartitionKeyExprs_ = Expr.substituteList(
+        deletePartitionKeyExprs_, smap, analyzer, true);
+  }
+
+  public List<Expr> getDeletePartitionExprs(Analyzer analyzer) throws AnalysisException {
+    if (!originalTargetTable_.isPartitioned()) return Collections.emptyList();
+    return getSlotRefs(analyzer, Lists.newArrayList(
+        "PARTITION__SPEC__ID", "ICEBERG__PARTITION__SERIALIZED"));
+  }
+
+  public List<Expr> getDeleteResultExprs(Analyzer analyzer) throws AnalysisException {
+    return getSlotRefs(analyzer, Lists.newArrayList(
+        "INPUT__FILE__NAME", "FILE__POSITION"));
+  }
+
+  private List<Expr> getSlotRefs(Analyzer analyzer, List<String> cols)
       throws AnalysisException {
+    List<Expr> ret = new ArrayList<>();
+    for (String col : cols) {
+      ret.add(createSlotRef(analyzer, col));
+    }
+    return ret;
   }
 
-  @Override
-  public void addKeyColumns(Analyzer analyzer, List<SelectListItem> selectList,
-      List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
-      Map<String, Integer> colIndexMap) throws AnalysisException {
-    if (originalTargetTable_.isPartitioned()) {
-      String[] partitionCols;
-      partitionCols = new String[] {"PARTITION__SPEC__ID",
-          "ICEBERG__PARTITION__SERIALIZED"};
-      for (String k : partitionCols) {
-        addPartitioningColumn(analyzer, selectList, referencedColumns, uniqueSlots,
-            keySlots, colIndexMap, k);
-      }
-    }
-    String[] deleteCols;
-    deleteCols = new String[] {"INPUT__FILE__NAME", "FILE__POSITION"};
-    // Add the key columns as slot refs
-    for (String k : deleteCols) {
-      addKeyColumn(analyzer, selectList, referencedColumns, uniqueSlots, keySlots,
-          colIndexMap, k, true);
-    }
+  protected SlotRef createSlotRef(Analyzer analyzer, String colName)
+      throws AnalysisException {
+    List<String> path = Path.createRawPath(modifyStmt_.targetTableRef_.getUniqueAlias(),
+        colName);
+    SlotRef ref = new SlotRef(path);
+    ref.analyze(analyzer);
+    return ref;
   }
 }

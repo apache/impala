@@ -56,6 +56,9 @@ public class DescriptorTable {
   // Table id 0 is reserved for it. Set in QueryStmt.analyze() that produces a table sink,
   // e.g. InsertStmt.analyze(), ModifyStmt.analyze().
   private FeTable targetTable_;
+  // Sometimes we have multiple target tables (e.g. Iceberg UPDATEs), in which case
+  // we can reserve multiple ids for the target tables.
+  private final Map<FeTable, Integer> additionalTargetTableIds_ = new HashMap<>();
   // For each table, the set of partitions that are referenced by at least one
   // scan range.
   private final Map<FeTable, Set<Long>> referencedPartitionsPerTable_ = new HashMap<>();
@@ -111,6 +114,12 @@ public class DescriptorTable {
   public SlotId getMaxSlotId() { return slotIdGenerator_.getMaxId(); }
 
   public void setTargetTable(FeTable table) { targetTable_ = table; }
+
+  public int addTargetTable(FeTable table) {
+    int id = nextTableId_++;
+    additionalTargetTableIds_.put(table, id);
+    return id;
+  }
 
   /**
    * Find the set of referenced partitions for the given table.  Allocates a set if
@@ -183,6 +192,12 @@ public class DescriptorTable {
       tableIdMap.put(targetTable_, TABLE_SINK_ID);
       referencedTables.put(targetTable_.getTableName(), targetTable_);
     }
+    for (Map.Entry<FeTable, Integer> tableIdEntry :
+        additionalTargetTableIds_.entrySet()) {
+      FeTable targetTable = tableIdEntry.getKey();
+      tableIdMap.put(targetTable, tableIdEntry.getValue());
+      referencedTables.put(targetTable.getTableName(), targetTable);
+    }
     for (TupleDescriptor tupleDesc: tupleDescs_.values()) {
       // inline view of a non-constant select has a non-materialized tuple descriptor
       // in the descriptor table just for type checking, which we need to skip
@@ -214,7 +229,9 @@ public class DescriptorTable {
     for (FeTable tbl: tableIdMap.keySet()) {
       Set<Long> referencedPartitions = null; // null means include all partitions.
       // We don't know which partitions are needed for INSERT, so do not prune partitions.
-      if (tbl != targetTable_) referencedPartitions = getReferencedPartitions(tbl);
+      if (tbl != targetTable_ && !additionalTargetTableIds_.containsKey(tbl)) {
+        referencedPartitions = getReferencedPartitions(tbl);
+      }
       result.addToTableDescriptors(
           tbl.toThriftDescriptor(tableIdMap.get(tbl), referencedPartitions));
     }

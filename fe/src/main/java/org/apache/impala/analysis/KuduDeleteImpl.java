@@ -26,6 +26,8 @@ import org.apache.impala.thrift.TSortingOrder;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import java.util.Collections;
+
 public class KuduDeleteImpl extends KuduModifyImpl {
   public KuduDeleteImpl(ModifyStmt modifyStmt) {
     super(modifyStmt);
@@ -36,7 +38,7 @@ public class KuduDeleteImpl extends KuduModifyImpl {
     // analyze() must have been called before.
     Preconditions.checkState(modifyStmt_.table_ instanceof FeKuduTable);
     TableSink tableSink = TableSink.create(modifyStmt_.table_, TableSink.Op.DELETE,
-        partitionKeyExprs_, resultExprs_, getReferencedColumns(), false, false,
+        Collections.emptyList(), resultExprs_, getReferencedColumns(), false, false,
         new Pair<>(ImmutableList.<Integer>of(), TSortingOrder.LEXICAL), -1,
         modifyStmt_.getKuduTransactionToken(),
         modifyStmt_.maxTableSinks_);

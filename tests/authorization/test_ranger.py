@@ -1486,6 +1486,11 @@ class TestRanger(CustomClusterTestSuite):
         unique_name + str(policy_cnt), user, "functional_parquet", "iceberg_partitioned",
         "id", "MASK_NULL")
       policy_cnt += 1
+      # Add column masking policy to an Iceberg V2 table.
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional_parquet",
+        "iceberg_v2_delete_positional", "data", "MASK_NULL")
+      policy_cnt += 1
       self.execute_query_expect_success(admin_client, "refresh authorization",
                                         user=ADMIN)
       self.run_test_case("QueryTest/ranger_column_masking", vector,
@@ -1655,6 +1660,12 @@ class TestRanger(CustomClusterTestSuite):
       TestRanger._add_row_filtering_policy(
           unique_name + str(policy_cnt), user, "functional_parquet", "complextypestbl",
           "nested_struct.a is not NULL")
+      policy_cnt += 1
+      # Row-filtering expr on Iceberg table
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional_parquet",
+          "iceberg_v2_positional_not_all_data_files_have_delete_files",
+          "i % 2 = 1")
       policy_cnt += 1
       admin_client.execute("refresh authorization")
       self.run_test_case("QueryTest/ranger_row_filtering", vector,

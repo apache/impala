@@ -23,6 +23,7 @@ import org.apache.curator.shaded.com.google.common.collect.Lists;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.SelectListItem;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -32,6 +33,7 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class ExprUtil {
   /**
@@ -132,5 +134,10 @@ public class ExprUtil {
     // TODO Implement a function that can take into consideration of data types,
     // expressions and potentially LLVM translation in BE. The function must also
     // run fast.
+  }
+
+  public static List<SelectListItem> exprsAsSelectList(List<Expr> exprs) {
+    return exprs.stream().map(
+        e -> new SelectListItem(e, null)).collect(Collectors.toList());
   }
 }

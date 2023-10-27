@@ -607,25 +607,11 @@ public class InsertStmt extends DmlStatementBase {
         }
         validateBucketTransformForOverwrite(iceTable);
       }
-      validateIcebergColumnsForInsert(iceTable);
+      IcebergUtil.validateIcebergColumnsForInsert(iceTable);
     }
 
     if (isHBaseTable && overwrite_) {
       throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
-    }
-  }
-
-  private void validateIcebergColumnsForInsert(FeIcebergTable iceTable)
-      throws AnalysisException {
-    for (Types.NestedField field : iceTable.getIcebergSchema().columns()) {
-      org.apache.iceberg.types.Type iceType = field.type();
-      if (iceType.isPrimitiveType() && iceType instanceof Types.TimestampType) {
-        Types.TimestampType tsType = (Types.TimestampType)iceType;
-        if (tsType.shouldAdjustToUTC()) {
-          throw new AnalysisException("The Iceberg table has a TIMESTAMPTZ " +
-              "column that Impala cannot write.");
-        }
-      }
     }
   }
 
@@ -901,8 +887,9 @@ public class InsertStmt extends DmlStatementBase {
 
     if (isIcebergTarget()) {
       // Add partition key expressions in the order of the Iceberg partition fields.
-      addIcebergPartExprs(analyzer, widestTypeExprList, selectExprTargetColumns,
-          selectListExprs, icebergPartSpec);
+      IcebergUtil.populatePartitionExprs(
+          analyzer, widestTypeExprList, selectExprTargetColumns, selectListExprs,
+          (FeIcebergTable)table_, partitionKeyExprs_, partitionColPos_);
     } else {
       // Reorder the partition key exprs and names to be consistent with the target table
       // declaration, and store their column positions.  We need those exprs in the
@@ -1030,76 +1017,6 @@ public class InsertStmt extends DmlStatementBase {
       queryStmt_ = new SelectStmt(selectList, null, null, null, null, null, null);
       queryStmt_.analyze(analyzer);
     }
-  }
-
-  /**
-   * Adds partition key expressions in the order of Iceberg partition spec fields.
-   */
-  private void addIcebergPartExprs(Analyzer analyzer, List<Expr> widestTypeExprList,
-      List<Column> selectExprTargetColumns, List<Expr> selectListExprs,
-      IcebergPartitionSpec icebergPartSpec) throws AnalysisException {
-    if (!icebergPartSpec.hasPartitionFields()) return;
-    for (IcebergPartitionField partField : icebergPartSpec.getIcebergPartitionFields()) {
-      if (partField.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
-      for (int i = 0; i < selectListExprs.size(); ++i) {
-        IcebergColumn targetColumn = (IcebergColumn)selectExprTargetColumns.get(i);
-        if (targetColumn.getFieldId() != partField.getSourceId()) continue;
-        // widestTypeExpr is widest type expression for column i
-        Expr widestTypeExpr =
-            (widestTypeExprList != null) ? widestTypeExprList.get(i) : null;
-        Expr compatibleExpr = checkTypeCompatibility(targetTableName_.toString(),
-            targetColumn, selectListExprs.get(i), analyzer, widestTypeExpr);
-        Expr icebergPartitionTransformExpr =
-            getIcebergPartitionTransformExpr(partField, compatibleExpr);
-        partitionKeyExprs_.add(icebergPartitionTransformExpr);
-        partitionColPos_.add(targetColumn.getPosition());
-        break;
-      }
-    }
-  }
-
-  /**
-   * Returns the partition transform expression. E.g. if the partition transform is DAY,
-   * it returns 'to_date(compatibleExpr)'. If the partition transform is BUCKET,
-   * it returns 'iceberg_bucket_transform(compatibleExpr, transformParam)'.
-   */
-  private Expr getIcebergPartitionTransformExpr(IcebergPartitionField partField,
-      Expr compatibleExpr) {
-    String funcNameStr = transformTypeToFunctionName(partField.getTransformType());
-    if (funcNameStr == null || funcNameStr.equals("")) return compatibleExpr;
-    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, funcNameStr);
-    List<Expr> paramList = new ArrayList<>();
-    paramList.add(compatibleExpr);
-    Integer transformParam = partField.getTransformParam();
-    if (transformParam != null) {
-      paramList.add(NumericLiteral.create(transformParam));
-    }
-    if (partField.getTransformType() == TIcebergPartitionTransformType.MONTH) {
-      paramList.add(new StringLiteral("yyyy-MM"));
-    }
-    else if (partField.getTransformType() == TIcebergPartitionTransformType.HOUR) {
-      paramList.add(new StringLiteral("yyyy-MM-dd-HH"));
-    }
-    FunctionCallExpr fnCall = new FunctionCallExpr(fnName, new FunctionParams(paramList));
-    fnCall.setIsInternalFnCall(true);
-    return fnCall;
-  }
-
-  /**
-   * Returns the builtin function to use for the given partition transform.
-   */
-  private static String transformTypeToFunctionName(
-      TIcebergPartitionTransformType transformType) {
-    switch (transformType) {
-      case IDENTITY: return "";
-      case HOUR:
-      case MONTH: return "from_timestamp";
-      case DAY: return "to_date";
-      case YEAR: return "year";
-      case BUCKET: return "iceberg_bucket_transform";
-      case TRUNCATE: return "iceberg_truncate_transform";
-    }
-    return "";
   }
 
   private static Set<String> getKuduPartitionColumnNames(FeKuduTable table) {
@@ -1246,6 +1163,7 @@ public class InsertStmt extends DmlStatementBase {
    * key expressions with smap. Preserves the original types of those expressions during
    * the substitution.
    */
+  @Override
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
     partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);

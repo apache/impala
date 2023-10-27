@@ -64,10 +64,12 @@ public class DeleteStmt extends ModifyStmt {
     }
   }
 
+  @Override
   public DataSink createDataSink() {
     return modifyImpl_.createDataSink();
   }
 
+  @Override
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
     modifyImpl_.substituteResultExprs(smap, analyzer);
   }

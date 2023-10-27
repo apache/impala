@@ -17,22 +17,18 @@
 
 package org.apache.impala.analysis;
 
-import static java.lang.String.format;
-
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.rewrite.ExprRewriter;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+
+import static java.lang.String.format;
 
 /**
  * Abstract class for implementing a Modify statement such as DELETE or UPDATE. Child
@@ -42,14 +38,28 @@ abstract class ModifyImpl {
   abstract void addCastsToAssignmentsInSourceStmt(Analyzer analyzer)
       throws AnalysisException;
 
-  abstract void addKeyColumns(Analyzer analyzer,
-      List<SelectListItem> selectList, List<Integer> referencedColumns,
-      Set<SlotId> uniqueSlots, Set<SlotId> keySlots, Map<String, Integer> colIndexMap)
-      throws AnalysisException;
-
   abstract void analyze(Analyzer analyzer) throws AnalysisException;
 
+  /**
+   * This method is invoked during the creation of the source SELECT statement.
+   * It populates 'selectList' with expressions we want to write during the operation.
+   * (E.g. primary keys for Kudu, or file path and row position for Iceberg DELETEs, etc.)
+   * This also sets the partition expressions and sort expressions if required.
+   */
+  abstract void buildAndValidateSelectExprs(Analyzer analyzer,
+      List<SelectListItem> selectList) throws AnalysisException;
+
   abstract DataSink createDataSink();
+
+  /**
+   * Substitutes the result expressions, partition key expressions with smap.
+   * Preserves the original types of those expressions during the substitution.
+   * It is usually invoked when a SORT node is added to the plan because the
+   * SORT node materializes sort expressions into the sort tuple, so after the
+   * SORT node we only need to have slot refs to the materialized exprs. 'smap'
+   * contains the mapping from the original exprs to the materialized slot refs.
+   */
+  abstract void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer);
 
   // The Modify statement for this modify impl. The ModifyStmt class holds information
   // about the statement (e.g. target table type, FROM, WHERE clause, etc.)
@@ -60,31 +70,7 @@ abstract class ModifyImpl {
   // Result of the analysis of the internal SelectStmt that produces the rows that
   // will be modified.
   protected SelectStmt sourceStmt_;
-
-  // Output expressions that produce the final results to write to the target table. May
-  // include casts.
-  //
-  // In case of DELETE statements it contains the columns that identify the deleted
-  // rows (Kudu primary keys, Iceberg file_path / position).
-  protected List<Expr> resultExprs_ = new ArrayList<>();
-
-  // Exprs corresponding to the partitionKeyValues, if specified, or to the partition
-  // columns for tables.
-  protected List<Expr> partitionKeyExprs_ = new ArrayList<>();
-
-  // For every column of the target table that is referenced in the optional
-  // 'sort.columns' table property, this list will contain the corresponding result expr
-  // from 'resultExprs_'. Before insertion, all rows will be sorted by these exprs. If the
-  // list is empty, no additional sorting by non-partitioning columns will be performed.
-  // The column list must not contain partition columns and must be empty for non-Hdfs
-  // tables.
-  protected List<Expr> sortExprs_ = new ArrayList<>();
-
-  // Position mapping of output expressions of the sourceStmt_ to column indices in the
-  // target table. The i'th position in this list maps to the referencedColumns_[i]'th
-  // position in the target table.
-  protected List<Integer> referencedColumns_ = new ArrayList<>();
-  // END: Members that are set in first run of analyze
+  // END: Members that are set in createSourceStmt().
   /////////////////////////////////////////
 
   public ModifyImpl(ModifyStmt modifyStmt) {
@@ -109,148 +95,73 @@ abstract class ModifyImpl {
     if (sourceStmt_ == null) {
       // Builds the select list and column position mapping for the target table.
       ArrayList<SelectListItem> selectList = new ArrayList<>();
-      buildAndValidateAssignmentExprs(analyzer, selectList);
+      buildAndValidateSelectExprs(analyzer, selectList);
 
       // Analyze the generated select statement.
       sourceStmt_ = new SelectStmt(new SelectList(selectList), modifyStmt_.fromClause_,
           modifyStmt_.wherePredicate_,
           null, null, null, null);
-
+      sourceStmt_.analyze(analyzer);
       addCastsToAssignmentsInSourceStmt(analyzer);
+    } else {
+      sourceStmt_.analyze(analyzer);
     }
-    sourceStmt_.analyze(analyzer);
   }
 
-  /**
-   * Validates the list of value assignments that should be used to modify the target
-   * table. It verifies that only those columns are referenced that belong to the target
-   * table, no key columns are modified, and that a single column is not modified multiple
-   * times. Analyzes the Exprs and SlotRefs of assignments_ and writes a list of
-   * SelectListItems to the out parameter selectList that is used to build the select list
-   * for sourceStmt_. A list of integers indicating the column position of an entry in the
-   * select list in the target table is written to the field referencedColumns_.
-   *
-   * In addition to the expressions that are generated for each assignment, the
-   * expression list contains an expression for each key column. The key columns
-   * are always prepended to the list of expression representing the assignments.
-   */
-  private void buildAndValidateAssignmentExprs(Analyzer analyzer,
-      List<SelectListItem> selectList)
+  abstract public List<Expr> getPartitionKeyExprs();
+
+  protected void checkSubQuery(SlotRef lhsSlotRef, Expr rhsExpr)
       throws AnalysisException {
-    // The order of the referenced columns equals the order of the result expressions
-    Set<SlotId> uniqueSlots = new HashSet<>();
-    Set<SlotId> keySlots = new HashSet<>();
-
-    // Mapping from column name to index
-    List<Column> cols = modifyStmt_.table_.getColumnsInHiveOrder();
-    Map<String, Integer> colIndexMap = new HashMap<>();
-    for (int i = 0; i < cols.size(); i++) {
-      colIndexMap.put(cols.get(i).getName(), i);
-    }
-
-    addKeyColumns(analyzer, selectList, referencedColumns_, uniqueSlots,
-        keySlots, colIndexMap);
-
-    // Assignments are only used in the context of updates.
-    for (Pair<SlotRef, Expr> valueAssignment : modifyStmt_.assignments_) {
-      SlotRef lhsSlotRef = valueAssignment.first;
-      lhsSlotRef.analyze(analyzer);
-
-      Expr rhsExpr = valueAssignment.second;
-      // No subqueries for rhs expression
-      if (rhsExpr.contains(Subquery.class)) {
-        throw new AnalysisException(
-            format("Subqueries are not supported as update expressions for column '%s'",
-                lhsSlotRef.toSql()));
-      }
-      rhsExpr.analyze(analyzer);
-
-      // Correct target table
-      if (!lhsSlotRef.isBoundByTupleIds(modifyStmt_.targetTableRef_.getId().asList())) {
-        throw new AnalysisException(
-            format("Left-hand side column '%s' in assignment expression '%s=%s' does not "
-                + "belong to target table '%s'", lhsSlotRef.toSql(), lhsSlotRef.toSql(),
-                rhsExpr.toSql(),
-                modifyStmt_.targetTableRef_.getDesc().getTable().getFullName()));
-      }
-
-      Column c = lhsSlotRef.getResolvedPath().destColumn();
-      // TODO(Kudu) Add test for this code-path when Kudu supports nested types
-      if (c == null) {
-        throw new AnalysisException(
-            format("Left-hand side in assignment expression '%s=%s' must be a column " +
-                "reference", lhsSlotRef.toSql(), rhsExpr.toSql()));
-      }
-
-      if (keySlots.contains(lhsSlotRef.getSlotId())) {
-        boolean isSystemGeneratedColumn =
-            c instanceof KuduColumn && ((KuduColumn)c).isAutoIncrementing();
-        throw new AnalysisException(format("%s column '%s' cannot be updated.",
-            isSystemGeneratedColumn ? "System generated key" : "Key",
-            lhsSlotRef.toSql()));
-      }
-
-      if (uniqueSlots.contains(lhsSlotRef.getSlotId())) {
-        throw new AnalysisException(
-            format("Duplicate value assignment to column: '%s'", lhsSlotRef.toSql()));
-      }
-
-      rhsExpr = StatementBase.checkTypeCompatibility(
-          modifyStmt_.targetTableRef_.getDesc().getTable().getFullName(),
-          c, rhsExpr, analyzer, null /*widestTypeSrcExpr*/);
-      uniqueSlots.add(lhsSlotRef.getSlotId());
-      selectList.add(new SelectListItem(rhsExpr, null));
-      referencedColumns_.add(colIndexMap.get(c.getName()));
+    if (rhsExpr.contains(Subquery.class)) {
+      throw new AnalysisException(
+          format("Subqueries are not supported as update expressions for column '%s'",
+              lhsSlotRef.toSql()));
     }
   }
 
-  protected void addKeyColumn(Analyzer analyzer, List<SelectListItem> selectList,
-      List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
-      Map<String, Integer> colIndexMap, String colName, boolean isSortingColumn)
+  protected void checkCorrectTargetTable(SlotRef lhsSlotRef, Expr rhsExpr)
       throws AnalysisException {
-    SlotRef ref = addSlotRef(analyzer, selectList, referencedColumns, uniqueSlots,
-        keySlots, colIndexMap, colName);
-    resultExprs_.add(ref);
-    if (isSortingColumn) sortExprs_.add(ref);
+    if (!lhsSlotRef.isBoundByTupleIds(modifyStmt_.targetTableRef_.getId().asList())) {
+      throw new AnalysisException(
+          format("Left-hand side column '%s' in assignment expression '%s=%s' does not "
+              + "belong to target table '%s'", lhsSlotRef.toSql(), lhsSlotRef.toSql(),
+              rhsExpr.toSql(),
+              modifyStmt_.targetTableRef_.getDesc().getTable().getFullName()));
+    }
   }
 
-  protected void addPartitioningColumn(Analyzer analyzer, List<SelectListItem> selectList,
-  List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
-  Map<String, Integer> colIndexMap, String colName) throws AnalysisException {
-    SlotRef ref = addSlotRef(analyzer, selectList, referencedColumns, uniqueSlots,
-        keySlots, colIndexMap, colName);
-    partitionKeyExprs_.add(ref);
-    sortExprs_.add(ref);
+  protected void checkLhsIsColumnRef(SlotRef lhsSlotRef, Expr rhsExpr)
+      throws AnalysisException {
+    Column c = lhsSlotRef.getResolvedPath().destColumn();
+    if (c == null) {
+      throw new AnalysisException(
+          format("Left-hand side in assignment expression '%s=%s' must be a column " +
+              "reference", lhsSlotRef.toSql(), rhsExpr.toSql()));
+    }
   }
 
-  private SlotRef addSlotRef(Analyzer analyzer, List<SelectListItem> selectList,
-      List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
-      Map<String, Integer> colIndexMap, String colName) throws AnalysisException {
-    List<String> path = Path.createRawPath(modifyStmt_.targetTableRef_.getUniqueAlias(),
-        colName);
-    SlotRef ref = new SlotRef(path);
-    ref.analyze(analyzer);
-    selectList.add(new SelectListItem(ref, null));
-    uniqueSlots.add(ref.getSlotId());
-    keySlots.add(ref.getSlotId());
-    referencedColumns.add(colIndexMap.get(colName));
-    return ref;
+  protected Expr checkTypeCompatiblity(Analyzer analyzer, Column c, Expr rhsExpr)
+      throws AnalysisException {
+    return StatementBase.checkTypeCompatibility(
+        modifyStmt_.targetTableRef_.getDesc().getTable().getFullName(),
+        c, rhsExpr, analyzer, null /*widestTypeSrcExpr*/);
   }
 
-  public List<Expr> getPartitionKeyExprs() {
-     return partitionKeyExprs_;
+  protected void checkLhsOnlyAppearsOnce(Map<Integer, Expr> colToExprs, Column c,
+      SlotRef lhsSlotRef, Expr rhsExpr) throws AnalysisException {
+    if (colToExprs.containsKey(c.getPosition())) {
+      throw new AnalysisException(
+          format("Left-hand side in assignment appears multiple times '%s=%s'",
+              lhsSlotRef.toSql(), rhsExpr.toSql()));
+    }
   }
 
   public List<Expr> getSortExprs() {
-    return sortExprs_;
+    return Collections.emptyList();
   }
 
   public QueryStmt getQueryStmt() {
     return sourceStmt_;
-  }
-
-  public List<Integer> getReferencedColumns() {
-    return referencedColumns_;
   }
 
   public void castResultExprs(List<Type> types) throws AnalysisException {
@@ -259,10 +170,5 @@ abstract class ModifyImpl {
 
   public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
     sourceStmt_.rewriteExprs(rewriter);
-  }
-
-  public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
-    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
-    partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
   }
 }

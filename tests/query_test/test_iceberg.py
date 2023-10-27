@@ -1237,6 +1237,12 @@ class TestIcebergV2Table(IcebergTestSuite):
       lambda v: v.get_value('table_format').file_format == 'parquet')
     add_exec_option_dimension(cls, 'disable_optimized_iceberg_v2_read', [0, 1])
 
+  def should_run_for_hive(self, vector):
+    # Hive interop tests are very slow. Only run them for a subset of dimensions.
+    if vector.get_value('exec_option')['disable_optimized_iceberg_v2_read'] == 0:
+      return True
+    return False
+
   # The test uses pre-written Iceberg tables where the position delete files refer to
   # the data files via full URI, i.e. they start with 'hdfs://localhost:2050/...'. In the
   # dockerised environment the namenode is accessible on a different hostname/port.
@@ -1283,14 +1289,10 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_delete_partitioned(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-delete-partitioned', vector,
         unique_database)
-    if IS_HDFS:
-      self._partitioned_hive_tests(unique_database)
+    if IS_HDFS and self.should_run_for_hive(vector):
+      self._delete_partitioned_hive_tests(unique_database)
 
-  def _partitioned_hive_tests(self, db):
-    # Hive needs table property 'format-version' explicitly set
-    for tbl in ["id_part", "trunc_part", "multi_part", "evolve_part", "ice_store_sales"]:
-      self.run_stmt_in_hive(
-          "ALTER TABLE {}.{} SET TBLPROPERTIES('format-version'='2')".format(db, tbl))
+  def _delete_partitioned_hive_tests(self, db):
     hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{} ORDER BY i".format(
         db, "id_part"))
     assert hive_output == "id_part.i,id_part.s\n"
@@ -1361,6 +1363,58 @@ class TestIcebergV2Table(IcebergTestSuite):
     hive_output = self.run_stmt_in_hive("SELECT id FROM {} ORDER BY id".format(ice_t))
     # Test that Hive sees the same rows deleted.
     assert hive_output == "id\n4\n5\n6\n7\n8\n"
+
+  def test_update_basic(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-update-basic', vector,
+        unique_database)
+    if IS_HDFS and self.should_run_for_hive(vector):
+      self._update_basic_hive_tests(unique_database)
+
+  def _update_basic_hive_tests(self, db):
+    def get_hive_results(tbl, order_by_col):
+      stmt = "SELECT * FROM {}.{} ORDER BY {}".format(db, tbl, order_by_col)
+      return self.run_stmt_in_hive(stmt).split("\n", 1)[1]
+
+    hive_results = get_hive_results("single_col", "i")
+    assert hive_results == "1\n3\n4\n"
+
+    hive_results = get_hive_results("ice_alltypes", "bool_col")
+    assert hive_results == \
+        "false,0,111,0.0,0.0,0,0.00,2023-11-07,2000-01-01 00:00:00.0,IMPALA,zerob\n" \
+        "true,3,222,1.0,1.0,23,123.12,2023-11-08,2001-01-01 01:01:01.0,ICEBERG,oneb\n"
+
+    hive_results = get_hive_results("ice_id_partitioned", "i")
+    assert hive_results == \
+        "1,0,Impala\n"     \
+        "2,0,iceberg\n"    \
+        "3,0,hive\n"       \
+        "4,1,spark\n"      \
+        "5,2,Kudu\n"
+
+    hive_results = get_hive_results("ice_bucket_transform", "i")
+    assert hive_results == \
+        "2,a fairly long string value,1000,1999-09-19 12:00:01.0\n" \
+        "4,bbb,2030,2001-01-01 00:00:00.0\n" \
+        "6,cccccccccccccccccccccccccccccccccccccccc,-123,2023-11-24 17:44:30.0\n"
+
+    hive_results = get_hive_results("ice_time_transforms_timestamp", "id")
+    assert hive_results == \
+        "1.5000,2001-01-01 01:01:01.0,2001-01-01 01:01:01.0,2001-01-01 01:01:01.0,2001-01-01 01:01:01.0\n" \
+        "2.4690,2023-11-24 18:02:00.0,2023-11-24 18:02:00.0,2023-11-24 18:02:00.0,2023-11-24 18:02:00.0\n" \
+        "1999.9998,2199-12-31 23:59:59.0,2199-12-31 23:59:59.0,2199-12-31 23:59:59.0,2199-12-31 23:59:59.0\n"  # noqa: E501
+
+    hive_results = get_hive_results("ice_time_transforms_date", "id")
+    assert hive_results == \
+        "1.5000,2001-01-01,2001-01-01,2001-01-01\n" \
+        "2.4690,2023-11-24,2023-11-24,2023-11-24\n" \
+        "1999.9998,2199-12-31,2199-12-31,2199-12-31\n"
+
+    hive_results = get_hive_results("ice_part_transforms", "i")
+    assert hive_results == \
+        "1,2023-11-13 18:07:05.0,blue,1234\n" \
+        "3,2023-11-14 19:07:05.0,green,1700\n" \
+        "4,2023-11-13 18:07:23.0,gray,2500\n" \
+        "8,2023-11-01 00:11:11.0,black,722\n"
 
   def test_optimize(self, vector, unique_database):
     tbl_name = unique_database + ".optimize_iceberg"

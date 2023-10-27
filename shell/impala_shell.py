@@ -1378,7 +1378,8 @@ class ImpalaShell(cmd.Cmd, object):
       if is_dml:
         # retrieve the error log
         warning_log = self.imp_client.get_warning_log(self.last_query_handle)
-        (num_rows, num_row_errors) = self.imp_client.close_dml(self.last_query_handle)
+        (num_rows, num_deleted_rows, num_row_errors) = self.imp_client.close_dml(
+            self.last_query_handle)
       else:
         # impalad does not support the fetching of metadata for certain types of queries.
         if not self.imp_client.expect_result_metadata(query_str, self.last_query_handle):
@@ -1421,7 +1422,11 @@ class ImpalaShell(cmd.Cmd, object):
       else:
         error_report = ""
 
-      if num_rows is not None:
+      if is_dml and num_rows == 0 and num_deleted_rows > 0:
+        verb = "Deleted"
+        self._print_if_verbose("%s %d row(s)%s in %2.2fs" %
+            (verb, num_deleted_rows, error_report, time_elapsed))
+      elif num_rows is not None:
         self._print_if_verbose("%s %d row(s)%s in %2.2fs" %
             (verb, num_rows, error_report, time_elapsed))
       else:

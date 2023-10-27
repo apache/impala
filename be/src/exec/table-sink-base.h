@@ -127,8 +127,8 @@ protected:
 
   /// Updates runtime stats of HDFS with rows written, then closes the file associated
   /// with the partition by calling ClosePartitionFile()
-  Status FinalizePartitionFile(RuntimeState* state, OutputPartition* partition)
-      WARN_UNUSED_RESULT;
+  Status FinalizePartitionFile(RuntimeState* state, OutputPartition* partition,
+      bool is_delete = false, DmlExecState* dml_exec_state = nullptr) WARN_UNUSED_RESULT;
 
   /// Writes all rows referenced by the row index vector in 'partition_pair' to the
   /// partition's writer and clears the row index vector afterwards.

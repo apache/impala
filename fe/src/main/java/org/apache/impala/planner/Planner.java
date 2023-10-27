@@ -27,8 +27,8 @@ import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
-import org.apache.impala.analysis.DeleteStmt;
 import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
+import org.apache.impala.analysis.DmlStatementBase;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
@@ -160,7 +160,7 @@ public class Planner {
       InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
       insertStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
       if (!ctx_.isSingleNodeExec()) {
-        // repartition on partition keys
+        // Repartition on partition keys
         rootFragment = distributedPlanner.createDmlFragment(
             rootFragment, insertStmt, ctx_.getRootAnalyzer(), fragments);
       }
@@ -172,22 +172,20 @@ public class Planner {
       QueryStmt queryStmt = ctx_.getQueryStmt();
       queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
       List<Expr> resultExprs = queryStmt.getResultExprs();
-      if (ctx_.isUpdate()) {
-        // Set up update sink for root fragment
-        rootFragment.setSink(
-            ctx_.getAnalysisResult().getUpdateStmt().createDataSink());
-      } else if (ctx_.isDelete()) {
-        // Set up delete sink for root fragment
-        DeleteStmt deleteStmt = ctx_.getAnalysisResult().getDeleteStmt();
-        if (deleteStmt.getTargetTable() instanceof FeIcebergTable) {
-          if (!ctx_.isSingleNodeExec()) {
-            // repartition on partition keys
-            rootFragment = distributedPlanner.createDmlFragment(
-                rootFragment, deleteStmt, ctx_.getRootAnalyzer(), fragments);
-          }
-          createPreDeleteSort(deleteStmt, rootFragment, ctx_.getRootAnalyzer());
+      if (ctx_.isUpdate() || ctx_.isDelete()) {
+        DmlStatementBase stmt;
+        if (ctx_.isUpdate()) {
+          stmt = ctx_.getAnalysisResult().getUpdateStmt();
+        } else {
+          stmt = ctx_.getAnalysisResult().getDeleteStmt();
         }
-        rootFragment.setSink(deleteStmt.createDataSink());
+        Preconditions.checkNotNull(stmt);
+        if (stmt.getTargetTable() instanceof FeIcebergTable) {
+          rootFragment = createIcebergDmlPlanFragment(
+              rootFragment, distributedPlanner, stmt, fragments);
+        }
+        // Set up update sink for root fragment
+        rootFragment.setSink(stmt.createDataSink());
       } else if (ctx_.isQuery()) {
         rootFragment.setSink(
             ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
@@ -269,6 +267,18 @@ public class Planner {
     }
 
     return fragments;
+  }
+
+  public PlanFragment createIcebergDmlPlanFragment(PlanFragment rootFragment,
+      DistributedPlanner distributedPlanner, DmlStatementBase stmt,
+      List<PlanFragment> fragments) throws ImpalaException {
+    if (!ctx_.isSingleNodeExec()) {
+      // Repartition on partition keys
+      rootFragment = distributedPlanner.createDmlFragment(
+          rootFragment, stmt, ctx_.getRootAnalyzer(), fragments);
+    }
+    createPreDmlSort(stmt, rootFragment, ctx_.getRootAnalyzer());
+    return rootFragment;
   }
 
   /**
@@ -909,20 +919,21 @@ public class Planner {
     inputFragment.setPlanRoot(node);
   }
 
-  public void createPreDeleteSort(DeleteStmt deleteStmt, PlanFragment inputFragment,
+  public void createPreDmlSort(DmlStatementBase dmlStmt, PlanFragment inputFragment,
       Analyzer analyzer) throws ImpalaException {
     List<Expr> orderingExprs = new ArrayList<>();
 
-    orderingExprs.addAll(deleteStmt.getSortExprs());
+    orderingExprs.addAll(dmlStmt.getPartitionKeyExprs());
+    orderingExprs.addAll(dmlStmt.getSortExprs());
 
     // Build sortinfo to sort by the ordering exprs.
     List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), true);
     List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
     SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams,
         TSortingOrder.LEXICAL);
-    sortInfo.createSortTupleInfo(deleteStmt.getResultExprs(), analyzer);
+    sortInfo.createSortTupleInfo(dmlStmt.getResultExprs(), analyzer);
     sortInfo.getSortTupleDescriptor().materializeSlots();
-    deleteStmt.substituteResultExprs(sortInfo.getOutputSmap(), analyzer);
+    dmlStmt.substituteResultExprs(sortInfo.getOutputSmap(), analyzer);
 
     PlanNode node = SortNode.createTotalSortNode(
         ctx_.getNextNodeId(), inputFragment.getPlanRoot(), sortInfo, 0);

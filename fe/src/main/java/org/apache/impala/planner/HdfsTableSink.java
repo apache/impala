@@ -229,15 +229,17 @@ public class HdfsTableSink extends TableSink {
         targetTable_.getFullName(), overwriteStr, partitionKeyStr));
     // Report the total number of partitions, independent of the number of nodes
     // and the data partition of the fragment executing this sink.
-    if (explainLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
-      long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs_);
-      if (totalNumPartitions == -1) {
-        output.append(detailPrefix + "partitions=unavailable");
-      } else {
-        output.append(detailPrefix + "partitions="
-            + (totalNumPartitions == 0 ? 1 : totalNumPartitions));
+    if (!(targetTable_ instanceof FeIcebergTable)) {
+      if (explainLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
+        long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs_);
+        if (totalNumPartitions == -1) {
+          output.append(detailPrefix + "partitions=unavailable");
+        } else {
+          output.append(detailPrefix + "partitions="
+              + (totalNumPartitions == 0 ? 1 : totalNumPartitions));
+        }
+        output.append("\n");
       }
-      output.append("\n");
     }
     if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(detailPrefix + "output exprs: ")
@@ -359,7 +361,7 @@ public class HdfsTableSink extends TableSink {
   /**
    * Return an estimate of the number of nodes the fragment with this sink will
    * run on. This is based on the number of nodes set for the plan root and has an
-   * upper limit set by the MAX_HDFS_WRITER query option.
+   * upper limit set by the MAX_FS_WRITERS query option.
    */
   public int getNumNodes() {
     int num_nodes = getFragment().getPlanRoot().getNumNodes();
@@ -374,7 +376,7 @@ public class HdfsTableSink extends TableSink {
   /**
    * Return an estimate of the number of instances the fragment with this sink
    * will run on. This is based on the number of instances set for the plan root
-   * and has an upper limit set by the MAX_HDFS_WRITER query option.
+   * and has an upper limit set by the MAX_FS_WRITERS query option.
    */
   public int getNumInstances() {
     int num_instances = getFragment().getPlanRoot().getNumInstances();

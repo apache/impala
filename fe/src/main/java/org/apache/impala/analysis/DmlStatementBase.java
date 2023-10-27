@@ -21,6 +21,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.planner.DataSink;
 
 import java.util.List;
 
@@ -62,6 +63,8 @@ public abstract class DmlStatementBase extends StatementBase {
   public boolean hasClusteredHint() { return false; }
   public boolean hasNoClusteredHint() { return false; }
 
+  abstract public DataSink createDataSink();
+  abstract public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer);
   abstract public List<Expr> getPartitionKeyExprs();
   abstract public List<Expr> getSortExprs();
 

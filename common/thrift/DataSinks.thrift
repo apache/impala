@@ -33,6 +33,7 @@ enum TDataSinkType {
   PLAN_ROOT_SINK = 3
   NESTED_LOOP_JOIN_BUILDER = 4
   ICEBERG_DELETE_BUILDER = 5
+  MULTI_DATA_SINK = 6
 }
 
 enum TSinkAction {
@@ -183,4 +184,7 @@ struct TDataSink {
 
   // Resource profile for this data sink. Always set.
   9: optional ResourceProfile.TBackendResourceProfile resource_profile
+
+  // Child data sinks if this is a MULTI_DATA_SINK.
+  10: optional list<TDataSink> child_data_sinks
 }

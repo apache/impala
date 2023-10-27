@@ -1514,7 +1514,7 @@ Status ClientRequestState::UpdateCatalog() {
   query_events_->MarkEvent("DML data written");
   SCOPED_TIMER(ADD_TIMER(server_profile_, "MetastoreUpdateTimer"));
 
-  TQueryExecRequest query_exec_request = exec_request_->query_exec_request;
+  const TQueryExecRequest& query_exec_request = exec_request_->query_exec_request;
   if (query_exec_request.__isset.finalize_params) {
     const TFinalizeParams& finalize_params = query_exec_request.finalize_params;
     TUpdateCatalogRequest catalog_update;
@@ -1562,7 +1562,12 @@ Status ClientRequestState::UpdateCatalog() {
           cat_ice_op.__set_is_overwrite(finalize_params.is_overwrite);
         } else if (ice_finalize_params.operation == TIcebergOperation::DELETE) {
           cat_ice_op.__set_iceberg_delete_files_fb(
+              dml_exec_state->CreateIcebergDeleteFilesVector());
+        } else if (ice_finalize_params.operation == TIcebergOperation::UPDATE) {
+          cat_ice_op.__set_iceberg_data_files_fb(
               dml_exec_state->CreateIcebergDataFilesVector());
+          cat_ice_op.__set_iceberg_delete_files_fb(
+              dml_exec_state->CreateIcebergDeleteFilesVector());
         }
       }
 

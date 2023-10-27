@@ -78,21 +78,27 @@ message DmlPartitionStatusPB {
   // The number of rows modified in this partition
   optional int64 num_modified_rows = 2;
 
+  // The number of rows deleted in this partition
+  optional int64 num_deleted_rows = 3;
+
   // Detailed statistics gathered by table writers for this partition
-  optional DmlStatsPB stats = 3;
+  optional DmlStatsPB stats = 4;
 
   // Fully qualified URI to the base directory for this partition.
-  optional string partition_base_dir = 4;
+  optional string partition_base_dir = 5;
 
   // The latest observed Kudu timestamp reported by the local KuduSession.
   // This value is an unsigned int64.
-  optional int64 kudu_latest_observed_ts = 5;
+  optional int64 kudu_latest_observed_ts = 6;
 
   // List of files created during the DML statement in this partition.
-  repeated DmlFileStatusPb created_files = 6;
+  repeated DmlFileStatusPb created_files = 7;
+
+  // List of delete files created during the DML statement in this partition.
+  repeated DmlFileStatusPb created_delete_files = 8;
 
   // Fully qualified URI to the staging directory for this partition.
-  optional string staging_dir_to_clean_up = 7;
+  optional string staging_dir_to_clean_up = 9;
 }
 
 // The results of a DML statement, sent to the coordinator as part of

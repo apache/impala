@@ -18,10 +18,12 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.planner.DataSink;
 import org.apache.impala.rewrite.ExprRewriter;
 
 import java.util.ArrayList;
@@ -82,8 +84,17 @@ public class OptimizeStmt extends DmlStatementBase {
     insertStmt_.reset();
   }
 
-
   public InsertStmt getInsertStmt() { return insertStmt_; }
+
+  @Override
+  public DataSink createDataSink() {
+    throw new NotImplementedException();
+  }
+
+  @Override
+  public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    throw new NotImplementedException();
+  }
 
   @Override
   public List<Expr> getPartitionKeyExprs() {

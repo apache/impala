@@ -39,19 +39,21 @@ import org.apache.impala.thrift.TTableSinkType;
  * Impala does this by doing an ANTI JOIN between data files and delete files.
  */
 public class IcebergDeleteSink extends TableSink {
-
-  // Set the limit on the maximum number of hdfs table sink instances.
-  // A value of 0 means no limit.
-  private int maxHdfsSinks_;
+  final private int deleteTableId_;
 
   // Exprs for computing the output partition(s).
   protected final List<Expr> partitionKeyExprs_;
 
   public IcebergDeleteSink(FeIcebergTable targetTable, List<Expr> partitionKeyExprs,
-      List<Expr> outputExprs, int maxTableSinks) {
+      List<Expr> outputExprs) {
+    this(targetTable, partitionKeyExprs, outputExprs, 0);
+  }
+
+  public IcebergDeleteSink(FeIcebergTable targetTable, List<Expr> partitionKeyExprs,
+      List<Expr> outputExprs, int deleteTableId) {
     super(targetTable, Op.DELETE, outputExprs);
     partitionKeyExprs_ = partitionKeyExprs;
-    maxHdfsSinks_ = maxTableSinks;
+    deleteTableId_ = deleteTableId;
   }
 
   @Override
@@ -119,6 +121,7 @@ public class IcebergDeleteSink extends TableSink {
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
             TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.iceberg_delete_sink = icebergDeleteSink;
+    tTableSink.setTarget_table_id(deleteTableId_);
     tsink.table_sink = tTableSink;
     tsink.output_exprs = Expr.treesToThrift(outputExprs_);
   }
@@ -132,34 +135,6 @@ public class IcebergDeleteSink extends TableSink {
   public void collectExprs(List<Expr> exprs) {
     exprs.addAll(partitionKeyExprs_);
     exprs.addAll(outputExprs_);
-  }
-
-  /**
-   * Return an estimate of the number of nodes the fragment with this sink will
-   * run on. This is based on the number of nodes set for the plan root and has an
-   * upper limit set by the MAX_HDFS_WRITER query option.
-   */
-  public int getNumNodes() {
-    int num_nodes = getFragment().getPlanRoot().getNumNodes();
-    if (maxHdfsSinks_ > 0) {
-      // If there are more nodes than instances where the fragment was initially
-      // planned to run then, then the instances will be distributed evenly across them.
-      num_nodes = Math.min(num_nodes, getNumInstances());
-    }
-    return num_nodes;
-  }
-
-  /**
-   * Return an estimate of the number of instances the fragment with this sink
-   * will run on. This is based on the number of instances set for the plan root
-   * and has an upper limit set by the MAX_HDFS_WRITER query option.
-   */
-  public int getNumInstances() {
-    int num_instances = getFragment().getPlanRoot().getNumInstances();
-    if (maxHdfsSinks_ > 0) {
-      num_instances =  Math.min(num_instances, maxHdfsSinks_);
-    }
-    return num_instances;
   }
 
   @Override

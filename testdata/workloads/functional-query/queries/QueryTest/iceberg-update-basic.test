@@ -1,0 +1,388 @@
+====
+---- QUERY
+create table single_col (i int)
+stored by iceberg
+tblproperties ('format-version'='2');
+update single_col set i = 4;
+---- DML_RESULTS: single_col
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 0
+====
+---- QUERY
+insert into single_col values (1), (2), (3);
+update single_col set i = cast(i + 1 as int);
+---- DML_RESULTS: single_col
+2
+3
+4
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+update single_col set i = 1 where i = 2
+---- DML_RESULTS: single_col
+1
+3
+4
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+create table ice_alltypes (bool_col boolean, int_col int, bigint_col bigint, float_col float,
+  double_col double, dec_10_0_col decimal(10,0), dec_8_2_col decimal(8,2), date_col date,
+  timestamp_col timestamp, string_col string, binary_col binary)
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ice_alltypes values (false, 0, 0, 0, 0, 0, 0, '2000-01-01', '2000-01-01 00:00:00',
+ 'zero', cast('zerob' as binary));
+---- DML_RESULTS: ice_alltypes
+false,0,0,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 0
+====
+---- QUERY
+update ice_alltypes set bool_col = true;
+---- DML_RESULTS: ice_alltypes
+true,0,0,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set int_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,0,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set bigint_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set float_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set double_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set dec_10_0_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set dec_8_2_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set date_col = '2001-01-01';
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set timestamp_col = '2001-01-01 01:01:01';
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set string_col = 'one';
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'one','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set binary_col = cast('oneb' as binary);
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'one','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set bigint_col = 33, int_col = 3, string_col = 'three';
+---- DML_RESULTS: ice_alltypes
+true,3,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set bigint_col = 33, int_col = 3, string_col = 'three';
+---- DML_RESULTS: ice_alltypes
+true,3,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set dec_10_0_col = 23, dec_8_2_col = cast(123.123 as decimal(8, 2));
+---- DML_RESULTS: ice_alltypes
+true,3,33,1,1,23,123.12,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# UPDATE table based on a reference table.
+insert into ice_alltypes values (false, 0, 0, 0, 0, 0, 0, '2000-01-01', '2000-01-01 00:00:00',
+ 'zero', cast('zerob' as binary));
+create table ref_table (i int, bi bigint, s string, d date);
+insert into ref_table values (0, 111, 'IMPALA', '2023-11-07'), (3, 222, 'ICEBERG', '2023-11-08');
+update ice_alltypes set bigint_col=bi, string_col=s, date_col=d from ice_alltypes, ref_table where int_col = i;
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,0,0.00,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,23,123.12,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====
+---- QUERY
+# If the JOIN in UPDATE has multiple matches Impala should raise an error.
+insert into ref_table values (0, 1111, 'IIMMPPAALLAA', '2023-12-01');
+update ice_alltypes set bigint_col=bi, string_col=s, date_col=d from ice_alltypes, ref_table where int_col = i;
+---- CATCH
+Duplicated row in DELETE sink.
+====
+---- QUERY
+create table ice_id_partitioned (i int, p int, s string)
+partitioned by spec(p)
+stored by iceberg
+tblproperties('format-version'='2');
+insert into ice_id_partitioned values
+(1, 0, 'impala'), (2, 0, 'iceberg'), (3, 0, 'hive'), (4, 1, 'spark'),
+(5, 2, 'kudu');
+update ice_id_partitioned set s='Impala' where i = 1;
+update ice_id_partitioned set s='Kudu' where i = 5;
+---- DML_RESULTS: ice_id_partitioned
+1,0,'Impala'
+2,0,'iceberg'
+3,0,'hive'
+4,1,'spark'
+5,2,'Kudu'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+show files in ice_id_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_id_partitioned/data/p=0/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_id_partitioned/data/p=0/delete-.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_id_partitioned/data/p=1/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_id_partitioned/data/p=2/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_id_partitioned/data/p=2/delete-.*parq','.*','','$ERASURECODE_POLICY'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_id_partitioned/data/p=1/delete-.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Negative test for UPDATE part 3:
+# updating partition column AND right side is non-constant value AND we have a FROM clause
+# For such operations, if there are multiple matches in the JOIN, the duplicated records can
+# get shuffled independently to different sink operators, therefore they cannot check the
+# presence of duplicates. For statements like this we need to raise an error during analysis.
+UPDATE ice_id_partitioned set p = cast(ref_table.bi as int)
+FROM ice_id_partitioned, ref_table
+WHERE ice_id_partitioned.i = ref_table.i;
+---- CATCH
+AnalysisException: Left-hand side in assignment 'p = CAST(ref_table.bi AS INT)' refers to a partitioning column
+====
+---- QUERY
+create table ice_bucket_transform(i int, str string, bi bigint, ts timestamp)
+partitioned by spec(bucket(91, str), bucket(199, bi), bucket(403, ts))
+stored by iceberg
+tblproperties('format-version'='2');
+insert into ice_bucket_transform values (1, 'a fairly long string value', 1000, '1999-09-19 12:00:01'),
+  (2, 'bbb', 2030, '2001-01-01 00:00:00'), (3, 'cccccccccccccccccccccccccccccccccccccccc', -123, '2023-11-24 17:44:30');
+update ice_bucket_transform set i = cast(i * 2 as int);
+---- DML_RESULTS: ice_bucket_transform
+2,'a fairly long string value',1000,1999-09-19 12:00:01
+4,'bbb',2030,2001-01-01 00:00:00
+6,'cccccccccccccccccccccccccccccccccccccccc',-123,2023-11-24 17:44:30
+---- TYPES
+INT,STRING,BIGINT,TIMESTAMP
+====
+---- QUERY
+show files in ice_bucket_transform;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_bucket_transform/data/str_bucket=38/bi_bucket=103/ts_bucket=204/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_bucket_transform/data/str_bucket=38/bi_bucket=103/ts_bucket=204/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_bucket_transform/data/str_bucket=54/bi_bucket=108/ts_bucket=277/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_bucket_transform/data/str_bucket=54/bi_bucket=108/ts_bucket=277/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_bucket_transform/data/str_bucket=58/bi_bucket=34/ts_bucket=104/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_bucket_transform/data/str_bucket=58/bi_bucket=34/ts_bucket=104/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table ice_time_transforms_timestamp(id decimal(8, 4), ts1 timestamp, ts2 timestamp, ts3 timestamp, ts4 timestamp)
+partitioned by spec(year(ts1), month(ts2), day(ts3), hour(ts4))
+stored by iceberg
+tblproperties('format-version'='2');
+insert into ice_time_transforms_timestamp values
+  (0.75, '2001-01-01 01:01:01', '2001-01-01 01:01:01', '2001-01-01 01:01:01', '2001-01-01 01:01:01'),
+  (1.2345, '2023-11-24 18:02:00', '2023-11-24 18:02:00', '2023-11-24 18:02:00', '2023-11-24 18:02:00'),
+  (999.9999, '2199-12-31 23:59:59', '2199-12-31 23:59:59', '2199-12-31 23:59:59', '2199-12-31 23:59:59');
+update ice_time_transforms_timestamp set id = cast(id * 2 as decimal(8, 4));
+---- DML_RESULTS: ice_time_transforms_timestamp
+1.5000,2001-01-01 01:01:01,2001-01-01 01:01:01,2001-01-01 01:01:01,2001-01-01 01:01:01
+2.4690,2023-11-24 18:02:00,2023-11-24 18:02:00,2023-11-24 18:02:00,2023-11-24 18:02:00
+1999.9998,2199-12-31 23:59:59,2199-12-31 23:59:59,2199-12-31 23:59:59,2199-12-31 23:59:59
+---- TYPES
+DECIMAL,TIMESTAMP,TIMESTAMP,TIMESTAMP,TIMESTAMP
+====
+---- QUERY
+show files in ice_time_transforms_timestamp;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_timestamp/data/ts1_year=2001/ts2_month=2001-01/ts3_day=2001-01-01/ts4_hour=2001-01-01-01/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_timestamp/data/ts1_year=2001/ts2_month=2001-01/ts3_day=2001-01-01/ts4_hour=2001-01-01-01/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_timestamp/data/ts1_year=2023/ts2_month=2023-11/ts3_day=2023-11-24/ts4_hour=2023-11-24-18/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_timestamp/data/ts1_year=2023/ts2_month=2023-11/ts3_day=2023-11-24/ts4_hour=2023-11-24-18/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_timestamp/data/ts1_year=2199/ts2_month=2199-12/ts3_day=2199-12-31/ts4_hour=2199-12-31-23/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_timestamp/data/ts1_year=2199/ts2_month=2199-12/ts3_day=2199-12-31/ts4_hour=2199-12-31-23/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table ice_time_transforms_date(id decimal(8, 4), ts1 DATE, ts2 DATE, ts3 DATE)
+partitioned by spec(year(ts1), month(ts2), day(ts3))
+stored by iceberg
+tblproperties('format-version'='2');
+insert into ice_time_transforms_date values
+  (0.75, '2001-01-01 01:01:01', '2001-01-01 01:01:01', '2001-01-01 01:01:01'),
+  (1.2345, '2023-11-24 18:02:00', '2023-11-24 18:02:00', '2023-11-24 18:02:00'),
+  (999.9999, '2199-12-31 23:59:59', '2199-12-31 23:59:59', '2199-12-31 23:59:59');
+update ice_time_transforms_date set id = cast(id * 2 as decimal(8, 4));
+---- DML_RESULTS: ice_time_transforms_date
+1.5000,2001-01-01,2001-01-01,2001-01-01
+2.4690,2023-11-24,2023-11-24,2023-11-24
+1999.9998,2199-12-31,2199-12-31,2199-12-31
+---- TYPES
+DECIMAL,DATE,DATE,DATE
+====
+---- QUERY
+show files in ice_time_transforms_date;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_date/data/ts1_year=2001/ts2_month=2001-01/ts3_day=2001-01-01/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_date/data/ts1_year=2001/ts2_month=2001-01/ts3_day=2001-01-01/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_date/data/ts1_year=2023/ts2_month=2023-11/ts3_day=2023-11-24/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_date/data/ts1_year=2023/ts2_month=2023-11/ts3_day=2023-11-24/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_date/data/ts1_year=2199/ts2_month=2199-12/ts3_day=2199-12-31/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_time_transforms_date/data/ts1_year=2199/ts2_month=2199-12/ts3_day=2199-12-31/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table ice_part_transforms (i int, ts timestamp, s string, p bigint)
+partitioned by spec(day(ts), truncate(1, s), truncate(1000, p))
+stored by iceberg
+tblproperties('format-version'='2');
+insert into ice_part_transforms values (1, '2023-11-13 18:07:05', 'blue', 1234),
+ (2, '2023-11-13 18:07:23', 'gray', 2500), (3, '2023-11-14 19:07:05', 'green', 1700),
+ (4, '2023-11-01 00:11:11', 'black', 722);
+show files in ice_part_transforms;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-13/s_trunc=b/p_trunc=1000/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-13/s_trunc=g/p_trunc=2000/(?!delete-).*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-14/s_trunc=g/p_trunc=1000/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-01/s_trunc=b/p_trunc=0/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+update ice_part_transforms set i = cast(i*2 as int) where i % 2 = 0;
+---- DML_RESULTS: ice_part_transforms
+1,2023-11-13 18:07:05,'blue',1234
+4,2023-11-13 18:07:23,'gray',2500
+3,2023-11-14 19:07:05,'green',1700
+8,2023-11-01 00:11:11,'black',722
+---- TYPES
+INT,TIMESTAMP,STRING,BIGINT
+====
+---- QUERY
+show files in ice_part_transforms;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-13/s_trunc=b/p_trunc=1000/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-13/s_trunc=g/p_trunc=2000/(?!delete-).*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-13/s_trunc=g/p_trunc=2000/delete-.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-14/s_trunc=g/p_trunc=1000/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-01/s_trunc=b/p_trunc=0/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-01/s_trunc=b/p_trunc=0/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-13/s_trunc=b/p_trunc=1000/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day=2023-11-14/s_trunc=g/p_trunc=1000/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====

@@ -78,6 +78,17 @@ class IcebergDeleteSink : public TableSinkBase {
       const TupleRow* row,
       OutputPartition* output_partition) override;
 
+  /// Verifies that the row batch does not contain duplicated rows. This can only happen
+  /// in the context of UPDATE FROM statements when we are updating a table based on
+  /// another table, e.g.:
+  /// UPDATE t SET t.x = s.x FROM ice_t t, source_tbl s where t.id = s.id;
+  /// Now, if 'source_tbl' has duplicate rows then the JOIN operator would produce
+  /// multiple matches for the same row, and we would insert them to the table.
+  /// Therefore, we should always raise an error if we find duplicated rows (i.e rows
+  /// having the same filepath + position), because that would corrupt the table data
+  /// and the delete files as well.
+  Status VerifyRowsNotDuplicated(RowBatch* batch);
+
   /// Returns the human-readable representation of a partition transform value. It is used
   /// to create the file paths. IcebergUtil.partitionDataFromDataFile() also expects
   /// partition values in this representation.
@@ -98,6 +109,15 @@ class IcebergDeleteSink : public TableSinkBase {
 
   /// The sink writes partitions one-by-one.
   PartitionPair current_partition_;
+
+  /// This sink has its own DmlExecState object because in the context of UPADTEs we
+  /// cannot modify the same DmlExecState object simultaneously (from the INSERT and
+  /// DELETE sinks). It is merged into state->dml_exec_state() in Close().
+  DmlExecState dml_exec_state_;
+
+  /// Variables necessary for validating that row batches don't contain duplicates.
+  std::string prev_file_path_;
+  int64_t prev_position_ = -1;
 };
 
 }

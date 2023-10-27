@@ -594,6 +594,15 @@ select id, b.item from functional_parquet.complextypestbl t, t.nested_struct.b
 BIGINT,INT
 ====
 ---- QUERY
+select * from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files;
+---- RESULTS
+1,'a'
+3,'c'
+5,'X'
+---- TYPES
+INT,STRING
+====
+---- QUERY
 # TODO: Row-filtering policy should keep rows with "nested_struct.a is not NULL" on base
 # table 'complextypestbl'. But now we can't apply it since the collection column 'b' is
 # non-relative. Fails these queries until IMPALA-10484 is resolved. See the next query
@@ -633,4 +642,16 @@ AuthorizationException: User '$USER' does not have privileges to execute 'INSERT
 compute stats functional.alltypestiny
 ---- CATCH
 AuthorizationException: User '$USER' does not have privileges to execute 'ALTER' on: functional.alltypestiny
+====
+---- QUERY
+# Deletes should be blocked if the user cannot see all the rows from the table.
+delete from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files where i = 2;
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to access: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files
+====
+---- QUERY
+# Updates on masked tables should be blocked.
+update functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files set s = concat(s, 'a');
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to access: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files
 ====

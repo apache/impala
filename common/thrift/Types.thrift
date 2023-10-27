@@ -113,8 +113,9 @@ enum TStmtType {
 }
 
 enum TIcebergOperation {
-  INSERT = 0,
+  INSERT = 0
   DELETE = 1
+  UPDATE = 2
 }
 
 // Level of verboseness for "explain" output.

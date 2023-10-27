@@ -83,6 +83,7 @@ add_library(Exec
   iceberg-delete-sink.cc
   incr-stats-util.cc
   join-builder.cc
+  multi-table-sink.cc
   nested-loop-join-builder.cc
   nested-loop-join-node.cc
   non-grouping-aggregator.cc

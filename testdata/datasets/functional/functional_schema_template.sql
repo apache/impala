@@ -3321,7 +3321,8 @@ iceberg_partition_evolution
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 (id int, int_col int, string_col string, date_string_col string, year int, month int)
 PARTITIONED BY SPEC (year, truncate(4, date_string_col))
-STORED AS ICEBERG;
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='2');
 ---- DEPENDENT_LOAD
 # We can use 'date_string_col' as it is once IMPALA-11954 is done.
 INSERT INTO {db_name}{db_suffix}.iceberg_partition_evolution
@@ -3388,7 +3389,8 @@ iceberg_int_partitioned
 ---- CREATE
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (i INT, j INT, k INT)
 PARTITIONED BY SPEC (i, j)
-STORED AS ICEBERG;
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='2');
 ====
 ---- DATASET
 functional

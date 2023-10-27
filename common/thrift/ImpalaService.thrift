@@ -881,6 +881,7 @@ struct TDmlResult {
   // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with
   // the root in an unpartitioned table being the empty string.
   1: required map<string, i64> rows_modified
+  3: optional map<string, i64> rows_deleted
 
   // Number of row operations attempted but not completed due to non-fatal errors
   // reported by the storage engine that Impala treats as warnings. Only applies to Kudu

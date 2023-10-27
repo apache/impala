@@ -69,12 +69,18 @@ class DmlExecState {
   /// Merge given values into stats for partition with name 'partition_name'.
   /// Ignores 'insert_stats' if nullptr.
   /// Requires that the partition already exist.
-  void UpdatePartition(const std::string& partition_name,
-      int64_t num_modified_rows_delta, const DmlStatsPB* insert_stats);
+  void UpdatePartition(const std::string& partition_name, int64_t num_rows_delta,
+      const DmlStatsPB* insert_stats, bool is_delete = false);
 
-  /// Extract information from 'partition', and add a new Iceberg data file.
+  /// Extract information from 'partition', and add a new data file.
   /// 'insert_stats' contains stats for the Iceberg data file.
   void AddCreatedFile(const OutputPartition& partition, bool is_iceberg,
+      const IcebergFileStats& insert_stats);
+
+  /// Extract information from 'partition', and add a new delete file. This function
+  /// can only be called for Iceberg tables.
+  /// 'insert_stats' contains stats for the Iceberg delete file.
+  void AddCreatedDeleteFile(const OutputPartition& partition,
       const IcebergFileStats& insert_stats);
 
   /// Used to initialize this state when execute Kudu DML. Must be called before
@@ -114,10 +120,17 @@ class DmlExecState {
   /// Beeswax.
   void ToTDmlResult(TDmlResult* dml_result);
 
-  // Encodes file list info in flatbuffer format expected by Iceberg API.
+  // Encodes data file list info in flatbuffer format expected by Iceberg API.
   std::vector<std::string> CreateIcebergDataFilesVector();
 
+  // Encodes delete file list info in flatbuffer format expected by Iceberg API.
+  std::vector<std::string> CreateIcebergDeleteFilesVector();
+
  private:
+  /// Auxiliary function used by 'AddCreatedFile' and 'AddCreatedDeleteFile'.
+  void AddFileAux(const OutputPartition& partition, bool is_iceberg,
+    const IcebergFileStats& insert_stats, bool is_delete);
+
   /// protects all fields below
   std::mutex lock_;
 

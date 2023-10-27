@@ -1315,6 +1315,12 @@ public class PlannerTest extends PlannerTestBase {
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
+  @Test
+  public void testIcebergV2Update() {
+    runPlannerTestFile("iceberg-v2-update", "functional_parquet",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
   /**
    * Check that Iceberg metadata table scan plans are as expected.
    */

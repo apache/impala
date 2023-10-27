@@ -129,6 +129,11 @@ public abstract class ModifyStmt extends DmlStatementBase {
     Path path = candidates.get(0);
     path.resolve();
 
+    if (!path.isResolved()) {
+      throw new AnalysisException(format("Cannot resolve path '%s' for DML statement.",
+          path.toString()));
+    }
+
     if (path.destTupleDesc() == null) {
       throw new AnalysisException(format(
           "'%s' is not a table alias. Using the FROM clause requires the target table " +
@@ -150,6 +155,9 @@ public abstract class ModifyStmt extends DmlStatementBase {
           format("Impala only supports modifying Kudu and Iceberg tables, " +
               "but the following table is neither: %s",
               dstTbl.getFullName()));
+    }
+    if (dstTbl instanceof FeIcebergTable) {
+      setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
     }
     // Make sure that the user is allowed to modify the target table. Use ALL because no
     // UPDATE / DELETE privilege exists yet (IMPALA-3840).
@@ -182,10 +190,6 @@ public abstract class ModifyStmt extends DmlStatementBase {
   public List<Expr> getPartitionKeyExprs() { return modifyImpl_.getPartitionKeyExprs(); }
   @Override
   public List<Expr> getSortExprs() { return modifyImpl_.getSortExprs(); }
-
-  public List<Integer> getReferencedColumns() {
-    return modifyImpl_.getReferencedColumns();
-  }
 
   public Expr getWherePredicate() { return wherePredicate_; }
 

@@ -95,6 +95,7 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
+import org.apache.impala.analysis.UpdateStmt;
 import org.apache.impala.authentication.saml.ImpalaSamlClient;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
@@ -126,7 +127,6 @@ import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
@@ -2532,6 +2532,9 @@ public class Frontend {
         if (analysisResult.isDeleteStmt()) {
           addFinalizationParamsForDelete(queryCtx, queryExecRequest,
               analysisResult.getDeleteStmt());
+        } else if (analysisResult.isUpdateStmt()) {
+          addFinalizationParamsForUpdate(queryCtx, queryExecRequest,
+              analysisResult.getUpdateStmt());
         }
       }
       return result;
@@ -2603,13 +2606,31 @@ public class Frontend {
       targetTable = ((IcebergPositionDeleteTable)targetTable).getBaseTable();
       TFinalizeParams finalizeParams = addFinalizationParamsForDml(
           queryCtx, targetTable, false);
-      TIcebergDmlFinalizeParams iceFinalizeParams = new TIcebergDmlFinalizeParams();
-      iceFinalizeParams.operation = TIcebergOperation.DELETE;
-      FeIcebergTable iceTable = (FeIcebergTable)targetTable;
-      iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
-      iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
+      TIcebergDmlFinalizeParams iceFinalizeParams = addFinalizationParamsForIcebergDml(
+        (FeIcebergTable)targetTable, TIcebergOperation.DELETE);
       finalizeParams.setIceberg_params(iceFinalizeParams);
       queryExecRequest.setFinalize_params(finalizeParams);
+  }
+
+  private static void addFinalizationParamsForUpdate(
+      TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, UpdateStmt updateStmt) {
+    FeTable targetTable = updateStmt.getTargetTable();
+    if (!(targetTable instanceof FeIcebergTable)) return;
+    TFinalizeParams finalizeParams = addFinalizationParamsForDml(
+        queryCtx, targetTable, false);
+    TIcebergDmlFinalizeParams iceFinalizeParams = addFinalizationParamsForIcebergDml(
+        (FeIcebergTable)targetTable, TIcebergOperation.UPDATE);
+    finalizeParams.setIceberg_params(iceFinalizeParams);
+    queryExecRequest.setFinalize_params(finalizeParams);
+  }
+
+  private static TIcebergDmlFinalizeParams addFinalizationParamsForIcebergDml(
+      FeIcebergTable iceTable, TIcebergOperation iceOperation) {
+    TIcebergDmlFinalizeParams iceFinalizeParams = new TIcebergDmlFinalizeParams();
+    iceFinalizeParams.operation = iceOperation;
+    iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
+    iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
+    return iceFinalizeParams;
   }
 
   // This is public to allow external frontends to utilize this method to fill in the

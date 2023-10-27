@@ -65,12 +65,22 @@ import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
+import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.StatementBase;
+import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TimeTravelSpec.Kind;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergColumn;
@@ -83,6 +93,7 @@ import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
@@ -1135,5 +1146,107 @@ public class IcebergUtil {
     }
 
     return props;
+  }
+
+  public static void validateIcebergColumnsForInsert(FeIcebergTable iceTable)
+      throws AnalysisException {
+    for (Types.NestedField field : iceTable.getIcebergSchema().columns()) {
+      org.apache.iceberg.types.Type iceType = field.type();
+      if (iceType.isPrimitiveType() && iceType instanceof Types.TimestampType) {
+        Types.TimestampType tsType = (Types.TimestampType)iceType;
+        if (tsType.shouldAdjustToUTC()) {
+          throw new AnalysisException("The Iceberg table has a TIMESTAMPTZ " +
+              "column that Impala cannot write.");
+        }
+      }
+    }
+  }
+
+  /**
+   * Creates partition key expressions in the order of Iceberg partition spec fields.
+   */
+  public static void populatePartitionExprs(Analyzer analyzer,
+      List<Expr> widestTypeExprList, List<Column> selectExprTargetColumns,
+      List<Expr> selectListExprs, FeIcebergTable targetTable,
+      List<Expr> outPartitionExprs, List<Integer> outPartitionColPos)
+      throws AnalysisException {
+    Preconditions.checkNotNull(outPartitionExprs);
+    Preconditions.checkState(outPartitionExprs.isEmpty());
+    Preconditions.checkState(outPartitionColPos == null || outPartitionColPos.isEmpty());
+    IcebergPartitionSpec icebergPartSpec = targetTable.getDefaultPartitionSpec();
+    if (!icebergPartSpec.hasPartitionFields()) return;
+    String tableName = targetTable.getFullName();
+    for (IcebergPartitionField partField : icebergPartSpec.getIcebergPartitionFields()) {
+      if (partField.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
+      for (int i = 0; i < selectListExprs.size(); ++i) {
+        IcebergColumn targetColumn = (IcebergColumn)selectExprTargetColumns.get(i);
+        if (targetColumn.getFieldId() != partField.getSourceId()) continue;
+        // widestTypeExpr is widest type expression for column i
+        Expr widestTypeExpr =
+            (widestTypeExprList != null) ? widestTypeExprList.get(i) : null;
+        Expr icebergPartitionTransformExpr = getIcebergPartitionTransformExpr(analyzer,
+            tableName, partField, targetColumn, selectListExprs.get(i), widestTypeExpr);
+        outPartitionExprs.add(icebergPartitionTransformExpr);
+        if (outPartitionColPos != null) {
+          outPartitionColPos.add(targetColumn.getPosition());
+        }
+        break;
+      }
+    }
+  }
+
+  private static Expr getIcebergPartitionTransformExpr(Analyzer analyzer,
+      String targetTableName, IcebergPartitionField partField, IcebergColumn targetColumn,
+      Expr sourceExpr, Expr widestTypeExpr) throws AnalysisException {
+    Preconditions.checkState(targetColumn.getFieldId() == partField.getSourceId());
+    Expr compatibleExpr = StatementBase.checkTypeCompatibility(targetTableName,
+        targetColumn, sourceExpr, analyzer, widestTypeExpr);
+    Expr ret = IcebergUtil.getIcebergPartitionTransformExpr(partField, compatibleExpr);
+    ret.analyze(analyzer);
+    return ret;
+  }
+
+  /**
+   * Returns the partition transform expression. E.g. if the partition transform is DAY,
+   * it returns 'to_date(compatibleExpr)'. If the partition transform is BUCKET,
+   * it returns 'iceberg_bucket_transform(compatibleExpr, transformParam)'.
+   */
+  private static Expr getIcebergPartitionTransformExpr(IcebergPartitionField partField,
+                                                Expr compatibleExpr) {
+    String funcNameStr = transformTypeToFunctionName(partField.getTransformType());
+    if (funcNameStr == null || funcNameStr.equals("")) return compatibleExpr;
+    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, funcNameStr);
+    List<Expr> paramList = new ArrayList<>();
+    paramList.add(compatibleExpr);
+    Integer transformParam = partField.getTransformParam();
+    if (transformParam != null) {
+      paramList.add(NumericLiteral.create(transformParam));
+    }
+    if (partField.getTransformType() == TIcebergPartitionTransformType.MONTH) {
+      paramList.add(new StringLiteral("yyyy-MM"));
+    }
+    else if (partField.getTransformType() == TIcebergPartitionTransformType.HOUR) {
+      paramList.add(new StringLiteral("yyyy-MM-dd-HH"));
+    }
+    FunctionCallExpr fnCall = new FunctionCallExpr(fnName, new FunctionParams(paramList));
+    fnCall.setIsInternalFnCall(true);
+    return fnCall;
+  }
+
+  /**
+   * Returns the builtin function to use for the given partition transform.
+   */
+  private static String transformTypeToFunctionName(
+      TIcebergPartitionTransformType transformType) {
+    switch (transformType) {
+      case IDENTITY: return "";
+      case HOUR:
+      case MONTH: return "from_timestamp";
+      case DAY: return "to_date";
+      case YEAR: return "year";
+      case BUCKET: return "iceberg_bucket_transform";
+      case TRUNCATE: return "iceberg_truncate_transform";
+    }
+    return "";
   }
 }

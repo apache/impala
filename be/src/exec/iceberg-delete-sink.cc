@@ -99,6 +99,8 @@ Status IcebergDeleteSink::Send(RuntimeState* state, RowBatch* batch) {
   // We don't do any work for an empty batch.
   if (batch->num_rows() == 0) return Status::OK();
 
+  RETURN_IF_ERROR(VerifyRowsNotDuplicated(batch));
+
   // If there are no partition keys then just pass the whole batch to one partition.
   if (dynamic_partition_key_expr_evals_.empty()) {
     if (current_partition_.first == nullptr) {
@@ -111,10 +113,39 @@ Status IcebergDeleteSink::Send(RuntimeState* state, RowBatch* batch) {
   return Status::OK();
 }
 
+Status IcebergDeleteSink::VerifyRowsNotDuplicated(RowBatch* batch) {
+  DCHECK_EQ(output_exprs_.size(), 2);
+  DCHECK_EQ(output_expr_evals_.size(), 2);
+
+  ScalarExpr* filepath_expr = output_exprs_[0];
+  ScalarExpr* position_expr = output_exprs_[1];
+  DCHECK(filepath_expr->type().IsStringType());
+  DCHECK(position_expr->type().IsIntegerType());
+
+  ScalarExprEvaluator* filepath_eval = output_expr_evals_[0];
+  ScalarExprEvaluator* position_eval = output_expr_evals_[1];
+  for (int i = 0; i < batch->num_rows(); ++i) {
+    TupleRow* row = batch->GetRow(i);
+    StringVal filepath_sv = filepath_eval->GetStringVal(row);
+    DCHECK(!filepath_sv.is_null);
+    BigIntVal position_bi = position_eval->GetBigIntVal(row);
+    DCHECK(!position_bi.is_null);
+    string filepath(reinterpret_cast<char*>(filepath_sv.ptr), filepath_sv.len);
+    int64_t position = position_bi.val;
+    if (prev_file_path_ == filepath && prev_position_ == position) {
+      return Status(Substitute("Duplicated row in DELETE sink. file_path='$0', pos='$1'. "
+          "If this is coming from an UPDATE statement with a JOIN, please check if there "
+          "multiple matches in the JOIN condition.", filepath, position));
+    }
+    prev_file_path_ = filepath;
+    prev_position_ = position;
+  }
+  return Status::OK();
+}
+
 inline Status IcebergDeleteSink::SetCurrentPartition(RuntimeState* state,
     const TupleRow* row, const string& key) {
   DCHECK(row != nullptr || key == ROOT_PARTITION_KEY);
-  PartitionMap::iterator existing_partition;
   if (current_partition_.first != nullptr &&
       key == current_clustered_partition_key_) {
     return Status::OK();
@@ -134,7 +165,7 @@ inline Status IcebergDeleteSink::SetCurrentPartition(RuntimeState* state,
 
   // Save the partition name so that the coordinator can create the partition
   // directory structure if needed.
-  state->dml_exec_state()->AddPartition(
+  dml_exec_state_.AddPartition(
       current_partition_.first->partition_name, prototype_partition_->id(),
       &table_desc_->hdfs_base_dir(),
       nullptr);
@@ -182,7 +213,7 @@ Status IcebergDeleteSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* 
         current_partition_.second.clear();
       }
       RETURN_IF_ERROR(FinalizePartitionFile(state,
-          current_partition_.first.get()));
+          current_partition_.first.get(), /*is_delete=*/true, &dml_exec_state_));
       if (current_partition_.first->writer.get() != nullptr) {
         current_partition_.first->writer->Close();
       }
@@ -207,7 +238,8 @@ Status IcebergDeleteSink::FlushFinal(RuntimeState* state) {
   SCOPED_TIMER(profile()->total_time_counter());
 
   if (current_partition_.first != nullptr) {
-    RETURN_IF_ERROR(FinalizePartitionFile(state, current_partition_.first.get()));
+    RETURN_IF_ERROR(FinalizePartitionFile(state, current_partition_.first.get(),
+        /*is_delete=*/true, &dml_exec_state_));
   }
   return Status::OK();
 }
@@ -215,6 +247,10 @@ Status IcebergDeleteSink::FlushFinal(RuntimeState* state) {
 void IcebergDeleteSink::Close(RuntimeState* state) {
   if (closed_) return;
   SCOPED_TIMER(profile()->total_time_counter());
+
+  DmlExecStatusPB dml_exec_proto;
+  dml_exec_state_.ToProto(&dml_exec_proto);
+  state->dml_exec_state()->Update(dml_exec_proto);
 
   if (current_partition_.first != nullptr) {
     if (current_partition_.first->writer != nullptr) {

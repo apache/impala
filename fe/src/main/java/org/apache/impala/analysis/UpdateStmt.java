@@ -22,6 +22,7 @@ import static java.lang.String.format;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
@@ -59,14 +60,23 @@ public class UpdateStmt extends ModifyStmt {
 
   @Override
   protected void createModifyImpl() {
-    // Currently only Kudu tables are supported.
-    Preconditions.checkState(table_ instanceof FeKuduTable);
-    modifyImpl_ = new KuduUpdateImpl(this);
+    // Currently Kudu and Iceberg tables are supported.
+    if (table_ instanceof FeKuduTable) {
+      modifyImpl_ = new KuduUpdateImpl(this);
+    } else if (table_ instanceof FeIcebergTable) {
+      modifyImpl_ = new IcebergUpdateImpl(this);
+    }
+  }
+
+  @Override
+  public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    modifyImpl_.substituteResultExprs(smap, analyzer);
   }
 
   /**
    * Return an instance of a KuduTableSink specialized as an Update operation.
    */
+  @Override
   public DataSink createDataSink() {
     // analyze() must have been called before.
     return modifyImpl_.createDataSink();

@@ -355,6 +355,10 @@ public class IcebergCatalogOpExecutor {
     switch (icebergOp.operation) {
       case INSERT: appendFiles(feIcebergTable, txn, icebergOp); break;
       case DELETE: deleteRows(feIcebergTable, txn, icebergOp); break;
+      case UPDATE: {
+        deleteRows(feIcebergTable, txn, icebergOp);
+        appendFiles(feIcebergTable, txn, icebergOp);
+      } break;
       default: throw new ImpalaRuntimeException(
           "Unknown Iceberg operation: " + icebergOp.operation);
     }

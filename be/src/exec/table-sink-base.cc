@@ -414,18 +414,26 @@ bool TableSinkBase::ShouldSkipStaging(RuntimeState* state, OutputPartition* part
 }
 
 Status TableSinkBase::FinalizePartitionFile(
-    RuntimeState* state, OutputPartition* partition) {
+    RuntimeState* state, OutputPartition* partition, bool is_delete,
+    DmlExecState* dml_exec_state) {
+  if (dml_exec_state == nullptr) dml_exec_state = state->dml_exec_state();
   if (partition->tmp_hdfs_file == nullptr && !is_overwrite()) return Status::OK();
   SCOPED_TIMER(ADD_TIMER(profile(), "FinalizePartitionFileTimer"));
 
   // OutputPartition writer could be nullptr if there is no row to output.
   if (partition->writer.get() != nullptr) {
     RETURN_IF_ERROR(partition->writer->Finalize());
-    state->dml_exec_state()->UpdatePartition(
+    dml_exec_state->UpdatePartition(
         partition->partition_name, partition->current_file_rows,
-        &partition->writer->stats());
-    state->dml_exec_state()->AddCreatedFile(*partition, IsIceberg(),
-        partition->writer->iceberg_file_stats());
+        &partition->writer->stats(), is_delete);
+    if (is_delete) {
+      DCHECK(IsIceberg());
+      dml_exec_state->AddCreatedDeleteFile(*partition,
+          partition->writer->iceberg_file_stats());
+    } else {
+      dml_exec_state->AddCreatedFile(*partition, IsIceberg(),
+          partition->writer->iceberg_file_stats());
+    }
   }
 
   RETURN_IF_ERROR(ClosePartitionFile(state, partition));

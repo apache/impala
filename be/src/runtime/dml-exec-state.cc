@@ -73,6 +73,9 @@ string DmlExecState::OutputPartitionStats(const string& prefix) {
     if (val.second.has_num_modified_rows()) {
       ss << "NumModifiedRows: " << val.second.num_modified_rows() << endl;
     }
+    if (val.second.has_num_deleted_rows()) {
+      ss << "NumDeletedRows: " << val.second.num_deleted_rows() << endl;
+    }
 
     if (!val.second.has_stats()) continue;
     const DmlStatsPB& stats = val.second.stats();
@@ -102,6 +105,8 @@ void DmlExecState::Update(const DmlExecStatusPB& dml_exec_status) {
     DmlPartitionStatusPB* status = &(per_partition_status_[part.first]);
     status->set_num_modified_rows(
         status->num_modified_rows() + part.second.num_modified_rows());
+    status->set_num_deleted_rows(
+      status->num_deleted_rows() + part.second.num_deleted_rows());
     status->set_kudu_latest_observed_ts(max<uint64_t>(
         part.second.kudu_latest_observed_ts(), status->kudu_latest_observed_ts()));
     status->set_id(part.second.id());
@@ -116,6 +121,13 @@ void DmlExecState::Update(const DmlExecStatusPB& dml_exec_status) {
     for (int i = 0; i < part.second.created_files_size(); ++i) {
       const DmlFileStatusPb& file = part.second.created_files(i);
       *status->add_created_files() = file;
+      if (!file.has_staging_path()) continue;
+      DCHECK(!file.staging_path().empty());
+      files_to_move_[file.staging_path()] = file.final_path();
+    }
+    for (int i = 0; i < part.second.created_delete_files_size(); ++i) {
+      const DmlFileStatusPb& file = part.second.created_delete_files(i);
+      *status->add_created_delete_files() = file;
       if (!file.has_staging_path()) continue;
       DCHECK(!file.staging_path().empty());
       files_to_move_[file.staging_path()] = file.final_path();
@@ -147,6 +159,10 @@ bool DmlExecState::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {
     TUpdatedPartition updatedPartition;
     for (int i = 0; i < partition.second.created_files_size(); ++i) {
       const DmlFileStatusPb& file = partition.second.created_files(i);
+      updatedPartition.files.push_back(file.final_path());
+    }
+    for (int i = 0; i < partition.second.created_delete_files_size(); ++i) {
+      const DmlFileStatusPb& file = partition.second.created_delete_files(i);
       updatedPartition.files.push_back(file.final_path());
     }
     catalog_update->updated_partitions[partition.first] = updatedPartition;
@@ -428,6 +444,10 @@ void DmlExecState::ToTDmlResult(TDmlResult* dml_result) {
   bool has_kudu_stats = false;
   for (const PartitionStatusMap::value_type& v: per_partition_status_) {
     dml_result->rows_modified[v.first] = v.second.num_modified_rows();
+    if (v.second.has_num_deleted_rows()) {
+      dml_result->__isset.rows_deleted = true;
+      dml_result->rows_deleted[v.first] = v.second.num_deleted_rows();
+    }
     if (v.second.has_stats() && v.second.stats().has_kudu_stats()) {
       has_kudu_stats = true;
     }
@@ -455,12 +475,17 @@ void DmlExecState::AddPartition(
 }
 
 void DmlExecState::UpdatePartition(const string& partition_name,
-    int64_t num_modified_rows_delta, const DmlStatsPB* insert_stats) {
+    int64_t num_rows_delta, const DmlStatsPB* insert_stats, bool is_delete) {
   lock_guard<mutex> l(lock_);
   PartitionStatusMap::iterator entry = per_partition_status_.find(partition_name);
   DCHECK(entry != per_partition_status_.end());
-  entry->second.set_num_modified_rows(
-      entry->second.num_modified_rows() + num_modified_rows_delta);
+  if (is_delete) {
+    entry->second.set_num_deleted_rows(
+        entry->second.num_deleted_rows() + num_rows_delta);
+  } else {
+    entry->second.set_num_modified_rows(
+        entry->second.num_modified_rows() + num_rows_delta);
+  }
   if (insert_stats == nullptr) return;
   MergeDmlStats(*insert_stats, entry->second.mutable_stats());
 }
@@ -533,11 +558,26 @@ string createIcebergDataFileString(
 
 void DmlExecState::AddCreatedFile(const OutputPartition& partition, bool is_iceberg,
     const IcebergFileStats& insert_stats) {
+  AddFileAux(partition, is_iceberg, insert_stats, /*is_delete=*/false);
+}
+
+void DmlExecState::AddCreatedDeleteFile(const OutputPartition& partition,
+    const IcebergFileStats& insert_stats) {
+  AddFileAux(partition, /*is_iceberg=*/true, insert_stats, /*is_delete=*/true);
+}
+
+void DmlExecState::AddFileAux(const OutputPartition& partition, bool is_iceberg,
+    const IcebergFileStats& insert_stats, bool is_delete) {
   lock_guard<mutex> l(lock_);
   PartitionStatusMap::iterator entry =
       per_partition_status_.find(partition.partition_name);
   DCHECK(entry != per_partition_status_.end());
-  DmlFileStatusPb* file = entry->second.add_created_files();
+  DmlFileStatusPb* file;
+  if (is_delete) {
+    file = entry->second.add_created_delete_files();
+  } else {
+    file = entry->second.add_created_files();
+  }
   if (partition.current_file_final_name.empty()) {
     file->set_final_path(partition.current_file_name);
   } else {
@@ -559,6 +599,20 @@ vector<string> DmlExecState::CreateIcebergDataFilesVector() {
   for (const PartitionStatusMap::value_type& partition : per_partition_status_) {
     for (int i = 0; i < partition.second.created_files_size(); ++i) {
       const DmlFileStatusPb& file = partition.second.created_files(i);
+      if (file.has_iceberg_data_file_fb()) {
+        ret.push_back(file.iceberg_data_file_fb());
+      }
+    }
+  }
+  return ret;
+}
+
+vector<string> DmlExecState::CreateIcebergDeleteFilesVector() {
+  vector<string> ret;
+  ret.reserve(per_partition_status_.size()); // min 1 file per partition
+  for (const PartitionStatusMap::value_type& partition : per_partition_status_) {
+    for (int i = 0; i < partition.second.created_delete_files_size(); ++i) {
+      const DmlFileStatusPb& file = partition.second.created_delete_files(i);
       if (file.has_iceberg_data_file_fb()) {
         ret.push_back(file.iceberg_data_file_fb());
       }
