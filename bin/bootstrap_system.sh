@@ -386,10 +386,20 @@ ubuntu sudo service postgresql stop
 # widely.
 ubuntu sudo sed -ri 's/local +all +all +peer/local all all trust/g' \
   /etc/postgresql/*/main/pg_hba.conf
+# Accept remote connections from the hosts in the same subnet.
+ubuntu sudo sed -ri "s/#listen_addresses = 'localhost'/listen_addresses = '0.0.0.0'/g" \
+  /etc/postgresql/*/main/postgresql.conf
+ubuntu sudo sed -ri 's/host +all +all +127.0.0.1\/32/host all all samenet/g' \
+  /etc/postgresql/*/main/pg_hba.conf
 redhat sudo sed -ri 's/local +all +all +(ident|peer)/local all all trust/g' \
   /var/lib/pgsql/data/pg_hba.conf
 # Accept md5 passwords from localhost
 redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
+# Accept remote connections from the hosts in the same subnet.
+redhat sudo sed -ri "s/#listen_addresses = 'localhost'/listen_addresses = '0.0.0.0'/g" \
+  /var/lib/pgsql/data/postgresql.conf
+redhat sudo sed -ri 's/host +all +all +127.0.0.1\/32/host all all samenet/g' \
+  /var/lib/pgsql/data/pg_hba.conf
 
 ubuntu sudo service postgresql start
 redhat notindocker sudo service postgresql start

@@ -20,7 +20,7 @@ from __future__ import absolute_import, division, print_function
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIf, SkipIfDockerizedCluster
+from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
@@ -82,12 +82,6 @@ class TestExtDataSources(ImpalaTestSuite):
   def test_data_source_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
 
-  # The test uses pre-written jdbc external tables where the jdbc.url refers to Postgres
-  # server via full URI, i.e. url starts with 'jdbc:postgresql://hostname:5432/'. In the
-  # dockerised environment, the Postgres server is running on a different host. It is
-  # configured to accept only local connection. Have to skip this test for dockerised
-  # cluster since Postgres server is not accessible from impalad.
-  @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.not_hdfs
   def test_jdbc_data_source(self, vector, unique_database):
     self.run_test_case('QueryTest/jdbc-data-source', vector, use_db=unique_database)
