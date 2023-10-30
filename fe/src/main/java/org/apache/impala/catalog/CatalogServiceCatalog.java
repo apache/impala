@@ -237,6 +237,8 @@ public class CatalogServiceCatalog extends Catalog {
   public static final long LOCK_RETRY_TIMEOUT_MS = 7200000;
   // Time to sleep before retrying to acquire a table lock
   private static final int LOCK_RETRY_DELAY_MS = 10;
+  // Threshold to add warning logs for slow lock acquiring.
+  private static final long LOCK_ACQUIRING_DURATION_WARN_MS = 100;
   // default value of table id in the GetPartialCatalogObjectRequest
   public static final long TABLE_ID_UNAVAILABLE = -1;
 
@@ -525,10 +527,10 @@ public class CatalogServiceCatalog extends Catalog {
           //cannot be acquired. Holding version lock can potentially blocks other
           //unrelated DDL operations.
           if (lock.tryLock(0, TimeUnit.SECONDS)) {
-            if (LOG.isTraceEnabled()) {
-              end = System.currentTimeMillis();
-              LOG.trace(String.format("Lock for table %s was acquired in %d msec",
-                  tbl.getFullName(), end - begin));
+            long duration = System.currentTimeMillis() - begin;
+            if (duration > LOCK_ACQUIRING_DURATION_WARN_MS) {
+              LOG.warn("{} lock for table {} was acquired in {} msec",
+                  useWriteLock ? "Write" : "Read", tbl.getFullName(), duration);
             }
             return true;
           }
@@ -557,10 +559,10 @@ public class CatalogServiceCatalog extends Catalog {
       do {
         versionLock_.writeLock().lock();
         if (db.getLock().tryLock()) {
-          if (LOG.isTraceEnabled()) {
-            end = System.currentTimeMillis();
-            LOG.trace(String.format("Lock for db %s was acquired in %d msec",
-                db.getName(), end - begin));
+          long duration = System.currentTimeMillis() - begin;
+          if (duration > LOCK_ACQUIRING_DURATION_WARN_MS) {
+            LOG.warn("Lock for db {} was acquired in {} msec",
+                db.getName(), duration);
           }
           return true;
         }
