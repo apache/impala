@@ -1716,9 +1716,10 @@ public class SingleNodePlanner {
 
   /**
    * Adds a new slot ref with path 'rawPath' to its tuple descriptor. This is a no-op if
-   * the tuple descriptor already has a slot ref with the given raw path.
+   * the tuple descriptor already has a slot ref with the given raw path. Returns the slot
+   * descriptor (new or already existing) for 'rawPath'.
    */
-  public static void addSlotRefToDesc(Analyzer analyzer, List<String> rawPath)
+  public static SlotDescriptor addSlotRefToDesc(Analyzer analyzer, List<String> rawPath)
       throws AnalysisException {
     Path resolvedPath = null;
     try {
@@ -1730,6 +1731,7 @@ public class SingleNodePlanner {
     Preconditions.checkNotNull(resolvedPath);
     SlotDescriptor desc = analyzer.registerSlotRef(resolvedPath);
     desc.setIsMaterialized(true);
+    return desc;
   }
 
   /**

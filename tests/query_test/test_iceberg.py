@@ -1236,6 +1236,51 @@ class TestIcebergV2Table(IcebergTestSuite):
 
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
+  def test_read_equality_deletes(self, vector):
+    self.run_test_case('QueryTest/iceberg-v2-read-equality-deletes', vector)
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  def test_multiple_equality_ids(self, unique_database):
+    """This test loads an Iceberg table that has 2 equality delete files with different
+        equality ID lists. A query on such a table fails due to lack of support."""
+    SRC_DIR = os.path.join(os.environ['IMPALA_HOME'],
+        "testdata/data/iceberg_test/hadoop_catalog/ice/"
+        "iceberg_v2_delete_different_equality_ids")
+    DST_DIR = "/test-warehouse/iceberg_test/hadoop_catalog/ice/" \
+        "iceberg_v2_delete_different_equality_ids"
+    TBL_NAME = "iceberg_v2_delete_different_equality_ids"
+    FULL_TBL_NAME = unique_database + "." + TBL_NAME
+
+    try:
+      self.filesystem_client.make_dir(DST_DIR, permission=777)
+
+      self.filesystem_client.copy_from_local(os.path.join(SRC_DIR, "data"), DST_DIR)
+      self.filesystem_client.copy_from_local(os.path.join(SRC_DIR, "metadata"), DST_DIR)
+
+      self.execute_query_expect_success(self.client,
+          """create external table {0} stored as iceberg
+           tblproperties('format-version'='2', 'iceberg.catalog'='hadoop.catalog',
+           'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
+           'iceberg.table_identifier'=
+           'ice.iceberg_v2_delete_different_equality_ids')""".format(FULL_TBL_NAME))
+
+      err = self.execute_query_expect_failure(self.client,
+          "select * from " + FULL_TBL_NAME)
+      assert "Equality delete files with different equality field ID lists aren't " \
+          "supported." in str(err)
+      # The error message also contains the mismatching equality ID lists but the order
+      # of the lists can change so we assert them separately. The end of the original
+      # message looks like: "[1] vs [1, 2]" or "[1, 2] vs [1]"
+      assert "[1, 2]" in str(err)
+      assert "[1]" in str(err)
+
+    finally:
+      # Clean up the test directory
+      self.filesystem_client.delete_file_dir(DST_DIR, True)
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
   def test_read_position_deletes_orc(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc', vector)
 

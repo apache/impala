@@ -761,7 +761,7 @@ public interface FeIcebergTable extends FeFsTable {
      */
     public static IcebergContentFileStore loadAllPartition(
         IcebergTable table, GroupedContentFiles icebergFiles)
-        throws IOException {
+        throws IOException, ImpalaRuntimeException {
       Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap = new HashMap<>();
       Collection<HdfsPartition> partitions =
           ((HdfsTable)table.getFeFsTable()).partitionMap_.values();
@@ -781,16 +781,14 @@ public interface FeIcebergTable extends FeFsTable {
         pathHashAndFd = getPathHashAndFd(dataFile, table, hdfsFileDescMap);
         fileStore.addDataFileWithDeletes(pathHashAndFd.first, pathHashAndFd.second);
       }
-      for (DeleteFile deleteFile : icebergFiles.deleteFiles) {
+      for (DeleteFile deleteFile : icebergFiles.positionDeleteFiles) {
         pathHashAndFd = getPathHashAndFd(deleteFile, table, hdfsFileDescMap);
-        if (deleteFile.content().equals(FileContent.POSITION_DELETES)) {
-          fileStore.addPositionDeleteFile(pathHashAndFd.first, pathHashAndFd.second);
-        } else if (deleteFile.content().equals(FileContent.EQUALITY_DELETES)) {
-          fileStore.addEqualityDeleteFile(pathHashAndFd.first, pathHashAndFd.second);
-        } else {
-          Preconditions.checkState(false,
-              "Delete file with unknown kind: " + deleteFile.path().toString());
-        }
+        fileStore.addPositionDeleteFile(pathHashAndFd.first, pathHashAndFd.second);
+      }
+      for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
+        pathHashAndFd = getPathHashAndFd(deleteFile, table, hdfsFileDescMap);
+        fileStore.addEqualityDeleteFile(pathHashAndFd.first, pathHashAndFd.second,
+            deleteFile.equalityFieldIds());
       }
       return fileStore;
     }

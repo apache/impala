@@ -770,6 +770,84 @@ statements:
 This table was created with HDFS absolute paths, which were replaced with the script
 specified in `iceberg_test/hadoop_catalog/ice/iceberg_v2_no_deletes`.
 
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_nulls:
+This table has an equality delete file that contains NULL value. Created by a hacked
+Impala where IcebergCatalogOpExecutor is changed to write equality delete metadata
+instead of position delete metadata when running a DELETE FROM statement. In a second
+step the underlying delete file was replaced by another parquet file with the desired
+content.
+The content:
+1: insert into functional_parquet.iceberg_v2_delete_equality_nulls values (1, "str1"), (null, "str2"), (3, "str3");
+2: EQ-delete file for the first column with values: (null), (3)
+3: insert into functional_parquet.iceberg_v2_delete_equality_nulls values (4, "str4"), (null, "str5");
+As a result 2 values (including the row with null) will be dropped from the first data
+file, while there is going to be another data file containing a null value that has
+greater data sequence number than the delete file.
+
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos:
+This table is created by Flink with 2 columns as primary key. Some data and equality
+delete files were added by Flink, and then Impala was used for dropping a row by writing
+a positional delete file.
+Steps:
+1-Flink:
+  create table ice.iceberg_v2_delete_both_eq_and_pos
+    (i int, s string, d date, primary key (i, d) not enforced)
+    with ('format-version'='2', 'write.upsert.enabled'='true');
+2: Flink:
+  insert into ice.iceberg_v2_delete_both_eq_and_pos values
+    (1, 'str1', to_date('2023-12-13')),
+    (2, 'str2', to_date('2023-12-13'));
+3-Flink:
+  insert into ice.iceberg_v2_delete_both_eq_and_pos values
+    (3, 'str3', to_date('2023-12-23')),
+    (2, 'str2_updated', to_date('2023-12-13'));
+4-Impala: delete from functional_parquet.iceberg_v2_delete_both_eq_and_pos where i = 1;
+
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_different_equality_ids:
+Used a hacked Impala to write Iceberg metadata where one equality delete file deletes by
+field ID [1] while another deletes by field IDs [1,2]. Note, the underlying delete files
+are position delete files written by Impala. It's not possible to add this table to the
+data load because it'd give a TableLoadingException when doing a refresh on the table.
+
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_partitioned:
+Flink is used for creating this test table. The statements executed are the follow:
+1: Create the table with the partition column part of the primary key. This is enforced
+by Flink:
+  create table ice.iceberg_v2_delete_equality_partitioned
+    (i int, s string, d date, primary key (d, s) not enforced)
+    partitioned by (d)
+  w  ith ('format-version'='2', 'write.upsert.enabled'='true');
+2: Populate one partition.
+  insert into ice.iceberg_v2_delete_equality_partitioned partition (d='2023-12-24') values
+    (1, 'str1'), (2, 'str2'), (3, 'str3');
+3: Populate another partition
+  insert into ice.iceberg_v2_delete_equality_partitioned partition (d='2023-12-25') values
+    (1, 'str1'), (2, 'str2');
+4: Update one row in the first partiton and add a new row.
+  insert into ice.iceberg_v2_delete_equality_partitioned partition (d='2023-12-24') values
+    (333333, 'str3'), (4, 'str4');
+5: Update one row in the second partition.
+  insert into ice.iceberg_v2_delete_equality_partitioned partition (d='2023-12-25') values
+    (222, 'str2');
+
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_partition_evolution:
+Flink is used to create and populate this simple table to have an equlity delete file.
+Impala is used for doing some partition evolution on this table.
+1-Flink:
+  create table ice.iceberg_v2_delete_equality_partition_evolution
+    (i int, s string, d date, primary key (d, s) not enforced)
+    partitioned by (d)
+    with ('format-version'='2', 'write.upsert.enabled'='true');
+2-Flink:
+  insert into ice.iceberg_v2_delete_equality_partition_evolution
+    partition (d='2023-12-24') values (1, 'str1'), (2, 'str2');
+3-Flink:
+  insert into ice.iceberg_v2_delete_equality_partition_evolution
+    partition (d='2023-12-24') values (111, 'str1');
+4-Impala:
+  alter table functional_parquet.iceberg_v2_delete_equality_partition_evolution
+    set partition spec (d, i);
+
 iceberg_test/iceberg_migrated_alter_test
 Generated and migrated by Hive
 CREATE TABLE iceberg_migrated_alter_test (int_col int, string_col string, double_col double) stored as parquet;

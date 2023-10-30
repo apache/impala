@@ -398,7 +398,13 @@ struct TEqJoinCondition {
   1: required Exprs.TExpr left;
   // right-hand side of "<a> = <b>"
   2: required Exprs.TExpr right;
-  // true if and only if operator is "<=>", also known as "IS NOT DISTINCT FROM"
+  // In SQL NULL values aren't equal to each other, in other words NULL == NULL is false.
+  // However, there are some cases when joining tables where we'd like to have the
+  // NULL == NULL comparison to return true. This flag is true in this case.
+  // One example is when we join Iceberg equality delete files to the data files where we
+  // want the NULLs in the delete files to match with the NULLs in the data files.
+  // Another example is when this operator is a "<=>", also known as "IS NOT DISTINCT
+  // FROM".
   3: required bool is_not_distinct_from;
 }
 

@@ -1,0 +1,73 @@
+====
+---- QUERY
+# We don't use time-travel, so we plan the query from cached metadata.
+select * from functional_parquet.iceberg_v2_delete_equality;
+---- RESULTS
+1,'test_1_base'
+2,'test_2_updated'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Use time-travel based on snapshot id.
+select * from functional_parquet.iceberg_v2_delete_equality for system_version as of 5763349507283783091;
+---- RESULTS
+1,'test_1_base'
+2,'test_2_updated'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Use time-travel based on timestamp.
+select * from functional_parquet.iceberg_v2_delete_equality for system_time as of now();
+---- RESULTS
+1,'test_1_base'
+2,'test_2_updated'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Equality delete file with data sequance number 2 contains (NULL), (3). Drops the
+# matching values with lower data sequence number, while keeps the one with higher seq
+# nums.
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from functional_parquet.iceberg_v2_delete_equality_nulls;
+---- RESULTS
+1,'str1',1
+4,'str4',3
+NULL,'str5',3
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Check that the NULL value was present in the first snapshot of the table.
+select *, ICEBERG__DATA__SEQUENCE__NUMBER from functional_parquet.iceberg_v2_delete_equality_nulls
+for system_version as of 4346796256488077976;
+---- RESULTS
+1,'str1',1
+NULL,'str2',1
+3,'str3',1
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Query a table that has both equality and positional delete files.
+select * from functional_parquet.iceberg_v2_delete_both_eq_and_pos;
+---- RESULTS
+2,'str2_updated',2023-12-13
+3,'str3',2023-12-23
+---- TYPES
+INT,STRING,DATE
+====
+---- QUERY
+# Query a partitioned table that has eq-delete files in both partitions.
+select * from functional_parquet.iceberg_v2_delete_equality_partitioned order by d, s;
+---- RESULTS
+1,'str1',2023-12-24
+2,'str2',2023-12-24
+333333,'str3',2023-12-24
+4,'str4',2023-12-24
+1,'str1',2023-12-25
+222,'str2',2023-12-25
+---- TYPES
+INT,STRING,DATE
+====

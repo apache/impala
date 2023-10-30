@@ -18,35 +18,18 @@
 package org.apache.impala.catalog;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang.NotImplementedException;
-import org.apache.iceberg.Table;
-import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.thrift.TColumnStats;
-import org.apache.impala.thrift.TCompressionCodec;
-import org.apache.impala.thrift.THdfsTable;
-import org.apache.impala.thrift.TIcebergCatalog;
-import org.apache.impala.thrift.TIcebergFileFormat;
-import org.apache.impala.thrift.TIcebergPartitionStats;
-import org.apache.impala.thrift.TTableDescriptor;
-import org.apache.impala.thrift.TTableStats;
 
 /**
  * Iceberg position delete table is created on the fly during planning. It belongs to an
  * actual Iceberg table (referred to as 'baseTable_'), but has a schema that corresponds
  * to the file schema of position delete files. Therefore with the help of it we can
- * do an ANTI JOIN between data files and delete files.
+ * do an ANTI JOIN between data files and position delete files.
  */
-public class IcebergPositionDeleteTable extends VirtualTable implements FeIcebergTable  {
-  private FeIcebergTable baseTable_;
-  private Set<FileDescriptor> deleteFiles_;
-  private long deleteRecordsCount_;
-
+public class IcebergPositionDeleteTable extends IcebergDeleteTable  {
   public static String FILE_PATH_COLUMN = "file_path";
   public static String POS_COLUMN = "pos";
 
@@ -58,23 +41,18 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
   public IcebergPositionDeleteTable(FeIcebergTable baseTable, String name,
       Set<FileDescriptor> deleteFiles,
       long deleteRecordsCount, TColumnStats filePathsStats) {
-    super(baseTable.getMetaStoreTable(), baseTable.getDb(), name,
-        baseTable.getOwnerUser());
-    baseTable_ = baseTable;
-    deleteFiles_ = deleteFiles;
-    deleteRecordsCount_ = deleteRecordsCount;
+    super(baseTable, name, deleteFiles, deleteRecordsCount);
     Column filePath = new IcebergColumn(FILE_PATH_COLUMN, Type.STRING, /*comment=*/"",
-        colsByPos_.size(), IcebergTable.V2_FILE_PATH_FIELD_ID, -1, -1,
-        /*nullable=*/false);
+        colsByPos_.size(), IcebergTable.V2_FILE_PATH_FIELD_ID, INVALID_MAP_KEY_ID,
+        INVALID_MAP_VALUE_ID, /*nullable=*/false);
     Column pos = new IcebergColumn(POS_COLUMN, Type.BIGINT, /*comment=*/"",
-        colsByPos_.size(), IcebergTable.V2_POS_FIELD_ID, -1, -1, /*nullable=*/false);
+        colsByPos_.size(), IcebergTable.V2_POS_FIELD_ID, INVALID_MAP_KEY_ID,
+        INVALID_MAP_VALUE_ID, /*nullable=*/false);
     filePath.updateStats(filePathsStats);
     pos.updateStats(getPosStats(pos));
     addColumn(filePath);
     addColumn(pos);
   }
-
-  public FeIcebergTable getBaseTable() { return baseTable_; }
 
   private TColumnStats getPosStats(Column pos) {
     TColumnStats colStats = new TColumnStats();
@@ -83,114 +61,4 @@ public class IcebergPositionDeleteTable extends VirtualTable implements FeIceber
     colStats.max_size = pos.getType().getSlotSize();
     return colStats;
   }
-
-  @Override
-  public long getNumRows() {
-    return deleteRecordsCount_;
-  }
-
-  @Override
-  public TTableStats getTTableStats() {
-    long totalBytes = 0;
-    for (FileDescriptor df : deleteFiles_) {
-      totalBytes += df.getFileLength();
-    }
-    TTableStats ret = new TTableStats(getNumRows());
-    ret.setTotal_file_bytes(totalBytes);
-    return ret;
-  }
-
-  /**
-   * Return same descriptor as the base table, but with a schema that corresponds to
-   * the position delete file schema ('file_path', 'pos').
-   */
-  @Override
-  public TTableDescriptor toThriftDescriptor(int tableId,
-      Set<Long> referencedPartitions) {
-    TTableDescriptor desc = baseTable_.toThriftDescriptor(tableId, referencedPartitions);
-    desc.setColumnDescriptors(FeCatalogUtils.getTColumnDescriptors(this));
-    return desc;
-  }
-
-  @Override
-  public IcebergContentFileStore getContentFileStore() {
-    throw new NotImplementedException("This should never be called.");
-  }
-
-  @Override
-  public Map<String, TIcebergPartitionStats> getIcebergPartitionStats() {
-    return null;
-  }
-
-  @Override
-  public FeFsTable getFeFsTable() {
-    return baseTable_.getFeFsTable();
-  }
-
-  @Override
-  public TIcebergCatalog getIcebergCatalog() {
-    return null;
-  }
-
-  @Override
-  public Table getIcebergApiTable() {
-    return baseTable_.getIcebergApiTable();
-  }
-
-  @Override
-  public String getIcebergCatalogLocation() {
-    return null;
-  }
-
-  @Override
-  public TIcebergFileFormat getIcebergFileFormat() {
-    return baseTable_.getIcebergFileFormat();
-  }
-
-  @Override
-  public TCompressionCodec getIcebergParquetCompressionCodec() {
-    return null;
-  }
-
-  @Override
-  public long getIcebergParquetRowGroupSize() {
-    return baseTable_.getIcebergParquetRowGroupSize();
-  }
-
-  @Override
-  public long getIcebergParquetPlainPageSize() {
-    return baseTable_.getIcebergParquetPlainPageSize();
-  }
-
-  @Override
-  public long getIcebergParquetDictPageSize() {
-    return baseTable_.getIcebergParquetDictPageSize();
-  }
-
-  @Override
-  public String getIcebergTableLocation() {
-    return null;
-  }
-
-  @Override
-  public List<IcebergPartitionSpec> getPartitionSpecs() {
-    return baseTable_.getPartitionSpecs();
-  }
-
-  @Override
-  public IcebergPartitionSpec getDefaultPartitionSpec() {
-    return null;
-  }
-
-  @Override
-  public int getDefaultPartitionSpecId() {
-    return -1;
-  }
-
-  @Override
-  public THdfsTable transformToTHdfsTable(boolean updatePartitionFlag,
-      ThriftObjectType type) {
-    throw new IllegalStateException("not implemented here");
-  }
-
 }

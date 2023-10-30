@@ -21,13 +21,17 @@ import com.google.common.collect.Iterables;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import hiveexec.com.google.common.collect.Lists;
 import org.apache.curator.shaded.com.google.common.base.Preconditions;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TIcebergContentFileStore;
@@ -98,6 +102,12 @@ public class IcebergContentFileStore {
   private MapListContainer positionDeleteFiles_ = new MapListContainer();
   private MapListContainer equalityDeleteFiles_ = new MapListContainer();
 
+  // The equality field IDs associated with the equality delete files.
+  // TODO IMPALA-12598: currently it's not supported to have equality delete files with
+  // different equality field ID lists, or in other words the equality delete files have
+  // to delete by the same columns.
+  private Set<Integer> equalityIds_ = new HashSet<>();
+
   // Caches file descriptors loaded during time-travel queries.
   private final ConcurrentMap<String, FileDescriptor> oldFileDescMap_ =
       new ConcurrentHashMap<>();
@@ -127,10 +137,21 @@ public class IcebergContentFileStore {
     }
   }
 
-  public void addEqualityDeleteFile(String pathHash, FileDescriptor desc) {
-    if (equalityDeleteFiles_.add(pathHash, desc)) {
-      updateFileFormats(desc);
+  public void addEqualityDeleteFile(String pathHash, FileDescriptor desc,
+      List<Integer> equalityIds) throws ImpalaRuntimeException {
+    if (equalityIds.isEmpty()) {
+      throw new ImpalaRuntimeException("No equality IDs for equality delete file " +
+          desc.getPath());
     }
+    if (equalityIds_.isEmpty()) {
+      equalityIds_.addAll(equalityIds);
+    } else if (equalityIds_.size() != equalityIds.size() ||
+        !equalityIds_.containsAll(equalityIds)) {
+      throw new ImpalaRuntimeException(String.format("Equality delete files with " +
+          "different equality field ID lists aren't supported. %s vs %s", equalityIds,
+          equalityIds_));
+    }
+    if (equalityDeleteFiles_.add(pathHash, desc)) updateFileFormats(desc);
   }
 
   // This is only invoked during time travel, when we are querying a snapshot that has
@@ -170,6 +191,8 @@ public class IcebergContentFileStore {
   public List<FileDescriptor> getEqualityDeleteFiles() {
     return equalityDeleteFiles_.getList();
   }
+
+  public Set<Integer> getEqualityIds() { return equalityIds_; }
 
   public long getNumFiles() {
     return dataFilesWithoutDeletes_.getNumFiles() +
@@ -213,6 +236,7 @@ public class IcebergContentFileStore {
     ret.setPath_hash_to_data_file_with_deletes(dataFilesWithDeletes_.toThrift());
     ret.setPath_hash_to_position_delete_file(positionDeleteFiles_.toThrift());
     ret.setPath_hash_to_equality_delete_file(equalityDeleteFiles_.toThrift());
+    ret.setEquality_ids(Lists.newArrayList(equalityIds_));
     ret.setHas_avro(hasAvro_);
     ret.setHas_orc(hasOrc_);
     ret.setHas_parquet(hasParquet_);
@@ -243,6 +267,7 @@ public class IcebergContentFileStore {
           tFileStore.getPath_hash_to_equality_delete_file(),
           networkAddresses, hostIndex);
     }
+    ret.equalityIds_.addAll(tFileStore.getEquality_ids());
     ret.hasAvro_ = tFileStore.isSetHas_avro() ? tFileStore.isHas_avro() : false;
     ret.hasOrc_ = tFileStore.isSetHas_orc() ? tFileStore.isHas_orc() : false;
     ret.hasParquet_ = tFileStore.isSetHas_parquet() ? tFileStore.isHas_parquet() : false;

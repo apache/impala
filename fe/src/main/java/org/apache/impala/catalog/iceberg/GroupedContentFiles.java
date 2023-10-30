@@ -22,23 +22,27 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.collect.Iterables;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.io.CloseableIterable;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 
 /**
  * Struct-like object to group different Iceberg content files:
  * - data files without deleted rows
  * - data files with deleted rows
- * - delete files
+ * - delete files (position and equality)
  */
 public class GroupedContentFiles {
   public List<DataFile> dataFilesWithoutDeletes = new ArrayList<>();
   public List<DataFile> dataFilesWithDeletes = new ArrayList<>();
-  public Set<DeleteFile> deleteFiles = new HashSet<>();
+  public Set<DeleteFile> positionDeleteFiles = new HashSet<>();
+  public Set<DeleteFile> equalityDeleteFiles = new HashSet<>();
 
   public GroupedContentFiles() { }
 
@@ -48,18 +52,26 @@ public class GroupedContentFiles {
         dataFilesWithoutDeletes.add(scanTask.file());
       } else {
         dataFilesWithDeletes.add(scanTask.file());
-        deleteFiles.addAll(scanTask.deletes());
+        for (DeleteFile delFile : scanTask.deletes()) {
+          if (delFile.content() == FileContent.POSITION_DELETES) {
+            positionDeleteFiles.add(delFile);
+          } else {
+            Preconditions.checkState(delFile.content() == FileContent.EQUALITY_DELETES);
+            equalityDeleteFiles.add(delFile);
+          }
+        }
       }
     }
   }
 
   public Iterable<ContentFile<?>> getAllContentFiles() {
-    return Iterables.concat(dataFilesWithoutDeletes, dataFilesWithDeletes, deleteFiles);
+    return Iterables.concat(dataFilesWithoutDeletes, dataFilesWithDeletes,
+        positionDeleteFiles, equalityDeleteFiles);
   }
 
   public int size() {
     return dataFilesWithDeletes.size() + dataFilesWithoutDeletes.size() +
-        deleteFiles.size();
+        positionDeleteFiles.size() + equalityDeleteFiles.size();
   }
 
   public boolean isEmpty() {

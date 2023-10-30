@@ -82,7 +82,9 @@ class PhjBuilderConfig : public JoinBuilderConfig {
   std::vector<ScalarExpr*> build_exprs_;
 
   /// is_not_distinct_from_[i] is true if and only if the ith equi-join predicate is IS
-  /// NOT DISTINCT FROM, rather than equality.
+  /// NOT DISTINCT FROM, rather than equality. This is the case when IS NOT DISTINCT FROM
+  /// is explicitly used as a join predicate or when joining Iceberg equality delete
+  /// files to data files.
   /// Set in InitExprsAndFilters() and constant thereafter.
   std::vector<bool> is_not_distinct_from_;
 

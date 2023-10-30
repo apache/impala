@@ -55,9 +55,8 @@ public class BinaryPredicate extends Predicate {
     GT(">", "gt", TComparisonOp.GT),
     DISTINCT_FROM("IS DISTINCT FROM", "distinctfrom", TComparisonOp.DISTINCT_FROM),
     NOT_DISTINCT("IS NOT DISTINCT FROM", "notdistinct", TComparisonOp.NOT_DISTINCT),
-    // Same as EQ, except it returns True if the rhs is NULL. There is no backend
-    // function for this. The functionality is embedded in the hash-join
-    // implementation.
+    // Same as EQ, except it returns True if both sides are NULL. There is no backend
+    // function for this. The functionality is embedded in the hash-join implementation.
     NULL_MATCHING_EQ("=", "null_matching_eq", TComparisonOp.EQ);
 
     private final String description_;

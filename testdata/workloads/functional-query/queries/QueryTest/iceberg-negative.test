@@ -716,27 +716,6 @@ select * from functional_parquet.iceberg_alltypes_part for system_time as of '20
 IllegalArgumentException: Cannot find a snapshot older than 2000-01-01 01:02:03
 ====
 ---- QUERY
-# Querying a table with equality deletes is not allowed.
-# We don't use time-travel, so we plan the query from cached metadata.
-select * from functional_parquet.iceberg_v2_delete_equality;
----- CATCH
-ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
-====
----- QUERY
-# Querying a table with equality deletes is not allowed.
-# Use time-travel based on snapshot id.
-select * from functional_parquet.iceberg_v2_delete_equality for system_version as of 5763349507283783091;
----- CATCH
-ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
-====
----- QUERY
-# Querying a table with equality deletes is not allowed.
-# Use time-travel based on timestamp.
-select * from functional_parquet.iceberg_v2_delete_equality for system_time as of now();
----- CATCH
-ImpalaRuntimeException: Iceberg table functional_parquet.iceberg_v2_delete_equality has EQUALITY delete file which is currently not supported by Impala
-====
----- QUERY
 create table ice_delete (i int, s string)
 stored by iceberg
 tblproperties ('format-version'='1');
@@ -862,4 +841,15 @@ alter table update_orc set tblproperties ('write.delete.format.default'='orc', '
 update update_orc set i = 3;
 ---- CATCH
 AnalysisException: Impala can only write delete files in PARQUET, but the given table uses a different file format: $DATABASE.update_orc
+====
+---- QUERY
+select * from functional_parquet.iceberg_v2_delete_equality_partition_evolution;
+---- CATCH
+ImpalaRuntimeException: Equality delete files are not supported for tables with partition evolution
+====
+---- QUERY
+# Cannot drop Flink primary key column.
+alter table functional_parquet.iceberg_v2_delete_equality_partitioned drop column s;
+---- CATCH
+Failed to ALTER table 'iceberg_v2_delete_equality_partitioned': Cannot delete identifier field 2: s: required string.
 ====

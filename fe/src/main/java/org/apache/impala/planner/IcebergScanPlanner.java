@@ -49,8 +49,6 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.IcebergExpressionCollector;
-import org.apache.impala.analysis.InPredicate;
-import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
@@ -66,6 +64,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergContentFileStore;
+import org.apache.impala.catalog.IcebergEqualityDeleteTable;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -113,16 +112,22 @@ public class IcebergScanPlanner {
   private final List<Expr> untranslatedExpressions_ = new ArrayList<>();
   // Conjuncts on columns not involved in IDENTITY-partitioning.
   private List<Expr> nonIdentityConjuncts_ = new ArrayList<>();
+
+  // Containers for different groupings of file descriptors.
   private List<FileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
   private List<FileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
-  private Set<FileDescriptor> deleteFiles_ = new HashSet<>();
-
+  private Set<FileDescriptor> positionDeleteFiles_ = new HashSet<>();
+  private Set<FileDescriptor> equalityDeleteFiles_ = new HashSet<>();
+  // The equality field IDs to be used for the equality delete files.
+  private Set<Integer> equalityIds_ = new HashSet<>();
 
   // Statistics about the data and delete files. Useful for memory estimates of the
   // ANTI JOIN
-  private long deletesRecordCount_ = 0;
+  private long positionDeletesRecordCount_ = 0;
+  private long equalityDeletesRecordCount_ = 0;
   private long dataFilesWithDeletesSumPaths_ = 0;
   private long dataFilesWithDeletesMaxPath_ = 0;
+  private Set<Long> equalityDeleteSequenceNumbers_ = new HashSet<>();
 
   public IcebergScanPlanner(Analyzer analyzer, PlannerContext ctx,
       TableRef iceTblRef, List<Expr> conjuncts, MultiAggregateInfo aggInfo)
@@ -163,23 +168,21 @@ public class IcebergScanPlanner {
 
   private void setFileDescriptorsBasedOnFileStore() throws ImpalaException {
     IcebergContentFileStore fileStore = getIceTable().getContentFileStore();
-    if (!fileStore.getEqualityDeleteFiles().isEmpty()) {
-      // TODO(IMPALA-11388): Add support for equality deletes.
-      FileDescriptor firstEqualityDeleteFile = fileStore.getEqualityDeleteFiles().get(0);
-      throw new ImpalaRuntimeException(String.format(
-          "Iceberg table %s has EQUALITY delete file which is currently " +
-          "not supported by Impala, for example: %s",
-          getIceTable().getFullName(),
-          firstEqualityDeleteFile.getAbsolutePath(getIceTable().getLocation())));
-    }
     dataFilesWithoutDeletes_ = fileStore.getDataFilesWithoutDeletes();
     dataFilesWithDeletes_ = fileStore.getDataFilesWithDeletes();
-    deleteFiles_ = new HashSet<>(fileStore.getPositionDeleteFiles());
+    positionDeleteFiles_ = new HashSet<>(fileStore.getPositionDeleteFiles());
+    equalityDeleteFiles_ = new HashSet<>(fileStore.getEqualityDeleteFiles());
+    equalityIds_ = fileStore.getEqualityIds();
+
     updateDeleteStatistics();
   }
 
+  private boolean noDeleteFiles() {
+    return positionDeleteFiles_.isEmpty() && equalityDeleteFiles_.isEmpty();
+  }
+
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
-    if (deleteFiles_.isEmpty()) {
+    if (noDeleteFiles()) {
       // If there are no delete files we can just create a single SCAN node.
       Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
       PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
@@ -188,7 +191,12 @@ public class IcebergScanPlanner {
       ret.init(analyzer_);
       return ret;
     }
-    PlanNode joinNode = createPositionJoinNode();
+
+    PlanNode joinNode = null;
+    if (!positionDeleteFiles_.isEmpty()) joinNode = createPositionJoinNode();
+
+    if (!equalityDeleteFiles_.isEmpty()) joinNode = createEqualityJoinNode(joinNode);
+    Preconditions.checkNotNull(joinNode);
 
     // If the count star query can be optimized for Iceberg V2 table, the number of rows
     // of all DataFiles without corresponding DeleteFiles can be calculated by Iceberg
@@ -219,7 +227,7 @@ public class IcebergScanPlanner {
   }
 
   private PlanNode createPositionJoinNode() throws ImpalaException {
-    Preconditions.checkState(deletesRecordCount_ != 0);
+    Preconditions.checkState(positionDeletesRecordCount_ != 0);
     Preconditions.checkState(dataFilesWithDeletesSumPaths_ != 0);
     Preconditions.checkState(dataFilesWithDeletesMaxPath_ != 0);
     // The followings just create separate scan nodes for data files and position delete
@@ -228,12 +236,13 @@ public class IcebergScanPlanner {
     PlanNodeId deleteScanNodeId = ctx_.getNextNodeId();
     IcebergPositionDeleteTable deleteTable = new IcebergPositionDeleteTable(getIceTable(),
         getIceTable().getName() + "-POSITION-DELETE-" + deleteScanNodeId.toString(),
-        deleteFiles_, deletesRecordCount_, getFilePathStats());
+        positionDeleteFiles_, positionDeletesRecordCount_, getFilePathStats());
     analyzer_.addVirtualTable(deleteTable);
     TableRef deleteDeltaRef = TableRef.newTableRef(analyzer_,
         Arrays.asList(deleteTable.getDb().getName(), deleteTable.getName()),
         tblRef_.getUniqueAlias() + "-position-delete");
     addDataVirtualPositionSlots(tblRef_);
+    if (!equalityDeleteFiles_.isEmpty()) addSlotsForEqualityDelete(equalityIds_, tblRef_);
     addDeletePositionSlots(deleteDeltaRef);
     IcebergScanNode dataScanNode = new IcebergScanNode(
         dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
@@ -244,14 +253,14 @@ public class IcebergScanPlanner {
         deleteDeltaRef,
         Collections.emptyList(), /*conjuncts*/
         aggInfo_,
-        Lists.newArrayList(deleteFiles_),
+        Lists.newArrayList(positionDeleteFiles_),
         Collections.emptyList(), /*nonIdentityConjuncts*/
         Collections.emptyList()); /*skippedConjuncts*/
     deleteScanNode.init(analyzer_);
 
     // Now let's create the JOIN node
     List<BinaryPredicate> positionJoinConjuncts = createPositionJoinConjuncts(
-            analyzer_, tblRef_.getDesc(), deleteDeltaRef.getDesc());
+        analyzer_, tblRef_.getDesc(), deleteDeltaRef.getDesc());
 
     TQueryOptions queryOpts = analyzer_.getQueryCtx().client_request.query_options;
     JoinNode joinNode = null;
@@ -270,38 +279,43 @@ public class IcebergScanPlanner {
   }
 
   private void addDataVirtualPositionSlots(TableRef tblRef) throws AnalysisException {
-    List<String> rawPath = new ArrayList<>();
-    rawPath.add(tblRef.getUniqueAlias());
-    // Add slot refs for position delete fields;
-    String[] posFields = {VirtualColumn.INPUT_FILE_NAME.getName(),
-                          VirtualColumn.FILE_POSITION.getName()};
-    for (String posField : posFields) {
-      rawPath.add(posField);
+    List<String> rawPath = Lists.newArrayList(
+        tblRef.getUniqueAlias(), VirtualColumn.INPUT_FILE_NAME.getName());
+    SlotDescriptor fileNameSlotDesc =
+        SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
+    fileNameSlotDesc.setStats(virtualInputFileNameStats());
+
+    rawPath = Lists.newArrayList(
+        tblRef.getUniqueAlias(), VirtualColumn.FILE_POSITION.getName());
+    SlotDescriptor filePosSlotDesc =
+        SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
+    filePosSlotDesc.setStats(virtualFilePositionStats());
+  }
+
+  private void addSlotsForEqualityDelete(Set<Integer> equalityIds, TableRef tblRef)
+      throws AnalysisException {
+    List<String> rawPath = Lists.newArrayList(
+        tblRef.getUniqueAlias(), VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER.getName());
+    SlotDescriptor slotDesc = SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
+    slotDesc.setStats(virtualDataSeqNumStats());
+
+    Preconditions.checkState(!equalityIds.isEmpty());
+    for (Integer eqId : equalityIds) {
+      String eqColName = getIceTable().getIcebergSchema().findColumnName(eqId);
+      Preconditions.checkNotNull(eqColName);
+      rawPath = Lists.newArrayList(tblRef.getUniqueAlias(), eqColName);
       SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
-      rawPath.remove(rawPath.size() - 1);
-    }
-    for (SlotDescriptor insertSlotDesc : tblRef.getDesc().getSlots()) {
-      TVirtualColumnType virtColType = insertSlotDesc.getVirtualColumnType();
-      if (virtColType == TVirtualColumnType.INPUT_FILE_NAME) {
-        insertSlotDesc.setStats(virtualInputFileNameStats());
-      } else if (virtColType == TVirtualColumnType.FILE_POSITION) {
-        insertSlotDesc.setStats(virtualFilePositionStats());
-      }
     }
   }
 
   private void addDeletePositionSlots(TableRef tblRef)
       throws AnalysisException {
-    List<String> rawPath = new ArrayList<>();
-    rawPath.add(tblRef.getUniqueAlias());
-    // Add slot refs for position delete fields;
-    String[] posFields = {IcebergPositionDeleteTable.FILE_PATH_COLUMN,
-                          IcebergPositionDeleteTable.POS_COLUMN};
-    for (String posField : posFields) {
-      rawPath.add(posField);
-      SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
-      rawPath.remove(rawPath.size() - 1);
-    }
+    SingleNodePlanner.addSlotRefToDesc(analyzer_,
+        Lists.newArrayList(
+            tblRef.getUniqueAlias(), IcebergPositionDeleteTable.FILE_PATH_COLUMN));
+    SingleNodePlanner.addSlotRefToDesc(analyzer_,
+        Lists.newArrayList(
+            tblRef.getUniqueAlias(), IcebergPositionDeleteTable.POS_COLUMN));
   }
 
   private List<BinaryPredicate> createPositionJoinConjuncts(Analyzer analyzer,
@@ -344,6 +358,48 @@ public class IcebergScanPlanner {
     return ret;
   }
 
+  private Pair<List<BinaryPredicate>, List<Expr>> createEqualityJoinConjuncts(
+      Analyzer analyzer, TupleDescriptor dataTupleDesc, TupleDescriptor deleteTupleDesc)
+      throws AnalysisException, ImpalaRuntimeException {
+    // Pre-process the slots for faster lookup by field ID.
+    Map<Integer, SlotDescriptor> fieldIdToIcebergColumn = new HashMap<>();
+    SlotDescriptor dataSeqNumSlot = null;
+    for (SlotDescriptor dataSlotDesc : dataTupleDesc.getSlots()) {
+      if (dataSlotDesc.getVirtualColumnType() ==
+          TVirtualColumnType.ICEBERG_DATA_SEQUENCE_NUMBER) {
+        dataSeqNumSlot = dataSlotDesc;
+      } else if (dataSlotDesc.getColumn() instanceof IcebergColumn) {
+        IcebergColumn icebergCol = (IcebergColumn)dataSlotDesc.getColumn();
+        fieldIdToIcebergColumn.put(icebergCol.getFieldId(), dataSlotDesc);
+      }
+    }
+
+    List<BinaryPredicate> eqPredicates = new ArrayList<>();
+    List<Expr> seqNumPredicate = new ArrayList<>();
+    for (SlotDescriptor deleteSlotDesc : deleteTupleDesc.getSlots()) {
+      if (deleteSlotDesc.getVirtualColumnType() ==
+          TVirtualColumnType.ICEBERG_DATA_SEQUENCE_NUMBER) {
+        BinaryPredicate pred = new BinaryPredicate(Operator.LT,
+            new SlotRef(dataSeqNumSlot), new SlotRef(deleteSlotDesc));
+        pred.analyze(analyzer);
+        seqNumPredicate.add(pred);
+      } else {
+        Preconditions.checkState(deleteSlotDesc.getColumn() instanceof IcebergColumn);
+        int fieldId = ((IcebergColumn)deleteSlotDesc.getColumn()).getFieldId();
+        if (!fieldIdToIcebergColumn.containsKey(fieldId)) {
+          throw new ImpalaRuntimeException("Field ID not found in table: " + fieldId);
+        }
+        SlotRef dataSlotRef = new SlotRef(fieldIdToIcebergColumn.get(fieldId));
+        SlotRef deleteSlotRef = new SlotRef(deleteSlotDesc);
+        BinaryPredicate eqColPred = new BinaryPredicate(
+            Operator.NOT_DISTINCT, dataSlotRef, deleteSlotRef);
+        eqColPred.analyze(analyzer);
+        eqPredicates.add(eqColPred);
+      }
+    }
+    return new Pair<>(eqPredicates, seqNumPredicate);
+  }
+
   private ColumnStats virtualInputFileNameStats() {
     ColumnStats ret = new ColumnStats(Type.STRING);
     ret.setNumDistinctValues(dataFilesWithDeletes_.size());
@@ -352,8 +408,75 @@ public class IcebergScanPlanner {
 
   private ColumnStats virtualFilePositionStats() {
     ColumnStats ret = new ColumnStats(Type.BIGINT);
-    ret.setNumDistinctValues(deletesRecordCount_ / dataFilesWithDeletes_.size());
+    ret.setNumDistinctValues(positionDeletesRecordCount_ / dataFilesWithDeletes_.size());
     return ret;
+  }
+
+  private ColumnStats virtualDataSeqNumStats() {
+    ColumnStats ret = new ColumnStats(Type.BIGINT);
+    ret.setNumDistinctValues(equalityDeleteSequenceNumbers_.size());
+    return ret;
+  }
+
+  private PlanNode createEqualityJoinNode(PlanNode positionJoinNode)
+      throws ImpalaException {
+    Preconditions.checkState(!equalityDeleteFiles_.isEmpty());
+    Preconditions.checkState(equalityDeletesRecordCount_ > 0);
+
+    if (getIceTable().getPartitionSpecs().size() > 1) {
+      throw new ImpalaRuntimeException("Equality delete files are not supported for " +
+          "tables with partition evolution");
+    }
+
+    PlanNode leftSideOfJoin = null;
+    if (positionJoinNode != null) {
+      leftSideOfJoin = positionJoinNode;
+    } else {
+      PlanNodeId dataScanNodeId = ctx_.getNextNodeId();
+      IcebergScanNode dataScanNode = new IcebergScanNode(
+          dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
+          nonIdentityConjuncts_, getSkippedConjuncts());
+      addSlotsForEqualityDelete(equalityIds_, tblRef_);
+      dataScanNode.init(analyzer_);
+
+      leftSideOfJoin = dataScanNode;
+    }
+
+    JoinNode joinNode = null;
+    PlanNodeId deleteScanNodeId = ctx_.getNextNodeId();
+    IcebergEqualityDeleteTable deleteTable =
+        new IcebergEqualityDeleteTable(getIceTable(),
+            getIceTable().getName() + "-EQUALITY-DELETE-" + deleteScanNodeId.toString(),
+            equalityDeleteFiles_, equalityIds_, equalityDeletesRecordCount_);
+    analyzer_.addVirtualTable(deleteTable);
+
+    TableRef deleteTblRef = TableRef.newTableRef(analyzer_,
+        Arrays.asList(deleteTable.getDb().getName(), deleteTable.getName()),
+        tblRef_.getUniqueAlias() + "-equality-delete-" + deleteScanNodeId.toString());
+    addSlotsForEqualityDelete(equalityIds_, deleteTblRef);
+
+    // TODO IMPALA-12608: As an optimization we can populate the conjuncts below that are
+    // relevant for the delete scan node.
+    IcebergScanNode deleteScanNode = new IcebergScanNode(
+        deleteScanNodeId,
+        deleteTblRef,
+        Collections.emptyList(), /*conjuncts*/
+        aggInfo_,
+        Lists.newArrayList(equalityDeleteFiles_),
+        Collections.emptyList(), /*nonIdentityConjuncts*/
+        Collections.emptyList()); /*skippedConjuncts*/
+    deleteScanNode.init(analyzer_);
+
+    Pair<List<BinaryPredicate>, List<Expr>> equalityJoinConjuncts =
+        createEqualityJoinConjuncts(
+        analyzer_, tblRef_.getDesc(), deleteTblRef.getDesc());
+
+    joinNode = new HashJoinNode(leftSideOfJoin, deleteScanNode,
+        /*straight_join=*/true, DistributionMode.NONE, JoinOperator.LEFT_ANTI_JOIN,
+        equalityJoinConjuncts.first, equalityJoinConjuncts.second);
+    joinNode.setId(ctx_.getNextNodeId());
+    joinNode.init(analyzer_);
+    return joinNode;
   }
 
   private void filterFileDescriptors() throws ImpalaException {
@@ -375,16 +498,15 @@ public class IcebergScanPlanner {
         } else {
           dataFilesWithDeletes_.add(fileDesc.first);
           for (DeleteFile delFile : fileScanTask.deletes()) {
-            // TODO(IMPALA-11388): Add support for equality deletes.
-            if (delFile.content() == FileContent.EQUALITY_DELETES) {
-              throw new ImpalaRuntimeException(String.format(
-                  "Iceberg table %s has EQUALITY delete file which is currently " +
-                  "not supported by Impala, for example: %s", getIceTable().getFullName(),
-                  delFile.path()));
-            }
             Pair<FileDescriptor, Boolean> delFileDesc = getFileDescriptor(delFile);
             if (!delFileDesc.second) ++dataFilesCacheMisses;
-            deleteFiles_.add(delFileDesc.first);
+            if (delFile.content() == FileContent.EQUALITY_DELETES) {
+              equalityDeleteFiles_.add(delFileDesc.first);
+              addEqualityIds(delFile.equalityFieldIds());
+            } else {
+              Preconditions.checkState(delFile.content() == FileContent.POSITION_DELETES);
+              positionDeleteFiles_.add(delFileDesc.first);
+            }
           }
         }
       }
@@ -399,6 +521,19 @@ public class IcebergScanPlanner {
           e);
     }
     updateDeleteStatistics();
+  }
+
+
+  private void addEqualityIds(List<Integer> equalityFieldIds)
+      throws ImpalaRuntimeException {
+    if (equalityIds_.isEmpty()) {
+      equalityIds_.addAll(equalityFieldIds);
+    } else if (equalityIds_.size() != equalityFieldIds.size() ||
+        !equalityIds_.containsAll(equalityFieldIds)) {
+      throw new ImpalaRuntimeException(String.format("Equality delete files with " +
+          "different equality field ID lists aren't supported. %s vs %s", equalityIds_,
+          equalityFieldIds));
+    }
   }
 
   private void filterConjuncts() {
@@ -442,8 +577,11 @@ public class IcebergScanPlanner {
     for (FileDescriptor fd : dataFilesWithDeletes_) {
       updateDataFilesWithDeletesStatistics(fd);
     }
-    for (FileDescriptor fd : deleteFiles_) {
-      updateDeleteFilesStatistics(fd);
+    for (FileDescriptor fd : positionDeleteFiles_) {
+      updatePositionDeleteFilesStatistics(fd);
+    }
+    for (FileDescriptor fd : equalityDeleteFiles_) {
+      updateEqualityDeleteFilesStatistics(fd);
     }
   }
 
@@ -456,8 +594,14 @@ public class IcebergScanPlanner {
     }
   }
 
-  private void updateDeleteFilesStatistics(FileDescriptor fd) {
-    deletesRecordCount_ += getRecordCount(fd);
+  private void updatePositionDeleteFilesStatistics(FileDescriptor fd) {
+    positionDeletesRecordCount_ += getRecordCount(fd);
+  }
+
+  private void updateEqualityDeleteFilesStatistics(FileDescriptor fd) {
+    equalityDeletesRecordCount_ += getRecordCount(fd);
+    equalityDeleteSequenceNumbers_.add(
+        fd.getFbFileMetadata().icebergMetadata().dataSequenceNumber());
   }
 
   private long getRecordCount(FileDescriptor fd) {
