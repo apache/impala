@@ -261,7 +261,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
   //  3. Don't start up if the number of ranges left is less than the number of
   //     active scanner threads.
   //  4. Don't start up if no initial ranges have been issued (see IMPALA-1722).
-  //  5. Don't start up a ScannerThread if the row batch queue is not full since
+  //  5. Don't start up a ScannerThread if the row batch queue is full since
   //     we are not scanner bound.
   //  6. Don't start up a thread if there is not enough memory available for the
   //     estimated memory consumption (include reservation and non-reserved memory).
@@ -416,6 +416,8 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       break;
     }
     if (scan_range != nullptr) {
+      discard_result(DebugAction(
+          runtime_state_->query_options(), "HDFS_SCANNER_THREAD_OBTAINED_RANGE"));
       // Got a scan range. Process the range end to end (in this thread).
       ProcessSplit(filter_status.ok() ? filter_ctxs : vector<FilterContext>(),
           &expr_results_pool, scan_range, &scanner_thread_reservation);

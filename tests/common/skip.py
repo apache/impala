@@ -179,6 +179,8 @@ class SkipIfDockerizedCluster:
       reason="IMPALA-8384: insert ACL tests are broken on dockerised minicluster.")
   insufficient_mem_limit = pytest.mark.skipif(
       IS_DOCKERIZED_TEST_CLUSTER, reason="Test require high per-process mem_limit.")
+  runs_slowly = pytest.mark.skipif(
+      IS_DOCKERIZED_TEST_CLUSTER, reason="Dockerized env too slow for test.")
   jira = partial(pytest.mark.skipif, IS_DOCKERIZED_TEST_CLUSTER)
 
 

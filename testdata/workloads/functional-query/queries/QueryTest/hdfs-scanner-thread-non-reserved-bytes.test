@@ -4,6 +4,7 @@
 # up to 3 threads (compressed_text_est_bytes ~ 211MB).
 set num_nodes=1;
 set mem_limit=750m;
+set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@100";
 select count(*) from tpch_text_gzip.lineitem where l_comment = 'telets. quickly ';
 ---- RESULTS:
 4
@@ -15,6 +16,7 @@ aggregation(SUM, NumScannerThreadsStarted): 3
 # will reduce NumScannerThreadsStarted.
 set num_nodes=1;
 set mem_limit=750m;
+set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@100";
 set hdfs_scanner_non_reserved_bytes=320m;
 select count(*) from tpch_text_gzip.lineitem where l_comment = 'telets. quickly ';
 ---- RESULTS:
@@ -27,6 +29,7 @@ aggregation(SUM, NumScannerThreadsStarted): 2
 # thread.
 set num_nodes=1;
 set mem_limit=750m;
+set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@100";
 set hdfs_scanner_non_reserved_bytes=2g;
 select count(*) from tpch_text_gzip.lineitem where l_comment = 'telets. quickly ';
 ---- RESULTS:
