@@ -575,8 +575,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_sanity_checks_dedicated_coordinator(self, vector, unique_database):
     """Sanity tests for verifying targeted dedicated coordinator memory estimations and
     behavior."""
-    self.client.set_configuration_option('request_pool', "root.regularPool")
     ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    self.client.set_configuration_option('request_pool', "root.regularPool")
     exec_options = vector.get_value('exec_option')
     # Make sure query option MAX_MEM_ESTIMATE_FOR_ADMISSION is enforced on the dedicated
     # coord estimates. Without this query option the estimate would be > 100MB.
@@ -621,8 +621,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     the actual vs expected values for mem admitted and mem limit for both coord and
     executor. Also verifies that those memory values are different if
     'using_dedicated_coord_estimates' is true."""
-    self.client.set_configuration_option('request_pool', "root.regularPool")
     ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    self.client.set_configuration_option('request_pool', "root.regularPool")
     # Use a test query that has unpartitioned non-coordinator fragments to make
     # sure those are handled correctly (IMPALA-10036).
     for query in [QUERY, QUERY_WITH_UNPARTITIONED_FRAGMENTS]:
@@ -706,8 +706,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_mem_limit_executors(self, vector, unique_database):
     """Verify that the query option mem_limit_executors is only enforced on the
     executors."""
-    expected_exec_mem_limit = "999999999"
     ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    expected_exec_mem_limit = "999999999"
     self.client.set_configuration({"MEM_LIMIT_EXECUTORS": expected_exec_mem_limit})
     handle = self.client.execute_async(QUERY.format(1))
     self.client.wait_for_finished_timeout(handle, 1000)
@@ -725,9 +725,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_mem_limit_coordinators(self, vector, unique_database):
     """Verify that the query option mem_limit_coordinators is only enforced on the
     coordinators."""
+    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     expected_exec_mem_limit = "999999999"
     expected_coord_mem_limit = "111111111"
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     self.client.set_configuration({"MEM_LIMIT_EXECUTORS": expected_exec_mem_limit,
         "MEM_LIMIT_COORDINATORS": expected_coord_mem_limit})
     handle = self.client.execute_async(QUERY.format(1))
@@ -746,10 +746,10 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_mem_limits(self, vector, unique_database):
     """Verify that the query option mem_limit_coordinators and mem_limit_executors are
     ignored when mem_limit is set."""
+    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     exec_mem_limit = "999999999"
     coord_mem_limit = "111111111"
     mem_limit = "888888888"
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     self.client.set_configuration({"MEM_LIMIT_EXECUTORS": exec_mem_limit,
         "MEM_LIMIT_COORDINATORS": coord_mem_limit, "MEM_LIMIT": mem_limit})
     handle = self.client.execute_async(QUERY.format(1))

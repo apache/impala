@@ -31,8 +31,8 @@ def cancel_query_and_validate_state(client, query, exec_option, table_format,
   calls to ImpalaConnection#fetch and #close are consistent. If 'join_before_close' is
   True the method will join against the fetch results thread before closing the query.
   """
-  if exec_option: client.set_configuration(exec_option)
   if table_format: ImpalaTestSuite.change_database(client, table_format)
+  if exec_option: client.set_configuration(exec_option)
   handle = client.execute_async(query)
 
   thread = threading.Thread(target=__fetch_results, args=(query, handle))
