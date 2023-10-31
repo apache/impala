@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -783,6 +784,34 @@ public class FileSystemUtil {
   public static void copyToLocal(Path source, Path dest) throws IOException {
     FileSystem fs = source.getFileSystem(CONF);
     fs.copyToLocalFile(source, dest);
+  }
+
+  /**
+   * Copies the source file with the given URI to tmp directory on the local filesystem.
+   * Returns local file path.
+   * Throws IOException on failure.
+   */
+  public static String copyFileFromUriToLocal(String srcUri)
+      throws IOException {
+    Preconditions.checkNotNull(srcUri);
+    String localLibPath = BackendConfig.INSTANCE.getBackendCfg().local_library_path;
+    String fileExt = FilenameUtils.getExtension(srcUri);
+    String localPath;
+    if (localLibPath != null && !localLibPath.isEmpty()) {
+      localPath = localLibPath + "/" + UUID.randomUUID().toString() + "." + fileExt;
+    } else {
+      localPath = "/tmp/" + UUID.randomUUID().toString() + "." + fileExt;
+    }
+    try {
+      Path remoteFilePath = new Path(srcUri);
+      Path localFilePath = new Path("file://" + localPath);
+      FileSystemUtil.copyToLocal(remoteFilePath, localFilePath);
+    } catch (IOException e) {
+      String errorMsg = "Failed to copy " + srcUri + " to local path: " + localPath;
+      LOG.error(errorMsg, e);
+      throw new IOException(String.format("%s, %s", errorMsg, e.getMessage()));
+    }
+    return localPath;
   }
 
   /**

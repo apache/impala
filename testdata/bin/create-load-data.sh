@@ -614,11 +614,6 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   # Caching tables in s3 returns an IllegalArgumentException, see IMPALA-1714
   run-step "Caching test tables" cache-test-tables.log cache-test-tables
 
-  # TODO: Modify the .sql file that creates the table to take an alternative location into
-  # account.
-  run-step "Loading external data sources" load-ext-data-source.log \
-      copy-and-load-ext-data-source
-
   run-step "Creating internal HBase table" create-internal-hbase-table.log \
       create-internal-hbase-table
 
@@ -626,6 +621,14 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 
   # Saving the list of created files can help in debugging missing files.
   run-step "Logging created files" created-files.log hdfs dfs -ls -R /test-warehouse
+fi
+
+if [[ "${TARGET_FILESYSTEM}" = "hdfs" || "${TARGET_FILESYSTEM}" = "ozone" || \
+      "${TARGET_FILESYSTEM}" = "s3" ]]; then
+  # TODO: Modify the .sql file that creates the table to take an alternative location into
+  # account.
+  run-step "Loading external data sources" load-ext-data-source.log \
+      copy-and-load-ext-data-source
 fi
 
 # TODO: Investigate why all stats are not preserved. Theoretically, we only need to

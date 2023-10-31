@@ -17,8 +17,8 @@
 
 package org.apache.impala.extdatasource.jdbc.dao;
 
-
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.sql.Connection;
@@ -36,6 +36,8 @@ import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfig;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfigManager;
 import org.apache.impala.extdatasource.jdbc.exception.JdbcDatabaseAccessException;
@@ -231,15 +233,15 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
                     BasicDataSourceFactory.createDataSource(props);
                 // Put jdbc driver to cache
                 String driverUrl = props.getProperty("driverUrl");
-                TCacheJarResult cacheResult = FeSupport.CacheJar(driverUrl);
-                TStatus cacheJarStatus = cacheResult.getStatus();
-                if (cacheJarStatus.getStatus_code() != TErrorCode.OK) {
+                String driverLocalPath;
+                try {
+                  driverLocalPath =
+                    FileSystemUtil.copyFileFromUriToLocal(driverUrl);
+                } catch (IOException e) {
                   throw new JdbcDatabaseAccessException(String.format(
-                      "Unable to cache jdbc driver jar at location '%s'. " +
-                      "Check that the file exists and is readable. Message: %s",
-                      driverUrl, cacheJarStatus.getError_msgs()));
+                      "Unable to fetch jdbc driver jar from location '%s'. ",
+                      driverUrl));
                 }
-                String driverLocalPath = cacheResult.getLocal_path();
                 // Create class loader for jdbc driver and set it for the
                 // BasicDataSource object so that the driver class could be loaded
                 // from jar file without searching classpath.
@@ -248,6 +250,9 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
                     URLClassLoader.newInstance( new URL[] { driverJarUrl },
                         getClass().getClassLoader());
                 basicDataSource.setDriverClassLoader(driverLoader);
+                // Delete the jar file once its loaded
+                Path localJarPath = new Path(driverLocalPath);
+                FileSystemUtil.deleteIfExists(localJarPath);
                 return basicDataSource;
               });
         }

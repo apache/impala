@@ -19,7 +19,6 @@ from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIf
 
 
 class TestExtDataSources(CustomClusterTestSuite):
@@ -37,7 +36,6 @@ class TestExtDataSources(CustomClusterTestSuite):
     """Start Impala cluster in LocalCatalog Mode"""
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
 
-  @SkipIf.not_hdfs
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
