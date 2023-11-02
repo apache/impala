@@ -381,17 +381,18 @@ void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id,
     // is not received.
     statestore_->Heartbeat(registration_id);
     // Report connection state with active statestore instance for the request from
-    // standby statestore.
-    if (request_active_conn_state && !statestore_->IsStatestoreActive()
-        && statestore2_ != nullptr) {
+    // standby statestore. It's possible that the notification of active statestored
+    // change has not been received.
+    if (request_active_conn_state && statestore2_ != nullptr) {
       *active_statestore_conn_state = statestore2_->GetStatestoreConnState();
     }
   } else if (statestore2_ != nullptr
       && statestore2_->IsMatchingStatestoreId(statestore_id)) {
     statestore2_->Heartbeat(registration_id);
     // Report connection state with active statestore instance for the request from
-    // standby statestore.
-    if (request_active_conn_state && !statestore2_->IsStatestoreActive()) {
+    // standby statestore. It's possible that the notification of active statestored
+    // change has not been received.
+    if (request_active_conn_state) {
       *active_statestore_conn_state = statestore_->GetStatestoreConnState();
     }
   } else {
@@ -426,9 +427,11 @@ void StatestoreSubscriber::UpdateStatestoredRole(bool is_active,
     bool* update_skipped) {
   DCHECK(enable_statestored_ha_);
   // Accept UpdateStatestoredRole RPC from standby statestored
+  StatestoreStub* active_statestore = GetActiveStatestore();
   StatestoreStub* standby_statestore = GetStandbyStatestore();
   if (standby_statestore != nullptr
-      && standby_statestore_->IsMatchingStatestoreId(statestore_id)) {
+      && standby_statestore->IsMatchingStatestoreId(statestore_id)) {
+    LOG(INFO) << "Receive UpdateStatestoredRole message from standby statestored";
     // Receive notification of statestore service fail over, switch active and standby
     // statestoreds.
     standby_statestore->IncCountForUpdateStatestoredRoleRPC();
@@ -440,14 +443,51 @@ void StatestoreSubscriber::UpdateStatestoredRole(bool is_active,
       standby_statestore_ = tmp;
       active_statestore_->SetStatestoreActive(is_active, active_statestored_version);
       standby_statestore_->SetStatestoreActive(!is_active, active_statestored_version);
+      LOG(INFO) << "Updated active statestored as " << active_statestore_->GetAddress();
     }
+
     if (update_active_catalogd) {
-      StatestoreStub* active_statestore = GetActiveStatestore();
+      active_statestore = GetActiveStatestore();
+      active_statestore->UpdateCatalogd(*catalogd_registration, registration_id,
+          active_catalogd_version, /* statestore_failover */true, update_skipped);
+      DCHECK(!(*update_skipped));
+    }
+  } else if (active_statestore == nullptr) {
+    {
+      lock_guard<mutex> r(statestore_ha_lock_);
+      if (active_statestore_ == nullptr) {
+        LOG(INFO) << "Subscriber was started before both statestore instances were "
+                     "ready to accept registration requests.";
+        DCHECK(standby_statestore_ == nullptr);
+        // Active/standby statestored are not set. This could happen if statestoreds were
+        // started after subscribers' registration attemption.
+        if (statestore_->IsMatchingStatestoreId(statestore_id)) {
+          active_statestore_ = statestore_;
+          standby_statestore_ = statestore2_;
+        } else {
+          DCHECK(statestore2_->IsMatchingStatestoreId(statestore_id));
+          active_statestore_ = statestore2_;
+          standby_statestore_ = statestore_;
+        }
+        active_statestore_->SetStatestoreActive(is_active, active_statestored_version);
+        standby_statestore_->SetStatestoreActive(!is_active, active_statestored_version);
+        LOG(INFO) << "Updated active statestored as " << active_statestore_->GetAddress();
+      } else {
+        LOG(INFO) << "Active statestored " << active_statestore_->GetAddress()
+                  << " has been updated.";
+      }
+    }
+
+    if (update_active_catalogd) {
+      active_statestore = GetActiveStatestore();
       DCHECK(active_statestore != nullptr);
       active_statestore->UpdateCatalogd(*catalogd_registration, registration_id,
           active_catalogd_version, /* statestore_failover */true, update_skipped);
       DCHECK(!(*update_skipped));
     }
+  } else if (active_statestore->IsMatchingStatestoreId(statestore_id)) {
+    LOG(INFO) << "statestored " << active_statestore->GetAddress()
+              << " is in active state.";
   } else {
     // It's possible the statestored update RPC is received before the registration
     // response is received. Skip this update so that the statestore will retry this
@@ -465,7 +505,6 @@ StatestoreSubscriber::StatestoreStub* StatestoreSubscriber::GetActiveStatestore(
 
 StatestoreSubscriber::StatestoreStub* StatestoreSubscriber::GetStandbyStatestore() {
   lock_guard<mutex> r(statestore_ha_lock_);
-  DCHECK(standby_statestore_ != nullptr);
   return standby_statestore_;
 }
 
@@ -662,6 +701,9 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
     } else {
       VLOG(1) << "No statestore ID received from statestore";
     }
+  }
+  {
+    lock_guard<mutex> l(active_lock_);
     if (status.ok() && response.__isset.statestore_is_active) {
       is_active_ = response.statestore_is_active;
       if (is_active_) {
@@ -671,16 +713,16 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
       active_statestored_version_ = response.active_statestored_version;
       active_status_metric_->SetValue(is_active_);
     }
-    if (status.ok() && response.__isset.catalogd_registration) {
-      VLOG(1) << "Active catalogd address: "
-              << TNetworkAddressToString(response.catalogd_registration.address);
-      if (has_active_catalogd != nullptr) *has_active_catalogd = true;
-      if (active_catalogd_version != nullptr && response.__isset.catalogd_version) {
-        *active_catalogd_version = response.catalogd_version;
-      }
-      if (active_catalogd_registration != nullptr) {
-        *active_catalogd_registration = response.catalogd_registration;
-      }
+  }
+  if (status.ok() && response.__isset.catalogd_registration) {
+    VLOG(1) << "Active catalogd address: "
+            << TNetworkAddressToString(response.catalogd_registration.address);
+    if (has_active_catalogd != nullptr) *has_active_catalogd = true;
+    if (active_catalogd_version != nullptr && response.__isset.catalogd_version) {
+      *active_catalogd_version = response.catalogd_version;
+    }
+    if (active_catalogd_registration != nullptr) {
+      *active_catalogd_registration = response.catalogd_registration;
     }
   }
   heartbeat_interval_timer_.Start();
@@ -1056,27 +1098,22 @@ bool StatestoreSubscriber::StatestoreStub::IsRegistered() {
 
 void StatestoreSubscriber::StatestoreStub::SetStatestoreActive(
     bool is_active, int64_t active_statestored_version) {
-  lock_guard<shared_mutex> exclusive_lock(lock_);
+  lock_guard<mutex> l(active_lock_);
   is_active_ = is_active;
   DCHECK(active_statestored_version_ <= active_statestored_version);
   active_statestored_version_ = active_statestored_version;
   active_status_metric_->SetValue(is_active);
 }
 
-bool StatestoreSubscriber::StatestoreStub::IsStatestoreActive() {
-  lock_guard<shared_mutex> exclusive_lock(lock_);
-  return is_active_;
-}
-
 int64_t StatestoreSubscriber::StatestoreStub::GetActiveVersion(bool* is_active) {
-  lock_guard<shared_mutex> exclusive_lock(lock_);
+  lock_guard<mutex> l(active_lock_);
   *is_active = is_active_;
   return active_statestored_version_;
 }
 
 void StatestoreSubscriber::StatestoreStub::GetRegistrationIdAndStatestoreId(
     RegistrationId* registration_id, TUniqueId* statestore_id) {
-  lock_guard<shared_mutex> exclusive_lock(lock_);
+  lock_guard<mutex> r(id_lock_);
   *registration_id = registration_id_;
   *statestore_id = statestore_id_;
 }
@@ -1100,6 +1137,10 @@ StatestoreSubscriber::StatestoreStub::GetStatestoreConnState() {
     default:
       return TStatestoreConnState::OK;
   }
+}
+
+std::string StatestoreSubscriber::StatestoreStub::GetAddress() const {
+  return TNetworkAddressToString(statestore_address_);
 }
 
 }

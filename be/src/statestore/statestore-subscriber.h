@@ -350,8 +350,7 @@ class StatestoreSubscriber {
     /// Returns true if the registration with statestore is completed.
     bool IsRegistered();
 
-    /// Get/set the active state of the registered statestore instance.
-    bool IsStatestoreActive();
+    /// Set the active state of the registered statestore instance.
     void SetStatestoreActive(bool is_active, int64_t active_statestored_version);
 
     /// Return the version of active statestore.
@@ -367,12 +366,24 @@ class StatestoreSubscriber {
     /// Get connection state with the registered statestore instance.
     TStatestoreConnState::type GetStatestoreConnState();
 
+    std::string GetAddress() const;
+
    private:
     /// Pointer to parent StatestoreSubscriber object
     StatestoreSubscriber* subscriber_;
 
     /// Address of the statestore
     TNetworkAddress statestore_address_;
+
+    /// True if the registered statestore instance is active.
+    bool is_active_ = false;
+
+    /// The version of active statestored.
+    int64_t active_statestored_version_ = 0;
+
+    /// Protects is_active_ and active_statestored_version_. Must be taken after lock_
+    /// if both are to be taken together.
+    std::mutex active_lock_;
 
     /// Object-wide lock that protects the below members. Must be held exclusively when
     /// modifying the members, except when modifying TopicRegistrations - see
@@ -381,12 +392,6 @@ class StatestoreSubscriber {
     /// private methods must be called holding this lock; this is noted in the method
     /// comments.
     boost::shared_mutex lock_;
-
-    /// True if the registered statestore instance is active.
-    bool is_active_ = false;
-
-    /// The version of active statestored.
-    int64_t active_statestored_version_ = 0;
 
     /// Failure detector that tracks heartbeat messages from the statestore.
     boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;

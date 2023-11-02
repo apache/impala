@@ -1620,6 +1620,10 @@ void Statestore::SendUpdateStatestoredRoleNotification(
   TCatalogRegistration catalogd_registration =
       catalog_manager_.GetActiveCatalogRegistration(
           &has_active_catalogd, &active_catalogd_version);
+  if (has_active_catalogd) {
+    active_catalogd_address_metric_->SetValue(
+        TNetworkAddressToString(catalogd_registration.address));
+  }
 
   bool resend_rpc = false;
   if (active_statestored_version > *last_active_statestored_version) {
@@ -2032,7 +2036,11 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
                        << " subscribers lost connections with active statestored.";
         }
         continue;
-      } else if (majority_failed) {
+      }
+
+      found_peer_ = false;
+      connected_peer_metric_->SetValue(found_peer_);
+      if (majority_failed) {
         // When standby statestored lost connection with active statestored, take over
         // active role if the majority of subscribers lost connections with active
         // statestored.
@@ -2042,8 +2050,6 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
         is_active_ = true;
         active_status_metric_->SetValue(is_active_);
         active_version_ = UnixMicros();
-        found_peer_ = false;
-        connected_peer_metric_->SetValue(found_peer_);
         // Send notification to all subscribers.
         update_statestored_cv_.NotifyAll();
       } else if (total_subscribers == 0) {
