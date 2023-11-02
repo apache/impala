@@ -513,7 +513,6 @@ class TestObservability(ImpalaTestSuite):
         "Created table using Iceberg Catalog HIVE_CATALOG",
         "Fetched event batch from Metastore",
         "Created table in catalog cache",
-        "Set Iceberg table owner in Metastore",
         "DDL finished",
     ])
 

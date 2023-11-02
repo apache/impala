@@ -45,6 +45,7 @@ import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
@@ -52,6 +53,7 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
+import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergColumnStats;
 import org.apache.impala.fb.FbIcebergDataFile;
@@ -83,11 +85,15 @@ public class IcebergCatalogOpExecutor {
    */
   public static Table createTable(TIcebergCatalog catalog, TableIdentifier identifier,
       String location, List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
-      Map<String, String> tableProperties) throws ImpalaRuntimeException {
+      String owner, Map<String, String> tableProperties) throws ImpalaRuntimeException {
     // Each table id increase from zero
     Schema schema = createIcebergSchema(columns);
     PartitionSpec spec = IcebergUtil.createIcebergPartition(schema, partitionSpec);
     IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
+    if (icebergCatalog instanceof IcebergHiveCatalog) {
+      // Put table owner to table properties for HiveCatalog.
+      tableProperties.put(HiveCatalog.HMS_TABLE_OWNER, owner);
+    }
     Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location,
         tableProperties);
     LOG.info("Create iceberg table successful.");

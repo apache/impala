@@ -219,7 +219,6 @@ import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TKuduPartitionParam;
-import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
@@ -388,8 +387,6 @@ public class CatalogOpExecutor {
   private static final String LOADED_ICEBERG_TABLE = "Loaded iceberg table";
   private static final String SENT_CATALOG_FOR_SYNC_DDL =
       "Sent catalog update for sync_ddl";
-  private static final String SET_ICEBERG_TABLE_OWNER =
-      "Set Iceberg table owner in Metastore";
 
   private final CatalogServiceCatalog catalog_;
   private final AuthorizationConfig authzConfig_;
@@ -3873,7 +3870,7 @@ public class CatalogOpExecutor {
             }
             String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
                 IcebergUtil.getIcebergTableIdentifier(newTable), location, columns,
-                partitionSpec, tableProperties).location();
+                partitionSpec, newTable.getOwner(), tableProperties).location();
             newTable.getSd().setLocation(tableLoc);
             catalogTimeline.markEvent(CREATED_ICEBERG_TABLE + catalog.name());
           } else {
@@ -3942,24 +3939,6 @@ public class CatalogOpExecutor {
       LOG.debug("Created an iceberg table {} in catalog with create event Id {} ",
           newTbl.getFullName(), createEventId);
       addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
-
-      try {
-        // Currently we create Iceberg tables using the Iceberg API, however, table owner
-        // is hardcoded to be the user running the Iceberg process. In our case it's the
-        // user running Catalogd and not the user running the create table DDL. Hence, an
-        // extra "ALTER TABLE SET OWNER" step is required.
-        setIcebergTableOwnerAfterCreateTable(newTable.getDbName(),
-            newTable.getTableName(), newTable.getOwner());
-        catalogTimeline.markEvent(SET_ICEBERG_TABLE_OWNER);
-        LOG.debug("Table owner has been changed to " + newTable.getOwner());
-      } catch (Exception e) {
-        LOG.warn("Failed to set table owner after creating " +
-            "Iceberg table but the table {} has been created successfully. Reason: {}",
-            newTable.toString(), e);
-        addSummary(response, "Table has been created. However, unable to change table " +
-            "owner to " + newTable.getOwner());
-        return true;
-      }
     } catch (Exception e) {
       if (e instanceof AlreadyExistsException && ifNotExists) {
         addSummary(response, "Table already exists.");
@@ -3975,18 +3954,6 @@ public class CatalogOpExecutor {
     return true;
   }
 
-  private void setIcebergTableOwnerAfterCreateTable(String dbName, String tableName,
-      String newOwner) throws ImpalaException {
-    TAlterTableOrViewSetOwnerParams setOwnerParams = new TAlterTableOrViewSetOwnerParams(
-        TOwnerType.USER, newOwner);
-    TAlterTableParams alterTableParams = new TAlterTableParams(
-        TAlterTableType.SET_OWNER, new TTableName(dbName, tableName));
-    alterTableParams.setSet_owner_params(setOwnerParams);
-    TDdlExecResponse dummyResponse = new TDdlExecResponse();
-    dummyResponse.result = new TCatalogUpdateResult();
-
-    alterTable(alterTableParams, null, true, dummyResponse);
-  }
   /**
    * Creates a new table in the metastore based on the definition of an existing table.
    * No data is copied as part of this process, it is a metadata only operation. If the
