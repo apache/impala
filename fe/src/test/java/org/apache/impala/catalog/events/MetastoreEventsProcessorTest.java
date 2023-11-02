@@ -101,6 +101,7 @@ import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.Reference;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
@@ -1682,56 +1683,87 @@ public class MetastoreEventsProcessorTest {
   }
 
   /**
-   * Test exercises the error condition in event processing when a table creation is
-   * skipped because event processing is disabled for that table. But then user alters
-   * the flag to re-enable the event processing. Since the table doesn't exist in the
-   * catalog in the first place, event processing should stop and go into error state
+   * Test exercises the event processing condition when table level HMS sync is changed
+   * from HMS. Consider the scenario where table creation is skipped because event
+   * processing is disabled for that table. But then user alters the flag to re-enable
+   * the event processing. Since the table doesn't exist in the catalog in the first
+   * place, event processing should not stop and go into error state, instead an
+   * incomplete table object should be added in cache, so that any direct access to
+   * that object fetches latest snapshot from HMS. Also this test verifies that older
+   * event of disabling HMS sync flag will be ignored if there is a drop & re-create of
+   * table in Impala. This test also marks the table object as stale if disableSync is
+   * enabled at table level and given that table object is loaded in the cache.
    */
   @Test
-  public void testEventSyncFlagTurnedOnErrorCase()
-      throws TException, CatalogException {
+  public void testEventSyncFlagChanged()
+      throws ImpalaException, TException, CatalogException {
     // when the event sync flag is changed from true to false (or null), it is possible
-    // that the table is not existing in catalog anymore. Event processing should error
-    // out in such a case
+    // that the table is not existing in catalog anymore. Event processing should not
+    // error out in such a case
     Pair<String, String> trueToFalse = new Pair<>("true", "false");
     Pair<String, String> trueToUnset = new Pair<>("true", null);
     List<Pair<String, String>> tblFlagTransitions = Arrays.asList(trueToFalse,
         trueToUnset);
     List<String> dbFlagVals = Arrays.asList(null, "false");
-    final String testTblName = "testEventSyncFlagTurnedOnErrorCase";
-    for (String dbFlag : dbFlagVals) {
-      for (Pair<String, String> tblTransition : tblFlagTransitions) {
-        Map<String, String> dbParams = new HashMap<>(1);
-        if (dbFlag != null) {
-          dbParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), dbFlag);
+    List<Boolean> createDropFromImpala = Arrays.asList(true, false);
+    final String testTblName = "testEventSyncFlagChanged";
+    boolean prevFlagVal = BackendConfig.INSTANCE.enableSkippingOlderEvents();
+    try {
+      BackendConfig.INSTANCE.setSkippingOlderEvents(true);
+      for (String dbFlag : dbFlagVals) {
+        for (Pair<String, String> tblTransition : tblFlagTransitions) {
+          Map<String, String> dbParams = new HashMap<>(1);
+          if (dbFlag != null) {
+            dbParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+                dbFlag);
+          }
+          Map<String, String> tblParams = new HashMap<>(1);
+          if (tblTransition.first != null) {
+            tblParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+                tblTransition.first);
+          }
+          createDatabase(TEST_DB_NAME, dbParams);
+          createTable(null, TEST_DB_NAME, testTblName, tblParams, false, null);
+          eventsProcessor_.processEvents();
+          // table creation is skipped since the flag says so
+          assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
+          // now turn on the flag
+          for (boolean doCreateDrop : createDropFromImpala) {
+            alterTableAddParameter(testTblName,
+                MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+                tblTransition.second);
+            if (doCreateDrop) {
+              catalog_.invalidateTable(new TTableName(TEST_DB_NAME, testTblName),
+                  new Reference<>(), new Reference<>());
+              dropTableFromImpala(TEST_DB_NAME, testTblName);
+              createTableFromImpala(TEST_DB_NAME, testTblName, null, false);
+              loadTable(TEST_DB_NAME, testTblName);
+            }
+            eventsProcessor_.processEvents();
+            assertEquals(EventProcessorStatus.ACTIVE,
+                eventsProcessor_.getStatus());
+            Table tbl = catalog_.getTable(TEST_DB_NAME, testTblName);
+            if (!doCreateDrop) {
+              assertTrue(tbl instanceof IncompleteTable);
+            } else {
+              // when the event sync is disabled on the table, make sure that any
+              // subsequent operations on the table don't mark the table as stale
+              // if the table object is loaded in the cache
+              assertTrue(tbl instanceof HdfsTable);
+              alterTableAddParameter(testTblName,
+                  MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
+                  tblTransition.first);
+              alterTableAddParameter(testTblName, "somekey", "someval");
+              eventsProcessor_.processEvents();
+              tbl = catalog_.getTable(TEST_DB_NAME, testTblName);
+              assertTrue(tbl instanceof HdfsTable);
+            }
+          }
+          dropDatabaseCascade(TEST_DB_NAME);
         }
-        Map<String, String> tblParams = new HashMap<>(1);
-        if (tblTransition.first != null) {
-          tblParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
-              tblTransition.first);
-        }
-        createDatabase(TEST_DB_NAME, dbParams);
-        createTable(null, TEST_DB_NAME, testTblName, tblParams, false, null);
-        eventsProcessor_.processEvents();
-        // table creation is skipped since the flag says so
-        assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
-        // now turn on the flag
-        alterTableAddParameter(testTblName,
-            MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
-            tblTransition.second);
-        eventsProcessor_.processEvents();
-        // if sync to latest event id is enabled, then the event is skipped
-        // since table does not exist in cache
-        if (!BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls()) {
-          assertEquals(EventProcessorStatus.NEEDS_INVALIDATE,
-              eventsProcessor_.getStatus());
-        }
-        // issue a catalog reset to make sure that table comes back again and event
-        // processing is active
-        catalog_.reset();
-        assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
-        dropDatabaseCascade(TEST_DB_NAME);
       }
+    } finally {
+      BackendConfig.INSTANCE.setSkippingOlderEvents(prevFlagVal);
     }
   }
 

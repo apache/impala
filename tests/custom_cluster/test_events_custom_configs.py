@@ -571,6 +571,43 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     EventProcessorUtils.wait_for_event_processing(self)
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=5")
+  def test_disable_hms_sync(self, unique_database):
+    """This test verifies that impala event processor is in active state after
+    processing an alter table event that re-enables hms sync"""
+    # test 1: re-enable disableHmsSync config at table level
+    test_table = "disable_hms_sync_table"
+    self.client.execute(
+      """create table {}.{} (i int) TBLPROPERTIES ('impala.disableHmsSync'='true')"""
+      .format(unique_database, test_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    prev_events_skipped = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    self.run_stmt_in_hive(
+      """"ALTER TABLE {}.{} SET TBLPROPERTIES('somekey'='somevalue')"""
+      .format(unique_database, test_table))
+    self.client.execute(
+      """ALTER TABLE {}.{} SET TBLPROPERTIES ('impala.disableHmsSync'='false')"""
+      .format(unique_database, test_table))
+    EventProcessorUtils.wait_for_event_processing(self)
+    current_events_skipped = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    assert current_events_skipped >= prev_events_skipped + 1
+
+    # test 2: re-enabling disableHmsSync config on a table shouldn't put event processor
+    # in error state if the database is not loaded.
+    try:
+      test_db = "unloaded_db_sync"
+      self.run_stmt_in_hive("""create database {}""".format(test_db))
+      self.run_stmt_in_hive("""create table {}.{} (id int)
+        TBLPROPERTIES ('impala.disableHmsSync'='true')""".format(test_db, test_table))
+      self.run_stmt_in_hive(
+        """ALTER TABLE {}.{} SET TBLPROPERTIES ('impala.disableHmsSync'='false')"""
+        .format(test_db, test_table))
+      EventProcessorUtils.wait_for_event_processing(self)
+      assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    finally:
+      self.run_stmt_in_hive("""drop database {} cascade""".format(test_db))
+
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=10")
   def test_event_processor_dropped_partition(self, unique_database):
     """This test verifies that impala event processor is in active state after

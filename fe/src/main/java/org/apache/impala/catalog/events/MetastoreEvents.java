@@ -1053,6 +1053,16 @@ public class MetastoreEvents {
         if (tbl == null || tbl instanceof IncompleteTable) {
           return false;
         }
+        if (getEventId() > 0 && getEventId() <= tbl.getCreateEventId()) {
+          // Older event, so this event will be skipped.
+          metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
+          infoLog("Table: {} createEventId: {} is >= to the current " +
+              "eventId: {}. Incremented skipped metric to {}", tbl.getFullName(),
+              tbl.getCreateEventId(), getEventId(),
+              metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                  .getCount());
+          return true;
+        }
         // Always check the lastRefreshEventId on the table first for table level refresh
         if (tbl.getLastRefreshEventId() > getEventId() || (partitionEventObj != null &&
             catalog_.isPartitionLoadedAfterEvent(dbName_, tblName_,
@@ -1522,26 +1532,15 @@ public class MetastoreEvents {
         return;
       }
       skipFileMetadataReload_ = canSkipFileMetadataReload(tableBefore_, tableAfter_);
-      // in case of table level alters from external systems it is better to do a full
-      // refresh  eg. this could be due to as simple as adding a new parameter or a
-      // full blown adding or changing column type
-      // rename is already handled above
       long startNs = System.nanoTime();
-      if (!reloadTableFromCatalog("ALTER_TABLE", false)) {
-        if (wasEventSyncTurnedOn()) {
-          // we received this alter table event on a non-existing table. We also
-          // detect that event sync was turned on in this event. This may mean that
-          // the table creation was skipped earlier because event sync was turned off
-          // we don't really know how many of events we have skipped till now because
-          // the sync was disabled all this while before we receive such a event. We
-          // error on the side of caution by stopping the event processing and
-          // letting the user to issue a invalidate metadata to reset the state
-          throw new MetastoreNotificationNeedsInvalidateException(debugString(
-              "Detected that event sync was turned on for the table %s "
-                  + "and the table does not exist. Event processing cannot be "
-                  + "continued further. Issue a invalidate metadata command to reset "
-                  + "the event processing state", getFullyQualifiedTblName()));
-        }
+      if (wasEventSyncTurnedOn()) {
+        handleEventSyncTurnedOn();
+      } else {
+        // in case of table level alters from external systems it is better to do a full
+        // refresh, eg. this could be due to as simple as adding a new parameter or a
+        // full blown adding or changing column type
+        // rename is already handled above
+        reloadTableFromCatalog("ALTER_TABLE", false);
       }
       long durationNs = System.nanoTime() - startNs;
       // Log event details for those triggered slow reload.
@@ -1552,6 +1551,41 @@ public class MetastoreEvents {
       }
     }
 
+    private void handleEventSyncTurnedOn() throws DatabaseNotFoundException,
+        MetastoreNotificationNeedsInvalidateException {
+      // check if the table exists or not. 1) if the table doesn't exist create an
+      // incomplete instance of the table. 2) If the table exists, there can be two
+      // scenarios a) current table eventId is greater than table's createEventId,
+      // then we should mark the table as stale. b) current table eventId <= table's
+      // createEventId, then we should ignore the event as it is an older event.
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl == null) { // table doesn't exist. Go with option (1)
+        if (catalogOpExecutor_.addTableIfNotRemovedLater(getEventId(), msTbl_)) {
+          infoLog("Successfully added table {}", getFullyQualifiedTblName());
+          metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLES_ADDED).inc();
+        } else {
+          metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
+          debugLog("Incremented skipped metric to " +
+              metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                  .getCount());
+        }
+      } else if (tbl instanceof IncompleteTable) {
+        // No-Op
+      } else if (getEventId() > tbl.getCreateEventId()) {
+        catalog_.invalidateTable(tbl.getTableName().toThrift(),
+            new Reference<>(), new Reference<>());
+        LOG.info("Table " + tbl.getFullName() + " is invalidated from catalog cache" +
+            " since eventSync is turned on for this table.");
+      } else {
+        // Unknown state of metadata object, make event processor go into error state
+        throw new MetastoreNotificationNeedsInvalidateException(debugString(
+            "Detected that event sync was turned on for the table %s "
+                + "with createEventId %s. This event should have been skipped as stale "
+                + "event. Event processing cannot be continued further. Issue a "
+                + "invalidate metadata command to reset the event processing state",
+            getFullyQualifiedTblName(), tbl.getCreateEventId()));
+      }
+    }
 
     /**
      * This method checks if the reloading of file metadata can be skipped for an alter
