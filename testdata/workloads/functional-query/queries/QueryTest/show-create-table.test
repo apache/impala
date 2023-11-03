@@ -452,7 +452,6 @@ ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ESCAPED BY '\\'
 WITH SERDEPROPERTIES ('field.delim'=',', 'serialization.format'=',', 'escape.delim'='\\')
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('transient_lastDdlTime'='1405990341')
 ====
 ---- QUERY
 SHOW CREATE VIEW functional.alltypes_view
@@ -1030,6 +1029,5 @@ CREATE EXTERNAL TABLE show_create_table_test_db.bucketed_sort_test (a INT, b STR
 CLUSTERED BY (a) SORT BY LEXICAL (b) INTO 4 BUCKETS
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('bucketing_version'='2', 'sort.columns'='b', 'sort.order'='LEXICAL',
-'external.table.purge'='TRUE')
+TBLPROPERTIES ('bucketing_version'='2', 'external.table.purge'='TRUE')
 ====

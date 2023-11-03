@@ -28,6 +28,29 @@ from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.util.filesystem_utils import WAREHOUSE
 
 
+def properties_map_regex(name):
+  return "%s \\(([^)]+)\\)" % name
+
+
+def get_properties_map(sql, properties_map_name, exclusions=None):
+  """ Extracts a dict of key-value pairs from the 'sql' string, which should be a SHOW
+  CREATE TABLE statement. The 'properties_map_name' is the name of the properties map,
+  e.g. 'TBLPROPERTIES' or 'SERDEPROPERTIES'. 'exclusions' is a list of properties to
+  exclude from the result.
+  """
+  map_match = re.search(properties_map_regex(properties_map_name), sql)
+  if map_match is None:
+    return dict()
+  kv_regex = "'([^\']+)'\\s*=\\s*'([^\']+)'"
+  kv_results = dict(re.findall(kv_regex, map_match.group(1)))
+
+  if exclusions is not None:
+    for filtered_key in exclusions:
+      if filtered_key in kv_results:
+        del kv_results[filtered_key]
+  return kv_results
+
+
 # The purpose of the show create table tests are to ensure that the "SHOW CREATE TABLE"
 # output can actually be used to recreate the table. A test consists of a table
 # definition. The table is created, then the output of "SHOW CREATE TABLE" is used to
@@ -36,17 +59,7 @@ class TestShowCreateTable(ImpalaTestSuite):
   VALID_SECTION_NAMES = ["CREATE_TABLE", "CREATE_VIEW", "QUERY", "RESULTS-HIVE",
                          "RESULTS-HIVE-3"]
   # Properties to filter before comparing results
-  FILTER_TBL_PROPERTIES = ["transient_lastDdlTime", "numFiles", "numPartitions",
-                           "numRows", "rawDataSize", "totalSize", "COLUMN_STATS_ACCURATE",
-                           "STATS_GENERATED_VIA_STATS_TASK", "last_modified_by",
-                           "last_modified_time", "numFilesErasureCoded",
-                           "bucketing_version", "OBJCAPABILITIES",
-                           "TRANSLATED_TO_EXTERNAL", "previous_metadata_location",
-                           "impala.events.catalogServiceId",
-                           "impala.events.catalogVersion", "uuid",
-                           "current-schema", "snapshot-count", "default-partition-spec",
-                           "current-snapshot-id", "current-snapshot-summary",
-                           "current-snapshot-timestamp-ms", "sort.columns", "sort.order"]
+  FILTER_TBL_PROPERTIES = ["bucketing_version", "OBJCAPABILITIES"]
 
   @classmethod
   def get_workload(self):
@@ -181,28 +194,14 @@ class TestShowCreateTable(ImpalaTestSuite):
     s = ' '.join(s.split())
     return s
 
-  def __properties_map_regex(self, name):
-    return "%s \(([^)]+)\)" % name
-
   def __remove_properties_maps(self, s):
     """ Removes the tblproperties and serdeproperties from the string """
     return re.sub(
-        self.__properties_map_regex("WITH SERDEPROPERTIES"), "",
-        re.sub(self.__properties_map_regex("TBLPROPERTIES"), "", s)).strip()
+        properties_map_regex("WITH SERDEPROPERTIES"), "",
+        re.sub(properties_map_regex("TBLPROPERTIES"), "", s)).strip()
 
   def __get_properties_map(self, s, properties_map_name):
-    """ Extracts a dict of key-value pairs from the sql string s. The properties_map_name
-    is the name of the properties map, e.g. 'tblproperties' or 'serdeproperties'
-    """
-    map_match = re.search(self.__properties_map_regex(properties_map_name), s)
-    if map_match is None:
-      return dict()
-    kv_regex = "'([^\']+)'\s*=\s*'([^\']+)'"
-    kv_results = dict(re.findall(kv_regex, map_match.group(1)))
-    for filtered_key in self.FILTER_TBL_PROPERTIES:
-      if filtered_key in kv_results:
-        del kv_results[filtered_key]
-    return kv_results
+    return get_properties_map(s, properties_map_name, self.FILTER_TBL_PROPERTIES)
 
   def __replace_uri(self, s, uri):
     return s if uri is None else s.replace("$$location_uri$$", uri)
@@ -310,3 +309,106 @@ class TestInfraCompat(ImpalaTestSuite):
     table = impala_testinfra_cursor.describe_table(table_primary_keys_map['table'])
     assert table_primary_keys_map['primary_keys'] == table.primary_key_names
     assert table_primary_keys_map['updatable_columns'] == table.updatable_column_names
+
+
+def get_tbl_properties_from_describe_formatted(lines):
+  """Get a map of table properties from the result of a DESCRIBE FORMATTED query."""
+  # The table properties are between a line that starts with 'Table Parameters' and the
+  # next line that doesn't start with a '\t'.
+  res = dict()
+
+  start_idx = None
+  for idx, value in enumerate(lines):
+    if value.startswith('Table Parameters'):
+      start_idx = idx + 1
+      break
+  if start_idx is None: return res
+
+  past_end_idx = start_idx
+  for idx, value in enumerate(lines[start_idx:]):
+    if not value.startswith('\t'):
+      break
+    past_end_idx += 1
+
+  for line in lines[start_idx:past_end_idx]:
+    [key, value] = line.strip().split('\t')
+    res[key.strip()] = value.strip()
+
+  return res
+
+
+class TestShowCreateTableIcebergProperties(ImpalaTestSuite):
+  """
+  Test that the SHOW CREATE TABLE statement does not contain irrelevant Iceberg-related
+  table properties.
+  """
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestShowCreateTableIcebergProperties, cls).add_test_dimensions()
+    # don't use any exec options, running exactly once is fine
+    cls.ImpalaTestMatrix.clear_dimension('exec_option')
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
+
+  def test_iceberg_properties(self, vector, unique_database):
+    """
+    Test that the SHOW CREATE TABLE statement does not contain irrelevant Iceberg-related
+    table properties.
+    """
+    tbl_name = unique_database + ".a"
+
+    create_sql = "CREATE TABLE {} (i INT, d DATE, s STRING, t TIMESTAMP) \
+        PARTITIONED BY SPEC (BUCKET(5, i), MONTH(d), TRUNCATE(3, s), HOUR(t)) \
+        SORT BY (i) \
+        STORED AS ICEBERG".format(tbl_name)
+    self.execute_query_expect_success(self.client, create_sql)
+
+    # Some table properties are only added when a new Iceberg snapshot is created.
+    # insert_sql = "insert into {} values (1)".format(tbl_name)
+    insert_sql = ("INSERT INTO {} VALUES (1, '2022-01-04', 'some', '2022-01-04 10:00:00')"
+        .format(tbl_name))
+    self.execute_query_expect_success(self.client, insert_sql)
+
+    do_not_update_stats_sql = ("alter table {} set TBLPROPERTIES "
+        "('DO_NOT_UPDATE_STATS'='true')".format(tbl_name))
+    self.execute_query_expect_success(self.client, do_not_update_stats_sql)
+
+    describe_sql = "describe formatted {}".format(tbl_name)
+    describe_res = self.execute_query_expect_success(self.client, describe_sql)
+
+    show_create_sql = "show create table {}".format(tbl_name)
+    show_create_res = self.execute_query_expect_success(self.client, show_create_sql)
+
+    tblproperties_to_omit = [
+        "storage_handler",
+        "DO_NOT_UPDATE_STATS",
+        "metadata_location",
+        "previous_metadata_location",
+        "current-schema",
+        "snapshot-count",
+        "current-snapshot-id",
+        "current-snapshot-summary",
+        "current-snapshot-timestamp-ms",
+        "default-partition-spec",
+        "uuid",
+        "impala.events.catalogServiceId",
+        "impala.events.catalogVersion",
+        "sort.columns",
+        "sort.order",
+        "numFiles",
+        "numRows",
+        "totalSize"
+    ]
+
+    tbl_props_in_describe = get_tbl_properties_from_describe_formatted(describe_res.data)
+    tbl_props_in_show_create = get_properties_map(
+        show_create_res.data[0], 'TBLPROPERTIES', None)
+    for tbl_prop in tblproperties_to_omit:
+      assert tbl_prop in tbl_props_in_describe
+      assert tbl_prop not in tbl_props_in_show_create

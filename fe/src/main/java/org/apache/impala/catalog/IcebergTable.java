@@ -93,6 +93,34 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // table metadata. This property is only valid for tables in 'hive.catalog'.
   public static final String METADATA_LOCATION = "metadata_location";
 
+  // Internal Iceberg table property that specifies the absolute path of the previous
+  // table metadata. This property is only valid for tables in 'hive.catalog'.
+  public static final String PREVIOUS_METADATA_LOCATION = "previous_metadata_location";
+
+  // Internal Iceberg table property that specifies the current schema.
+  public static final String CURRENT_SCHEMA = "current-schema";
+
+  // Internal Iceberg table property that specifies the number of snapshots.
+  public static final String SNAPSHOT_COUNT = "snapshot-count";
+
+  // Internal Iceberg table property that specifies the current snapshot id.
+  public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
+
+  // Internal Iceberg table property that specifies the current snapshot summary.
+  public static final String CURRENT_SNAPSHOT_SUMMARY = "current-snapshot-summary";
+
+  // Internal Iceberg table property that specifies the current snapshot timestamp in
+  // milliseconds.
+  public static final String CURRENT_SNAPSHOT_TIMESTAMP_MS
+      = "current-snapshot-timestamp-ms";
+
+  // Internal Iceberg table property that specifies the current default partition
+  // specification of the table.
+  public static final String DEFAULT_PARTITION_SPEC = "default-partition-spec";
+
+  // Internal Iceberg table property that specifies the UUID of the table.
+  public static final String UUID = "uuid";
+
   // Parquet compression codec and compression level table properties.
   public static final String PARQUET_COMPRESSION_CODEC =
       "write.parquet.compression-codec";

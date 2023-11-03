@@ -33,13 +33,27 @@ import org.apache.impala.thrift.TTableStats;
  * Frontend interface for interacting with a table.
  */
 public interface FeTable {
-
   Comparator<FeTable> NAME_COMPARATOR = new Comparator<FeTable>() {
     @Override
     public int compare(FeTable t1, FeTable t2) {
       return t1.getFullName().compareTo(t2.getFullName());
     }
   };
+
+  // Internal table property that specifies the number of rows in the table.
+  public static final String NUM_ROWS = "numRows";
+
+  // Internal table property that specifies which user the table was last modified by.
+  public static final String LAST_MODIFIED_BY = "last_modified_by";
+
+  // Internal table property that specifies when the table was last modified.
+  public static final String LAST_MODIFIED_TIME = "last_modified_time";
+
+  // Internal table property that specifies the catalog service id.
+  public static final String CATALOG_SERVICE_ID = "impala.events.catalogServiceId";
+
+  // Internal table property that specifies the catalog version of the table.
+  public static final String CATALOG_VERSION = "impala.events.catalogVersion";
 
   /** @see CatalogObject#isLoaded() */
   boolean isLoaded();

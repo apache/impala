@@ -83,8 +83,19 @@ public class ToSqlUtils {
   // "CREATE EXTERNAL TABLE <name> ... SORT BY ZORDER (...) ... COMMENT <comment> ..."
   @VisibleForTesting
   protected static final ImmutableSet<String> HIDDEN_TABLE_PROPERTIES = ImmutableSet.of(
-      "EXTERNAL", "comment", AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
-      AlterTableSortByStmt.TBL_PROP_SORT_ORDER, "TRANSLATED_TO_EXTERNAL");
+      "EXTERNAL",
+      "TRANSLATED_TO_EXTERNAL",
+      "comment",
+      AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
+      AlterTableSortByStmt.TBL_PROP_SORT_ORDER,
+      FeFsTable.NUM_ERASURE_CODED_FILES,
+      FeFsTable.NUM_FILES,
+      FeFsTable.TOTAL_SIZE,
+      FeTable.CATALOG_SERVICE_ID,
+      FeTable.CATALOG_VERSION,
+      FeTable.LAST_MODIFIED_BY,
+      FeTable.LAST_MODIFIED_TIME,
+      FeTable.NUM_ROWS);
 
   /**
    * Removes all hidden properties from the given 'tblProperties' map.
@@ -356,6 +367,7 @@ public class ToSqlUtils {
     TSortingOrder sortingOrder = TSortingOrder.valueOf(getSortingOrder(properties));
     String comment = properties.get("comment");
     removeHiddenTableProperties(properties);
+
     List<String> colsSql = new ArrayList<>();
     List<String> partitionColsSql = new ArrayList<>();
     boolean isHbaseTable = table instanceof FeHBaseTable;
@@ -426,6 +438,14 @@ public class ToSqlUtils {
         properties.remove(IcebergTable.KEY_STORAGE_HANDLER);
         properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
         properties.remove(IcebergTable.METADATA_LOCATION);
+        properties.remove(IcebergTable.PREVIOUS_METADATA_LOCATION);
+        properties.remove(IcebergTable.CURRENT_SCHEMA);
+        properties.remove(IcebergTable.SNAPSHOT_COUNT);
+        properties.remove(IcebergTable.CURRENT_SNAPSHOT_ID);
+        properties.remove(IcebergTable.CURRENT_SNAPSHOT_SUMMARY);
+        properties.remove(IcebergTable.CURRENT_SNAPSHOT_TIMESTAMP_MS);
+        properties.remove(IcebergTable.DEFAULT_PARTITION_SPEC);
+        properties.remove(IcebergTable.UUID);
 
         // Fill "PARTITIONED BY SPEC" part if the Iceberg table is partitioned.
         FeIcebergTable feIcebergTable= (FeIcebergTable)table;

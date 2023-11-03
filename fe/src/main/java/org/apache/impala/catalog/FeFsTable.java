@@ -78,6 +78,16 @@ public interface FeFsTable extends FeTable {
   // and its usage in getFileSystem suggests it should be.
   public static final Configuration CONF = new Configuration();
 
+  // Internal table property that specifies the number of files in the table.
+  public static final String NUM_FILES = "numFiles";
+
+  // Internal table property that specifies the total size of the table.
+  public static final String TOTAL_SIZE = "totalSize";
+
+  // Internal table property that specifies the number of erasure coded files in the
+  // table.
+  public static final String NUM_ERASURE_CODED_FILES = "numFilesErasureCoded";
+
   /**
    * @return true if the table and all its partitions reside at locations which
    * support caching (e.g. HDFS).
