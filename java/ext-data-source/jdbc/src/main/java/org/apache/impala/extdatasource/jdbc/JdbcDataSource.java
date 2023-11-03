@@ -98,7 +98,7 @@ public class JdbcDataSource implements ExternalDataSource {
   // iterator_ is used when schema_.getColsSize() does not equal 0.
   private JdbcRecordIterator iterator_ = null;
   // currRow_ and totalNumberOfRecords_ are used when schema_.getColsSize() equals 0.
-  private int currRow_;
+  private long currRow_;
   private long totalNumberOfRecords_ = 0;
 
   // Enumerates the states of the data source, which indicates which ExternalDataSource
@@ -193,13 +193,10 @@ public class JdbcDataSource implements ExternalDataSource {
       }
       if (!hasNext) eos_ = true;
     } else { // for count(*)
-      if (currRow_ + batchSize_ <= totalNumberOfRecords_) {
-        numRows = batchSize_;
-      } else {
-        numRows = totalNumberOfRecords_ - currRow_;
-      }
-      currRow_ += numRows;
-      if (currRow_ == totalNumberOfRecords_) eos_ = true;
+      // Don't need to check batchSize_.
+      numRows = totalNumberOfRecords_ - currRow_;
+      currRow_ = totalNumberOfRecords_;
+      eos_ = true;
     }
     return new TGetNextResult(STATUS_OK).setEos(eos_)
         .setRows(new TRowBatch().setCols(cols).setNum_rows(numRows));

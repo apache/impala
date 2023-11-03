@@ -348,24 +348,35 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
   while (true) {
     {
       SCOPED_TIMER(materialize_tuple_timer());
-      // copy rows until we hit the limit/capacity or until we exhaust input_batch_
-      while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
-        // TODO The timezone depends on flag use_local_tz_for_unix_timestamp_conversions.
-        //      Check if this is the intended behaviour.
-        RETURN_IF_ERROR(MaterializeNextRow(
-            state->time_zone_for_unix_time_conversions(), tuple_pool, tuple));
-        ++rows_read;
-        int row_idx = row_batch->AddRow();
-        TupleRow* tuple_row = row_batch->GetRow(row_idx);
-        tuple_row->SetTuple(tuple_idx_, tuple);
+      if (tuple_desc_->slots().size() > 0) {
+        // Copy rows until we hit the limit/capacity or until we exhaust input_batch_
+        while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
+          // TODO Timezone depends on flag use_local_tz_for_unix_timestamp_conversions.
+          //      Check if this is the intended behaviour.
+          RETURN_IF_ERROR(MaterializeNextRow(
+              state->time_zone_for_unix_time_conversions(), tuple_pool, tuple));
+          ++rows_read;
+          int row_idx = row_batch->AddRow();
+          TupleRow* tuple_row = row_batch->GetRow(row_idx);
+          tuple_row->SetTuple(tuple_idx_, tuple);
 
-        if (ExecNode::EvalConjuncts(evals, num_conjuncts, tuple_row)) {
-          row_batch->CommitLastRow();
-          tuple = reinterpret_cast<Tuple*>(
-              reinterpret_cast<uint8_t*>(tuple) + tuple_desc_->byte_size());
-          IncrementNumRowsReturned(1);
+          if (ExecNode::EvalConjuncts(evals, num_conjuncts, tuple_row)) {
+            row_batch->CommitLastRow();
+            tuple = reinterpret_cast<Tuple*>(
+                reinterpret_cast<uint8_t*>(tuple) + tuple_desc_->byte_size());
+            IncrementNumRowsReturned(1);
+          }
+          ++next_row_idx_;
         }
-        ++next_row_idx_;
+      } else {
+        // For count(*)
+        rows_read += num_rows_;
+        next_row_idx_ += num_rows_;
+        IncrementNumRowsReturned(num_rows_);
+        if (input_batch_->eos) {
+          row_batch->limit_capacity(rows_read);
+          row_batch->CommitRows(rows_read);
+        }
       }
       if (row_batch->AtCapacity() || ReachedLimit()
           || (input_batch_->eos && !InputBatchHasNext())) {
