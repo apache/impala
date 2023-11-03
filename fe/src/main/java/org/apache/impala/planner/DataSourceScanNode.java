@@ -194,7 +194,7 @@ public class DataSourceScanNode extends ScanNode {
           DataSource.debugString(table_.getDataSource())), e);
     } finally {
       // Delete the jar file once its loaded
-      Path localJarPath = new Path(localPath);
+      Path localJarPath = new Path("file://" + localPath);
       FileSystemUtil.deleteIfExists(localJarPath);
     }
     if (prepareStatus.getStatus_code() != TErrorCode.OK) {

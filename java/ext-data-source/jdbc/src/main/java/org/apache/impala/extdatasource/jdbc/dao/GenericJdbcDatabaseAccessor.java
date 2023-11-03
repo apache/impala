@@ -251,7 +251,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
                         getClass().getClassLoader());
                 basicDataSource.setDriverClassLoader(driverLoader);
                 // Delete the jar file once its loaded
-                Path localJarPath = new Path(driverLocalPath);
+                Path localJarPath = new Path("file://" + driverLocalPath);
                 FileSystemUtil.deleteIfExists(localJarPath);
                 return basicDataSource;
               });
