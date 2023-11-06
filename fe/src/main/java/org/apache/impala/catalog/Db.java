@@ -212,6 +212,11 @@ public class Db extends CatalogObjectImpl implements FeDb {
    */
   public List<Table> getTables() { return tableCache_.getValues(); }
 
+  /**
+   * Returns the number of tables in this db.
+   */
+  public int getNumTables() { return tableCache_.size(); }
+
   @Override
   public boolean containsTable(String tableName) {
     return tableCache_.contains(tableName.toLowerCase());

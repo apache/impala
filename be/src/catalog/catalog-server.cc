@@ -180,6 +180,23 @@ const string CATALOG_SERVER_PARTIAL_FETCH_RPC_QUEUE_LEN =
 const string CATALOG_ACTIVE_STATUS = "catalog-server.active-status";
 const string CATALOG_HA_NUM_ACTIVE_STATUS_CHANGE =
     "catalog-server.ha-number-active-status-change";
+const string CATALOG_NUM_FILE_METADATA_LOADING_THREADS =
+    "catalog-server.metadata.file.num-loading-threads";
+const string CATALOG_NUM_FILE_METADATA_LOADING_TASKS =
+    "catalog-server.metadata.file.num-loading-tasks";
+const string CATALOG_NUM_TABLES_LOADING_FILE_METADATA =
+    "catalog-server.metadata.table.num-loading-file-metadata";
+const string CATALOG_NUM_TABLES_LOADING_METADATA =
+    "catalog-server.metadata.table.num-loading-metadata";
+const string CATALOG_NUM_TABLES_ASYNC_LOADING_METADATA =
+    "catalog-server.metadata.table.async-loading.num-in-progress";
+const string CATALOG_NUM_TABLES_WAITING_FOR_ASYNC_LOADING =
+    "catalog-server.metadata.table.async-loading.queue-len";
+const string CATALOG_NUM_DBS = "catalog.num-databases";
+const string CATALOG_NUM_TABLES = "catalog.num-tables";
+const string CATALOG_NUM_FUNCTIONS = "catalog.num-functions";
+const string CATALOG_NUM_HMS_CLIENTS_IDLE = "catalog.hms-client-pool.num-idle";
+const string CATALOG_NUM_HMS_CLIENTS_IN_USE = "catalog.hms-client-pool.num-in-use";
 
 const string CATALOG_WEB_PAGE = "/catalog";
 const string CATALOG_TEMPLATE = "catalog.tmpl";
@@ -370,6 +387,24 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
       CATALOG_SERVER_TOPIC_PROCESSING_TIMES);
   partial_fetch_rpc_queue_len_metric_ =
       metrics->AddGauge(CATALOG_SERVER_PARTIAL_FETCH_RPC_QUEUE_LEN, 0);
+  num_file_metadata_loading_threads_metric_ =
+      metrics->AddGauge(CATALOG_NUM_FILE_METADATA_LOADING_THREADS, 0);
+  num_file_metadata_loading_tasks_metric_ =
+      metrics->AddGauge(CATALOG_NUM_FILE_METADATA_LOADING_TASKS, 0);
+  num_tables_loading_file_metadata_metric_ =
+      metrics->AddGauge(CATALOG_NUM_TABLES_LOADING_FILE_METADATA, 0);
+  num_tables_loading_metadata_metric_ =
+      metrics->AddGauge(CATALOG_NUM_TABLES_LOADING_METADATA, 0);
+  num_tables_async_loading_metadata_metric_ =
+      metrics->AddGauge(CATALOG_NUM_TABLES_ASYNC_LOADING_METADATA, 0);
+  num_tables_waiting_for_async_loading_metric_ =
+      metrics->AddGauge(CATALOG_NUM_TABLES_WAITING_FOR_ASYNC_LOADING, 0);
+  num_dbs_metric_ = metrics->AddGauge(CATALOG_NUM_DBS, 0);
+  num_tables_metric_ = metrics->AddGauge(CATALOG_NUM_TABLES, 0);
+  num_functions_metric_ = metrics->AddGauge(CATALOG_NUM_FUNCTIONS, 0);
+  num_hms_clients_idle_metric_ = metrics->AddGauge(CATALOG_NUM_HMS_CLIENTS_IDLE, 0);
+  num_hms_clients_in_use_metric_ = metrics->AddGauge(CATALOG_NUM_HMS_CLIENTS_IN_USE, 0);
+
   active_status_metric_ =
       metrics->AddProperty(CATALOG_ACTIVE_STATUS, !FLAGS_enable_catalogd_ha);
   num_ha_active_status_change_metric_ =
@@ -632,6 +667,23 @@ bool CatalogServer::IsActive() {
     }
     partial_fetch_rpc_queue_len_metric_->SetValue(
         response.catalog_partial_fetch_rpc_queue_len);
+    num_file_metadata_loading_threads_metric_->SetValue(
+        response.catalog_num_file_metadata_loading_threads);
+    num_file_metadata_loading_tasks_metric_->SetValue(
+        response.catalog_num_file_metadata_loading_tasks);
+    num_tables_loading_file_metadata_metric_->SetValue(
+        response.catalog_num_tables_loading_file_metadata);
+    num_tables_loading_metadata_metric_->SetValue(
+        response.catalog_num_tables_loading_metadata);
+    num_tables_async_loading_metadata_metric_->SetValue(
+        response.catalog_num_tables_async_loading_metadata);
+    num_tables_waiting_for_async_loading_metric_->SetValue(
+        response.catalog_num_tables_waiting_for_async_loading);
+    num_dbs_metric_->SetValue(response.catalog_num_dbs);
+    num_tables_metric_->SetValue(response.catalog_num_tables);
+    num_functions_metric_->SetValue(response.catalog_num_functions);
+    num_hms_clients_idle_metric_->SetValue(response.catalog_num_hms_clients_idle);
+    num_hms_clients_in_use_metric_->SetValue(response.catalog_num_hms_clients_in_use);
     TEventProcessorMetrics eventProcessorMetrics = response.event_metrics;
     MetastoreEventMetrics::refresh(&eventProcessorMetrics);
   }

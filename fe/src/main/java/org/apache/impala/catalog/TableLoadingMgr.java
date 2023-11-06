@@ -365,4 +365,12 @@ public class TableLoadingMgr {
       }
     }
   }
+
+  public int numRemainingItems() {
+    return tableLoadingDeque_.size();
+  }
+
+  public int numLoadsInProgress() {
+    return loadingTables_.size();
+  }
 }

@@ -86,6 +86,7 @@ public class View extends Table implements FeView {
       org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
       throws TableLoadingException {
     try {
+      Table.LOADING_TABLES.incrementAndGet();
       clearColumns();
       msTable_ = msTbl;
       // Load columns.
@@ -106,6 +107,8 @@ public class View extends Table implements FeView {
       throw e;
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for view: " + name_, e);
+    } finally {
+      Table.LOADING_TABLES.decrementAndGet();
     }
   }
 

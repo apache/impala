@@ -331,6 +331,7 @@ public class KuduTable extends Table implements FeKuduTable {
       throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
+    Table.LOADING_TABLES.incrementAndGet();
     try {
       // Copy the table to check later if anything has changed.
       msTable_ = msTbl.deepCopy();
@@ -371,6 +372,7 @@ public class KuduTable extends Table implements FeKuduTable {
         throw new TableLoadingException(e.getMessage());
       }
     } finally {
+      Table.LOADING_TABLES.decrementAndGet();
       context.stop();
     }
   }

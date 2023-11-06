@@ -154,6 +154,36 @@ class CatalogServer {
   /// Metric to count the number of active status changes.
   IntCounter* num_ha_active_status_change_metric_;
 
+  /// Metric that tracks the total size of all thread pools used in all
+  /// ParallelFileMetadataLoader instances.
+  IntGauge* num_file_metadata_loading_threads_metric_;
+
+  /// Metric that tracks the total number of unfinished FileMetadataLoader tasks that
+  /// are submitted to the pools.
+  IntGauge* num_file_metadata_loading_tasks_metric_;
+
+  /// Metric that tracks the total number of tables that are loading file metadata.
+  IntGauge* num_tables_loading_file_metadata_metric_;
+
+  /// Metric that tracks the total number of tables that are loading metadata.
+  IntGauge* num_tables_loading_metadata_metric_;
+
+  /// Metric that tracks the total number of tables that are loading metadata
+  /// asynchronously, e.g. initial metadata loading triggered by first access of a table.
+  IntGauge* num_tables_async_loading_metadata_metric_;
+
+  /// Metric that tracks the total number of tables that are waiting for async loading.
+  IntGauge* num_tables_waiting_for_async_loading_metric_;
+
+  /// Metrics of the total number of dbs, tables and functions in the catalog cache
+  IntGauge* num_dbs_metric_;
+  IntGauge* num_tables_metric_;
+  IntGauge* num_functions_metric_;
+
+  /// Metrics that track the number of HMS clients
+  IntGauge* num_hms_clients_idle_metric_;
+  IntGauge* num_hms_clients_in_use_metric_;
+
   /// Thread that polls the catalog for any updates.
   std::unique_ptr<Thread> catalog_update_gathering_thread_;
 

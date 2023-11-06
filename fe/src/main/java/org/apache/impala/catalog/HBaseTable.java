@@ -101,6 +101,7 @@ public class HBaseTable extends Table implements FeHBaseTable {
       org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
       throws TableLoadingException {
     Preconditions.checkNotNull(getMetaStoreTable());
+    Table.LOADING_TABLES.incrementAndGet();
     try (Timer.Context timer = getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time()) {
       msTable_ = msTbl;
       final Timer.Context storageLoadTimer =
@@ -127,6 +128,8 @@ public class HBaseTable extends Table implements FeHBaseTable {
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table: " + name_,
           e);
+    } finally {
+      Table.LOADING_TABLES.decrementAndGet();
     }
   }
 

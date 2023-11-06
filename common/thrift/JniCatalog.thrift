@@ -1038,6 +1038,23 @@ struct TGetCatalogServerMetricsResponse {
 
   // get the catalogd Hive metastore server metrics, if configured
   3: optional TCatalogdHmsCacheMetrics catalogd_hms_cache_metrics
+
+  // Metrics of table metadata loading
+  4: optional i32 catalog_num_file_metadata_loading_threads
+  5: optional i32 catalog_num_file_metadata_loading_tasks
+  6: optional i32 catalog_num_tables_loading_file_metadata
+  7: optional i32 catalog_num_tables_loading_metadata
+  8: optional i32 catalog_num_tables_async_loading_metadata
+  9: optional i32 catalog_num_tables_waiting_for_async_loading
+
+  // Metrics of the catalog
+  10: optional i32 catalog_num_dbs
+  11: optional i32 catalog_num_tables
+  12: optional i32 catalog_num_functions
+
+  // Metrics of HMS clients
+  13: optional i32 catalog_num_hms_clients_idle
+  14: optional i32 catalog_num_hms_clients_in_use
 }
 
 // Request to copy the generated testcase from a given input path.

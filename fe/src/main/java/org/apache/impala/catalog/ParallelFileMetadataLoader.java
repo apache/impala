@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.Nullable;
 import org.apache.hadoop.fs.FileSystem;
@@ -64,6 +65,9 @@ public class ParallelFileMetadataLoader {
       BackendConfig.INSTANCE.maxHdfsPartsParallelLoad();
   private static final int MAX_NON_HDFS_PARTITIONS_PARALLEL_LOAD =
       BackendConfig.INSTANCE.maxNonHdfsPartsParallelLoad();
+
+  public static final AtomicInteger TOTAL_THREADS = new AtomicInteger(0);
+  public static final AtomicInteger TOTAL_TABLES = new AtomicInteger(0);
 
   // Maximum number of errors logged when loading partitioned tables.
   private static final int MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG = 100;
@@ -169,8 +173,11 @@ public class ParallelFileMetadataLoader {
     if (loaders_.isEmpty()) return;
 
     int failedLoadTasks = 0;
-    ExecutorService pool = createPool(loaders_.size(), fs_, logPrefix_);
+    int poolSize = getPoolSize(loaders_.size(), fs_);
+    ExecutorService pool = createPool(poolSize, logPrefix_);
+    TOTAL_THREADS.addAndGet(poolSize);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(logPrefix_)) {
+      TOTAL_TABLES.incrementAndGet();
       List<Pair<FileMetadataLoader, Future<Void>>> futures =
           new ArrayList<>(loaders_.size());
       for (FileMetadataLoader loader : loaders_.values()) {
@@ -191,6 +198,8 @@ public class ParallelFileMetadataLoader {
       }
     } finally {
       pool.shutdown();
+      TOTAL_THREADS.addAndGet(-poolSize);
+      TOTAL_TABLES.addAndGet(-1);
     }
     if (failedLoadTasks > 0) {
       int errorsNotLogged = failedLoadTasks - MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG;
@@ -204,7 +213,21 @@ public class ParallelFileMetadataLoader {
   }
 
   /**
-   * Returns the thread pool to load the file metadata.
+   * Returns the thread pool to load the file metadata. Callers should use
+   * {@link #getPoolSize(int, FileSystem)} to get a correct pool size.
+   */
+  public static ExecutorService createPool(int poolSize, String logPrefix) {
+    Preconditions.checkState(poolSize > 0, "Illegal poolSize: {}", poolSize);
+    if (poolSize == 1) {
+      return MoreExecutors.newDirectExecutorService();
+    } else {
+      LOG.info("{} using a thread pool of size {}", logPrefix, poolSize);
+      return Executors.newFixedThreadPool(poolSize);
+    }
+  }
+
+  /**
+   * Returns the thread pool size to load the file metadata.
    *
    * We use different thread pool sizes for HDFS and non-HDFS tables since the latter
    * supports much higher throughput of RPC calls for listStatus/listFiles. For
@@ -215,19 +238,12 @@ public class ParallelFileMetadataLoader {
    * clusters. We narrowed it down to scalability bottlenecks in HDFS RPC implementation
    * (HADOOP-14558) on both the server and the client side.
    */
-  public static ExecutorService createPool(
-      int numLoaders, FileSystem fs, String logPrefix) {
-    Preconditions.checkState(numLoaders > 0);
+  public static int getPoolSize(int numLoaders, FileSystem fs) {
     int poolSize = FileSystemUtil.supportsStorageIds(fs) ?
         MAX_HDFS_PARTITIONS_PARALLEL_LOAD :
         MAX_NON_HDFS_PARTITIONS_PARALLEL_LOAD;
     // Thread pool size need not exceed the number of paths to be loaded.
     poolSize = Math.min(numLoaders, poolSize);
-    if (poolSize == 1) {
-      return MoreExecutors.newDirectExecutorService();
-    } else {
-      LOG.info("{} using a thread pool of size {}", logPrefix, poolSize);
-      return Executors.newFixedThreadPool(poolSize);
-    }
+    return poolSize;
   }
 }

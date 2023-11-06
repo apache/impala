@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
@@ -49,6 +50,9 @@ public class MetaStoreClientPool {
   private static final int DEFAULT_HIVE_METASTORE_CNXN_DELAY_MS_CONF = 0;
   // Maximum number of idle metastore connections in the connection pool at any point.
   private static final int MAX_HMS_CONNECTION_POOL_SIZE = 32;
+
+  private final AtomicInteger numHmsClientsInUse_ = new AtomicInteger(0);
+
   // Number of milliseconds to sleep between creation of HMS connections. Used to debug
   // IMPALA-825.
   private final int clientCreationDelayMs_;
@@ -131,6 +135,7 @@ public class MetaStoreClientPool {
     public void close() {
       Preconditions.checkState(isInUse_);
       isInUse_ = false;
+      numHmsClientsInUse_.decrementAndGet();
       // Ensure the connection isn't returned to the pool if the pool has been closed
       // or if the number of connections in the pool exceeds MAX_HMS_CONNECTION_POOL_SIZE.
       // This lock is needed to ensure proper behavior when a thread reads poolClosed
@@ -148,6 +153,7 @@ public class MetaStoreClientPool {
     private void markInUse() {
       Preconditions.checkState(!isInUse_);
       isInUse_ = true;
+      numHmsClientsInUse_.incrementAndGet();
     }
   }
 
@@ -225,4 +231,7 @@ public class MetaStoreClientPool {
       client.getHiveClient().close();
     }
   }
+
+  public int getNumHmsClientsIdle() { return clientPool_.size(); }
+  public int getNumHmsClientsInUse() { return numHmsClientsInUse_.get(); }
 }

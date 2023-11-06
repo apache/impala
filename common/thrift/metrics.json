@@ -330,8 +330,69 @@
     "key": "catalog-server.topic-processing-time-s"
   },
   {
-    "description": "The number of databases in the catalog. Untracked in LocalCatalog mode.",
+    "description": "The total size of all thread pools used in loading file metadata.",
     "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Server File Metadata Loading Threads",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog-server.metadata.file.num-loading-threads"
+  },
+  {
+    "description": "The total number of unfinished file metadata loading tasks. Each task corresponds to a partition.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Server File Metadata Loading Tasks",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog-server.metadata.file.num-loading-tasks"
+  },
+  {
+    "description": "The total number of tables that are loading file metadata.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Server File Metadata Loading Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog-server.metadata.table.num-loading-file-metadata"
+  },
+  {
+    "description": "The total number of tables that are loading metadata.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Server Metadata Loading Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog-server.metadata.table.num-loading-metadata"
+  },
+  {
+    "description": "The total number of tables that are loading metadata asynchronously. E.g. initial metadata loading triggered by the first access on a table.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Server Async Metadata Loading Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog-server.metadata.table.async-loading.num-in-progress"
+  },
+  {
+    "description": "The total number of tables that are waiting for loading metadata asynchronously.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalog Server Queue Size for Async Metadata Loading Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog-server.metadata.table.async-loading.queue-len"
+  },
+  {
+    "description": "The number of databases in the catalog. Untracked in LocalCatalog mode coordinators.",
+    "contexts": [
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Databases",
@@ -340,14 +401,45 @@
     "key": "catalog.num-databases"
   },
   {
-    "description": "The number of tables in the catalog. Untracked in LocalCatalog mode.",
+    "description": "The number of tables in the catalog. Untracked in LocalCatalog mode coordinators.",
     "contexts": [
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Tables",
     "units": "NONE",
     "kind": "GAUGE",
     "key": "catalog.num-tables"
+  },
+  {
+    "description": "The number of functions in the catalog.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Functions",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.num-functions"
+  },
+  {
+    "description": "The number of Hive Metastore Clients that are idle.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Idle HMS Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.hms-client-pool.num-idle"
+  },
+  {
+    "description": "The number of Hive Metastore Clients that are in use.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "HMS Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.hms-client-pool.num-in-use"
   },
   {
     "description": "Catalog topic update version.",

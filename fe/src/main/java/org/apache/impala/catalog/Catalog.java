@@ -397,6 +397,14 @@ public abstract class Catalog implements AutoCloseable {
    */
   public MetaStoreClient getMetaStoreClient() { return metaStoreClientPool_.getClient(); }
 
+  public int getNumHmsClientsIdle() {
+    return metaStoreClientPool_.getNumHmsClientsIdle();
+  }
+
+  public int getNumHmsClientsInUse() {
+    return metaStoreClientPool_.getNumHmsClientsInUse();
+  }
+
   /**
    * Same as the above but also update the given 'timeline'.
    */

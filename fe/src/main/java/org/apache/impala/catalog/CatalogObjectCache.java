@@ -58,6 +58,8 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
   // all methods as synchronized.
   private final Map<String, T> metadataCache_ = new ConcurrentHashMap<String, T>();
 
+  public int size() { return metadataCache_.size(); }
+
   /**
    * Adds a new catalogObject to the cache. If a catalogObject with the same name already
    * exists in the cache, the new item will only be added if it has a larger catalog

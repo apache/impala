@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.Nullable;
 
@@ -53,6 +54,10 @@ import javax.annotation.Nullable;
 public class FileMetadataLoader {
   private final static Logger LOG = LoggerFactory.getLogger(FileMetadataLoader.class);
   private static final Configuration CONF = new Configuration();
+
+  // The number of unfinished instances. Incremented in the constructor and decremented
+  // at the end of load().
+  public static final AtomicInteger TOTAL_TASKS = new AtomicInteger();
 
   protected final Path partDir_;
   protected final boolean recursive_;
@@ -104,6 +109,7 @@ public class FileMetadataLoader {
     if (writeIds_ != null) {
       Preconditions.checkArgument(recursive_, "ACID tables must be listed recursively");
     }
+    TOTAL_TASKS.incrementAndGet();
   }
 
   public FileMetadataLoader(Path partDir, boolean recursive, List<FileDescriptor> oldFds,
@@ -161,6 +167,14 @@ public class FileMetadataLoader {
    * resolved.
    */
   public void load() throws CatalogException, IOException {
+    try {
+      loadInternal();
+    } finally {
+      TOTAL_TASKS.decrementAndGet();
+    }
+  }
+
+  private void loadInternal() throws CatalogException, IOException {
     Preconditions.checkState(loadStats_ == null, "already loaded");
     loadStats_ = new LoadStats(partDir_);
     FileSystem fs = partDir_.getFileSystem(CONF);

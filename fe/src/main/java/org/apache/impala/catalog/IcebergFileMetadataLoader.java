@@ -17,7 +17,9 @@
 
 package org.apache.impala.catalog;
 
+import static org.apache.impala.catalog.ParallelFileMetadataLoader.TOTAL_THREADS;
 import static org.apache.impala.catalog.ParallelFileMetadataLoader.createPool;
+import static org.apache.impala.catalog.ParallelFileMetadataLoader.getPoolSize;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -112,7 +114,11 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     if (!shouldReuseOldFds()) {
       super.load();
     } else {
-      reloadWithOldFds();
+      try {
+        reloadWithOldFds();
+      } finally {
+        FileMetadataLoader.TOTAL_TASKS.decrementAndGet();
+      }
     }
   }
 
@@ -232,19 +238,29 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
 
   private Map<Path, FileStatus> parallelListing(FileSystem fs) throws IOException {
     String logPrefix = "Parallel Iceberg file metadata listing";
-    ExecutorService pool = createPool(icebergFiles_.size(), fs, logPrefix);
+    int poolSize = getPoolSize(icebergFiles_.size(), fs);
+    ExecutorService pool = createPool(poolSize, logPrefix);
+    TOTAL_THREADS.addAndGet(poolSize);
     final Set<Path> partitionPaths;
     Map<Path, FileStatus> nameToFileStatus = Maps.newConcurrentMap();
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(logPrefix)) {
       partitionPaths = icebergFilesByPartition();
+      TOTAL_TASKS.addAndGet(partitionPaths.size());
       List<Future<Void>> tasks =
           partitionPaths.stream()
-              .map(path -> pool.submit(() -> listingTask(fs, path, nameToFileStatus)))
+              .map(path -> pool.submit(() -> {
+                try {
+                  return listingTask(fs, path, nameToFileStatus);
+                } finally {
+                  TOTAL_TASKS.decrementAndGet();
+                }
+              }))
               .collect(Collectors.toList());
       for (Future<Void> task : tasks) { task.get(); }
     } catch (ExecutionException | InterruptedException e) {
       throw new IOException(String.format("%s: failed to load paths.", logPrefix), e);
     } finally {
+      TOTAL_THREADS.addAndGet(-poolSize);
       pool.shutdown();
     }
     return nameToFileStatus;

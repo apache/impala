@@ -898,6 +898,23 @@ class TestWebPage(ImpalaTestSuite):
     page = requests.head("http://localhost:25020/operations")
     assert page.status_code == requests.codes.ok
 
+  def test_catalog_metrics(self):
+    """Test /metrics of catalogd"""
+    url = self.METRICS_URL.format(*self.CATALOG_TEST_PORT) + "?json"
+    json_res = json.loads(requests.get(url).text)
+    metric_keys = {m["name"] for m in json_res["metric_group"]["metrics"]}
+    assert "catalog-server.metadata.file.num-loading-threads" in metric_keys
+    assert "catalog-server.metadata.file.num-loading-tasks" in metric_keys
+    assert "catalog-server.metadata.table.num-loading-file-metadata" in metric_keys
+    assert "catalog-server.metadata.table.num-loading-metadata" in metric_keys
+    assert "catalog-server.metadata.table.async-loading.num-in-progress" in metric_keys
+    assert "catalog-server.metadata.table.async-loading.queue-len" in metric_keys
+    assert "catalog.num-databases" in metric_keys
+    assert "catalog.num-tables" in metric_keys
+    assert "catalog.num-functions" in metric_keys
+    assert "catalog.hms-client-pool.num-idle" in metric_keys
+    assert "catalog.hms-client-pool.num-in-use" in metric_keys
+
   def test_query_progress(self):
     """Tests that /queries page shows query progress."""
     query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"

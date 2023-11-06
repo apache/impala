@@ -36,9 +36,12 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.ParallelFileMetadataLoader;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
@@ -532,6 +535,22 @@ public class JniCatalog {
         "getCatalogServerMetrics", shortDesc, () -> {
           response.setCatalog_partial_fetch_rpc_queue_len(
               catalog_.getPartialFetchRpcQueueLength());
+          response.setCatalog_num_file_metadata_loading_threads(
+              ParallelFileMetadataLoader.TOTAL_THREADS.get());
+          response.setCatalog_num_tables_loading_file_metadata(
+              ParallelFileMetadataLoader.TOTAL_TABLES.get());
+          response.setCatalog_num_file_metadata_loading_tasks(
+              FileMetadataLoader.TOTAL_TASKS.get());
+          response.setCatalog_num_tables_loading_metadata(Table.LOADING_TABLES.get());
+          response.setCatalog_num_tables_async_loading_metadata(
+              catalog_.getNumAsyncLoadingTables());
+          response.setCatalog_num_tables_waiting_for_async_loading(
+              catalog_.getNumAsyncWaitingTables());
+          response.setCatalog_num_dbs(catalog_.getNumDatabases());
+          response.setCatalog_num_tables(catalog_.getNumTables());
+          response.setCatalog_num_functions(catalog_.getNumFunctions());
+          response.setCatalog_num_hms_clients_idle(catalog_.getNumHmsClientsIdle());
+          response.setCatalog_num_hms_clients_in_use(catalog_.getNumHmsClientsInUse());
           response.setEvent_metrics(catalog_.getEventProcessorMetrics());
           return response;
         });

@@ -1252,6 +1252,7 @@ public class HdfsTable extends Table implements FeFsTable {
     final Timer storageLdTimer =
         getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA);
     storageMetadataLoadTime_ = 0;
+    Table.LOADING_TABLES.incrementAndGet();
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
       // turn all exceptions into TableLoadingException
       msTable_ = msTbl;
@@ -1317,6 +1318,7 @@ public class HdfsTable extends Table implements FeFsTable {
             "warning threshold. Time: " + PrintUtils.printTimeNs(load_time_duration));
       }
       updateTableLoadingTime();
+      Table.LOADING_TABLES.decrementAndGet();
     }
   }
 

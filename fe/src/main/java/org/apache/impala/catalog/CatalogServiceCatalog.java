@@ -331,6 +331,12 @@ public class CatalogServiceCatalog extends Catalog {
   // Table properties that require file metadata reload
   private final Set<String> whitelistedTblProperties_;
 
+  // Total number of dbs, tables and functions in the catalog cache.
+  // Updated in each catalog topic update (getCatalogDelta()).
+  private int numDbs_ = 0;
+  private int numTables_ = 0;
+  private int numFunctions_ = 0;
+
   /**
    * Initialize the CatalogServiceCatalog using a given MetastoreClientPool impl.
    *
@@ -663,6 +669,18 @@ public class CatalogServiceCatalog extends Catalog {
     return partialObjectFetchAccess_.getQueueLength();
   }
 
+  public int getNumAsyncWaitingTables() {
+    return tableLoadingMgr_.numRemainingItems();
+  }
+
+  public int getNumAsyncLoadingTables() {
+    return tableLoadingMgr_.numLoadsInProgress();
+  }
+
+  public int getNumDatabases() { return numDbs_; }
+  public int getNumTables() { return numTables_; }
+  public int getNumFunctions() { return numFunctions_; }
+
   /**
    * Adds a list of cache directive IDs for the given table name. Asynchronously
    * refreshes the table metadata once all cache directives complete.
@@ -762,6 +780,11 @@ public class CatalogServiceCatalog extends Catalog {
     long fromVersion;
     long toVersion;
     long lastResetStartVersion;
+    // Total number of dbs, tables, and functions in the catalog
+    int numDbs = 0;
+    int numTables = 0;
+    int numFunctions = 0;
+
     // The keys of the updated topics.
     Set<String> updatedCatalogObjects;
     TSerializer serializer;
@@ -927,6 +950,7 @@ public class CatalogServiceCatalog extends Catalog {
       versionLock_.readLock().unlock();
     }
     for (Db db: getAllDbs()) {
+      ctx.numDbs++;
       addDatabaseToCatalogDelta(db, ctx);
     }
     for (DataSource dataSource: getAllDataSources()) {
@@ -1006,6 +1030,9 @@ public class CatalogServiceCatalog extends Catalog {
     synchronized (topicUpdateLog_) {
       topicUpdateLog_.notifyAll();
     }
+    numDbs_ = ctx.numDbs;
+    numTables_ = ctx.numTables;
+    numFunctions_ = ctx.numFunctions;
     return ctx.toVersion;
   }
 
@@ -1272,9 +1299,11 @@ public class CatalogServiceCatalog extends Catalog {
       ctx.addCatalogObject(catalogDb, false);
     }
     for (Table tbl: getAllTables(db)) {
+      ctx.numTables++;
       addTableToCatalogDelta(tbl, ctx);
     }
     for (Function fn: getAllFunctions(db)) {
+      ctx.numFunctions++;
       addFunctionToCatalogDelta(fn, ctx);
     }
   }

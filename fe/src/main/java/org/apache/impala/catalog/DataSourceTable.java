@@ -175,6 +175,7 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
       org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
       throws TableLoadingException {
     Preconditions.checkNotNull(msTbl);
+    Table.LOADING_TABLES.incrementAndGet();
     msTable_ = msTbl;
     clearColumns();
     if (LOG.isTraceEnabled()) {
@@ -189,6 +190,7 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
     initString_ = getRequiredTableProperty(msTbl, TBL_PROP_INIT_STRING, dataSourceName);
 
     if (msTbl.getPartitionKeysSize() > 0) {
+      Table.LOADING_TABLES.decrementAndGet();
       throw new TableLoadingException("Data source table cannot contain clustering " +
           "columns: " + name_);
     }
@@ -205,6 +207,8 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for data source table: " +
           name_, e);
+    } finally {
+      Table.LOADING_TABLES.decrementAndGet();
     }
   }
 
