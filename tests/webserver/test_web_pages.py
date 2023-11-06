@@ -609,6 +609,13 @@ class TestWebPage(ImpalaTestSuite):
         self.THREAD_GROUP_URL + "?group=disk-io-mgr&json", ports_to_test=[25000])
     assert len(responses) == 1
     response_json = json.loads(responses[0].text)
+    # Verify metric keys for each thread
+    for t in response_json['threads']:
+      assert "name" in t
+      assert "id" in t
+      assert "user_s" in t
+      assert "kernel_s" in t
+      assert "iowait_s" in t
     thread_names = [t["name"] for t in response_json['threads']]
     expected_name_patterns = ["ADLS remote", "S3 remote", "HDFS remote"]
     for pattern in expected_name_patterns:
