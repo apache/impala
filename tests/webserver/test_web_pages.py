@@ -957,7 +957,10 @@ class TestWebPage(ImpalaTestSuite):
     response_json = json.loads(response.text)
     assert response_json['contents'] == "Query cancellation successful"
 
-    response_json = self.get_queries()
+    # Cancel request can return before cancellation is finalized. Retry for slow
+    # environments like ASAN.
+    response_json = self.try_until("query cancellation", self.get_queries,
+        lambda resp: resp['num_in_flight_queries'] == 0)
     assert response_json['num_in_flight_queries'] == 0
     assert response_json['num_waiting_queries'] == 0
 
