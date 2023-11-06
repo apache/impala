@@ -1,0 +1,289 @@
+====
+---- QUERY
+create table testtbl1(`세율대분류구분코드` int, s string COMMENT 'String col') stored as TEXTFILE;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Make sure creating a table with the same name doesn't throw an error when
+# IF NOT EXISTS is specified.
+create table if not exists testtbl1(`세율대분류구분코드` int, s string)
+STORED AS TEXTFILE;
+---- RESULTS
+'Table already exists.'
+====
+---- QUERY
+show tables;
+---- RESULTS
+'testtbl1'
+---- TYPES
+STRING
+====
+---- QUERY
+describe testtbl1;
+---- RESULTS: RAW_STRING
+'세율대분류구분코드','int',''
+'s','string','String col'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+insert into table testtbl1 values(1, 'Alice');
+====
+---- QUERY
+select * from testtbl1;
+---- RESULTS
+1,'Alice'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+drop table testtbl1;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+create table testtbl_kudu(`시스템처리최종사용자번호a` int, s string COMMENT 'String col',
+ Primary key(`시스템처리최종사용자번호a`)) stored as KUDU;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+show tables;
+---- RESULTS
+'testtbl_kudu'
+---- TYPES
+STRING
+====
+---- QUERY
+describe testtbl_kudu;
+---- RESULTS: RAW_STRING
+'시스템처리최종사용자번호a','int','','true','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s','string','String col','false','','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+insert into table testtbl_kudu values(1, 'Alice');
+====
+---- QUERY
+select * from testtbl_kudu;
+---- RESULTS
+1,'Alice'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+drop table testtbl_kudu;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+create table testtbl_iceberg(`我` int, s string COMMENT 'String col') stored as ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Make sure creating a table with the same name doesn't throw an error when
+# IF NOT EXISTS is specified.
+create table if not exists testtbl_iceberg(`我` int, s string)
+STORED AS ICEBERG;
+---- RESULTS
+'Table already exists.'
+====
+---- QUERY
+show tables;
+---- RESULTS
+'testtbl_iceberg'
+---- TYPES
+STRING
+====
+---- QUERY
+describe testtbl_iceberg;
+---- RESULTS: RAW_STRING
+'我','int','','true'
+'s','string','String col','true'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+insert into table testtbl_iceberg values(1, 'Alice');
+====
+---- QUERY
+select * from testtbl_iceberg;
+---- RESULTS
+1,'Alice'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+drop table testtbl_iceberg;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+create table $DATABASE.testtbl_orc(`我` int, s string COMMENT 'String col') stored as ORC;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Make sure creating a table with the same name doesn't throw an error when
+# IF NOT EXISTS is specified.
+create table if not exists $DATABASE.testtbl_orc(`我` int, s string)
+STORED AS ORC;
+---- RESULTS
+'Table already exists.'
+====
+---- QUERY
+show tables;
+---- RESULTS
+'testtbl_orc'
+---- TYPES
+STRING
+====
+---- QUERY
+describe $DATABASE.testtbl_orc;
+---- RESULTS: RAW_STRING
+'我','int',''
+'s','string','String col'
+---- TYPES
+STRING, STRING, STRING
+====
+---- HIVE_QUERY
+insert into table $DATABASE.testtbl_orc values(1, 'Alice');
+====
+---- HIVE_QUERY
+select * from $DATABASE.testtbl_orc;
+---- RESULTS
+1,'Alice'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+drop table $DATABASE.testtbl_orc;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+create table $DATABASE.testtbl_avro(`我` int, s string COMMENT 'String col') stored as AVRO;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Make sure creating a table with the same name doesn't throw an error when
+# IF NOT EXISTS is specified.
+create table if not exists $DATABASE.testtbl_avro(`我` int, s string)
+STORED AS AVRO;
+---- RESULTS
+'Table already exists.'
+====
+---- QUERY
+show tables;
+---- RESULTS
+'testtbl_avro'
+---- TYPES
+STRING
+====
+---- QUERY
+describe $DATABASE.testtbl_avro;
+---- RESULTS: RAW_STRING
+'我','int','from deserializer'
+'s','string','String col'
+---- TYPES
+STRING, STRING, STRING
+====
+---- HIVE_QUERY
+insert into table $DATABASE.testtbl_avro values(1, 'Alice');
+====
+---- HIVE_QUERY
+select * from $DATABASE.testtbl_avro;
+---- RESULTS
+1,'Alice'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+drop table $DATABASE.testtbl_avro;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+create table testtbl_part(`我` int, s string) PARTITIONED BY (`고객` int comment 'C') stored as TEXTFILE;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Partition columns are displayed as part of DESCRIBE <table>
+describe testtbl_part;
+---- RESULTS: RAW_STRING
+'我','int',''
+'s','string',''
+'고객','int','C'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+insert into table testtbl_part partition(`고객`=24) values(1, 'Alice');
+====
+---- QUERY
+insert into table testtbl_part partition(`고객`=20) values(2, 'Alison');
+====
+---- QUERY
+insert into table testtbl_part partition(`고객`=23) values(3, 'Zack');
+====
+---- QUERY
+select * from testtbl_part;
+---- RESULTS
+1,'Alice',24
+2,'Alison',20
+3,'Zack',23
+---- TYPES
+INT, STRING, INT
+====
+---- QUERY
+drop table testtbl_part;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+create table testtbl_parquet(`我` int, s string COMMENT 'String col') stored as PARQUET;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Make sure creating a table with the same name doesn't throw an error when
+# IF NOT EXISTS is specified.
+create table if not exists testtbl_parquet(`我` int, s string)
+STORED AS PARQUET;
+---- RESULTS
+'Table already exists.'
+====
+---- QUERY
+show tables;
+---- RESULTS
+'testtbl_parquet'
+---- TYPES
+STRING
+====
+---- QUERY
+describe testtbl_parquet;
+---- RESULTS: RAW_STRING
+'我','int',''
+'s','string','String col'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+insert into table testtbl_parquet values(1, 'Alice');
+====
+---- QUERY
+select * from testtbl_parquet;
+---- RESULTS
+1,'Alice'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+drop table testtbl_parquet;
+---- RESULTS
+'Table has been dropped.'

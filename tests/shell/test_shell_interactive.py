@@ -401,6 +401,30 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     child_proc.sendline('quit;')
     child_proc.wait()
 
+  def test_unicode_column(self, vector, unique_database):
+    """Tests unicode column name support"""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Failed, need to investigate.")
+    args = ("create table {0}.test_tbl(`세율중분류구분코드` int, s string COMMENT 'String col')"
+            " STORED AS TEXTFILE;".format(unique_database))
+    result = run_impala_shell_interactive(vector, args)
+    assert "Fetched 1 row(s)" in result.stderr, result.stderr
+    args = ("describe {0}.test_tbl;"
+            .format(unique_database))
+    result = run_impala_shell_interactive(vector, args)
+    assert "Fetched 2 row(s)" in result.stderr, result.stderr
+    assert "세율중분류구분코드" in result.stdout
+    args = ("insert into table {0}.test_tbl values(1, 'Alice');"
+            .format(unique_database))
+    result = run_impala_shell_interactive(vector, args)
+    assert "Modified 1 row(s)" in result.stderr, result.stderr
+    args = ("select * from {0}.test_tbl;"
+            .format(unique_database))
+    result = run_impala_shell_interactive(vector, args)
+    assert "Fetched 1 row(s)" in result.stderr, result.stderr
+    assert "세율중분류구분코드" in result.stdout
+
+
   def test_welcome_string(self, vector):
     """Test that the shell's welcome message is only printed once
     when the shell is started. Ensure it is not reprinted on errors.

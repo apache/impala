@@ -79,6 +79,7 @@ import org.apache.impala.util.HiveMetadataFormatUtils;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 
 /**
  * Base class for Hive 3 MetastoreShim.
@@ -822,5 +823,12 @@ public class Hive3MetastoreShimBase {
     // TODO(IMPALA-9088): deal with customized transformer in HMS.
     return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
         .toString();
+  }
+
+  /**
+   * At the Metadata level there are no restrictions on column names.
+   */
+  public static boolean validateColumnName(String name) {
+    return MetaStoreUtils.validateColumnName(name);
   }
 }

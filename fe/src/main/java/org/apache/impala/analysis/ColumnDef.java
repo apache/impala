@@ -203,7 +203,7 @@ public class ColumnDef {
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.
-    if (!MetastoreShim.validateName(colName_)) {
+    if (!MetastoreShim.validateColumnName(colName_)) {
       throw new AnalysisException("Invalid column/field name: " + colName_);
     }
     if (typeDef_ != null) {

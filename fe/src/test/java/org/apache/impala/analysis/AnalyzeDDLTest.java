@@ -447,6 +447,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes add column NEW_COL int");
     AnalyzesOk("alter table functional.alltypes add column if not exists int_col int");
     AnalyzesOk("alter table functional.alltypes add column if not exists INT_COL int");
+    // Valid unicode column name.
+    AnalyzesOk("alter table functional.alltypes add column `???` int");
 
     // Column name must be unique for add.
     AnalysisError("alter table functional.alltypes add column int_col int",
@@ -462,9 +464,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Column name conflicts with existing partition column: year");
     AnalysisError("alter table functional.alltypes add column if not exists YEAR int",
         "Column name conflicts with existing partition column: year");
-    // Invalid column name.
-    AnalysisError("alter table functional.alltypes add column `???` int",
-        "Invalid column/field name: ???");
 
     // Table/Db does not exist.
     AnalysisError("alter table db_does_not_exist.alltypes add column i int",
@@ -520,6 +519,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes add columns (c struct<f1:int>)");
     AnalyzesOk("alter table functional.alltypes add if not exists columns (int_col int)");
     AnalyzesOk("alter table functional.alltypes add if not exists columns (INT_COL int)");
+    // Valid unicode column name.
+    AnalyzesOk("alter table functional.alltypes add columns" +
+        "(`시스???पताED` int)");
 
     // Column name must be unique for add.
     AnalysisError("alter table functional.alltypes add columns (int_col int)",
@@ -529,9 +531,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Column name conflicts with existing partition column: year");
     AnalysisError("alter table functional.alltypes add if not exists columns (year int)",
         "Column name conflicts with existing partition column: year");
-    // Invalid column name.
-    AnalysisError("alter table functional.alltypes add columns (`???` int)",
-        "Invalid column/field name: ???");
 
     // Duplicate column names.
     AnalysisError("alter table functional.alltypes add columns (c1 int, c1 int)",
@@ -600,9 +599,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes replace columns " +
         "(C1 int comment 'c', C2 int)");
     AnalyzesOk("alter table functional.alltypes replace columns (c array<string>)");
-    // Invalid column name.
-    AnalysisError("alter table functional.alltypes replace columns (`???` int)",
-        "Invalid column/field name: ???");
+    AnalyzesOk("alter table functional.alltypes replace columns" +
+        "(`?최종हिंदी` int)");
 
     // Replace should not throw an error if the column already exists.
     AnalyzesOk("alter table functional.alltypes replace columns (int_col int)");
@@ -699,6 +697,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes change column int_col int_col tinyint");
     // Add a comment to a column.
     AnalyzesOk("alter table functional.alltypes change int_col int_col int comment 'c'");
+    AnalyzesOk("alter table functional.alltypes change column int_col `汉字` int");
 
     AnalysisError("alter table functional.alltypes change column no_col c1 int",
         "Column 'no_col' does not exist in table: functional.alltypes");
@@ -710,9 +709,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "alter table functional.alltypes change column int_col Tinyint_col int",
         "Column already exists: tinyint_col");
 
-    // Invalid column name.
-    AnalysisError("alter table functional.alltypes change column int_col `???` int",
-        "Invalid column/field name: ???");
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
@@ -1481,9 +1477,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "select * from functional.alltypessmall a inner join " +
         "functional.alltypessmall b on a.id = b.id",
         "Duplicate column name: id");
-    // Invalid column name.
-    AnalysisError("alter view functional.alltypes_view as select 'abc' as `???`",
-        "Invalid column/field name: ???");
+    AnalyzesOk("alter view functional.alltypes_view as select 'abc' as `ㅛㅜ`");
     // Change the view definition to contain a subquery (IMPALA-1797)
     AnalyzesOk("alter view functional.alltypes_view as " +
         "select * from functional.alltypestiny where id in " +
@@ -2831,11 +2825,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Invalid table/view name.
     AnalysisError("create table functional.`^&*` (x int) PARTITIONED BY (y int)",
         "Invalid table/view name: ^&*");
-    // Invalid column names.
-    AnalysisError("create table new_table (`???` int) PARTITIONED BY (i int)",
-        "Invalid column/field name: ???");
-    AnalysisError("create table new_table (i int) PARTITIONED BY (`^&*` int)",
-        "Invalid column/field name: ^&*");
+    // Valid unicode column names.
+    AnalyzesOk("create table new_table (`???` int) PARTITIONED BY (i int)");
+    AnalyzesOk("create table new_table (i int) PARTITIONED BY (`^&*` int)");
     // Test HMS constraint on comment length.
     AnalyzesOk(String.format("create table t (i int comment '%s')",
         StringUtils.repeat("c", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH)));
@@ -3236,10 +3228,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Invalid database name: ???");
     AnalysisError("create view `^%&` as select 1, 2, 3",
         "Invalid table/view name: ^%&");
-    AnalysisError("create view foo as select 1 as `???`",
-        "Invalid column/field name: ???");
-    AnalysisError("create view foo(`%^&`) as select 1",
-        "Invalid column/field name: %^&");
+    AnalyzesOk("create view foo as select 1 as `???`");
+    AnalyzesOk("create view foo(`%^&`) as select 1");
 
     // Table/view already exists.
     AnalysisError("create view functional.alltypes as " +
