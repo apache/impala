@@ -21,6 +21,7 @@
 #include <jni.h>
 
 #include "common/status.h"
+#include "gen-cpp/CatalogService_types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaService.h"
@@ -59,8 +60,16 @@ class Frontend {
   /// Get the metrics from the catalog used by this frontend.
   Status GetCatalogMetrics(TGetCatalogMetricsResult* resp);
 
-  /// Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
-  /// table name returned is unqualified.
+  /// Get all matching table names, per Hive's "SHOW TABLES <pattern>" regardless of the
+  /// table type.
+  Status GetTableNames(const std::string& db, const std::string* pattern,
+      const TSessionState* session, TGetTablesResult* table_names);
+
+  /// Returns all matching table names, per Hive's "SHOW TABLES <pattern>" such that each
+  /// corresponds to a table whose type is in table_types for a non-empty table_types.
+  /// Each table name returned is unqualified.
+  /// If table_types is empty, then all types of tables will be considered when their
+  /// table names are matched against the pattern.
   /// If pattern is NULL, match all tables otherwise match only those tables that
   /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   /// and each pN may contain wildcards denoted by '*' which match all strings.
@@ -70,7 +79,8 @@ class Frontend {
   /// the session should be set to NULL which will skip privilege checks returning all
   /// results.
   Status GetTableNames(const std::string& db, const std::string* pattern,
-      const TSessionState* session, TGetTablesResult* table_names);
+      const TSessionState* session, const std::set<TImpalaTableType::type>& table_types,
+      TGetTablesResult* table_names);
 
   /// Return all databases matching the optional argument 'pattern'.
   /// If pattern is NULL, match all databases otherwise match only those databases that

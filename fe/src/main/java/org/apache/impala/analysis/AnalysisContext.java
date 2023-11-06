@@ -119,6 +119,7 @@ public class AnalysisContext {
     public boolean isUseStmt() { return stmt_ instanceof UseStmt; }
     public boolean isSetStmt() { return stmt_ instanceof SetStmt; }
     public boolean isShowTablesStmt() { return stmt_ instanceof ShowTablesStmt; }
+    public boolean isShowViewsStmt() { return stmt_ instanceof ShowViewsStmt; }
     public boolean isDescribeHistoryStmt() {
       return stmt_ instanceof DescribeHistoryStmt;
     }
@@ -176,11 +177,11 @@ public class AnalysisContext {
     }
 
     private boolean isViewMetadataStmt() {
-      return isShowFilesStmt() || isShowTablesStmt() || isShowDbsStmt() ||
-          isShowFunctionsStmt() || isShowRolesStmt() || isShowGrantPrincipalStmt() ||
-          isShowCreateTableStmt() || isShowDataSrcsStmt() || isShowStatsStmt() ||
-          isDescribeTableStmt() || isDescribeDbStmt() || isShowCreateFunctionStmt() ||
-          isDescribeHistoryStmt();
+      return isShowFilesStmt() || isShowTablesStmt() || isShowViewsStmt() ||
+          isShowDbsStmt() || isShowFunctionsStmt() || isShowRolesStmt() ||
+          isShowGrantPrincipalStmt() || isShowCreateTableStmt() ||
+          isShowDataSrcsStmt() || isShowStatsStmt() || isDescribeTableStmt() ||
+          isDescribeDbStmt() || isShowCreateFunctionStmt() || isDescribeHistoryStmt();
     }
 
     private boolean isGrantRevokeStmt() {
@@ -210,7 +211,8 @@ public class AnalysisContext {
      */
     public boolean isSingleColumnPrivStmt() {
       return isDescribeTableStmt() || isResetMetadataStmt() || isUseStmt()
-          || isShowTablesStmt() || isAlterTableStmt() || isShowFunctionsStmt();
+          || isShowTablesStmt() || isShowViewsStmt() || isAlterTableStmt()
+          || isShowFunctionsStmt();
     }
 
     public boolean isConvertTableToIcebergStmt() {
@@ -326,6 +328,11 @@ public class AnalysisContext {
     public ShowTablesStmt getShowTablesStmt() {
       Preconditions.checkState(isShowTablesStmt());
       return (ShowTablesStmt) stmt_;
+    }
+
+    public ShowViewsStmt getShowViewsStmt() {
+      Preconditions.checkState(isShowViewsStmt());
+      return (ShowViewsStmt) stmt_;
     }
 
     public ShowDbsStmt getShowDbsStmt() {

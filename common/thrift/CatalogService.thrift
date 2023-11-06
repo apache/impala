@@ -523,12 +523,12 @@ struct TPartialTableInfo {
   13: optional CatalogObjects.TIcebergTable iceberg_table
 }
 
-// Table types in the user's perspective. Though we treat materialized view as table
-// internally, materialized views are shown in view type to the users.
+// Table types in the user's perspective.
 enum TImpalaTableType {
   TABLE,
   VIEW,
-  UNKNOWN
+  UNKNOWN,
+  MATERIALIZED_VIEW
 }
 
 struct TBriefTableMeta {

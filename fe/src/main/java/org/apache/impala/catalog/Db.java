@@ -23,8 +23,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.impala.analysis.ColumnDef;
@@ -41,6 +43,7 @@ import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TPartialDbInfo;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
@@ -199,11 +202,23 @@ public class Db extends CatalogObjectImpl implements FeDb {
    */
   public void addTable(Table table) { tableCache_.add(table); }
 
-  /**
-   * Gets all table names in the table cache.
-   */
   @Override
   public List<String> getAllTableNames() {
+    return getAllTableNames(/*tableTypes*/ Collections.emptySet());
+  }
+
+  /**
+   * Gets all table names in the table cache whose corresponding tables are of a table
+   * type specified in 'tableTypes'. Returns all table names if 'tableTypes' is empty.
+   */
+  @Override
+  public List<String> getAllTableNames(Set<TImpalaTableType> tableTypes) {
+    if (!tableTypes.isEmpty()) {
+      return tableCache_.getValues().stream()
+          .filter(table -> tableTypes.contains(table.getTableType()))
+          .map(table -> table.getName())
+          .collect(Collectors.toList());
+    }
     return Lists.newArrayList(tableCache_.keySet());
   }
 

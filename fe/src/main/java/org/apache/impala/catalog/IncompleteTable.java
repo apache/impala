@@ -122,6 +122,8 @@ public class IncompleteTable extends Table implements FeIncompleteTable {
     }
     if (tableType_ == TImpalaTableType.VIEW) {
       table.setTable_type(TTableType.VIEW);
+    } else if (tableType_ == TImpalaTableType.MATERIALIZED_VIEW) {
+      table.setTable_type(TTableType.MATERIALIZED_VIEW);
     } else {
       table.setTable_type(TTableType.UNLOADED_TABLE);
     }

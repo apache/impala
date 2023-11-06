@@ -494,10 +494,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     CatalogInterners.internFieldsInPlace(msTbl);
     Table table = null;
     // Create a table of appropriate type
-    if (TImpalaTableType.VIEW ==
-        MetastoreShim.mapToInternalTableType(msTbl.getTableType())) {
-      if (msTbl.getTableType().equalsIgnoreCase("MATERIALIZED_VIEW") &&
-          HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
+    TImpalaTableType tableType =
+        MetastoreShim.mapToInternalTableType(msTbl.getTableType());
+    if (tableType == TImpalaTableType.VIEW) {
+        table = new View(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (tableType == TImpalaTableType.MATERIALIZED_VIEW) {
+      if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
         table = new MaterializedViewHdfsTable(msTbl, db, msTbl.getTableName(),
             msTbl.getOwner());
       } else {
@@ -535,6 +537,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       TImpalaTableType tblType;
       if (thriftTable.getTable_type() == TTableType.VIEW) {
         tblType = TImpalaTableType.VIEW;
+      } else if (thriftTable.getTable_type() == TTableType.MATERIALIZED_VIEW) {
+        tblType = TImpalaTableType.MATERIALIZED_VIEW;
       } else {
         // If the table is unloaded or --pull_table_types_and_comments flag is not set,
         // keep the legacy behavior as showing the table type as TABLE.

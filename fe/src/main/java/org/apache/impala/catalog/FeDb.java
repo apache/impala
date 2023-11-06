@@ -17,6 +17,7 @@
 package org.apache.impala.catalog;
 
 import java.util.Comparator;
+import java.util.Set;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -27,6 +28,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.util.PatternMatcher;
 
 /**
@@ -70,9 +72,15 @@ public interface FeDb extends HasName {
   FeTable getTableIfCached(String tbl);
 
   /**
-   * @return the names of the tables within this database
+   * @return the names of the tables and views within this database
    */
   List<String> getAllTableNames();
+
+  /**
+   * Gets all table names in the table cache whose corresponding tables are of a table
+   * type specified in 'tableTypes'. Returns all table names if 'tableTypes' is empty.
+   */
+  List<String> getAllTableNames(Set<TImpalaTableType> tableTypes);
 
   /**
    * @return true if this is a system database (i.e. cannot be dropped,

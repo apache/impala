@@ -332,7 +332,7 @@ terminal
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
   KW_TO, KW_TRUE, KW_UDF, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNIQUE, KW_UNKNOWN,
   KW_UNNEST, KW_UNSET, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE,
-  KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
+  KW_VALUES, KW_VARCHAR, KW_VIEW, KW_VIEWS, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
 
 terminal UNUSED_RESERVED_WORD;
 
@@ -381,6 +381,7 @@ nonterminal UseStmt use_stmt;
 nonterminal SetStmt set_stmt;
 nonterminal SetStmt unset_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
+nonterminal ShowViewsStmt show_views_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal ShowStatsStmt show_stats_stmt, show_partitions_stmt,
   show_range_partitions_stmt, show_hash_schema_stmt;
@@ -680,6 +681,8 @@ stmt ::=
   {: RESULT = use; :}
   | show_tables_stmt:show_tables
   {: RESULT = show_tables; :}
+  | show_views_stmt:show_views
+  {: RESULT = show_views; :}
   | show_dbs_stmt:show_dbs
   {: RESULT = show_dbs; :}
   | show_partitions_stmt:show_partitions
@@ -2929,6 +2932,17 @@ show_tables_stmt ::=
   {: RESULT = new ShowTablesStmt(db, showPattern); :}
   ;
 
+show_views_stmt ::=
+  KW_SHOW KW_VIEWS
+  {: RESULT = new ShowViewsStmt(); :}
+  | KW_SHOW KW_VIEWS show_pattern:showPattern
+  {: RESULT = new ShowViewsStmt(showPattern); :}
+  | KW_SHOW KW_VIEWS KW_IN ident_or_default:db
+  {: RESULT = new ShowViewsStmt(db, null); :}
+  | KW_SHOW KW_VIEWS KW_IN ident_or_default:db show_pattern:showPattern
+  {: RESULT = new ShowViewsStmt(db, showPattern); :}
+  ;
+
 show_dbs_stmt ::=
   KW_SHOW dbs_or_schemas_kw
   {: RESULT = new ShowDbsStmt(); :}
@@ -4616,6 +4630,8 @@ word ::=
   | KW_VARCHAR:r
   {: RESULT = r.toString(); :}
   | KW_VIEW:r
+  {: RESULT = r.toString(); :}
+  | KW_VIEWS:r
   {: RESULT = r.toString(); :}
   | KW_WHEN:r
   {: RESULT = r.toString(); :}

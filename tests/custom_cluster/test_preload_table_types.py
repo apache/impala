@@ -42,7 +42,8 @@ class TestPreLoadTableTypes(CustomClusterTestSuite):
     assert types_and_comments['functional.alltypestiny'] == ('TABLE', 'Tiny table')
     assert types_and_comments['functional.alltypes_view'] == ('VIEW', 'View on alltypes')
     assert types_and_comments['functional.alltypes'] == ('TABLE', '')
-    assert types_and_comments['functional_orc_def.materialized_view'] == ('VIEW', '')
+    assert types_and_comments['functional_orc_def.materialized_view'] == \
+        ('MATERIALIZED_VIEW', '')
 
   def verify_table_types_and_comments(self, unique_database):
     n = self.get_impalad_cluster_size()

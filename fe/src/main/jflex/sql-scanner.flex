@@ -291,6 +291,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("values", SqlParserSymbols.KW_VALUES);
     keywordMap.put("varchar", SqlParserSymbols.KW_VARCHAR);
     keywordMap.put("view", SqlParserSymbols.KW_VIEW);
+    keywordMap.put("views", SqlParserSymbols.KW_VIEWS);
     keywordMap.put("when", SqlParserSymbols.KW_WHEN);
     keywordMap.put("where", SqlParserSymbols.KW_WHERE);
     keywordMap.put("with", SqlParserSymbols.KW_WITH);

@@ -266,7 +266,7 @@ public class Hive3MetastoreShimBase {
           .put("MANAGED_TABLE", TImpalaTableType.TABLE)
           .put("INDEX_TABLE", TImpalaTableType.TABLE)
           .put("VIRTUAL_VIEW", TImpalaTableType.VIEW)
-          .put("MATERIALIZED_VIEW", TImpalaTableType.VIEW).build();
+          .put("MATERIALIZED_VIEW", TImpalaTableType.MATERIALIZED_VIEW).build();
 
   /**
    * Method which maps Metastore's TableType to Impala's table type. In metastore 2
@@ -287,8 +287,9 @@ public class Hive3MetastoreShimBase {
       case MANAGED_TABLE:
         return TImpalaTableType.TABLE;
       case VIRTUAL_VIEW:
-      case MATERIALIZED_VIEW:
         return TImpalaTableType.VIEW;
+      case MATERIALIZED_VIEW:
+        return TImpalaTableType.MATERIALIZED_VIEW;
       default:
         return defaultTableType;
     }

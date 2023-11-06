@@ -198,8 +198,16 @@ Status Frontend::GetCatalogMetrics(TGetCatalogMetricsResult* resp) {
 
 Status Frontend::GetTableNames(const string& db, const string* pattern,
     const TSessionState* session, TGetTablesResult* table_names) {
+    set<TImpalaTableType::type> table_types = set<TImpalaTableType::type>();
+    return GetTableNames(db, pattern, session, table_types, table_names);
+}
+
+Status Frontend::GetTableNames(const string& db, const string* pattern,
+    const TSessionState* session, const set<TImpalaTableType::type>& table_types,
+    TGetTablesResult* table_names) {
   TGetTablesParams params;
   params.__set_db(db);
+  params.__set_table_types(table_types);
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
   return JniUtil::CallJniMethod(fe_, get_table_names_id_, params, table_names);

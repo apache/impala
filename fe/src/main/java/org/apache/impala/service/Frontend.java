@@ -168,6 +168,7 @@ import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
 import org.apache.impala.thrift.TIcebergOperation;
 import org.apache.impala.thrift.TExecRequest;
@@ -582,6 +583,11 @@ public class Frontend {
     } else if (analysis.isShowTablesStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_TABLES;
       ddl.setShow_tables_params(analysis.getShowTablesStmt().toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("name", Type.STRING.toThrift())));
+    } else if (analysis.isShowViewsStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_VIEWS;
+      ddl.setShow_tables_params(analysis.getShowViewsStmt().toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isShowDbsStmt()) {
@@ -1130,17 +1136,22 @@ public class Frontend {
     }
   }
 
+  public List<String> getTableNames(String dbName, PatternMatcher matcher, User user)
+      throws ImpalaException {
+    return getTableNames(dbName, matcher, user, /*tableTypes*/ Collections.emptySet());
+  }
+
   /**
-   * Returns all tables in database 'dbName' that match the pattern of 'matcher' and are
-   * accessible to 'user'.
+   * Returns tables of types specified in 'tableTypes' in database 'dbName' that
+   * match the pattern of 'matcher' and are accessible to 'user'.
    */
   public List<String> getTableNames(String dbName, PatternMatcher matcher,
-      User user) throws ImpalaException {
+      User user, Set<TImpalaTableType> tableTypes) throws ImpalaException {
     RetryTracker retries = new RetryTracker(
         String.format("fetching %s table names", dbName));
     while (true) {
       try {
-        return doGetTableNames(dbName, matcher, user);
+        return doGetTableNames(dbName, matcher, user, tableTypes);
       } catch(InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
@@ -1176,9 +1187,10 @@ public class Frontend {
   }
 
   private List<String> doGetTableNames(String dbName, PatternMatcher matcher,
-      User user) throws ImpalaException {
+      User user, Set<TImpalaTableType> tableTypes)
+      throws ImpalaException {
     FeCatalog catalog = getCatalog();
-    List<String> tblNames = catalog.getTableNames(dbName, matcher);
+    List<String> tblNames = catalog.getTableNames(dbName, matcher, tableTypes);
 
     boolean needsAuthChecks = authzFactory_.getAuthorizationConfig().isEnabled()
                               && !userHasAccessForWholeDb(user, dbName);

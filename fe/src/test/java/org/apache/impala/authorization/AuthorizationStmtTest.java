@@ -1253,6 +1253,16 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     }
     test.error(accessError("functional.*.*"));
 
+    // Show views.
+    test = authorize("show views in functional");
+    // We exclude TPrivilegeLevel.RWSTORAGE because of the same reason mentioned above.
+    for (TPrivilegeLevel privilege: allExcept(TPrivilegeLevel.RWSTORAGE)) {
+      test.ok(onServer(privilege))
+          .ok(onDatabase("functional", privilege))
+          .ok(onTable("functional", "alltypes_views", privilege));
+    }
+    test.error(accessError("functional.*.*"));
+
     // Show functions.
     test = authorize("show functions in functional");
     for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
@@ -1264,8 +1274,14 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     // Show tables in system database should always be allowed.
     authorize("show tables in _impala_builtins").ok();
 
+    // Show views in system database should always be allowed.
+    authorize("show views in _impala_builtins").ok();
+
     // Show tables for non-existent database.
     authorize("show tables in nodb").error(accessError("nodb"));
+
+    // Show views for non-existent database.
+    authorize("show views in nodb").error(accessError("nodb"));
 
     // Show partitions, table stats, and column stats
     for (AuthzTest authzTest: new AuthzTest[]{

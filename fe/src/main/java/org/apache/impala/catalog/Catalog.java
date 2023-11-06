@@ -44,6 +44,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TTable;
@@ -233,20 +234,30 @@ public abstract class Catalog implements AutoCloseable {
   }
 
   /**
-   * Returns all tables in 'dbName' that match 'matcher'.
+   * Returns all tables and views in 'dbName' that match 'matcher'.
+   */
+  public List<String> getTableNames(String dbName, PatternMatcher matcher)
+      throws DatabaseNotFoundException {
+    return getTableNames(dbName, matcher, /*tableTypes*/ Collections.emptySet());
+  }
+
+  /**
+   * Returns all tables of types specified in 'tableTypes' under the database 'dbName'
+   * that match 'matcher'.
    *
    * dbName must not be null.
    *
    * Table names are returned unqualified.
    */
-  public List<String> getTableNames(String dbName, PatternMatcher matcher)
+  public List<String> getTableNames(String dbName, PatternMatcher matcher,
+      Set<TImpalaTableType> tableTypes)
       throws DatabaseNotFoundException {
     Preconditions.checkNotNull(dbName);
     Db db = getDb(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-    return filterStringsByPattern(db.getAllTableNames(), matcher);
+    return filterStringsByPattern(db.getAllTableNames(tableTypes), matcher);
   }
 
   /**

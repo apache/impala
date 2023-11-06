@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
@@ -119,7 +121,16 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public List<String> getTableNames(String dbName, PatternMatcher matcher)
       throws DatabaseNotFoundException {
-    return Catalog.filterStringsByPattern(getDbOrThrow(dbName).getAllTableNames(), matcher);
+    return getTableNames(dbName, matcher, /*tableTypes*/ Collections.emptySet());
+  }
+
+  @Override
+  public List<String> getTableNames(String dbName, PatternMatcher matcher,
+      Set<TImpalaTableType> tableTypes)
+      throws DatabaseNotFoundException {
+    FeDb db = getDbOrThrow(dbName);
+    return Catalog.filterStringsByPattern(db.getAllTableNames(tableTypes),
+        matcher);
   }
 
   @Override

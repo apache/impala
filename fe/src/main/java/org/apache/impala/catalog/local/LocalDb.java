@@ -19,9 +19,11 @@ package org.apache.impala.catalog.local;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.stream.Collectors;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -40,6 +42,7 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
@@ -155,7 +158,19 @@ public class LocalDb implements FeDb {
 
   @Override
   public List<String> getAllTableNames() {
+    return getAllTableNames(/*tableTypes*/ Collections.emptySet());
+  }
+
+  @Override
+  public List<String> getAllTableNames(Set<TImpalaTableType> tableTypes) {
     loadTableNames();
+    if (!tableTypes.isEmpty()) {
+      return tables_.values().stream()
+          .filter(table ->
+              tableTypes.stream().anyMatch(type -> type.equals(table.getTableType())))
+          .map(table -> table.getName())
+          .collect(Collectors.toList());
+    }
     return ImmutableList.copyOf(tables_.keySet());
   }
 

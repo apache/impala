@@ -1975,10 +1975,17 @@ public class ParserTest extends FrontendTestBase {
   public void TestShow() {
     // Short form ok
     ParsesOk("SHOW TABLES");
+    ParsesOk("SHOW VIEWS");
     // Well-formed pattern
     ParsesOk("SHOW TABLES 'tablename|othername'");
+    ParsesOk("SHOW VIEWS 'tablename|othername'");
+    ParsesOk("SHOW TABLES LIKE 'tablename|othername'");
+    ParsesOk("SHOW VIEWS LIKE 'tablename|othername'");
+    ParsesOk("SHOW TABLES IN db LIKE 'tablename|othername'");
+    ParsesOk("SHOW VIEWS IN db LIKE 'tablename|othername'");
     // Empty pattern ok
     ParsesOk("SHOW TABLES ''");
+    ParsesOk("SHOW VIEWS ''");
     // Databases
     ParsesOk("SHOW DATABASES");
     ParsesOk("SHOW SCHEMAS");
@@ -2028,6 +2035,7 @@ public class ParserTest extends FrontendTestBase {
     ParserError("SHOW");
     // Malformed pattern (no quotes)
     ParserError("SHOW TABLES tablename");
+    ParserError("SHOW VIEWS tablename");
     // Invalid SHOW DATA SOURCE statements
     ParserError("SHOW DATA");
     ParserError("SHOW SOURCE");

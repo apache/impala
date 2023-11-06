@@ -17,41 +17,39 @@
 
 package org.apache.impala.analysis;
 
-/**
- * Representation of a SHOW TABLES [pattern] statement.
- * Acceptable syntax:
- *
- * SHOW TABLES
- * SHOW TABLES "pattern"
- * SHOW TABLES LIKE "pattern"
- * SHOW TABLES IN database
- * SHOW TABLES IN database "pattern"
- * SHOW TABLES IN database LIKE "pattern"
- *
- * In Hive, the 'LIKE' is optional. Also SHOW TABLES unquotedpattern is accepted
- * by the parser but returns no results. We don't support that syntax.
- */
-public class ShowTablesStmt extends ShowTablesOrViewsStmt {
-  public ShowTablesStmt() { super(null, null); }
+import org.apache.impala.thrift.TImpalaTableType;
+import org.apache.impala.thrift.TShowTablesParams;
 
-  public ShowTablesStmt(String pattern) { super(null, pattern); }
+import com.google.common.collect.Sets;
 
-  public ShowTablesStmt(String database, String pattern) { super(database, pattern); }
+public class ShowViewsStmt extends ShowTablesOrViewsStmt {
+  public ShowViewsStmt() { super(null, null); }
+
+  public ShowViewsStmt(String pattern) { super(null, pattern); }
+
+  public ShowViewsStmt(String database, String pattern) { super(database, pattern); }
 
   @Override
   public String toSql(ToSqlOptions options) {
     if (getPattern() == null) {
       if (getParsedDb() == null) {
-        return "SHOW TABLES";
+        return "SHOW VIEWS";
       } else {
-        return "SHOW TABLES IN " + getParsedDb();
+        return "SHOW VIEWS IN " + getParsedDb();
       }
     } else {
       if (getParsedDb() == null) {
-        return "SHOW TABLES LIKE '" + getPattern() + "'";
+        return "SHOW VIEWS LIKE '" + getPattern() + "'";
       } else {
-        return "SHOW TABLES IN " + getParsedDb() + " LIKE '" + getPattern() + "'";
+        return "SHOW VIEWS IN " + getParsedDb() + " LIKE '" + getPattern() + "'";
       }
     }
+  }
+
+  @Override
+  public TShowTablesParams toThrift() {
+    TShowTablesParams params = super.toThrift();
+    params.setTable_types(Sets.newHashSet(TImpalaTableType.VIEW));
+    return params;
   }
 }

@@ -354,16 +354,18 @@ Status ClientRequestState::ExecLocalCatalogOp(
       session_->database = exec_request_->catalog_op_request.use_db_params.db;
       return Status::OK();
     }
-    case TCatalogOpType::SHOW_TABLES: {
+    case TCatalogOpType::SHOW_TABLES:
+    case TCatalogOpType::SHOW_VIEWS: {
       const TShowTablesParams* params = &catalog_op.show_tables_params;
-      // A NULL pattern means match all tables. However, Thrift string types can't
-      // be NULL in C++, so we have to test if it's set rather than just blindly
-      // using the value.
+      // A NULL pattern means match all tables of the specified table types. However,
+      // Thrift string types can't be NULL in C++, so we have to test if it's set rather
+      // than just blindly using the value.
       const string* table_name =
           params->__isset.show_pattern ? &(params->show_pattern) : NULL;
       TGetTablesResult table_names;
+      const set<TImpalaTableType::type>& table_types = params->table_types;
       RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
-          &query_ctx_.session, &table_names));
+          &query_ctx_.session, table_types, &table_names));
       SetResultSet(table_names.tables);
       return Status::OK();
     }

@@ -1,0 +1,176 @@
+====
+---- QUERY
+# use functional
+use functional
+====
+---- QUERY
+# Simple pattern literal
+show views "alltypes_view"
+---- RESULTS
+'alltypes_view'
+---- TYPES
+STRING
+====
+---- QUERY
+# Pattern with wildcard
+show views "all*types*"
+---- RESULTS
+'alltypes_dp_2_view_1'
+'alltypes_dp_2_view_2'
+'alltypes_hive_view'
+'alltypes_parens'
+'alltypes_view'
+'alltypes_view_sub'
+---- TYPES
+STRING
+====
+---- QUERY
+# Empty string matches nothing
+show views ""
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# Check that regex metacharacters are being escaped
+show views '+alltypes_view'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# Fully qualified names will not match
+show views "functional.alltypes_view"
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# We have no SHOW VIES with no pattern test since the set of views is
+# changing often, and may be different depending on whether benchmark data is
+# loaded, for example.
+show views '*'
+---- RESULTS: VERIFY_IS_SUBSET
+'alltypes_dp_2_view_1'
+'alltypes_dp_2_view_2'
+'alltypes_hive_view'
+'alltypes_parens'
+'alltypes_view'
+'alltypes_view_sub'
+'complex_view'
+'hive_view'
+'view_view'
+---- TYPES
+STRING
+====
+---- QUERY
+# Choice amongst patterns
+show views "alltypes_view|complex_view|hive_view"
+---- RESULTS
+'alltypes_view'
+'complex_view'
+'hive_view'
+---- TYPES
+STRING
+====
+---- QUERY
+# Show views in
+show views in functional
+---- RESULTS: VERIFY_IS_SUBSET
+'alltypes_dp_2_view_1'
+'alltypes_dp_2_view_2'
+'alltypes_hive_view'
+'alltypes_parens'
+'alltypes_view'
+'alltypes_view_sub'
+'complex_view'
+'hive_view'
+'view_view'
+---- TYPES
+STRING
+====
+---- HIVE_QUERY
+# This test case verifies that HiveServer2 treats 'materialized_view' as a table instead
+# of a view.
+show views in functional
+---- RESULTS: VERIFY_IS_SUBSET
+'alltypes_dp_2_view_1'
+'alltypes_dp_2_view_2'
+'alltypes_hive_view'
+'alltypes_parens'
+'alltypes_view'
+'alltypes_view_sub'
+'complex_view'
+'hive_view'
+'view_view'
+---- TYPES
+STRING
+====
+---- QUERY
+# Show views in with a pattern
+show views in functional like 'alltypes*'
+---- RESULTS
+'alltypes_dp_2_view_1'
+'alltypes_dp_2_view_2'
+'alltypes_hive_view'
+'alltypes_parens'
+'alltypes_view'
+'alltypes_view_sub'
+---- TYPES
+STRING
+====
+---- QUERY
+# Impala only considers '*' and '|' as meta-characters in SHOW statements
+# See IMPALA-3744
+show views in functional like 'alltypes.'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show views in functional like 'alltypes.*'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show views in functional like 'alltypes%'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show views in functional like 'alltypes_'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# Coverage of syntax variations.
+show views in functional 'alltypes_view'
+---- RESULTS
+'alltypes_view'
+---- TYPES
+STRING
+====
+---- QUERY
+show views in functional like 'alltypes_view'
+---- RESULTS
+'alltypes_view'
+---- TYPES
+STRING
+====
+---- QUERY
+show views 'alltypes_view'
+---- RESULTS
+'alltypes_view'
+---- TYPES
+STRING
+====
+---- QUERY
+show views like 'alltypes_view'
+---- RESULTS
+'alltypes_view'
+---- TYPES
+STRING
+====

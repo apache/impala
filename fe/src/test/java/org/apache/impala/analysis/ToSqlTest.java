@@ -1895,4 +1895,28 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql(":shutdown('hostname', 1000)");
     testToSql(":shutdown(1000)");
   }
+
+  /**
+   * Test SHOW TABLES statements are output correctly.
+   */
+  @Test
+  public void testShowTables() {
+    testToSql("SHOW TABLES", "default", "SHOW TABLES");
+    testToSql("SHOW TABLES IN functional");
+    testToSql("SHOW TABLES LIKE 'alltypes*'", "functional",
+        "SHOW TABLES LIKE 'alltypes*'");
+    testToSql("SHOW TABLES IN functional LIKE 'alltypes*'");
+  }
+
+  /**
+   * Test SHOW VIEWS statements are output correctly.
+   */
+  @Test
+  public void testShowViews() {
+    testToSql("SHOW VIEWS", "default", "SHOW VIEWS");
+    testToSql("SHOW VIEWS IN functional");
+    testToSql("SHOW VIEWS LIKE 'alltypes*'", "functional",
+        "SHOW VIEWS LIKE 'alltypes*'");
+    testToSql("SHOW VIEWS IN functional LIKE 'alltypes*'");
+  }
 }

@@ -64,8 +64,8 @@ struct THiveUdfExecutorCtorParams {
   7: required i64 output_buffer_ptr
 }
 
-// Arguments to getTableNames, which returns a list of tables that match an
-// optional pattern.
+// Arguments to getTableNames, which returns a list of tables that are of specified table
+// types and match an optional pattern.
 struct TGetTablesParams {
   // If not set, match tables in all DBs
   1: optional string db
@@ -77,6 +77,10 @@ struct TGetTablesParams {
   // enabled, only the tables this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
   3: optional Query.TSessionState session
+
+  // This specifies the types of tables that should be returned. If not set, all types of
+  // tables are considered when their names are matched against pattern.
+  4: optional set<CatalogService.TImpalaTableType> table_types = []
 }
 
 // getTableNames returns a list of unqualified table names
@@ -246,7 +250,7 @@ struct TShowFunctionsParams {
   3: optional string show_pattern
 }
 
-// Parameters for SHOW TABLES commands
+// Parameters for SHOW TABLES and SHOW VIEWS commands
 struct TShowTablesParams {
   // Database to use for SHOW TABLES
   1: optional string db
@@ -254,6 +258,10 @@ struct TShowTablesParams {
   // Optional pattern to match tables names. If not set, all tables from the given
   // database are returned.
   2: optional string show_pattern
+
+  // This specifies the types of tables that should be returned. If not set, all types of
+  // tables are considered when their names are matched against pattern.
+  3: optional set<CatalogService.TImpalaTableType> table_types = []
 }
 
 // Parameters for SHOW FILES commands
@@ -429,6 +437,7 @@ enum TCatalogOpType {
   SHOW_FILES = 13
   SHOW_CREATE_FUNCTION = 14
   DESCRIBE_HISTORY = 15
+  SHOW_VIEWS = 16
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field

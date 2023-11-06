@@ -56,6 +56,12 @@ enum TTableType {
   // Type for tables that we haven't loaded its full metadata so we don't know whether
   // it's a HDFS or Kudu table, etc. We just know it's not a view.
   UNLOADED_TABLE = 6
+  // We added MATERIALIZED_VIEW as a table type to TImpalaTableType in IMPALA-3268.
+  // To properly set the table type of a materialized view when calling
+  // JniFrontend#updateCatalogCache(), we need to also introduce this table type here
+  // so that a materialized view will not be classified as a table. Refer to
+  // IncompleteTable#toThrift() for further details.
+  MATERIALIZED_VIEW = 7
 }
 
 // TODO: Separate the storage engines (e.g. Kudu) from the file formats.

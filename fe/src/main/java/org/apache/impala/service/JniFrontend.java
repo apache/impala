@@ -278,7 +278,8 @@ public class JniFrontend {
 
     Preconditions.checkState(!params.isSetSession() || user != null );
     List<String> tables = frontend_.getTableNames(params.db,
-        PatternMatcher.createHivePatternMatcher(params.pattern), user);
+        PatternMatcher.createHivePatternMatcher(params.pattern), user,
+        params.getTable_types());
 
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
