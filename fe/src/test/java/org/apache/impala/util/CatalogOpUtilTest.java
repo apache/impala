@@ -23,9 +23,11 @@ import org.apache.impala.analysis.PrivilegeSpec;
 import org.apache.impala.analysis.ResetMetadataStmt;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbType;
 import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TColumnName;
 import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCreateDbParams;
@@ -47,6 +49,7 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -54,6 +57,14 @@ import java.util.Collections;
 import static org.junit.Assert.assertEquals;
 
 public class CatalogOpUtilTest {
+
+  @BeforeClass
+  public static void setup() {
+    // Make sure BackendConfig.INSTANCE is initialized.
+    if (BackendConfig.INSTANCE == null) {
+      BackendConfig.create(new TBackendGflags());
+    }
+  }
 
   private void testResetStmt(ResetMetadataStmt stmt, User user, String expected)
       throws Exception {
