@@ -17,6 +17,8 @@
 
 from __future__ import absolute_import, division, print_function
 import pytest
+import os
+import subprocess
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
@@ -57,3 +59,51 @@ class TestExtDataSources(CustomClusterTestSuite):
   def test_data_source_small_batch_size(self, vector, unique_database):
     """Run test with batch size less than default size 1024"""
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
+
+
+class TestMySqlExtJdbcTables(CustomClusterTestSuite):
+  """Impala query tests for external jdbc tables on MySQL server."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def _setup_mysql_test_env(cls):
+    # Download MySQL docker image and jdbc driver, start MySQL server, create database
+    # and tables, create user account, load testing data, copy jdbc driver to HDFS, etc.
+    script = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/setup-mysql-env.sh')
+    run_cmd = [script]
+    try:
+      subprocess.check_call(run_cmd, close_fds=True)
+    except subprocess.CalledProcessError as e:
+      if e.returncode == 10:
+        pytest.skip("These tests requireadd the docker to be added to sudoer's group")
+      elif e.returncode == 20:
+        pytest.skip("Can't connect to local MySQL server")
+      else:
+        assert False, "Failed to setup MySQL testing environment"
+
+  @classmethod
+  def _remove_mysql_test_env(cls):
+    # Tear down MySQL server, remove its docker image, etc.
+    script = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/clean-mysql-env.sh')
+    run_cmd = [script]
+    subprocess.check_call(run_cmd, close_fds=True)
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('These tests only run in exhaustive')
+    cls._setup_mysql_test_env()
+    super(TestMySqlExtJdbcTables, cls).setup_class()
+
+  @classmethod
+  def teardown_class(cls):
+    cls._remove_mysql_test_env()
+    super(TestMySqlExtJdbcTables, cls).teardown_class()
+
+  @pytest.mark.execute_serially
+  def test_mysql_ext_jdbc_tables(self, vector, unique_database):
+    """Run tests for external jdbc tables on MySQL"""
+    self.run_test_case('QueryTest/mysql-ext-jdbc-tables', vector, use_db=unique_database)

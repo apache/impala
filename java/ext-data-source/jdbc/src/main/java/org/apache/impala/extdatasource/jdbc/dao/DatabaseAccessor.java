@@ -30,4 +30,6 @@ public interface DatabaseAccessor {
       throws JdbcDatabaseAccessException;
 
   void close(boolean cleanCache);
+
+  String getCaseSensitiveName(String name);
 }

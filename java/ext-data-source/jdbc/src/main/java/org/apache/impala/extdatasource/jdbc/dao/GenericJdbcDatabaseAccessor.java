@@ -167,6 +167,11 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
     }
   }
 
+  @Override
+  public String getCaseSensitiveName(String name) {
+    return name;
+  }
+
   /**
    * Uses generic JDBC escape functions to add a limit and offset clause to a query
    * string

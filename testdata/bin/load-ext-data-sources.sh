@@ -77,7 +77,6 @@ sudo -u postgres psql -d functional -c "$loadCmd"
 loadCmd="COPY \"AllTypesWithQuote\" FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
 sudo -u postgres psql -d functional -c "$loadCmd"
 
-
 # Clean tmp files
 rm /tmp/jdbc_alltypes.*
 rm /tmp/jdbc_alltypes_with_quote.*

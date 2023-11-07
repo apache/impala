@@ -24,6 +24,18 @@ package org.apache.impala.extdatasource.jdbc.dao;
 public class PostgresDatabaseAccessor extends GenericJdbcDatabaseAccessor {
 
   @Override
+  public String getCaseSensitiveName(String name) {
+    if (!name.isEmpty() && name.charAt(0) != '\"') {
+      StringBuilder sb = new StringBuilder("\"");
+      sb.append(name);
+      sb.append("\"");
+      return sb.toString();
+    } else {
+      return name;
+    }
+  }
+
+  @Override
   protected String addLimitAndOffsetToQuery(String sql, int limit, int offset) {
     if (offset == 0) {
       return addLimitToQuery(sql, limit);

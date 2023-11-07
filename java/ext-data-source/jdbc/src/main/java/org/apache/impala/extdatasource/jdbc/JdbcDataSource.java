@@ -154,6 +154,7 @@ public class JdbcDataSource implements ExternalDataSource {
     }
     // 2. Build the query and execute it
     try {
+      Preconditions.checkState(tableConfig_ != null);
       dbAccessor_ = DatabaseAccessorFactory.getAccessor(tableConfig_);
       buildQueryAndExecute(params);
     } catch (JdbcDatabaseAccessException e) {
@@ -282,11 +283,8 @@ public class JdbcDataSource implements ExternalDataSource {
     sb.append(" FROM ");
     // Make jdbc table name to be quoted with double quotes if columnMapping is not empty
     String jdbcTableName = tableConfig_.get(JdbcStorageConfig.TABLE.getPropertyName());
-    if (!columnMapping.isEmpty() && jdbcTableName.charAt(0) != '\"') {
-      StringBuilder sb2 = new StringBuilder("\"");
-      sb2.append(jdbcTableName);
-      sb2.append("\"");
-      jdbcTableName = sb2.toString();
+    if (!columnMapping.isEmpty()) {
+      jdbcTableName = dbAccessor_.getCaseSensitiveName(jdbcTableName);
     }
     sb.append(jdbcTableName);
     String condition = QueryConditionUtil
@@ -320,13 +318,7 @@ public class JdbcDataSource implements ExternalDataSource {
     for (String mapPair : mappingPairs) {
       String[] columns = mapPair.split("=");
       // Make jdbc column name to be quoted with double quotes
-      String jdbcColumnName = columns[1].trim();
-      if (!jdbcColumnName.isEmpty() && jdbcColumnName.charAt(0) != '\"') {
-        StringBuilder sb = new StringBuilder("\"");
-        sb.append(jdbcColumnName);
-        sb.append("\"");
-        jdbcColumnName = sb.toString();
-      }
+      String jdbcColumnName = dbAccessor_.getCaseSensitiveName(columns[1].trim());
       columnMap.put(columns[0].trim(), jdbcColumnName);
     }
 
