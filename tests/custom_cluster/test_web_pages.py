@@ -161,7 +161,7 @@ class TestWebPage(CustomClusterTestSuite):
       pytest.skip('runs only for text table_format')
     # If webserver url is not exposed, debug web urls shouldn't be printed out.
     shell_messages = ["Query submitted at: ", "(Coordinator: ",
-        "Query progress can be monitored at: "]
+        "Query state can be monitored at: "]
     query_shell_arg = '--query=select * from functional.alltypes'
     # hs2
     results = run_impala_shell_cmd(vector, [query_shell_arg])

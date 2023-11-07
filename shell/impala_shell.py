@@ -1304,15 +1304,25 @@ class ImpalaShell(cmd.Cmd, object):
         progress = summary.progress
 
         # If the data is not complete return and wait for a good result.
-        if not progress.total_scan_ranges and not progress.num_completed_scan_ranges:
+        if not progress.total_scan_ranges and not progress.num_completed_scan_ranges and \
+           not progress.total_fragment_instances and \
+           not progress.num_completed_fragment_instances:
           self.last_summary = time.time()
           return
 
         if self.live_progress and progress.total_scan_ranges > 0:
-          val = ((summary.progress.num_completed_scan_ranges * 100) //
-                 summary.progress.total_scan_ranges)
-          fragment_text = "[%s%s] %s%%\n" % ("#" * val, " " * (100 - val), val)
-          data += fragment_text
+          val = ((summary.progress.num_completed_scan_ranges * 100)
+                 // summary.progress.total_scan_ranges)
+          scan_progress_text =\
+              " Scan Progress:[%s%s] %s%%\n" % ("#" * val, " " * (100 - val), val)
+          data += scan_progress_text
+
+        if self.live_progress and progress.total_fragment_instances > 0:
+          val = ((progress.num_completed_fragment_instances * 100)
+                 // progress.total_fragment_instances)
+          query_progress_text =\
+              "Query Progress:[%s%s] %s%%\n" % ("#" * val, " " * (100 - val), val)
+          data += query_progress_text
 
         if self.live_summary:
           table = self._default_summary_table()
@@ -1357,7 +1367,7 @@ class ImpalaShell(cmd.Cmd, object):
       self.last_summary = time.time()
       if print_web_link:
         self._print_if_verbose(
-            "Query progress can be monitored at: %s" % self.imp_client.get_query_link(
+            "Query state can be monitored at: %s" % self.imp_client.get_query_link(
              self.imp_client.get_query_id_str(self.last_query_handle)))
 
       wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle,

@@ -866,7 +866,7 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_query_time_and_link_message(self, vector, unique_database):
     shell_messages = ["Query submitted at: ", "(Coordinator: ",
-        "Query progress can be monitored at: "]
+        "Query state can be monitored at: "]
     # CREATE statements should not print query time and webserver address.
     results = run_impala_shell_cmd(
         vector, ['--query=create table %s.shell_msg_test (id int)' % unique_database])
