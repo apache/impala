@@ -59,6 +59,7 @@ class TestWebPage(ImpalaTestSuite):
   QUERIES_URL = "http://localhost:{0}/queries"
   HEALTHZ_URL = "http://localhost:{0}/healthz"
   EVENT_PROCESSOR_URL = "http://localhost:{0}/events"
+  HADOOP_VARZ_URL = "http://localhost:{0}/hadoop-varz"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -1110,6 +1111,18 @@ class TestWebPage(ImpalaTestSuite):
                         if q['query_id'] == query_id]
     assert len(expected_queries) == 1
 
+  @pytest.mark.execute_serially
+  def test_hadoop_varz_page(self):
+    """test for /hadoop-var to check availablity of haqoop configuration like
+    hive warehouse dir, fs.defaultFS"""
+    responses = self.get_and_check_status(self.HADOOP_VARZ_URL,
+        "hive.metastore.warehouse.dir", ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+    responses = self.get_and_check_status(self.HADOOP_VARZ_URL,
+        "hive.metastore.warehouse.external.dir", ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+    responses = self.get_and_check_status(self.HADOOP_VARZ_URL,
+        "fs.defaultFS", ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+    # check if response size is 2 , for both catalog and impalad webUI
+    assert len(responses) == 2
 
 class TestWebPageAndCloseSession(ImpalaTestSuite):
   ROOT_URL = "http://localhost:{0}/"

@@ -227,6 +227,7 @@ class TestWebPage(CustomClusterTestSuite):
       expected_catalog_links = [
         "/",
         "/catalog",
+        "/hadoop-varz",
         "/events",
         "/jmx",
         "/log_level",

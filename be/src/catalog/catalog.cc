@@ -73,6 +73,7 @@ Catalog::Catalog() {
     {"refreshDataSources", "()V", &refresh_data_sources_},
     {"getNullPartitionName", "()[B", &get_null_partition_name_id_},
     {"getLatestCompactions", "([B)[B", &get_latest_compactions_id_},
+    {"getAllHadoopConfigs", "()[B", &get_hadoop_configs_id_},
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -211,6 +212,10 @@ Status Catalog::GetPartitionStats(
 
 Status Catalog::UpdateTableUsage(const TUpdateTableUsageRequest& req) {
   return JniUtil::CallJniMethod(catalog_, update_table_usage_id_, req);
+}
+
+Status Catalog::GetAllHadoopConfigs(TGetAllHadoopConfigsResponse* result) {
+  return JniUtil::CallJniMethod(catalog_, get_hadoop_configs_id_, result);
 }
 
 void Catalog::RegenerateServiceId() {

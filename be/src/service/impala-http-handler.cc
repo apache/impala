@@ -230,11 +230,17 @@ void ImpalaHttpHandler::HadoopVarzHandler(const Webserver::WebRequest& req,
     Document* document) {
   TGetAllHadoopConfigsResponse response;
   Status status  = server_->exec_env_->frontend()->GetAllHadoopConfigs(&response);
-  if (!status.ok()) return;
+  if (!status.ok()) {
+    LOG(ERROR) << "Error getting cluster configuration for hadoop-varz: "
+               << status.GetDetail();
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
 
   Value configs(kArrayType);
   typedef map<string, string> ConfigMap;
-  for (const ConfigMap::value_type& config: response.configs) {
+  for (const auto& config: response.configs) {
     Value key(config.first.c_str(), document->GetAllocator());
     Value value(config.second.c_str(), document->GetAllocator());
     Value config_json(kObjectType);

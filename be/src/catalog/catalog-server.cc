@@ -213,6 +213,8 @@ const string TABLE_METRICS_TEMPLATE = "table_metrics.tmpl";
 const string EVENT_WEB_PAGE = "/events";
 const string EVENT_METRICS_TEMPLATE = "events.tmpl";
 const string CATALOG_SERVICE_HEALTH_WEB_PAGE = "/healthz";
+const string HADOOP_VARZ_TEMPLATE = "hadoop-varz.tmpl";
+const string HADOOP_VARZ_WEB_PAGE = "/hadoop-varz";
 
 const int REFRESH_METRICS_INTERVAL_MS = 1000;
 
@@ -532,6 +534,8 @@ void CatalogServer::RegisterWebpages(Webserver* webserver, bool metrics_only) {
   webserver->RegisterUrlCallback(CATALOG_OPERATIONS_WEB_PAGE, CATALOG_OPERATIONS_TEMPLATE,
       [this](const auto& args, auto* doc) { this->OperationUsageUrlCallback(args, doc); },
       true);
+  webserver->RegisterUrlCallback(HADOOP_VARZ_WEB_PAGE, HADOOP_VARZ_TEMPLATE,
+      [this](const auto& args, auto* doc) { this->HadoopVarzHandler(args, doc); }, true);
   RegisterLogLevelCallbacks(webserver, true);
 }
 
@@ -1169,6 +1173,31 @@ void CatalogServer::HealthzHandler(
   }
   *(data) << "Not Available";
   *response = HttpStatusCode::ServiceUnavailable;
+}
+
+void CatalogServer::HadoopVarzHandler(const Webserver::WebRequest& req,
+    Document* document) {
+  TGetAllHadoopConfigsResponse response;
+  Status status  = catalog_->GetAllHadoopConfigs(&response);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error getting cluster configuration for hadoop-varz: "
+               << status.GetDetail();
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+
+  Value configs(kArrayType);
+  typedef map<string, string> ConfigMap;
+  for (const auto& config: response.configs) {
+    Value key(config.first.c_str(), document->GetAllocator());
+    Value value(config.second.c_str(), document->GetAllocator());
+    Value config_json(kObjectType);
+    config_json.AddMember("key", key, document->GetAllocator());
+    config_json.AddMember("value", value, document->GetAllocator());
+    configs.PushBack(config_json, document->GetAllocator());
+  }
+  document->AddMember("configs", configs, document->GetAllocator());
 }
 
 }

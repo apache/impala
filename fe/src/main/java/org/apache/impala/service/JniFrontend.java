@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -617,17 +618,20 @@ public class JniFrontend {
     return frontend_.getCatalog().getTable(tableName.db_name, tableName.table_name);
   }
 
-  // Caching this saves ~50ms per call to getHadoopConfigAsHtml
+  // Caching this saves ~50ms per call to getHadoopConfig
   private static final Configuration CONF = new Configuration();
   private static final Groups GROUPS = Groups.getUserToGroupsMappingService(CONF);
 
+  // Caching this saves ~50ms per call to getAllHadoopConfigs
+  // org.apache.hadoop.hive.conf.HiveConf inherrits org.apache.hadoop.conf.Configuration
+  private static final HiveConf HIVE_CONF = new HiveConf();
+
   /**
-   * Returns a string of all loaded Hadoop configuration parameters as a table of keys
-   * and values. If asText is true, output in raw text. Otherwise, output in html.
+   * Returns the serialized byte array of TGetAllHadoopConfigsResponse
    */
   public byte[] getAllHadoopConfigs() throws ImpalaException {
     Map<String, String> configs = Maps.newHashMap();
-    for (Map.Entry<String, String> e: CONF) {
+    for (Map.Entry<String, String> e: HIVE_CONF) {
       configs.put(e.getKey(), e.getValue());
     }
     TGetAllHadoopConfigsResponse result = new TGetAllHadoopConfigsResponse();

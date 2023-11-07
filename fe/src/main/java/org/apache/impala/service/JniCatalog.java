@@ -21,12 +21,15 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
@@ -85,6 +88,7 @@ import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
+import org.apache.impala.thrift.TGetAllHadoopConfigsResponse;
 import org.apache.impala.util.AuthorizationUtil;
 import org.apache.impala.util.CatalogOpUtil;
 import org.apache.impala.util.GlogAppender;
@@ -125,6 +129,8 @@ public class JniCatalog {
     UUID uuid = UUID.randomUUID();
     return new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
   }
+
+  private static final HiveConf HIVE_CONF = new HiveConf();
 
   public JniCatalog(byte[] thriftBackendConfig) throws ImpalaException {
     TBackendGflags cfg = new TBackendGflags();
@@ -593,5 +599,23 @@ public class JniCatalog {
       }
       return response;
     });
+  }
+
+  /**
+   * Returns the serialized byte array of TGetAllHadoopConfigsResponse
+   */
+  public byte[] getAllHadoopConfigs() throws ImpalaException {
+    Map<String, String> configs = Maps.newHashMap();
+    for (Map.Entry<String, String> e: HIVE_CONF) {
+      configs.put(e.getKey(), e.getValue());
+    }
+    TGetAllHadoopConfigsResponse result = new TGetAllHadoopConfigsResponse();
+    result.setConfigs(configs);
+    try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 }

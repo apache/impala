@@ -356,6 +356,11 @@ class CatalogServer {
   /// Raw callback to indicate whether the service is ready.
   void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,
       HttpStatusCode* response);
+
+  /// Json callback for /hadoop-varz. Produces Json with a list, 'configs', of (key,
+  /// value) pairs, one for each Hadoop configuration value.
+  void HadoopVarzHandler(const Webserver::WebRequest& req,
+      rapidjson::Document* document);
 };
 
 }

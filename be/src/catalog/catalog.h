@@ -152,6 +152,8 @@ class Catalog {
   /// Returns OK if the refreshing was successful, otherwise a Status object with
   /// information on the error will be returned.
   Status RefreshDataSources();
+  /// Returns all Hadoop configurations in key, value form in result.
+  Status GetAllHadoopConfigs(TGetAllHadoopConfigsResponse* result);
 
  private:
   jobject catalog_;  // instance of org.apache.impala.service.JniCatalog
@@ -179,6 +181,7 @@ class Catalog {
   jmethodID refresh_data_sources_; // JniCatalog.refreshDataSources()
   jmethodID get_null_partition_name_id_; // JniCatalog.getNullPartitionName()
   jmethodID get_latest_compactions_id_; // JniCatalog.getLatestCompactions()
+  jmethodID get_hadoop_configs_id_;  // JniCatalog.getAllHadoopConfigs()
 };
 
 }
