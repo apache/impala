@@ -678,15 +678,21 @@ public class AggregationNode extends PlanNode {
         Preconditions.checkState(lowPerInstanceDataBytes <= perInstanceDataBytes);
 
         // Given N as number of non-literal grouping expressions,
-        // corrFactor = AGG_MEM_CORRELATION_FACTOR ^ max(0, N - 1)
+        //   memScale = (1.0 - AGG_MEM_CORRELATION_FACTOR) ^ max(0, N - 1)
+        // Note that high value of AGG_MEM_CORRELATION_FACTOR value (close to 1.0) means
+        // there is high correlation between grouping expressions / columns, while low
+        // value (close to 0.0) means there is low correlation between them.
+        // High correlation means aggregation node can be scheduled with lower memory
+        // estimation (lower memScale).
         long nonLiteralExprCount = aggInfo.getGroupingExprs()
                                        .stream()
                                        .filter(e -> !(e instanceof LiteralExpr))
                                        .count();
-        double corrFactor = Math.pow(queryOptions.getAgg_mem_correlation_factor(),
-            Math.max(0, nonLiteralExprCount - 1));
+        double corrFactor = queryOptions.getAgg_mem_correlation_factor();
+        double memScale =
+            Math.pow(1.0 - corrFactor, Math.max(0, nonLiteralExprCount - 1));
         long resolvedPerInstanceDataBytes = lowPerInstanceDataBytes
-            + Math.round(corrFactor * (perInstanceDataBytes - lowPerInstanceDataBytes));
+            + Math.round(memScale * (perInstanceDataBytes - lowPerInstanceDataBytes));
         if (LOG.isTraceEnabled() && perInstanceDataBytes > resolvedPerInstanceDataBytes) {
           LOG.trace("Node " + getDisplayLabel() + " reduce perInstanceDataBytes from "
               + perInstanceDataBytes + " to " + resolvedPerInstanceDataBytes);

@@ -1418,20 +1418,47 @@ public class PlannerTest extends PlannerTestBase {
 
   /**
    * Test that memory estimate of aggregation node equals to the default estimation
-   * (with NDV multiplication method) if AGG_MEM_CORRELATION_FACTOR=1.0 or
+   * (with NDV multiplication method) if AGG_MEM_CORRELATION_FACTOR=0.0 or
    * LARGE_AGG_MEM_THRESHOLD is less than or equal to zero.
    */
   @Test
   public void testAggNodeMaxMemEstimate() {
     Set<PlannerTestOption> testOptions = tpcdsParquetTestOptions();
     TQueryOptions options = tpcdsParquetQueryOptions();
-    double defaultAggMemCorrelationFactor = options.getAgg_mem_correlation_factor();
-    options.setAgg_mem_correlation_factor(1.0);
+    options.setAgg_mem_correlation_factor(0.0);
+    options.setLarge_agg_mem_threshold(512 * 1024 * 1024);
     runPlannerTestFile(
         "agg-node-max-mem-estimate", "tpcds_parquet", options, testOptions);
 
+    options.setAgg_mem_correlation_factor(0.5);
     options.setLarge_agg_mem_threshold(0);
     runPlannerTestFile(
         "agg-node-max-mem-estimate", "tpcds_parquet", options, testOptions);
+  }
+
+  /**
+   * Test that high AGG_MEM_CORRELATION_FACTOR results in low memory estimate
+   * for aggregation node.
+   */
+  @Test
+  public void testAggNodeLowMemEstimate() {
+    Set<PlannerTestOption> testOptions = tpcdsParquetTestOptions();
+    TQueryOptions options = tpcdsParquetQueryOptions();
+    options.setAgg_mem_correlation_factor(0.9);
+    runPlannerTestFile(
+        "agg-node-low-mem-estimate", "tpcds_parquet", options, testOptions);
+  }
+
+  /**
+   * Test that low AGG_MEM_CORRELATION_FACTOR results in high memory estimate
+   * for aggregation node.
+   */
+  @Test
+  public void testAggNodeHighMemEstimate() {
+    Set<PlannerTestOption> testOptions = tpcdsParquetTestOptions();
+    TQueryOptions options = tpcdsParquetQueryOptions();
+    options.setAgg_mem_correlation_factor(0.1);
+    runPlannerTestFile(
+        "agg-node-high-mem-estimate", "tpcds_parquet", options, testOptions);
   }
 }
