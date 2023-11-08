@@ -794,6 +794,13 @@ class Statestore : public CacheLineAligned {
   /// True if the statestore instance is in recovery mode.
   bool in_recovery_mode_ = false;
 
+  /// Starting time to enter recovery mode.
+  int64_t recovery_start_time_;
+
+  /// Number of HA heartbeat received in active state.
+  /// Reset this variable whenever `is_active_` is set to true.
+  int num_received_heartbeat_in_active_ = 0;
+
   /// Disable network if this variable is set as true by statestore service API.
   /// This is only used for unit-test.
   AtomicBool disable_network_{false};
@@ -999,6 +1006,9 @@ class Statestore : public CacheLineAligned {
   /// Raw callback to indicate whether the service is ready.
   void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,
       HttpStatusCode* response);
+
+  // Return true if this statestore instance is in recovery mode.
+  bool IsInRecoveryMode();
 };
 
 } // namespace impala

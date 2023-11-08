@@ -208,6 +208,13 @@ const string STATESTORE_CONNECTED_PEER = "statestore.connected-with-peer-statest
 // an entry with the initial version.
 const Statestore::TopicEntry::Version Statestore::Subscriber::TOPIC_INITIAL_VERSION = 0;
 
+// If statestore instance in active state receives more than 10 heartbeats from its peer,
+// enter recovery mode to re-negotiate role with its peer.
+// Heartbeat period is set by FALGS_statestore_ha_heartbeat_monitoring_frequency_ms, its
+// default value is 1000 ms. That means statestore instance in active state will enter
+// recovery mode in 10 seconds if it repeatedly receives heartbeats from its peer.
+#define MAX_NUM_RECEIVED_HEARTBEAT_IN_ACTIVE 10
+
 // Updates or heartbeats that miss their deadline by this much are logged.
 const uint32_t DEADLINE_MISS_THRESHOLD_MS = 2000;
 
@@ -674,6 +681,7 @@ Statestore::Statestore(MetricGroup* metrics)
         FLAGS_statestore_max_missed_heartbeats,
         FLAGS_statestore_max_missed_heartbeats / 2)) {
   UUIDToTUniqueId(boost::uuids::random_generator()(), &statestore_id_);
+  LOG(INFO) << "Statestore ID: " << PrintId(statestore_id_);
   DCHECK(metrics != NULL);
   metrics_ = metrics;
   num_subscribers_metric_ = metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0);
@@ -712,6 +720,7 @@ Statestore::Statestore(MetricGroup* metrics)
     is_active_ = true;
     active_status_metric_->SetValue(is_active_);
     active_version_ = UnixMicros();
+    num_received_heartbeat_in_active_ = 0;
   } else {
     is_active_ = false;
     active_status_metric_->SetValue(is_active_);
@@ -1823,6 +1832,7 @@ Status Statestore::InitStatestoreHa(
     is_active_ = true;
     active_status_metric_->SetValue(is_active_);
     active_version_ = UnixMicros();
+    num_received_heartbeat_in_active_ = 0;
     LOG(INFO) << "Set Statestore as active since it does not receive handshake "
               << "response in HA preemption waiting period";
     found_peer_ = false;
@@ -1853,6 +1863,11 @@ int64_t Statestore::GetActiveVersion(bool* is_active) {
   lock_guard<mutex> l(ha_lock_);
   *is_active = is_active_;
   return active_version_;
+}
+
+bool Statestore::IsInRecoveryMode() {
+  lock_guard<mutex> l(ha_lock_);
+  return in_recovery_mode_;
 }
 
 Status Statestore::SendHaHandshake(TStatestoreHaHandshakeResponse* response) {
@@ -1906,6 +1921,7 @@ Status Statestore::ReceiveHaHandshakeRequest(const TUniqueId& peer_statestore_id
       is_active_ = true;
       active_status_metric_->SetValue(is_active_);
       active_version_ = UnixMicros();
+      num_received_heartbeat_in_active_ = 0;
       ha_standby_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
       LOG(INFO) << "Set the statestored as active since it's started with force active "
                 << "flag";
@@ -1924,6 +1940,8 @@ Status Statestore::ReceiveHaHandshakeRequest(const TUniqueId& peer_statestore_id
       }
       LOG(INFO) << "Set the statestored as " << (is_active_ ? "active" : "standby");
     }
+  } else {
+    LOG(INFO) << "Active state of statestored is not changed";
   }
   *statestore_active = is_active_;
   if (!found_peer_) {
@@ -1942,11 +1960,16 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
     // process HA heartbeat from active statestore
     ha_active_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
   } else {
-    // Receive heartbeat from its peer statestored. That means both statestored designate
-    // themselves as active. Enter recovery mode to restart negotiation.
+    num_received_heartbeat_in_active_++;
+    if (num_received_heartbeat_in_active_ <= MAX_NUM_RECEIVED_HEARTBEAT_IN_ACTIVE) {
+      return;
+    }
+    // Repeatedly receive heartbeat from its peer statestored. That means both statestored
+    // designate themselves as active. Enter recovery mode to restart negotiation.
     LOG(WARNING)
         << "Both statestoreds designate themselves as active, restart negotiation.";
     in_recovery_mode_ = true;
+    recovery_start_time_ = MonotonicMillis();
     in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
     is_active_ = false;
     active_status_metric_->SetValue(is_active_);
@@ -1954,19 +1977,30 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
   }
 }
 
+// TODO: break this function to 3 functions for each branch: recovery-mode, active state,
+// and standby state.
 [[noreturn]] void Statestore::MonitorStatestoredHaHeartbeat() {
+  bool sleep_between_processing = true;
   while (1) {
-    SleepForMs(FLAGS_statestore_ha_heartbeat_monitoring_frequency_ms);
-    lock_guard<mutex> l(ha_lock_);
-    if (in_recovery_mode_) {
+    if (sleep_between_processing) {
+      SleepForMs(FLAGS_statestore_ha_heartbeat_monitoring_frequency_ms);
+    } else {
+      sleep_between_processing = true;
+    }
+    if (IsInRecoveryMode()) {
       // Keep sending HA handshake request to its peer periodically until receiving
-      // response.
+      // response. Don't hold the ha_lock_ when sending HA handshake.
       TStatestoreHaHandshakeResponse response;
       Status status = SendHaHandshake(&response);
       if (!status.ok()) continue;
       status = Status(response.status);
       DCHECK(status.ok());
 
+      lock_guard<mutex> l(ha_lock_);
+      if (!in_recovery_mode_) {
+        sleep_between_processing = false;
+        continue;
+      }
       // Exit "recovery" mode.
       in_recovery_mode_ = false;
       in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
@@ -1975,19 +2009,31 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
       active_status_metric_->SetValue(is_active_);
       found_peer_ = true;
       connected_peer_metric_->SetValue(found_peer_);
-      LOG(INFO) << "Receive Statestore HA handshake response, exit HA recovery mode. "
-                << "Set the statestored as " << (is_active_ ? "active" : "standby");
+      int64_t elapsed_ms = MonotonicMillis() - recovery_start_time_;
+      LOG(INFO) << "Receive Statestore HA handshake response, exit HA recovery mode in "
+                << PrettyPrinter::Print(elapsed_ms, TUnit::TIME_MS)
+                << ". Set the statestored as " << (is_active_ ? "active" : "standby");
       if (is_active_) {
         active_version_ = UnixMicros();
         // Send notification to all subscribers.
         update_statestored_cv_.NotifyAll();
       }
-    } else if (is_active_) {
+    } else if (IsActive()) {
       // Statestored in active state
       // Send HA heartbeat to standby statestored.
-      if (found_peer_) {
+      bool send_heartbeat = false;
+      {
+        lock_guard<mutex> l(ha_lock_);
+        if (is_active_ && found_peer_) send_heartbeat = true;
+      }
+      if (send_heartbeat) {
         Status status = SendHaHeartbeat();
         if (status.ok()) continue;
+      }
+      lock_guard<mutex> l(ha_lock_);
+      if (!is_active_) {
+        sleep_between_processing = false;
+        continue;
       }
       // Check if standby statestored is reachable.
       FailureDetector::PeerState state =
@@ -2001,12 +2047,13 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
         LOG(INFO) << "Statestored lost connection with peer statestored";
       }
 
-      lock_guard<mutex> l(subscribers_lock_);
+      lock_guard<mutex> l2(subscribers_lock_);
       if (subscribers_.size() == 0) {
         // To avoid race with new active statestored, original active statestored enter
         // "recovery" mode if it does not receive heartbeat responses from standby
         // statestored and all subscribers.
         in_recovery_mode_ = true;
+        recovery_start_time_ = MonotonicMillis();
         in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
         is_active_ = false;
         active_status_metric_->SetValue(is_active_);
@@ -2017,6 +2064,11 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
     } else {
       // Statestored in standby state
       // Monitor connection state with its peer statestored.
+      lock_guard<mutex> l(ha_lock_);
+      if (is_active_) {
+        sleep_between_processing = false;
+        continue;
+      }
       FailureDetector::PeerState state =
           ha_active_ss_failure_detector_->GetPeerState(STATESTORE_ID);
       // Check if the majority of subscribers lost connection with active statestored.
@@ -2050,12 +2102,14 @@ void Statestore::HaHeartbeatRequest(const TUniqueId& dst_statestore_id,
         is_active_ = true;
         active_status_metric_->SetValue(is_active_);
         active_version_ = UnixMicros();
+        num_received_heartbeat_in_active_ = 0;
         // Send notification to all subscribers.
         update_statestored_cv_.NotifyAll();
       } else if (total_subscribers == 0) {
         // If there is no subscriber, it means this statestored lost connection with
         // other nodes in the cluster, enter "recovery" mode.
         in_recovery_mode_ = true;
+        recovery_start_time_ = MonotonicMillis();
         in_ha_recovery_mode_metric_->SetValue(in_recovery_mode_);
         LOG(WARNING) << "Enter HA recovery mode.";
       } else {
@@ -2080,7 +2134,10 @@ Status Statestore::SendHaHeartbeat() {
 
   TStatestoreHaHeartbeatRequest request;
   TStatestoreHaHeartbeatResponse response;
-  request.__set_dst_statestore_id(peer_statestore_id_);
+  {
+    lock_guard<mutex> l(ha_lock_);
+    request.__set_dst_statestore_id(peer_statestore_id_);
+  }
   request.__set_src_statestore_id(statestore_id_);
   status = client.DoRpc(&StatestoreHaServiceClientWrapper::StatestoreHaHeartbeat,
       request, &response);

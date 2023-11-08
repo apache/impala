@@ -396,7 +396,8 @@ void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id,
       *active_statestore_conn_state = statestore_->GetStatestoreConnState();
     }
   } else {
-    VLOG(3) << "Ignore heartbeat message from unknown statestored: " << statestore_id;
+    VLOG(3) << "Ignore heartbeat message from unknown statestored: "
+            << PrintId(statestore_id);
   }
 }
 
@@ -416,7 +417,7 @@ void StatestoreSubscriber::UpdateCatalogd(
     // the future.
     *update_skipped = true;
     LOG(INFO) << "Skipped updating catalogd message from unknown or inactive "
-              << "statestored: " << statestore_id;
+              << "statestored: " << PrintId(statestore_id);
   }
 }
 
@@ -494,7 +495,7 @@ void StatestoreSubscriber::UpdateStatestoredRole(bool is_active,
     // update in the future.
     *update_skipped = true;
     LOG(INFO) << "Skipped updating statestored message from unknown statestored: "
-              << statestore_id;
+              << PrintId(statestore_id);
   }
 }
 
@@ -523,7 +524,7 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
     // future.
     *skipped = true;
     VLOG(3) << "Skipped topic update message from unknown or inactive statestored: "
-            << statestore_id;
+            << PrintId(statestore_id);
     return Status::OK();
   }
 }

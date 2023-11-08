@@ -629,12 +629,9 @@ class TestStatestoredHA(CustomClusterTestSuite):
     # Re-enable network for standby statestored. Verify that the statestored exits
     # HA recovery mode.
     self.__disable_statestored_network(disable_network=False)
-    # IMPALA-12550: sometimes the active statestore takes a few minutes to response
-    # the HA handshake from standby statestore. Temporarily comment out following
-    # two lines util the issue is fixed.
-    # statestore_service_0.wait_for_metric_value(
-    #    "statestore.in-ha-recovery-mode", expected_value=False, timeout=120)
-    # assert(not statestore_service_0.get_metric_value("statestore.active-status"))
+    statestore_service_0.wait_for_metric_value(
+        "statestore.in-ha-recovery-mode", expected_value=False, timeout=120)
+    assert(not statestore_service_0.get_metric_value("statestore.active-status"))
 
 
 class TestStatestoredHAStartupDelay(CustomClusterTestSuite):
