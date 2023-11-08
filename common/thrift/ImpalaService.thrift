@@ -878,6 +878,20 @@ enum TImpalaQueryOptions {
   // During this time deleted Kudu tables can be recovered by Kudu's 'recall table' API.
   // See KUDU-3326 for details.
   KUDU_TABLE_RESERVE_SECONDS = 168
+
+  // When true, TIMESTAMPs read from Kudu will be converted from UTC to local time.
+  // Writes are unaffected.
+  CONVERT_KUDU_UTC_TIMESTAMPS = 169
+
+  // This only makes sense when 'CONVERT_KUDU_UTC_TIMESTAMPS' is true. When true, it
+  // disables the bloom filter for Kudu's timestamp type, because using local timestamp in
+  // Kudu bloom filter may cause missing rows.
+  // Local timestamp convert to UTC could be ambiguous in the case of DST change.
+  // We can only put one of the two possible UTC timestamps in the bloom filter
+  // for now, which may cause missing rows that have the other UTC timestamp.
+  // For those regions that do not observe DST, could set this flag to false
+  // to re-enable kudu local timestamp bloom filter.
+  DISABLE_KUDU_LOCAL_TIMESTAMP_BLOOM_FILTER = 170
 }
 
 // The summary of a DML statement.

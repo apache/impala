@@ -84,7 +84,6 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragment& fragmen
         query_state->query_ctx().utc_timestamp_string))),
     local_time_zone_(UTCPTR),
     time_zone_for_unix_time_conversions_(UTCPTR),
-    time_zone_for_legacy_parquet_time_conversions_(UTCPTR),
     profile_(RuntimeProfile::Create(
         obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
     instance_buffer_reservation_(obj_pool()->Add(new ReservationTracker)) {
@@ -111,7 +110,6 @@ RuntimeState::RuntimeState(
         qctx.utc_timestamp_string))),
     local_time_zone_(UTCPTR),
     time_zone_for_unix_time_conversions_(UTCPTR),
-    time_zone_for_legacy_parquet_time_conversions_(UTCPTR),
     profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")),
     instance_buffer_reservation_(nullptr) {
   // We may use execution resources while evaluating exprs, etc. Decremented in
@@ -176,9 +174,6 @@ void RuntimeState::Init() {
     }
     if (query_options().use_local_tz_for_unix_timestamp_conversions) {
       time_zone_for_unix_time_conversions_ = local_time_zone_;
-    }
-    if (query_options().convert_legacy_hive_parquet_utc_timestamps) {
-      time_zone_for_legacy_parquet_time_conversions_ = local_time_zone_;
     }
   }
 }

@@ -88,6 +88,16 @@ class KuduScanner {
   /// Closes the current kudu::client::KuduScanner.
   void CloseCurrentClientScanner();
 
+  /// Convert the 'v' from local timezone to UTC, and for those ambiguous conversions,
+  /// if timestamp t >= v before conversion, then this function converts v in such a way
+  /// that the same will be true after t is converted.
+  void ConvertLocalTimeMinStatToUTC(TimestampValue* v) const;
+
+  /// Convert the 'v' from local timezone to UTC, and for those ambiguous conversions,
+  /// if timestamp t <= v before conversion, then this function converts v in such a way
+  /// that the same will be true after t is converted.
+  void ConvertLocalTimeMaxStatToUTC(TimestampValue* v) const;
+
   inline Tuple* next_tuple(Tuple* t) const {
     uint8_t* mem = reinterpret_cast<uint8_t*>(t);
     return reinterpret_cast<Tuple*>(mem + scan_node_->tuple_desc()->byte_size());

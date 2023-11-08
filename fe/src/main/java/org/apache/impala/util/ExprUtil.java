@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 
 import org.apache.curator.shaded.com.google.common.collect.Lists;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.SelectListItem;
@@ -83,9 +84,32 @@ public class ExprUtil {
   public static long localTimestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr)
       throws AnalysisException, InternalException {
     return utcTimestampToUnixTimeMicros(analyzer,
-        toUtcTimestampExpr(analyzer, timestampExpr));
+        toUtcTimestampExpr(analyzer, timestampExpr, null));
   }
 
+  /**
+   * Converts a timestamp in local timezone to UTC, then to UNIX microseconds.
+   * If expectPreIfNonUnique is null, expect the conversion to be unique and returns
+   * the unique value, otherwise it returns null.
+   * In cases of ambiguous conversion (e.g., when the timestamp falls within the DST
+   * repeated interval), if 'expectPreIfNonUnique' is true, it returns the previous
+   * possible value, otherwise it returns the posterior possible value.
+   * In cases of invalid conversion (e.g., when the timestamp falls within the DST
+   * skipped interval), if 'expectPreIfNonUnique' is true, it returns the transition point
+   * value, otherwise it returns null.
+   */
+  public static Long localTimestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr,
+      Boolean expectPreIfNonUnique) throws AnalysisException, InternalException {
+    Expr toUtcTimestampExpr = toUtcTimestampExpr(analyzer, timestampExpr,
+        expectPreIfNonUnique);
+    Expr toUnixTimeExpr = new FunctionCallExpr("utc_to_unix_micros",
+        Lists.newArrayList(toUtcTimestampExpr));
+    toUnixTimeExpr.analyze(analyzer);
+    TColumnValue result = FeSupport.EvalExprWithoutRow(toUnixTimeExpr,
+        analyzer.getQueryCtx());
+    if (!result.isSetLong_val()) return null;
+    return result.getLong_val();
+  }
 
   /**
    * Converts a timestamp in local timezone to string value.
@@ -93,17 +117,21 @@ public class ExprUtil {
   public static String localTimestampToString(Analyzer analyzer, Expr timestampExpr)
       throws AnalysisException, InternalException {
     return utcTimestampToSpecifiedTimeZoneTimestamp(analyzer,
-        toUtcTimestampExpr(analyzer, timestampExpr));
+        toUtcTimestampExpr(analyzer, timestampExpr, null));
   }
 
-  private static Expr toUtcTimestampExpr(Analyzer analyzer, Expr timestampExpr)
-      throws AnalysisException {
+  private static Expr toUtcTimestampExpr(Analyzer analyzer, Expr timestampExpr,
+      Boolean expectPreIfNonUnique) throws AnalysisException {
     Preconditions.checkArgument(timestampExpr.isAnalyzed());
     Preconditions.checkArgument(timestampExpr.isConstant());
     Preconditions.checkArgument(timestampExpr.getType() == Type.TIMESTAMP);
-    Expr toUtcTimestamp = new FunctionCallExpr("to_utc_timestamp",
-        Lists.newArrayList(timestampExpr,
-            new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone())));
+    List<Expr> params = Lists.newArrayList(timestampExpr,
+        new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone()));
+    if (expectPreIfNonUnique != null) {
+      params.add(new BoolLiteral(expectPreIfNonUnique));
+    }
+    FunctionCallExpr toUtcTimestamp = new FunctionCallExpr("to_utc_timestamp", params);
+    toUtcTimestamp.setIsInternalFnCall(true);
     toUtcTimestamp.analyze(analyzer);
     return toUtcTimestamp;
   }

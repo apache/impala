@@ -298,7 +298,24 @@ class TimestampValue {
 
   /// Converts from 'local_tz' to UTC time zone in-place. The caller must ensure the
   /// TimestampValue this function is called upon has both a valid date and time.
-  void LocalToUtc(const Timezone& local_tz);
+  ///
+  /// If pre/post_utc_if_repeated is not nullptr and timestamp falls into an interval
+  /// where conversion is ambiguous (e.g. Summer->Winter DST change on Northern
+  /// hemisphere), then these arguments are set to the previous/posterior of possible UTC
+  /// timestamp. Or if the timestamp falls into a skipped interval (e.g. Winter->Summer
+  /// DST change on Northern hemisphere), then these arguments will be both set to the UTC
+  /// timestamp of the transition point, and if the above conditions occur 'this' will be
+  /// set to invalid timestamp.
+  ///
+  /// The pre/post_utc_if_repeated is useful to get some ordering guarantees in the case
+  /// when the order of two timestamps is different in UTC and local time (e.g CET Autumn
+  /// dst change 00:30:00 -> 02:30:00 vs 01:15:00 -> 02:15:00) - any timestamp that is
+  /// earlier than 'this' in local time is guaranteed to be earlier than
+  /// 'post_utc_if_repeated' in UTC, and any timestamp later than 'this' in local time is
+  /// guaranteed to be later than 'pre_utc_if_repeated' in UTC.
+  void LocalToUtc(const Timezone& local_tz,
+      TimestampValue* pre_utc_if_repeated = nullptr,
+      TimestampValue* post_utc_if_repeated = nullptr);
 
   void set_date(const boost::gregorian::date d) { date_ = d; Validate(); }
   void set_time(const boost::posix_time::time_duration t) { time_ = t; Validate(); }

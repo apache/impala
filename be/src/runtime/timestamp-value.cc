@@ -155,8 +155,11 @@ void TimestampValue::UtcToLocal(const Timezone& local_tz,
   }
 }
 
-void TimestampValue::LocalToUtc(const Timezone& local_tz) {
+void TimestampValue::LocalToUtc(const Timezone& local_tz,
+    TimestampValue* pre_utc_if_repeated, TimestampValue* post_utc_if_repeated) {
   DCHECK(HasDateAndTime());
+  // Time-zone conversion rules don't affect fractional seconds, leave them intact.
+  const auto nanos = nanoseconds(time_.fractional_seconds());
   const cctz::civil_second from_cs(date_.year(), date_.month(), date_.day(),
       time_.hours(), time_.minutes(), time_.seconds());
 
@@ -164,18 +167,37 @@ void TimestampValue::LocalToUtc(const Timezone& local_tz) {
   // 'local_tz' time-zone.
   const cctz::time_zone::civil_lookup from_cl = local_tz.lookup(from_cs);
 
-  // In case the resulting 'time_point' is ambiguous, we have to invalidate
-  // TimestampValue.
+  if (LIKELY(from_cl.kind == cctz::time_zone::civil_lookup::UNIQUE)) {
+    *this = UtcFromUnixTimeTicks<1>(TimePointToUnixTime(from_cl.pre));
+    time_ += nanos;
+    return;
+  }
+
+  // In case the resulting 'time_point' is ambiguous, we have to invalidate this
+  // TimestampValue and set pre/post_utc_if_repeated if needed.
   // 'civil_lookup' members and the details of handling ambiguity are described at:
   // https://github.com/google/cctz/blob/a2dd3d0fbc811fe0a1d4d2dbb0341f1a3d28cb2a/
   // include/cctz/time_zone.h#L106
-  if (UNLIKELY(from_cl.kind != cctz::time_zone::civil_lookup::UNIQUE)) {
-    SetToInvalidDateTime();
+  SetToInvalidDateTime();
+  if (from_cl.kind == cctz::time_zone::civil_lookup::REPEATED){
+    if (pre_utc_if_repeated != nullptr) {
+      *pre_utc_if_repeated = UtcFromUnixTimeTicks<1>(TimePointToUnixTime(from_cl.pre));
+      pre_utc_if_repeated->time_ += nanos;
+    }
+    if (post_utc_if_repeated != nullptr) {
+      *post_utc_if_repeated = UtcFromUnixTimeTicks<1>(TimePointToUnixTime(from_cl.post));
+      post_utc_if_repeated->time_ += nanos;
+    }
   } else {
-    int64_t nanos = time_.fractional_seconds();
-    *this = UtcFromUnixTimeTicks<1>(TimePointToUnixTime(from_cl.pre));
-    // Time-zone conversion rules don't affect fractional seconds, leave them intact.
-    time_ += nanoseconds(nanos);
+    DCHECK(from_cl.kind == cctz::time_zone::civil_lookup::SKIPPED);
+    if (pre_utc_if_repeated != nullptr) {
+      *pre_utc_if_repeated = UtcFromUnixTimeTicks<1>(TimePointToUnixTime(from_cl.trans));
+      pre_utc_if_repeated->time_ += nanos;
+    }
+    if (post_utc_if_repeated != nullptr) {
+      *post_utc_if_repeated = UtcFromUnixTimeTicks<1>(TimePointToUnixTime(from_cl.trans));
+      post_utc_if_repeated->time_ += nanos;
+    }
   }
 }
 

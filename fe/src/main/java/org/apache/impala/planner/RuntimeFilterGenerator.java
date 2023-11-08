@@ -43,6 +43,7 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.Predicate;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
@@ -482,6 +483,12 @@ public final class RuntimeFilterGenerator {
       if (isTimestampTruncation) {
         Preconditions.checkArgument(srcExpr.isAnalyzed());
         Preconditions.checkArgument(srcExpr.getType() == Type.TIMESTAMP);
+        // The filter is targeted for Kudu scan node with source timestamp truncation.
+        if (analyzer.getQueryOptions().isConvert_kudu_utc_timestamps()) {
+          List<Expr> params = Lists.newArrayList(srcExpr,
+              new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone()));
+          srcExpr = new FunctionCallExpr("to_utc_timestamp", params);
+        }
         Expr toUnixTimeExpr =
             new FunctionCallExpr("utc_to_unix_micros", Lists.newArrayList(srcExpr));
         try {
@@ -1170,6 +1177,19 @@ public final class RuntimeFilterGenerator {
           }
           SlotRef slotRef = (SlotRef) targetExpr;
           if (slotRef.getDesc().getColumn() == null) continue;
+          if (filter.isTimestampTruncation() &&
+              analyzer.getQueryOptions().isConvert_kudu_utc_timestamps() &&
+              analyzer.getQueryOptions().isDisable_kudu_local_timestamp_bloom_filter()) {
+            // Local timestamp convert to UTC could be ambiguous in the case of DST
+            // change. We can only put one of the two possible UTC timestamps in the bloom
+            // filter for now, which may cause missing rows that have the other UTC
+            // timestamp.
+            // For those regions that do not observe DST, could set this flag to false
+            // to re-enable kudu local timestamp bloom filter.
+            LOG.info("Skipping runtime filter because kudu local timestamp bloom filter "
+                + "is disabled: " + filter.getSrcExpr().toSql());
+            continue;
+          }
         } else if (filter.getType() == TRuntimeFilterType.MIN_MAX) {
           Preconditions.checkState(
               enabledRuntimeFilterTypes.contains(TRuntimeFilterType.MIN_MAX),

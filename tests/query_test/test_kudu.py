@@ -17,6 +17,8 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
+from copy import deepcopy
+
 from kudu.schema import (
     BOOL,
     DOUBLE,
@@ -92,6 +94,33 @@ class TestKuduBasicDML(KuduTestSuite):
       'QueryTest/kudu_create_table_like_table',
       vector,
       use_db=unique_database)
+
+
+class TestKuduTimestampConvert(KuduTestSuite):
+  """
+  This suite tests converts UTC timestamps read from kudu table to local time.
+  """
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestKuduTimestampConvert, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('convert_kudu_utc_timestamps', 'true')
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('timezone', '"America/Los_Angeles"')
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_timestamp_conversion(self, vector):
+    self.run_test_case('QueryTest/kudu_timestamp_conversion', vector)
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_predicate_with_timestamp_conversion(self, vector):
+    self.run_test_case('QueryTest/kudu_predicate_with_timestamp_conversion', vector)
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_runtime_filter_with_timestamp_conversion(self, vector):
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['timezone']  # .test file sets timezone
+    self.run_test_case('QueryTest/kudu_runtime_filter_with_timestamp_conversion',
+        new_vector)
+
 
 # TODO(IMPALA-8614): parameterize some tests to run with HMS integration enabled.
 class TestKuduOperations(KuduTestSuite):

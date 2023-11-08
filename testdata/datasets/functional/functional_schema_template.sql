@@ -4402,3 +4402,31 @@ transactional=false
 ---- DEPENDENT_LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/empty_present_stream.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+timestamp_at_dst_changes
+---- COLUMNS
+id int
+unixtime bigint
+ts timestamp
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/timestamp_at_dst_changes.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  id INT PRIMARY KEY,
+  unixtime BIGINT,
+  ts TIMESTAMP
+)
+PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
+---- DEPENDENT_LOAD_KUDU
+INSERT into TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+====

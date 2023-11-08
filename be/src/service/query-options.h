@@ -50,7 +50,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::KUDU_TABLE_RESERVE_SECONDS + 1);                              \
+      TImpalaQueryOptions::DISABLE_KUDU_LOCAL_TIMESTAMP_BLOOM_FILTER + 1);               \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -313,6 +313,10 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(codegen_opt_level, CODEGEN_OPT_LEVEL, TQueryOptionLevel::ADVANCED)        \
   QUERY_OPT_FN(kudu_table_reserve_seconds, KUDU_TABLE_RESERVE_SECONDS,                   \
       TQueryOptionLevel::ADVANCED)                                                       \
+  QUERY_OPT_FN(convert_kudu_utc_timestamps,                                              \
+      CONVERT_KUDU_UTC_TIMESTAMPS, TQueryOptionLevel::ADVANCED)                          \
+  QUERY_OPT_FN(disable_kudu_local_timestamp_bloom_filter,                                \
+      DISABLE_KUDU_LOCAL_TIMESTAMP_BLOOM_FILTER, TQueryOptionLevel::ADVANCED)            \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.

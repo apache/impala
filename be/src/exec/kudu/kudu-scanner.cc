@@ -285,6 +285,18 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
           max = &int_max;
         }
 
+        TimestampValue ts_min;
+        TimestampValue ts_max;
+        if (state_->query_options().convert_kudu_utc_timestamps &&
+            col_type.type == TYPE_TIMESTAMP) {
+          ts_min = *reinterpret_cast<const TimestampValue*>(min);
+          ts_max = *reinterpret_cast<const TimestampValue*>(max);
+          ConvertLocalTimeMinStatToUTC(&ts_min);
+          ConvertLocalTimeMaxStatToUTC(&ts_max);
+          min = &ts_min;
+          max = &ts_max;
+        }
+
         KuduValue* min_value;
         RETURN_IF_ERROR(CreateKuduValue(col_type, min, &min_value));
         KUDU_RETURN_IF_ERROR(scanner_->AddConjunctPredicate(
@@ -391,7 +403,14 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
       }
       int64_t ts_micros = *reinterpret_cast<int64_t*>(
           kudu_tuple->GetSlot(slot->tuple_offset()));
-      TimestampValue tv = TimestampValue::UtcFromUnixTimeMicros(ts_micros);
+
+      TimestampValue tv;
+      if (state_->query_options().convert_kudu_utc_timestamps) {
+        tv = TimestampValue::FromUnixTimeMicros(ts_micros, state_->local_time_zone());
+      } else {
+        tv = TimestampValue::UtcFromUnixTimeMicros(ts_micros);
+      }
+
       if (tv.HasDateAndTime()) {
         RawValue::Write(&tv, kudu_tuple, slot, nullptr);
       } else {
@@ -461,6 +480,22 @@ Status KuduScanner::GetNextScannerBatch() {
 string KuduScanner::BuildErrorString(const char* msg) const {
   return Substitute("$0 for node with id '$1' for Kudu table '$2'",
       msg, scan_node_->id(), scan_node_->table_desc()->table_name());
+}
+
+void KuduScanner::ConvertLocalTimeMinStatToUTC(TimestampValue* v) const {
+  if (!v->HasDateAndTime()) return;
+  TimestampValue pre_repeated_utc_time;
+  const Timezone* local_tz = state_->local_time_zone();
+  v->LocalToUtc(*local_tz, &pre_repeated_utc_time);
+  if (pre_repeated_utc_time.HasDateAndTime()) *v = pre_repeated_utc_time;
+}
+
+void KuduScanner::ConvertLocalTimeMaxStatToUTC(TimestampValue* v) const {
+  if (!v->HasDateAndTime()) return;
+  TimestampValue post_repeated_utc_time;
+  const Timezone* local_tz = state_->local_time_zone();
+  v->LocalToUtc(*local_tz, nullptr, &post_repeated_utc_time);
+  if (post_repeated_utc_time.HasDateAndTime()) *v = post_repeated_utc_time;
 }
 
 }  // namespace impala

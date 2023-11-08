@@ -909,6 +909,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_convert_legacy_hive_parquet_utc_timestamps(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::CONVERT_KUDU_UTC_TIMESTAMPS: {
+        query_options->__set_convert_kudu_utc_timestamps(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::DISABLE_KUDU_LOCAL_TIMESTAMP_BLOOM_FILTER: {
+        query_options->__set_disable_kudu_local_timestamp_bloom_filter(IsTrue(value));
+        break;
+      }
       case TImpalaQueryOptions::ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION: {
         query_options->__set_enable_outer_join_to_inner_transformation(IsTrue(value));
         break;

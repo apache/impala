@@ -150,6 +150,56 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
   return ts_val_ret;
 }
 
+TimestampVal TimestampFunctions::ToUtcUnambiguous(FunctionContext* context,
+    const TimestampVal& ts_val, const StringVal& tz_string_val,
+    const BooleanVal& expect_pre_bool_val) {
+  if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (!ts_value.HasDateAndTime()) return TimestampVal::null();
+
+  const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
+  const Timezone* timezone = TimezoneDatabase::FindTimezone(
+      string(tz_string_value.Ptr(), tz_string_value.Len()));
+  if (UNLIKELY(timezone == nullptr)) {
+    // Although this is an error, Hive ignores it. We will issue a warning but otherwise
+    // ignore the error too.
+    stringstream ss;
+    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
+    context->AddWarning(ss.str().c_str());
+    return ts_val;
+  }
+
+  TimestampValue ts_value_ret = ts_value;
+  TimestampValue pre_utc_if_repeated;
+  TimestampValue post_utc_if_repeated;
+  ts_value_ret.LocalToUtc(*timezone, &pre_utc_if_repeated, &post_utc_if_repeated);
+
+  TimestampVal ts_val_ret;
+  if (LIKELY(ts_value_ret.HasDateAndTime())) {
+    ts_value_ret.ToTimestampVal(&ts_val_ret);
+  } else {
+    if (expect_pre_bool_val.is_null) {
+      const string& msg =
+          Substitute("Timestamp '$0' in timezone '$1' could not be converted to UTC",
+              ts_value.ToString(), tz_string_value.DebugString());
+      context->AddWarning(msg.c_str());
+      return TimestampVal::null();
+    }
+    if (expect_pre_bool_val.val) {
+      pre_utc_if_repeated.ToTimestampVal(&ts_val_ret);
+    } else {
+      if (pre_utc_if_repeated == post_utc_if_repeated) {
+        return TimestampVal::null();
+      } else {
+        post_utc_if_repeated.ToTimestampVal(&ts_val_ret);
+      }
+    }
+  }
+
+  return ts_val_ret;
+}
+
+
 // The purpose of making this .cc only is to avoid moving the code of
 // CastDirection into the .h file
 void UnixAndFromUnixPrepare(FunctionContext* context,

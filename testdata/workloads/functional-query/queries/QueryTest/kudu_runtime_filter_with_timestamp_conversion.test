@@ -1,0 +1,73 @@
+====
+---- QUERY
+# Test that kudu runtime filter with timestamps can be work correctly in the local time.
+set timezone='America/Los_Angeles';
+select straight_join t1.id, t1.ts, t2.id, from_utc_timestamp(t2.ts, 'America/Los_Angeles')
+  from timestamp_at_dst_changes t1
+  join functional.timestamp_at_dst_changes t2
+  on t1.ts = from_utc_timestamp(t2.ts, 'America/Los_Angeles')
+  order by t1.id, t2.id;
+---- TYPES
+BIGINT,TIMESTAMP,BIGINT,TIMESTAMP
+---- RESULTS
+1,2011-03-13 01:00:00,1,2011-03-13 01:00:00
+2,2011-03-13 01:30:00,2,2011-03-13 01:30:00
+3,2011-03-13 03:00:00,3,2011-03-13 03:00:00
+4,2011-03-13 03:30:00,4,2011-03-13 03:30:00
+5,2011-11-06 01:00:00,5,2011-11-06 01:00:00
+5,2011-11-06 01:00:00,8,2011-11-06 01:00:00
+6,2011-11-06 01:20:00,6,2011-11-06 01:20:00
+6,2011-11-06 01:20:00,9,2011-11-06 01:20:00
+7,2011-11-06 01:40:00,7,2011-11-06 01:40:00
+7,2011-11-06 01:40:00,10,2011-11-06 01:40:00
+8,2011-11-06 01:00:00,5,2011-11-06 01:00:00
+8,2011-11-06 01:00:00,8,2011-11-06 01:00:00
+9,2011-11-06 01:20:00,6,2011-11-06 01:20:00
+9,2011-11-06 01:20:00,9,2011-11-06 01:20:00
+10,2011-11-06 01:40:00,7,2011-11-06 01:40:00
+10,2011-11-06 01:40:00,10,2011-11-06 01:40:00
+---- RUNTIME_PROFILE
+row_regex: .*RF00.\[min_max\] <- from_utc_timestamp\(t2.ts, 'America/Los_Angeles'\).*
+====
+---- QUERY
+# Test that kudu min_max runtime filter with timestamps can be work correctly in the
+# local time even dst changes.
+set timezone='America/Los_Angeles';
+select straight_join * from timestamp_at_dst_changes t1
+  join (select '2011-11-06 01:00:00' as ts) t2 on t1.ts = t2.ts;
+---- TYPES
+BIGINT,BIGINT,TIMESTAMP,TIMESTAMP
+---- RESULTS
+5,1320566400,2011-11-06 01:00:00,2011-11-06 01:00:00
+8,1320570000,2011-11-06 01:00:00,2011-11-06 01:00:00
+---- RUNTIME_PROFILE
+row_regex: .*RF00.\[min_max\] <- t2.ts.*
+====
+---- QUERY
+# Test that kudu bloom runtime filter with timestamps can be work correctly in the
+# local time without DST changes. After using kudu timestamp conversion, the kudu bloom
+# filter for target columns of timestamp type is disabled by default to avoid missing rows
+# due to DST ambiguity. If it is certain that the time zone being used does not observe
+# DST, the Bloom filter can be re-enabled using disable_kudu_local_timestamp_bloom_filter.
+set timezone='Asia/Shanghai';
+set disable_kudu_local_timestamp_bloom_filter=false;
+select straight_join t1.id, t1.ts, t2.ts from timestamp_at_dst_changes t1
+  join functional.timestamp_at_dst_changes t2
+  on t1.ts = from_utc_timestamp(t2.ts, 'Asia/Shanghai')
+  order by t1.id;
+---- TYPES
+BIGINT,TIMESTAMP,TIMESTAMP
+---- RESULTS
+1,2011-03-13 17:00:00,2011-03-13 09:00:00
+2,2011-03-13 17:30:00,2011-03-13 09:30:00
+3,2011-03-13 18:00:00,2011-03-13 10:00:00
+4,2011-03-13 18:30:00,2011-03-13 10:30:00
+5,2011-11-06 16:00:00,2011-11-06 08:00:00
+6,2011-11-06 16:20:00,2011-11-06 08:20:00
+7,2011-11-06 16:40:00,2011-11-06 08:40:00
+8,2011-11-06 17:00:00,2011-11-06 09:00:00
+9,2011-11-06 17:20:00,2011-11-06 09:20:00
+10,2011-11-06 17:40:00,2011-11-06 09:40:00
+---- RUNTIME_PROFILE
+row_regex: .*RF00.\[bloom\] <- utc_to_unix_micros\(to_utc_timestamp\(from_utc_timestamp\(t2.ts, 'Asia/Shanghai'\), 'Asia/Shanghai'\)\).*
+====

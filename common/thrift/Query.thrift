@@ -681,6 +681,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   169: optional i32 kudu_table_reserve_seconds = 0;
+
+  // See comment in ImpalaService.thrift
+  170: optional bool convert_kudu_utc_timestamps = false;
+
+  // See comment in ImpalaService.thrift
+  171: optional bool disable_kudu_local_timestamp_bloom_filter = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

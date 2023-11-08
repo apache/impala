@@ -124,9 +124,6 @@ class RuntimeState {
   const Timezone* time_zone_for_unix_time_conversions() const {
     return time_zone_for_unix_time_conversions_;
   }
-  const Timezone* time_zone_for_legacy_parquet_time_conversions() const {
-    return time_zone_for_legacy_parquet_time_conversions_;
-  }
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& fragment_instance_id() const {
     return instance_ctx_ != nullptr
@@ -358,11 +355,6 @@ class RuntimeState {
   /// if use_local_tz_for_unix_timestamp_conversions=1, then the local_time_zone_ is used
   /// instead.
   const Timezone* time_zone_for_unix_time_conversions_;
-
-  /// Query-global timezone used to read INT96 timestamps written by Hive. UTC by default,
-  /// but if convert_legacy_hive_parquet_utc_timestamps=1, then the local_time_zone_ is
-  /// used instead.
-  const Timezone* time_zone_for_legacy_parquet_time_conversions_;
 
   /// Thread resource management object for this fragment's execution.  The runtime
   /// state is responsible for returning this pool to the thread mgr.

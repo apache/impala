@@ -3120,7 +3120,8 @@ ParquetTimestampDecoder HdfsParquetScanner::CreateTimestampDecoder(
     const parquet::SchemaElement& element) {
   bool timestamp_conversion_needed_for_int96_timestamps =
       file_version_.application == "parquet-mr" &&
-      state_->time_zone_for_legacy_parquet_time_conversions() != UTCPTR;
+      state_->query_options().convert_legacy_hive_parquet_utc_timestamps &&
+      state_->local_time_zone() != UTCPTR;
 
   return ParquetTimestampDecoder(element, state_->local_time_zone(),
       timestamp_conversion_needed_for_int96_timestamps);

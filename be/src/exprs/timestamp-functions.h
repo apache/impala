@@ -159,6 +159,19 @@ class TimestampFunctions {
   static TimestampVal ToUtc(FunctionContext* context,
       const TimestampVal& ts_val, const StringVal& tz_string_val);
 
+  /// Convert a timestamp in particular timezone to UTC unambiguously.
+  /// If the conversion is unique or 'expect_pre_bool_val' is null, this function behaves
+  /// consistently with ToUtc.
+  /// In cases of ambiguous conversion (e.g., when the timestamp falls within the DST
+  /// repeated interval), if 'expect_pre_bool_val' is true, it returns the previous
+  /// possible value, otherwise it returns the posterior possible value.
+  /// In cases of invalid conversion (e.g., when the timestamp falls within the DST
+  /// skipped interval), if 'expect_pre_bool_val' is true, it returns the transition point
+  /// value, otherwise it returns null.
+  static TimestampVal ToUtcUnambiguous(FunctionContext* context,
+      const TimestampVal& ts_val, const StringVal& tz_string_val,
+      const BooleanVal& expect_pre_bool_val);
+
   /// Functions to extract parts of the timestamp, return integers.
   static IntVal Year(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal Quarter(FunctionContext* context, const TimestampVal& ts_val);

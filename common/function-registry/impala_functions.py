@@ -1071,6 +1071,9 @@ visible_functions = [
 ]
 
 invisible_functions = [
+  [['to_utc_timestamp'], 'TIMESTAMP', ['TIMESTAMP', 'STRING', 'BOOLEAN'],
+      "impala::TimestampFunctions::ToUtcUnambiguous"],
+
   [['months_add_interval'], 'TIMESTAMP', ['TIMESTAMP', 'INT'],
       '_ZN6impala18TimestampFunctions6AddSubILb1EN10impala_udf6IntValEN5boost9date_time15months_durationINS4_9gregorian21greg_durations_configEEELb0EEENS2_12TimestampValEPNS2_15FunctionContextERKSA_RKT0_'],
   [['months_add_interval'], 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
