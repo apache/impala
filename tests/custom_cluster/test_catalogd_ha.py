@@ -21,6 +21,7 @@ import re
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
+from tests.util.filesystem_utils import get_fs_path
 from time import sleep
 
 LOG = logging.getLogger('catalogd_ha_test')
@@ -389,3 +390,38 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
     # Verify simple queries are ran successfully.
     self.__run_simple_queries()
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=true",
+    start_args="--enable_catalogd_ha")
+  def test_metadata_after_failover(self, unique_database):
+    """Verify that the metadata is correct after failover."""
+    catalogds = self.cluster.catalogds()
+    assert(len(catalogds) == 2)
+    catalogd_service_1 = catalogds[0].service
+    catalogd_service_2 = catalogds[1].service
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    create_func_impala = ("create function {database}.identity_tmp(bigint) "
+                          "returns bigint location '{location}' symbol='Identity'")
+    self.client.execute(create_func_impala.format(
+        database=unique_database,
+        location=get_fs_path('/test-warehouse/libTestUdfs.so')))
+    self.execute_query_expect_success(
+        self.client, "select %s.identity_tmp(10)" % unique_database)
+
+    # Kill active catalogd
+    catalogds[0].kill()
+
+    # Wait for long enough for the statestore to detect the failure of active catalogd
+    # and assign active role to standby catalogd.
+    catalogd_service_2.wait_for_metric_value(
+        "catalog-server.active-status", expected_value=True, timeout=30)
+    assert(catalogd_service_2.get_metric_value(
+        "catalog-server.ha-number-active-status-change") > 0)
+    assert(catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    self.execute_query_expect_success(
+        self.client, "select %s.identity_tmp(10)" % unique_database)

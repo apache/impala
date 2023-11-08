@@ -152,6 +152,9 @@ DEFINE_bool(enable_skipping_older_events, false, "This configuration is used to 
 DEFINE_int32(catalog_operation_log_size, 100, "Number of catalog operation log records "
     "to retain in catalogd. If -1, the operation log has unbounded size.");
 
+DEFINE_bool(catalogd_ha_reset_metadata_on_failover, false, "If true, reset all metadata "
+    "when the catalogd becomes active.");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);
@@ -542,6 +545,19 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
       catalog_->RegenerateServiceId();
       // Clear pending topic updates.
       pending_topic_updates_.clear();
+      if (FLAGS_catalogd_ha_reset_metadata_on_failover) {
+        // Reset all metadata when the catalogd becomes active.
+        TResetMetadataRequest req;
+        TResetMetadataResponse resp;
+        req.__set_header(TCatalogServiceRequestHeader());
+        req.header.__set_want_minimal_response(false);
+        req.__set_is_refresh(false);
+        req.__set_sync_ddl(false);
+        Status status = catalog_->ResetMetadata(req, &resp);
+        if (!status.ok()) {
+          LOG(ERROR) << "Failed to reset metadata triggered by catalogd failover.";
+        }
+      }
       // Signal the catalog update gathering thread to start.
       topic_updates_ready_ = false;
       catalog_update_cv_.NotifyOne();
