@@ -117,39 +117,40 @@ EOF
 # These use the same pip caches as the virtualenvs to avoid extra downloads. This
 # script is a prerequisite for the pypi packaging, so there is no concurrency issue.
 echo "Building all external dependencies"
-for MODULE in ${SHELL_HOME}/ext-py/*; do
-  # Sometimes there are leftover module directories from version changes. If IMPALA_HOME
-  # is a git repository, then we can check if the module directory is tracked by git.
-  # If it is not tracked, skip building it. The downside of this check is that when
-  # adding a new directory, it won't build until added in git. This check does not apply
-  # when IMPALA_HOME is not a git repository (e.g. if building from a release tarball).
-  if ${IS_GIT_CHECKOUT} &&
-     ! git ls-files --error-unmatch ${MODULE} > /dev/null 2>&1 ; then
-    echo "WARNING: ${MODULE} is not tracked by the git repository, skipping..."
-    continue;
-  fi
-  pushd ${MODULE} > /dev/null 2>&1
-  for PYTHON_EXE in $*; do
+for PYTHON_EXE in $*; do
+  PYTHON_NAME=$(basename ${PYTHON_EXE})
+  PYTHON_VERSION=$(${PYTHON_EXE} -c 'import sys; \
+    print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
+  # pip install the wheel into the external dependencies directory
+  PIP_CACHE="~/.cache/impala_pip/${PYTHON_NAME}"
+  # overwrite any earlier install of the same version. System Pythons are appended to
+  # the list, and will always override extra definitions of the same version.
+  rm -rf ${TARBALL_ROOT}/ext-py${PYTHON_VERSION}
+  # Use the venv to get the wheel package needed for bdist_wheel below.
+  source ${IMPALA_HOME}/shell/build/${PYTHON_NAME}_venv/bin/activate
+  for MODULE in ${SHELL_HOME}/ext-py/*; do
+    # Sometimes there are leftover module directories from version changes. If IMPALA_HOME
+    # is a git repository, then we can check if the module directory is tracked by git.
+    # If it is not tracked, skip building it. The downside of this check is that when
+    # adding a new directory, it won't build until added in git. This check does not apply
+    # when IMPALA_HOME is not a git repository (e.g. if building from a release tarball).
+    if ${IS_GIT_CHECKOUT} &&
+      ! git ls-files --error-unmatch ${MODULE} > /dev/null 2>&1 ; then
+      echo "WARNING: ${MODULE} is not tracked by the git repository, skipping..."
+      continue;
+    fi
+    pushd ${MODULE} > /dev/null 2>&1
     echo "Cleaning up old build artifacts."
     rm -rf dist 2>&1 > /dev/null
     rm -rf build 2>&1 > /dev/null
     echo "Building ${MODULE} with ${PYTHON_EXE}"
-    # Use the venv to get the wheel package needed for bdist_wheel below.
-    PYTHON_NAME=$(basename ${PYTHON_EXE})
-    source ${IMPALA_HOME}/shell/build/${PYTHON_NAME}_venv/bin/activate
     if [[ "$MODULE" == *"/bitarray"* ]]; then
       # Need to use setuptools to build wheel for bitarray module
       python -c "import setuptools; exec(open('setup.py').read())" -q bdist_wheel
     else
       python setup.py -q bdist_wheel clean
     fi
-    # pip install the wheel into the external dependencies directory
-    PIP_CACHE="~/.cache/impala_pip/${PYTHON_NAME}"
-    PYTHON_VERSION=$(${PYTHON_EXE} -c 'import sys; \
-      print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
-    # Use --upgrade to suppress warnings about replacement when $* includes duplicate
-    # Python minor versions.
-    pip install --upgrade --no-deps --cache "${PIP_CACHE}" \
+    pip install --no-deps --cache "${PIP_CACHE}" \
       --target ${TARBALL_ROOT}/ext-py${PYTHON_VERSION} dist/*.whl
   done
   popd 2>&1 > /dev/null
