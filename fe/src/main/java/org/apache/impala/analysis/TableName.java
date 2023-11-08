@@ -140,9 +140,10 @@ public class TableName {
   }
 
   public List<String> toPath() {
-    List<String> result = Lists.newArrayListWithCapacity(2);
+    List<String> result = Lists.newArrayListWithCapacity(3);
     if (db_ != null) result.add(db_);
     result.add(tbl_);
+    if (vTbl_ != null && !vTbl_.isEmpty()) result.add(vTbl_);
     return result;
   }
 

@@ -38,6 +38,7 @@ import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
+import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
@@ -272,8 +273,11 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       Preconditions.checkArgument(includedStrings_.length != 0 ||
               excludedStrings_.length != 0,
           "One or both of included or excluded strings must be defined.");
-      List<String> result = resultToStringList(authzFrontend_.describeTable(table,
-          outputStyle_, user_));
+      TDescribeTableParams testParams = new TDescribeTableParams();
+      testParams.setTable_name(table);
+      testParams.setOutput_style(outputStyle_);
+      List<String> result = resultToStringList(authzFrontend_.describeTable(testParams,
+          user_));
       for (String str: includedStrings_) {
         assertTrue(String.format("\"%s\" is not in the describe output.\n" +
                 "Expected : %s\n Actual   : %s", str, Arrays.toString(includedStrings_),

@@ -186,6 +186,9 @@ Status Frontend::DescribeTable(const TDescribeTableParams& params,
   tparams.__set_output_style(params.output_style);
   if (params.__isset.table_name) tparams.__set_table_name(params.table_name);
   if (params.__isset.result_struct) tparams.__set_result_struct(params.result_struct);
+  if (params.__isset.metadata_table_name) {
+    tparams.__set_metadata_table_name(params.metadata_table_name);
+  }
   tparams.__set_session(session);
   return JniUtil::CallJniMethod(fe_, describe_table_id_, tparams, response);
 }

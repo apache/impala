@@ -3563,6 +3563,9 @@ public class Analyzer {
    */
   public FeTable getTable(TableName tblName, boolean mustExist)
       throws AnalysisException, TableLoadingException {
+    if (IcebergMetadataTable.isIcebergMetadataTable(tblName.toPath())) {
+      return getMetadataVirtualTable(tblName.toPath());
+    }
     FeTable table = globalState_.stmtTableCache.tables.get(tblName);
     if (table == null) {
       if (!mustExist) {
@@ -3603,13 +3606,15 @@ public class Analyzer {
   }
 
   /**
-   * Adds a new Iceberg metadata table to the stmt table cache. At this point it is
-   * unknown if the base table is loaded for scanning as well, therefore the original
-   * table is kept. The metadata table will have its vTbl field filled, while the original
-   * table gets a new key without the vTbl field.
-   * 'tblRefPath' parameter has to be an IcebergMetadataTable reference path.
+   * Retrieves the Iceberg metadata table from the stmtTableCache if the Iceberg metadata
+   * table exists or creates and adds it to the stmtTableCache if it does not exist. At
+   * this point it is unknown if the base table is loaded for scanning as well, therefore
+   * the original table is kept. The metadata table will have its vTbl field filled, while
+   * the original table gets a new key without the vTbl field. 'tblRefPath' parameter has
+   * to be an IcebergMetadataTable reference path. Returns the the Iceberg metadata table.
    */
-  public void addMetadataVirtualTable(List<String> tblRefPath) throws AnalysisException {
+  public FeTable getMetadataVirtualTable(List<String> tblRefPath)
+      throws AnalysisException {
     Preconditions.checkArgument(IcebergMetadataTable.isIcebergMetadataTable(tblRefPath));
     try {
       TableName catalogTableName = new TableName(tblRefPath.get(0),
@@ -3619,11 +3624,14 @@ public class Analyzer {
       // The catalog table (the base of the virtual table) has been loaded and cached
       // under the name of the virtual table.
       FeTable catalogTable = getStmtTableCache().tables.get(virtualTableName);
-      if (catalogTable instanceof IcebergMetadataTable || catalogTable == null) return;
+      if (catalogTable instanceof IcebergMetadataTable || catalogTable == null) {
+        return catalogTable;
+      }
       IcebergMetadataTable virtualTable =
           new IcebergMetadataTable(catalogTable, tblRefPath.get(2));
       getStmtTableCache().tables.put(catalogTableName, catalogTable);
       getStmtTableCache().tables.put(virtualTableName, virtualTable);
+      return virtualTable;
     } catch (ImpalaRuntimeException e) {
       throw new AnalysisException("Could not create metadata table for table "
           + "reference: " + StringUtils.join(tblRefPath, "."), e);

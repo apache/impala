@@ -127,9 +127,11 @@ import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -169,6 +171,7 @@ import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TImpalaTableType;
+import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
 import org.apache.impala.thrift.TIcebergOperation;
 import org.apache.impala.thrift.TExecRequest;
@@ -664,7 +667,8 @@ public class Frontend {
         columns.add(new TColumn("encoding", Type.STRING.toThrift()));
         columns.add(new TColumn("compression", Type.STRING.toThrift()));
         columns.add(new TColumn("block_size", Type.STRING.toThrift()));
-      } else if (descStmt.getTable() instanceof FeIcebergTable
+      } else if ((descStmt.getTable() instanceof FeIcebergTable
+          || descStmt.getTable() instanceof IcebergMetadataTable)
           && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
         columns.add(new TColumn("nullable", Type.STRING.toThrift()));
       }
@@ -1656,24 +1660,34 @@ public class Frontend {
    * Throws an exception if the table or db is not found or if there is an error loading
    * the table metadata.
    */
-  public TDescribeResult describeTable(TTableName tableName,
-      TDescribeOutputStyle outputStyle, User user) throws ImpalaException {
-    RetryTracker retries = new RetryTracker(
-        String.format("fetching table %s.%s", tableName.db_name, tableName.table_name));
-    while (true) {
-      try {
-        return doDescribeTable(tableName, outputStyle, user);
-      } catch(InconsistentMetadataFetchException e) {
-        retries.handleRetryOrThrow(e);
+  public TDescribeResult describeTable(TDescribeTableParams params, User user)
+      throws ImpalaException {
+    if (params.isSetTable_name()) {
+      RetryTracker retries = new RetryTracker(
+          String.format("fetching table %s.%s", params.table_name.db_name,
+              params.table_name.table_name));
+      while (true) {
+        try {
+          return doDescribeTable(params.table_name, params.output_style, user,
+              params.metadata_table_name);
+        } catch(InconsistentMetadataFetchException e) {
+          retries.handleRetryOrThrow(e);
+        }
       }
+    } else {
+      Preconditions.checkState(params.output_style == TDescribeOutputStyle.MINIMAL);
+      Preconditions.checkNotNull(params.result_struct);
+      StructType structType = (StructType)Type.fromThrift(params.result_struct);
+      return DescribeResultFactory.buildDescribeMinimalResult(structType);
     }
   }
 
-  private TDescribeResult doDescribeTable(TTableName tableName,
-      TDescribeOutputStyle outputStyle, User user) throws ImpalaException {
-    FeTable table = getCatalog().getTable(tableName.db_name,
-        tableName.table_name);
-    List<Column> filteredColumns;
+  /**
+   * Filters out columns that the user is not authorized to see.
+   */
+  private List<Column> filterAuthorizedColumnsForDescribeTable(FeTable table, User user)
+      throws InternalException {
+    List<Column> authFilteredColumns;
     if (authzFactory_.getAuthorizationConfig().isEnabled()) {
       // First run a table check
       PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
@@ -1681,7 +1695,7 @@ public class Frontend {
           .allOf(Privilege.VIEW_METADATA).onTable(table).build();
       if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
         // Filter out columns that the user is not authorized to see.
-        filteredColumns = new ArrayList<Column>();
+        authFilteredColumns = new ArrayList<Column>();
         for (Column col: table.getColumnsInHiveOrder()) {
           String colName = col.getName();
           privilegeRequest = new PrivilegeRequestBuilder(
@@ -1690,22 +1704,37 @@ public class Frontend {
               .onColumn(table.getDb().getName(),
                   table.getName(), colName, table.getOwnerUser()).build();
           if (authzChecker_.get().hasAccess(user, privilegeRequest)) {
-            filteredColumns.add(col);
+            authFilteredColumns.add(col);
           }
         }
       } else {
         // User has table-level access
-        filteredColumns = table.getColumnsInHiveOrder();
+        authFilteredColumns = table.getColumnsInHiveOrder();
       }
     } else {
       // Authorization is disabled
-      filteredColumns = table.getColumnsInHiveOrder();
+      authFilteredColumns = table.getColumnsInHiveOrder();
     }
+    return authFilteredColumns;
+  }
+
+  private TDescribeResult doDescribeTable(TTableName tableName,
+      TDescribeOutputStyle outputStyle, User user, String vTableName)
+      throws ImpalaException {
+    FeTable table = getCatalog().getTable(tableName.db_name,
+        tableName.table_name);
+    List<Column> filteredColumns = filterAuthorizedColumnsForDescribeTable(table, user);
     if (outputStyle == TDescribeOutputStyle.MINIMAL) {
       if (table instanceof FeKuduTable) {
         return DescribeResultFactory.buildKuduDescribeMinimalResult(filteredColumns);
       } else if (table instanceof FeIcebergTable) {
-        return DescribeResultFactory.buildIcebergDescribeMinimalResult(filteredColumns);
+        if (vTableName == null) {
+          return DescribeResultFactory.buildIcebergDescribeMinimalResult(filteredColumns);
+        } else {
+          Preconditions.checkArgument(vTableName != null);
+          return DescribeResultFactory.buildIcebergMetadataDescribeMinimalResult(table,
+              vTableName);
+        }
       } else {
         return DescribeResultFactory.buildDescribeMinimalResult(
             Column.columnsToStruct(filteredColumns));
@@ -1713,6 +1742,7 @@ public class Frontend {
     } else {
       Preconditions.checkArgument(outputStyle == TDescribeOutputStyle.FORMATTED ||
           outputStyle == TDescribeOutputStyle.EXTENDED);
+      Preconditions.checkArgument(vTableName == null);
       TDescribeResult result = DescribeResultFactory.buildDescribeFormattedResult(table,
           filteredColumns);
       // Filter out LOCATION text

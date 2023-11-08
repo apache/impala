@@ -33,6 +33,7 @@ import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumnValue;
@@ -350,5 +351,20 @@ public class DescribeResultFactory {
           Lists.newArrayList(colNameCol, dataTypeCol, commentCol, nullableCol)));
     }
     return descResult;
+  }
+
+  /**
+   * Builds a TDescribeResult for an Iceberg metadata table from an IcebergTable and a
+   * metadata table name.
+   *
+   * This describe request is issued against a VirtualTable which only exists in the
+   * Analyzer's StmtTableCache. Therefore, to get the columns of an IcebergMetadataTable
+   * it is simpler to re-create this object than to extract those from a new
+   * org.apache.iceberg.Table object or to send it over.
+   */
+  public static TDescribeResult buildIcebergMetadataDescribeMinimalResult(FeTable table,
+      String vTableName) throws ImpalaRuntimeException {
+    IcebergMetadataTable metadataTable = new IcebergMetadataTable(table, vTableName);
+    return buildIcebergDescribeMinimalResult(metadataTable.getColumns());
   }
 }

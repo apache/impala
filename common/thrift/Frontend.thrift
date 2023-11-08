@@ -187,11 +187,14 @@ struct TDescribeTableParams {
   // Set when describing a table.
   2: optional CatalogObjects.TTableName table_name
 
+  // Set for metadata tables
+  3: optional string metadata_table_name
+
   // Set when describing a path to a nested collection.
-  3: optional Types.TColumnType result_struct
+  4: optional Types.TColumnType result_struct
 
   // Session state for the user who initiated this request.
-  4: optional Query.TSessionState session
+  5: optional Query.TSessionState session
 }
 
 // Results of a call to describeDb() and describeTable()

@@ -25,6 +25,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeTableParams;
@@ -124,6 +125,7 @@ public class DescribeTableStmt extends StatementBase {
     // all columns returning an empty result due to insufficient VIEW_METADATA privilege.
     analyzer.getTable(table_.getTableName(), /* add column-level privilege */ true,
         Privilege.ANY);
+    checkMinimalForIcebergMetadataTable();
 
     // Describing a table.
     if (path_.destTable() != null) return;
@@ -150,6 +152,14 @@ public class DescribeTableStmt extends StatementBase {
     }
   }
 
+  private void checkMinimalForIcebergMetadataTable() throws AnalysisException {
+    if (table_ instanceof IcebergMetadataTable &&
+        outputStyle_ != TDescribeOutputStyle.MINIMAL) {
+      throw new AnalysisException("DESCRIBE FORMATTED|EXTENDED cannot refer to a "
+          + "metadata table.");
+    }
+  }
+
   public TDescribeTableParams toThrift() {
     TDescribeTableParams params = new TDescribeTableParams();
     params.setOutput_style(outputStyle_);
@@ -158,6 +168,10 @@ public class DescribeTableStmt extends StatementBase {
     } else {
       Preconditions.checkNotNull(table_);
       params.setTable_name(table_.getTableName().toThrift());
+      if (table_ instanceof IcebergMetadataTable) {
+        params.setMetadata_table_name(((IcebergMetadataTable)table_).
+            getMetadataTableName());
+      }
     }
     return params;
   }
