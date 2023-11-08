@@ -1213,6 +1213,7 @@ class TestIcebergV2Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-tablesample-v2', vector,
         use_db="functional_parquet")
 
+  @SkipIf.hardcoded_uris
   def test_metadata_tables(self, vector):
     with self.create_impala_client() as impalad_client:
       overwrite_snapshot_id = impalad_client.execute("select snapshot_id from "
