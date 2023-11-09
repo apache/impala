@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog;
 
+import static org.apache.impala.catalog.ParallelFileMetadataLoader.createPool;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -24,9 +26,18 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -188,21 +199,11 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   protected List<FileStatus> getFileStatuses(FileSystem fs, boolean listWithLocations)
       throws IOException {
     if (icebergFiles_.isEmpty()) return null;
-    RemoteIterator<? extends FileStatus> fileStatuses = null;
     // For the FSs in 'FileSystemUtil#SCHEME_SUPPORT_STORAGE_IDS' (e.g. HDFS, Ozone,
     // Alluxio, etc.) we ensure the file with block location information, so we're going
     // to get the block information through 'FileSystemUtil.listFiles'.
-    if (listWithLocations) {
-      fileStatuses = FileSystemUtil.listFiles(fs, partDir_, recursive_, debugAction_);
-    }
-    Map<Path, FileStatus> nameToFileStatus = Maps.newHashMap();
-    if (fileStatuses != null) {
-      while (fileStatuses.hasNext()) {
-        FileStatus status = fileStatuses.next();
-        nameToFileStatus.put(status.getPath(), status);
-      }
-    }
-
+    Map<Path, FileStatus> nameToFileStatus = Collections.emptyMap();
+    if (listWithLocations) nameToFileStatus = parallelListing(fs);
     List<FileStatus> stats = Lists.newLinkedList();
     for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
       Path path = FileSystemUtil.createFullyQualifiedPath(
@@ -227,6 +228,45 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       }
     }
     return stats;
+  }
+
+  private Map<Path, FileStatus> parallelListing(FileSystem fs) throws IOException {
+    String logPrefix = "Parallel Iceberg file metadata listing";
+    ExecutorService pool = createPool(icebergFiles_.size(), fs, logPrefix);
+    final Set<Path> partitionPaths;
+    Map<Path, FileStatus> nameToFileStatus = Maps.newConcurrentMap();
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(logPrefix)) {
+      partitionPaths = icebergFilesByPartition();
+      List<Future<Void>> tasks =
+          partitionPaths.stream()
+              .map(path -> pool.submit(() -> listingTask(fs, path, nameToFileStatus)))
+              .collect(Collectors.toList());
+      for (Future<Void> task : tasks) { task.get(); }
+    } catch (ExecutionException | InterruptedException e) {
+      throw new IOException(String.format("%s: failed to load paths.", logPrefix), e);
+    } finally {
+      pool.shutdown();
+    }
+    return nameToFileStatus;
+  }
+
+  private Set<Path> icebergFilesByPartition() {
+    return StreamSupport.stream(icebergFiles_.getAllContentFiles().spliterator(), false)
+        .map(contentFile -> new Path(String.valueOf(contentFile.path())).getParent())
+        .collect(Collectors.toSet());
+  }
+
+  private Void listingTask(FileSystem fs, Path partitionPath,
+      Map<Path, FileStatus> nameToFileStatus) throws IOException {
+    RemoteIterator<? extends FileStatus> remoteIterator =
+        FileSystemUtil.listFiles(fs, partitionPath, recursive_, debugAction_);
+    Map<Path, FileStatus> perThreadMapping = new HashMap<>();
+    while (remoteIterator.hasNext()) {
+      FileStatus status = remoteIterator.next();
+      perThreadMapping.put(status.getPath(), status);
+    }
+    nameToFileStatus.putAll(perThreadMapping);
+    return null;
   }
 
   @VisibleForTesting
