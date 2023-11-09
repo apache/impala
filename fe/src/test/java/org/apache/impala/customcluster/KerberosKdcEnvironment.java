@@ -84,9 +84,27 @@ class KerberosKdcEnvironment extends ExternalResource {
     return servicePrincipal;
   }
 
+  public String getServicePrincipal(String service, String hostname) {
+    return String.format("%s/%s@%s", service, hostname, realm);
+  }
+
   public String getServiceKeytabFilePath() throws IOException {
     return new File(kerbyServer.getWorkDir().getCanonicalPath() + "/impala.keytab")
             .getCanonicalPath();
+  }
+
+  public String getKeytabFilePathWithServicePrincipal(String service, String hostname)
+          throws IOException, KrbException {
+    String servicePrincipal = getServicePrincipal(service, hostname);
+
+    String keytabFileName = String.format("%s.%s.keytab", service, hostname);
+    File keytabFile = new File(kerbyServer.getWorkDir().getCanonicalPath() +
+            "/" + keytabFileName);
+
+    kerbyServer.createPrincipal(servicePrincipal, "password");
+    kerbyServer.exportPrincipal(servicePrincipal, keytabFile);
+
+    return keytabFile.getCanonicalPath();
   }
 
   public String getKrb5ConfigPath() throws IOException {
@@ -125,6 +143,23 @@ class KerberosKdcEnvironment extends ExternalResource {
     return ImmutableMap.of(
             "principal", getServicePrincipal(), // enables Kerberos auth
             "keytab_file", getServiceKeytabFilePath()
+    );
+  }
+
+  public Map<String, String> getKerberosAuthFlagsWithCustomServicePrincipal(
+          String service, String hostname) throws IOException, KrbException {
+    return ImmutableMap.of(
+            "principal", getServicePrincipal(service, hostname), // enables Kerberos auth
+            "keytab_file", getKeytabFilePathWithServicePrincipal(service, hostname),
+
+            // To use the internal Kerberos authentication, the impala daemons must be
+            // started with a service principal that has a valid hostname,
+            // which in this test environment can be practically only "localhost",
+            // but here we want to specify a unique hostname,
+            // so we need to disable internal Kerberos authentication.
+            // Another, more complicated option would be to put more service principals
+            // in the keytab file above and specify the "be_principal" flag accordingly.
+            "skip_internal_kerberos_auth", "true"
     );
   }
 

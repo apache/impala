@@ -167,6 +167,7 @@ cp ${SHELL_HOME}/ImpalaHttpClient.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/shell_exceptions.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/shell_output.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/cookie_util.py ${TARBALL_ROOT}/lib
+cp ${SHELL_HOME}/kerberos_util.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/value_converter.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
 cp ${SHELL_HOME}/impala_shell.py ${TARBALL_ROOT}

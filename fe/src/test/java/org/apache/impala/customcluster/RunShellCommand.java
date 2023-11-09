@@ -22,7 +22,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.IOException;
 
 /**
  * Helper class to run a shell command.

@@ -60,6 +60,7 @@ assemble_package_files() {
   cp "${SHELL_HOME}/ImpalaHttpClient.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/shell_exceptions.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/cookie_util.py" "${MODULE_LIB_DIR}"
+  cp "${SHELL_HOME}/kerberos_util.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/value_converter.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/thrift_printer.py" "${MODULE_LIB_DIR}"
 

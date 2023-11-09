@@ -46,6 +46,7 @@ from TCLIService.TCLIService import (TExecuteStatementReq, TOpenSessionReq,
     TOperationState, TFetchResultsReq, TFetchOrientation, TGetLogReq,
     TGetResultSetMetadataReq, TTypeId, TCancelOperationReq, TCloseOperationReq)
 from ImpalaHttpClient import ImpalaHttpClient
+from kerberos_util import get_kerb_host_from_kerberos_host_fqdn
 from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
@@ -432,7 +433,7 @@ class ImpalaClient(object):
     elif self.use_kerberos or self.kerberos_host_fqdn:
       # Set the Kerberos service
       if self.kerberos_host_fqdn is not None:
-        kerb_host = self.kerberos_host_fqdn.split(':')[0].encode('ascii', 'ignore')
+        kerb_host = get_kerb_host_from_kerberos_host_fqdn(self.kerberos_host_fqdn)
       else:
         kerb_host = self.impalad_host
       kerb_service = "{0}@{1}".format(self.kerberos_service_name, kerb_host)
@@ -463,14 +464,13 @@ class ImpalaClient(object):
       # Systems. Only attempt to import TSSLSocket if the user wants an SSL connection.
       from TSSLSocketWithWildcardSAN import TSSLSocketWithWildcardSAN
 
-    # sasl does not accept unicode strings, explicitly encode the string into ascii.
     # The kerberos_host_fqdn option exposes the SASL client's hostname attribute to
     # the user. impala-shell checks to ensure this host matches the host in the kerberos
     # principal. So when a load balancer is configured to be used, its hostname is
     # expected by impala-shell. Setting this option to the load balancer hostname allows
     # impala-shell to connect directly to an impalad.
     if self.kerberos_host_fqdn is not None:
-      sasl_host = self.kerberos_host_fqdn.split(':')[0].encode('ascii', 'ignore')
+      sasl_host = get_kerb_host_from_kerberos_host_fqdn(self.kerberos_host_fqdn)
     else:
       sasl_host = self.impalad_host
 

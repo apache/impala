@@ -587,11 +587,46 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
   }
 
   /**
+   * Tests Kerberos authentication with the Kerberos hostname override option.
+   */
+  @Test
+  public void testShellKerberosAuthWithKerberosHostnameOverride()
+          throws Exception {
+    String kerberosHostFqdn = "any.host";
+
+    Map<String, String> flags = mergeFlags(
+
+            // enable Kerberos authentication
+            kerberosKdcEnvironment.getKerberosAuthFlagsWithCustomServicePrincipal(
+                    "impala", kerberosHostFqdn)
+
+    );
+    int ret = startImpalaCluster(flagsToArgs(flags));
+    assertEquals(ret, 0);
+
+    // Cluster should pass impala-shell Kerberos auth tests:
+    // In this test, the impala daemon is running on localhost, and we connect to it
+    // with impala-shell, but the service principal used in the impala daemon does
+    // not have a "localhost" hostname, so we need to use the kerberos_host_fqdn option.
+    testShellKerberosAuthWithUser( kerberosKdcEnvironment, "user",
+            /* shouldSucceed */ true, kerberosHostFqdn);
+  }
+
+  /**
    * Tests Kerberos authentication using impala-shell.
    */
   protected void testShellKerberosAuthWithUser(
           KerberosKdcEnvironment kerberosKdcEnvironment, String username,
           boolean shouldSucceed) throws Exception {
+    testShellKerberosAuthWithUser(kerberosKdcEnvironment, username, shouldSucceed, null);
+  }
+
+  /**
+   * Tests Kerberos authentication using impala-shell.
+   */
+  protected void testShellKerberosAuthWithUser(
+          KerberosKdcEnvironment kerberosKdcEnvironment, String username,
+          boolean shouldSucceed, String kerberosHostFqdn) throws Exception {
 
     List<String> protocolsToTest = Arrays.asList("beeswax", "hs2");
     if (pythonSupportsSSLContext()) {
@@ -605,12 +640,11 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
             kerberosKdcEnvironment.createUserPrincipalAndCredentialsCache(username);
 
     for (String protocol : protocolsToTest) {
-      String[] command = {
-              "impala-shell.sh",
-              String.format("--protocol=%s", protocol),
-              "--kerberos",
-              "--query=select logged_in_user()"
-      };
+      String[] command =
+              kerberosHostFqdn == null ?
+                      createCommandForProtocol(protocol) :
+                      createCommandForProtocolAndKerberosHostFqdn(protocol,
+                              kerberosHostFqdn);
       String expectedOut =
               shouldSucceed ? kerberosKdcEnvironment.getUserPrincipal(username) : "";
       String expectedErr =
@@ -620,6 +654,28 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
               kerberosKdcEnvironment.getImpalaShellEnv(credentialsCacheFilePath),
               shouldSucceed, expectedOut, expectedErr);
     }
+  }
+
+  private String[] createCommandForProtocol(String protocol) {
+    String[] command = {
+            "impala-shell.sh",
+            String.format("--protocol=%s", protocol),
+            "--kerberos",
+            "--query=select logged_in_user()"
+    };
+    return command;
+  }
+
+  private String[] createCommandForProtocolAndKerberosHostFqdn(String protocol,
+                                                               String kerberosHostFqdn) {
+    String[] command = {
+            "impala-shell.sh",
+            String.format("--protocol=%s", protocol),
+            "--kerberos",
+            String.format("--kerberos_host_fqdn=%s", kerberosHostFqdn),
+            "--query=select logged_in_user()"
+    };
+    return command;
   }
 
   private Map<String, String> getLdapSimpleBindFlags() {

@@ -1,3 +1,6 @@
+#!/usr/bin/env impala-python
+# -*- coding: utf-8 -*-
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,21 +18,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Python2-only requirements
+from __future__ import absolute_import, division, print_function
 
-cm-api == 10.0.0
-  # Already available as part of python on Linux.
-  readline == 6.2.4.1; sys_platform == 'darwin'
-flake8 == 3.9.2
-  mccabe == 0.6.1
-  pycodestyle == 2.7.0
-  pyflakes == 2.3.1
-  enum34 == 1.1.10
-  typing == 3.10.0.0
-  configparser == 4.0.2
-  functools32 == 3.2.3-2
-  importlib-metadata == 2.1.3
-    contextlib2 == 0.6.0
-    pathlib2 == 2.3.7.post1
-    zipp == 1.2.0
-k5test==0.9.2
+import unittest
+
+from shell.kerberos_util import get_kerb_host_from_kerberos_host_fqdn
+
+
+class TestKerberosUtil(unittest.TestCase):
+  def test_get_kerb_host_from_kerberos_host_fqdn(self):
+    assert isinstance(get_kerb_host_from_kerberos_host_fqdn("any.host:1234"), str)
+    assert get_kerb_host_from_kerberos_host_fqdn("any.host:1234") == "any.host"
+    assert get_kerb_host_from_kerberos_host_fqdn("any.host") == "any.host"
