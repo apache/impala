@@ -11,12 +11,117 @@
 // execution engine and RuntimeDyld
 //
 //===----------------------------------------------------------------------===//
+// Impala: Copied from the LLVM project to customize private portions of the
+// implementation.
 
 #include "SectionMemoryManager.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Process.h"
 
+#include "common/logging.h"
+
 namespace impala {
+
+// ---- Impala: llvm/llvm-project#71968 ----
+bool SectionMemoryManager::hasSpace(const MemoryGroup &MemGroup,
+                                    uintptr_t Size) const {
+  for (const FreeMemBlock &FreeMB : MemGroup.FreeMem) {
+    if (FreeMB.Free.size() >= Size)
+      return true;
+  }
+  return false;
+}
+
+static uintptr_t alignTo(uintptr_t Size, uint32_t Alignment) {
+  return (Size + Alignment - 1) & ~(uintptr_t)(Alignment - 1);
+}
+
+static uint32_t checkAlignment(uint32_t Alignment, unsigned PageSize) {
+  DCHECK_GT(Alignment, 0);
+  DCHECK(!(Alignment & (Alignment - 1))) << "Alignment must be a power of two.";
+  DCHECK_LT(Alignment, PageSize);
+  // Code alignment needs to be at least the stub alignment - however, we
+  // don't have an easy way to get that here so as a workaround, we assume
+  // it's 8, which is the largest value I observed across all platforms.
+  constexpr uint32_t StubAlign = 8;
+  return std::max(Alignment, StubAlign);
+}
+
+void SectionMemoryManager::reserveAllocationSpace(
+    uintptr_t CodeSize, uint32_t CodeAlign, uintptr_t RODataSize, uint32_t RODataAlign,
+    uintptr_t RWDataSize, uint32_t RWDataAlign) {
+  if (CodeSize == 0 && RODataSize == 0 && RWDataSize == 0) return;
+
+  static const unsigned PageSize = sys::Process::getPageSize();
+
+  CodeAlign = checkAlignment(CodeAlign, PageSize);
+  RODataAlign = checkAlignment(RODataAlign, PageSize);
+  RWDataAlign = checkAlignment(RWDataAlign, PageSize);
+
+  // Get space required for each section. Use the same calculation as
+  // allocateSection because we need to be able to satisfy it.
+  uintptr_t RequiredCodeSize = alignTo(CodeSize, CodeAlign) + CodeAlign;
+  uintptr_t RequiredRODataSize = alignTo(RODataSize, RODataAlign) + RODataAlign;
+  uintptr_t RequiredRWDataSize = alignTo(RWDataSize, RWDataAlign) + RWDataAlign;
+
+  if (hasSpace(CodeMem, RequiredCodeSize) &&
+      hasSpace(RODataMem, RequiredRODataSize) &&
+      hasSpace(RWDataMem, RequiredRWDataSize)) {
+    // Sufficient space in contiguous block already available.
+    return;
+  }
+
+  // MemoryManager does not have functions for releasing memory after it's
+  // allocated. Normally it tries to use any excess blocks that were allocated
+  // due to page alignment, but if we have insufficient free memory for the
+  // request this can lead to allocating disparate memory that can violate the
+  // ARM ABI. Clear free memory so only the new allocations are used, but do
+  // not release allocated memory as it may still be in-use.
+  CodeMem.FreeMem.clear();
+  RODataMem.FreeMem.clear();
+  RWDataMem.FreeMem.clear();
+
+  // Round up to the nearest page size. Blocks must be page-aligned.
+  RequiredCodeSize = alignTo(RequiredCodeSize, PageSize);
+  RequiredRODataSize = alignTo(RequiredRODataSize, PageSize);
+  RequiredRWDataSize = alignTo(RequiredRWDataSize, PageSize);
+  uintptr_t RequiredSize = RequiredCodeSize + RequiredRODataSize + RequiredRWDataSize;
+
+  std::error_code ec;
+  sys::MemoryBlock MB = sys::Memory::allocateMappedMemory(RequiredSize, nullptr,
+      sys::Memory::MF_READ | sys::Memory::MF_WRITE, ec);
+  if (ec) {
+    return;
+  }
+  // Request is page-aligned, so we should always get back exactly the request.
+  DCHECK_EQ(MB.size(), RequiredSize);
+  // CodeMem will arbitrarily own this MemoryBlock to handle cleanup.
+  CodeMem.AllocatedMem.push_back(MB);
+  uintptr_t Addr = (uintptr_t)MB.base();
+  FreeMemBlock FreeMB;
+  FreeMB.PendingPrefixIndex = (unsigned)-1;
+
+  if (CodeSize > 0) {
+    DCHECK_EQ(Addr, alignTo(Addr, CodeAlign));
+    FreeMB.Free = sys::MemoryBlock((void*)Addr, RequiredCodeSize);
+    CodeMem.FreeMem.push_back(FreeMB);
+    Addr += RequiredCodeSize;
+  }
+
+  if (RODataSize > 0) {
+    DCHECK_EQ(Addr, alignTo(Addr, RODataAlign));
+    FreeMB.Free = sys::MemoryBlock((void*)Addr, RequiredRODataSize);
+    RODataMem.FreeMem.push_back(FreeMB);
+    Addr += RequiredRODataSize;
+  }
+
+  if (RWDataSize > 0) {
+    DCHECK_EQ(Addr, alignTo(Addr, RWDataAlign));
+    FreeMB.Free = sys::MemoryBlock((void*)Addr, RequiredRWDataSize);
+    RWDataMem.FreeMem.push_back(FreeMB);
+  }
+}
+// ---- End Impala changes ----
 
 uint8_t *SectionMemoryManager::allocateDataSection(uintptr_t Size,
                                                    unsigned Alignment,

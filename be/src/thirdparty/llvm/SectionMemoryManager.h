@@ -51,6 +51,20 @@ public:
   void operator=(const SectionMemoryManager&) = delete;
   ~SectionMemoryManager() override;
 
+  /// Impala: enable reserveAllocationSpace callback.
+  bool needsToReserveAllocationSpace() override { return true; }
+
+  /// Impala: Provides an option to reserveAllocationSpace and pre-allocate all
+  /// memory in a single block. This is required for ARM where ADRP instructions
+  /// have a limit of 4GB offsets. Large memory systems may allocate sections
+  /// further apart than this unless we pre-allocate.
+  ///
+  /// Should only be called once. Later calls might re-use free blocks rather
+  /// than allocating a new contiguous block.
+  void reserveAllocationSpace(uintptr_t CodeSize, uint32_t CodeAlign,
+      uintptr_t RODataSize, uint32_t RODataAlign,
+      uintptr_t RWDataSize, uint32_t RWDataAlign) override;
+
   /// \brief Allocates a memory block of (at least) the given size suitable for
   /// executable code.
   ///
@@ -121,6 +135,9 @@ private:
 
   std::error_code applyMemoryGroupPermissions(MemoryGroup &MemGroup,
                                               unsigned Permissions);
+
+  // Impala: added to identify possible MemoryBlock re-use
+  bool hasSpace(const MemoryGroup &MemGroup, uintptr_t Size) const;
 
   MemoryGroup CodeMem;
   MemoryGroup RWDataMem;
