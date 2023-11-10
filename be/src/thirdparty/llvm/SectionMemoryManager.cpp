@@ -311,6 +311,16 @@ void SectionMemoryManager::invalidateInstructionCache() {
     sys::Memory::InvalidateInstructionCache(Block.base(), Block.size());
 }
 
+// Impala: added to track actual allocation
+int64_t SectionMemoryManager::bytes_allocated() const {
+  int64_t total = 0;
+  for (const MemoryGroup *Group : {&CodeMem, &RWDataMem, &RODataMem}) {
+    for (const sys::MemoryBlock &Block : Group->AllocatedMem)
+      total += Block.size();
+  }
+  return total;
+}
+
 SectionMemoryManager::~SectionMemoryManager() {
   for (MemoryGroup *Group : {&CodeMem, &RWDataMem, &RODataMem}) {
     for (sys::MemoryBlock &Block : Group->AllocatedMem)
