@@ -16,6 +16,8 @@
 # under the License.
 
 
+set(THIRDPARTY_LLVM_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/llvm")
+
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 
@@ -37,6 +39,7 @@ add_library(CodeGen
   llvm-codegen.cc
   llvm-codegen-cache.cc
   instruction-counter.cc
+  ${THIRDPARTY_LLVM_SRC_DIR}/SectionMemoryManager.cpp
   ${IR_O1_C_FILE}
   ${IR_O2_C_FILE}
   ${IR_Os_C_FILE}

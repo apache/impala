@@ -33,6 +33,7 @@ bin/banned_py3k_warnings.txt
 # See $IMPALA_HOME/LICENSE.txt
 be/src/gutil/*
 be/src/thirdparty/datasketches/*
+be/src/thirdparty/llvm/*
 be/src/thirdparty/murmurhash/*
 be/src/thirdparty/mpfit/*
 be/src/thirdparty/fast_double_parser/*

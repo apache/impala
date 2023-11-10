@@ -19,7 +19,7 @@
 #ifndef IMPALA_CODEGEN_MCJIT_MEM_MGR_H
 #define IMPALA_CODEGEN_MCJIT_MEM_MGR_H
 
-#include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#include "thirdparty/llvm/SectionMemoryManager.h"
 
 extern void *__dso_handle __attribute__ ((__visibility__ ("hidden")));
 
@@ -34,7 +34,7 @@ namespace impala {
 /// which come from global variables with destructors.
 ///
 /// We also use it to track how much memory is allocated for compiled code.
-class ImpalaMCJITMemoryManager : public llvm::SectionMemoryManager {
+class ImpalaMCJITMemoryManager : public SectionMemoryManager {
  public:
   ImpalaMCJITMemoryManager() : bytes_allocated_(0), bytes_tracked_(0){}
 
@@ -46,14 +46,14 @@ class ImpalaMCJITMemoryManager : public llvm::SectionMemoryManager {
   virtual uint8_t* allocateCodeSection(uintptr_t size, unsigned alignment,
       unsigned section_id, llvm::StringRef section_name) override {
     bytes_allocated_ += size;
-    return llvm::SectionMemoryManager::allocateCodeSection(
+    return SectionMemoryManager::allocateCodeSection(
         size, alignment, section_id, section_name);
   }
 
   virtual uint8_t* allocateDataSection(uintptr_t size, unsigned alignment,
       unsigned section_id, llvm::StringRef section_name, bool is_read_only) override {
     bytes_allocated_ += size;
-    return llvm::SectionMemoryManager::allocateDataSection(
+    return SectionMemoryManager::allocateDataSection(
         size, alignment, section_id, section_name, is_read_only);
   }
 
