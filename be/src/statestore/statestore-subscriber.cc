@@ -337,9 +337,11 @@ Status StatestoreSubscriber::Start() {
     if (statestore_is_active) {
       active_statestore_ = statestore_;
       standby_statestore_ = statestore2_;
+      LOG(INFO) << "Set active statestored as " << statestore_->GetAddress();
     } else if (statestore2_is_active) {
       active_statestore_ = statestore2_;
       standby_statestore_ = statestore_;
+      LOG(INFO) << "Set active statestored as " << statestore2_->GetAddress();
     } else {
       // Both statestoreds are not ready. If FLAGS_tolerate_statestore_startup_delay is
       // as true, subscriber enter recovery mode.

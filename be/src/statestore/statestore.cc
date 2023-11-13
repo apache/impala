@@ -1910,14 +1910,14 @@ Status Statestore::ReceiveHaHandshakeRequest(const TUniqueId& peer_statestore_id
   LOG(INFO) << "Receive Statestore HA handshake request";
   lock_guard<mutex> l(ha_lock_);
   peer_statestore_id_ = peer_statestore_id;
-  if (peer_force_active) {
+  if (peer_force_active && !FLAGS_statestore_force_active) {
     is_active_ = false;
     active_status_metric_->SetValue(is_active_);
     ha_active_ss_failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
     LOG(INFO) << "Set the statestored as standby since the peer is started with force "
               << "active flag";
   } else if (!is_active_) {
-    if (FLAGS_statestore_force_active) {
+    if (FLAGS_statestore_force_active && !peer_force_active) {
       is_active_ = true;
       active_status_metric_->SetValue(is_active_);
       active_version_ = UnixMicros();
