@@ -1,11 +1,11 @@
 ====
 ---- QUERY
 # IMPALA-11068: without tuning hdfs_scanner_non_reserved_bytes, this query can launch
-# up to 3 threads (compressed_text_est_bytes ~ 211MB).
+# up to 3 threads (with hdfs_scanner_thread_max_estimated_bytes default to 32MB).
 set num_nodes=1;
-set mem_limit=750m;
-set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@100";
-select count(*) from tpch_text_gzip.lineitem where l_comment = 'telets. quickly ';
+set mem_limit=130m;
+set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@500";
+select count(*) from tpch_parquet.lineitem where l_comment = 'telets. quickly ';
 ---- RESULTS:
 4
 ---- RUNTIME_PROFILE
@@ -15,10 +15,10 @@ aggregation(SUM, NumScannerThreadsStarted): 3
 # IMPALA-11068: raising hdfs_scanner_non_reserved_bytes above compressed_text_est_bytes
 # will reduce NumScannerThreadsStarted.
 set num_nodes=1;
-set mem_limit=750m;
-set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@100";
-set hdfs_scanner_non_reserved_bytes=320m;
-select count(*) from tpch_text_gzip.lineitem where l_comment = 'telets. quickly ';
+set mem_limit=130m;
+set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@500";
+set hdfs_scanner_non_reserved_bytes=48m;
+select count(*) from tpch_parquet.lineitem where l_comment = 'telets. quickly ';
 ---- RESULTS:
 4
 ---- RUNTIME_PROFILE
@@ -28,10 +28,10 @@ aggregation(SUM, NumScannerThreadsStarted): 2
 # IMPALA-11068: high hdfs_scanner_non_reserved_bytes does not impact the first scanner
 # thread.
 set num_nodes=1;
-set mem_limit=750m;
-set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@100";
-set hdfs_scanner_non_reserved_bytes=2g;
-select count(*) from tpch_text_gzip.lineitem where l_comment = 'telets. quickly ';
+set mem_limit=130m;
+set debug_action="HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@500";
+set hdfs_scanner_non_reserved_bytes=64m;
+select count(*) from tpch_parquet.lineitem where l_comment = 'telets. quickly ';
 ---- RESULTS:
 4
 ---- RUNTIME_PROFILE
