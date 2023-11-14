@@ -64,6 +64,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
   protected static final int DEFAULT_FETCH_SIZE = 1000;
   protected static final int CACHE_EXPIRE_TIMEOUT_S = 1800;
   protected static final int CACHE_SIZE = 100;
+  protected String jdbcDriverLocalPath = null;
 
   protected DataSource dbcpDataSource = null;
   // Cache datasource for sharing
@@ -159,6 +160,11 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
       dataSourceCache.invalidateAll();
       dataSourceCache = null;
     }
+    if (jdbcDriverLocalPath != null) {
+      // Delete the jar file of jdbc driver.
+      Path localJarPath = new Path("file://" + jdbcDriverLocalPath);
+      FileSystemUtil.deleteIfExists(localJarPath);
+    }
   }
 
   /**
@@ -245,14 +251,12 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
                 // Create class loader for jdbc driver and set it for the
                 // BasicDataSource object so that the driver class could be loaded
                 // from jar file without searching classpath.
+                jdbcDriverLocalPath = driverLocalPath;
                 URL driverJarUrl = new File(driverLocalPath).toURI().toURL();
                 URLClassLoader driverLoader =
                     URLClassLoader.newInstance( new URL[] { driverJarUrl },
                         getClass().getClassLoader());
                 basicDataSource.setDriverClassLoader(driverLoader);
-                // Delete the jar file once its loaded
-                Path localJarPath = new Path("file://" + driverLocalPath);
-                FileSystemUtil.deleteIfExists(localJarPath);
                 return basicDataSource;
               });
         }
