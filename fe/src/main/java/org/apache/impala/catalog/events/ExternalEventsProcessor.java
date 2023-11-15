@@ -38,7 +38,7 @@ public interface ExternalEventsProcessor {
    * Get the current event id on metastore. Useful for restarting the event processing
    * from a given event id
    */
-  long getCurrentEventId() throws CatalogException;
+  long getCurrentEventId() throws MetastoreNotificationFetchException;
 
   /**
    * Pauses the event processing. Use <code>start(fromEventId)</code> method below to

@@ -48,7 +48,9 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.MetastoreClientInstantiationException;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
@@ -331,7 +333,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         }
       }
       return result;
-    } catch (TException e) {
+    } catch (MetastoreClientInstantiationException | TException e) {
       throw new MetastoreNotificationFetchException(String.format(
           CatalogOpExecutor.HMS_RPC_ERROR_FORMAT_STR, "getNextNotification"), e);
     }
@@ -738,12 +740,12 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * Get the current notification event id from metastore
    */
   @Override
-  public long getCurrentEventId() throws CatalogException {
+  public long getCurrentEventId() throws MetastoreNotificationFetchException {
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       return metaStoreClient.getHiveClient().getCurrentNotificationEventId().getEventId();
-    } catch (TException e) {
-      throw new CatalogException("Unable to fetch the current notification event id. "
-          + "Check if metastore service is accessible");
+    } catch (MetastoreClientInstantiationException | TException e) {
+      throw new MetastoreNotificationFetchException("Unable to fetch the current " +
+          "notification event id. Check if metastore service is accessible", e);
     }
   }
 
@@ -785,10 +787,13 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * Get the event time by fetching the specified event from HMS.
    * @return 0 if the event has been cleaned up or any error occurs.
    */
-  private int getEventTimeFromHMS(long eventId) {
+  @VisibleForTesting
+  public int getEventTimeFromHMS(long eventId) {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       NotificationEvent event = getEventFromHMS(msClient, eventId);
       if (event != null) return event.getEventTime();
+    } catch (MetastoreClientInstantiationException e) {
+      LOG.error("Failed to get event time from HMS for event {}", eventId, e);
     }
     return 0;
   }
@@ -903,7 +908,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         if (filter.accept(event)) filteredEvents.add(event);
       }
       return filteredEvents;
-    } catch (TException e) {
+    } catch (MetastoreClientInstantiationException | TException e) {
       throw new MetastoreNotificationFetchException(
           "Unable to fetch notifications from metastore. Last synced event id is "
               + eventId, e);
@@ -918,7 +923,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   @VisibleForTesting
   protected List<NotificationEvent> getNextMetastoreEvents()
-      throws MetastoreNotificationFetchException, CatalogException {
+      throws MetastoreNotificationFetchException {
     return getNextMetastoreEvents(getCurrentEventId());
   }
 

@@ -30,6 +30,7 @@ METASTORE_TRANSPORT="buffered"
 START_METASTORE=1
 START_HIVESERVER=1
 ENABLE_RANGER_AUTH=0
+RESTART_SERVICE=1
 
 CLUSTER_BIN=${IMPALA_HOME}/testdata/bin
 
@@ -57,11 +58,15 @@ do
     -only_hiveserver)
       START_METASTORE=0
       ;;
+    -if_not_running)
+      RESTART_SERVICE=0
+      ;;
     -help|-h|*)
       echo "run-hive-server.sh : Starts the hive server and the metastore."
       echo "[-only_metastore] : Only starts the hive metastore."
       echo "[-only_hiveserver] : Only starts the hive server."
       echo "[-with_ranger] : Starts with Ranger authorization (only for Hive 3)."
+      echo "[-if_not_running] : Only starts services when they are not running."
       exit 1;
       ;;
     esac
@@ -73,13 +78,37 @@ if [[ $START_METASTORE -eq 0 && $START_HIVESERVER -eq 0 ]]; then
   exit 1;
 fi
 
+NEEDS_START=0
+HMS_PID=
+HS2_PID=
+if [[ $START_METASTORE -eq 1 && $RESTART_SERVICE -eq 0 ]]; then
+  HMS_PID=$(jps -m | (grep HiveMetaStore || true) | awk '{print $1}')
+  if [[ -n $HMS_PID ]]; then
+    echo "Found HiveMetaStore running. PID=$HMS_PID"
+  else
+    NEEDS_START=1
+  fi
+fi
+if [[ $START_HIVESERVER -eq 1 && $RESTART_SERVICE -eq 0 ]]; then
+  HS2_PID=$(jps -m | (grep HiveServer || true) | awk '{print $1}')
+  if [[ -n $HS2_PID ]]; then
+    echo "Found HiveServer running. PID=$HS2_PID"
+  else
+    NEEDS_START=1
+  fi
+fi
+if [[ $NEEDS_START -eq 0 && $RESTART_SERVICE -eq 0 ]]; then
+  echo "Required services are all running."
+  exit 0
+fi
+
 # TODO: We should have a retry loop for every service we start.
 # Kill for a clean start.
-if [[ $START_HIVESERVER -eq 1 ]]; then
+if [[ $START_HIVESERVER -eq 1 && $RESTART_SERVICE -eq 1 ]]; then
   ${CLUSTER_BIN}/kill-hive-server.sh -only_hiveserver &> /dev/null
 fi
 
-if [[ $START_METASTORE -eq 1 ]]; then
+if [[ $START_METASTORE -eq 1 && $RESTART_SERVICE -eq 1 ]]; then
   ${CLUSTER_BIN}/kill-hive-server.sh -only_metastore &> /dev/null
 fi
 
@@ -129,7 +158,7 @@ export KUDU_SKIP_HMS_PLUGIN_VALIDATION=${KUDU_SKIP_HMS_PLUGIN_VALIDATION:-1}
 # Starts a Hive Metastore Server on the specified port.
 # To debug log4j2 loading issues, add to HADOOP_CLIENT_OPTS:
 #   -Dorg.apache.logging.log4j.simplelog.StatusLogger.level=TRACE
-if [ ${START_METASTORE} -eq 1 ]; then
+if [[ ${START_METASTORE} -eq 1 && -z $HMS_PID ]]; then
   HADOOP_CLIENT_OPTS="-Xmx2024m -Dhive.log.file=hive-metastore.log" hive \
       --service metastore -p $HIVE_METASTORE_PORT >> ${LOGDIR}/hive-metastore.out 2>&1 &
 
@@ -147,7 +176,7 @@ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}:${GCC_HOME}/lib64"
 
 export HIVESERVER2_HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,\
 suspend=n,address=30020"
-if [ ${START_HIVESERVER} -eq 1 ]; then
+if [[ ${START_HIVESERVER} -eq 1 && -z $HS2_PID ]]; then
   # Starts a HiveServer2 instance on the port specified by the HIVE_SERVER2_THRIFT_PORT
   # environment variable. HADOOP_HEAPSIZE should be set to at least 2048 to avoid OOM
   # when loading ORC tables like widerow.

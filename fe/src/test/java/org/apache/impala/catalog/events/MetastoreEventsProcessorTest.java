@@ -110,6 +110,7 @@ import org.apache.impala.hive.executor.TestHiveJavaFunctionFactory;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.testutil.IncompetentMetastoreClientPool;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
@@ -242,7 +243,7 @@ public class MetastoreEventsProcessorTest {
    * @throws TException
    */
   @Before
-  public void beforeTest() throws TException, CatalogException {
+  public void beforeTest() throws Exception {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().dropDatabase(TEST_DB_NAME, true, true, true);
     }
@@ -1432,10 +1433,10 @@ public class MetastoreEventsProcessorTest {
 
     @Override
     public List<NotificationEvent> getNextMetastoreEvents()
-        throws MetastoreNotificationFetchException, CatalogException {
+        throws MetastoreNotificationFetchException {
       // Throw exception roughly half of the time
       Random rand = new Random();
-      if (rand.nextInt(10) % 2 == 0){
+      if (rand.nextInt(10) % 2 == 0) {
         throw new MetastoreNotificationFetchException("Fetch Exception");
       }
       return super.getNextMetastoreEvents();
@@ -3363,6 +3364,72 @@ public class MetastoreEventsProcessorTest {
       assertEquals(0, events.size());
       MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
       assertEquals(currentEventId + 2, eventsProcessor_.getCurrentEventId());
+    }
+  }
+
+  /**
+   * Test getCurrentEventId() throws MetastoreNotificationFetchException when there are
+   * connection issues with HMS.
+   */
+  @Test(expected = MetastoreNotificationFetchException.class)
+  public void testHMSClientFailureInGettingCurrentEventId() throws Exception {
+    MetaStoreClientPool origPool = catalog_.getMetaStoreClientPool();
+    try {
+      MetaStoreClientPool badPool = new IncompetentMetastoreClientPool(0, 0);
+      catalog_.setMetaStoreClientPool(badPool);
+      eventsProcessor_.getCurrentEventId();
+    } finally {
+      catalog_.setMetaStoreClientPool(origPool);
+    }
+  }
+
+  /**
+   * Test getNextMetastoreEvents() throws MetastoreNotificationFetchException when there
+   * are connection issues with HMS.
+   */
+  @Test(expected = MetastoreNotificationFetchException.class)
+  public void testHMSClientFailureInFetchingEvents() throws Exception {
+    MetaStoreClientPool origPool = catalog_.getMetaStoreClientPool();
+    try {
+      MetaStoreClientPool badPool = new IncompetentMetastoreClientPool(0, 0);
+      catalog_.setMetaStoreClientPool(badPool);
+      // Use a fake currentEventId that is larger than lastSyncedEventId
+      // so getNextMetastoreEvents() will fetch new events.
+      long currentEventId = eventsProcessor_.getLastSyncedEventId() + 1;
+      eventsProcessor_.getNextMetastoreEvents(currentEventId);
+    } finally {
+      catalog_.setMetaStoreClientPool(origPool);
+    }
+  }
+
+  /**
+   * Test getNextMetastoreEventsInBatches() throws MetastoreNotificationFetchException
+   * when there are connection issues with HMS.
+   */
+  @Test(expected = MetastoreNotificationFetchException.class)
+  public void testHMSClientFailureInFetchingEventsInBatches() throws Exception {
+    MetaStoreClientPool origPool = catalog_.getMetaStoreClientPool();
+    try {
+      MetaStoreClientPool badPool = new IncompetentMetastoreClientPool(0, 0);
+      catalog_.setMetaStoreClientPool(badPool);
+      MetastoreEventsProcessor.getNextMetastoreEventsInBatches(catalog_, 0, null);
+    } finally {
+      catalog_.setMetaStoreClientPool(origPool);
+    }
+  }
+
+  /**
+   * Test getEventTimeFromHMS() returns 0 when there are connection issues with HMS.
+   */
+  @Test
+  public void testHMSClientFailureInGettingEventTime() {
+    MetaStoreClientPool origPool = catalog_.getMetaStoreClientPool();
+    try {
+      MetaStoreClientPool badPool = new IncompetentMetastoreClientPool(0, 0);
+      catalog_.setMetaStoreClientPool(badPool);
+      assertEquals(0, eventsProcessor_.getEventTimeFromHMS(0));
+    } finally {
+      catalog_.setMetaStoreClientPool(origPool);
     }
   }
 

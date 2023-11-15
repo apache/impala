@@ -106,7 +106,9 @@ public class MetaStoreClientPool {
         } catch (Exception e) {
           // If time is up, throw an unchecked exception
           long delayUntilMillis = System.currentTimeMillis() + retryDelayMillis;
-          if (delayUntilMillis >= endTimeMillis) throw new IllegalStateException(e);
+          if (delayUntilMillis >= endTimeMillis) {
+            throw new MetastoreClientInstantiationException(e);
+          }
 
           LOG.warn("Failed to connect to Hive MetaStore. Retrying.", e);
           while (delayUntilMillis > System.currentTimeMillis()) {

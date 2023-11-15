@@ -53,6 +53,7 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.PatternMatcher;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
@@ -80,7 +81,7 @@ public abstract class Catalog implements AutoCloseable {
   public static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
   public static final String DEFAULT_DB = "default";
 
-  private final MetaStoreClientPool metaStoreClientPool_;
+  private MetaStoreClientPool metaStoreClientPool_;
 
   // Cache of authorization policy metadata. Populated from data retried from the
   // Sentry Service, if configured.
@@ -402,6 +403,14 @@ public abstract class Catalog implements AutoCloseable {
    */
   @Override
   public void close() { metaStoreClientPool_.close(); }
+
+  @VisibleForTesting
+  public MetaStoreClientPool getMetaStoreClientPool() { return metaStoreClientPool_; }
+
+  @VisibleForTesting
+  public void setMetaStoreClientPool(MetaStoreClientPool pool) {
+    metaStoreClientPool_ = pool;
+  }
 
   /**
    * Returns a managed meta store client from the client connection pool.

@@ -70,6 +70,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLat
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.catalog.events.MetastoreNotificationFetchException;
 import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.metastore.CatalogHmsUtils;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
@@ -2053,7 +2054,12 @@ public class CatalogServiceCatalog extends Catalog {
     // alter events, however it is likely that some tables would be unnecessarily
     // refreshed. That would happen when during reset, there were external alter events
     // and by the time we processed them, catalog had already loaded them.
-    long currentEventId = metastoreEventProcessor_.getCurrentEventId();
+    long currentEventId;
+    try {
+      currentEventId = metastoreEventProcessor_.getCurrentEventId();
+    } catch (MetastoreNotificationFetchException e) {
+      throw new CatalogException("Failed to fetch current event id", e);
+    }
     // pause the event processing since the cache is anyways being cleared
     metastoreEventProcessor_.pause();
     // Update the HDFS cache pools
