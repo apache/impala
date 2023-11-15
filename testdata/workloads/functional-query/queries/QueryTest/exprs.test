@@ -3094,3 +3094,11 @@ select distinct year from functional.alltypes where case when year = 2010 then m
 ---- TYPES
 int
 ====
+---- QUERY
+# Test for IMPALA-12565 (UDF)
+select pmod(0, 0), pmod(0, 0.0);
+---- RESULTS
+NULL,NULL
+---- TYPES
+BIGINT, DOUBLE
+====
