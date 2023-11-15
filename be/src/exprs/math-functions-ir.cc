@@ -435,13 +435,13 @@ bool MathFunctions::HandleParseResult(int8_t dest_base, int64_t* num,
 
 BigIntVal MathFunctions::PmodBigInt(FunctionContext* ctx, const BigIntVal& a,
     const BigIntVal& b) {
-  if (a.is_null || b.is_null) return BigIntVal::null();
+  if (a.is_null || b.is_null || b.val == 0) return BigIntVal::null();
   return BigIntVal(((a.val % b.val) + b.val) % b.val);
 }
 
 DoubleVal MathFunctions::PmodDouble(FunctionContext* ctx, const DoubleVal& a,
     const DoubleVal& b) {
-  if (a.is_null || b.is_null) return DoubleVal::null();
+  if (a.is_null || b.is_null || b.val == 0) return DoubleVal::null();
   return DoubleVal(fmod(fmod(a.val, b.val) + b.val, b.val));
 }
 
