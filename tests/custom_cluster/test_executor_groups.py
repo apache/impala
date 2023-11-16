@@ -1403,10 +1403,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
     second_coord_client.close()
 
   @pytest.mark.execute_serially
-  def test_75_percent_availability(self):
-    """Test query planning and execution when only 75% of executor is up.
-    This test will run query over 8 node executor group at its healthy threshold (6) and
-    start the other 2 executor after query is planned.
+  def test_partial_availability(self):
+    """Test query planning and execution when only 80% of executor is up.
+    This test will run a query over 5 node executor group at its healthy threshold (4)
+    and start the last executor after query is planned.
     """
     coordinator_test_args = ''
     # The path to resources directory which contains the admission control config files.
@@ -1421,7 +1421,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # extra args template to start coordinator
     extra_args_template = ("-vmodule admission-controller=3 "
         "-admission_control_slots=8 "
-        "-expected_executor_group_sets=root.large:8 "
+        "-expected_executor_group_sets=root.large:5 "
         "-fair_scheduler_allocation_path %s "
         "-llama_site_path %s "
         "%s ")
@@ -1433,27 +1433,29 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
     # Create fresh client
     self.create_impala_clients()
-    # Start root.large exec group with 8 admission slots and 6 executors.
-    self._add_executor_group("group", 6, num_executors=6, admission_control_slots=8,
-                             resource_pool="root.large", extra_args="-mem_limit=2g")
+    # Start root.large exec group with 8 admission slots and 4 executors.
+    healthy_threshold = 4
+    self._add_executor_group("group", healthy_threshold, num_executors=healthy_threshold,
+                             admission_control_slots=8, resource_pool="root.large",
+                             extra_args="-mem_limit=2g")
     assert self._get_num_executor_groups(only_healthy=False) == 1
     assert self._get_num_executor_groups(only_healthy=False,
                                          exec_group_set_prefix="root.large") == 1
 
-    # Run query and let it compile, but delay admission for 5s
+    # Run query and let it compile, but delay admission for 10s
     handle = self.execute_query_async(CPU_TEST_QUERY, {
       "COMPUTE_PROCESSING_COST": "true",
-      "DEBUG_ACTION": "AC_BEFORE_ADMISSION:SLEEP@5000"})
+      "DEBUG_ACTION": "AC_BEFORE_ADMISSION:SLEEP@10000"})
 
-    # Start the next 2 executors.
-    self._add_executors("group", 6, num_executors=2, resource_pool="root.large",
-        extra_args="-mem_limit=2g", expected_num_impalads=9)
+    # Start the 5th executor.
+    self._add_executors("group", healthy_threshold, num_executors=1,
+        resource_pool="root.large", extra_args="-mem_limit=2g", expected_num_impalads=6)
 
     self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
     profile = self.client.get_runtime_profile(handle)
-    assert "F00:PLAN FRAGMENT [RANDOM] hosts=6 instances=12" in profile, profile
+    assert "F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=12" in profile, profile
     assert ("Scheduler Warning: Cluster membership might changed between planning and "
-        "scheduling, F00 scheduled instance count (16) is higher than its effective "
+        "scheduling, F00 scheduled instance count (15) is higher than its effective "
         "count (12)") in profile, profile
     self.client.close_query(handle)
 
