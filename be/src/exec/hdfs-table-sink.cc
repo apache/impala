@@ -261,7 +261,7 @@ Status HdfsTableSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* batc
   return Status::OK();
 }
 
-void HdfsTableSink::ConstructPartitionInfo(
+Status HdfsTableSink::ConstructPartitionInfo(
     const TupleRow* row,
     OutputPartition* output_partition) {
   DCHECK(output_partition != nullptr);
@@ -305,6 +305,7 @@ void HdfsTableSink::ConstructPartitionInfo(
     // Use default partition spec id.
     output_partition->iceberg_spec_id = table_desc_->IcebergSpecId();
   }
+  return Status::OK();
 }
 
 inline const HdfsPartitionDescriptor* HdfsTableSink::GetPartitionDescriptor(

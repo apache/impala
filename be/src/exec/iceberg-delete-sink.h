@@ -74,9 +74,16 @@ class IcebergDeleteSink : public TableSinkBase {
   /// tables 'row' must contain the Iceberg virtual columns PARTITION__SPEC__ID and
   /// ICEBERG__PARTITION__SERIALIZED. Every information needed for 'output_partition' can
   /// be retrieved from these fields and from the 'table_desc_'.
-  void ConstructPartitionInfo(
+  Status ConstructPartitionInfo(
       const TupleRow* row,
       OutputPartition* output_partition) override;
+
+  /// Returns the human-readable representation of a partition transform value. It is used
+  /// to create the file paths. IcebergUtil.partitionDataFromDataFile() also expects
+  /// partition values in this representation.
+  std::string HumanReadablePartitionValue(
+      TIcebergPartitionTransformType::type transform_type, const std::string& value,
+      Status* transform_result);
 
   /// Maps all rows in 'batch' to partitions and appends them to their temporary Hdfs
   /// files. The input must be ordered by the partition key expressions.

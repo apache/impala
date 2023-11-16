@@ -449,6 +449,10 @@ class HdfsTableDescriptor : public TableDescriptor {
   const std::vector<std::string>& IcebergNonVoidPartitionNames() const {
     return iceberg_non_void_partition_names_;
   }
+  const std::vector<TIcebergPartitionTransformType::type>&
+      IcebergNonVoidPartitionTransforms() const {
+    return iceberg_non_void_partition_transforms_;
+  }
   const TCompressionCodec& IcebergParquetCompressionCodec() const {
     return iceberg_parquet_compression_codec_;
   }
@@ -484,6 +488,8 @@ class HdfsTableDescriptor : public TableDescriptor {
   std::string iceberg_table_location_;
   std::vector<TIcebergPartitionSpec> iceberg_partition_specs_;
   std::vector<std::string> iceberg_non_void_partition_names_;
+  std::vector<TIcebergPartitionTransformType::type>
+      iceberg_non_void_partition_transforms_;
   TCompressionCodec iceberg_parquet_compression_codec_;
   int64_t iceberg_parquet_row_group_size_;
   int64_t iceberg_parquet_plain_page_size_;

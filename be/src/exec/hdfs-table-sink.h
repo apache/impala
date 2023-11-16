@@ -136,7 +136,7 @@ class HdfsTableSink : public TableSinkBase {
   /// 'output_partition->raw_partition_names' is a vector of partition key-values in a
   /// non-encoded format.
   /// Staying with the above example this would hold ["a=12/31/11", "b=10"].
-  void ConstructPartitionInfo(
+  Status ConstructPartitionInfo(
       const TupleRow* row,
       OutputPartition* output_partition) override;
 

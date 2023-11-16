@@ -196,7 +196,7 @@ Status TableSinkBase::InitOutputPartition(RuntimeState* state,
     OutputPartition* output_partition, bool empty_partition) {
   // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
   // etc.
-  ConstructPartitionInfo(row, output_partition);
+  RETURN_IF_ERROR(ConstructPartitionInfo(row, output_partition));
 
   BuildHdfsFileNames(partition_descriptor, output_partition);
 

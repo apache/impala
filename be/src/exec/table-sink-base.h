@@ -86,7 +86,7 @@ protected:
 
   virtual bool IsHiveAcid() const { return false; }
 
-  virtual void ConstructPartitionInfo(
+  virtual Status ConstructPartitionInfo(
       const TupleRow* row,
       OutputPartition* output_partition) = 0;
 

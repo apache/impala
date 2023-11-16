@@ -407,3 +407,379 @@ SELECT * FROM ice_store_sales where ss_customer_sk % 10 = 0;
 ---- TYPES
 INT, BIGINT, INT, INT, INT, INT, INT, INT, BIGINT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, INT
 ====
+---- QUERY
+create table date_year_part (i int, d date)
+partitioned by spec (year(d))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into date_year_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+show files in date_year_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1968/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1969/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1970/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=2023/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1968/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1969/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1970/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=2023/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from date_year_part where i > 0;
+show files in date_year_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1968/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1969/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1970/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=2023/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1968/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1969/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=1970/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_year_part/data/d_year=2023/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from date_year_part;
+---- RESULTS
+---- TYPES
+INT, DATE
+====
+---- QUERY
+create table date_month_part (i int, d date)
+partitioned by spec (month(d))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into date_month_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+show files in date_month_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1968-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1969-12/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1970-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=2023-11/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1968-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1969-12/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1970-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=2023-11/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from date_month_part where i > 0;
+show files in date_month_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1968-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1969-12/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1970-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=2023-11/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1968-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1969-12/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=1970-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_month_part/data/d_month=2023-11/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from date_month_part;
+---- RESULTS
+---- TYPES
+INT, DATE
+====
+---- QUERY
+create table date_day_part (i int, d date)
+partitioned by spec (day(d))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into date_day_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+show files in date_day_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1968-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1969-12-31/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1970-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=2023-11-15/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1968-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1969-12-31/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1970-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=2023-11-15/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from date_day_part where i > 0;
+show files in date_day_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1968-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1969-12-31/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1970-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=2023-11-15/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1968-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1969-12-31/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=1970-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/date_day_part/data/d_day=2023-11-15/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from date_day_part;
+---- RESULTS
+---- TYPES
+INT, DATE
+====
+---- QUERY
+create table ts_year_part (i int, ts timestamp)
+partitioned by spec (year(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_year_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+show files in ts_year_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1968/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1969/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1970/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=2023/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1968/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1969/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1970/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=2023/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from ts_year_part where i > 0;
+show files in ts_year_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1968/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1969/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1970/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=2023/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1968/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1969/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=1970/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_year_part/data/ts_year=2023/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from ts_year_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_month_part (i int, ts timestamp)
+partitioned by spec (month(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_month_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+show files in ts_month_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1968-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1969-12/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1970-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=2023-11/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1968-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1969-12/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1970-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=2023-11/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from ts_month_part where i > 0;
+show files in ts_month_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1968-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1969-12/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1970-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=2023-11/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1968-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1969-12/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=1970-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_month_part/data/ts_month=2023-11/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from ts_month_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_day_part (i int, ts timestamp)
+partitioned by spec (day(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_day_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+show files in ts_day_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1968-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1969-12-31/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1970-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=2023-11-15/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1968-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1969-12-31/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1970-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=2023-11-15/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from ts_day_part where i > 0;
+show files in ts_day_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1968-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1969-12-31/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1970-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=2023-11-15/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1968-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1969-12-31/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=1970-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_day_part/data/ts_day=2023-11-15/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from ts_day_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_hour_part (i int, ts timestamp)
+partitioned by spec (hour(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_hour_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+show files in ts_hour_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1968-01-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1969-12-31-23/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1970-01-01-00/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=2023-11-15-15/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1968-01-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1969-12-31-23/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1970-01-01-00/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=2023-11-15-15/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from ts_hour_part where i > 0;
+show files in ts_hour_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1968-01-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1969-12-31-23/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1970-01-01-00/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=2023-11-15-15/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1968-01-01-01/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1969-12-31-23/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=1970-01-01-00/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_hour_part/data/ts_hour=2023-11-15-15/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from ts_hour_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_evolve_part (i int, ts timestamp)
+partitioned by spec (year(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_evolve_part values (1, '1968-01-01 01:02:03');
+alter table ts_evolve_part set partition spec (month(ts));
+insert into ts_evolve_part values (2, '1969-12-31 23:59:00');
+insert into ts_evolve_part values (111, 'invalid');
+alter table ts_evolve_part set partition spec (day(ts));
+insert into ts_evolve_part values (3, '1970-01-01 00:00:00');
+alter table ts_evolve_part set partition spec (hour(ts));
+insert into ts_evolve_part values (4, '2023-11-15 15:31:00');
+show files in ts_evolve_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_year=1968/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=1969-12/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_day=1970-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_hour=2023-11-15-15/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_year=1968/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=1969-12/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=__HIVE_DEFAULT_PARTITION__/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_day=1970-01-01/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_hour=2023-11-15-15/delete-.*.parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from ts_evolve_part where i > 0;
+show files in ts_evolve_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_year=1968/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=1969-12/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=__HIVE_DEFAULT_PARTITION__/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_day=1970-01-01/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_hour=2023-11-15-15/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_year=1968/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=1969-12/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_month=__HIVE_DEFAULT_PARTITION__/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_day=1970-01-01/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ts_evolve_part/data/ts_hour=2023-11-15-15/delete-.*.parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from ts_evolve_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table numeric_truncate (id int, int_col int, bigint_col bigint, dec_8_0 decimal(8, 0), dec_10_2 decimal(10, 2))
+partitioned by spec (truncate(10, int_col), truncate(1000, bigint_col), void(id), truncate(20, dec_8_0), truncate(50, dec_10_2))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into numeric_truncate values (1, 12, 1222, 135, 20.75);
+show files in numeric_truncate;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/numeric_truncate/data/int_col_trunc=10/bigint_col_trunc=1000/dec_8_0_trunc=120/dec_10_2_trunc=20.50/(?!delete-).*.parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+delete from numeric_truncate where id = 1;
+---- DML_RESULTS: numeric_truncate
+---- TYPES
+INT,INT,BIGINT,DECIMAL,DECIMAL
+====
+---- QUERY
+show files in numeric_truncate;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/numeric_truncate/data/int_col_trunc=10/bigint_col_trunc=1000/dec_8_0_trunc=120/dec_10_2_trunc=20.50/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/numeric_truncate/data/int_col_trunc=10/bigint_col_trunc=1000/dec_8_0_trunc=120/dec_10_2_trunc=20.50/delete-.*.parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
