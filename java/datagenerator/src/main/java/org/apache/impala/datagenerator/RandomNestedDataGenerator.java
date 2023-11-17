@@ -42,7 +42,8 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 public class RandomNestedDataGenerator {
 
   public static Random rand;
-  public static int numListItems;
+  public static int maxNormalStrLen;
+  public static int maxNumListItems;
   public static int numElementsGenerated = 0;
   public static ArrayList<Double> doubleCache;
   public static ArrayList<Float> floatCache;
@@ -126,7 +127,7 @@ public class RandomNestedDataGenerator {
     stringCache = new ArrayList<String>();
     for (int i = 0; i < NUM_ELEMENTS; i++) {
       StringBuilder sb = new StringBuilder();
-      int len = rand.nextInt(10);
+      int len = rand.nextInt(maxNormalStrLen);
       for (int j = 0; j < len; j++) {
         sb.append(alphabet.charAt(rand.nextInt(alphabet.length())));
       }
@@ -144,7 +145,7 @@ public class RandomNestedDataGenerator {
 
   private static int generateListLength(int depth) {
     if (rand.nextDouble() < 0.1) return 0; // empty list
-    return rand.nextInt(numListItems);
+    return rand.nextInt(maxNumListItems);
   }
 
   private static Schema getNonNullSchema(Schema schema) {
@@ -254,19 +255,21 @@ public class RandomNestedDataGenerator {
 
   public static void main(String[] args) throws Exception {
     final int num_args = args.length;
-    if (num_args < 4 || num_args > 5) {
+    if (num_args < 5 || num_args > 6) {
       System.err.println(
-          "Arguments: schema_file num_elements list_len output_file [random_seed]");
+          "Arguments: schema_file num_elements max_normal_str_len max_list_len " +
+          "output_file [random_seed]");
       System.exit(1);
     }
     String schemaFile = args[0];
     int numElements = Integer.valueOf(args[1]);
-    numListItems = Integer.valueOf(args[2]);
-    String outputFile = args[3];
+    maxNormalStrLen = Integer.valueOf(args[2]);
+    maxNumListItems = Integer.valueOf(args[3]);
+    String outputFile = args[4];
 
     Optional<Long> seed;
-    if (num_args > 4) {
-      seed = Optional.of(Long.valueOf(args[4]));
+    if (num_args > 5) {
+      seed = Optional.of(Long.valueOf(args[5]));
     } else {
       seed = Optional.empty();
     }

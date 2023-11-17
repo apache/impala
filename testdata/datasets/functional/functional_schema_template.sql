@@ -3877,27 +3877,27 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
    array(1, 2, NULL),
    array(array(1, 2, NULL), array(3)),
    array(array(array(1, 2, NULL), array(3)), array(array(4))),
-   array("1", "2", NULL),
-   array(array("1", "2", NULL), array("3")),
-   array(array(array("1", "2", NULL), array("3")), array(array("4"))),
-   map(1, "first", 2, "second"),
-   map(1, map(10, "ten", 20, "twenty"), 2, map(30, "thirty", 40, "forty")),
+   array("1", "two wooden boxes", NULL),
+   array(array("one silk glove", "2", NULL), array("three pancakes")),
+   array(array(array("1", "second harmonic", NULL), array("three cities")), array(array("four castles"))),
+   map(1, "first automobile", 2, "second"),
+   map(1, map(10, "ten", 20, "twentieth paragraph"), 2, map(30, "thirty minutes", 40, "forty")),
    map(
-       1, map(10, map(100, "hundred", 200, "two hundred"), 20, map(300, "three hundred", 400, "four hundred")),
-       2, map(30, map(500, "five hundred", 600, "six hundred"), 40, map(700, "seven hundred", 800, "eight hundred"))
+       1, map(10, map(100, "hundred", 200, "two hundred pages"), 20, map(300, "three hundred pages", 400, "four hundred")),
+       2, map(30, map(500, "five hundred pages", 600, "six hundred"), 40, map(700, "seven hundred pages", 800, "eight hundred"))
    ),
    map(
        1, map(10, array(100, 200), 20, array(300, 400)),
        2, map(30, array(500, 600), 40, array(700, 800))
    ),
-   map(true, "true", false, "false"),
-   map(-1Y, "a", 0Y, "b", 1Y, "c"),
-   map(-1S, "a", 0S, "b", 1S, "c"),
-   map(-1L, "a", 0L, "b", 1L, "c"),
-   map(cast(-1.5 as FLOAT), "a", cast(0.25 as FLOAT), "b", cast(1.75 as FLOAT), "c"),
-   map(cast(-1.5 as DOUBLE), "a", cast(0.25 as DOUBLE), "b", cast(1.75 as DOUBLE), "c"),
-   map(-1.8, "a", 0.2, "b", 1.2, "c"),
-   map("one", 1, "two", 2, "three", 3),
+   map(true, "true", false, "false statement"),
+   map(-1Y, "a nice sunny day", 0Y, "best day in my life", 1Y, "c"),
+   map(-1S, "a nice sunny day", 0S, "best day in my life", 1S, "c"),
+   map(-1L, "a nice sunny day", 0L, "best day in my life", 1L, "c"),
+   map(cast(-1.5 as FLOAT), "a nice sunny day", cast(0.25 as FLOAT), "best day in my life", cast(1.75 as FLOAT), "c"),
+   map(cast(-1.5 as DOUBLE), "a nice sunny day", cast(0.25 as DOUBLE), "best day in my life", cast(1.75 as DOUBLE), "c"),
+   map(-1.8, "a nice sunny day", 0.2, "best day in my life", 1.2, "c"),
+   map("one", 1, "two", 2, "three distinct values", 3),
    map(cast("Mon" as CHAR(3)), 1,
        cast("Tue" as CHAR(3)), 2,
        cast("Wed" as CHAR(3)), 3,
@@ -3909,7 +3909,83 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
    map(cast("a" as VARCHAR(3)), "A", cast("ab" as VARCHAR(3)), "AB", cast("abc" as VARCHAR(3)), "ABC"),
    map(to_utc_timestamp("2022-12-10 08:15:12", "UTC"), "Saturday morning",
        to_utc_timestamp("2022-12-09 18:15:12", "UTC"), "Friday evening"),
-   map(to_date("2022-12-10"), "Saturday", to_date("2022-12-09"), "Friday")
+   map(to_date("2022-12-10"), "Saturday 24 hours", to_date("2022-12-09"), "Friday")
+  ),
+  (2,
+   array(1, NULL, 3),
+   array(array(NULL, 1, 2, NULL), array(5, 14, NULL)),
+   array(array(array(NULL, 1, 2, NULL), array(5, 14, NULL)), array(array(NULL, 5))),
+   array("one dinosaur bone", NULL, "2", NULL),
+   array(array("1", "2", NULL, "four dinosaur bones"), array("five dinosaur bones")),
+   array(array(array("second dinosaur bone", NULL, NULL), array("three dinosaur bones")), array(array("one", NULL, "four dinosaur bones"))),
+   map(1, "first dinosaur bone", 2, "second", 3, NULL),
+   map(1, map(10, "ten dinosaur bones", 20, "20"), 2, map(30, "thirty dinosaur bones", 40, "forty dinosaur bones")),
+   map(
+       1, map(10, map(100, "hundred", 200, "two hundred dinosaur bones"), 20, map(300, "three hundred dinosaur bones", 400, "four hundred")),
+       2, map(30, map(500, "five hundred dinosaur bones", 600, "six hundred"), 40, map(700, "seven hundred dinosaur bones", 800, "eight hundred"))
+   ),
+   map(
+       1, map(10, array(100, 200), 20, array(300, 400)),
+       2, map(30, array(500, 600), 40, array(700, 800))
+   ),
+   map(true, "true", false, "false dinosaur bones"),
+   map(-1Y, "a nice dinosaur bone", 0Y, "best dinosaur bone", 1Y, "c"),
+   map(-1S, "a nice dinosaur bone", 0S, "best dinosaur bone", 1S, "c"),
+   map(-1L, "a nice dinosaur bone", 0L, "best dinosaur bone", 1L, "c"),
+   map(cast(-1.5 as FLOAT), "a nice dinosaur bone", cast(0.25 as FLOAT), "best dinosaur bone", cast(1.75 as FLOAT), "c"),
+   map(cast(-1.5 as DOUBLE), "a nice dinosaur bone", cast(0.25 as DOUBLE), "best dinosaur bone", cast(1.75 as DOUBLE), "c"),
+   map(-1.8, "a nice dinosaur bone", 0.2, "best dinosaur bone", 1.2, "c"),
+   map("one", 1, "two", 2, "three distinct dinosaur bones", 3),
+   map(cast("Mon" as CHAR(3)), 1,
+       cast("Tue" as CHAR(3)), 2,
+       cast("Wed" as CHAR(3)), 3,
+       cast("Thu" as CHAR(3)), 4,
+       cast("Fri" as CHAR(3)), 5,
+       cast("Sat" as CHAR(3)), 6,
+       cast("Sun" as CHAR(3)), 7
+      ),
+   map(cast("a" as VARCHAR(3)), "A", cast("ab" as VARCHAR(3)), "AB", cast("abc" as VARCHAR(3)), "ABC"),
+   map(to_utc_timestamp("2022-12-10 08:15:12", "UTC"), "Saturday morning",
+       to_utc_timestamp("2022-12-09 18:15:12", "UTC"), "Friday evening"),
+   map(to_date("2022-12-10"), "Saturday 24 dinosaur bones", to_date("2022-12-09"), "Friday")
+  ),
+  (3,
+   array(NULL, 4679, NULL, 49, NULL),
+   array(array(1, 2, NULL, NULL, 856), array(365, 855, 369, NULL)),
+   array(array(array(1, NULL, 2, NULL), array(NULL, 15)), array(array(NULL, 4))),
+   array("1", NULL, "three even-toed ungulates"),
+   array(array("one even-toed ungulate", "2", NULL, NULL), array(NULL, "three even-toed ungulates")),
+   array(array(array("1", "-1", "second even-toed ungulate", NULL), array("three even-toed ungulates")), array(array("four even-toed ungulate"))),
+   map(645, "fourth even-toed ungulate", 5, "fifth"),
+   map(1, map(10, "ten", 20, "twentieth even-toed ungulate"), 2, map(30, "thirty even-toed ungulates", 40, "forty")),
+   map(
+       1, map(10, map(100, "hundred", 200, "two hundred even-toed ungulates"), 20, map(300, "three hundred even-toed ungulates", 400, "four hundred")),
+       2, map(30, map(500, "five hundred even-toed ungulates", 600, "six hundred"), 40, map(700, "seven hundred even-toed ungulates", 800, "eight hundred"))
+   ),
+   map(
+       1, map(10, array(100, 200), 20, array(300, 400)),
+       2, map(30, array(500, 600), 40, array(700, 800))
+   ),
+   map(true, "true even-toed ungulate", false, "false"),
+   map(-1Y, "a nice even-toed ungulate", 0Y, "best even-toed ungulate", 1Y, "c"),
+   map(-1S, "a nice even-toed ungulate", 0S, "best even-toed ungulate", 1S, "c"),
+   map(-1L, "a nice even-toed ungulate", 0L, "best even-toed ungulate", 1L, "c"),
+   map(cast(-1.5 as FLOAT), "a nice even-toed ungulate", cast(0.25 as FLOAT), "best even-toed ungulate", cast(1.75 as FLOAT), "c"),
+   map(cast(-1.5 as DOUBLE), "a nice even-toed ungulate", cast(0.25 as DOUBLE), "best even-toed ungulate", cast(1.75 as DOUBLE), "c"),
+   map(-1.8, "a nice even-toed ungulate", 0.2, "best even-toed ungulate", 1.2, "c"),
+   map("one", 1, "two", 2, "three distinct even-toed ungulates", 3),
+   map(cast("Mon" as CHAR(3)), 1,
+       cast("Tue" as CHAR(3)), 2,
+       cast("Wed" as CHAR(3)), 3,
+       cast("Thu" as CHAR(3)), 4,
+       cast("Fri" as CHAR(3)), 5,
+       cast("Sat" as CHAR(3)), 6,
+       cast("Sun" as CHAR(3)), 7
+      ),
+   map(cast("a" as VARCHAR(3)), "A", cast("ab" as VARCHAR(3)), "AB", cast("abc" as VARCHAR(3)), "ABC"),
+   map(to_utc_timestamp("2022-12-10 08:15:12", "UTC"), "Saturday morning",
+       to_utc_timestamp("2022-12-09 18:15:12", "UTC"), "Friday evening"),
+   map(to_date("2022-12-10"), "Saturday 24 even-toed ungulates", to_date("2022-12-09"), "Friday")
   );
 ---- LOAD
 ====
@@ -3992,11 +4068,11 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
   (
     1,
     named_struct("arr", array(1, 2, 3, 4, NULL, NULL, 5)),
-    named_struct("m", map(1, "one", 2, "two", 0, NULL)),
+    named_struct("m", map(1, "one spaceship captain", 2, "two", 0, NULL)),
     array(named_struct("i", 1L), named_struct("i", 2L), named_struct("i", 3L),
           named_struct("i", 4L), NULL, named_struct("i", 5L), named_struct("i", NULL)),
     array(named_struct("inner_struct", named_struct("str", "", "l", 0), "small", 2S), NULL,
-          named_struct("inner_struct", named_struct("str", "some_string", "l", 5), "small", 20S)),
+          named_struct("inner_struct", named_struct("str", "some spaceship captain", "l", 5), "small", 20S)),
     named_struct("arr", array(array(to_date("2022-12-05"), to_date("2022-12-06"), NULL, to_date("2022-12-07")),
                               array(to_date("2022-12-08"), to_date("2022-12-09"), NULL)), "i", 2),
     map(
@@ -4016,7 +4092,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
           "n", 98
         ),
         "small", named_struct(
-          "str", "somestring",
+          "str", "a few spaceship captains",
           "i", 100
         )
       )
@@ -4025,11 +4101,11 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
   (
     2,
     named_struct("arr", if(false, array(1), NULL)),
-    named_struct("m", if(false, map(1, "one"), NULL)),
+    named_struct("m", if(false, map(1, "one soju distillery"), NULL)),
     array(named_struct("i", 100L), named_struct("i", 8L), named_struct("i", 35L),
           named_struct("i", 45L), NULL, named_struct("i", 193L), named_struct("i", NULL)),
     array(named_struct("inner_struct", if(false, named_struct("str", "", "l", 0), NULL), "small", 104S),
-          named_struct("inner_struct", named_struct("str", "aaa", "l", 28), "small", 105S), NULL),
+          named_struct("inner_struct", named_struct("str", "a few soju distilleries", "l", 28), "small", 105S), NULL),
     named_struct("arr", array(array(to_date("2022-12-10"), to_date("2022-12-11"), NULL, to_date("2022-12-12")),
                               if(false, array(to_date("2022-12-12")), NULL)), "i", 2754),
     map(
@@ -4049,7 +4125,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
           "n", 95
         ),
         "small", named_struct(
-          "str", "otherstring",
+          "str", "other soju distillery",
           "i", 2048
         )
       ),
@@ -4065,7 +4141,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
           "n", 8
         ),
         "small", named_struct(
-          "str", "textstring",
+          "str", "test soju distillery",
           "i", 0
         )
       ),
@@ -4081,7 +4157,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
           "n", 93
         ), NULL),
         "small", named_struct(
-          "str", "nextstring",
+          "str", "next soju distillery",
           "i", 128
         )
       ),

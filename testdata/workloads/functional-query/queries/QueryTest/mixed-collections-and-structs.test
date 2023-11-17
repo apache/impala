@@ -11,8 +11,8 @@ select
   all_mix
 from collection_struct_mix;
 ---- RESULTS
-1,'{"arr":[1,2,3,4,null,null,5]}','{"m":{1:"one",2:"two",0:null}}','[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]','{"arr":[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]],"i":2}','{10:{"big":{"arr":[{"inner_arr":[[0,null,-1,-5,null,8],[20,null]],"m":"2022-12-05 14:30:00"},{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-06 16:20:52"}],"n":98},"small":{"str":"somestring","i":100}}}'
-2,'{"arr":null}','{"m":null}','[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]','{"arr":[["2022-12-10","2022-12-11",null,"2022-12-12"],null],"i":2754}','{20:{"big":{"arr":[null,{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-10 08:15:12"}],"n":95},"small":{"str":"otherstring","i":2048}},21:{"big":{"arr":null,"n":8},"small":{"str":"textstring","i":0}},22:{"big":null,"small":{"str":"nextstring","i":128}},23:null}'
+1,'{"arr":[1,2,3,4,null,null,5]}','{"m":{1:"one spaceship captain",2:"two",0:null}}','[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]','{"arr":[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]],"i":2}','{10:{"big":{"arr":[{"inner_arr":[[0,null,-1,-5,null,8],[20,null]],"m":"2022-12-05 14:30:00"},{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-06 16:20:52"}],"n":98},"small":{"str":"a few spaceship captains","i":100}}}'
+2,'{"arr":null}','{"m":null}','[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]','{"arr":[["2022-12-10","2022-12-11",null,"2022-12-12"],null],"i":2754}','{20:{"big":{"arr":[null,{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-10 08:15:12"}],"n":95},"small":{"str":"other soju distillery","i":2048}},21:{"big":{"arr":null,"n":8},"small":{"str":"test soju distillery","i":0}},22:{"big":null,"small":{"str":"next soju distillery","i":128}},23:null}'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING,STRING
 ====
@@ -141,9 +141,9 @@ select id, item from collection_struct_mix, collection_struct_mix.arr_contains_n
 ---- RESULTS
 1,'{"inner_struct":{"str":"","l":0},"small":2}'
 1,'NULL'
-1,'{"inner_struct":{"str":"some_string","l":5},"small":20}'
+1,'{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}'
 2,'{"inner_struct":null,"small":104}'
-2,'{"inner_struct":{"str":"aaa","l":28},"small":105}'
+2,'{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105}'
 2,'NULL'
 ---- TYPES
 INT,STRING
@@ -157,9 +157,9 @@ select id, item from sub2, sub2.arr2 a;
 ---- RESULTS
 1,'{"inner_struct":{"str":"","l":0},"small":2}'
 1,'NULL'
-1,'{"inner_struct":{"str":"some_string","l":5},"small":20}'
+1,'{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}'
 2,'{"inner_struct":null,"small":104}'
-2,'{"inner_struct":{"str":"aaa","l":28},"small":105}'
+2,'{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105}'
 2,'NULL'
 ---- TYPES
 INT,STRING
@@ -172,9 +172,9 @@ select id, item from collection_struct_mix_view,
 ---- RESULTS
 1,'{"inner_struct":{"str":"","l":0},"small":2}'
 1,'NULL'
-1,'{"inner_struct":{"str":"some_string","l":5},"small":20}'
+1,'{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}'
 2,'{"inner_struct":null,"small":104}'
-2,'{"inner_struct":{"str":"aaa","l":28},"small":105}'
+2,'{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105}'
 2,'NULL'
 ---- TYPES
 INT,STRING
@@ -229,9 +229,9 @@ select id, a.item, a.item.inner_struct, a.item.small from collection_struct_mix,
 ---- RESULTS
 1,'{"inner_struct":{"str":"","l":0},"small":2}','{"str":"","l":0}',2
 1,'NULL','NULL',NULL
-1,'{"inner_struct":{"str":"some_string","l":5},"small":20}','{"str":"some_string","l":5}',20
+1,'{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}','{"str":"some spaceship captain","l":5}',20
 2,'{"inner_struct":null,"small":104}','NULL',104
-2,'{"inner_struct":{"str":"aaa","l":28},"small":105}','{"str":"aaa","l":28}',105
+2,'{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105}','{"str":"a few soju distilleries","l":28}',105
 2,'NULL','NULL',NULL
 ---- TYPES
 INT,STRING,STRING,SMALLINT
@@ -243,9 +243,9 @@ select id, a.item, a.item.inner_struct, a.item.small from collection_struct_mix_
 ---- RESULTS
 1,'{"inner_struct":{"str":"","l":0},"small":2}','{"str":"","l":0}',2
 1,'NULL','NULL',NULL
-1,'{"inner_struct":{"str":"some_string","l":5},"small":20}','{"str":"some_string","l":5}',20
+1,'{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}','{"str":"some spaceship captain","l":5}',20
 2,'{"inner_struct":null,"small":104}','NULL',104
-2,'{"inner_struct":{"str":"aaa","l":28},"small":105}','{"str":"aaa","l":28}',105
+2,'{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105}','{"str":"a few soju distilleries","l":28}',105
 2,'NULL','NULL',NULL
 ---- TYPES
 INT,STRING,STRING,SMALLINT
@@ -258,9 +258,9 @@ select id, a.item, a.item.inner_struct, a.item.small from sub,
 ---- RESULTS
 1,'{"inner_struct":{"str":"","l":0},"small":2}','{"str":"","l":0}',2
 1,'NULL','NULL',NULL
-1,'{"inner_struct":{"str":"some_string","l":5},"small":20}','{"str":"some_string","l":5}',20
+1,'{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}','{"str":"some spaceship captain","l":5}',20
 2,'{"inner_struct":null,"small":104}','NULL',104
-2,'{"inner_struct":{"str":"aaa","l":28},"small":105}','{"str":"aaa","l":28}',105
+2,'{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105}','{"str":"a few soju distilleries","l":28}',105
 2,'NULL','NULL',NULL
 ---- TYPES
 INT,STRING,STRING,SMALLINT
@@ -345,7 +345,7 @@ STRING
 set STRINGIFY_MAP_KEYS=1;
 select id, struct_contains_map from collection_struct_mix;
 ---- RESULTS
-1,'{"m":{"1":"one","2":"two","0":null}}'
+1,'{"m":{"1":"one spaceship captain","2":"two","0":null}}'
 2,'{"m":null}'
 ---- TYPES
 INT,STRING
@@ -478,8 +478,8 @@ select * from (
   select * from sub
 ) sub2;
 ---- RESULTS
-1,'{"arr":[1,2,3,4,null,null,5]}','{"m":{1:"one",2:"two",0:null}}','[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]','{"arr":[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]],"i":2}','{10:{"big":{"arr":[{"inner_arr":[[0,null,-1,-5,null,8],[20,null]],"m":"2022-12-05 14:30:00"},{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-06 16:20:52"}],"n":98},"small":{"str":"somestring","i":100}}}'
-2,'{"arr":null}','{"m":null}','[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]','{"arr":[["2022-12-10","2022-12-11",null,"2022-12-12"],null],"i":2754}','{20:{"big":{"arr":[null,{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-10 08:15:12"}],"n":95},"small":{"str":"otherstring","i":2048}},21:{"big":{"arr":null,"n":8},"small":{"str":"textstring","i":0}},22:{"big":null,"small":{"str":"nextstring","i":128}},23:null}'
+1,'{"arr":[1,2,3,4,null,null,5]}','{"m":{1:"one spaceship captain",2:"two",0:null}}','[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]','{"arr":[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]],"i":2}','{10:{"big":{"arr":[{"inner_arr":[[0,null,-1,-5,null,8],[20,null]],"m":"2022-12-05 14:30:00"},{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-06 16:20:52"}],"n":98},"small":{"str":"a few spaceship captains","i":100}}}'
+2,'{"arr":null}','{"m":null}','[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]','{"arr":[["2022-12-10","2022-12-11",null,"2022-12-12"],null],"i":2754}','{20:{"big":{"arr":[null,{"inner_arr":[[12,1024,null],[null,null,84],[null,15,null]],"m":"2022-12-10 08:15:12"}],"n":95},"small":{"str":"other soju distillery","i":2048}},21:{"big":{"arr":null,"n":8},"small":{"str":"test soju distillery","i":0}},22:{"big":null,"small":{"str":"next soju distillery","i":128}},23:null}'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING,STRING
 ====
@@ -494,8 +494,8 @@ select id, arr_contains_nested_struct, struct_contains_nested_arr.* from (
   select id, arr_contains_nested_struct, struct_contains_nested_arr from sub
 ) sub2;
 ---- RESULTS
-1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]',2
-2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]',2754
+1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]',2
+2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]',2754
 ---- TYPES
 INT,STRING,INT
 ====
@@ -510,8 +510,8 @@ select id, arr_contains_nested_struct, struct_contains_nested_arr.* from (
   select id, arr_contains_nested_struct, struct_contains_nested_arr from sub
 ) sub2;
 ---- RESULTS
-1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some_string","l":5},"small":20}]','[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]]',2
-2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"aaa","l":28},"small":105},null]','[["2022-12-10","2022-12-11",null,"2022-12-12"],null]',2754
+1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]','[["2022-12-05","2022-12-06",null,"2022-12-07"],["2022-12-08","2022-12-09",null]]',2
+2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]','[["2022-12-10","2022-12-11",null,"2022-12-12"],null]',2754
 ---- TYPES
 INT,STRING,STRING,INT
 ====
@@ -542,9 +542,9 @@ from collection_struct_mix, collection_struct_mix.arr_contains_nested_struct arr
 ---- RESULTS
 1,'{"str":"","l":0}',2
 1,'NULL',NULL
-1,'{"str":"some_string","l":5}',20
+1,'{"str":"some spaceship captain","l":5}',20
 2,'NULL',104
-2,'{"str":"aaa","l":28}',105
+2,'{"str":"a few soju distilleries","l":28}',105
 2,'NULL',NULL
 ---- TYPES
 INT,STRING,SMALLINT

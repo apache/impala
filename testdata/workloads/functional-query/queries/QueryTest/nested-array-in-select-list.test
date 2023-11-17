@@ -434,7 +434,9 @@ INT,INT,STRING
 #   IMPALA-11434: "More than 1 2d arrays in select list causes analysis error"
 select id, arr_int_1d, arr_int_2d, arr_int_3d, arr_string_1d, arr_string_2d, arr_string_3d from collection_tbl;
 ---- RESULTS
-1,'[1,2,null]','[[1,2,null],[3]]','[[[1,2,null],[3]],[[4]]]','["1","2",null]','[["1","2",null],["3"]]','[[["1","2",null],["3"]],[["4"]]]'
+1,'[1,2,null]','[[1,2,null],[3]]','[[[1,2,null],[3]],[[4]]]','["1","two wooden boxes",null]','[["one silk glove","2",null],["three pancakes"]]','[[["1","second harmonic",null],["three cities"]],[["four castles"]]]'
+2,'[1,null,3]','[[null,1,2,null],[5,14,null]]','[[[null,1,2,null],[5,14,null]],[[null,5]]]','["one dinosaur bone",null,"2",null]','[["1","2",null,"four dinosaur bones"],["five dinosaur bones"]]','[[["second dinosaur bone",null,null],["three dinosaur bones"]],[["one",null,"four dinosaur bones"]]]'
+3,'[null,4679,null,49,null]','[[1,2,null,null,856],[365,855,369,null]]','[[[1,null,2,null],[null,15]],[[null,4]]]','["1",null,"three even-toed ungulates"]','[["one even-toed ungulate","2",null,null],[null,"three even-toed ungulates"]]','[[["1","-1","second even-toed ungulate",null],["three even-toed ungulates"]],[["four even-toed ungulate"]]]'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING,STRING
 ====
@@ -446,9 +448,9 @@ from alltypestiny a left outer join
   (select id, arr_int_1d, arr_int_2d from collection_tbl) b
 on a.id = b.id where a.id < 3;
 ---- RESULTS
-0,'NULL','NULL'
 1,'[1,2,null]','[[1,2,null],[3]]'
-2,'NULL','NULL'
+2,'[1,null,3]','[[null,1,2,null],[5,14,null]]'
+0,'NULL','NULL'
 ---- TYPES
 INT,STRING,STRING
 =====

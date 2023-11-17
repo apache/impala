@@ -25,22 +25,26 @@ SHELL_CMD=${IMPALA_HOME}/bin/impala-shell.sh
 
 usage() {
   echo "Usage: $0 [-n num databases] [-e num elements]" 1>&2;
-  echo "       [-i num list items] [-f]" 1>&2;
+  echo "       [-l string length] [-i num list items] [-f]" 1>&2;
   echo "Tables will be flattened if -f is set." 1>&2;
   exit 1;
 }
 
 NUM_DATABASES=1
 NUM_ELEMENTS=$((10**7))
+STR_LEN=10
 NUM_FIELDS=30
 FLATTEN=false
-while getopts ":n:e:i:f" OPTION; do
+while getopts ":n:e:l:i:f" OPTION; do
   case "${OPTION}" in
     n)
       NUM_DATABASES=${OPTARG}
       ;;
     e)
       NUM_ELEMENTS=${OPTARG}
+      ;;
+    l)
+      STR_LEN=${OPTARG}
       ;;
     i)
       NUM_FIELDS=${OPTARG}
@@ -81,7 +85,7 @@ do
     TABLE_NAME="${FILE_NAME%.*}"
     mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/java/datagenerator/pom.xml" exec:java \
       -Dexec.mainClass="org.apache.impala.datagenerator.RandomNestedDataGenerator" \
-      -Dexec.args="${AVRO_SCHEMA_PATH} ${NUM_ELEMENTS} ${NUM_FIELDS} ${DB_DIR}/${TABLE_NAME}/${TABLE_NAME}.parquet";
+      -Dexec.args="${AVRO_SCHEMA_PATH} ${NUM_ELEMENTS} ${STR_LEN} ${NUM_FIELDS} ${DB_DIR}/${TABLE_NAME}/${TABLE_NAME}.parquet";
 
     if $FLATTEN; then
       mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/java/TableFlattener/pom.xml" \
