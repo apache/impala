@@ -196,6 +196,15 @@ function(IMPALA_ADD_THIRDPARTY_LIB NAME HEADER STATIC_LIB SHARED_LIB)
     ADD_THIRDPARTY_LIB(${NAME} SHARED_LIB ${SHARED_LIB})
   else()
     ADD_THIRDPARTY_LIB(${NAME} STATIC_LIB ${STATIC_LIB})
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+      if ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN" OR
+          "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL")
+        # UBSAN builds on ARM require that gcc is included last to cover several symbols
+        # omitted in libgcc_s, which is required because we use -rtlib=compiler-rt to
+        # work around https://bugs.llvm.org/show_bug.cgi?id=16404.
+        target_link_libraries(${NAME} INTERFACE gcc)
+      endif()
+    endif()
   endif()
 endfunction()
 

@@ -116,6 +116,15 @@ if [[ "${ERASURE_CODING}" = true ]]; then
   FE_TEST=false
 fi
 
+if test -v CMAKE_BUILD_TYPE && [[ "${CMAKE_BUILD_TYPE}" =~ 'UBSAN' ]] \
+    && [[ "$(uname -p)" = "aarch64" ]]; then
+  # FE tests fail on ARM with
+  #   libfesupport.so: cannot allocate memory in static TLS block
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1722181 mentions this is more likely
+  # on aarch64 due to how it uses thread-local storage (TLS). There's no clear fix.
+  FE_TEST=false
+fi
+
 # Indicates whether code coverage reports should be generated.
 : ${CODE_COVERAGE:=false}
 
