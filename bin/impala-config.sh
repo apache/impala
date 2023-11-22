@@ -85,13 +85,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=3-c22e6eb3b9
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=377-c22e6eb3b9
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=8-62067ab072
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=378-62067ab072
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-c22e6eb3b95979bdd7a2ec8f86abb751b439f7a4}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-62067ab072750a6395307499caf9ebaa65cb79b7}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -100,6 +100,8 @@ if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
     "come from the same commit hash."
   exit 1
 fi
+
+export ARCH_NAME=$(uname -p)
 
 # Versions of toolchain dependencies.
 # -----------------------------------
@@ -201,6 +203,10 @@ export IMPALA_CLOUDFLAREZLIB_VERSION=9e601a3f37
 unset IMPALA_CLOUDFLAREZLIB_URL
 export IMPALA_CALLONCEHACK_VERSION=1.0.0
 unset IMPALA_CALLONCEHACK_URL
+if [[ $ARCH_NAME == 'aarch64' ]]; then
+  export IMPALA_HADOOP_CLIENT_BINARY_VERSION=3.3.6
+  unset IMPALA_HADOOP_CLIENT_BINARY_URL
+fi
 # Thrift related environment variables.
 # IMPALA_THRIFT_POM_VERSION is used to populate IMPALA_THRIFT_JAVA_VERSION and
 # thrift.version in java/pom.xml.
@@ -260,8 +266,6 @@ export APACHE_MIRROR
 export APACHE_HIVE_VERSION=3.1.3
 export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
 export APACHE_OZONE_VERSION=1.3.0
-
-export ARCH_NAME=$(uname -p)
 
 # Java dependencies that are not also runtime components. Declaring versions here allows
 # other branches to override them in impala-config-branch.sh for cleaner patches.

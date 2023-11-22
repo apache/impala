@@ -443,13 +443,10 @@ bootstrap_dependencies() {
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     echo "Toolchain bootstrap complete."
   fi
-  # Download prebuilt Hadoop native binaries for aarch64
+  # Use prebuilt Hadoop native binaries for aarch64
   if [[ "$(uname -p)" = "aarch64" ]]; then
-    if ! [[ -d "$IMPALA_HOME/../hadoopAarch64NativeLibs" ]]; then
-      git clone https://github.com/zhaorenhai/hadoopAarch64NativeLibs \
-        "$IMPALA_HOME/../hadoopAarch64NativeLibs"
-    fi
-    cp $IMPALA_HOME/../hadoopAarch64NativeLibs/lib*  $HADOOP_HOME/lib/native/
+    cp $IMPALA_TOOLCHAIN_PACKAGES_HOME/hadoop-$IMPALA_HADOOP_CLIENT_BINARY_VERSION/lib/* \
+        $HADOOP_HOME/lib/native/
   fi
   if [[ "${USE_APACHE_HIVE}" = true ]]; then
     "$IMPALA_HOME/testdata/bin/patch_hive.sh"
