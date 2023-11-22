@@ -36,9 +36,10 @@ uint64_t StringValue::ToUInt64() const {
   unsigned char bytes[8];
   *((uint64_t*)bytes) = 0;
   uint32_t len = Len();
+  const char* ptr = Ptr();
   int chars_to_copy = (len < 8) ? len : 8;
   for (int i = 0; i < chars_to_copy; i++) {
-    bytes[i] = static_cast<unsigned char>(Ptr()[i]);
+    bytes[i] = static_cast<unsigned char>(ptr[i]);
   }
   return static_cast<uint64_t>(bytes[0]) << 56 | static_cast<uint64_t>(bytes[1]) << 48
       | static_cast<uint64_t>(bytes[2]) << 40 | static_cast<uint64_t>(bytes[3]) << 32

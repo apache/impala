@@ -160,16 +160,20 @@ void TestConvertToUInt64Impl(StringValue* svs) {
 TEST(StringValueTest, TestConvertToUInt64) {
   // Test converting StringValues to uint64_t which utilizes up to first 8 bytes.
   const int NUM_STRINGS = 7;
+  string strings[NUM_STRINGS];
+  strings[0] = "";
+  strings[1] = "\1";
+  strings[2] = "\1\2";
+  strings[3] = "\1\2\3";
+  strings[4] = "\1\2\3\4\5\6\7\7";
+  strings[5] = "\1\2\3\4\5\6\7\7\7";
+  strings[6] = "\1\2\3\4\5\6\7\7\7\7\7\7\7\7\7";
 
   // Must be in lexical order
   StringValue svs[NUM_STRINGS];
-  svs[0] = FromStdString("");
-  svs[1] = FromStdString("\1");
-  svs[2] = FromStdString("\1\2");
-  svs[3] = FromStdString("\1\2\3");
-  svs[4] = FromStdString("\1\2\3\4\5\6\7\7");
-  svs[5] = FromStdString("\1\2\3\4\5\6\7\7\7");
-  svs[6] = FromStdString("\1\2\3\4\5\6\7\7\7\7\7\7\7\7\7");
+  for (int i = 0; i < NUM_STRINGS; ++i) {
+    svs[i] = FromStdString(strings[i]);
+  }
 
   TestConvertToUInt64Impl(svs);
   for (int i = 0; i < NUM_STRINGS; ++i) {

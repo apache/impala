@@ -107,8 +107,8 @@ Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
 // overhead.
 void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) {
   if (desc.HasVarlenSlots()) {
-    SmallifyStrings(desc);
     memcpy(dst, this, desc.byte_size());
+    dst->SmallifyStrings(desc);
     dst->DeepCopyVarlenData(desc, pool);
   } else {
     memcpy(dst, this, desc.byte_size());
