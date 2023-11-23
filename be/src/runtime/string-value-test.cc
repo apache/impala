@@ -263,20 +263,26 @@ TEST(StringValueTest, TestConstructors) {
 }
 
 TEST(StringValueTest, TestSmallify) {
+  StringValue nullstr;
   StringValue empty(const_cast<char*>(""), 0);
   StringValue one_char(const_cast<char*>("a"), 1);
   StringValue limit(const_cast<char*>("0123456789A"), 11);
   StringValue over_the_limit(const_cast<char*>("0123456789AB"), 12);
 
+  StringValue nullstr_clone(nullstr);
   StringValue empty_clone(empty);
   StringValue one_char_clone(one_char);
   StringValue limit_clone(limit);
   StringValue over_the_limit_clone(over_the_limit);
 
+  EXPECT_TRUE(nullstr.Smallify());
   EXPECT_TRUE(empty.Smallify());
   EXPECT_TRUE(one_char.Smallify());
   EXPECT_TRUE(limit.Smallify());
   EXPECT_FALSE(over_the_limit.Smallify());
+
+  EXPECT_EQ(nullstr, nullstr_clone);
+  EXPECT_NE(nullstr.Ptr(), nullstr_clone.Ptr());
 
   EXPECT_EQ(empty, empty_clone);
   EXPECT_NE(empty.Ptr(), empty_clone.Ptr());

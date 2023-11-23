@@ -19,6 +19,8 @@
 
 #include <string>
 
+#include "util/ubsan.h"
+
 #include "common/logging.h"
 
 namespace impala {
@@ -119,7 +121,7 @@ class __attribute__((__packed__)) SmallableString {
     // Let's zero out the object so compression algorithms will be more efficient
     // on small strings (there will be no garbage between string data and len).
     memset(this, 0, sizeof(*this));
-    memcpy(rep.small_rep.buf, s, len);
+    Ubsan::MemCpy(rep.small_rep.buf, s, len);
     SetSmallLen(len);
     return true;
   }
