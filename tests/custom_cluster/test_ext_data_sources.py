@@ -109,3 +109,37 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
   def test_mysql_ext_jdbc_tables(self, vector, unique_database):
     """Run tests for external jdbc tables on MySQL"""
     self.run_test_case('QueryTest/mysql-ext-jdbc-tables', vector, use_db=unique_database)
+
+
+class TestImpalaExtJdbcTables(CustomClusterTestSuite):
+  """Impala query tests for external jdbc tables in Impala cluster."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def _download_impala_jdbc_driver(cls):
+    # Download Impala jdbc driver and copy jdbc driver to HDFS.
+    script = os.path.join(
+        os.environ['IMPALA_HOME'], 'testdata/bin/download-impala-jdbc-driver.sh')
+    run_cmd = [script]
+    try:
+      subprocess.check_call(run_cmd, close_fds=True)
+    except subprocess.CalledProcessError:
+      assert False, "Failed to download Impala JDBC driver"
+
+  @classmethod
+  def setup_class(cls):
+    cls._download_impala_jdbc_driver()
+    super(TestImpalaExtJdbcTables, cls).setup_class()
+
+  @classmethod
+  def teardown_class(cls):
+    super(TestImpalaExtJdbcTables, cls).teardown_class()
+
+  @pytest.mark.execute_serially
+  def test_impala_ext_jdbc_tables(self, vector, unique_database):
+    """Run tests for external jdbc tables in Impala cluster"""
+    self.run_test_case(
+        'QueryTest/impala-ext-jdbc-tables', vector, use_db=unique_database)

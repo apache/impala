@@ -207,6 +207,10 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
   export IMPALA_HADOOP_CLIENT_VERSION=3.3.6
   unset IMPALA_HADOOP_CLIENT_URL
 fi
+
+# Impala JDBC driver for testing.
+export IMPALA_SIMBA_JDBC_DRIVER_VERSION=42-2.6.32.1041
+
 # Thrift related environment variables.
 # IMPALA_THRIFT_POM_VERSION is used to populate IMPALA_THRIFT_JAVA_VERSION and
 # thrift.version in java/pom.xml.

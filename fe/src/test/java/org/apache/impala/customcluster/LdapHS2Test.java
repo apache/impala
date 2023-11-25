@@ -40,6 +40,8 @@ import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @CreateDS(name = "myDS",
     partitions = { @CreatePartition(name = "test", suffix = "dc=myorg,dc=com") })
@@ -51,6 +53,8 @@ import org.junit.Test;
  * ldap authentication is being used.
  */
 public class LdapHS2Test {
+  private static final Logger LOG = LoggerFactory.getLogger(LdapHS2Test.class);
+
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
 
@@ -92,7 +96,9 @@ public class LdapHS2Test {
     verifySuccess(fetchResp.getStatus());
     List<TColumn> columns = fetchResp.getResults().getColumns();
     assertEquals(1, columns.size());
-    assertEquals(expectedResult, columns.get(0).getStringVal().getValues().get(0));
+    if (expectedResult != null) {
+      assertEquals(expectedResult, columns.get(0).getStringVal().getValues().get(0));
+    }
 
     return execResp.getOperationHandle();
   }
@@ -703,5 +709,150 @@ public class LdapHS2Test {
       verifyJwtAuthMetrics(3, 1);
       assertEquals(e.getMessage(), "HTTP Response code: 401");
     }
+  }
+
+  /**
+   * Tests LDAP for reading Impala table through JDBC external data source.
+   */
+  @Test
+  public void testImpalaExtJdbcTables() throws Exception {
+    setUp("");
+    verifyMetrics(0, 0);
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+    // Authenticate as 'Test1Ldap' with password '12345'
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'Test1Ldap'.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    TSessionHandle session = openResp.getSessionHandle();
+    // One successful authentication.
+    verifyMetrics(1, 0);
+
+    // Download Impala JDBC driver.
+    String downloadImpalaJdbcDriver = new File(System.getenv("IMPALA_HOME"),
+        "testdata/bin/download-impala-jdbc-driver.sh").getPath();
+    String[] cmd = { downloadImpalaJdbcDriver };
+    RunShellCommand.Run(cmd, /*shouldSucceed*/ true, "", "");
+
+    // Define queries.
+    String fileSystemPrefix = System.getenv("FILESYSTEM_PREFIX");
+    String internalListenHost = System.getenv("INTERNAL_LISTEN_HOST");
+
+    String dropDSQuery = "DROP DATA SOURCE IF EXISTS impala_jdbc_test_ds";
+    String createDSQuery = String.format("CREATE DATA SOURCE impala_jdbc_test_ds " +
+        "LOCATION '%s/test-warehouse/data-sources/jdbc-data-source.jar' " +
+        "CLASS 'org.apache.impala.extdatasource.jdbc.JdbcDataSource' " +
+        "API_VERSION 'V1'", fileSystemPrefix);
+    String dropTableQuery = "DROP TABLE IF EXISTS %s";
+    // Set JDBC authentication mechanisms as LDAP (3) with username/password as
+    // TEST_USER_1/TEST_PASSWORD_1.
+    String createTableQuery = String.format("CREATE TABLE impala_jdbc_ext_test_table (" +
+        "id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT, " +
+        "int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE, " +
+        "date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP) " +
+        "PRODUCED BY DATA SOURCE impala_jdbc_test_ds(" +
+        "'{\"database.type\":\"IMPALA\", " +
+          "\"jdbc.url\":\"jdbc:impala://%s:21050/functional\", " +
+          "\"jdbc.auth\":\"AuthMech=3\", " +
+          "\"jdbc.driver\":\"com.cloudera.impala.jdbc.Driver\", " +
+          "\"driver.url\":\"%s/test-warehouse/data-sources/jdbc-drivers/" +
+          "ImpalaJDBC42.jar\", " +
+          "\"dbcp.username\":\"%s\", " +
+          "\"dbcp.password\":\"%s\", " +
+          "\"table\":\"alltypes\"}')",
+          internalListenHost, fileSystemPrefix, TEST_USER_1, TEST_PASSWORD_1);
+    // Set JDBC authentication mechanisms as LDAP with wrong password.
+    String createTableWithWrongPassword =
+        String.format("CREATE TABLE impala_jdbc_tbl_wrong_password (" +
+        "id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT, " +
+        "int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE, " +
+        "date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP) " +
+        "PRODUCED BY DATA SOURCE impala_jdbc_test_ds(" +
+        "'{\"database.type\":\"IMPALA\", " +
+          "\"jdbc.url\":\"jdbc:impala://%s:21050/functional\", " +
+          "\"jdbc.auth\":\"AuthMech=3\", " +
+          "\"jdbc.driver\":\"com.cloudera.impala.jdbc.Driver\", " +
+          "\"driver.url\":\"%s/test-warehouse/data-sources/jdbc-drivers/" +
+          "ImpalaJDBC42.jar\", " +
+          "\"dbcp.username\":\"%s\", " +
+          "\"dbcp.password\":\"wrong-password\", " +
+          "\"table\":\"alltypes\"}')",
+          internalListenHost, fileSystemPrefix, TEST_USER_1);
+    // Set JDBC authentication mechanisms as LDAP without AuthMech.
+    String createTableWithoutAuthMech =
+        String.format("CREATE TABLE impala_jdbc_tbl_without_auth_mech (" +
+        "id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT, " +
+        "int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE, " +
+        "date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP) " +
+        "PRODUCED BY DATA SOURCE impala_jdbc_test_ds(" +
+        "'{\"database.type\":\"IMPALA\", " +
+          "\"jdbc.url\":\"jdbc:impala://%s:21050/functional\", " +
+          "\"jdbc.driver\":\"com.cloudera.impala.jdbc.Driver\", " +
+          "\"driver.url\":\"%s/test-warehouse/data-sources/jdbc-drivers/" +
+          "ImpalaJDBC42.jar\", " +
+          "\"dbcp.username\":\"%s\", " +
+          "\"dbcp.password\":\"%s\", " +
+          "\"table\":\"alltypes\"}')",
+          internalListenHost, fileSystemPrefix, TEST_USER_1, TEST_PASSWORD_1);
+    String selectQuery = "select string_col from %s where id=9";
+
+    // Run queries.
+    //
+    // Create data source and tables.
+    execAndFetch(client, session, dropDSQuery, null);
+    execAndFetch(client, session, createDSQuery, "Data source has been created.");
+    execAndFetch(client, session,
+        String.format(dropTableQuery, "impala_jdbc_ext_test_table"), null);
+    execAndFetch(client, session, createTableQuery, "Table has been created.");
+    execAndFetch(client, session,
+        String.format(dropTableQuery, "impala_jdbc_tbl_wrong_password"), null);
+    execAndFetch(client, session, createTableWithWrongPassword,
+        "Table has been created.");
+    execAndFetch(client, session,
+        String.format(dropTableQuery, "impala_jdbc_tbl_without_auth_mech"), null);
+    execAndFetch(client, session, createTableWithoutAuthMech, "Table has been created.");
+
+    // Successfully access JDBC data source table with LDAP.
+    execAndFetch(client, session,
+        String.format(selectQuery, "impala_jdbc_ext_test_table"), "9");
+    // Negative case for JDBC data source table with wrong password.
+    String expectedError = "Error initialized or created transport for authentication";
+    try {
+      execAndFetch(client, session,
+          String.format(selectQuery, "impala_jdbc_tbl_wrong_password"), "9");
+      fail("Expected error: " + expectedError);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(expectedError));
+    }
+    // Negative case for JDBC data source table without AuthMech.
+    expectedError = "Communication link failure. Failed to connect to server";
+    try {
+      execAndFetch(client, session,
+          String.format(selectQuery, "impala_jdbc_tbl_without_auth_mech"), "9");
+      fail("Expected error: " + expectedError);
+    } catch (Exception e) {
+      assertTrue(String.format("Authentication failed with error: %s", e.getMessage()),
+          e.getMessage().contains(expectedError));
+    }
+
+    // Drop data source and tables.
+    execAndFetch(client, session, dropDSQuery, "Data source has been dropped.");
+    execAndFetch(client, session,
+        String.format(dropTableQuery, "impala_jdbc_ext_test_table"),
+        "Table has been dropped.");
+    execAndFetch(client, session,
+        String.format(dropTableQuery, "impala_jdbc_tbl_wrong_password"),
+        "Table has been dropped.");
+    execAndFetch(client, session,
+        String.format(dropTableQuery, "impala_jdbc_tbl_without_auth_mech"),
+        "Table has been dropped.");
+
+    // Two successful authentications for each ExecAndFetch().
+    verifyMetrics(31, 0);
   }
 }

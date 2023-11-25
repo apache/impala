@@ -57,6 +57,10 @@ public class DatabaseAccessorFactory {
         accessor = new DB2DatabaseAccessor();
         break;
 
+      case IMPALA:
+        accessor = new ImpalaDatabaseAccessor();
+        break;
+
       default:
         accessor = new GenericJdbcDatabaseAccessor();
         break;

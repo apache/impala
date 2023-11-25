@@ -229,6 +229,9 @@ public class JdbcDataSource implements ExternalDataSource {
           initString = initString.substring(CACHE_CLASS_PREFIX.length());
           cacheClass_ = true;
         }
+        // Replace '\n' with single space character so that one property setting in
+        // initString can be broken into multiple lines for better readability.
+        initString = initString.replace('\n', ' ');
         Map<String, String> config = new ObjectMapper().readValue(initString, typeRef);
         tableConfig_ = JdbcStorageConfigManager.convertMapToConfiguration(config);
       } catch (JsonProcessingException e) {
@@ -294,6 +297,7 @@ public class JdbcDataSource implements ExternalDataSource {
     }
     // Execute query and get iterator
     tableConfig_.set(JdbcStorageConfig.QUERY.getPropertyName(), sb.toString());
+    LOG.trace("JDBC Query: " + sb.toString());
 
     if (schema_.getColsSize() != 0) {
       int limit = -1;

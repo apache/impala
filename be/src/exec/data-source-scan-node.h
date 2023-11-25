@@ -98,6 +98,9 @@ class DataSourceScanNode : public ScanNode {
   /// the next row batch.
   std::vector<int> cols_next_val_idx_;
 
+  /// The total number of calls to ExternalDataSource::GetNext().
+  RuntimeProfile::Counter* num_ext_data_source_get_next_;
+
   /// Materializes the next row (next_row_idx_) into tuple. 'local_tz' is used as the
   /// local time-zone for materializing 'TYPE_TIMESTAMP' slots.
   Status MaterializeNextRow(const Timezone* local_tz, MemPool* mem_pool, Tuple* tuple);

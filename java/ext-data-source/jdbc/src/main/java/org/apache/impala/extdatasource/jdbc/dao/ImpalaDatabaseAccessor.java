@@ -15,15 +15,35 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.extdatasource.jdbc.conf;
+package org.apache.impala.extdatasource.jdbc.dao;
 
-public enum DatabaseType {
-  MYSQL,
-  H2,
-  DB2,
-  ORACLE,
-  POSTGRES,
-  MSSQL,
-  JETHRO_DATA,
-  IMPALA
+/**
+ * Impala specific data accessor. This is needed because Impala JDBC drivers do not
+ * support generic LIMIT and OFFSET escape functions
+ */
+public class ImpalaDatabaseAccessor extends GenericJdbcDatabaseAccessor {
+
+  @Override
+  protected String addLimitAndOffsetToQuery(String sql, int limit, int offset) {
+    if (offset == 0) {
+      return addLimitToQuery(sql, limit);
+    } else {
+      if (limit != -1) {
+        return sql + " LIMIT " + limit + " OFFSET " + offset;
+      } else {
+        return sql;
+      }
+    }
+  }
+
+
+  @Override
+  protected String addLimitToQuery(String sql, int limit) {
+    if (limit != -1) {
+      return sql + " LIMIT " + limit;
+    } else {
+      return sql;
+    }
+  }
+
 }

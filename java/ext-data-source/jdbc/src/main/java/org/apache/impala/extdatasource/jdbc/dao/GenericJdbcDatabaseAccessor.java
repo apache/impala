@@ -48,6 +48,7 @@ import org.apache.impala.thrift.TStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
@@ -283,7 +284,12 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
     }
 
     // essential properties
-    dbProperties.put("url", conf.get(JdbcStorageConfig.JDBC_URL.getPropertyName()));
+    String jdbcUrl = conf.get(JdbcStorageConfig.JDBC_URL.getPropertyName());
+    String jdbcAuth = conf.get(JdbcStorageConfig.JDBC_AUTH.getPropertyName());
+    if (!Strings.isNullOrEmpty(jdbcAuth)) {
+      jdbcUrl += ";" + jdbcAuth;
+    }
+    dbProperties.put("url", jdbcUrl);
     dbProperties.put("driverClassName",
         conf.get(JdbcStorageConfig.JDBC_DRIVER_CLASS.getPropertyName()));
     dbProperties.put("driverUrl",

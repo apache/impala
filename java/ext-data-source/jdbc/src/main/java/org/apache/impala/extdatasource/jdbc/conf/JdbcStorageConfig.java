@@ -26,6 +26,8 @@ public enum JdbcStorageConfig {
   // JDBC connection string, including the database type, IP address, port number, and
   // database name. For example, "jdbc:postgresql://127.0.0.1:5432/functional
   JDBC_URL("jdbc.url", true),
+  // Authentication mechanisms of JDBC driver.
+  JDBC_AUTH("jdbc.auth", false),
   // Class name of JDBC driver. For example, "org.postgresql.Driver"
   JDBC_DRIVER_CLASS("jdbc.driver", true),
   // Driver URL for downloading the Jar file package that is used to access the external

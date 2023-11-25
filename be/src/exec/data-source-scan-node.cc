@@ -49,6 +49,9 @@ DEFINE_int32(data_source_batch_size, 1024, "Batch size for calls to GetNext() on
 
 namespace impala {
 
+PROFILE_DEFINE_COUNTER(NumExternalDataSourceGetNext, DEBUG, TUnit::UNIT,
+    "The total number of calls to ExternalDataSource::GetNext()");
+
 // $0 = num expected cols, $1 = actual num columns
 const string ERROR_NUM_COLUMNS = "Data source returned unexpected number of columns. "
     "Expected $0 but received $1. This likely indicates a problem with the data source "
@@ -93,6 +96,8 @@ Status DataSourceScanNode::Prepare(RuntimeState* state) {
       data_src_node_.init_string));
 
   cols_next_val_idx_.resize(tuple_desc_->slots().size(), 0);
+  num_ext_data_source_get_next_ =
+      PROFILE_NumExternalDataSourceGetNext.Instantiate(runtime_profile_);
   return Status::OK();
 }
 
@@ -157,6 +162,7 @@ Status DataSourceScanNode::GetNextInputBatch() {
   Ubsan::MemSet(cols_next_val_idx_.data(), 0, sizeof(int) * cols_next_val_idx_.size());
   TGetNextParams params;
   params.__set_scan_handle(scan_handle_);
+  COUNTER_ADD(num_ext_data_source_get_next_, 1);
   RETURN_IF_ERROR(data_source_executor_->GetNext(params, input_batch_.get()));
   RETURN_IF_ERROR(Status(input_batch_->status));
   RETURN_IF_ERROR(ValidateRowBatchSize());
