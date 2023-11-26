@@ -38,6 +38,7 @@ add_library(CodeGen
   codegen-util.cc
   llvm-codegen.cc
   llvm-codegen-cache.cc
+  llvm-codegen-object-cache.cc
   instruction-counter.cc
   ${THIRDPARTY_LLVM_SRC_DIR}/SectionMemoryManager.cpp
   ${IR_O1_C_FILE}

@@ -200,7 +200,12 @@ class TestCodegenCache(CustomClusterTestSuite):
     When the --codegen_symbol_emitter_log_successful_destruction_test_only flag is set to
     true, 'CodegenSymbolEmitter' will log a message when it is being destroyed correctly
     (i.e. when use-after-free will not happen). If we don't have the expected message in
-    the logs (after some timeout), the test fails."""
+    the logs (after some timeout), the test fails.
+
+    After IMPALA-11805, codegen caching is no longer using the 'llvm::ExecutionEngine',
+    instead we use 'CodeGenObjectCache'. While 'CodeGenObjectCache' doesn't impact the
+    lifecycle of 'CodegenSymbolEmitter's, the testcase in this context still verifies
+    the correct usage of 'CodegenSymbolEmitter's."""
 
     exec_options = copy(vector.get_value('exec_option'))
     exec_options['exec_single_node_rows_threshold'] = 0
@@ -225,19 +230,23 @@ class TestCodegenCache(CustomClusterTestSuite):
     self.execute_query_expect_success(self.client, q1, exec_options)
     cache_entries_in_use = self.get_metric('impala.codegen-cache.entries-in-use')
     cache_entries_evicted = self.get_metric('impala.codegen-cache.entries-evicted')
+    # Query 1 contains 2 fragments.
+    fragments_ran = 2
     assert cache_entries_in_use > 0
     assert self.get_metric('impala.codegen-cache.hits') == 0
     # Initialising the cross-compiled modules also consumes an LLVM executor engine.
-    expected_num_msg = cache_entries_evicted + 1
+    expected_num_msg = fragments_ran + 1
     self.assert_impalad_log_contains("INFO", symbol_emitter_ok_msg, expected_num_msg)
 
     # ## Second query
     self.execute_query_expect_success(self.client, q2, exec_options)
     assert self.get_metric('impala.codegen-cache.hits') == 0
+    # Query 2 contains 4 fragments.
+    fragments_ran = fragments_ran + 4
     cache_entries_evicted = self.get_metric('impala.codegen-cache.entries-evicted')
     assert cache_entries_evicted >= cache_entries_in_use
     # Initialising the cross-compiled modules also consumes an LLVM executor engine.
-    expected_num_msg = cache_entries_evicted + 1
+    expected_num_msg = fragments_ran + 1
     self.assert_impalad_log_contains("INFO", symbol_emitter_ok_msg, expected_num_msg)
 
   @pytest.mark.execute_serially

@@ -78,7 +78,11 @@ class TestEnv {
   int64_t TotalQueryMemoryConsumption();
 
   /// Reset the codegen cache.
-  void ResetCodegenCache(MetricGroup* metrics) {
+  void ResetCodegenCache(MetricGroup* metrics = nullptr) {
+    if (metrics == nullptr) {
+      exec_env_->codegen_cache_.reset();
+      return;
+    }
     exec_env_->codegen_cache_.reset(new CodeGenCache(metrics));
   }
 

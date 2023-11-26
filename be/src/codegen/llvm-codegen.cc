@@ -130,7 +130,6 @@ DEFINE_string_hidden(llvm_ir_opt, "Os",
 DECLARE_bool(enable_legacy_avx_support);
 
 namespace impala {
-
 const string LlvmCodeGen::ASYNC_CODEGEN_THREAD_COUNTERS_PREFIX = "CodegenCompileThread";
 bool LlvmCodeGen::llvm_initialized_ = false;
 string LlvmCodeGen::cpu_name_;
@@ -477,9 +476,8 @@ Status LlvmCodeGen::Init(unique_ptr<llvm::Module> module) {
   builder.setMAttrs(cpu_attrs_);
   builder.setErrorStr(&error_string_);
 
-  unique_ptr<llvm::ExecutionEngine> execution_engine =
-      unique_ptr<llvm::ExecutionEngine>(builder.create());
-  if (execution_engine == nullptr) {
+  execution_engine_ = unique_ptr<llvm::ExecutionEngine>(builder.create());
+  if (execution_engine_ == nullptr) {
     module_ = nullptr; // module_ was owned by builder.
     stringstream ss;
     ss << "Could not create ExecutionEngine: " << error_string_;
@@ -487,18 +485,15 @@ Status LlvmCodeGen::Init(unique_ptr<llvm::Module> module) {
   }
 
   // The module data layout must match the one selected by the execution engine.
-  module_->setDataLayout(execution_engine->getDataLayout());
+  module_->setDataLayout(execution_engine_->getDataLayout());
 
   void_type_ = llvm::Type::getVoidTy(context());
   ptr_type_ = llvm::PointerType::get(i8_type(), 0);
   true_value_ = llvm::ConstantInt::get(context(), llvm::APInt(1, true, true));
   false_value_ = llvm::ConstantInt::get(context(), llvm::APInt(1, false, true));
 
-  unique_ptr<CodegenSymbolEmitter> symbol_emitter = SetupSymbolEmitter(
-      execution_engine.get());
-
-  execution_engine_wrapper_ = make_shared<LlvmExecutionEngineWrapper>(
-      std::move(execution_engine), std::move(symbol_emitter));
+  symbol_emitter_ = SetupSymbolEmitter(execution_engine_.get());
+  engine_cache_ = make_shared<CodeGenObjectCache>();
 
   RETURN_IF_ERROR(LoadIntrinsics());
 
@@ -522,7 +517,7 @@ unique_ptr<CodegenSymbolEmitter> LlvmCodeGen::SetupSymbolEmitter(
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
-  DCHECK(execution_engine_wrapper_ == nullptr) << "Must Close() before destruction";
+  DCHECK(execution_engine_ == nullptr) << "Must Close() before destruction";
 }
 
 void LlvmCodeGen::Close() {
@@ -533,9 +528,10 @@ void LlvmCodeGen::Close() {
     memory_manager_ = nullptr;
   }
   if (mem_tracker_ != nullptr) mem_tracker_->Close();
-
-  execution_engine_wrapper_.reset();
-  execution_engine_wrapper_cached_.reset();
+  engine_cache_.reset();
+  engine_cache_cached_.reset();
+  execution_engine_.reset();
+  symbol_emitter_.reset();
   module_ = nullptr;
 }
 
@@ -1166,8 +1162,7 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
   CodeGenCache* cache = ExecEnv::GetInstance()->codegen_cache();
   DCHECK(cache != nullptr);
   Status lookup_status = cache->Lookup(cache_key,
-      state_->query_options().codegen_cache_mode, &entry,
-      &execution_engine_wrapper_cached_);
+      state_->query_options().codegen_cache_mode, &entry, &engine_cache_cached_);
   bool entry_exists = lookup_status.ok() && !entry.Empty();
   LOG(INFO) << DebugCacheEntryString(cache_key, true /*is_lookup*/,
       CodeGenCacheModeAnalyzer::is_debug(state_->query_options().codegen_cache_mode),
@@ -1194,11 +1189,8 @@ bool LlvmCodeGen::LookupCache(CodeGenCacheKey& cache_key) {
       return false;
     }
 
-    const bool fn_pointers_set_from_cache = SetFunctionPointers(cache, &cache_key);
-    if (!fn_pointers_set_from_cache) return false;
-
-    // Because we cache the entire execution engine, the cached number of functions should
-    // be the same as the total optimized function number.
+    // Because we cache all the compiled codegened functions, the cached number of
+    // functions should be the same as the total optimized function number.
     COUNTER_SET(num_cached_functions_, entry.num_opt_functions);
     COUNTER_SET(num_functions_, entry.num_functions);
     COUNTER_SET(num_instructions_, entry.num_instructions);
@@ -1259,7 +1251,7 @@ void LlvmCodeGen::PruneModule() {
   module_pass_manager.run(*module_, module_analysis_manager);
 }
 
-Status LlvmCodeGen::FinalizeModule() {
+Status LlvmCodeGen::FinalizeModule(string* module_id) {
   DCHECK(!is_compiled_);
   is_compiled_ = true;
 
@@ -1309,6 +1301,7 @@ Status LlvmCodeGen::FinalizeModule() {
 
   bool codegen_cache_enabled = state_->codegen_cache_enabled() && codegen_cache_enabled_;
   CodeGenCacheKey cache_key;
+  bool cache_hit = false;
   if (codegen_cache_enabled) {
     string bitcode;
     SCOPED_TIMER(codegen_cache_lookup_timer_);
@@ -1323,25 +1316,29 @@ Status LlvmCodeGen::FinalizeModule() {
     // in the cache store process if look up failed.
     GenerateFunctionNamesHashCode();
     DCHECK(!cache_key.empty());
-    if (LookupCache(cache_key)) return Status::OK();
+    // Set the module id for the use of ObjectCache.
+    module_->setModuleIdentifier(cache_key.hash_code().str());
+    cache_hit = LookupCache(cache_key);
   }
 
-  // Update counters before final optimization, but after removing unused functions. This
-  // gives us a rough measure of how much work the optimization and compilation must do.
-  // If found in cache, counters will be restored from the cache entry.
-  InstructionCounter counter;
-  counter.visit(*module_);
-  COUNTER_SET(num_functions_, counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
-  COUNTER_SET(num_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
-
-  if (optimizations_enabled_ && !FLAGS_disable_optimization_passes) {
-    RETURN_IF_ERROR(OptimizeModule());
-    counter.ResetCount();
+  if (!cache_hit) {
+    // Update counters before final optimization, but after removing unused functions.
+    // This gives us a rough measure of how much work the optimization and compilation
+    // must do. If found in cache, counters will be restored from the cache entry.
+    InstructionCounter counter;
     counter.visit(*module_);
+    COUNTER_SET(num_functions_, counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
+    COUNTER_SET(num_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
+
+    if (optimizations_enabled_ && !FLAGS_disable_optimization_passes) {
+      RETURN_IF_ERROR(OptimizeModule());
+      counter.ResetCount();
+      counter.visit(*module_);
+    }
+    COUNTER_SET(
+        num_opt_functions_, counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
+    COUNTER_SET(num_opt_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
   }
-  COUNTER_SET(num_opt_functions_,
-      counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
-  COUNTER_SET(num_opt_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
 
   if (FLAGS_opt_module_dir.size() != 0) {
     string path = FLAGS_opt_module_dir + "/" + id_ + "_opt.ll";
@@ -1355,30 +1352,39 @@ Status LlvmCodeGen::FinalizeModule() {
     }
   }
 
+  if (codegen_cache_enabled) {
+    if (cache_hit) {
+      DCHECK(engine_cache_cached_ != nullptr);
+      execution_engine()->setObjectCache(engine_cache_cached_.get());
+    } else {
+      execution_engine()->setObjectCache(engine_cache_.get());
+    }
+  }
   {
     SCOPED_TIMER(compile_timer_);
     // Finalize module, which compiles all functions.
     execution_engine()->finalizeObject();
   }
-
   SetFunctionPointers();
   Status store_cache_status;
-  if (codegen_cache_enabled) {
+  if (codegen_cache_enabled && !cache_hit) {
     SCOPED_TIMER(codegen_cache_save_timer_);
     store_cache_status = StoreCache(cache_key);
   }
-  // If the codegen is stored to the cache successfully, the cache will be responsible to
-  // track the memory consumption instead.
-  if (!codegen_cache_enabled || !store_cache_status.ok()) {
-    // Track the memory consumed by the compiled code.
-    int64_t bytes_allocated = memory_manager_->bytes_allocated();
-    if (!mem_tracker_->TryConsume(bytes_allocated)) {
-      const string& msg = Substitute(
-          "Failed to allocate '$0' bytes for compiled code module", bytes_allocated);
-      return mem_tracker_->MemLimitExceeded(NULL, msg, bytes_allocated);
-    }
-    memory_manager_->set_bytes_tracked(bytes_allocated);
+
+  // Track the memory consumed by the runtime compiled code.
+  // If codegen cache is enabled, the part stored to the cache will be taken care by
+  // codegen cache to track the memory consumption.
+  int64_t bytes_allocated = memory_manager_->bytes_allocated();
+  if (!mem_tracker_->TryConsume(bytes_allocated)) {
+    const string& msg = Substitute(
+        "Failed to allocate '$0' bytes for compiled code module", bytes_allocated);
+    return mem_tracker_->MemLimitExceeded(NULL, msg, bytes_allocated);
   }
+  memory_manager_->set_bytes_tracked(bytes_allocated);
+
+  // Get the module id before module destruction.
+  if (module_id != nullptr) *module_id = module_->getModuleIdentifier();
   DestroyModule();
   return Status::OK();
 }
@@ -1490,18 +1496,15 @@ bool LlvmCodeGen::SetFunctionPointers(CodeGenCache* cache,
     void* jitted_function = nullptr;
     if (cache != nullptr) {
       DCHECK(cache_key != nullptr);
-      // execution_engine_wrapper_cached_ is used to keep the life of the jitted functions
-      // in case the engine is evicted in the global cache.
-      DCHECK(execution_engine_wrapper_cached_ != nullptr);
-      llvm::ExecutionEngine* cached_execution_engine =
-          execution_engine_wrapper_cached_->execution_engine();
-
+      // engine_cache_cached_ is used to keep the life of the object cache
+      // in case the object cache is evicted in the global cache.
+      DCHECK(engine_cache_cached_ != nullptr);
       // Using the function getFunctionAddress() with a non-existent function name would
       // hit an assertion during the test, could be a bug in llvm 5, need to review after
       // upgrade llvm. But because we already checked the names hashcode for key collision
       // cases, we expect all the functions should be in the cached execution engine.
-      jitted_function = reinterpret_cast<void*>(
-          cached_execution_engine->getFunctionAddress(function_name));
+      jitted_function =
+          reinterpret_cast<void*>(execution_engine()->getFunctionAddress(function_name));
       if (jitted_function == nullptr) {
         LOG(WARNING) << "Failed to get a jitted function from cache: "
                      << function_name.data()

@@ -161,14 +161,14 @@ class CodeGenCacheModeAnalyzer {
 };
 
 struct CodeGenCacheEntry {
-  CodeGenCacheEntry() : engine_pointer(nullptr) {}
+  CodeGenCacheEntry() : cached_engine_pointer(nullptr) {}
   // When Empty, no guarantees are made about the content of other fields.
-  bool Empty() { return engine_pointer == nullptr; }
-  void Reset() { engine_pointer = nullptr; }
-  void Reset(llvm::ExecutionEngine* engine_ptr, int64_t num_funcs, int64_t num_instrucs,
-      int64_t num_opt_funcs, int64_t num_opt_instrucs, uint64_t names_hashcode,
-      int64_t charge, TCodeGenOptLevel::type opt) {
-    engine_pointer = engine_ptr;
+  bool Empty() { return cached_engine_pointer == nullptr; }
+  void Reset() { cached_engine_pointer = nullptr; }
+  void Reset(CodeGenObjectCache* cached_engine_ptr, int64_t num_funcs,
+      int64_t num_instrucs, int64_t num_opt_funcs, int64_t num_opt_instrucs,
+      uint64_t names_hashcode, int64_t charge, TCodeGenOptLevel::type opt) {
+    cached_engine_pointer = cached_engine_ptr;
     num_functions = num_funcs;
     num_instructions = num_instrucs;
     num_opt_functions = num_opt_funcs;
@@ -177,7 +177,7 @@ struct CodeGenCacheEntry {
     total_bytes_charge = charge;
     opt_level = opt;
   }
-  llvm::ExecutionEngine* engine_pointer;
+  CodeGenObjectCache* cached_engine_pointer;
   /// Number of functions before optimization.
   int64_t num_functions;
   /// Number of instructions before optimization.
@@ -215,25 +215,25 @@ class CodeGenCache {
   /// entry will be reset to empty.
   /// Return Status::Okay unless there is any internal error to throw.
   Status Lookup(const CodeGenCacheKey& key, const TCodeGenCacheMode::type& mode,
-      CodeGenCacheEntry* entry,
-      std::shared_ptr<LlvmExecutionEngineWrapper>* execution_engine);
+      CodeGenCacheEntry* entry, std::shared_ptr<CodeGenObjectCache>* cached_engine);
+  bool Lookup(const CodeGenCacheKey& key, const TCodeGenCacheMode::type& mode);
 
   /// Store the cache entry with the specific cache key.
   Status Store(const CodeGenCacheKey& key, LlvmCodeGen* codegen,
       TCodeGenCacheMode::type mode, TCodeGenOptLevel::type opt_level);
 
-  /// Store the shared pointer of llvm execution engine to the cache to keep all the
-  /// jitted functions in that engine alive.
+  /// Store the shared pointer of CodeGenObjectCache to keep the compiled module cache
+  /// alive.
   void StoreEngine(LlvmCodeGen* codegen);
 
-  /// Look up the shared pointer of the LlvmExecutionEngineWrapper by the raw pointer of
-  /// its execution engine field. If found, return true. Ohterwise, return false.
-  bool LookupEngine(const llvm::ExecutionEngine* engine,
-      std::shared_ptr<LlvmExecutionEngineWrapper>* execution_engine_wrapper);
+  /// Look up the shared pointer of the CodeGenObjectCache by its raw pointer.
+  /// If found, return true. Ohterwise, return false.
+  bool LookupEngine(const CodeGenObjectCache* cached_engine_raw_ptr,
+      std::shared_ptr<CodeGenObjectCache>* cached_engine = nullptr);
 
-  /// Remove the shared pointer of llvm execution engine from the cache by its raw
-  /// pointer address.
-  void RemoveEngine(const llvm::ExecutionEngine* engine);
+  /// Remove the shared pointer of CodeGenObjectCache from the cache by its raw pointer
+  /// address.
+  void RemoveEngine(const CodeGenObjectCache* cached_engine_raw_ptr);
 
   /// Increment a hit count or miss count.
   void IncHitOrMissCount(bool hit) {
@@ -302,10 +302,10 @@ class CodeGenCache {
   /// Protects to the map of cached engines.
   std::mutex cached_engines_lock_;
 
-  /// Stores shared pointers to LlvmExecutionEngineWrappers to keep the jitted functions
+  /// Stores shared pointers to CodeGenObjectCaches to keep the jitted functions
   /// alive. The shared pointer entries could be removed when the cache entry is evicted
   /// or when the whole cache is destructed.
-  std::unordered_map<const llvm::ExecutionEngine*,
-      std::shared_ptr<LlvmExecutionEngineWrapper>> cached_engines_;
+  std::unordered_map<const CodeGenObjectCache*, std::shared_ptr<CodeGenObjectCache>>
+      cached_engines_;
 };
 } // namespace impala

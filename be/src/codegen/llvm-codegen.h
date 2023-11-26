@@ -35,10 +35,9 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
-#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include "codegen/llvm-execution-engine-wrapper.h"
+#include "codegen/llvm-codegen-object-cache.h"
 #include "exprs/scalar-expr.h"
 #include "impala-ir/impala-ir-functions.h"
 #include "runtime/types.h"
@@ -325,10 +324,11 @@ class LlvmCodeGen {
   llvm::LLVMContext& context() { return *context_.get(); }
 
   /// Returns execution engine interface
-  llvm::ExecutionEngine* execution_engine() {
-    if (execution_engine_wrapper_ == nullptr) return nullptr;
-    return execution_engine_wrapper_->execution_engine();
-  }
+  llvm::ExecutionEngine* execution_engine() { return execution_engine_.get(); }
+
+  /// Returns the cache which is for the execution engine to write the compiled functions
+  /// to.
+  CodeGenObjectCache* engine_cache() { return engine_cache_.get(); }
 
   /// Register a expr function with unique id.  It can be subsequently retrieved via
   /// GetRegisteredExprFn with that id.
@@ -350,7 +350,9 @@ class LlvmCodeGen {
   /// false, the module will not be optimized before compilation. After FinalizeModule()
   /// is called, the LLVM module is destroyed and it is invalid to call any LlvmCodegen
   /// functions.
-  Status FinalizeModule();
+  /// During FinalizeModule(), a new module id might be assigned for caching storage and
+  /// retrieval. If module_id is not nullptr, the final module id is returned.
+  Status FinalizeModule(string* module_id = nullptr);
 
   /// Start executing 'FinalizeModule' in a separate thread and return.
   /// 'async_compile_thread_' is set to point to the new 'Thread' object.
@@ -915,15 +917,22 @@ class LlvmCodeGen {
   std::unique_ptr<llvm::LLVMContext> context_;
 
   /// Top level codegen object. Contains everything to jit one 'unit' of code.  module_ is
-  /// set by Init(). module_ is owned by the execution engine in
-  /// execution_engine_wrapper_.
+  /// set by Init(). module_ is owned by the execution engine.
   llvm::Module* module_;
 
-  /// Execution/Jitting engine in a wrapper.
-  std::shared_ptr<LlvmExecutionEngineWrapper> execution_engine_wrapper_;
+  // Execution/Jitting engine.
+  std::unique_ptr<llvm::ExecutionEngine> execution_engine_;
 
-  /// Cached Execution/Jitting engine in a wrapper.
-  std::shared_ptr<LlvmExecutionEngineWrapper> execution_engine_wrapper_cached_;
+  /// Object cache which is for the execution engine to write the compiled codegened
+  /// functions to. Would be used as a part of CodeGen caching.
+  std::shared_ptr<CodeGenObjectCache> engine_cache_;
+
+  /// Object cache from the global CodeGen Cache, storing compiled codegened functions
+  /// that align with the module of the current ExecutionEngine.
+  /// Not null only when there is a cache hit.
+  /// The purpose of it is to maintain the lifecycle of this CodeGenObjectCache in case
+  /// it gets evicted from the global cache while in use.
+  std::shared_ptr<CodeGenObjectCache> engine_cache_cached_;
 
   /// The memory manager used by 'execution_engine_'. Owned by 'execution_engine_'.
   ImpalaMCJITMemoryManager* memory_manager_;
@@ -990,6 +999,12 @@ class LlvmCodeGen {
   /// llvm constants to help with code gen verbosity
   llvm::Constant* true_value_;
   llvm::Constant* false_value_;
+
+  /// The symbol emitter associated with 'execution_engine_'. Methods on
+  /// 'symbol_emitter_' are called by 'execution_engine_' when code is emitted or
+  /// freed. The lifetime of the symbol emitter must be longer than
+  /// 'execution_engine_'.
+  std::unique_ptr<CodegenSymbolEmitter> symbol_emitter_;
 
   /// Provides an implementation of a LLVM diagnostic handler and maintains the error
   /// information from its callbacks.

@@ -41,7 +41,7 @@ void CodeGenCache::EvictionCallback::EvictedEntry(Slice key, Slice value) {
   const CodeGenCacheEntry* cache_entry =
       reinterpret_cast<const CodeGenCacheEntry*>(value.data());
   DCHECK(cache_entry != nullptr);
-  cache_->RemoveEngine(cache_entry->engine_pointer);
+  cache_->RemoveEngine(cache_entry->cached_engine_pointer);
   LOG(INFO) << "Evict CodeGen Cache, key hash_code=" << CodeGenCacheKey::hash_code(key);
   // For statistics.
   if (codegen_cache_entries_evicted_ != nullptr) {
@@ -109,18 +109,20 @@ void CodeGenCache::ReleaseResources() {
 
 Status CodeGenCache::Lookup(const CodeGenCacheKey& cache_key,
     const TCodeGenCacheMode::type& mode, CodeGenCacheEntry* entry,
-    shared_ptr<LlvmExecutionEngineWrapper>* execution_engine) {
+    shared_ptr<CodeGenObjectCache>* cached_engine) {
   DCHECK(!is_closed_);
   DCHECK(cache_ != nullptr);
   DCHECK(entry != nullptr);
-  DCHECK(execution_engine != nullptr);
+  DCHECK(cached_engine != nullptr);
   // Use hash code and the total length as the key for optimal mode, because the whole
   // key could be very large, using optimal mode could improve the performance and save
   // memory consumption. However, it could lead to a collision, even though the chance
   // is very small, in that case, we may switch to normal mode for the query or disable
   // the codegen cache.
-  Slice key = cache_key.optimal_key_slice();
-  if (!CodeGenCacheModeAnalyzer::is_optimal(mode)) {
+  Slice key;
+  if (CodeGenCacheModeAnalyzer::is_optimal(mode)) {
+    key = cache_key.optimal_key_slice();
+  } else {
     key = cache_key.data_slice();
   }
   Cache::UniqueHandle handle(cache_->Lookup(key));
@@ -131,8 +133,8 @@ Status CodeGenCache::Lookup(const CodeGenCacheKey& cache_key,
     // because the shared pointer could be deleted in the eviction process.
     // If can't find it, treat it as cache missing, because the engine is needed
     // to look for jitted functions.
-    if (LookupEngine(cached_entry->engine_pointer, execution_engine)) {
-      entry->Reset(cached_entry->engine_pointer, cached_entry->num_functions,
+    if (LookupEngine(cached_entry->cached_engine_pointer, cached_engine)) {
+      entry->Reset(cached_entry->cached_engine_pointer, cached_entry->num_functions,
           cached_entry->num_instructions, cached_entry->num_opt_functions,
           cached_entry->num_opt_instructions, cached_entry->function_names_hashcode,
           cached_entry->total_bytes_charge, cached_entry->opt_level);
@@ -148,12 +150,14 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
     TCodeGenOptLevel::type opt_level) {
   // In normal mode, we will store the whole key content to the cache.
   // Otherwise, in optimal mode, we will only store the hash code and length of the key.
-  Slice key = cache_key.optimal_key_slice();
-  if (!CodeGenCacheModeAnalyzer::is_optimal(mode)) {
+  Slice key;
+  if (CodeGenCacheModeAnalyzer::is_optimal(mode)) {
+    key = cache_key.optimal_key_slice();
+  } else {
     key = cache_key.data_slice();
   }
   // Memory charge includes both key and entry size.
-  int64_t mem_charge = codegen->memory_manager_->bytes_allocated() + key.size()
+  int64_t mem_charge = codegen->engine_cache()->objSize() + key.size()
       + sizeof(CodeGenCacheEntry) + FLAGS_codegen_cache_entry_bytes_charge_overhead;
   Cache::UniquePendingHandle pending_handle(
       cache_->Allocate(key, sizeof(CodeGenCacheEntry), mem_charge));
@@ -164,7 +168,7 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
   }
   CodeGenCacheEntry* cache_entry =
       reinterpret_cast<CodeGenCacheEntry*>(cache_->MutableValue(&pending_handle));
-  cache_entry->Reset(codegen->execution_engine(), codegen->num_functions_->value(),
+  cache_entry->Reset(codegen->engine_cache(), codegen->num_functions_->value(),
       codegen->num_instructions_->value(), codegen->num_opt_functions_->value(),
       codegen->num_opt_instructions_->value(), codegen->function_names_hashcode_,
       mem_charge, opt_level);
@@ -173,7 +177,7 @@ Status CodeGenCache::StoreInternal(const CodeGenCacheKey& cache_key,
   Cache::UniqueHandle cache_handle =
       cache_->Insert(move(pending_handle), evict_callback_.get());
   if (cache_handle == nullptr) {
-    RemoveEngine(codegen->execution_engine());
+    RemoveEngine(codegen->engine_cache());
     return Status(Substitute("Couldn't insert codegen cache entry,"
                              " hash code:'$0', size: '$1'",
         cache_key.hash_code().str(), mem_charge));
@@ -209,7 +213,6 @@ Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, LlvmCodeGen* codege
     // If hash code exists, return an okay immediately.
     if (!key_to_insert_it.second) return status;
   }
-  // Do store the cache entry to the cache.
   status = StoreInternal(cache_key, codegen, mode, opt_level);
   // Remove the hash code of the key from the to_insert_keys set.
   lock_guard<mutex> lock(to_insert_set_lock_);
@@ -220,25 +223,25 @@ Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, LlvmCodeGen* codege
 void CodeGenCache::StoreEngine(LlvmCodeGen* codegen) {
   DCHECK(codegen != nullptr);
   lock_guard<mutex> lock(cached_engines_lock_);
-  cached_engines_.emplace(codegen->execution_engine(),
-      codegen->execution_engine_wrapper_);
+  cached_engines_.emplace(codegen->engine_cache_.get(), codegen->engine_cache_);
 }
 
-bool CodeGenCache::LookupEngine(const llvm::ExecutionEngine* engine,
-    shared_ptr<LlvmExecutionEngineWrapper>* execution_engine_wrapper) {
-  DCHECK(engine != nullptr);
-  DCHECK(execution_engine_wrapper != nullptr);
+bool CodeGenCache::LookupEngine(const CodeGenObjectCache* cached_engine_raw_ptr,
+    shared_ptr<CodeGenObjectCache>* cached_engine) {
+  DCHECK(cached_engine_raw_ptr != nullptr);
   lock_guard<mutex> lock(cached_engines_lock_);
-  auto engine_it = cached_engines_.find(engine);
+  auto engine_it = cached_engines_.find(cached_engine_raw_ptr);
   if (engine_it == cached_engines_.end()) return false;
-  *execution_engine_wrapper = engine_it->second;
+  if (cached_engine != nullptr) {
+    *cached_engine = engine_it->second;
+  }
   return true;
 }
 
-void CodeGenCache::RemoveEngine(const llvm::ExecutionEngine* engine) {
-  DCHECK(engine != nullptr);
+void CodeGenCache::RemoveEngine(const CodeGenObjectCache* cached_engine_raw_ptr) {
+  DCHECK(cached_engine_raw_ptr != nullptr);
   lock_guard<mutex> lock(cached_engines_lock_);
-  cached_engines_.erase(engine);
+  cached_engines_.erase(cached_engine_raw_ptr);
 }
 
 } // namespace impala
