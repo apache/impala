@@ -569,6 +569,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     this.catalog_ = Preconditions.checkNotNull(catalogOpExecutor.getCatalog());
     validateConfigs();
     lastSyncedEventId_.set(startSyncFromId);
+    lastSyncedEventTimeSecs_.set(getEventTimeFromHMS(startSyncFromId));
     initMetrics();
     metastoreEventFactory_ = new MetastoreEventFactory(catalogOpExecutor);
     pollingFrequencyInSec_ = pollingFrequencyInSec;
@@ -758,6 +759,41 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   /**
+   * Fetch the event from HMS specified by 'eventId'
+   * @return null if the event has been cleaned up or any error occurs.
+   */
+  private NotificationEvent getEventFromHMS(MetaStoreClient msClient, long eventId) {
+    NotificationEventRequest eventRequest = new NotificationEventRequest();
+    eventRequest.setLastEvent(eventId - 1);
+    eventRequest.setMaxEvents(1);
+    try {
+      NotificationEventResponse response = MetastoreShim.getNextNotification(
+          msClient.getHiveClient(), eventRequest, false);
+      Iterator<NotificationEvent> eventIter = response.getEventsIterator();
+      if (!eventIter.hasNext()) {
+        LOG.warn("Unable to fetch event {}. It has been cleaned up", eventId);
+        return null;
+      }
+      return eventIter.next();
+    } catch (TException e) {
+      LOG.warn("Unable to fetch event {}", eventId, e);
+    }
+    return null;
+  }
+
+  /**
+   * Get the event time by fetching the specified event from HMS.
+   * @return 0 if the event has been cleaned up or any error occurs.
+   */
+  private int getEventTimeFromHMS(long eventId) {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      NotificationEvent event = getEventFromHMS(msClient, eventId);
+      if (event != null) return event.getEventTime();
+    }
+    return 0;
+  }
+
+  /**
    * Starts the event processor from a given event id
    */
   @Override
@@ -775,6 +811,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       }
     }
     lastSyncedEventId_.set(fromEventId);
+    lastSyncedEventTimeSecs_.set(getEventTimeFromHMS(fromEventId));
     updateStatus(EventProcessorStatus.ACTIVE);
     LOG.info(String.format(
         "Metastore event processing restarted. Last synced event id was updated "
@@ -964,16 +1001,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         return;
       }
       // Fetch the last event to get its eventTime.
-      NotificationEventRequest eventRequest = new NotificationEventRequest();
-      eventRequest.setLastEvent(currentEventId - 1);
-      eventRequest.setMaxEvents(1);
-      NotificationEventResponse response = MetastoreShim.getNextNotification(
-          msClient.getHiveClient(), eventRequest, false);
-      Iterator<NotificationEvent> eventIter = response.getEventsIterator();
+      NotificationEvent event = getEventFromHMS(msClient, currentEventId);
       // Events could be empty if they are just cleaned up.
-      if (!eventIter.hasNext()) return;
-      NotificationEvent event = eventIter.next();
-      Preconditions.checkState(event.getEventId() == currentEventId);
+      if (event == null) return;
       long lastSyncedEventId = lastSyncedEventId_.get();
       long lastSyncedEventTime = lastSyncedEventTimeSecs_.get();
       long currentEventTime = event.getEventTime();
@@ -1090,6 +1120,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         // Possible to receive empty list due to event skip list in notification event
         // request. Update the last synced event id with current event id on metastore
         lastSyncedEventId_.set(currentEventId);
+        lastSyncedEventTimeSecs_.set(getEventTimeFromHMS(currentEventId));
       }
       return;
     }
@@ -1100,7 +1131,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       List<MetastoreEvent> filteredEvents =
           metastoreEventFactory_.getFilteredEvents(events, metrics_);
       if (filteredEvents.isEmpty()) {
-        lastSyncedEventId_.set(events.get(events.size() - 1).getEventId());
+        NotificationEvent e = events.get(events.size() - 1);
+        lastSyncedEventId_.set(e.getEventId());
+        lastSyncedEventTimeSecs_.set(e.getEventTime());
         return;
       }
       for (MetastoreEvent event : filteredEvents) {

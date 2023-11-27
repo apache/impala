@@ -152,8 +152,10 @@ public class HiveJdbcClientPool implements Closeable {
     while (closedCount > 0) {
       try {
         HiveJdbcClient client = freeClients_.poll(5 * 60, TimeUnit.SECONDS);
-        if (client.stmt_ != null) { client.stmt_.close(); }
-        if (client.conn_ != null) { client.conn_.close(); }
+        if (client != null) {
+          if (client.stmt_ != null) { client.stmt_.close(); }
+          if (client.conn_ != null) { client.conn_.close(); }
+        }
         closedCount--;
       } catch (Exception e) {
         throw new RuntimeException(e);

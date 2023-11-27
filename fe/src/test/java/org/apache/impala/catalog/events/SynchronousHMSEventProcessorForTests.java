@@ -17,12 +17,10 @@
 
 package org.apache.impala.catalog.events;
 
-import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
-import org.apache.hadoop.hive.metastore.api.NotificationEvent;
-import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.service.CatalogOpExecutor;
+import org.junit.Assert;
 
 /**
  * A test MetastoreEventProcessor which executes in the same thread. Useful for testing
@@ -44,5 +42,28 @@ public class SynchronousHMSEventProcessorForTests extends MetastoreEventsProcess
   @Override
   public void startScheduler() {
     // nothing to do here; there is no background thread for this processor
+  }
+
+  @Override
+  public void processEvents() {
+    super.processEvents();
+    super.updateLatestEventId();
+    verifyEventSyncedMetrics();
+  }
+
+  private void verifyEventSyncedMetrics() {
+    Metrics metrics = getMetrics();
+    long lastSyncedEventId = (Long) metrics.getGauge(
+        MetastoreEventsProcessor.LAST_SYNCED_ID_METRIC).getValue();
+    long latestEventId = (Long) metrics.getGauge(
+        MetastoreEventsProcessor.LATEST_EVENT_ID).getValue();
+    long lastSyncedEventTime = (Long) metrics.getGauge(
+        MetastoreEventsProcessor.LAST_SYNCED_EVENT_TIME).getValue();
+    long latestEventTime = (Long) metrics.getGauge(
+        MetastoreEventsProcessor.LATEST_EVENT_TIME).getValue();
+    if (lastSyncedEventId == latestEventId) {
+      Assert.assertEquals("Incorrect last synced event time for event " + latestEventId,
+          latestEventTime, lastSyncedEventTime);
+    }
   }
 }
