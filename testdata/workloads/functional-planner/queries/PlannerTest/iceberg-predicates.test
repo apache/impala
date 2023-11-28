@@ -167,3 +167,52 @@ PLAN-ROOT SINK
    skipped Iceberg predicates: action IS NOT NULL
    row-size=44B cardinality=1
 ====
+---- QUERY
+# Regression test for IMPALA-12580: predicate filtering could throw UnsupportedOperationException
+select p_int from functional_parquet.iceberg_alltypes_part where i = 1 and p_int = i;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
+   HDFS partitions=1/1 files=1 size=433B
+   predicates: i = 1
+   skipped Iceberg predicates: functional_parquet.iceberg_alltypes_part.p_int = 1
+   row-size=8B cardinality=1
+====
+---- QUERY
+# Regression test for IMPALA-12580: predicate filtering could throw UnsupportedOperationException
+select * from functional_parquet.iceberg_alltypes_part
+where i = 1 and p_bigint = 10 + i and p_int = p_bigint - 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
+   HDFS partitions=1/1 files=1 size=433B
+   predicates: i = 1
+   skipped Iceberg predicates: p_bigint = 11, p_int = 1
+   row-size=49B cardinality=1
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part
+where p_string = concat(chr(cast(p_int + 104 as int)), "mpala") and
+p_string = concat("i", "mpala") and p_decimal between 122 and 124 and i = floor(p_float)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
+   HDFS partitions=1/1 files=1 size=433B
+   predicates: i = floor(p_float), concat(chr(CAST(p_int + 104 AS INT)), 'mpala') = 'impala'
+   skipped Iceberg predicates: p_string = 'impala', p_decimal >= 122, p_decimal <= 124
+   row-size=49B cardinality=1
+====
+---- QUERY
+select * from functional_parquet.iceberg_alltypes_part where i in (1,2,3) and i = p_int;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.iceberg_alltypes_part]
+   HDFS partitions=1/1 files=1 size=433B
+   predicates: i = p_int, i IN (1, 2, 3)
+   skipped Iceberg predicates: functional_parquet.iceberg_alltypes_part.p_int IN (1, 2, 3)
+   row-size=49B cardinality=1
+====

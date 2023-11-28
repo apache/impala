@@ -120,10 +120,9 @@ public class IcebergScanPlanner {
   // Residual expressions after Iceberg planning
   private final Set<Expression> residualExpressions_ =
       new TreeSet<>(Comparator.comparing(ExpressionUtil::toSanitizedString));
-  // Expressions filtered by Iceberg's planFiles, subset of 'translatedExpressions_''s
-  // values
-  private final Set<Expr> skippedExpressions_ =
-      new TreeSet<>(Comparator.comparingInt(System::identityHashCode));
+  // Expressions filtered by Iceberg's planFiles, subset of
+  // 'impalaIcebergPredicateMapping_''s values
+  private final List<Expr> skippedExpressions_ = new ArrayList<>();
   // Impala expressions that can't be translated into Iceberg expressions
   private final List<Expr> untranslatedExpressions_ = new ArrayList<>();
   // Conjuncts on columns not involved in IDENTITY-partitioning.
@@ -433,15 +432,15 @@ public class IcebergScanPlanner {
           new IcebergExpressionCollector());
       for (Expression located : locatedExpressions) {
         Expr expr = impalaIcebergPredicateMapping_.get(located);
-        /* If we fail to locate any of the Iceberg residual expressions then we skip
-         filtering the predicates to be pushed down to Impala scanner.*/
+        // If we fail to locate any of the Iceberg residual expressions then we skip
+        // filtering the predicates to be pushed down to Impala scanner.
         if (expr == null) return false;
         expressionsToRetain.add(expr);
       }
     }
     skippedExpressions_.addAll(
         conjuncts_.stream().filter(expr -> !expressionsToRetain.contains(expr)).collect(
-            Collectors.toSet()));
+            Collectors.toList()));
     conjuncts_ = expressionsToRetain;
     LOG.debug("Iceberg predicate pushdown subsetting took {} ms",
         (System.currentTimeMillis() - startTime));
@@ -449,9 +448,7 @@ public class IcebergScanPlanner {
   }
 
   private List<Expr> getSkippedConjuncts() {
-    if (!residualExpressions_.isEmpty()) {
-      return new ArrayList<>(skippedExpressions_);
-    }
+    if (!residualExpressions_.isEmpty()) return skippedExpressions_;
     return new ArrayList<>(impalaIcebergPredicateMapping_.values());
   }
 

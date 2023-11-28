@@ -1169,3 +1169,20 @@ select * from iceberg_v2_delete_equality for system_version as of 32076731677950
 ---- TYPES
 BIGINT,STRING
 ====
+---- QUERY
+# Regression test for IMPALA-12580: predicate filtering could throw UnsupportedOperationException
+select i from functional_parquet.iceberg_alltypes_part
+where i = 1 and p_bigint = 10 + i and p_int = p_bigint - 10;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Regression test for IMPALA-12580: predicate filtering could throw UnsupportedOperationException
+select p_int from functional_parquet.iceberg_alltypes_part where i = 1 and p_int = i;
+---- RESULTS
+1
+---- TYPES
+INT
+====
