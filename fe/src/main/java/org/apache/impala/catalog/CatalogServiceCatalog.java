@@ -1771,8 +1771,7 @@ public class CatalogServiceCatalog extends Catalog {
       db.addFunction(f, false);
       f.setCatalogVersion(incrementAndGetCatalogVersion());
     }
-
-    LOG.info("Loaded native functions for database: " + db.getName());
+    LOG.info("Loaded {} native functions for database: {}", funcs.size(), db.getName());
   }
 
   /**
@@ -1788,6 +1787,7 @@ public class CatalogServiceCatalog extends Catalog {
       return;
     }
     LOG.info("Loading Java functions for database: " + db.getName());
+    int numFuncs = 0;
     for (org.apache.hadoop.hive.metastore.api.Function function: functions) {
       try {
         HiveJavaFunctionFactoryImpl factory =
@@ -1796,12 +1796,13 @@ public class CatalogServiceCatalog extends Catalog {
         for (Function fn: javaFunction.extract()) {
           db.addFunction(fn);
           fn.setCatalogVersion(incrementAndGetCatalogVersion());
+          ++numFuncs;
         }
       } catch (Exception | LinkageError e) {
         LOG.error("Skipping function load: " + function.getFunctionName(), e);
       }
     }
-    LOG.info("Loaded Java functions for database: " + db.getName());
+    LOG.info("Loaded {} Java functions for database: {}", numFuncs, db.getName());
   }
 
   /**
@@ -1932,6 +1933,8 @@ public class CatalogServiceCatalog extends Catalog {
       loadJavaFunctions(newDb, javaFns);
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
 
+      LOG.info("Loading table list for database: {}", dbName);
+      int numTables = 0;
       List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
       for (TableMeta tblMeta: getTableMetaFromHive(msClient, dbName, /*tblName*/null)) {
         String tableName = tblMeta.getTableName().toLowerCase();
@@ -1945,10 +1948,13 @@ public class CatalogServiceCatalog extends Catalog {
             tblMeta.getComments());
         incompleteTbl.setCatalogVersion(incrementAndGetCatalogVersion());
         newDb.addTable(incompleteTbl);
+        ++numTables;
         if (loadInBackground_) {
           tblsToBackgroundLoad.add(new TTableName(dbName, tableName));
         }
       }
+      LOG.info("Loaded table list for database: {}. Number of tables: {}",
+          dbName, numTables);
 
       if (existingDb != null) {
         // Identify any removed functions and add them to the delta log.
