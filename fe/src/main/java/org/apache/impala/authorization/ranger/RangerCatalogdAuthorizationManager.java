@@ -28,6 +28,7 @@ import org.apache.impala.catalog.AuthzCacheInvalidation;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
@@ -49,7 +50,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -308,6 +311,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   @VisibleForTesting
   public void grantPrivilege(List<GrantRevokeRequest> requests, String sqlStmt,
       String clientIp) throws ImpalaException {
+    long startTime = System.currentTimeMillis();
     try {
       for (GrantRevokeRequest request : requests) {
         try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush(sqlStmt,
@@ -319,12 +323,16 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
       LOG.error("Error granting a privilege in Ranger: ", e);
       throw new InternalException("Error granting a privilege in Ranger. " +
           "Ranger error message: " + e.getMessage());
+    } finally {
+      LOG.debug("Handling granting privilege(s) took {} ms",
+          (System.currentTimeMillis() - startTime));
     }
   }
 
   @VisibleForTesting
   public void revokePrivilege(List<GrantRevokeRequest> requests, String sqlStmt,
       String clientIp) throws ImpalaException {
+    long startTime = System.currentTimeMillis();
     try {
       for (GrantRevokeRequest request : requests) {
         try (AutoFlush auditHandler = RangerBufferAuditHandler.autoFlush(sqlStmt,
@@ -336,6 +344,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
       LOG.error("Error revoking a privilege in Ranger: ", e);
       throw new InternalException("Error revoking a privilege in Ranger. " +
           "Ranger error message: " + e.getMessage());
+    } finally {
+      LOG.debug("Handling revoking privilege(s) took {} ms",
+          (System.currentTimeMillis() - startTime));
     }
   }
 
@@ -419,7 +430,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
       }
     }
 
-    return requests;
+    return consolidateGrantRevokeRequests(requests);
   }
 
   private static GrantRevokeRequest createGrantRevokeRequest(String grantor, String user,
@@ -478,6 +489,52 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     }
 
     return request;
+  }
+
+  /**
+   * This method combines GrantRevokeRequest's for specified columns in the same table
+   * into one GrantRevokeRequest to reduce the number of Ranger policies created on the
+   * Ranger server. This method implicitly assumes that for those GrantRevokeRequest's
+   * with specified columns on the given List, the fields other than database, table, and
+   * column names are the same.
+   */
+  private static List<GrantRevokeRequest> consolidateGrantRevokeRequests(
+      List<GrantRevokeRequest> requests) {
+    List<GrantRevokeRequest> combinedRequests = new LinkedList<>();
+    Map<Pair<String, String>, GrantRevokeRequest> consolidatedColumnRequests =
+        new HashMap<>();
+    List<GrantRevokeRequest> unconsolidatedRequests = new LinkedList<>();
+
+    for (GrantRevokeRequest request : requests) {
+      Map<String, String> resource = request.getResource();
+      String column = resource.get(RangerImpalaResourceBuilder.COLUMN);
+      if (column != null &&
+          !column.equals(RangerImpalaResourceBuilder.WILDCARD_ASTERISK)) {
+        // If 'column' is the name of a specified column, the database name and the table
+        // name must have been specified too.
+        String database = resource.get(RangerImpalaResourceBuilder.DATABASE);
+        String table = resource.get(RangerImpalaResourceBuilder.TABLE);
+        Pair<String, String> key = new Pair<>(database, table);
+        if (!consolidatedColumnRequests.containsKey(key)) {
+          consolidatedColumnRequests.put(key, request);
+        } else {
+          // Combine 'column' into the GrantRevokeRequest for other specified columns in
+          // the same table.
+          Map<String, String> consolidatedResource =
+              consolidatedColumnRequests.get(key).getResource();
+          String consolidatedColumns = consolidatedResource
+              .get(RangerImpalaResourceBuilder.COLUMN);
+          consolidatedResource.put(RangerImpalaResourceBuilder.COLUMN,
+              consolidatedColumns + RangerImpalaResourceBuilder.COLUMN_SEP + column);
+        }
+      } else {
+        unconsolidatedRequests.add(request);
+      }
+    }
+
+    combinedRequests.addAll(consolidatedColumnRequests.values());
+    combinedRequests.addAll(unconsolidatedRequests);
+    return combinedRequests;
   }
 
   /**

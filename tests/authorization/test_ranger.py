@@ -1051,7 +1051,7 @@ class TestRanger(CustomClusterTestSuite):
 
   @staticmethod
   def _get_ranger_privileges_db(user, db):
-    policies = TestRanger._get_ranger_privileges(user)
+    policies = TestRanger._get_ranger_privileges()
     result = []
 
     for policy in policies:
@@ -1065,7 +1065,7 @@ class TestRanger(CustomClusterTestSuite):
     return result
 
   @staticmethod
-  def _get_ranger_privileges(user):
+  def _get_ranger_privileges():
     r = requests.get("{0}/service/plugins/policies"
                      .format(RANGER_HOST),
                      auth=RANGER_AUTH, headers=REST_HEADERS)
@@ -1270,6 +1270,72 @@ class TestRanger(CustomClusterTestSuite):
       return self.execute_query_expect_success(
           impala_client, query, user=username, query_options={'sync_ddl': 1})
     return self.execute_query_expect_failure(impala_client, query, user=username)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS, reset_ranger=True)
+  def test_grant_multiple_columns(self):
+    admin_client = self.create_impala_client()
+    access_type = "select"
+    db = "functional"
+    tbl = "alltypes"
+    cols = ["id", "bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
+        "float_col", "double_col", "date_string_col", "string_col", "timestamp_col",
+        "year", "month"]
+    cols_str = ""
+    for col in cols:
+      if not cols_str:
+        cols_str = col
+      else:
+        cols_str = cols_str + ", " + col
+    test_data = [("user", "non_owner", "users"), ("group", "non_owner", "groups"),
+        ("role", "test_role", "roles")]
+
+    for data in test_data:
+      kw = data[0]
+      principal_name = data[1]
+      principal_key = data[2]
+      try:
+        policy_ids = set()
+        if kw == "role":
+          admin_client.execute("create role {0}".format(principal_name), user=ADMIN)
+        admin_client.execute("grant {0}({1}) on table {2}.{3} to {4} {5}"
+            .format(access_type, cols_str, db, tbl, kw, principal_name), user=ADMIN)
+        policies = TestRanger._get_ranger_privileges()
+        for col in cols:
+          policy_ids = policy_ids \
+              .union(TestRanger._get_ranger_policy_ids(policies, principal_name,
+              principal_key, db, tbl, col, access_type))
+        # After the GRANT statement above, there should be only one single Ranger policy
+        # that grants the privilege of 'access_type' on the column 'db'.'tbl'.'col' to
+        # the principal 'principal_name' for each column in 'cols'.
+        assert len(policy_ids) == 1
+      finally:
+        admin_client.execute("revoke {0}({1}) on table {2}.{3} from {4} {5}"
+            .format(access_type, cols_str, db, tbl, kw, principal_name), user=ADMIN)
+        if kw == "role":
+          admin_client.execute("drop role {0}".format(principal_name), user=ADMIN)
+
+  @staticmethod
+  def _get_ranger_policy_ids(policies, principal_name, principal_key, db, tbl, col,
+      access_type):
+    """Returns the set of Ranger policy id's that grant the privilege of 'access_type' on
+    the column 'db'.'tbl'.'col'. to the principal 'principal_name'."""
+    result = set()
+
+    for policy in policies:
+      id = policy["id"]
+      resources = policy["resources"]
+      if "database" in resources and db in resources["database"]["values"] \
+          and "table" in resources and tbl in resources["table"]["values"] \
+          and "column" in resources and col in resources["column"]["values"]:
+        for policy_items in policy["policyItems"]:
+          if principal_name in policy_items[principal_key]:
+            for access in policy_items["accesses"]:
+              if access_type in access["type"] and access["isAllowed"] is True:
+                result.add(id)
+                break
+    return result
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
