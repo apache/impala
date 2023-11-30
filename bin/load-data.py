@@ -396,7 +396,6 @@ def main():
 
     impala_create_files = []
     hive_load_text_files = []
-    hive_load_orc_files = []
     hive_load_nontext_files = []
     hbase_create_files = []
     hbase_postload_files = []
@@ -408,8 +407,6 @@ def main():
       elif hive_load_match in filename:
         if 'text-none-none' in filename:
           hive_load_text_files.append(filename)
-        elif 'orc-def-block' in filename:
-          hive_load_orc_files.append(filename)
         else:
           hive_load_nontext_files.append(filename)
       elif hbase_create_match in filename:
@@ -432,7 +429,6 @@ def main():
 
     log_file_list("Impala Create Files:", impala_create_files)
     log_file_list("Hive Load Text Files:", hive_load_text_files)
-    log_file_list("Hive Load Orc Files:", hive_load_orc_files)
     log_file_list("Hive Load Non-Text Files:", hive_load_nontext_files)
     log_file_list("HBase Create Files:", hbase_create_files)
     log_file_list("HBase Post-Load Files:", hbase_postload_files)
@@ -457,13 +453,6 @@ def main():
     # need to be loaded first
     assert(len(hive_load_text_files) <= 1)
     hive_exec_query_files_parallel(thread_pool, hive_load_text_files)
-    # IMPALA-9923: Run ORC serially separately from other non-text formats. This hacks
-    # around flakiness seen when loading this in parallel. This should be removed as
-    # soon as possible.
-    assert(len(hive_load_orc_files) <= 1)
-    hive_exec_query_files_parallel(thread_pool, hive_load_orc_files)
-
-    # Load all non-text formats (goes parallel)
     hive_exec_query_files_parallel(thread_pool, hive_load_nontext_files)
 
     assert(len(hbase_postload_files) <= 1)
