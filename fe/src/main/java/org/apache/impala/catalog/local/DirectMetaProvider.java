@@ -149,6 +149,16 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
+  public Pair<Table, TableMetaRef> getTableIfPresent(String dbName, String tblName) {
+    try {
+      return loadTable(dbName, tblName);
+    } catch (TException e) {
+      LOG.error("Failed to load table", e);
+      return null;
+    }
+  }
+
+  @Override
   public Pair<Table, TableMetaRef> loadTable(String dbName, String tableName)
       throws MetaException, NoSuchObjectException, TException {
     Table msTable;

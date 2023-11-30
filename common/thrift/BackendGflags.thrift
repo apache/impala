@@ -272,4 +272,6 @@ struct TBackendGflags {
   120: required i32 catalog_operation_log_size
 
   121: required string hostname
+
+  122: required bool allow_catalog_cache_op_from_masked_users
 }

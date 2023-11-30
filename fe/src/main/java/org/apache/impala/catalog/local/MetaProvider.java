@@ -78,6 +78,8 @@ public interface MetaProvider {
   Pair<Table, TableMetaRef> loadTable(String dbName, String tableName)
       throws NoSuchObjectException, MetaException, TException;
 
+  Pair<Table, TableMetaRef> getTableIfPresent(String dbName, String tableName);
+
   String loadNullPartitionKeyValue()
       throws MetaException, TException;
 

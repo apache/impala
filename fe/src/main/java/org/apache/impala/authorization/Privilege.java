@@ -18,6 +18,7 @@
 package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.service.BackendConfig;
 
 import java.util.EnumSet;
 
@@ -92,7 +93,11 @@ public enum Privilege {
    * Returns true if this implies modification on data or metadata.
    */
   public boolean impliesUpdate() {
+    // When allow_catalog_cache_op_from_masked_users=false, REFRESH is considered as
+    // an update operation.
+    boolean considerCatalogCacheOp =
+        !BackendConfig.INSTANCE.allowCatalogCacheOpFromMaskedUsers();
     return this == ALTER || this == DROP || this == CREATE || this == INSERT
-        || this == REFRESH || this == ALL;
+        || (this == REFRESH && considerCatalogCacheOp) || this == ALL;
   }
 }

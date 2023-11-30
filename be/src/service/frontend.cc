@@ -90,6 +90,12 @@ DEFINE_string(jni_frontend_class, "org/apache/impala/service/JniFrontend", "By d
     "overridden class needs to contain all the methods in the methods[] variable, so "
     "most implementations should make their class a child of JniFrontend and "
     "override only relevant methods.");
+DEFINE_bool(allow_catalog_cache_op_from_masked_users, false, "Whether to allow table "
+    "level catalog-cache operations, i.e. REFRESH/INVALIDATE METADATA <table>, from users"
+    " that have associate Ranger masking policies on the table. By default, such "
+    "operations are blocked since such users are considered read-only users. Note that "
+    "checking column masking policies requires loading column info of the table, which "
+    "could slow down simple commands like INVALIDATE METADATA <table>");
 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {

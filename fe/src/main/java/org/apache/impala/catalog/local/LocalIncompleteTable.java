@@ -16,7 +16,9 @@
 // under the License.
 package org.apache.impala.catalog.local;
 
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.FeIncompleteTable;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TImpalaTableType;
@@ -40,6 +42,13 @@ public class LocalIncompleteTable extends LocalTable implements FeIncompleteTabl
     super(db, tableMeta.getName());
     tableType_ = tableMeta.getTblType();
     tableComment_ = tableMeta.getComment();
+  }
+
+  public LocalIncompleteTable(LocalDb db, Table msTbl, TableMetaRef ref,
+      @Nullable TImpalaTableType tableType, @Nullable String tableComment) {
+    super(db, msTbl, ref);
+    this.tableType_ = tableType;
+    this.tableComment_ = tableComment;
   }
 
   @Override

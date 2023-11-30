@@ -54,13 +54,14 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.AcidUtils;
-import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Table instance loaded from {@link LocalCatalog}.
@@ -69,7 +70,7 @@ import com.google.common.collect.Lists;
  * each catalog instance.
  */
 abstract class LocalTable implements FeTable {
-  private static final Logger LOG = Logger.getLogger(LocalTable.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LocalTable.class);
 
   protected final LocalDb db_;
   /** The lower-case name of the table. */
@@ -100,10 +101,15 @@ abstract class LocalTable implements FeTable {
   protected final TableMetaRef ref_;
 
   public static LocalTable load(LocalDb db, String tblName) throws TableLoadingException {
+    Pair<Table, TableMetaRef> tableMeta = loadTableMetadata(db, tblName);
+    return load(db, tableMeta);
+  }
+
+  public static LocalTable load(LocalDb db, Pair<Table, TableMetaRef> tableMeta)
+      throws TableLoadingException {
     // In order to know which kind of table subclass to instantiate, we need
     // to eagerly grab and parse the top-level Table object from the HMS.
     LocalTable t = null;
-    Pair<Table, TableMetaRef> tableMeta = loadTableMetadata(db, tblName);
     Table msTbl = tableMeta.first;
     TableMetaRef ref = tableMeta.second;
     if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
@@ -123,7 +129,7 @@ abstract class LocalTable implements FeTable {
 
     if (t == null) {
       throw new LocalCatalogException("Unknown table type for table " +
-          db.getName() + "." + tblName);
+          db.getName() + "." + msTbl.getTableName());
     }
 
     // TODO(todd): it would be preferable to only load stats for those columns
@@ -201,7 +207,10 @@ abstract class LocalTable implements FeTable {
 
   @Override
   public String getOwnerUser() {
-    if (msTable_ == null) return null;
+    if (msTable_ == null) {
+      LOG.warn("Owner of {} is unknown due to msTable is unloaded", getFullName());
+      return null;
+    }
     return msTable_.getOwner();
   }
 

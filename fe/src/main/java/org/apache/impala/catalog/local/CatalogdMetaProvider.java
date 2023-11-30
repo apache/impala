@@ -743,6 +743,20 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   @Override
+  public Pair<Table, TableMetaRef> getTableIfPresent(String dbName, String tblName) {
+    TableCacheKey cacheKey = new TableCacheKey(dbName.toLowerCase(),
+        tblName.toLowerCase());
+    try {
+      Object value = getIfPresent(cacheKey);
+      if (value == null) return null;
+      TableMetaRefImpl ref = (TableMetaRefImpl) value;
+      return Pair.create(ref.msTable_, ref);
+    } catch (TException e) {
+      return null;
+    }
+  }
+
+  @Override
   public Pair<Table, TableMetaRef> loadTable(final String dbName, final String tableName)
       throws NoSuchObjectException, MetaException, TException {
     TableCacheKey cacheKey = new TableCacheKey(dbName.toLowerCase(),

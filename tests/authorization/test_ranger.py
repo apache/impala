@@ -892,7 +892,9 @@ class TestRanger(CustomClusterTestSuite):
     r = requests.post("{0}/service/public/v2/api/policy".format(RANGER_HOST),
                       auth=RANGER_AUTH, json=data, headers=REST_HEADERS)
     assert 300 > r.status_code >= 200, r.content
-    return json.loads(r.content)["id"]
+    policy_id = json.loads(r.content)["id"]
+    LOG.info("Added column masking policy " + str(policy_id))
+    return policy_id
 
   @staticmethod
   def _add_row_filtering_policy(policy_name, user, db, table, filter_expr):
@@ -1562,6 +1564,86 @@ class TestRanger(CustomClusterTestSuite):
     finally:
       TestRanger._remove_policy(unique_name)
       admin_client.execute("revoke all on server from user {0}".format(user))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="{0} {1}".format(IMPALAD_ARGS,
+                                  "--allow_catalog_cache_op_from_masked_users=true"),
+    catalogd_args=CATALOGD_ARGS)
+  def test_allow_metadata_update(self, unique_name):
+    self.__test_allow_catalog_cache_op_from_masked_users(unique_name)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="{0} {1}".format(LOCAL_CATALOG_IMPALAD_ARGS,
+                                  "--allow_catalog_cache_op_from_masked_users=true"),
+    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS)
+  def test_allow_metadata_update_local_catalog(self, unique_name):
+    self.__test_allow_catalog_cache_op_from_masked_users(unique_name)
+
+  def __test_allow_catalog_cache_op_from_masked_users(self, unique_name):
+    """Verify that catalog cache operations are allowed for masked users
+    when allow_catalog_cache_op_from_masked_users=true."""
+    user = getuser()
+    admin_client = self.create_impala_client()
+    non_admin_client = self.create_impala_client()
+    try:
+      # Create a column masking policy on 'user' which is also the owner of the table
+      TestRanger._add_column_masking_policy(
+          unique_name, user, "functional", "alltypestiny", "id",
+          "CUSTOM", "id * 100")
+
+      # At a cold start, the table is unloaded so its owner is unknown.
+      # INVALIDATE METADATA <table> is denied since 'user' is not detected as the owner.
+      result = self.execute_query_expect_failure(
+          non_admin_client, "invalidate metadata functional.alltypestiny", user=user)
+      assert "User '{0}' does not have privileges to execute " \
+             "'INVALIDATE METADATA/REFRESH' on: functional.alltypestiny".format(user) \
+             in str(result)
+      # Verify catalogd never loads metadata of this table
+      table_loaded_log = "Loaded metadata for: functional.alltypestiny"
+      self.assert_catalogd_log_contains("INFO", table_loaded_log, expected_count=0)
+
+      # Run a query to trigger metadata loading on the table
+      self.execute_query_expect_success(
+        non_admin_client, "describe functional.alltypestiny", user=user)
+      # Verify catalogd loads metadata of this table
+      self.assert_catalogd_log_contains("INFO", table_loaded_log, expected_count=1)
+
+      # INVALIDATE METADATA <table> is allowed since 'user' is detected as the owner.
+      self.execute_query_expect_success(
+          non_admin_client, "invalidate metadata functional.alltypestiny", user=user)
+
+      # Run a query to trigger metadata loading on the table
+      self.execute_query_expect_success(
+          non_admin_client, "describe functional.alltypestiny", user=user)
+      # Verify catalogd loads metadata of this table
+      self.assert_catalogd_log_contains("INFO", table_loaded_log, expected_count=2)
+
+      # Verify REFRESH <table> is allowed since 'user' is detected as the owner.
+      self.execute_query_expect_success(
+          non_admin_client, "refresh functional.alltypestiny", user=user)
+      self.execute_query_expect_success(
+          non_admin_client,
+          "refresh functional.alltypestiny partition(year=2009, month=1)", user=user)
+
+      # Clear the catalog cache and grant 'user' enough privileges
+      self.execute_query_expect_success(
+          admin_client, "invalidate metadata functional.alltypestiny", user=ADMIN)
+      admin_client.execute("grant refresh on table functional.alltypestiny to user {0}"
+                           .format(user), user=ADMIN)
+      try:
+        # Now 'user' should be able to run REFRESH/INVALIDATE even if the table is
+        # unloaded (not recognize it as the owner).
+        self.execute_query_expect_success(
+            non_admin_client, "invalidate metadata functional.alltypestiny", user=user)
+        self.execute_query_expect_success(
+            non_admin_client, "refresh functional.alltypestiny", user=user)
+      finally:
+        admin_client.execute(
+            "revoke refresh on table functional.alltypestiny from user {0}".format(user))
+    finally:
+      TestRanger._remove_policy(unique_name)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

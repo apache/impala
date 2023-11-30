@@ -28,6 +28,7 @@ import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.EventSequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -215,8 +216,16 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
       return;
     }
     // Populate column names to check column masking policies in blocking updates.
+    // No need to do this for REFRESH if allow_catalog_cache_op_from_masked_users=true.
+    // Note that db.getTable() could be a heavy operation in local catalog mode since it
+    // triggers metadata loading on the table if it's unloaded in catalogd. Skipping this
+    // improves the performance of "INVALIDATE METADATA <table>" statements. For REFRESH
+    // statements, the performance doesn't differ a lot since there are other places that
+    // use db.getTable() (see IMPALA-12591).
     if (config_.isEnabled() && request.getAuthorizable() != null
-        && request.getAuthorizable().getType() == Type.TABLE) {
+        && request.getAuthorizable().getType() == Type.TABLE
+        && (request.getPrivilege() != Privilege.REFRESH
+          || !BackendConfig.INSTANCE.allowCatalogCacheOpFromMaskedUsers())) {
       Preconditions.checkNotNull(dbName);
       AuthorizableTable authorizableTable = (AuthorizableTable) request.getAuthorizable();
       FeDb db = catalog.getDb(dbName);

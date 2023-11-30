@@ -895,7 +895,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   @Override // FeTable
   public String getOwnerUser() {
-    if (msTable_ == null) return null;
+    if (msTable_ == null) {
+      LOG.warn("Owner of {} is unknown due to table is unloaded", getFullName());
+      return null;
+    }
     return msTable_.getOwner();
   }
 

@@ -445,4 +445,8 @@ public class BackendConfig {
   public String getHostname() {
     return backendCfg_.hostname;
   }
+
+  public boolean allowCatalogCacheOpFromMaskedUsers() {
+    return backendCfg_.allow_catalog_cache_op_from_masked_users;
+  }
 }

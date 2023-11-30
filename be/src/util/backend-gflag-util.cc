@@ -113,6 +113,7 @@ DECLARE_bool(enable_skipping_older_events);
 DECLARE_bool(enable_json_scanner);
 DECLARE_int32(catalog_operation_log_size);
 DECLARE_string(hostname);
+DECLARE_bool(allow_catalog_cache_op_from_masked_users);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -444,6 +445,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_max_filter_error_rate_from_full_scan);
   cfg.__set_catalog_operation_log_size(FLAGS_catalog_operation_log_size);
   cfg.__set_hostname(FLAGS_hostname);
+  cfg.__set_allow_catalog_cache_op_from_masked_users(
+      FLAGS_allow_catalog_cache_op_from_masked_users);
   return Status::OK();
 }
 

@@ -39,6 +39,7 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.AcidUtils;
@@ -352,10 +353,12 @@ public class StmtMetadataLoader {
     List<TableRef> tblRefs = new ArrayList<>();
     // The information about whether table masking is supported is not available to
     // ResetMetadataStmt so we collect the TableRef for ResetMetadataStmt whenever
-    // applicable.
+    // applicable. Skip this if allow_catalog_cache_op_from_masked_users=true because
+    // we don't need column info for fetching column-masking policies.
     if (stmt instanceof ResetMetadataStmt
         && fe_.getAuthzFactory().getAuthorizationConfig().isEnabled()
-        && fe_.getAuthzFactory().supportsTableMasking()) {
+        && fe_.getAuthzFactory().supportsTableMasking()
+        && !BackendConfig.INSTANCE.allowCatalogCacheOpFromMaskedUsers()) {
       TableName tableName = ((ResetMetadataStmt) stmt).getTableName();
       if (tableName != null) tblRefs.add(new TableRef(tableName.toPath(), null));
     } else {

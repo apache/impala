@@ -39,6 +39,7 @@ import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionCategory;
@@ -51,6 +52,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -60,6 +63,7 @@ import com.google.common.collect.Maps;
  * each catalog instance.
  */
 public class LocalDb implements FeDb {
+  private final static Logger LOG = LoggerFactory.getLogger(LocalDb.class);
   private final LocalCatalog catalog_;
   /** The lower-case name of the database. */
   private final String name_;
@@ -117,7 +121,18 @@ public class LocalDb implements FeDb {
       // Table doesn't exist.
       return null;
     }
-    return tables_.get(tblName);
+    FeTable tbl = tables_.get(tblName);
+    if (tbl instanceof LocalIncompleteTable && tbl.getMetaStoreTable() == null) {
+      // Add msTable if it's cached.
+      Pair<Table, MetaProvider.TableMetaRef> tblMeta =
+          catalog_.getMetaProvider().getTableIfPresent(name_, tblName);
+      if (tblMeta != null) {
+        tbl = new LocalIncompleteTable(this, tblMeta.first, tblMeta.second,
+            tbl.getTableType(), tbl.getTableComment());
+        tables_.put(tblName, tbl);
+      }
+    }
+    return tbl;
   }
 
   @Override
