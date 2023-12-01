@@ -1,0 +1,460 @@
+====
+---- QUERY
+CREATE TABLE id_part (i int, s string)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+UPDATE id_part SET i = 1;
+---- DML_RESULTS: id_part
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SHOW FILES IN id_part;
+---- RESULTS
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+UPDATE id_part SET i = cast(i * 10 as int);
+---- DML_RESULTS: id_part
+10,'one'
+20,'two'
+30,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+UPDATE id_part SET i =  cast(i / 2 as int), s = upper(s);
+---- DML_RESULTS: id_part
+5,'ONE'
+10,'TWO'
+15,'THREE'
+2,'FOUR'
+2,'FIVE'
+3,'SIX'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SHOW FILES IN id_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=1/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=10/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=10/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=15/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=2/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=20/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=20/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=3/delete-.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=30/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=30/delete.*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=4/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=5/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=6/(?!delete-).*.parq','.*B','','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/id_part/data/i=15/delete-.*.parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+CREATE TABLE trunc_part (i int, s string)
+PARTITIONED BY SPEC (truncate(1, s))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Delete from empty table is no-op.
+UPDATE trunc_part SET i = 1;
+---- DML_RESULTS: trunc_part
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+UPDATE trunc_part SET i = cast(i + 100 as int) WHERE s like 't%';
+---- DML_RESULTS: trunc_part
+1,'one'
+102,'two'
+103,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+UPDATE trunc_part SET s = concat(upper(s), s), i = cast(i + 1000 as int) WHERE i % 2 = 0;
+---- DML_RESULTS: trunc_part
+1,'one'
+1102,'TWOtwo'
+103,'three'
+1004,'FOURfour'
+5,'five'
+1006,'SIXsix'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+CREATE TABLE multi_part (i int, s string, f double)
+PARTITIONED BY SPEC (bucket(7, i), truncate(1, s))
+SORT BY (f, i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Delete from empty table is no-op.
+UPDATE multi_part SET i = 1;
+---- DML_RESULTS: multi_part
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(1, 'one', 1.1), (2, 'two', 2.2), (3, 'three', 3.33);
+UPDATE multi_part
+SET s = concat(s, s), f = 9.9, i = cast(i + 10 as int)
+WHERE i != (select min(i) from multi_part) and
+      i != (select max(i) from multi_part);
+---- DML_RESULTS: multi_part
+1,'one',1.1
+12,'twotwo',9.9
+3,'three', 3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(4, 'four', 4.4), (5, 'five', 5.5), (6, 'six', 6.6);
+UPDATE multi_part SET i = 0, s = 'void', f = 3.14 WHERE i % 2 = 0;
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three', 3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+# No matching rows to WHERE condition
+UPDATE multi_part SET i = 0, s = 'void', f = 3.14
+WHERE f > 1000;
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three',3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES (null, 'null',0.0);
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three',3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+NULL,'null',0.0
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+UPDATE multi_part SET i = 111, s = 'fox', f = 1.1 where i is null;
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three',3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+111,'fox',1.1
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+CREATE TABLE evolve_part (i int, s string, f double)
+SORT BY ZORDER(i,s)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+INSERT INTO evolve_part VALUES(1, 'one', 1.1), (2, 'two', 2.2), (3, 'three', 3.33);
+UPDATE evolve_part SET i = 222 WHERE i = 2;
+---- DML_RESULTS: evolve_part
+1,'one',1.1
+222,'two',2.2
+3,'three',3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+ALTER TABLE evolve_part SET PARTITION SPEC (i);
+SELECT * FROM evolve_part;
+---- RESULTS
+1,'one',1.1
+222,'two',2.2
+3,'three',3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO evolve_part VALUES (10, 'ten', 10.10), (20, 'twenty', 20.20);
+---- DML_RESULTS: evolve_part
+1,'one',1.1
+222,'two',2.2
+3,'three',3.33
+10,'ten',10.10
+20,'twenty',20.20
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+UPDATE evolve_part SET i = cast(i + 1000 as int) where s like 't%';
+---- DML_RESULTS: evolve_part
+1,'one',1.1
+1222,'two',2.2
+1003,'three',3.33
+1010,'ten',10.10
+1020,'twenty',20.20
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+ALTER TABLE evolve_part SET PARTITION SPEC (truncate(1, s));
+---- DML_RESULTS: evolve_part
+1,'one',1.1
+1222,'two',2.2
+1003,'three',3.33
+1010,'ten',10.10
+1020,'twenty',20.20
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO evolve_part VALUES (30, 'thirty', 30.30), (40, 'forty', 40.40), (50, 'fifty', 50.50);
+---- DML_RESULTS: evolve_part
+1,'one',1.1
+1222,'two',2.2
+1003,'three',3.33
+1010,'ten',10.10
+1020,'twenty',20.20
+30,'thirty',30.30
+40,'forty',40.40
+50,'fifty',50.50
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+UPDATE evolve_part SET i = cast(i + 100 as int), s = concat('+++', s);
+---- DML_RESULTS: evolve_part
+101,'+++one',1.1
+1322,'+++two',2.2
+1103,'+++three',3.33
+1110,'+++ten',10.10
+1120,'+++twenty',20.20
+130,'+++thirty',30.30
+140,'+++forty',40.40
+150,'+++fifty',50.50
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+ALTER TABLE evolve_part SET PARTITION SPEC (void(s));
+---- DML_RESULTS: evolve_part
+101,'+++one',1.1
+1322,'+++two',2.2
+1103,'+++three',3.33
+1110,'+++ten',10.10
+1120,'+++twenty',20.20
+130,'+++thirty',30.30
+140,'+++forty',40.40
+150,'+++fifty',50.50
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+UPDATE evolve_part SET s = substr(s, 4), i = cast(i - 100 as int);
+---- DML_RESULTS: evolve_part
+1,'one',1.1
+1222,'two',2.2
+1003,'three',3.33
+1010,'ten',10.10
+1020,'twenty',20.20
+30,'thirty',30.30
+40,'forty',40.40
+50,'fifty',50.50
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+create table date_year_part (i int, d date)
+partitioned by spec (year(d))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into date_year_part values
+  (1, '1968-01-01'), (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE date_year_part SET d = years_add(d, 10), i = cast(i + 10 as int);
+---- DML_RESULTS: date_year_part
+11,1978-01-01
+12,1979-12-31
+13,1980-01-01
+14,2033-11-15
+---- TYPES
+INT, DATE
+====
+---- QUERY
+create table date_month_part (i int, d date)
+partitioned by spec (month(d))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into date_month_part values
+  (1, '1968-01-01'), (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE date_month_part SET d = years_add(d, 10), i = cast(i + 10 as int);
+---- DML_RESULTS: date_month_part
+11,1978-01-01
+12,1979-12-31
+13,1980-01-01
+14,2033-11-15
+---- TYPES
+INT, DATE
+====
+---- QUERY
+create table date_day_part (i int, d date)
+partitioned by spec (day(d))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into date_day_part values
+  (1, '1968-01-01'), (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE date_day_part SET d = years_add(d, 10), i = cast(i + 10 as int);
+---- DML_RESULTS: date_day_part
+11,1978-01-01
+12,1979-12-31
+13,1980-01-01
+14,2033-11-15
+---- TYPES
+INT, DATE
+====
+---- QUERY
+create table ts_year_part (i int, ts timestamp)
+partitioned by spec (year(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_year_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE ts_year_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);
+---- DML_RESULTS: ts_year_part
+101,1958-01-01 00:00:00
+102,1959-12-31 00:00:00
+103,1960-01-01 00:00:00
+104,2013-11-15 00:00:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_month_part (i int, ts timestamp)
+partitioned by spec (month(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_month_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+UPDATE ts_month_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);
+---- DML_RESULTS: ts_month_part
+101,1958-01-01 01:02:03
+102,1959-12-31 23:59:00
+103,1960-01-01 00:00:00
+104,2013-11-15 15:31:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_day_part (i int, ts timestamp)
+partitioned by spec (day(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_day_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+UPDATE ts_day_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);
+---- DML_RESULTS: ts_day_part
+101,1958-01-01 01:02:03
+102,1959-12-31 23:59:00
+103,1960-01-01 00:00:00
+104,2013-11-15 15:31:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_hour_part (i int, ts timestamp)
+partitioned by spec (hour(ts))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_hour_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+UPDATE ts_hour_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);;
+---- DML_RESULTS: ts_hour_part
+101,1958-01-01 01:02:03
+102,1959-12-31 23:59:00
+103,1960-01-01 00:00:00
+104,2013-11-15 15:31:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table ts_evolve_part (i int, ts timestamp)
+partitioned by spec (year(ts))
+sort by (ts, i)
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into ts_evolve_part values (1, '1968-01-01 01:02:03');
+alter table ts_evolve_part set partition spec (month(ts));
+insert into ts_evolve_part values (2, '1969-12-31 23:59:00');
+insert into ts_evolve_part values (111, 'invalid');
+alter table ts_evolve_part set partition spec (day(ts));
+insert into ts_evolve_part values (3, '1970-01-01 00:00:00');
+alter table ts_evolve_part set partition spec (hour(ts));
+insert into ts_evolve_part values (4, '2023-11-15 15:31:00');
+---- DML_RESULTS: ts_evolve_part
+1,1968-01-01 01:02:03
+2,1969-12-31 23:59:00
+3,1970-01-01 00:00:00
+4,2023-11-15 15:31:00
+111,NULL
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+UPDATE ts_evolve_part set i = cast(i + 1000 as int), ts = days_add(months_add(years_add(ts, 20), 1), 1);
+---- DML_RESULTS: ts_evolve_part
+1001,1988-02-02 01:02:03
+1002,1990-02-01 23:59:00
+1003,1990-02-02 00:00:00
+1004,2043-12-16 15:31:00
+1111,NULL
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+create table numeric_truncate (id int, int_col int, bigint_col bigint, dec_8_0 decimal(8, 0), dec_10_2 decimal(10, 2))
+partitioned by spec (truncate(10, int_col), truncate(1000, bigint_col), void(id), truncate(20, dec_8_0), truncate(50, dec_10_2))
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into numeric_truncate values (1, 12, 1222, 135, 20.75);
+UPDATE numeric_truncate SET dec_10_2 = 75.20, dec_8_0 = 531, bigint_col = 2111, int_col = 21, id = 11;
+---- DML_RESULTS: numeric_truncate
+11,21,2111,531,75.20
+---- TYPES
+INT,INT,BIGINT,DECIMAL,DECIMAL
+====

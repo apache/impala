@@ -22,6 +22,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.thrift.TSortingOrder;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -171,4 +172,6 @@ abstract class ModifyImpl {
   public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
     sourceStmt_.rewriteExprs(rewriter);
   }
+
+  public TSortingOrder getSortingOrder() { return TSortingOrder.LEXICAL; }
 }

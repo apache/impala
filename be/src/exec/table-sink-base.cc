@@ -192,12 +192,8 @@ void TableSinkBase::BuildHdfsFileNames(
 }
 
 Status TableSinkBase::InitOutputPartition(RuntimeState* state,
-    const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
+    const HdfsPartitionDescriptor& partition_descriptor,
     OutputPartition* output_partition, bool empty_partition) {
-  // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
-  // etc.
-  RETURN_IF_ERROR(ConstructPartitionInfo(row, output_partition));
-
   BuildHdfsFileNames(partition_descriptor, output_partition);
 
   if (ShouldSkipStaging(state, output_partition)) {
@@ -366,16 +362,16 @@ Status TableSinkBase::CreateNewTmpFile(RuntimeState* state,
 }
 
 Status TableSinkBase::WriteRowsToPartition(
-    RuntimeState* state, RowBatch* batch, PartitionPair* partition_pair) {
+    RuntimeState* state, RowBatch* batch, OutputPartition* output_partition,
+    const std::vector<int32_t>& indices) {
   // The rows of this batch may span multiple files. We repeatedly pass the row batch to
   // the writer until it sets new_file to false, indicating that all rows have been
   // written. The writer tracks where it is in the batch when it returns with new_file
   // set.
   bool new_file;
   while (true) {
-    OutputPartition* output_partition = partition_pair->first.get();
     Status status =
-        output_partition->writer->AppendRows(batch, partition_pair->second, &new_file);
+        output_partition->writer->AppendRows(batch, indices, &new_file);
     if (!status.ok()) {
       // IMPALA-10607: Deletes partition file if staging is skipped when appending rows
       // fails. Otherwise, it leaves the file in un-finalized state.
@@ -390,7 +386,6 @@ Status TableSinkBase::WriteRowsToPartition(
     RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
     RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
   }
-  partition_pair->second.clear();
   return Status::OK();
 }
 

@@ -17,22 +17,18 @@
 
 #include "exec/iceberg-delete-sink.h"
 
-#include <boost/algorithm/string.hpp>
-
 #include "common/object-pool.h"
+#include "exec/iceberg-delete-sink-config.h"
 #include "exec/parquet/hdfs-parquet-table-writer.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "kudu/util/url-coding.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/coding-util.h"
-#include "util/debug-util.h"
 #include "util/hdfs-util.h"
-#include "util/iceberg-utility-functions.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
 #include "util/runtime-profile-counters.h"
@@ -41,54 +37,20 @@
 
 namespace impala {
 
-DataSink* IcebergDeleteSinkConfig::CreateSink(RuntimeState* state) const {
-  TDataSinkId sink_id = state->fragment().idx;
-  return state->obj_pool()->Add(
-      new IcebergDeleteSink(sink_id, *this,
-          this->tsink_->table_sink.iceberg_delete_sink, state));
-}
-
-Status IcebergDeleteSinkConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, FragmentState* state) {
-  RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
-  DCHECK(tsink_->__isset.table_sink);
-  DCHECK(tsink_->table_sink.__isset.iceberg_delete_sink);
-  RETURN_IF_ERROR(
-      ScalarExpr::Create(tsink_->table_sink.iceberg_delete_sink.partition_key_exprs,
-          *input_row_desc_, state, &partition_key_exprs_));
-  return Status::OK();
-}
-
 IcebergDeleteSink::IcebergDeleteSink(TDataSinkId sink_id,
-    const IcebergDeleteSinkConfig& sink_config, const TIcebergDeleteSink& ice_del_sink,
-    RuntimeState* state) :
-    TableSinkBase(sink_id, sink_config, "IcebergDeleteSink", state) {
+    const IcebergDeleteSinkConfig& sink_config, RuntimeState* state) :
+    IcebergDeleteSinkBase(sink_id, sink_config, "IcebergDeleteSink", state) {
 }
 
 Status IcebergDeleteSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   SCOPED_TIMER(profile()->total_time_counter());
-  RETURN_IF_ERROR(TableSinkBase::Prepare(state, parent_mem_tracker));
-  unique_id_str_ = "delete-" + PrintId(state->fragment_instance_id(), "-");
-
-  // Resolve table id and set input tuple descriptor.
-  table_desc_ = static_cast<const HdfsTableDescriptor*>(
-      state->desc_tbl().GetTableDescriptor(table_id_));
-  if (table_desc_ == nullptr) {
-    stringstream error_msg("Failed to get table descriptor for table id: ");
-    error_msg << table_id_;
-    return Status(error_msg.str());
-  }
-
-  DCHECK_GE(output_expr_evals_.size(),
-      table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
-
+  RETURN_IF_ERROR(IcebergDeleteSinkBase::Prepare(state, parent_mem_tracker));
   return Status::OK();
 }
 
 Status IcebergDeleteSink::Open(RuntimeState* state) {
   SCOPED_TIMER(profile()->total_time_counter());
-  RETURN_IF_ERROR(TableSinkBase::Open(state));
-  DCHECK_EQ(partition_key_expr_evals_.size(), dynamic_partition_key_expr_evals_.size());
+  RETURN_IF_ERROR(IcebergDeleteSinkBase::Open(state));
   return Status::OK();
 }
 
@@ -106,7 +68,8 @@ Status IcebergDeleteSink::Send(RuntimeState* state, RowBatch* batch) {
     if (current_partition_.first == nullptr) {
       RETURN_IF_ERROR(SetCurrentPartition(state, nullptr, ROOT_PARTITION_KEY));
     }
-    RETURN_IF_ERROR(WriteRowsToPartition(state, batch, &current_partition_));
+    DCHECK(current_partition_.second.empty());
+    RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_partition_.first.get()));
   } else {
     RETURN_IF_ERROR(WriteClusteredRowBatch(state, batch));
   }
@@ -153,7 +116,10 @@ inline Status IcebergDeleteSink::SetCurrentPartition(RuntimeState* state,
 
   current_partition_.first.reset(new OutputPartition());
   current_partition_.second.clear();
-  Status status = InitOutputPartition(state, *prototype_partition_, row,
+  // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
+  // etc.
+  RETURN_IF_ERROR(ConstructPartitionInfo(row, current_partition_.first.get()));
+  Status status = InitOutputPartition(state, *prototype_partition_,
       current_partition_.first.get(), false);
   if (!status.ok()) {
     // We failed to create the output partition successfully. Clean it up now.
@@ -165,7 +131,7 @@ inline Status IcebergDeleteSink::SetCurrentPartition(RuntimeState* state,
 
   // Save the partition name so that the coordinator can create the partition
   // directory structure if needed.
-  dml_exec_state_.AddPartition(
+  state->dml_exec_state()->AddPartition(
       current_partition_.first->partition_name, prototype_partition_->id(),
       &table_desc_->hdfs_base_dir(),
       nullptr);
@@ -193,7 +159,7 @@ Status IcebergDeleteSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* 
       dynamic_partition_key_expr_evals_, &last_row_key);
   if (last_row_key == current_clustered_partition_key_) {
     DCHECK(current_partition_.second.empty());
-    RETURN_IF_ERROR(WriteRowsToPartition(state, batch, &current_partition_));
+    RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_partition_.first.get()));
     return Status::OK();
   }
 
@@ -209,11 +175,12 @@ Status IcebergDeleteSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* 
       DCHECK(current_partition_.first->writer != nullptr);
       // Done with previous partition - write rows and close.
       if (!current_partition_.second.empty()) {
-        RETURN_IF_ERROR(WriteRowsToPartition(state, batch, &current_partition_));
+        RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_partition_.first.get(),
+            current_partition_.second));
         current_partition_.second.clear();
       }
       RETURN_IF_ERROR(FinalizePartitionFile(state,
-          current_partition_.first.get(), /*is_delete=*/true, &dml_exec_state_));
+          current_partition_.first.get(), /*is_delete=*/true));
       if (current_partition_.first->writer.get() != nullptr) {
         current_partition_.first->writer->Close();
       }
@@ -229,7 +196,9 @@ Status IcebergDeleteSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* 
     current_partition_.second.push_back(i);
   }
   // Write final set of rows to the partition but keep its file open.
-  RETURN_IF_ERROR(WriteRowsToPartition(state, batch, &current_partition_));
+  RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_partition_.first.get(),
+      current_partition_.second));
+  current_partition_.second.clear();
   return Status::OK();
 }
 
@@ -239,7 +208,7 @@ Status IcebergDeleteSink::FlushFinal(RuntimeState* state) {
 
   if (current_partition_.first != nullptr) {
     RETURN_IF_ERROR(FinalizePartitionFile(state, current_partition_.first.get(),
-        /*is_delete=*/true, &dml_exec_state_));
+        /*is_delete=*/true));
   }
   return Status::OK();
 }
@@ -247,10 +216,6 @@ Status IcebergDeleteSink::FlushFinal(RuntimeState* state) {
 void IcebergDeleteSink::Close(RuntimeState* state) {
   if (closed_) return;
   SCOPED_TIMER(profile()->total_time_counter());
-
-  DmlExecStatusPB dml_exec_proto;
-  dml_exec_state_.ToProto(&dml_exec_proto);
-  state->dml_exec_state()->Update(dml_exec_proto);
 
   if (current_partition_.first != nullptr) {
     if (current_partition_.first->writer != nullptr) {
@@ -261,114 +226,8 @@ void IcebergDeleteSink::Close(RuntimeState* state) {
   }
 
   current_partition_.first.reset();
-  TableSinkBase::Close(state);
-  closed_ = true;
-}
-
-std::string IcebergDeleteSink::HumanReadablePartitionValue(
-    TIcebergPartitionTransformType::type transform_type, const std::string& value,
-    Status* transform_result) {
-  if (!iceberg::IsTimeBasedPartition(transform_type) ||
-    value == table_desc_->null_partition_key_value()) {
-    *transform_result = Status::OK();
-    return value;
-  }
-  return iceberg::HumanReadableTime(transform_type, value, transform_result);
-}
-
-Status IcebergDeleteSink::ConstructPartitionInfo(
-    const TupleRow* row,
-    OutputPartition* output_partition) {
-  DCHECK(output_partition != nullptr);
-  DCHECK(output_partition->raw_partition_names.empty());
-
-  if (partition_key_expr_evals_.empty()) {
-    output_partition->iceberg_spec_id = table_desc_->IcebergSpecId();
-    return Status::OK();
-  }
-
-  DCHECK_EQ(partition_key_expr_evals_.size(), 2);
-
-  ScalarExprEvaluator* spec_id_eval = partition_key_expr_evals_[0];
-  ScalarExprEvaluator* partitions_eval = partition_key_expr_evals_[1];
-
-  int spec_id = spec_id_eval->GetIntVal(row).val;
-  output_partition->iceberg_spec_id = spec_id;
-
-  StringVal partitions_strings_val = partitions_eval->GetStringVal(row);
-  string partition_values_str((const char*)partitions_strings_val.ptr,
-      partitions_strings_val.len);
-
-  vector<string> non_void_partition_names;
-  vector<TIcebergPartitionTransformType::type> non_void_partition_transforms;
-  if (LIKELY(spec_id == table_desc_->IcebergSpecId())) {
-    // If 'spec_id' is the default spec id, then just copy the already populated
-    // non void partition names and transforms.
-    non_void_partition_names = table_desc_->IcebergNonVoidPartitionNames();
-    non_void_partition_transforms = table_desc_->IcebergNonVoidPartitionTransforms();
-  } else {
-    // Otherwise collect the non-void partition names belonging to 'spec_id'.
-    const TIcebergPartitionSpec& partition_spec =
-        table_desc_->IcebergPartitionSpecs()[spec_id];
-    for (const TIcebergPartitionField& spec_field : partition_spec.partition_fields) {
-      auto transform_type = spec_field.transform.transform_type;
-      if (transform_type != TIcebergPartitionTransformType::VOID) {
-        non_void_partition_names.push_back(spec_field.field_name);
-        non_void_partition_transforms.push_back(transform_type);
-      }
-    }
-  }
-
-  if (non_void_partition_names.empty()) {
-    DCHECK(partition_values_str.empty());
-    return Status::OK();
-  }
-
-  vector<string> partition_values_encoded;
-  boost::split(partition_values_encoded, partition_values_str, boost::is_any_of("."));
-  vector<string> partition_values_decoded;
-  partition_values_decoded.reserve(partition_values_encoded.size());
-  for (const string& encoded_part_val : partition_values_encoded) {
-    string decoded_val;
-    bool success = kudu::Base64Decode(encoded_part_val, &decoded_val);
-    // We encoded it, we must succeed decoding it.
-    DCHECK(success);
-    partition_values_decoded.push_back(std::move(decoded_val));
-  }
-
-  DCHECK_EQ(partition_values_decoded.size(), non_void_partition_names.size());
-  DCHECK_EQ(partition_values_decoded.size(), non_void_partition_transforms.size());
-
-  stringstream url_encoded_partition_name_ss;
-  stringstream external_partition_name_ss;
-
-  for (int i = 0; i < partition_values_decoded.size(); ++i) {
-    auto transform_type = non_void_partition_transforms[i];
-    stringstream raw_partition_key_value_ss;
-    stringstream encoded_partition_key_value_ss;
-
-    raw_partition_key_value_ss << non_void_partition_names[i] << "=";
-    encoded_partition_key_value_ss << non_void_partition_names[i] << "=";
-
-    string& value_str = partition_values_decoded[i];
-    Status transform_status;
-    value_str = HumanReadablePartitionValue(
-        transform_type, value_str, &transform_status);
-    if (!transform_status.ok()) return transform_status;
-    raw_partition_key_value_ss << value_str;
-
-    string part_key_value = UrlEncodePartitionValue(value_str);
-    encoded_partition_key_value_ss << part_key_value;
-    if (i < partition_values_decoded.size() - 1) encoded_partition_key_value_ss << "/";
-
-    url_encoded_partition_name_ss << encoded_partition_key_value_ss.str();
-    output_partition->raw_partition_names.push_back(raw_partition_key_value_ss.str());
-  }
-
-  output_partition->partition_name = url_encoded_partition_name_ss.str();
-  output_partition->external_partition_name = external_partition_name_ss.str();
-
-  return Status::OK();
+  IcebergDeleteSinkBase::Close(state);
+  DCHECK(closed_);
 }
 
 string IcebergDeleteSink::DebugString() const {

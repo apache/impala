@@ -23,18 +23,61 @@ import time
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
+from tests.common.test_vector import ImpalaTestDimension
 from tests.stress.stress_util import run_tasks, Task
+from tests.util.filesystem_utils import IS_HDFS
+
+
+# Longer-running UPDATE tests are executed here
+class TestIcebergV2UpdateStress(ImpalaTestSuite):
+  """UPDATE tests against Iceberg V2 tables."""
+
+  BATCH_SIZES = [0, 32]
+  EXHAUSTIVE_BATCH_SIZES = [0, 1, 11, 32]
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergV2UpdateStress, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+    if cls.exploration_strategy() == 'core':
+      cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestIcebergV2UpdateStress.BATCH_SIZES))
+    else:
+      cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size',
+            *TestIcebergV2UpdateStress.EXHAUSTIVE_BATCH_SIZES))
+
+  def test_update_stress(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-update-stress', vector,
+        unique_database)
+    if IS_HDFS:
+      self._update_stress_hive_tests(unique_database)
+
+  def _update_stress_hive_tests(self, db):
+    stmt = """
+        SELECT count(*), sum(ss_ticket_number)
+        FROM {}.ice_store_sales
+        WHERE ss_item_sk % 1999 = 0""".format(db)
+
+    hive_results = self.run_stmt_in_hive(stmt).split("\n", 1)[1]
+    assert hive_results == \
+        "3138,848464922\n"
 
 
 # Stress test for concurrent UPDATE operations against Iceberg tables.
-class TestIcebergUpdateStress(ImpalaTestSuite):
+class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
     return 'targeted-stress'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestIcebergUpdateStress, cls).add_test_dimensions()
+    super(TestIcebergConcurrentUpdateStress, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: (v.get_value('table_format').file_format == 'parquet'
             and v.get_value('table_format').compression_codec == 'snappy'))

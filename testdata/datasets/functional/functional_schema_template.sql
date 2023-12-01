@@ -3401,7 +3401,11 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 (ts timestamp, s string, i int, j int)
 PARTITIONED BY SPEC (year(ts), bucket(5, s))
 SORT BY ZORDER (i, j)
-STORED AS ICEBERG;
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='2');
+---- DEPENDENT_LOAD
+TRUNCATE TABLE {db_name}{db_suffix}.{table_name};
+INSERT INTO {db_name}{db_suffix}.{table_name} VALUES ('2023-12-08 16:15:33', 'Alpaca', 111, 222);
 ====
 ---- DATASET
 functional

@@ -1,0 +1,39 @@
+====
+---- QUERY
+CREATE TABLE ice_store_sales
+PARTITIONED BY SPEC (truncate(500, ss_sold_date_sk))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT * FROM tpcds_parquet.store_sales;
+select count(*), sum(ss_ticket_number) from ice_store_sales where ss_item_sk % 1999 = 0
+---- RESULTS
+1569,188882461
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+update ice_store_sales set ss_ticket_number = ss_ticket_number + 100000 where ss_item_sk % 1999 = 0;
+select count(*), sum(ss_ticket_number) from ice_store_sales where ss_item_sk % 1999 = 0
+---- RESULTS
+1569,345782461
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+alter table ice_store_sales set partition spec (void(ss_sold_date_sk), truncate(1000, ss_sold_date_sk));
+alter table ice_store_sales sort by lexical (ss_ticket_number);
+insert into ice_store_sales SELECT * FROM tpcds_parquet.store_sales;
+select count(*), sum(ss_ticket_number) from ice_store_sales where ss_item_sk % 1999 = 0;
+---- RESULTS
+3138,534664922
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+update ice_store_sales set ss_ticket_number = ss_ticket_number + 100000 where ss_item_sk % 1999 = 0;
+select count(*), sum(ss_ticket_number) from ice_store_sales where ss_item_sk % 1999 = 0
+---- RESULTS
+3138,848464922
+---- TYPES
+BIGINT,BIGINT
+====

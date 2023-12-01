@@ -111,6 +111,8 @@ struct TIcebergDeleteSink {
   // Partition expressions of this sink. In case of Iceberg DELETEs these are the
   // partition spec id and the serialized partition data.
   1: required list<Exprs.TExpr> partition_key_exprs
+  // True if we are using the buffered delete sink.
+  2: required bool is_buffered = false
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

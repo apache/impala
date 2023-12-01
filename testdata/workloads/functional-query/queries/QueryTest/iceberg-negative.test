@@ -804,16 +804,6 @@ SELECT ICEBERG__DATA__SEQUENCE__NUMBER FROM functional_parquet.alltypes;
 AnalysisException: Could not resolve column/field reference: 'iceberg__data__sequence__number'
 ====
 ---- QUERY
-update functional_parquet.iceberg_partition_evolution set year = 2023 where id = 14393;
----- CATCH
-AnalysisException: Table 'functional_parquet.iceberg_partition_evolution' has multiple partition specs, therefore cannot be used as a target table in an UPDATE statement
-====
----- QUERY
-update functional_parquet.iceberg_int_partitioned set i = j;
----- CATCH
-AnalysisException: Left-hand side in assignment 'i = j' refers to a partitioning column
-====
----- QUERY
 update functional_parquet.iceberg_int_partitioned set k = 1, k = 2;
 ---- CATCH
 AnalysisException: Left-hand side in assignment appears multiple times 'k=2'
@@ -854,17 +844,10 @@ update ice_v2_timestamptz set i = 3;
 AnalysisException: The Iceberg table has a TIMESTAMPTZ column that Impala cannot write.
 ====
 ---- QUERY
-create table sorted_ice (i int) sort by (i)
-stored by iceberg tblproperties ('format-version'='2');
-update sorted_ice set i = 4;
----- CATCH
-AnalysisException: Impala does not support updating sorted tables. Data files in table '$DATABASE.sorted_ice' are sorted by the following column(s): i
-====
----- QUERY
 # Metadata tables should raise proper error message.
-update $DATABASE.sorted_ice.history set parent_id = 0 where snapshot_id = 3;
+update functional_parquet.iceberg_int_partitioned.history set parent_id = 0 where snapshot_id = 3;
 ---- CATCH
-AnalysisException: Cannot resolve path '$DATABASE.sorted_ice.history' for DML statement.
+AnalysisException: Cannot resolve path 'functional_parquet.iceberg_int_partitioned.history' for DML statement.
 ====
 ---- QUERY
 create table update_orc (i int)

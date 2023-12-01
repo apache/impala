@@ -25,6 +25,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.thrift.TSortingOrder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -93,6 +94,11 @@ public class OptimizeStmt extends DmlStatementBase {
 
   @Override
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    throw new NotImplementedException();
+  }
+
+  @Override
+  public TSortingOrder getSortingOrder() {
     throw new NotImplementedException();
   }
 

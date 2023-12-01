@@ -17,8 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import static java.lang.String.format;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,14 +30,13 @@ import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
-import org.apache.impala.planner.IcebergDeleteSink;
+import org.apache.impala.planner.IcebergBufferedDeleteSink;
 import org.apache.impala.planner.MultiDataSink;
 import org.apache.impala.planner.TableSink;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TSortingOrder;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.IcebergUtil;
 
@@ -52,6 +49,10 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
   private List<Expr> insertResultExprs_ = new ArrayList<>();
   private List<Expr> insertPartitionKeyExprs_ = new ArrayList<>();
 
+  private List<Integer> sortColumns_ = new ArrayList<>();
+
+  // The sort order used for tables that have SORT BY columns.
+  private TSortingOrder sortingOrder_ = TSortingOrder.LEXICAL;
   // END: Members that are set in buildAndValidateSelectExprs().
   /////////////////////////////////////////
 
@@ -63,12 +64,6 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
     super.analyze(analyzer);
     deleteTableId_ = analyzer.getDescTbl().addTargetTable(icePosDelTable_);
     IcebergUtil.validateIcebergColumnsForInsert(originalTargetTable_);
-    if (originalTargetTable_.getPartitionSpecs().size() > 1) {
-      throw new AnalysisException(
-          String.format("Table '%s' has multiple partition specs, therefore " +
-              "cannot be used as a target table in an UPDATE statement",
-              originalTargetTable_.getFullName()));
-    }
     String updateMode = originalTargetTable_.getIcebergApiTable().properties().get(
         TableProperties.UPDATE_MODE);
     if (updateMode != null && !updateMode.equals("merge-on-read")) {
@@ -86,13 +81,6 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
     Pair<List<Integer>, TSortingOrder> sortProperties =
         AlterTableSetTblProperties.analyzeSortColumns(originalTargetTable_,
             originalTargetTable_.getMetaStoreTable().getParameters());
-    if (!sortProperties.first.isEmpty()) {
-      throw new AnalysisException(String.format("Impala does not support updating " +
-              "sorted tables. Data files in table '%s' are sorted by the " +
-              "following column(s): %s", originalTargetTable_.getFullName(),
-          originalTargetTable_.getMetaStoreTable().getParameters().get(
-              AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)));
-    }
     if (originalTargetTable_.getIcebergFileFormat() != TIcebergFileFormat.PARQUET) {
       throw new AnalysisException(String.format("Impala can only write Parquet data " +
           "files, while table '%s' expects '%s' data files.",
@@ -119,13 +107,24 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
 
       IcebergColumn c = (IcebergColumn)lhsSlotRef.getResolvedPath().destColumn();
       rhsExpr = checkTypeCompatiblity(analyzer, c, rhsExpr);
-      if (IcebergUtil.isPartitionColumn(
-          c, originalTargetTable_.getDefaultPartitionSpec())) {
+      // In case of a JOIN, and if duplicated rows are shuffled independently, we cannot
+      // do duplicate checking in the SINK. This is the case when the following
+      // conditions are true:
+      // * UPDATE FROM statement with multiple table references
+      // * Updating partition column value with a non-constant expression
+      // Therefore we are throwing an exception here because we cannot guarantee
+      // that the result will be valid.
+      // TODO(IMPALA-12531): Mention the MERGE statement in the error message,
+      // as the MERGE statement should be able to do the duplicate checking.
+      if (IcebergUtil.isPartitionColumn(c,
+          originalTargetTable_.getDefaultPartitionSpec()) &&
+          (modifyStmt_.fromClause_ != null && modifyStmt_.fromClause_.size() > 1) &&
+          !rhsExpr.isConstant()) {
         throw new AnalysisException(
-            String.format("Left-hand side in assignment '%s = %s' refers to a " +
-                "partitioning column", lhsSlotRef.toSql(), rhsExpr.toSql()));
+            String.format("Cannot UPDATE partitioning column '%s' via UPDATE FROM " +
+                "statement with multiple table refs, and when right-hand side '%s' is " +
+                "non-constant. ", lhsSlotRef.toSql(), rhsExpr.toSql()));
       }
-
       checkLhsOnlyAppearsOnce(colToExprs, c, lhsSlotRef, rhsExpr);
       colToExprs.put(c.getPosition(), rhsExpr);
     }
@@ -145,7 +144,18 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
     selectList.addAll(ExprUtil.exprsAsSelectList(deletePartitionKeyExprs_));
     selectList.addAll(ExprUtil.exprsAsSelectList(deleteResultExprs_));
 
-    sortExprs_.addAll(deleteResultExprs_);
+    addSortColumns();
+  }
+
+  private void addSortColumns() throws AnalysisException {
+    Pair<List<Integer>, TSortingOrder> sortProperties =
+        AlterTableSetTblProperties.analyzeSortColumns(originalTargetTable_,
+            originalTargetTable_.getMetaStoreTable().getParameters());
+    sortColumns_ = sortProperties.first;
+    sortingOrder_ = sortProperties.second;
+
+    // Assign sortExprs_ based on sortColumns_.
+    for (Integer colIdx: sortColumns_) sortExprs_.add(insertResultExprs_.get(colIdx));
   }
 
   @Override
@@ -166,8 +176,11 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
 
   @Override
   public List<Expr> getPartitionKeyExprs() {
-    return deletePartitionKeyExprs_;
+    return insertPartitionKeyExprs_;
   }
+
+  @Override
+  public TSortingOrder getSortingOrder() { return sortingOrder_; }
 
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
     super.substituteResultExprs(smap, analyzer);
@@ -183,9 +196,9 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
 
     TableSink insertSink = TableSink.create(modifyStmt_.table_, TableSink.Op.INSERT,
         insertPartitionKeyExprs_, insertResultExprs_, Collections.emptyList(), false,
-        false, new Pair<>(ImmutableList.<Integer>of(), TSortingOrder.LEXICAL), -1, null,
+        false, new Pair<>(sortColumns_, sortingOrder_), -1, null,
         modifyStmt_.maxTableSinks_);
-    TableSink deleteSink = new IcebergDeleteSink(
+    TableSink deleteSink = new IcebergBufferedDeleteSink(
         icePosDelTable_, deletePartitionKeyExprs_, deleteResultExprs_, deleteTableId_);
 
     MultiDataSink ret = new MultiDataSink();

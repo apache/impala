@@ -138,7 +138,7 @@ class HdfsTableSink : public TableSinkBase {
   /// Staying with the above example this would hold ["a=12/31/11", "b=10"].
   Status ConstructPartitionInfo(
       const TupleRow* row,
-      OutputPartition* output_partition) override;
+      OutputPartition* output_partition);
 
   /// Returns partition descriptor object for the given key.
   const HdfsPartitionDescriptor* GetPartitionDescriptor(const std::string& key);

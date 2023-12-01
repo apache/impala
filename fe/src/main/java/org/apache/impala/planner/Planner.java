@@ -923,14 +923,19 @@ public class Planner {
       Analyzer analyzer) throws ImpalaException {
     List<Expr> orderingExprs = new ArrayList<>();
 
-    orderingExprs.addAll(dmlStmt.getPartitionKeyExprs());
+    List<Expr> partitionKeyExprs = dmlStmt.getPartitionKeyExprs();
+    orderingExprs.addAll(partitionKeyExprs);
     orderingExprs.addAll(dmlStmt.getSortExprs());
+
+    if (orderingExprs.isEmpty()) return;
 
     // Build sortinfo to sort by the ordering exprs.
     List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), true);
     List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
     SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams,
-        TSortingOrder.LEXICAL);
+        dmlStmt.getSortingOrder());
+    int numPartitionKeys = partitionKeyExprs.size();
+    sortInfo.setNumLexicalKeysInZOrder(numPartitionKeys);
     sortInfo.createSortTupleInfo(dmlStmt.getResultExprs(), analyzer);
     sortInfo.getSortTupleDescriptor().materializeSlots();
     dmlStmt.substituteResultExprs(sortInfo.getOutputSmap(), analyzer);

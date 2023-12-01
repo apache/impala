@@ -17,8 +17,6 @@
 
 package org.apache.impala.planner;
 
-import java.util.List;
-
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -31,26 +29,23 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
 
-/**
- * Sink for deleting data from Iceberg tables. Impala deletes data via 'merge-on-read'
- * strategy, which means it writes Iceberg position delete files. These files contain
- * information (file_path, position) about the deleted rows. Query engines reading from
- * an Iceberg table need to exclude the deleted rows from the result of the table scan.
- * Impala does this by doing an ANTI JOIN between data files and delete files.
- */
-public class IcebergDeleteSink extends TableSink {
+import java.util.List;
+
+public class IcebergBufferedDeleteSink extends TableSink {
+
   final private int deleteTableId_;
 
   // Exprs for computing the output partition(s).
   protected final List<Expr> partitionKeyExprs_;
 
-  public IcebergDeleteSink(FeIcebergTable targetTable, List<Expr> partitionKeyExprs,
-      List<Expr> outputExprs) {
+  public IcebergBufferedDeleteSink(FeIcebergTable targetTable,
+      List<Expr> partitionKeyExprs, List<Expr> outputExprs) {
     this(targetTable, partitionKeyExprs, outputExprs, 0);
   }
 
-  public IcebergDeleteSink(FeIcebergTable targetTable, List<Expr> partitionKeyExprs,
-      List<Expr> outputExprs, int deleteTableId) {
+  public IcebergBufferedDeleteSink(FeIcebergTable targetTable,
+      List<Expr> partitionKeyExprs, List<Expr> outputExprs,
+      int deleteTableId) {
     super(targetTable, Op.DELETE, outputExprs);
     partitionKeyExprs_ = partitionKeyExprs;
     deleteTableId_ = deleteTableId;
@@ -66,30 +61,30 @@ public class IcebergDeleteSink extends TableSink {
   public void computeResourceProfile(TQueryOptions queryOptions) {
     PlanNode inputNode = fragment_.getPlanRoot();
     final int numInstances = fragment_.getNumInstances();
-    // Input is clustered, so it produces a single partition at a time.
-    final long numBufferedPartitionsPerInstance = 1;
     // For regular Parquet files we estimate 1GB memory consumption which is already
     // a conservative, i.e. probably too high memory estimate.
     // Writing out position delete files means we are writing filenames and positions
     // per partition. So assuming 0.5 GB per position delete file writer can be still
     // considered a very conservative estimate.
     final long perPartitionMemReq = 512L * ByteUnits.MEGABYTE;
+    // The writer also buffers the file paths and positions before it can start writing
+    // out files. Let's assume it needs to buffer 20K file paths and 1M positions
+    // per sink, that is around 20K * 200 byte + 1M * 8 bytes = 12 megabytes. Let's
+    // make it 16 MBs.
+    final long bufferedData = 16 * ByteUnits.MEGABYTE;
 
     long perInstanceMemEstimate;
     // The estimate is based purely on the per-partition mem req if the input cardinality_
     // or the avg row size is unknown.
     if (inputNode.getCardinality() == -1 || inputNode.getAvgRowSize() == -1) {
-      perInstanceMemEstimate = numBufferedPartitionsPerInstance * perPartitionMemReq;
+      perInstanceMemEstimate = perPartitionMemReq + bufferedData;
     } else {
       // The per-partition estimate may be higher than the memory required to buffer
       // the entire input data.
       long perInstanceInputCardinality =
           Math.max(1L, inputNode.getCardinality() / numInstances);
-      long perInstanceInputBytes =
+      perInstanceMemEstimate =
           (long) Math.ceil(perInstanceInputCardinality * inputNode.getAvgRowSize());
-      long perInstanceMemReq =
-          PlanNode.checkedMultiply(numBufferedPartitionsPerInstance, perPartitionMemReq);
-      perInstanceMemEstimate = Math.min(perInstanceInputBytes, perInstanceMemReq);
     }
     resourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
   }
@@ -97,29 +92,30 @@ public class IcebergDeleteSink extends TableSink {
   @Override
   public void appendSinkExplainString(String prefix, String detailPrefix,
       TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
-    output.append(String.format("%sDELETE FROM ICEBERG [%s]\n", prefix,
+    output.append(String.format("%sBUFFERED DELETE FROM ICEBERG [%s]\n", prefix,
         targetTable_.getFullName()));
     if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(detailPrefix + "output exprs: ")
-            .append(Expr.getExplainString(outputExprs_, explainLevel) + "\n");
+          .append(Expr.getExplainString(outputExprs_, explainLevel) + "\n");
       if (!partitionKeyExprs_.isEmpty()) {
         output.append(detailPrefix + "partition keys: ")
-              .append(Expr.getExplainString(partitionKeyExprs_, explainLevel) + "\n");
+            .append(Expr.getExplainString(partitionKeyExprs_, explainLevel) + "\n");
       }
     }
   }
 
   @Override
   protected String getLabel() {
-    return "ICEBERG DELETER";
+    return "ICEBERG BUFFERED DELETER";
   }
 
   @Override
   protected void toThriftImpl(TDataSink tsink) {
     TIcebergDeleteSink icebergDeleteSink = new TIcebergDeleteSink();
     icebergDeleteSink.setPartition_key_exprs(Expr.treesToThrift(partitionKeyExprs_));
+    icebergDeleteSink.setIs_buffered(true);
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
-            TTableSinkType.HDFS, sinkOp_.toThrift());
+        TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.iceberg_delete_sink = icebergDeleteSink;
     tTableSink.setTarget_table_id(deleteTableId_);
     tsink.table_sink = tTableSink;

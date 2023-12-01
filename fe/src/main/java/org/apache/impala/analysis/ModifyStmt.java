@@ -33,6 +33,7 @@ import org.apache.impala.rewrite.ExprRewriter;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import org.apache.impala.thrift.TSortingOrder;
 
 /**
  * Abstract super class for statements that modify existing data like
@@ -194,6 +195,9 @@ public abstract class ModifyStmt extends DmlStatementBase {
   public Expr getWherePredicate() { return wherePredicate_; }
 
   public List<Pair<SlotRef, Expr>> getAssignments() { return assignments_; }
+
+  @Override
+  public TSortingOrder getSortingOrder() { return modifyImpl_.getSortingOrder(); }
 
   @Override
   public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {

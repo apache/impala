@@ -39,7 +39,6 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.iceberg_test_suite import IcebergTestSuite
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfDockerizedCluster
 from tests.common.test_dimensions import add_exec_option_dimension
-from tests.common.test_vector import ImpalaTestDimension
 from tests.common.file_utils import (
   create_iceberg_table_from_directory,
   create_table_from_parquet)
@@ -1415,6 +1414,82 @@ class TestIcebergV2Table(IcebergTestSuite):
         "3,2023-11-14 19:07:05.0,green,1700\n" \
         "4,2023-11-13 18:07:23.0,gray,2500\n" \
         "8,2023-11-01 00:11:11.0,black,722\n"
+
+  def test_update_partitions(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-update-partitions', vector,
+        unique_database)
+    if IS_HDFS and self.should_run_for_hive(vector):
+      self._update_partitions_hive_tests(unique_database)
+
+  def _update_partitions_hive_tests(self, db):
+    def get_hive_results(tbl, order_by_col):
+      stmt = "SELECT * FROM {}.{} ORDER BY {}".format(db, tbl, order_by_col)
+      return self.run_stmt_in_hive(stmt).split("\n", 1)[1]
+
+    hive_results = get_hive_results("id_part", "i, s")
+    assert hive_results == \
+        "2,FIVE\n" \
+        "2,FOUR\n" \
+        "3,SIX\n" \
+        "5,ONE\n" \
+        "10,TWO\n" \
+        "15,THREE\n"
+
+    hive_results = get_hive_results("trunc_part", "i")
+    assert hive_results == \
+        "1,one\n" \
+        "5,five\n" \
+        "103,three\n" \
+        "1004,FOURfour\n" \
+        "1006,SIXsix\n" \
+        "1102,TWOtwo\n"
+
+    hive_results = get_hive_results("multi_part", "i")
+    assert hive_results == \
+        "0,void,3.14\n" \
+        "0,void,3.14\n" \
+        "0,void,3.14\n" \
+        "1,one,1.1\n" \
+        "3,three,3.33\n" \
+        "5,five,5.5\n" \
+        "111,fox,1.1\n"
+
+    hive_results = get_hive_results("evolve_part", "i")
+    assert hive_results == \
+        "1,one,1.1\n" \
+        "30,thirty,30.3\n" \
+        "40,forty,40.4\n" \
+        "50,fifty,50.5\n" \
+        "1003,three,3.33\n" \
+        "1010,ten,10.1\n" \
+        "1020,twenty,20.2\n" \
+        "1222,two,2.2\n"
+
+    hive_results = get_hive_results("date_day_part", "i")
+    assert hive_results == \
+        "11,1978-01-01\n" \
+        "12,1979-12-31\n" \
+        "13,1980-01-01\n" \
+        "14,2033-11-15\n"
+
+    hive_results = get_hive_results("ts_hour_part", "i")
+    assert hive_results == \
+        "101,1958-01-01 01:02:03.0\n" \
+        "102,1959-12-31 23:59:00.0\n" \
+        "103,1960-01-01 00:00:00.0\n" \
+        "104,2013-11-15 15:31:00.0\n"
+
+    hive_results = get_hive_results("ts_evolve_part", "i")
+    assert hive_results == \
+        "1001,1988-02-02 01:02:03.0\n" \
+        "1002,1990-02-01 23:59:00.0\n" \
+        "1003,1990-02-02 00:00:00.0\n" \
+        "1004,2043-12-16 15:31:00.0\n" \
+        "1111,NULL\n"
+
+    hive_results = get_hive_results("numeric_truncate", "id")
+    assert hive_results == \
+        "11,21,2111,531,75.20\n"
 
   def test_optimize(self, vector, unique_database):
     tbl_name = unique_database + ".optimize_iceberg"

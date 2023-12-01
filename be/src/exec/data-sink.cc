@@ -27,7 +27,7 @@
 #include "exec/hbase/hbase-table-sink.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/iceberg-delete-builder.h"
-#include "exec/iceberg-delete-sink.h"
+#include "exec/iceberg-delete-sink-config.h"
 #include "exec/multi-table-sink.h"
 #include "exec/kudu/kudu-table-sink.h"
 #include "exec/kudu/kudu-util.h"

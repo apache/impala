@@ -22,6 +22,7 @@ import org.apache.impala.catalog.FeTable;
 
 import com.google.common.base.Preconditions;
 import org.apache.impala.planner.DataSink;
+import org.apache.impala.thrift.TSortingOrder;
 
 import java.util.List;
 
@@ -67,6 +68,7 @@ public abstract class DmlStatementBase extends StatementBase {
   abstract public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer);
   abstract public List<Expr> getPartitionKeyExprs();
   abstract public List<Expr> getSortExprs();
+  abstract public TSortingOrder getSortingOrder();
 
   /**
    * Return bytes of Kudu transaction token.

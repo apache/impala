@@ -66,6 +66,11 @@ class DmlExecState {
   void AddPartition(const std::string& name, int64_t id, const std::string* base_dir,
       const std::string* staging_dir_to_clean_up);
 
+  /// Returns true if partition with 'name' already exists.
+  bool PartitionExists(const std::string& name) {
+    return per_partition_status_.find(name) != per_partition_status_.end();
+  }
+
   /// Merge given values into stats for partition with name 'partition_name'.
   /// Ignores 'insert_stats' if nullptr.
   /// Requires that the partition already exist.

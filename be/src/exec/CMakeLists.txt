@@ -78,9 +78,12 @@ add_library(Exec
   hdfs-table-sink.cc
   hdfs-table-writer.cc
   hdfs-text-table-writer.cc
+  iceberg-buffered-delete-sink.cc
   iceberg-delete-builder.cc
   iceberg-delete-node.cc
   iceberg-delete-sink.cc
+  iceberg-delete-sink-base.cc
+  iceberg-delete-sink-config.cc
   incr-stats-util.cc
   join-builder.cc
   multi-table-sink.cc

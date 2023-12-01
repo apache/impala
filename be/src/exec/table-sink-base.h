@@ -86,15 +86,14 @@ protected:
 
   virtual bool IsHiveAcid() const { return false; }
 
-  virtual Status ConstructPartitionInfo(
-      const TupleRow* row,
-      OutputPartition* output_partition) = 0;
-
   /// Initialises the filenames of a given output partition, and opens the temporary file.
-  /// The partition key is derived from 'row'. If the partition will not have any rows
-  /// added to it, empty_partition must be true.
+  /// The caller of this function must already have filled partition-related information
+  /// in 'output_partition', such as 'iceberg_spec_id', 'partition_name',
+  /// 'raw_partition_names', 'external_partition_name' for table types where these fields
+  /// are applicable.
+  /// If the partition will not have any rows added to it, empty_partition must be true.
   Status InitOutputPartition(RuntimeState* state,
-      const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
+      const HdfsPartitionDescriptor& partition_descriptor,
       OutputPartition* output_partition, bool empty_partition) WARN_UNUSED_RESULT;
 
   /// Sets hdfs_file_name and tmp_hdfs_file_name of given output partition.
@@ -130,10 +129,11 @@ protected:
   Status FinalizePartitionFile(RuntimeState* state, OutputPartition* partition,
       bool is_delete = false, DmlExecState* dml_exec_state = nullptr) WARN_UNUSED_RESULT;
 
-  /// Writes all rows referenced by the row index vector in 'partition_pair' to the
-  /// partition's writer and clears the row index vector afterwards.
+  /// Writes all rows in 'batch' referenced by the row index vector in 'indices' to the
+  /// partition's writer. If 'indices' is empty, then it writes all rows in 'batch'.
   Status WriteRowsToPartition(
-      RuntimeState* state, RowBatch* batch, PartitionPair* partition_pair)
+      RuntimeState* state, RowBatch* batch, OutputPartition* partition,
+      const std::vector<int32_t>& indices = {})
       WARN_UNUSED_RESULT;
 
   /// Closes the hdfs file for this partition as well as the writer.

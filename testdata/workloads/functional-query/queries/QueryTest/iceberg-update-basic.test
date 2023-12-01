@@ -249,7 +249,7 @@ STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Negative test for UPDATE part 3:
-# updating partition column AND right side is non-constant value AND we have a FROM clause
+# updating partition column AND right side is non-constant value AND we have a FROM clause with multiple table refs.
 # For such operations, if there are multiple matches in the JOIN, the duplicated records can
 # get shuffled independently to different sink operators, therefore they cannot check the
 # presence of duplicates. For statements like this we need to raise an error during analysis.
@@ -257,7 +257,7 @@ UPDATE ice_id_partitioned set p = cast(ref_table.bi as int)
 FROM ice_id_partitioned, ref_table
 WHERE ice_id_partitioned.i = ref_table.i;
 ---- CATCH
-AnalysisException: Left-hand side in assignment 'p = CAST(ref_table.bi AS INT)' refers to a partitioning column
+AnalysisException: Cannot UPDATE partitioning column 'p' via UPDATE FROM statement with multiple table refs, and when right-hand side 'CAST(ref_table.bi AS INT)' is non-constant.
 ====
 ---- QUERY
 create table ice_bucket_transform(i int, str string, bi bigint, ts timestamp)
