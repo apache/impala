@@ -105,6 +105,10 @@ parser.add_option("--max_log_files", default=DEFAULT_IMPALA_MAX_LOG_FILES,
                   help="Max number of log files before rotation occurs.")
 parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
+parser.add_option("--ignore_pid_on_log_rotation", dest="ignore_pid_on_log_rotation",
+                  action='store_true', default=False,
+                  help=("Determine if log rotation should ignore or match PID in "
+                        "log file name."))
 parser.add_option("--jvm_args", dest="jvm_args", default="",
                   help="Additional arguments to pass to the JVM(s) during startup.")
 parser.add_option("--env_vars", dest="env_vars", default="",
@@ -282,6 +286,11 @@ def build_logging_args(service_name):
   logging"""
   result = ["-logbufsecs=5", "-v={0}".format(options.log_level),
       "-max_log_files={0}".format(options.max_log_files)]
+  if not options.ignore_pid_on_log_rotation:
+    # IMPALA-12595: ignore_pid_on_log_rotation default to False in this script.
+    # This is because multiple impalads still logs to the same log_dir in minicluster
+    # and we want to keep all logs for debugging purpose.
+    result += ["-log_rotation_match_pid=true"]
   if options.docker_network is None:
     # Impala inside a docker container should always log to the same location.
     result += ["-log_filename={0}".format(service_name),

@@ -44,6 +44,7 @@ DECLARE_string(redaction_rules_file);
 DECLARE_string(log_filename);
 DECLARE_bool(redirect_stdout_stderr);
 DECLARE_int32(max_log_size);
+DECLARE_bool(log_rotation_match_pid);
 
 using boost::uuids::random_generator;
 using impala::TUniqueId;
@@ -98,10 +99,17 @@ impala::Status ResolveLogSymlink(const string& symlink_path, string& canonical_p
 // We specifically target the base file name created by glog.
 // Glog's default base file name follow this pattern:
 // "<program name>.<hostname>.<user name>.log.<severity level>.<date>-<time>.<pid>"
+// IMPALA-12595: FLAGS_log_rotation_match_pid is added to control whether to match against
+// PID or not.
 inline string GlobPatternForLog(google::LogSeverity severity) {
-  return strings::Substitute("$0/$1*.log.$2.*.$3", FLAGS_log_dir,
-      google::ProgramInvocationShortName(), google::GetLogSeverityName(severity),
-      getpid());
+  if (FLAGS_log_rotation_match_pid) {
+    return strings::Substitute("$0/$1*.log.$2.*.$3", FLAGS_log_dir,
+        google::ProgramInvocationShortName(), google::GetLogSeverityName(severity),
+        getpid());
+  } else {
+    return strings::Substitute("$0/$1*.log.$2.*", FLAGS_log_dir,
+        google::ProgramInvocationShortName(), google::GetLogSeverityName(severity));
+  }
 }
 
 impala::Status GetLatestCanonicalLogPath(

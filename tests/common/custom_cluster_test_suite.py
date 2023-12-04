@@ -292,7 +292,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             expected_subscribers=0,
                             default_query_options=None,
                             statestored_timeout_s=60,
-                            impalad_timeout_s=60):
+                            impalad_timeout_s=60,
+                            ignore_pid_on_log_rotation=False):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -303,6 +304,11 @@ class CustomClusterTestSuite(ImpalaTestSuite):
            '--num_coordinators=%d' % num_coordinators,
            '--log_dir=%s' % impala_log_dir,
            '--log_level=%s' % log_level]
+
+    if ignore_pid_on_log_rotation:
+      # IMPALA-12595: Ignore PID on log rotation for all custom cluster tests.
+      # Most of test in custom_cluster need to match PID, except some test for logging.
+      cmd.append('--ignore_pid_on_log_rotation')
 
     if use_exclusive_coordinators:
       cmd.append("--use_exclusive_coordinators")

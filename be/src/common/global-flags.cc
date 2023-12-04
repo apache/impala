@@ -232,6 +232,12 @@ DEFINE_bool(redirect_stdout_stderr, true,
 DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per severity "
     "level. The most recent log files are retained. If set to 0, all log files are "
     "retained.");
+DEFINE_bool(log_rotation_match_pid, false,
+    "If set to True, Impala log rotation will only consider log files that match with "
+    "PID of currently running service. Otherwise, log rotation will ignore the PID in "
+    "log file names and may remove older log files from previous PID run. "
+    "Set to True if log files from prior run must be retained or when running multiple "
+    "instances of same service with common log directory. Default to False.");
 
 static const string re2_mem_limit_help_msg =
     "Maximum bytes of memory to be used by re2's regex engine "
