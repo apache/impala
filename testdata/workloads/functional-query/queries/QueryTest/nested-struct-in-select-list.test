@@ -452,8 +452,7 @@ from complextypes_nested_structs;
 INT,STRING
 ====
 ---- QUERY
-# Subquery that returns a complex type is not supported.
-# IMPALA-9500
+# Complex types in IN predicates are not supported.
 select outer_struct
 from complextypes_nested_structs
 where outer_struct in
@@ -461,4 +460,14 @@ where outer_struct in
 ---- CATCH
 AnalysisException: A subquery can't return complex types. (SELECT outer_struct FROM functional_parquet.complex
 types_nested_structs)
+====
+---- QUERY
+select distinct outer_struct from complextypes_nested_structs
+---- CATCH
+AnalysisException: Complex types are not supported in SELECT DISTINCT clauses.
+====
+---- QUERY
+select count(distinct outer_struct) from complextypes_nested_structs;
+---- CATCH
+AnalysisException: Complex types are not supported as DISTINCT parameters of aggregate functions.
 ====

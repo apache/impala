@@ -249,6 +249,10 @@ public class MultiAggregateInfo {
         groupingBuiltinExprs.add(aggExpr);
       } else if (aggExpr.isDistinct()) {
         List<Expr> children = AggregateFunction.getCanonicalDistinctAggChildren(aggExpr);
+
+        // Complex types are not supported as DISTINCT parameters of aggregate functions.
+        checkComplexDistinctParams(aggExpr, children);
+
         int groupIdx = distinctExprs.indexOf(children);
         List<FunctionCallExpr> groupAggFns;
         if (groupIdx == -1) {
@@ -338,6 +342,18 @@ public class MultiAggregateInfo {
         outputSmap_.put(
             aggSmap.getLhs().get(i).clone(), new SlotRef(outputSlots.get(outputSlotIdx)));
         ++outputSlotIdx;
+      }
+    }
+  }
+
+  private static void checkComplexDistinctParams(FunctionCallExpr aggExpr,
+      List<Expr> params) throws AnalysisException {
+    for (Expr child : params) {
+      if (child.getType().isComplexType()) {
+        throw new AnalysisException("Complex types are not supported " +
+            "as DISTINCT parameters of aggregate functions. Distinct parameter: '" +
+            child.toSql() + "', type: '" + child.getType().toSql() +
+            "' in aggregate function '" + aggExpr.toSql() + "'.");
       }
     }
   }

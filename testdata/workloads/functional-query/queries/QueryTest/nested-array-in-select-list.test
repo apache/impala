@@ -425,4 +425,14 @@ on a.id = b.id where a.id < 3;
 0,'NULL','NULL'
 ---- TYPES
 INT,STRING,STRING
-=====
+====
+---- QUERY
+select distinct arr1 from complextypes_arrays
+---- CATCH
+AnalysisException: Complex types are not supported in SELECT DISTINCT clauses.
+====
+---- QUERY
+select count(distinct arr1) from complextypes_arrays
+---- CATCH
+AnalysisException: Complex types are not supported as DISTINCT parameters of aggregate functions.
+====

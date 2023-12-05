@@ -392,7 +392,7 @@ select id, map_1d, map_2d, map_3d, arr_int_3d, map_map_array from collection_tbl
 3,'{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:"ten",20:"twentieth even-toed ungulate"},2:{30:"thirty even-toed ungulates",40:"forty"}}','{1:{10:{100:"hundred",200:"two hundred even-toed ungulates"},20:{300:"three hundred even-toed ungulates",400:"four hundred"}},2:{30:{500:"five hundred even-toed ungulates",600:"six hundred"},40:{700:"seven hundred even-toed ungulates",800:"eight hundred"}}}','[[[1,null,2,null],[null,15]],[[null,4]]]','{1:{10:[100,200],20:[300,400]},2:{30:[500,600],40:[700,800]}}'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING,STRING
-=====
+====
 ---- QUERY
 select id, map_1d, map_2d, mma.value mma_value, ma.value ma_value
 from collection_tbl c, c.map_map_array mma, mma.value ma;
@@ -411,7 +411,7 @@ from collection_tbl c, c.map_map_array mma, mma.value ma;
 3,'{645:"fourth even-toed ungulate",5:"fifth"}','{1:{10:"ten",20:"twentieth even-toed ungulate"},2:{30:"thirty even-toed ungulates",40:"forty"}}','{30:[500,600],40:[700,800]}','[700,800]'
 ---- TYPES
 INT,STRING,STRING,STRING,STRING
-=====
+====
 ---- QUERY
 -- Test that map keys are printed correctly.
 set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
@@ -435,7 +435,7 @@ from collection_tbl;
 '{true:"true even-toed ungulate",false:"false"}','{-1:"a nice even-toed ungulate",0:"best even-toed ungulate",1:"c"}','{-1:"a nice even-toed ungulate",0:"best even-toed ungulate",1:"c"}','{-1:"a nice even-toed ungulate",0:"best even-toed ungulate",1:"c"}','{-1.5:"a nice even-toed ungulate",0.25:"best even-toed ungulate",1.75:"c"}','{-1.5:"a nice even-toed ungulate",0.25:"best even-toed ungulate",1.75:"c"}','{-1.8:"a nice even-toed ungulate",0.2:"best even-toed ungulate",1.2:"c"}','{"one":1,"two":2,"three distinct even-toed ungulates":3}','{"Mon":1,"Tue":2,"Wed":3,"Thu":4,"Fri":5,"Sat":6,"Sun":7}','{"a":"A","ab":"AB","abc":"ABC"}','{"2022-12-10 08:15:12":"Saturday morning","2022-12-09 18:15:12":"Friday evening"}','{"2022-12-10":"Saturday 24 even-toed ungulates","2022-12-09":"Friday"}'
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
-=====
+====
 ---- QUERY
 -- Test that map keys are printed correctly with STRINGIFY_MAP_KEYS=true.
 set CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS=1;
@@ -460,4 +460,14 @@ from collection_tbl;
 '{"true":"true even-toed ungulate","false":"false"}','{"-1":"a nice even-toed ungulate","0":"best even-toed ungulate","1":"c"}','{"-1":"a nice even-toed ungulate","0":"best even-toed ungulate","1":"c"}','{"-1":"a nice even-toed ungulate","0":"best even-toed ungulate","1":"c"}','{"-1.5":"a nice even-toed ungulate","0.25":"best even-toed ungulate","1.75":"c"}','{"-1.5":"a nice even-toed ungulate","0.25":"best even-toed ungulate","1.75":"c"}','{"-1.8":"a nice even-toed ungulate","0.2":"best even-toed ungulate","1.2":"c"}','{"one":1,"two":2,"three distinct even-toed ungulates":3}','{"Mon":1,"Tue":2,"Wed":3,"Thu":4,"Fri":5,"Sat":6,"Sun":7}','{"a":"A","ab":"AB","abc":"ABC"}','{"2022-12-10 08:15:12":"Saturday morning","2022-12-09 18:15:12":"Friday evening"}','{"2022-12-10":"Saturday 24 even-toed ungulates","2022-12-09":"Friday"}'
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
-=====
+====
+---- QUERY
+select distinct int_map from complextypestbl
+---- CATCH
+AnalysisException: Complex types are not supported in SELECT DISTINCT clauses.
+====
+---- QUERY
+select count(distinct int_map) from complextypestbl;
+---- CATCH
+AnalysisException: Complex types are not supported as DISTINCT parameters of aggregate functions.
+====

@@ -562,6 +562,12 @@ public class SelectStmt extends QueryStmt {
       }
 
       for (Expr expr: resultExprs_) {
+        if (selectList_.isDistinct() && expr.getType().isComplexType()) {
+          throw new AnalysisException("Complex types are not supported " +
+              "in SELECT DISTINCT clauses. Expr: '" + expr.toSql() + "', type: '"
+              + expr.getType().toSql() + "'.");
+        }
+
         if (expr.getType().isArrayType()) {
           ArrayType arrayType = (ArrayType) expr.getType();
           if (!arrayType.getItemType().isSupported()) {
