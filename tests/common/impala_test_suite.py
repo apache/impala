@@ -77,7 +77,8 @@ from tests.util.filesystem_utils import (
     S3GUARD_ENABLED,
     ADLS_STORE_NAME,
     FILESYSTEM_PREFIX,
-    FILESYSTEM_NAME)
+    FILESYSTEM_NAME,
+    FILESYSTEM_URI_SCHEME)
 
 from tests.util.hdfs_util import (
   HdfsConfig,
@@ -495,6 +496,7 @@ class ImpalaTestSuite(BaseTestSuite):
     repl = dict(('$' + k, globs[k]) for k in [
         "FILESYSTEM_PREFIX",
         "FILESYSTEM_NAME",
+        "FILESYSTEM_URI_SCHEME",
         "GROUP_NAME",
         "NAMENODE",
         "IMPALA_HOME",

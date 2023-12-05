@@ -17,11 +17,13 @@
 
 package org.apache.impala.extdatasource.jdbc.conf;
 
-
 import java.util.Map;
 import java.util.Map.Entry;
 
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.alias.CredentialProviderFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,8 +32,8 @@ import org.slf4j.LoggerFactory;
  */
 public class JdbcStorageConfigManager {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(JdbcStorageConfigManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(
+      JdbcStorageConfigManager.class);
 
   public static Configuration convertMapToConfiguration(Map<String, String> props) {
     checkRequiredPropertiesAreDefined(props);
@@ -42,6 +44,55 @@ public class JdbcStorageConfigManager {
     }
 
     return conf;
+  }
+
+  public static String getPasswordFromProperties(Configuration conf) {
+    String username = conf.get(JdbcStorageConfig.DBCP_USERNAME.getPropertyName());
+    String passwd = conf.get(JdbcStorageConfig.DBCP_PASSWORD.getPropertyName());
+    String keystore = conf.get(JdbcStorageConfig.DBCP_PASSWORD_KEYSTORE.
+        getPropertyName());
+    if (countNonNull(passwd, keystore) > 1) {
+      LOGGER.warn("Only one of " + passwd + ", " + keystore + " can be set");
+    }
+    if (passwd == null && keystore != null) {
+      String key = conf.get(JdbcStorageConfig.DBCP_PASSWORD_KEY.getPropertyName());
+      if (key == null) {
+        key = username;
+      }
+      LOGGER.info("hadoop keystore: " + keystore + " hadoop key: " + key);
+      try {
+        passwd = getPasswdFromKeystore(keystore, key);
+      } catch (IOException e) {
+        LOGGER.error("Failed to get password from keystore " + key + ", error: " + e);
+      }
+    }
+    return passwd;
+  }
+
+  private static int countNonNull(String ... values) {
+    int count = 0;
+    for (String str : values) {
+      if (str != null) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  public static String getPasswdFromKeystore(String keystore, String key)
+      throws IOException {
+    String passwd = null;
+    if (keystore != null && key != null) {
+      Configuration conf = new Configuration();
+      conf.set(CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH, keystore);
+      char[] pwdCharArray = conf.getPassword(key);
+      if (pwdCharArray != null) {
+        passwd = new String(pwdCharArray);
+      } else {
+        LOGGER.error("empty or null password for " + key);
+      }
+    }
+    return passwd;
   }
 
   private static void checkRequiredPropertiesAreDefined(Map<String, String> props) {

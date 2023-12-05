@@ -85,6 +85,17 @@ def get_secondary_fs_path(path):
   return prepend_with_fs(SECONDARY_FILESYSTEM, path)
 
 
+def get_fs_uri_scheme():
+  # Set default URI scheme as "hdfs".
+  uri_scheme = "hdfs"
+  # Extract URI scheme from DEFAULT_FS environment variable.
+  default_fs = os.getenv("DEFAULT_FS")
+  if default_fs and default_fs.find(':') != -1:
+    uri_scheme = default_fs.split(':')[0]
+  return uri_scheme
+
+
 WAREHOUSE = get_fs_path('/test-warehouse')
 FILESYSTEM_NAME = get_fs_name(FILESYSTEM)
 WAREHOUSE_PREFIX = os.getenv("WAREHOUSE_LOCATION_PREFIX")
+FILESYSTEM_URI_SCHEME = get_fs_uri_scheme()

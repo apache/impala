@@ -80,3 +80,8 @@ class TestExtDataSources(ImpalaTestSuite):
 
   def test_jdbc_data_source(self, vector, unique_database):
     self.run_test_case('QueryTest/jdbc-data-source', vector, use_db=unique_database)
+
+  def test_jdbc_data_source_with_keystore(self, vector, unique_database):
+    # Impala query tests for external data sources with keystore.
+    self.run_test_case('QueryTest/jdbc-data-source-with-keystore', vector,
+        use_db=unique_database)
