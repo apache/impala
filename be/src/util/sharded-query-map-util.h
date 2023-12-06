@@ -55,6 +55,16 @@ class GenericShardedQueryMap {
     }
   }
 
+  // Return number of elements in the sharded query map.
+  size_t Count() {
+    size_t count = 0;
+    for (int i = 0; i < NUM_QUERY_BUCKETS; ++i) {
+      std::lock_guard<SpinLock> l(shards_[i].map_lock_);
+      count += shards_[i].map_.size();
+    }
+    return count;
+  }
+
   // Adds ('key', 'value') to the map, returning an error if 'key' already exists.
   Status Add(const K& key, const V& value);
 

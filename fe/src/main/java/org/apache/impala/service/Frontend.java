@@ -127,6 +127,7 @@ import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
@@ -1596,6 +1597,8 @@ public class Frontend {
       }
     } else if (table instanceof MaterializedViewHdfsTable) {
       return ((MaterializedViewHdfsTable) table).getTableStats();
+    } else if (table instanceof SystemTable) {
+      return ((SystemTable) table).getTableStats();
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());
     }
@@ -1878,6 +1881,10 @@ public class Frontend {
           && !queryCtx.tables_missing_stats.isEmpty()
           && !planner.getAnalysisResult().getAnalyzer().hasPlanHints();
     queryCtx.setDisable_spilling(disableSpilling);
+
+    if (planner.getAnalysisResult().getAnalyzer().includeAllCoordinatorsInScheduling()) {
+      result.setInclude_all_coordinators(true);
+    }
 
     // assign fragment idx
     int idx = 0;

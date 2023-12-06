@@ -62,6 +62,8 @@ enum TTableType {
   // so that a materialized view will not be classified as a table. Refer to
   // IncompleteTable#toThrift() for further details.
   MATERIALIZED_VIEW = 7
+  // Represents a system table reflecting backend internal state.
+  SYSTEM_TABLE = 8
 }
 
 // TODO: Separate the storage engines (e.g. Kudu) from the file formats.
@@ -667,6 +669,17 @@ struct TIcebergTable {
   10: optional map<string, TIcebergPartitionStats> partition_stats;
 }
 
+// Describes the purpose of a particular system table.
+// Table names can be found in SystemTable.java
+enum TSystemTableName {
+  QUERY_LIVE = 0
+}
+
+// Represents a System Table
+struct TSystemTable {
+  1: required TSystemTableName table_name
+}
+
 // Represents a table or view.
 struct TTable {
   // Name of the parent database. Case insensitive, expected to be stored as lowercase.
@@ -725,6 +738,9 @@ struct TTable {
   // Comment of the table/view. Set only for FeIncompleteTable where msTable doesn't
   // exists.
   18: optional string tbl_comment
+
+  // Set if this is a system table
+  19: optional TSystemTable system_table
 }
 
 // Represents a database.

@@ -85,6 +85,10 @@ class ClusterMembershipMgr {
   struct Snapshot {
     Snapshot() = default;
     Snapshot(const Snapshot&) = default;
+    /// Returns an executor group of all non-quiescing coordinators in the cluster.
+    ExecutorGroup GetCoordinators() const;
+    /// Returns the addresses of all non-quiescing coordinators in the cluster.
+    std::vector<TNetworkAddress> GetCoordinatorAddresses() const;
     /// The current backend descriptor of the local backend.
     BeDescSharedPtr local_be_desc;
     /// Map from unique backend ID to BackendDescriptorPB for all known backends,

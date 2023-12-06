@@ -362,12 +362,13 @@ public class PlannerTestBase extends FrontendTestBase {
    * Extracts and returns the expected error message from expectedPlan.
    * Returns null if expectedPlan is empty or its first element is not an error message.
    * The accepted format for error messages is the exception string. We currently
-   * support only NotImplementedException and InternalException.
+   * support only NotImplementedException, InternalException, and AnalysisException.
    */
   private String getExpectedErrorMessage(ArrayList<String> expectedPlan) {
     if (expectedPlan == null || expectedPlan.isEmpty()) return null;
     if (!expectedPlan.get(0).contains("NotImplementedException") &&
-        !expectedPlan.get(0).contains("InternalException")) return null;
+        !expectedPlan.get(0).contains("InternalException") &&
+        !expectedPlan.get(0).contains("AnalysisException")) return null;
     return expectedPlan.get(0).trim();
   }
 

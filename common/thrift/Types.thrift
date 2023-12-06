@@ -161,6 +161,11 @@ struct TNetworkAddress {
   3: optional string uds_address
 }
 
+// A list of network addresses
+struct TAddressesList {
+  1: required list<TNetworkAddress> addresses;
+}
+
 // Wire format for UniqueId
 struct TUniqueId {
   1: required i64 hi

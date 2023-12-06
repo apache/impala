@@ -43,6 +43,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
+#include "scheduling/cluster-membership-mgr.h"
 #include "service/impala-server.h"
 #include "service/query-options.h"
 #include "util/bloom-filter.h"
@@ -643,6 +644,35 @@ Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions(
   return result_bytes;
 }
 
+// Get a list of known coordinators.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeGetCoordinators(
+    JNIEnv* env, jclass caller_class) {
+  ClusterMembershipMgr::SnapshotPtr membership_snapshot =
+      ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot();
+  DCHECK(membership_snapshot != nullptr);
+  vector<TNetworkAddress> coordinators = membership_snapshot->GetCoordinatorAddresses();
+
+  TAddressesList addresses_container;
+  addresses_container.__set_addresses(coordinators);
+  jbyteArray result_bytes = nullptr;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &addresses_container, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
+// Get the number of live queries.
+extern "C" JNIEXPORT jlong JNICALL
+Java_org_apache_impala_service_FeSupport_NativeNumLiveQueries(
+    JNIEnv* env, jclass caller_class) {
+  ImpalaServer* server = ExecEnv::GetInstance()->impala_server();
+  if (LIKELY(server != nullptr)) {
+    return server->NumLiveQueries();
+  }
+  // Allow calling without an ImpalaServer, such as during PlannerTest.
+  return 0;
+}
+
 // Returns the log (base 2) of the minimum number of bytes we need for a Bloom filter
 // with 'ndv' unique elements and a false positive probability of less than 'fpp'.
 extern "C"
@@ -817,6 +847,14 @@ static JNINativeMethod native_methods[] = {
   {
     const_cast<char*>("NativeGetLatestCompactions"), const_cast<char*>("([B)[B"),
     (void*) ::Java_org_apache_impala_service_FeSupport_NativeGetLatestCompactions
+  },
+  {
+    const_cast<char*>("NativeGetCoordinators"), const_cast<char*>("()[B"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeGetCoordinators
+  },
+  {
+    const_cast<char*>("NativeNumLiveQueries"), const_cast<char*>("()J"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeNumLiveQueries
   },
 };
 

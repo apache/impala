@@ -64,6 +64,7 @@ static void _write_event(FieldParserContext& ctx, QueryEvent target_event) {
   ctx.sql << event->second;
 }
 
+/// List of query table columns. Must be kept in-sync with SystemTables.thrift
 const std::list<FieldDefinition> FIELD_DEFINITIONS = {
     // Cluster Id
     // Required

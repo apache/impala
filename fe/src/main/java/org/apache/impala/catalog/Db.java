@@ -35,6 +35,7 @@ import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -81,6 +82,9 @@ public class Db extends CatalogObjectImpl implements FeDb {
   private final AtomicReference<TDatabase> thriftDb_ = new AtomicReference<>();
 
   public static final String FUNCTION_INDEX_PREFIX = "impala_registered_function_";
+
+  // Name of the standard system DB. Also used by Hive MetaStore.
+  public static final String SYS = "sys";
 
   // Hive metastore imposes a limit of 4000 bytes on the key and value strings
   // in DB parameters map. We need ensure that this limit isn't crossed
@@ -129,6 +133,13 @@ public class Db extends CatalogObjectImpl implements FeDb {
     setMetastoreDb(name, msDb);
     tableCache_ = new CatalogObjectCache<>();
     functions_ = new HashMap<>();
+
+    // This constructor is called from a static initializer in tests.
+    if (BackendConfig.INSTANCE != null && BackendConfig.INSTANCE.enableWorkloadMgmt() &&
+        name.equalsIgnoreCase(SYS)) {
+      // Add built-in tables.
+      addTable(SystemTable.CreateQueryLiveTable(this, getOwnerUser()));
+    }
   }
 
   public long getCreateEventId() { return createEventId_; }

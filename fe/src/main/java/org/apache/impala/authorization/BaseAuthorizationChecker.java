@@ -304,6 +304,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
    * Throws an AuthorizationException if the dbName is a system db
    * and the user is trying to modify it.
    * Returns true if this is a system db and the action is allowed.
+   * Return false if authorization should be checked in the usual way.
    */
   private boolean checkSystemDbAccess(FeCatalog catalog, String dbName,
       Privilege privilege)
@@ -314,6 +315,9 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
         case VIEW_METADATA:
         case ANY:
           return true;
+        case SELECT:
+          // Check authorization for SELECT on system tables in the usual way.
+          return false;
         default:
           throw new AuthorizationException("Cannot modify system database.");
       }

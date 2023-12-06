@@ -70,6 +70,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
@@ -1894,13 +1895,18 @@ public class SingleNodePlanner {
       scanNode.addConjuncts(conjuncts);
       scanNode.init(analyzer);
       return scanNode;
-    } else if (tblRef.getTable() instanceof FeKuduTable) {
+    } else if (table instanceof FeKuduTable) {
       scanNode = new KuduScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts,
           aggInfo, tblRef);
       scanNode.init(analyzer);
       return scanNode;
     } else if (table instanceof IcebergMetadataTable) {
       return createIcebergMetadataScanNode(tblRef, conjuncts, analyzer);
+    } else if (table instanceof SystemTable) {
+      scanNode = new SystemTableScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
+      scanNode.addConjuncts(conjuncts);
+      scanNode.init(analyzer);
+      return scanNode;
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table class: " + table.getClass());

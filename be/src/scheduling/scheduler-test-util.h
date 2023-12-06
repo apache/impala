@@ -310,6 +310,9 @@ class Plan {
 
   const TScanRangeSpec& scan_range_specs() const;
 
+  /// Add a scan across all coordinators.
+  void AddSystemTableScan();
+
   /// Add a scan of table 'table_name' to the plan. This method will populate the internal
   /// TScanRangeSpecs and can be called multiple times for the same table to schedule
   /// additional scans.
@@ -513,10 +516,13 @@ class SchedulerWrapper {
   SchedulerWrapper(const Plan& plan);
 
   /// Call ComputeScanRangeAssignment() with exec_at_coord set to false.
-  Status Compute(Result* result) { return Compute(false, result); }
+  Status Compute(Result* result, bool include_all_coordinators = false) {
+    return Compute(false, result, include_all_coordinators);
+  }
 
   /// Call ComputeScanRangeAssignment().
-  Status Compute(bool exec_at_coord, Result* result);
+  Status Compute(bool exec_at_coord, Result* result,
+      bool include_all_coordinators = false);
 
   /// Reset the state of the scheduler by re-creating and initializing it.
   void Reset() { InitializeScheduler(); }

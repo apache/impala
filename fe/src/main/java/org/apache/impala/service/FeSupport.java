@@ -28,6 +28,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TAddressesList;
 import org.apache.impala.thrift.TCacheJarParams;
 import org.apache.impala.thrift.TCacheJarResult;
 import org.apache.impala.thrift.TCatalogObject;
@@ -147,6 +148,12 @@ public class FeSupport {
 
   // Does an RPC to the Catalog Server to get the latest compactions.
   public native static byte[] NativeGetLatestCompactions(byte[] thriftReq);
+
+  // Get a list of addresses for coordinators.
+  public native static byte[] NativeGetCoordinators();
+
+  // Get the number of live queries.
+  public native static long NativeNumLiveQueries();
 
   /**
    * Locally caches the jar at the specified HDFS location.
@@ -530,6 +537,23 @@ public class FeSupport {
       return NativeGetLatestCompactions(thriftReq);
     } catch (UnsatisfiedLinkError e) { loadLibrary(); }
     return NativeGetLatestCompactions(thriftReq);
+  }
+
+  public static TAddressesList GetCoordinators() throws InternalException {
+    try {
+      byte[] result = NativeGetCoordinators();
+      Preconditions.checkNotNull(result);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TAddressesList coordinators_list = new TAddressesList();
+      deserializer.deserialize(coordinators_list, result);
+      return coordinators_list;
+    } catch (TException e) {
+      throw new InternalException("Error getting coordinators", e);
+     }
+  }
+
+  public static long NumLiveQueries() {
+    return NativeNumLiveQueries();
   }
 
   /**

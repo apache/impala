@@ -204,6 +204,7 @@ set (SRC_FILES
   RuntimeProfile.thrift
   SqlConstraints.thrift
   StatestoreService.thrift
+  SystemTables.thrift
   Zip.thrift
   ${TCLI_SERVICE_THRIFT}
   ${EXT_DATA_SRC_FILES}

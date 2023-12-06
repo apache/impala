@@ -78,6 +78,7 @@ struct TTableDescriptor {
   9: optional CatalogObjects.TDataSourceTable dataSourceTable
   10: optional CatalogObjects.TKuduTable kuduTable
   11: optional CatalogObjects.TIcebergTable icebergTable
+  12: optional CatalogObjects.TSystemTable systemTable
 
   // Unqualified name of table
   7: required string tableName

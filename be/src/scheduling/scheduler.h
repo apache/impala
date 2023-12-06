@@ -66,6 +66,7 @@ class Scheduler {
   struct ExecutorConfig {
     const ExecutorGroup& group;
     const BackendDescriptorPB& coord_desc;
+    const ExecutorGroup& all_coords;
   };
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
@@ -351,13 +352,15 @@ class Scheduler {
   /// query_options:           Query options for the current query.
   /// timer:                   Tracks execution time of ComputeScanRangeAssignment.
   /// rng:                     Random number generated used for any random decisions
+  /// summary_profile:         Summary profile for any scheduler warnings.
   /// assignment:              Output parameter, to which new assignments will be added.
   Status ComputeScanRangeAssignment(const ExecutorConfig& executor_config,
       PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
       bool node_random_replica, const std::vector<TScanRangeLocationList>& locations,
       const std::vector<TNetworkAddress>& host_list, bool exec_at_coord,
       const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
-      std::mt19937* rng, FragmentScanRangeAssignment* assignment);
+      std::mt19937* rng, RuntimeProfile* summary_profile,
+      FragmentScanRangeAssignment* assignment);
 
   /// Computes execution parameters for all backends assigned in the query and always one
   /// for the coordinator backend since it participates in execution regardless. Must be

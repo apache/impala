@@ -34,6 +34,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
 import org.apache.impala.planner.IcebergScanPlanner;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
@@ -1534,5 +1535,17 @@ public class PlannerTest extends PlannerTestBase {
             Lists.newArrayList(1, 2),
             Lists.newArrayList(2, 3)),
         IcebergScanPlanner.getOrderedEqualityFieldIds(inp));
+  }
+
+  /**
+   * Test queries against sys.impala_query_live.
+   */
+  @Test
+  public void testQueryLive() {
+    boolean savedEnableWorkloadMgmt = BackendConfig.INSTANCE.enableWorkloadMgmt();
+    BackendConfig.INSTANCE.setEnableWorkloadMgmt(true);
+    addTestDb(Db.SYS, "ensure system db");
+    runPlannerTestFile("impala-query-live");
+    BackendConfig.INSTANCE.setEnableWorkloadMgmt(savedEnableWorkloadMgmt);
   }
 }

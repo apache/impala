@@ -281,6 +281,23 @@ const TScanRangeSpec& Plan::scan_range_specs() const {
   return scan_range_specs_;
 }
 
+void Plan::AddSystemTableScan() {
+  for (const Host& host : cluster().hosts()) {
+    // SystemTable host_list uses coordinator addresses.
+    TNetworkAddress node;
+    node.hostname = host.ip;
+    node.port = host.be_port;
+    int32_t host_idx = referenced_datanodes_.size();
+    referenced_datanodes_.push_back(node);
+
+    TScanRangeLocationList scan_range_locations;
+    scan_range_locations.scan_range.__set_is_system_scan(true);
+    scan_range_locations.locations.resize(1);
+    scan_range_locations.locations[0].host_idx = host_idx;
+    scan_range_specs_.concrete_ranges.push_back(scan_range_locations);
+  }
+}
+
 void Plan::AddTableScan(const TableName& table_name) {
   const Table& table = schema_.GetTable(table_name);
   const vector<Block>& blocks = table.blocks;
@@ -564,8 +581,13 @@ void Result::ProcessAssignments(const AssignmentCallback& cb) const {
             per_node_ranges_elem.second;
         for (const ScanRangeParamsPB& scan_range_params : scan_range_params_vector) {
           const ScanRangePB& scan_range = scan_range_params.scan_range();
-          DCHECK(scan_range.has_hdfs_file_split());
-          const HdfsFileSplitPB& hdfs_file_split = scan_range.hdfs_file_split();
+          HdfsFileSplitPB hdfs_file_split;
+          if (scan_range.has_hdfs_file_split()) {
+            hdfs_file_split = scan_range.hdfs_file_split();
+          } else {
+            DCHECK(scan_range.has_is_system_scan() && scan_range.is_system_scan());
+            hdfs_file_split.set_length(0);
+          }
           bool try_hdfs_cache = scan_range_params.has_try_hdfs_cache() ?
               scan_range_params.try_hdfs_cache() : false;
           bool is_remote =
@@ -619,7 +641,8 @@ SchedulerWrapper::SchedulerWrapper(const Plan& plan)
   InitializeScheduler();
 }
 
-Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
+Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result,
+    bool include_all_coordinators) {
   DCHECK(scheduler_ != nullptr);
 
   // Compute Assignment.
@@ -644,17 +667,29 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
       cluster_membership_mgr_->GetSnapshot();
   auto it = membership_snapshot->executor_groups.find(
       ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
+
+  ExecutorGroup coords("all-coordinators");
+  if (include_all_coordinators) {
+    for (const auto& it : membership_snapshot->current_backends) {
+      if (it.second.has_is_coordinator() && it.second.is_coordinator()) {
+        coords.AddExecutor(it.second);
+        LOG(INFO) << "Adding " << it.second.address() << " to all coordinators";
+      }
+    }
+    LOG(INFO) << "Added " << coords.NumExecutors() << " to all coordinators";
+  }
+
   // If a group does not exist (e.g. no executors are registered), we pass an empty group
   // to the scheduler to exercise its error handling logic.
   bool no_executor_group = it == membership_snapshot->executor_groups.end();
   ExecutorGroup empty_group("empty-group");
   DCHECK(membership_snapshot->local_be_desc.get() != nullptr);
-  Scheduler::ExecutorConfig executor_config =
-      {no_executor_group ? empty_group : it->second, *membership_snapshot->local_be_desc};
+  Scheduler::ExecutorConfig executor_config = {no_executor_group ? empty_group :
+      it->second, *membership_snapshot->local_be_desc, coords};
   std::mt19937 rng(rand());
   return scheduler_->ComputeScanRangeAssignment(executor_config, 0, nullptr, false,
       *locations, plan_.referenced_datanodes(), exec_at_coord, plan_.query_options(),
-      nullptr, &rng, assignment);
+      nullptr, &rng, nullptr, assignment);
 }
 
 void SchedulerWrapper::AddBackend(const Host& host) {

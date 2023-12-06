@@ -161,6 +161,33 @@ ClusterMembershipMgr::SnapshotPtr ClusterMembershipMgr::GetSnapshot() const {
   return state;
 }
 
+static bool is_active_coordinator(const BackendDescriptorPB& be) {
+  return be.has_is_coordinator() && be.is_coordinator() &&
+      !(be.has_is_quiescing() && be.is_quiescing());
+}
+
+ExecutorGroup ClusterMembershipMgr::Snapshot::GetCoordinators() const {
+  ExecutorGroup coordinators("all-coordinators");
+  for (const auto& it : current_backends) {
+    if (is_active_coordinator(it.second)) {
+      coordinators.AddExecutor(it.second);
+    }
+  }
+  return coordinators;
+}
+
+vector<TNetworkAddress> ClusterMembershipMgr::Snapshot::GetCoordinatorAddresses() const {
+  vector<TNetworkAddress> coordinators;
+  for (const auto& it : current_backends) {
+    if (is_active_coordinator(it.second)) {
+      VLOG_QUERY << "Found coordinator "
+                 << it.second.address().hostname() << ":" << it.second.address().port();
+      coordinators.emplace_back(FromNetworkAddressPB(it.second.address()));
+    }
+  }
+  return coordinators;
+}
+
 void ClusterMembershipMgr::UpdateMembership(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {

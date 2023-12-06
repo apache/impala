@@ -81,6 +81,7 @@ class TGetExecSummaryReq;
 class ClientRequestState;
 class QueryDriver;
 struct QueryHandle;
+class QueryScanner;
 class SimpleLogger;
 class UpdateFilterParamsPB;
 class UpdateFilterResultPB;
@@ -504,6 +505,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// the server has started successfully.
   int GetHS2Port();
 
+  /// Return the number of live queries managed by this server. Acquires
+  /// completed_queries_lock_ to check for completed queries that have not been written.
+  /// (implemented in workload-management.cc)
+  size_t NumLiveQueries();
+
   /// Returns a current snapshot of the local backend descriptor.
   std::shared_ptr<const BackendDescriptorPB> GetLocalBackendDescriptor();
 
@@ -701,6 +707,7 @@ class ImpalaServer : public ImpalaServiceIf,
   friend struct SessionState;
   friend class ImpalaServerTest;
   friend class QueryDriver;
+  friend class QueryScanner;
 
   static const string BEESWAX_SERVER_NAME;
   static const string HS2_SERVER_NAME;
@@ -1129,6 +1136,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Periodically writes out completed queries (if configured)
   /// (implemented in workload-management.cc)
   void CompletedQueriesThread();
+
+  /// Returns a list of completed queries that have not yet been written to storage.
+  /// Acquires completed_queries_lock_ to make a copy of completed_queries_ state.
+  /// (implemented in workload-management.cc)
+  std::vector<std::shared_ptr<QueryStateExpanded>> GetCompletedQueries();
 
   /// Called from ExpireQueries() to check query resource limits for 'crs'. If the query
   /// exceeded a resource limit, returns a non-OK status with information about what

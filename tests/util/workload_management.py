@@ -104,7 +104,8 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   profile_lines = profile_text.split("\n")
 
   # Force Impala to process the inserts to the completed queries table.
-  client.execute("refresh " + query_tbl)
+  if query_tbl != 'sys.impala_query_live':
+    client.execute("refresh " + query_tbl)
 
   # Assert the query was written correctly to the query log table.
   if max_row_size is not None:

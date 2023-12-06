@@ -24,6 +24,7 @@ import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
@@ -138,6 +139,7 @@ public class DescribeTableStmt extends StatementBase {
     analyzer.getTable(table_.getTableName(), /* add column-level privilege */ true,
         Privilege.ANY);
     checkMinimalForIcebergMetadataTable();
+    checkMinimalForSystemTable();
 
     if (!targetsTable()) analyzeComplexType(analyzer);
   }
@@ -171,6 +173,13 @@ public class DescribeTableStmt extends StatementBase {
         outputStyle_ != TDescribeOutputStyle.MINIMAL) {
       throw new AnalysisException("DESCRIBE FORMATTED|EXTENDED cannot refer to a "
           + "metadata table.");
+    }
+  }
+
+  private void checkMinimalForSystemTable() throws AnalysisException {
+    if (table_ instanceof SystemTable && outputStyle_ != TDescribeOutputStyle.MINIMAL) {
+      throw new AnalysisException(
+          "DESCRIBE FORMATTED|EXTENDED cannot refer to a system table.");
     }
   }
 

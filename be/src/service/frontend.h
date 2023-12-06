@@ -248,7 +248,7 @@ class Frontend {
   jmethodID get_hadoop_groups_id_;  // JniFrontend.getHadoopGroups()
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache(byte[][])
-  jmethodID update_membership_id_; // JniFrontend.updateMembership()
+  jmethodID update_membership_id_; // JniFrontend.updateExecutorMembership()
   jmethodID get_catalog_metrics_id_; // JniFrontend.getCatalogMetrics()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_db_id_; // JniFrontend.describeDb

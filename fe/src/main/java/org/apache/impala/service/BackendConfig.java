@@ -484,6 +484,11 @@ public class BackendConfig {
     return backendCfg_.enable_workload_mgmt;
   }
 
+  @VisibleForTesting
+  public void setEnableWorkloadMgmt(boolean enableWorkloadMgmt) {
+    backendCfg_.enable_workload_mgmt = enableWorkloadMgmt;
+  }
+
   public String queryLogTableName() {
     return backendCfg_.query_log_table_name;
   }

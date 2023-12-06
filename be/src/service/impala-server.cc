@@ -1562,6 +1562,7 @@ void ImpalaServer::FinishUnregisterQuery(const QueryHandle& query_handle) {
   // Do all the finalization before removing the QueryDriver from the map so that
   // concurrent operations, e.g. GetRuntimeProfile() can find the query.
   CloseClientRequestState(query_handle);
+  DebugActionNoFail(query_handle->query_options(), "CLOSED_NOT_UNREGISTERED");
   // Make the QueryDriver inaccessible. There is a time window where the query is
   // both in 'query_driver_map_' and 'query_locations_'.
   Status status = query_handle.query_driver()->Unregister(&query_driver_map_);

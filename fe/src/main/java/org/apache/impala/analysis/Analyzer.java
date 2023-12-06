@@ -68,6 +68,7 @@ import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
@@ -459,6 +460,9 @@ public class Analyzer {
     // select item from complextypestbl.int_array;
     public boolean hasTopLevelAcidCollectionTableRef = false;
 
+    // True when a SystemTableScanNode is present.
+    public boolean includeAllCoordinatorsInScheduling = false;
+
     // all registered conjuncts (map from expr id to conjunct). We use a LinkedHashMap to
     // preserve the order in which conjuncts are added.
     public final Map<ExprId, Expr> conjuncts = new LinkedHashMap<>();
@@ -690,6 +694,14 @@ public class Analyzer {
     } else {
       return 1;
     }
+  }
+
+  public boolean includeAllCoordinatorsInScheduling() {
+    return globalState_.includeAllCoordinatorsInScheduling;
+  }
+
+  public void setIncludeAllCoordinatorsInScheduling(boolean flag) {
+    globalState_.includeAllCoordinatorsInScheduling = flag;
   }
 
   // An analyzer stores analysis state for a single select block. A select block can be
@@ -974,7 +986,8 @@ public class Analyzer {
       Preconditions.checkState(table instanceof FeFsTable ||
           table instanceof FeKuduTable ||
           table instanceof FeHBaseTable ||
-          table instanceof FeDataSourceTable);
+          table instanceof FeDataSourceTable ||
+          table instanceof SystemTable);
       return new BaseTableRef(tableRef, resolvedPath);
     } else {
       return new CollectionTableRef(tableRef, resolvedPath, false);

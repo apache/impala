@@ -54,6 +54,7 @@ enum TPlanNodeType {
   ICEBERG_DELETE_NODE = 18
   ICEBERG_METADATA_SCAN_NODE = 19
   TUPLE_CACHE_NODE = 20
+  SYSTEM_TABLE_SCAN_NODE = 21
 }
 
 // phases of an execution node
@@ -286,6 +287,7 @@ struct TScanRange {
   2: optional THBaseKeyRange hbase_key_range
   3: optional binary kudu_scan_token
   4: optional binary file_metadata
+  5: optional bool is_system_scan
 }
 
 // Specification of an overlap predicate desc.
@@ -395,6 +397,11 @@ struct TKuduScanNode {
 
   // The byte offset of the slot for Kudu metadata if count star optimization is enabled.
   3: optional i32 count_star_slot_offset
+}
+
+struct TSystemTableScanNode {
+  1: required Types.TTupleId tuple_id
+  2: required CatalogObjects.TSystemTableName table_name
 }
 
 struct TEqJoinCondition {
@@ -770,6 +777,8 @@ struct TPlanNode {
   27: optional TCardinalityCheckNode cardinality_check_node
 
   28: optional TTupleCacheNode tuple_cache_node
+
+  29: optional TSystemTableScanNode system_table_scan_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

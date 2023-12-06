@@ -999,5 +999,8 @@ struct TQueryExecRequest {
   // Estimated per-host memory. The planner generates this value which may or may not be
   // overridden to come up with a final per-host memory estimate.
   15: optional i64 planner_per_host_mem_estimate;
+
+  // Used for system tables that need to run on all nodes.
+  16: optional bool include_all_coordinators
 }
 

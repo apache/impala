@@ -101,6 +101,8 @@ add_library(Exec
   sort-node.cc
   streaming-aggregation-node.cc
   subplan-node.cc
+  system-table-scan-node.cc
+  system-table-scanner.cc
   table-sink-base.cc
   text-converter.cc
   topn-node.cc

@@ -65,7 +65,8 @@ static const string SCHEDULER_WARNING_KEY("Scheduler Warning");
 
 static const vector<TPlanNodeType::type> SCAN_NODE_TYPES{TPlanNodeType::HDFS_SCAN_NODE,
     TPlanNodeType::HBASE_SCAN_NODE, TPlanNodeType::DATA_SOURCE_NODE,
-    TPlanNodeType::KUDU_SCAN_NODE, TPlanNodeType::ICEBERG_METADATA_SCAN_NODE};
+    TPlanNodeType::KUDU_SCAN_NODE, TPlanNodeType::ICEBERG_METADATA_SCAN_NODE,
+    TPlanNodeType::SYSTEM_TABLE_SCAN_NODE};
 
 // Consistent scheduling requires picking up to k distinct candidates out of n nodes.
 // Since each iteration can pick a node that it already picked (i.e. it is sampling with
@@ -92,11 +93,18 @@ const BackendDescriptorPB& Scheduler::LookUpBackendDesc(
     const ExecutorConfig& executor_config, const NetworkAddressPB& host) {
   const BackendDescriptorPB* desc = executor_config.group.LookUpBackendDesc(host);
   if (desc == nullptr) {
-    // Coordinator host may not be in executor_config's executor group if it's a dedicated
-    // coordinator, or if it is configured to be in a different executor group.
-    const BackendDescriptorPB& coord_desc = executor_config.coord_desc;
-    DCHECK(host == coord_desc.address());
-    desc = &coord_desc;
+    if (executor_config.all_coords.NumExecutors() > 0) {
+      // Group containing all coordinators was provided, so use that for lookup.
+      desc = executor_config.all_coords.LookUpBackendDesc(host);
+      DCHECK_NE(nullptr, desc);
+    } else {
+      // Coordinator host may not be in executor_config's executor group if it's a
+      // dedicated coordinator, or if it is configured to be in a different executor
+      // group.
+      const BackendDescriptorPB& coord_desc = executor_config.coord_desc;
+      DCHECK(host == coord_desc.address());
+      desc = &coord_desc;
+    }
   }
   return *desc;
 }
@@ -212,7 +220,8 @@ Status Scheduler::ComputeScanRangeAssignment(
       RETURN_IF_ERROR(
           ComputeScanRangeAssignment(executor_config, node_id, node_replica_preference,
               node_random_replica, *locations, exec_request.host_list, exec_at_coord,
-              state->query_options(), total_assignment_timer, state->rng(), assignment));
+              state->query_options(), total_assignment_timer, state->rng(),
+              state->summary_profile(), assignment));
       state->IncNumScanRanges(locations->size());
     }
   }
@@ -376,6 +385,13 @@ void Scheduler::ComputeRandomKrpcForAggregation(const ExecutorConfig& executor_c
   }
 }
 
+static inline void initializeSchedulerWarning(RuntimeProfile* summary_profile) {
+  if (summary_profile->GetInfoString(SCHEDULER_WARNING_KEY) == nullptr) {
+    summary_profile->AddInfoString(SCHEDULER_WARNING_KEY,
+        "Cluster membership might changed between planning and scheduling");
+  }
+}
+
 Status Scheduler::CheckEffectiveInstanceCount(
     const FragmentScheduleState* fragment_state, ScheduleState* state) {
   // These checks are only intended if COMPUTE_PROCESSING_COST=true.
@@ -383,11 +399,7 @@ Status Scheduler::CheckEffectiveInstanceCount(
 
   int effective_instance_count = fragment_state->fragment.effective_instance_count;
   if (effective_instance_count < fragment_state->instance_states.size()) {
-    if (state->summary_profile()->GetInfoString(SCHEDULER_WARNING_KEY) == nullptr) {
-      state->summary_profile()->AddInfoString(SCHEDULER_WARNING_KEY,
-          "Cluster membership might changed between planning and scheduling");
-    }
-
+    initializeSchedulerWarning(state->summary_profile());
     string warn_message = Substitute(
         "$0 scheduled instance count ($1) is higher than its effective count ($2)",
         fragment_state->fragment.display_name, fragment_state->instance_states.size(),
@@ -815,7 +827,7 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
     bool node_random_replica, const vector<TScanRangeLocationList>& locations,
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, RuntimeProfile::Counter* timer, std::mt19937* rng,
-    FragmentScanRangeAssignment* assignment) {
+    RuntimeProfile* summary_profile, FragmentScanRangeAssignment* assignment) {
   const ExecutorGroup& executor_group = executor_config.group;
   if (executor_group.NumExecutors() == 0 && !exec_at_coord) {
     return Status(TErrorCode::NO_REGISTERED_BACKENDS);
@@ -864,6 +876,28 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
           coord_desc.address().hostname(), nullptr));
       assignment_ctx.RecordScanRangeAssignment(
           coord_desc, node_id, host_list, scan_range_locations, assignment);
+    } else if (scan_range_locations.scan_range.__isset.is_system_scan &&
+               scan_range_locations.scan_range.is_system_scan) {
+      // Must run on a coordinator, lookup in executor_config.all_coords
+      DCHECK_EQ(1, scan_range_locations.locations.size());
+      const TNetworkAddress& coordinator =
+          host_list[scan_range_locations.locations[0].host_idx];
+      const BackendDescriptorPB* coordinatorPB =
+          executor_config.all_coords.LookUpBackendDesc(FromTNetworkAddress(coordinator));
+      if (coordinatorPB == nullptr) {
+        // Coordinator is no longer available, skip this range.
+        string warn_message = Substitute(
+            "Coordinator $0 is no longer available for system table scan assignment",
+            TNetworkAddressToString(coordinator));
+        if (LIKELY(summary_profile != nullptr)) {
+          initializeSchedulerWarning(summary_profile);
+          summary_profile->AppendInfoString(SCHEDULER_WARNING_KEY, warn_message);
+        }
+        LOG(WARNING) << warn_message;
+        continue;
+      }
+      assignment_ctx.RecordScanRangeAssignment(
+        *coordinatorPB, node_id, host_list, scan_range_locations, assignment);
     } else {
       // Collect executor candidates with smallest memory distance.
       vector<IpAddr> executor_candidates;
@@ -1387,6 +1421,9 @@ void TScanRangeToScanRangePB(const TScanRange& tscan_range, ScanRangePB* scan_ra
   if (tscan_range.__isset.file_metadata) {
     scan_range_pb->set_file_metadata(tscan_range.file_metadata);
   }
+  if (tscan_range.__isset.is_system_scan) {
+    scan_range_pb->set_is_system_scan(tscan_range.is_system_scan);
+  }
 }
 
 void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
@@ -1394,6 +1431,23 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
     const vector<TNetworkAddress>& host_list,
     const TScanRangeLocationList& scan_range_locations,
     FragmentScanRangeAssignment* assignment) {
+  if (scan_range_locations.scan_range.__isset.is_system_scan &&
+      scan_range_locations.scan_range.is_system_scan) {
+    // Assigned to a coordinator.
+    PerNodeScanRanges* scan_ranges =
+        FindOrInsert(assignment, executor.address(), PerNodeScanRanges());
+    vector<ScanRangeParamsPB>* scan_range_params_list =
+        FindOrInsert(scan_ranges, node_id, vector<ScanRangeParamsPB>());
+    ScanRangeParamsPB scan_range_params;
+    TScanRangeToScanRangePB(
+        scan_range_locations.scan_range, scan_range_params.mutable_scan_range());
+    scan_range_params_list->push_back(scan_range_params);
+
+    VLOG_FILE << "Scheduler assignment of system table scan to coordinator: "
+              << executor.address();
+    return;
+  }
+
   int64_t scan_range_length = 0;
   if (scan_range_locations.scan_range.__isset.hdfs_file_split) {
     scan_range_length = scan_range_locations.scan_range.hdfs_file_split.length;

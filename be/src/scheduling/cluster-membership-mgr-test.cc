@@ -792,6 +792,51 @@ TEST(ClusterMembershipMgrUnitTest, PopulateExecutorMembershipRequest) {
   }
 }
 
+template <class T>
+static bool has(const vector<T>& v, const T& m) {
+  return find(v.begin(), v.end(), m) != v.end();
+}
+
+/// Test that we can get a list of coordinators.
+TEST_F(ClusterMembershipMgrTest, GetCoordinatorAddresses) {
+  // Initialize all backends early. Test methods handle state propagation through the
+  // backends_ list, which must be fully initialized before starting backends.
+  Backend* coordinator0 = CreateBackend();
+  const NetworkAddressPB& addr0 = coordinator0->desc->address();
+  CreateCMM(coordinator0);
+  Backend* coordinator1 = CreateBackend();
+  const NetworkAddressPB& addr1 = coordinator1->desc->address();
+  coordinator1->desc->set_is_executor(false);
+  CreateCMM(coordinator1);
+  Backend* executor = CreateBackend();
+  executor->desc->set_is_coordinator(false);
+  CreateCMM(executor);
+
+  EXPECT_EQ(0, coordinator0->cmm->GetSnapshot()->GetCoordinatorAddresses().size());
+
+  StartBackend(coordinator0);
+  vector<TNetworkAddress> orig_coordinators =
+      coordinator0->cmm->GetSnapshot()->GetCoordinatorAddresses();
+  EXPECT_EQ(1, orig_coordinators.size());
+  EXPECT_EQ(FromNetworkAddressPB(addr0), orig_coordinators[0]);
+
+  StartBackend(executor);
+  EXPECT_EQ(orig_coordinators,
+      coordinator0->cmm->GetSnapshot()->GetCoordinatorAddresses());
+  EXPECT_EQ(orig_coordinators, executor->cmm->GetSnapshot()->GetCoordinatorAddresses());
+
+  StartBackend(coordinator1);
+  orig_coordinators = coordinator0->cmm->GetSnapshot()->GetCoordinatorAddresses();
+  EXPECT_EQ(2, orig_coordinators.size());
+  // List of coordinators is unsorted.
+  EXPECT_TRUE(has(orig_coordinators, FromNetworkAddressPB(addr0)));
+  EXPECT_TRUE(has(orig_coordinators, FromNetworkAddressPB(addr1)));
+
+  EXPECT_EQ(orig_coordinators, executor->cmm->GetSnapshot()->GetCoordinatorAddresses());
+  EXPECT_EQ(orig_coordinators,
+      coordinator1->cmm->GetSnapshot()->GetCoordinatorAddresses());
+}
+
 /// TODO: Write a test that makes a number of random changes to cluster membership while
 /// not maintaining the proper lifecycle steps that a backend goes through (create, start,
 /// quiesce, delete).

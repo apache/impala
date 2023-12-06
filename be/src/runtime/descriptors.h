@@ -575,6 +575,16 @@ class KuduTableDescriptor : public TableDescriptor {
   std::vector<std::string> master_addresses_;
 };
 
+// Descriptor for a SystemTable
+class SystemTableDescriptor : public TableDescriptor {
+ public:
+  SystemTableDescriptor(const TTableDescriptor& tdesc);
+  virtual std::string DebugString() const;
+
+ private:
+  TSystemTableName::type table_name_;
+};
+
 class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }

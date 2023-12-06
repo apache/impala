@@ -342,6 +342,16 @@ string KuduTableDescriptor::DebugString() const {
   return out.str();
 }
 
+SystemTableDescriptor::SystemTableDescriptor(const TTableDescriptor& tdesc)
+  : TableDescriptor(tdesc), table_name_(tdesc.systemTable.table_name) {}
+
+string SystemTableDescriptor::DebugString() const {
+  stringstream out;
+  out << "SystemTable(" << TableDescriptor::DebugString() << " table=" << table_name_
+      << ")";
+  return out.str();
+}
+
 TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
   : id_(tdesc.id),
     byte_size_(tdesc.byteSize),
@@ -596,6 +606,9 @@ Status DescriptorTbl::CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
       break;
     case TTableType::KUDU_TABLE:
       *desc = pool->Add(new KuduTableDescriptor(tdesc));
+      break;
+    case TTableType::SYSTEM_TABLE:
+      *desc = pool->Add(new SystemTableDescriptor(tdesc));
       break;
     default:
       DCHECK(false) << "invalid table type: " << tdesc.tableType;

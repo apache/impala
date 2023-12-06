@@ -1861,6 +1861,10 @@ Status AdmissionController::ComputeGroupScheduleStates(
     return Status::OK();
   }
 
+  // Collect all coordinators if needed for the request.
+  ExecutorGroup coords = request.request.include_all_coordinators ?
+      membership_snapshot->GetCoordinators() : ExecutorGroup("all-coordinators");
+
   // We loop over the executor groups in a deterministic order. If
   // --balance_queries_across_executor_groups set to true, executor groups with more
   // available memory and slots will be processed first. If the flag set to false, we will
@@ -1890,7 +1894,7 @@ Status AdmissionController::ComputeGroupScheduleStates(
     const string& group_name = executor_group->name();
     VLOG(3) << "Scheduling for executor group: " << group_name << " with "
             << executor_group->NumExecutors() << " executors";
-    const Scheduler::ExecutorConfig group_config = {*executor_group, coord_desc};
+    const Scheduler::ExecutorConfig group_config = {*executor_group, coord_desc, coords};
     RETURN_IF_ERROR(scheduler_->Schedule(group_config, group_state.get()));
     DCHECK(!group_state->executor_group().empty());
     output_schedules->emplace_back(std::move(group_state), *orig_executor_group);

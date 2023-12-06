@@ -381,7 +381,8 @@ public class CatalogServiceCatalog extends Catalog {
         .getBackendCfg().topic_update_tbl_max_wait_time_ms;
     Preconditions.checkState(topicUpdateTblLockMaxWaitTimeMs_ >= 0,
         "topic_update_tbl_max_wait_time_ms must be positive");
-    impalaSysTables = Arrays.asList(BackendConfig.INSTANCE.queryLogTableName());
+    impalaSysTables = Arrays.asList(
+        BackendConfig.INSTANCE.queryLogTableName(), SystemTable.QUERY_LIVE);
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
     try {
@@ -440,7 +441,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public boolean isBlacklistedDb(String dbName) {
     Preconditions.checkNotNull(dbName);
-    if (BackendConfig.INSTANCE.enableWorkloadMgmt() && dbName.equalsIgnoreCase("sys")) {
+    if (BackendConfig.INSTANCE.enableWorkloadMgmt() && dbName.equalsIgnoreCase(Db.SYS)) {
       // Override 'sys' for Impala system tables.
       return false;
     }
@@ -452,7 +453,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public boolean isBlacklistedTable(TableName table) {
     Preconditions.checkNotNull(table);
-    if (table.getDb().equalsIgnoreCase("sys") && blacklistedDbs_.contains("sys")) {
+    if (table.getDb().equalsIgnoreCase(Db.SYS) && blacklistedDbs_.contains(Db.SYS)) {
       // If we've overridden the database blacklist, only allow Impala system tables.
       return !impalaSysTables.contains(table.getTbl());
     }

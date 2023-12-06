@@ -176,6 +176,7 @@ Status PlanNode::CreatePlanNode(
     case TPlanNodeType::HBASE_SCAN_NODE:
     case TPlanNodeType::DATA_SOURCE_NODE:
     case TPlanNodeType::KUDU_SCAN_NODE:
+    case TPlanNodeType::SYSTEM_TABLE_SCAN_NODE:
       *node = pool->Add(new ScanPlanNode());
       break;
     case TPlanNodeType::AGGREGATION_NODE:

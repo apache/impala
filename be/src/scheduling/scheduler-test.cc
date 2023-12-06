@@ -111,6 +111,25 @@ TEST_F(SchedulerTest, ExecAtCoord) {
   EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
 }
 
+/// Test cluster configuration with one coordinator that can't process scan ranges
+/// when scheduling to coordinators is enabled.
+TEST_F(SchedulerTest, UseDedicatedCoordinator) {
+  Cluster cluster;
+  cluster.AddHost(true, true, false);
+  cluster.AddHost(true, true, true);
+  cluster.AddHost(true, true, true);
+
+  Schema schema(cluster);
+  Plan plan(schema);
+  plan.AddSystemTableScan();
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  ASSERT_OK(scheduler.Compute(&result, true));
+
+  EXPECT_EQ(3, result.NumDistinctBackends());
+}
+
 /// Test scanning a simple table twice.
 TEST_F(SchedulerTest, ScanTableTwice) {
   Cluster cluster;

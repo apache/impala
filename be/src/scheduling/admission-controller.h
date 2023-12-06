@@ -948,6 +948,8 @@ class AdmissionController {
   /// an error if no executor groups are available for scheduling, but will set
   /// 'queue_node->not_admitted_reason' and leave 'queue_node->group_states' empty in
   /// that case.
+  /// If the associated TQueryExecRequest sets include_all_coordinators, an extra group
+  /// containing all active coordinators will be added to ExecutorConfig for scheduling.
   Status ComputeGroupScheduleStates(
       ClusterMembershipMgr::SnapshotPtr membership_snapshot, QueueNode* queue_node);
 

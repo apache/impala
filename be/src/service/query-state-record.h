@@ -343,7 +343,7 @@ struct QueryStateExpanded {
   /// Required data will be copied from the provided ClientRequestState into members of
   /// the struct.
   QueryStateExpanded(const ClientRequestState& exec_state,
-      const std::shared_ptr<QueryStateRecord> base_state_src);
+      const std::shared_ptr<QueryStateRecord> base_state_src = nullptr);
 }; // struct QueryStateExpanded
 
 } // namespace impala

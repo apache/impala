@@ -24,6 +24,7 @@
 #include "exec/hbase/hbase-scan-node.h"
 #include "exec/kudu/kudu-scan-node-mt.h"
 #include "exec/kudu/kudu-scan-node.h"
+#include "exec/system-table-scan-node.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/blocking-row-batch-queue.h"
@@ -134,6 +135,9 @@ Status ScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const 
         DCHECK(!is_mt_fragment() || state->query_options().num_scanner_threads == 1);
         *node = pool->Add(new KuduScanNode(pool, *this, state->desc_tbl()));
       }
+      break;
+    case TPlanNodeType::SYSTEM_TABLE_SCAN_NODE:
+      *node = pool->Add(new SystemTableScanNode(pool, *this, state->desc_tbl()));
       break;
     default:
       DCHECK(false) << "Unexpected scan node type: " << tnode_->node_type;

@@ -166,6 +166,12 @@ static const string QueryStateToSql(const QueryStateExpanded* rec) noexcept {
   return sql.str();
 } // function QueryStateToSql
 
+size_t ImpalaServer::NumLiveQueries() {
+  size_t live_queries = query_driver_map_.Count();
+  std::lock_guard<std::mutex> l(completed_queries_lock_);
+  return live_queries + completed_queries_.size();
+}
+
 Status ImpalaServer::InitWorkloadManagement() {
   if (FLAGS_enable_workload_mgmt) {
     return Thread::Create("impala-server", "completed-queries",
@@ -414,5 +420,15 @@ void ImpalaServer::CompletedQueriesThread() {
     }
   }
 } // ImpalaServer::CompletedQueriesThread
+
+vector<shared_ptr<QueryStateExpanded>> ImpalaServer::GetCompletedQueries() {
+  lock_guard<mutex> l(completed_queries_lock_);
+  vector<shared_ptr<QueryStateExpanded>> results;
+  results.reserve(completed_queries_.size());
+  for (const auto& r : completed_queries_) {
+    results.emplace_back(r.query);
+  }
+  return results;
+}
 
 } // namespace impala
