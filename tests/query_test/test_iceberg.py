@@ -1291,7 +1291,7 @@ class TestIcebergV2Table(IcebergTestSuite):
         use_db="functional_parquet")
 
   @SkipIf.hardcoded_uris
-  def test_metadata_tables(self, vector):
+  def test_metadata_tables(self, vector, unique_database):
     with self.create_impala_client() as impalad_client:
       overwrite_snapshot_id = impalad_client.execute("select snapshot_id from "
                              "functional_parquet.iceberg_query_metadata.snapshots "
@@ -1300,7 +1300,7 @@ class TestIcebergV2Table(IcebergTestSuite):
                              "functional_parquet.iceberg_query_metadata.snapshots "
                              "where operation = 'overwrite';")
       self.run_test_case('QueryTest/iceberg-metadata-tables', vector,
-          use_db="functional_parquet",
+          unique_database,
           test_file_vars={'$OVERWRITE_SNAPSHOT_ID': str(overwrite_snapshot_id.data[0]),
                           '$OVERWRITE_SNAPSHOT_TS': str(overwrite_snapshot_ts.data[0])})
 

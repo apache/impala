@@ -83,22 +83,73 @@ Status IcebergMetadataScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, jmetadata_scanner, &jmetadata_scanner_));
   RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(ScanMetadataTable());
-  // Create field accessors
+  RETURN_IF_ERROR(CreateFieldAccessors());
+  return Status::OK();
+}
+
+Status IcebergMetadataScanNode::CreateFieldAccessors() {
+  JNIEnv* env = JniUtil::GetJNIEnv();
+  if (env == nullptr) return Status("Failed to get/create JVM");
   for (SlotDescriptor* slot_desc: tuple_desc_->slots()) {
-    jobject accessor_for_field = env->CallObjectMethod(jmetadata_scanner_,
-        get_accessor_, slot_desc->col_pos());
-    RETURN_ERROR_IF_EXC(env);
-    jobject accessor_for_field_global_ref;
-    RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, accessor_for_field,
-        &accessor_for_field_global_ref));
-    jaccessors_[slot_desc->col_pos()] = accessor_for_field_global_ref;
+    if (slot_desc->type().IsStructType()) {
+      // Get the top level struct's field id from the ColumnDescriptor then recursively
+      // get the field ids for struct fields
+      int field_id = tuple_desc_->table_desc()->GetColumnDesc(slot_desc).field_id();
+      RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
+      RETURN_IF_ERROR(CreateFieldAccessors(env, slot_desc));
+    } else if (slot_desc->col_path().size() > 1) {
+      DCHECK(!slot_desc->type().IsComplexType());
+      // Slot that is child of a struct without tuple, can occur when a struct member is
+      // in the select list. ColumnType has a tree structure, and this loop finds the
+      // STRUCT node that stores the primitive type. Because, that struct node has the
+      // field id list of its childs.
+      int root_type_index = slot_desc->col_path()[0];
+      ColumnType current_type =
+          tuple_desc_->table_desc()->col_descs()[root_type_index].type();
+      for (int i = 1; i < slot_desc->col_path().size() - 1; ++i) {
+        current_type = current_type.children[slot_desc->col_path()[i]];
+      }
+      int field_id = current_type.field_ids[slot_desc->col_path().back()];
+      RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
+    } else {
+      // For primitives in the top level tuple, use the ColumnDescriptor
+      int field_id = tuple_desc_->table_desc()->GetColumnDesc(slot_desc).field_id();
+      RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
+    }
   }
+  return Status::OK();
+}
+
+Status IcebergMetadataScanNode::CreateFieldAccessors(JNIEnv* env,
+    const SlotDescriptor* struct_slot_desc) {
+  if (!struct_slot_desc->type().IsStructType()) return Status::OK();
+  const std::vector<int>& struct_field_ids = struct_slot_desc->type().field_ids;
+  for (SlotDescriptor* child_slot_desc:
+      struct_slot_desc->children_tuple_descriptor()->slots()) {
+    int field_id = struct_field_ids[child_slot_desc->col_path().back()];
+    RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, child_slot_desc->id()));
+    if (child_slot_desc->type().IsStructType()) {
+      RETURN_IF_ERROR(CreateFieldAccessors(env, child_slot_desc));
+    }
+  }
+  return Status::OK();
+}
+
+Status IcebergMetadataScanNode::AddAccessorForFieldId(JNIEnv* env, int field_id,
+    SlotId slot_id) {
+  jobject accessor_for_field = env->CallObjectMethod(jmetadata_scanner_,
+      get_accessor_, field_id);
+  RETURN_ERROR_IF_EXC(env);
+  jobject accessor_for_field_global_ref;
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, accessor_for_field,
+      &accessor_for_field_global_ref));
+  jaccessors_[slot_id] = accessor_for_field_global_ref;
   return Status::OK();
 }
 
 Status IcebergMetadataScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Open(state));
-  iceberg_row_reader_.reset(new IcebergRowReader(tuple_desc_, jaccessors_));
+  iceberg_row_reader_.reset(new IcebergRowReader(jaccessors_));
   return Status::OK();
 }
 
@@ -128,8 +179,8 @@ Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch
       return Status::OK();
     }
     // Translate a StructLikeRow from Iceberg to Tuple
-    RETURN_IF_ERROR(iceberg_row_reader_->MaterializeRow(env, struct_like_row, tuple,
-        row_batch->tuple_data_pool()));
+    RETURN_IF_ERROR(iceberg_row_reader_->MaterializeTuple(env, struct_like_row,
+        tuple_desc_, tuple, row_batch->tuple_data_pool()));
     env->DeleteLocalRef(struct_like_row);
     RETURN_ERROR_IF_EXC(env);
     COUNTER_ADD(rows_read_counter(), 1);

@@ -107,39 +107,3 @@ PLAN-ROOT SINK
 00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.HISTORY q]
    row-size=8B cardinality=unavailable
 ====
-select * from functional_parquet.iceberg_alltypes_part_orc.manifests a, a.partition_summaries
----- PLAN
-PLAN-ROOT SINK
-|
-01:SUBPLAN
-|  row-size=98B cardinality=unavailable
-|
-|--04:NESTED LOOP JOIN [CROSS JOIN]
-|  |  row-size=98B cardinality=10
-|  |
-|  |--02:SINGULAR ROW SRC
-|  |     row-size=72B cardinality=1
-|  |
-|  03:UNNEST [a.partition_summaries]
-|     row-size=0B cardinality=10
-|
-00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.MANIFESTS a]
-   row-size=72B cardinality=unavailable
----- DISTRIBUTEDPLAN
-PLAN-ROOT SINK
-|
-01:SUBPLAN
-|  row-size=98B cardinality=unavailable
-|
-|--04:NESTED LOOP JOIN [CROSS JOIN]
-|  |  row-size=98B cardinality=10
-|  |
-|  |--02:SINGULAR ROW SRC
-|  |     row-size=72B cardinality=1
-|  |
-|  03:UNNEST [a.partition_summaries]
-|     row-size=0B cardinality=10
-|
-00:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part_orc.MANIFESTS a]
-   row-size=72B cardinality=unavailable
-====

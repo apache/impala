@@ -454,3 +454,100 @@ alter table functional_parquet.iceberg_query_metadata.snapshots add columns (col
 ---- CATCH
 ParseException: Syntax error in line 1
 ====
+
+####
+# Test 9 : Query STRUCT type columns
+####
+====
+---- QUERY
+select readable_metrics from functional_parquet.iceberg_query_metadata.entries;
+---- RESULTS
+'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":3,"upper_bound":3}}'
+'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":2}}'
+'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":1}}'
+'{"i":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
+---- TYPES
+STRING
+====
+---- QUERY
+select snapshot_id, readable_metrics from functional_parquet.iceberg_query_metadata.entries;
+---- RESULTS
+row_regex:[1-9]\d*|0,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":3,"upper_bound":3}}'
+row_regex:[1-9]\d*|0,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":2}}'
+row_regex:[1-9]\d*|0,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":1}}'
+row_regex:[1-9]\d*|0,'{"i":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+select snapshot_id, readable_metrics.i.lower_bound as lower_bound from functional_parquet.iceberg_query_metadata.entries;
+---- RESULTS
+row_regex:[1-9]\d*|0,3
+row_regex:[1-9]\d*|0,2
+row_regex:[1-9]\d*|0,1
+row_regex:[1-9]\d*|0,'NULL'
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select snapshot_id, readable_metrics.i.lower_bound as lower_bound from functional_parquet.iceberg_query_metadata.entries
+order by lower_bound;
+---- RESULTS
+row_regex:[1-9]\d*|0,1
+row_regex:[1-9]\d*|0,2
+row_regex:[1-9]\d*|0,3
+row_regex:[1-9]\d*|0,'NULL'
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select SUM(readable_metrics.i.lower_bound) from functional_parquet.iceberg_query_metadata.entries;
+---- RESULTS
+6
+---- TYPES
+BIGINT
+====
+---- QUERY
+select all_ent.data_file.file_path, ent.readable_metrics.i.lower_bound
+from functional_parquet.iceberg_query_metadata.entries ent
+join functional_parquet.iceberg_query_metadata.all_entries all_ent
+on ent.snapshot_id = all_ent.snapshot_id
+order by ent.readable_metrics.i.lower_bound;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',1
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',2
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',3
+row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',NULL
+---- TYPES
+STRING,INT
+====
+---- QUERY
+select i from functional_parquet.iceberg_query_metadata.entries.readable_metrics;
+---- CATCH
+AnalysisException: Illegal table reference to non-collection type: 'functional_parquet.iceberg_query_metadata.entries.readable_metrics'
+====
+---- QUERY
+select delete_ids.item
+from functional_parquet.iceberg_query_metadata.all_files, functional_parquet.iceberg_query_metadata.all_files.equality_ids delete_ids;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+====
+---- QUERY
+select null_value_counts.key, null_value_counts.value
+from functional_parquet.iceberg_query_metadata.all_files, functional_parquet.iceberg_query_metadata.all_files.null_value_counts null_value_counts;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+====
+---- QUERY
+select item
+from functional_parquet.iceberg_query_metadata.all_files a, a.equality_ids e, e.delete_ids;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+====
+---- QUERY
+create view iceberg_query_metadata_all_files
+as select equality_ids from functional_parquet.iceberg_query_metadata.all_files;
+select item from iceberg_query_metadata_all_files a, a.equality_ids e, e.delete_ids;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+====

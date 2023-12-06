@@ -26,14 +26,20 @@ import org.apache.iceberg.MetadataTableUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.VirtualTable;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.IcebergSchemaConverter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -44,6 +50,7 @@ import com.google.common.base.Preconditions;
  * table object based on the Iceberg API.
  */
 public class IcebergMetadataTable extends VirtualTable {
+  private final static Logger LOG = LoggerFactory.getLogger(IcebergMetadataTable.class);
 
   // The Iceberg table that is the base of the metadata table.
   private FeIcebergTable baseTable_;
@@ -64,6 +71,8 @@ public class IcebergMetadataTable extends VirtualTable {
     Schema metadataTableSchema = metadataTable.schema();
     for (Column col : IcebergSchemaConverter.convertToImpalaSchema(
         metadataTableSchema)) {
+      LOG.trace("Adding column: \"{}\" with type: \"{}\" to metadata table.",
+          col.getName(), col.getType());
       addColumn(col);
     }
   }
@@ -111,8 +120,15 @@ public class IcebergMetadataTable extends VirtualTable {
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
-    TTableDescriptor desc = baseTable_.toThriftDescriptor(tableId, referencedPartitions);
+    TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.ICEBERG_TABLE,
+        getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
+    desc.setIcebergTable(FeIcebergTable.Utils.getTIcebergTable(baseTable_,
+        ThriftObjectType.DESCRIPTOR_ONLY));
     return desc;
+  }
+
+  private List<TColumnDescriptor> getTColumnDescriptors() {
+    return FeCatalogUtils.getTColumnDescriptors(this);
   }
 
   /**
@@ -120,7 +136,7 @@ public class IcebergMetadataTable extends VirtualTable {
    */
   public static boolean isIcebergMetadataTable(List<String> tblRefPath) {
     if (tblRefPath == null) return false;
-    if (tblRefPath.size() != 3) return false;
+    if (tblRefPath.size() < 3) return false;
     String vTableName = tblRefPath.get(2).toUpperCase();
     return EnumUtils.isValidEnum(MetadataTableType.class, vTableName);
   }

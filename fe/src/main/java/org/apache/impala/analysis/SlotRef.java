@@ -29,6 +29,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
+import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TExprNode;
@@ -226,29 +227,37 @@ public class SlotRef extends Expr {
     if (resolvedPath_ != null) {
       FeTable rootTable = resolvedPath_.getRootTable();
       if (rootTable != null) {
-        if (!(rootTable instanceof FeFsTable)) {
-          throw new AnalysisException(
-              String.format("%s is not supported when querying STRUCT type %s", rootTable,
-                  type_.toSql()));
-        }
-        FeFsTable feTable = (FeFsTable) rootTable;
-        for (HdfsFileFormat format : feTable.getFileFormats()) {
-          if (!formatSupportsQueryingStruct(format)) {
-            throw new AnalysisException("Querying STRUCT is only supported for ORC and "
-                + "Parquet file formats.");
-          }
+        checkTableTypeSupportsStruct(rootTable);
+        if (rootTable instanceof FeFsTable) {
+          checkFileFormatSupportsStruct((FeFsTable)rootTable);
         }
       }
     }
   }
 
-  // Returns true if the given HdfsFileFormat supports querying STRUCT types. Iceberg
-  // tables also have ICEBERG as HdfsFileFormat. We can return TRUE in case of Iceberg
-  // because the data file formats in the Iceberg table will be also tested separately.
-  private static boolean formatSupportsQueryingStruct(HdfsFileFormat format) {
-    return format == HdfsFileFormat.PARQUET ||
+  private void checkTableTypeSupportsStruct(FeTable feTable) throws AnalysisException {
+    if (!(feTable instanceof FeFsTable) &&
+        !(feTable instanceof IcebergMetadataTable)) {
+      throw new AnalysisException(
+          String.format("%s is not supported when querying STRUCT type %s",
+              feTable, type_.toSql()));
+    }
+  }
+
+  // Throws exception if the given HdfsFileFormat does not support querying STRUCT types.
+  // Iceberg tables also have ICEBERG as HdfsFileFormat. In case of Iceberg there is no
+  // need to throw exception because the data file formats in the Iceberg table will be
+  // also tested separately.
+  private void checkFileFormatSupportsStruct(FeFsTable feFsTable)
+      throws AnalysisException {
+    for (HdfsFileFormat format : feFsTable.getFileFormats()) {
+      if (! (format == HdfsFileFormat.PARQUET ||
            format == HdfsFileFormat.ORC ||
-           format == HdfsFileFormat.ICEBERG;
+           format == HdfsFileFormat.ICEBERG)) {
+        throw new AnalysisException("Querying STRUCT is only supported for ORC and "
+            + "Parquet file formats.");
+      }
+    }
   }
 
   // Assumes this 'SlotRef' is a struct and that desc_.itemTupleDesc_ has already been

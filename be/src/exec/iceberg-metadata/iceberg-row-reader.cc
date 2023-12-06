@@ -24,10 +24,8 @@
 
 namespace impala {
 
-IcebergRowReader::IcebergRowReader(
-    const TupleDescriptor* tuple_desc, const std::unordered_map<int, jobject>& jaccessor)
-  : tuple_desc_(tuple_desc),
-    jaccessors_(jaccessor) {}
+IcebergRowReader::IcebergRowReader(const std::unordered_map<SlotId, jobject>& jaccessors)
+  : jaccessors_(jaccessors) {}
 
 Status IcebergRowReader::InitJNI() {
   DCHECK(iceberg_accessor_cl_ == nullptr) << "InitJNI() already called!";
@@ -65,15 +63,19 @@ Status IcebergRowReader::InitJNI() {
   return Status::OK();
 }
 
-Status IcebergRowReader::MaterializeRow(JNIEnv* env,
-    jobject struct_like_row, Tuple* tuple, MemPool* tuple_data_pool) {
+Status IcebergRowReader::MaterializeTuple(JNIEnv* env,
+    jobject struct_like_row, const TupleDescriptor* tuple_desc, Tuple* tuple,
+    MemPool* tuple_data_pool) {
   DCHECK(env != nullptr);
   DCHECK(struct_like_row != nullptr);
   DCHECK(tuple != nullptr);
   DCHECK(tuple_data_pool != nullptr);
-  for (SlotDescriptor* slot_desc: tuple_desc_->slots()) {
-    jobject accessed_value = env->CallObjectMethod(jaccessors_.at(slot_desc->col_pos()),
-        iceberg_accessor_get_, struct_like_row);
+  DCHECK(tuple_desc != nullptr);
+
+  for (SlotDescriptor* slot_desc: tuple_desc->slots()) {
+    jobject accessor = jaccessors_.at(slot_desc->id());
+    jobject accessed_value = env->CallObjectMethod(accessor, iceberg_accessor_get_,
+        struct_like_row);
     RETURN_ERROR_IF_EXC(env);
     if (accessed_value == nullptr) {
       tuple->SetNull(slot_desc->null_indicator_offset());
@@ -96,6 +98,10 @@ Status IcebergRowReader::MaterializeRow(JNIEnv* env,
       } case TYPE_STRING: { // java.lang.String
         RETURN_IF_ERROR(WriteStringSlot(env, accessed_value, slot, tuple_data_pool));
         break;
+      } case TYPE_STRUCT: {
+        RETURN_IF_ERROR(WriteStructSlot(env, struct_like_row, slot_desc, tuple,
+            tuple_data_pool));
+        break;
       }
       default:
         // Skip the unsupported type and set it to NULL
@@ -108,6 +114,7 @@ Status IcebergRowReader::MaterializeRow(JNIEnv* env,
 
 Status IcebergRowReader::WriteBooleanSlot(JNIEnv* env, jobject accessed_value,
     void* slot) {
+  DCHECK(accessed_value != nullptr);
   DCHECK(env->IsInstanceOf(accessed_value, java_boolean_cl_) == JNI_TRUE);
   jboolean result = env->CallBooleanMethod(accessed_value, boolean_value_);
   RETURN_ERROR_IF_EXC(env);
@@ -116,6 +123,7 @@ Status IcebergRowReader::WriteBooleanSlot(JNIEnv* env, jobject accessed_value,
 }
 
 Status IcebergRowReader::WriteIntSlot(JNIEnv* env, jobject accessed_value, void* slot) {
+  DCHECK(accessed_value != nullptr);
   DCHECK(env->IsInstanceOf(accessed_value, java_int_cl_) == JNI_TRUE);
   jint result = env->CallIntMethod(accessed_value, int_value_);
   RETURN_ERROR_IF_EXC(env);
@@ -124,6 +132,7 @@ Status IcebergRowReader::WriteIntSlot(JNIEnv* env, jobject accessed_value, void*
 }
 
 Status IcebergRowReader::WriteLongSlot(JNIEnv* env, jobject accessed_value, void* slot) {
+  DCHECK(accessed_value != nullptr);
   DCHECK(env->IsInstanceOf(accessed_value, java_long_cl_) == JNI_TRUE);
   jlong result = env->CallLongMethod(accessed_value, long_value_);
   RETURN_ERROR_IF_EXC(env);
@@ -133,6 +142,7 @@ Status IcebergRowReader::WriteLongSlot(JNIEnv* env, jobject accessed_value, void
 
 Status IcebergRowReader::WriteTimeStampSlot(JNIEnv* env, jobject accessed_value,
     void* slot) {
+  DCHECK(accessed_value != nullptr);
   DCHECK(env->IsInstanceOf(accessed_value, java_long_cl_) == JNI_TRUE);
   jlong result = env->CallLongMethod(accessed_value, long_value_);
   RETURN_ERROR_IF_EXC(env);
@@ -143,6 +153,7 @@ Status IcebergRowReader::WriteTimeStampSlot(JNIEnv* env, jobject accessed_value,
 
 Status IcebergRowReader::WriteStringSlot(JNIEnv* env, jobject accessed_value, void* slot,
       MemPool* tuple_data_pool) {
+  DCHECK(accessed_value != nullptr);
   DCHECK(env->IsInstanceOf(accessed_value, java_char_sequence_cl_) == JNI_TRUE);
   jstring result = static_cast<jstring>(env->CallObjectMethod(accessed_value,
       char_sequence_to_string_));
@@ -159,6 +170,14 @@ Status IcebergRowReader::WriteStringSlot(JNIEnv* env, jobject accessed_value, vo
   }
   memcpy(buffer, str_guard.get(), str_len);
   reinterpret_cast<StringValue*>(slot)->Assign(buffer, str_len);
+  return Status::OK();
+}
+
+Status IcebergRowReader::WriteStructSlot(JNIEnv* env, jobject struct_like_row,
+    SlotDescriptor* slot_desc, Tuple* tuple, MemPool* tuple_data_pool) {
+  DCHECK(slot_desc != nullptr);
+  RETURN_IF_ERROR(MaterializeTuple(env, struct_like_row,
+      slot_desc->children_tuple_descriptor(), tuple, tuple_data_pool));
   return Status::OK();
 }
 

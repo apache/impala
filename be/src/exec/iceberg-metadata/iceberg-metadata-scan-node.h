@@ -100,12 +100,10 @@ class IcebergMetadataScanNode : public ScanNode {
 
   /// Accessor map for the scan result, pairs the slot ids with the java Accessor
   /// objects.
-  std::unordered_map<int, jobject> jaccessors_;
+  std::unordered_map<SlotId, jobject> jaccessors_;
 
-  /// Tuple id resolved in Prepare() to set 'tuple_desc_'.
-  TupleId tuple_id_;
-
-  /// Descriptor of tuples read from Iceberg metadata table.
+  // The TupleId and TupleDescriptor of the tuple that this scan node will populate.
+  const TupleId tuple_id_;
   const TupleDescriptor* tuple_desc_ = nullptr;
 
   /// Table and metadata table names.
@@ -121,6 +119,24 @@ class IcebergMetadataScanNode : public ScanNode {
 
   /// Gets the FeIceberg table from the Frontend.
   Status GetCatalogTable(jobject* jtable);
+
+  /// Populates the jaccessors_ map by creating the accessors for the columns in the JVM.
+  /// To create a field accessor for a column the Iceberg field id is needed. For
+  /// primitive type columns that are not a field of a struct, this can be found in the
+  /// ColumnDescriptor. However, ColumnDescriptors are not available for struct fields,
+  /// in this case the SlotDescriptor can be used.
+  Status CreateFieldAccessors();
+
+  /// Recursive part of the Accessor collection, when there is a struct in the tuple.
+  /// Collects the field ids of the struct members. The type_ field inside the struct slot
+  /// stores an ordered list of Iceberg Struct member field ids. This list can be indexed
+  /// with the last element of SchemaPath col_path to obtain the correct field id of the
+  /// struct member.
+  Status CreateFieldAccessors(JNIEnv* env, const SlotDescriptor* struct_slot_desc);
+
+  /// Helper method to simplify adding new accessors to the jaccessors_ map. It obtains
+  /// the Accessor through JNI and persists it into the jaccessors_ map.
+  Status AddAccessorForFieldId(JNIEnv* env, int field_id, SlotId slot_id);
 };
 
 }

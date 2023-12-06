@@ -89,11 +89,10 @@ public class IcebergMetadataScanner {
   }
 
   /**
-   * Returns the field {Accessor} for the specified column position. This {Accessor} is
+   * Returns the field {Accessor} for the specified field id. This {Accessor} then is
    * used to access a field in the {StructLike} object.
    */
-  public Accessor GetAccessor(int slotColPos) {
-    int fieldId = metadataTable_.schema().columns().get(slotColPos).fieldId();
+  public Accessor GetAccessor(int fieldId) {
     return metadataTable_.schema().accessorForField(fieldId);
   }
 
@@ -112,4 +111,5 @@ public class IcebergMetadataScanner {
     }
     return null;
   }
+
 }

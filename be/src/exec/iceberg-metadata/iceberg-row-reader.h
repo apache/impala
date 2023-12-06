@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "common/global-types.h"
+
 #include <jni.h>
 #include <unordered_map>
 
@@ -33,16 +35,15 @@ class TupleDescriptor;
 class IcebergRowReader {
  public:
   /// Initialize the tuple descriptor and accessors
-  IcebergRowReader(const TupleDescriptor* tuple_desc,
-      const std::unordered_map<int, jobject>& jaccessors);
+  IcebergRowReader(const std::unordered_map<SlotId, jobject>& jaccessors);
 
   /// JNI setup. Create global references for Java classes and find method ids.
   /// Initializes static members, should be called once per process lifecycle.
   static Status InitJNI();
 
-  /// Materlilize the StructLike Java objects into Impala rows.
-  Status MaterializeRow(JNIEnv* env, jobject struct_like_row, Tuple* tuple,
-      MemPool* tuple_data_pool);
+  /// Materialize the StructLike Java objects into Impala rows.
+  Status MaterializeTuple(JNIEnv* env, jobject struct_like_row,
+      const TupleDescriptor* tuple_desc, Tuple* tuple,  MemPool* tuple_data_pool);
 
  private:
   /// Global class references created with JniUtil.
@@ -62,12 +63,9 @@ class IcebergRowReader {
   inline static jmethodID long_value_ = nullptr;
   inline static jmethodID char_sequence_to_string_ = nullptr;
 
-  /// TupleDescriptor received from the ScanNode.
-  const TupleDescriptor* tuple_desc_;
-
   /// Accessor map for the scan result, pairs the slot ids with the java Accessor
   /// objects.
-  const std::unordered_map<int, jobject> jaccessors_;
+  const std::unordered_map<SlotId, jobject> jaccessors_;
 
   /// Reads the value of a primitive from the StructLike, translates it to a matching
   /// Impala type and writes it into the target tuple. The related Accessor objects are
@@ -82,6 +80,9 @@ class IcebergRowReader {
   /// and reclaims the memory area.
   Status WriteStringSlot(JNIEnv* env, jobject accessed_value, void* slot,
       MemPool* tuple_data_pool);
+  /// Recursively calls MaterializeTuple method with the child tuple of the struct slot.
+  Status WriteStructSlot(JNIEnv* env, jobject struct_like_row, SlotDescriptor* slot_desc,
+      Tuple* tuple, MemPool* tuple_data_pool);
 };
 
 }
