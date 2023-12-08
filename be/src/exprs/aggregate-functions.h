@@ -66,6 +66,16 @@ class AggregateFunctions {
   static StringVal StringValSerializeOrFinalize(
       FunctionContext* ctx, const StringVal& src);
 
+  /// Implementation of Regr_Count()
+  static void RegrCountUpdate(FunctionContext*, const DoubleVal& src1,
+      const DoubleVal& src2, BigIntVal* dst);
+  static void RegrCountRemove(FunctionContext*, const DoubleVal& src1,
+      const DoubleVal& src2, BigIntVal* dst);
+  static void TimestampRegrCountUpdate(FunctionContext*,
+      const TimestampVal& src1, const TimestampVal& src2, BigIntVal* dst);
+  static void TimestampRegrCountRemove(FunctionContext*,
+      const TimestampVal& src1, const TimestampVal& src2, BigIntVal* dst);
+
   /// Implementation of regr_slope() and regr_intercept()
   static void RegrSlopeInit(FunctionContext* ctx, StringVal* dst);
   static void RegrSlopeUpdate(FunctionContext* ctx, const DoubleVal& src1,

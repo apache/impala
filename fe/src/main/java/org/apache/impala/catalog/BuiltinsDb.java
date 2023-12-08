@@ -1367,6 +1367,25 @@ public class BuiltinsDb extends Db {
         prefix + "12CorrFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false, true, false));
 
+    // Regr_count()
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "regr_count",
+        Lists.<Type>newArrayList(Type.DOUBLE, Type.DOUBLE), Type.BIGINT, Type.BIGINT,
+        prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
+        prefix + "15RegrCountUpdateEPN10impala_udf15FunctionContextERKNS1_9DoubleValES6_PNS1_9BigIntValE",
+        prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
+        null, null,
+        prefix + "15RegrCountRemoveEPN10impala_udf15FunctionContextERKNS1_9DoubleValES6_PNS1_9BigIntValE",
+        null, false, true, true));
+
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "regr_count",
+        Lists.<Type>newArrayList(Type.TIMESTAMP, Type.TIMESTAMP), Type.BIGINT, Type.BIGINT,
+        prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
+        prefix + "24TimestampRegrCountUpdateEPN10impala_udf15FunctionContextERKNS1_12TimestampValES6_PNS1_9BigIntValE",
+        prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
+        null, null,
+        prefix + "24TimestampRegrCountRemoveEPN10impala_udf15FunctionContextERKNS1_12TimestampValES6_PNS1_9BigIntValE",
+        null, false, true, true));
+
     // Regr_r2()
     db.addBuiltin(AggregateFunction.createBuiltin(db, "regr_r2",
         Lists.<Type>newArrayList(Type.DOUBLE, Type.DOUBLE), Type.DOUBLE, Type.STRING,

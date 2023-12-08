@@ -288,6 +288,39 @@ void AggregateFunctions::CountMerge(FunctionContext*, const BigIntVal& src,
   dst->val += src.val;
 }
 
+// regr_count(y, x) returns an integer that is the number of non-null
+// number pairs. It indicates how many observations are included in the
+// analysis.
+void AggregateFunctions::RegrCountUpdate(
+    FunctionContext*, const DoubleVal& src1, const DoubleVal& src2, BigIntVal* dst) {
+  DCHECK(!dst->is_null);
+  if (!src1.is_null && !src2.is_null) ++dst->val;
+}
+
+void AggregateFunctions::RegrCountRemove(
+    FunctionContext*, const DoubleVal& src1, const DoubleVal& src2, BigIntVal* dst) {
+  DCHECK(!dst->is_null);
+  if (!src1.is_null && !src2.is_null) {
+    --dst->val;
+    DCHECK_GE(dst->val, 0);
+  }
+}
+
+void AggregateFunctions::TimestampRegrCountUpdate(FunctionContext*,
+    const TimestampVal& src1, const TimestampVal& src2, BigIntVal* dst) {
+  DCHECK(!dst->is_null);
+  if (!src1.is_null && !src2.is_null) ++dst->val;
+}
+
+void AggregateFunctions::TimestampRegrCountRemove(FunctionContext*,
+    const TimestampVal& src1, const TimestampVal& src2, BigIntVal* dst) {
+  DCHECK(!dst->is_null);
+  if (!src1.is_null && !src2.is_null) {
+    --dst->val;
+    DCHECK_GE(dst->val, 0);
+  }
+}
+
 // Implementation of regr_slope() and regr_intercept():
 // RegrSlopeState is used for implementing regr_slope() and regr_intercept().
 // regr_slope() and regr_intercept() take two arguments of numeric type and return the
