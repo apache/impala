@@ -33,7 +33,8 @@ fi
 rm -rf "${IMPALA_HOME}"/logs_system
 mkdir -p "${IMPALA_HOME}"/logs_system
 # Tolerate dmesg failures. dmesg can fail if there are insufficient permissions.
-if dmesg > "${IMPALA_HOME}"/logs_system/dmesg ; then
+if dmesg > "${IMPALA_HOME}"/logs_system/dmesg 2>/dev/null ||
+    sudo dmesg > "${IMPALA_HOME}"/logs_system/dmesg; then
 
   # Check dmesg for OOMs and generate a symptom if present.
   if [[ $(grep "Out of memory" "${IMPALA_HOME}"/logs_system/dmesg) ]]; then
