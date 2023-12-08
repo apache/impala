@@ -446,6 +446,24 @@ SELECT * FROM insert_string_partitioned WHERE s2 = "/\%.";
 string, string
 ====
 ---- QUERY
+truncate insert_string_partitioned;
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2="O'Reilly") values ('0');
+SELECT * FROM insert_string_partitioned where s2= "O'Reilly";
+---- RESULTS
+'0','O''Reilly'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+truncate insert_string_partitioned;
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2="Impala'#%*/:=?{}[]^") values ('0');
+SELECT * FROM insert_string_partitioned where s2= "Impala'#%*/:=?{}[]^";
+---- RESULTS
+'0','Impala''#%*/:=?{}[]^'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
 # static partition insert into string-partitioned table with non-escaped special characters
 # (Hive chooses not to escape + and ' ')
 truncate insert_string_partitioned;

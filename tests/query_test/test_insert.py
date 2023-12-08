@@ -294,6 +294,69 @@ class TestInsertPartKey(ImpalaTestSuite):
     self.run_test_case('QueryTest/insert_part_key', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
+  def test_escaped_partition_values(self, unique_database):
+    """Test for special characters in partition values."""
+    tbl = unique_database + ".tbl"
+    self.execute_query(
+        "create table {}(i int) partitioned by (p string) stored as parquet".format(tbl))
+    # "\\'" is used to represent a single quote since the insert statement uses a single
+    # quote on the partition value. "\\\\" is used for backslash since it gets escaped
+    # again in parsing the insert statement.
+    special_characters = "SpecialCharacters\x01\x02\x03\x04\x05\x06\x07\b\t\n\v\f\r" \
+                         "\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" \
+                         "\x1C\x1D\x1E\x1F\"\x7F\\'%*/:=?\\\\{[]#^"
+    part_value = "SpecialCharacters\x01\x02\x03\x04\x05\x06\x07\b\t\n\v\f\r" \
+                 "\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" \
+                 "\x1C\x1D\x1E\x1F\"\x7F'%*/:=?\\{[]#^"
+    part_dir = "p=SpecialCharacters%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%" \
+                "10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%22%7F%27%25%2A" \
+                "%2F%3A%3D%3F%5C%7B%5B%5D%23%5E"
+    res = self.execute_query(
+        "insert into {} partition(p='{}') values (0)".format(tbl, special_characters))
+    assert res.data[0] == part_dir + ": 1"
+    res = self.client.execute("select p from {}".format(tbl))
+    assert res.data[0] == part_value
+    res = self.execute_query("show partitions " + tbl)
+    # There is a "\t" in the partition value making splitting of the result line
+    # difficult, hence we only verify that the value is present in string
+    # representation of the whole row.
+    assert part_value in res.data[0]
+    assert part_dir in res.data[0]
+
+  def test_escaped_partition_values_iceberg(self, unique_database):
+    """Test for special characters in partition values for iceberg tables"""
+    tbl = unique_database + ".tbl"
+    self.execute_query("create table {} (id int, p string) partitioned by"
+                       " spec (identity(p)) stored by iceberg".format(tbl))
+    # "\\'" is used to represent a single quote since the insert statement uses a single
+    # quote on the partition value. "\\\\" is used for backslash since it gets escaped
+    # again in parsing the insert statement.
+    special_characters = "SpecialCharacters\x01\x02\x03\x04\x05\x06\x07\b\t\n\v\f\r" \
+                         "\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" \
+                         "\x1C\x1D\x1E\x1F\"\x7F\\'%*/:=?\\\\{[]#^"
+    part_value = "SpecialCharacters\x01\x02\x03\x04\x05\x06\x07\b\t\n\v\f\r" \
+                 "\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" \
+                 "\x1C\x1D\x1E\x1F\"\x7F'%*/:=?\\{[]#^"
+    part_dir = "p=SpecialCharacters%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%" \
+               "10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%22%7F%27%25%2A" \
+               "%2F%3A%3D%3F%5C%7B%5B%5D%23%5E"
+    show_part_value = "SpecialCharacters\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006" \
+                      "\\u0007\\b\\t\\n\\u000B\\f\\r\\u000E\\u000F\\u0010" \
+                      "\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017" \
+                      "\\u0018\\u0019\\u001A\\u001B\\u001C\\u001D\\u001E" \
+                     "\\u001F\\\"\\u007F\'%*\\/:=?\\\\{[]#^"
+    res = self.execute_query(
+        "insert into {} values (0, '{}')".format(tbl, special_characters))
+    assert res.data[0] == part_dir + ": 1"
+    res = self.client.execute("select p from {}".format(tbl))
+    assert res.data[0] == part_value
+    res = self.execute_query("show partitions " + tbl)
+    # There is a "\t" in the partition value making splitting of the result line
+    # difficult, hence we only verify that the value is present in string
+    # representation of the whole row.
+    assert show_part_value in res.data[0]
+
+
 class TestInsertNullQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

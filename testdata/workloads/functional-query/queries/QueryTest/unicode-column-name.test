@@ -291,3 +291,39 @@ INT, STRING
 drop table testtbl_parquet;
 ---- RESULTS
 'Table has been dropped.'
+====
+---- QUERY
+# Tests for IMPALA-11499
+create table unicode_partition_values (id int) partitioned by (p string) stored as parquet;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into unicode_partition_values partition(p='运营业务数据') values (0);
+insert into unicode_partition_values partition(p='运') values (0);
+insert into unicode_partition_values partition(p='运营业务数据1234567890!@#$%^&*(){}[]') values (0);
+select * from unicode_partition_values;
+---- RESULTS: RAW_STRING
+0,'运'
+0,'运营业务数据'
+0,'运营业务数据1234567890!@#$%^&*(){}[]'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+create table unicode_partition_values_iceberg (id int, p string) partitioned by spec (identity(p)) stored by iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into unicode_partition_values_iceberg values (0, '运营业务数据');
+insert into unicode_partition_values_iceberg values (0, '运');
+insert into unicode_partition_values_iceberg values (0, '运营业务数据1234567890!@#$%^&*(){}[]');
+select * from unicode_partition_values_iceberg;
+---- RESULTS: RAW_STRING
+0,'运'
+0,'运营业务数据'
+0,'运营业务数据1234567890!@#$%^&*(){}[]'
+---- TYPES
+INT, STRING
+====
