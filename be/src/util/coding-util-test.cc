@@ -113,8 +113,18 @@ TEST(UrlCodingTest, BlankString) {
 }
 
 TEST(UrlCodingTest, PathSeparators) {
-  TestUrl("/home/impala/directory/", "%2Fhome%2Fimpala%2Fdirectory%2F", false);
-  TestUrl("/home/impala/directory/", "%2Fhome%2Fimpala%2Fdirectory%2F", true);
+  string test_path = "/home/impala/directory/";
+  string encoded_test_path = "%2Fhome%2Fimpala%2Fdirectory%2F";
+  TestUrl(test_path, encoded_test_path, false);
+  TestUrl(test_path, encoded_test_path, true);
+  string test = "SpecialCharacters\x01\x02\x03\x04\x05\x06\x07\b\t\n\v\f\r\x0E\x0F\x10"
+                "\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x7F\"#%'"
+                "*/:=?\\{[]^";
+  string encoded_test = "SpecialCharacters%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F"
+                        "%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%7F%22%23%25"
+                        "%27%2A%2F%3A%3D%3F%5C%7B%5B%5D%5E";
+  TestUrl(test, encoded_test, false);
+  TestUrl(test, encoded_test, true);
 }
 
 TEST(Base64Test, Basic) {
