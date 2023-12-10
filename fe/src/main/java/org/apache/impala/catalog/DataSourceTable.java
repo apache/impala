@@ -40,11 +40,9 @@ import com.google.common.base.Preconditions;
 
 /**
  * All data source properties are stored as table properties (persisted in the
- * metastore) because the DataSource catalog object is not persisted so the
- * DataSource catalog object will not exist if the catalog server is restarted,
- * but the table does not need the DataSource catalog object in order to scan
- * the table. Tables that contain the TBL_PROP_DATA_SRC_NAME table parameter are
- * assumed to be backed by an external data source.
+ * metastore) so that the table does not need the DataSource catalog object in
+ * order to scan the table. Tables that contain the TBL_PROP_DATA_SRC_NAME table
+ * parameter are assumed to be backed by an external data source.
  */
 public class DataSourceTable extends Table implements FeDataSourceTable {
   private final static Logger LOG = LoggerFactory.getLogger(DataSourceTable.class);

@@ -63,8 +63,8 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
       }
     }
     // Add table properties from the DataSource catalog object now that we have access
-    // to the catalog. These are stored in the table metadata because DataSource catalog
-    // objects are not currently persisted.
+    // to the catalog. These are stored in the table metadata so that the table could
+    // be scanned without the DataSource catalog object.
     String location = dataSource.getLocation();
     getTblProperties().put(TBL_PROP_LOCATION, location);
     getTblProperties().put(TBL_PROP_CLASS, dataSource.getClassName());

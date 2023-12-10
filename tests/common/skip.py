@@ -257,3 +257,6 @@ class SkipIfOS:
 class SkipIfApacheHive():
   feature_not_supported = pytest.mark.skipif(IS_APACHE_HIVE,
       reason="Apache Hive does not support this feature")
+  data_connector_not_supported = pytest.mark.skipif(
+      IS_APACHE_HIVE and HIVE_MAJOR_VERSION <= 3,
+      reason="Apache Hive 3.1 or older version do not support DataConnector")

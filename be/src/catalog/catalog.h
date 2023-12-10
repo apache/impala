@@ -141,6 +141,11 @@ class Catalog {
   /// The function should be called when the CatalogD becomes active.
   void RegenerateServiceId();
 
+  /// Refresh the data sources from metadata store.
+  /// Returns OK if the refreshing was successful, otherwise a Status object with
+  /// information on the error will be returned.
+  Status RefreshDataSources();
+
  private:
   jobject catalog_;  // instance of org.apache.impala.service.JniCatalog
   jmethodID update_metastore_id_;  // JniCatalog.updateMetaastore()
@@ -164,6 +169,7 @@ class Catalog {
   jmethodID catalog_ctor_;
   jmethodID update_table_usage_id_;
   jmethodID regenerate_service_id_; // JniCatalog.regenerateServiceId()
+  jmethodID refresh_data_sources_; // JniCatalog.refreshDataSources()
 };
 
 }

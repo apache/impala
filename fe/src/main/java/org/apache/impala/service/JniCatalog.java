@@ -555,4 +555,11 @@ public class JniCatalog {
           return response;
         });
   }
+
+  /**
+   * Refresh data sources from metadata store.
+   */
+  public void refreshDataSources() throws TException {
+    catalog_.refreshDataSources();
+  }
 }

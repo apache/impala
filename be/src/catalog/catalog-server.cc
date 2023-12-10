@@ -592,6 +592,12 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
         if (!status.ok()) {
           LOG(ERROR) << "Failed to reset metadata triggered by catalogd failover.";
         }
+      } else {
+        // Refresh DataSource objects when the catalogd becomes active.
+        Status status = catalog_->RefreshDataSources();
+        if (!status.ok()) {
+          LOG(ERROR) << "Failed to refresh data sources triggered by catalogd failover.";
+        }
       }
       // Signal the catalog update gathering thread to start.
       topic_updates_ready_ = false;

@@ -21,6 +21,8 @@ import os
 import subprocess
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import build_flavor_timeout
+from tests.common.skip import SkipIfApacheHive
 
 
 class TestExtDataSources(CustomClusterTestSuite):
@@ -59,6 +61,89 @@ class TestExtDataSources(CustomClusterTestSuite):
   def test_data_source_small_batch_size(self, vector, unique_database):
     """Run test with batch size less than default size 1024"""
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
+
+  @SkipIfApacheHive.data_connector_not_supported
+  @pytest.mark.execute_serially
+  def test_restart_catalogd(self, vector, unique_database):
+    """Restart Catalog server after creating a data source. Verify that the data source
+    object is persistent across restarting of Catalog server."""
+    DROP_DATA_SOURCE_QUERY = "DROP DATA SOURCE IF EXISTS test_restart_persistent"
+    CREATE_DATA_SOURCE_QUERY = "CREATE DATA SOURCE test_restart_persistent " \
+        "LOCATION '/test-warehouse/data-sources/jdbc-data-source.jar' " \
+        "CLASS 'org.apache.impala.extdatasource.jdbc.PersistentJdbcDataSource' " \
+        "API_VERSION 'V1'"
+    SHOW_DATA_SOURCE_QUERY = "SHOW DATA SOURCES LIKE 'test_restart_*'"
+
+    # Create a data source and verify that the object is created successfully.
+    self.execute_query_expect_success(self.client, DROP_DATA_SOURCE_QUERY)
+    self.execute_query_expect_success(self.client, CREATE_DATA_SOURCE_QUERY)
+    result = self.execute_query(SHOW_DATA_SOURCE_QUERY)
+    assert result.success, str(result)
+    assert "PersistentJdbcDataSource" in result.get_data()
+
+    # Restart Catalog server.
+    self.cluster.catalogd.restart()
+    wait_time_s = build_flavor_timeout(90, slow_build_timeout=180)
+    self.cluster.statestored.service.wait_for_metric_value('statestore.live-backends',
+        expected_value=4, timeout=wait_time_s)
+
+    # Verify that the data source object is still available after restarting Catalog
+    # server.
+    result = self.execute_query(SHOW_DATA_SOURCE_QUERY)
+    assert result.success, str(result)
+    assert "PersistentJdbcDataSource" in result.get_data()
+    # Remove the data source
+    self.execute_query_expect_success(self.client, DROP_DATA_SOURCE_QUERY)
+    result = self.execute_query(SHOW_DATA_SOURCE_QUERY)
+    assert result.success, str(result)
+    assert "PersistentJdbcDataSource" not in result.get_data()
+
+  @SkipIfApacheHive.data_connector_not_supported
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
+                     "--statestore_heartbeat_frequency_ms=1000",
+    start_args="--enable_catalogd_ha")
+  def test_catalogd_ha_failover(self):
+    """The test case for cluster started with catalogd HA enabled."""
+    DROP_DATA_SOURCE_QUERY = "DROP DATA SOURCE IF EXISTS test_failover_persistent"
+    CREATE_DATA_SOURCE_QUERY = "CREATE DATA SOURCE test_failover_persistent " \
+        "LOCATION '/test-warehouse/data-sources/jdbc-data-source.jar' " \
+        "CLASS 'org.apache.impala.extdatasource.jdbc.FailoverInSyncJdbcDataSource' " \
+        "API_VERSION 'V1'"
+    SHOW_DATA_SOURCE_QUERY = "SHOW DATA SOURCES LIKE 'test_failover_*'"
+    # Verify two catalogd instances are created with one as active.
+    catalogds = self.cluster.catalogds()
+    assert(len(catalogds) == 2)
+    catalogd_service_1 = catalogds[0].service
+    catalogd_service_2 = catalogds[1].service
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    # Create a data source and verify that the object is created successfully.
+    self.execute_query_expect_success(self.client, DROP_DATA_SOURCE_QUERY)
+    self.execute_query_expect_success(self.client, CREATE_DATA_SOURCE_QUERY)
+    result = self.execute_query(SHOW_DATA_SOURCE_QUERY)
+    assert result.success, str(result)
+    assert "FailoverInSyncJdbcDataSource" in result.get_data()
+
+    # Kill active catalogd
+    catalogds[0].kill()
+    # Wait for long enough for the statestore to detect the failure of active catalogd
+    # and assign active role to standby catalogd.
+    catalogd_service_2.wait_for_metric_value(
+        "catalog-server.active-status", expected_value=True, timeout=30)
+    assert(catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    # Verify that the data source object is available in the catalogd of HA pair.
+    result = self.execute_query(SHOW_DATA_SOURCE_QUERY)
+    assert result.success, str(result)
+    assert "FailoverInSyncJdbcDataSource" in result.get_data()
+    # Remove the data source
+    self.execute_query_expect_success(self.client, DROP_DATA_SOURCE_QUERY)
+    result = self.execute_query(SHOW_DATA_SOURCE_QUERY)
+    assert result.success, str(result)
+    assert "FailoverInSyncJdbcDataSource" not in result.get_data()
 
 
 class TestMySqlExtJdbcTables(CustomClusterTestSuite):

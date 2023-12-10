@@ -1898,6 +1898,38 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Loads DataSource objects into the catalog and assigns new versions to all the
+   * loaded DataSource objects.
+   */
+  public void refreshDataSources() throws TException {
+    Map<String, DataSource> newDataSrcs = null;
+    try (MetaStoreClient msClient = getMetaStoreClient()) {
+      // Load all DataSource objects from HMS DataConnector objects.
+      newDataSrcs = MetastoreShim.loadAllDataSources(msClient.getHiveClient());
+      if (newDataSrcs == null) return;
+    }
+    Set<String> oldDataSrcNames = dataSources_.keySet();
+    Set<String> newDataSrcNames = newDataSrcs.keySet();
+    oldDataSrcNames.removeAll(newDataSrcNames);
+    int removedDataSrcNum = 0;
+    for (String dataSrcName: oldDataSrcNames) {
+      // Add removed DataSource objects to deleteLog_.
+      DataSource dataSrc = dataSources_.remove(dataSrcName);
+      if (dataSrc != null) {
+        dataSrc.setCatalogVersion(incrementAndGetCatalogVersion());
+        deleteLog_.addRemovedObject(dataSrc.toTCatalogObject());
+        removedDataSrcNum++;
+      }
+    }
+    for (DataSource dataSrc: newDataSrcs.values()) {
+      dataSrc.setCatalogVersion(incrementAndGetCatalogVersion());
+      dataSources_.add(dataSrc);
+    }
+    LOG.info("Finished refreshing DataSources. Added {}. Removed {}.",
+        newDataSrcs.size(), removedDataSrcNum);
+  }
+
+  /**
    * Load the list of TableMeta from Hive. If pull_table_types_and_comments=true, the list
    * will contain the table types and comments. Otherwise, we just fetch the table names
    * and set nulls on the types and comments.
@@ -2078,13 +2110,12 @@ public class CatalogServiceCatalog extends Catalog {
     // reset operation itself and to unblock impalads by making the catalog version >
     // INITIAL_CATALOG_VERSION. See Frontend.waitForCatalog()
     ++catalogVersion_;
-    // Assign new versions to all the loaded data sources.
-    for (DataSource dataSource: getDataSources()) {
-      dataSource.setCatalogVersion(incrementAndGetCatalogVersion());
-    }
 
-    // Update db and table metadata
+    // Update data source, db and table metadata
     try {
+      // Refresh DataSource objects from HMS and assign new versions.
+      refreshDataSources();
+
       // Not all Java UDFs are persisted to the metastore. The ones which aren't
       // should be restored once the catalog has been invalidated.
       Map<String, Db> oldDbCache = dbCache_.get();

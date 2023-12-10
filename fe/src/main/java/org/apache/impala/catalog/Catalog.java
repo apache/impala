@@ -271,8 +271,7 @@ public abstract class Catalog implements AutoCloseable {
   }
 
   /**
-   * Adds a data source to the in-memory map of data sources. It is not
-   * persisted to the metastore.
+   * Adds a data source to the in-memory map of data sources.
    * @return true if this item was added or false if the existing value was preserved.
    */
   public boolean addDataSource(DataSource dataSource) {

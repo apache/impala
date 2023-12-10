@@ -70,6 +70,7 @@ Catalog::Catalog() {
     {"getPartitionStats", "([B)[B", &get_partition_stats_id_},
     {"updateTableUsage", "([B)V", &update_table_usage_id_},
     {"regenerateServiceId", "()V", &regenerate_service_id_},
+    {"refreshDataSources", "()V", &refresh_data_sources_},
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -214,4 +215,8 @@ void Catalog::RegenerateServiceId() {
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
   jni_env->CallVoidMethod(catalog_, regenerate_service_id_);
   ABORT_IF_EXC(jni_env);
+}
+
+Status Catalog::RefreshDataSources() {
+  return JniUtil::CallJniMethod(catalog_, refresh_data_sources_);
 }

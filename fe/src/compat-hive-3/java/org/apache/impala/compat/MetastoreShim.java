@@ -27,6 +27,7 @@ import static org.apache.impala.util.HiveMetadataFormatUtils.formatOutput;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 
 import java.net.InetAddress;
@@ -46,9 +47,11 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.CompactionInfoStruct;
+import org.apache.hadoop.hive.metastore.api.DataConnector;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FireEventRequest;
 import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
@@ -90,6 +93,7 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.CompactionInfoLoader;
+import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsPartition;
@@ -130,6 +134,13 @@ import org.slf4j.LoggerFactory;
  */
 public class MetastoreShim extends Hive3MetastoreShimBase {
   private static final Logger LOG = LoggerFactory.getLogger(MetastoreShim.class);
+
+  // Impala DataSource object is saved in HMS as DataConnector with type
+  // as 'impalaDataSource'
+  private static final String HMS_DATA_CONNECTOR_TYPE = "impalaDataSource";
+  private static final String HMS_DATA_CONNECTOR_DESC = "Impala DataSource Object";
+  private static final String HMS_DATA_CONNECTOR_PARAM_KEY_CLASS_NAME = "className";
+  private static final String HMS_DATA_CONNECTOR_PARAM_KEY_API_VERSION = "apiVersion";
 
   /**
    * Wrapper around IMetaStoreClient.alter_table with validWriteIds as a param.
@@ -961,5 +972,83 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
               sourceTable.getDeletedCount()));
       tableInfo.append(metaDataTable.renderTable(isOutputPadded));
     }
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.createDataConnector().
+   */
+  public static void createDataSource(IMetaStoreClient client, DataSource dataSource)
+      throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
+    DataConnector connector = MetastoreShim.dataSourceToDataConnector(dataSource);
+    Preconditions.checkNotNull(connector);
+    client.createDataConnector(connector);
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.dropDataConnector().
+   */
+  public static void dropDataSource(IMetaStoreClient client, String name,
+      boolean ifExists) throws NoSuchObjectException, InvalidOperationException,
+          MetaException, TException {
+    // Set 'checkReferences' as false, e.g. drop DataSource object without checking its
+    // reference since the properties of DataSource object are copied to the table
+    // property of the referenced DataSource tables.
+    client.dropDataConnector(
+        name, /* ifNotExists */ !ifExists, /* checkReferences */ false);
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.getAllDataConnectorNames() and
+   * IMetaStoreClient.getDataConnector().
+   */
+  public static Map<String, DataSource> loadAllDataSources(IMetaStoreClient client)
+      throws MetaException, TException {
+    Map<String, DataSource> newDataSrcs = new HashMap<String, DataSource>();
+    // Load DataSource objects from HMS DataConnector objects.
+    List<String> allConnectorNames = client.getAllDataConnectorNames();
+    for (String connectorName: allConnectorNames) {
+      DataConnector connector = client.getDataConnector(connectorName);
+      if (connector != null) {
+        DataSource dataSrc = MetastoreShim.dataConnectorToDataSource(connector);
+        if (dataSrc != null) newDataSrcs.put(connectorName, dataSrc);
+      }
+    }
+    return newDataSrcs;
+  }
+
+  /**
+   * Convert DataSource object to DataConnector object.
+   */
+  private static DataConnector dataSourceToDataConnector(DataSource dataSource) {
+    DataConnector connector = new DataConnector(
+        dataSource.getName(), HMS_DATA_CONNECTOR_TYPE, dataSource.getLocation());
+    connector.setDescription(HMS_DATA_CONNECTOR_DESC);
+    connector.putToParameters(
+        HMS_DATA_CONNECTOR_PARAM_KEY_CLASS_NAME, dataSource.getClassName());
+    connector.putToParameters(
+        HMS_DATA_CONNECTOR_PARAM_KEY_API_VERSION, dataSource.getApiVersion());
+    return connector;
+  }
+
+  /**
+   * Convert DataConnector object to DataSource object.
+   */
+  private static DataSource dataConnectorToDataSource(DataConnector connector) {
+    if (!connector.isSetName() || !connector.isSetType() || !connector.isSetUrl()
+        || !connector.isSetDescription() || connector.getParametersSize() == 0
+        || !connector.getType().equalsIgnoreCase(HMS_DATA_CONNECTOR_TYPE)) {
+      return null;
+    }
+    String name = connector.getName();
+    String location = connector.getUrl();
+    String className =
+        connector.getParameters().get(HMS_DATA_CONNECTOR_PARAM_KEY_CLASS_NAME);
+    String apiVersion =
+        connector.getParameters().get(HMS_DATA_CONNECTOR_PARAM_KEY_API_VERSION);
+    if (!Strings.isNullOrEmpty(name) && !Strings.isNullOrEmpty(location) &&
+        !Strings.isNullOrEmpty(className) && !Strings.isNullOrEmpty(apiVersion)) {
+      return new DataSource(name, location, className, apiVersion);
+    }
+    return null;
   }
 }

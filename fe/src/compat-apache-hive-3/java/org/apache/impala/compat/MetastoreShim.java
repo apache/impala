@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -65,6 +66,7 @@ import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.hadoop.hive.metastore.utils.FileUtils;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
@@ -945,5 +947,23 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     // TODO: IMPALA-11815: hive metastore doesn't privide api to judge whether the
     //  materialized view is outdated for rewriting, so set the flag to "Unknown"
     formatOutput("Outdated for Rewriting:", "Unknown", tableInfo);
+  }
+
+  public static void createDataSource(IMetaStoreClient client, DataSource dataSource)
+      throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
+    // noop for unsupported operation IMetaStoreClient.createDataConnector().
+  }
+
+  public static void dropDataSource(IMetaStoreClient client, String name,
+      boolean ifExists) throws NoSuchObjectException, InvalidOperationException,
+          MetaException, TException {
+    // noop for unsupported operation IMetaStoreClient.dropDataConnector().
+  }
+
+  public static Map<String, DataSource> loadAllDataSources(IMetaStoreClient client)
+      throws MetaException, TException {
+    // Unsupported operation IMetaStoreClient.getAllDataConnectorNames() and
+    // IMetaStoreClient.getDataConnector().
+    return null;
   }
 }
