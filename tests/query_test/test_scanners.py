@@ -1949,3 +1949,49 @@ class TestParquetV2(ImpalaTestSuite):
 
   def test_parquet_v2(self, vector):
     self.run_test_case('QueryTest/parquet-v2', vector)
+
+
+class TestSingleFileTable(ImpalaTestSuite):
+  """IMPALA-12589: Regression test for corner case behavior where a table LOCATION might
+  point to a file instead of a directory. Expect SELECT and SHOW FILES to still work in
+  that case."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestSingleFileTable, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'text')
+
+  def test_single_file_table(self, vector, unique_database):
+    # Create a simple table with one column.
+    params = {"db": unique_database, "tbl": "single_file_table"}
+    create_tbl_ddl = ("create external table {db}.{tbl} (c1 int) "
+                      "stored as textfile").format(**params)
+    self.execute_query_expect_success(self.client, create_tbl_ddl)
+
+    # Insert one value to the table.
+    insert_stmt = "insert into {db}.{tbl} values (1)".format(**params)
+    self.execute_query_expect_success(self.client, insert_stmt)
+
+    # Show files and get the path to the first data file.
+    show_files_stmt = "show files in {db}.{tbl}".format(**params)
+    res = self.execute_query_expect_success(self.client, show_files_stmt)
+    assert len(res.data) == 1
+    hdfs_file_path = res.data[0].split("\t")[0]
+    params['new_location'] = hdfs_file_path
+
+    # Alter location to point a data file.
+    alter_stmt = "alter table {db}.{tbl} set location '{new_location}'".format(**params)
+    self.execute_query_expect_success(self.client, alter_stmt)
+
+    # Show files and count star should still work.
+    res = self.execute_query_expect_success(self.client, show_files_stmt)
+    assert res.data[0].split("\t")[0] == (hdfs_file_path + '/')
+    select_stmt = "select count(*) from {db}.{tbl}".format(**params)
+    res = self.execute_query_expect_success(self.client, select_stmt)
+    assert res.data[0].split("\t")[0] == '1'
+

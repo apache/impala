@@ -260,17 +260,28 @@ public class HdfsPartition extends CatalogObjectImpl
 
     public String getRelativePath() { return fbFileDescriptor_.relativePath(); }
 
-    public String getAbsolutePath() { return fbFileDescriptor_.absolutePath(); }
+    public String getAbsolutePath() {
+      return StringUtils.isEmpty(fbFileDescriptor_.absolutePath()) ?
+          StringUtils.EMPTY :
+          fbFileDescriptor_.absolutePath();
+    }
 
     public String getAbsolutePath(String rootPath) {
-      return StringUtils.isNotEmpty(fbFileDescriptor_.relativePath())
-          ? rootPath + Path.SEPARATOR + fbFileDescriptor_.relativePath()
-          : fbFileDescriptor_.absolutePath();
+      if (StringUtils.isEmpty(fbFileDescriptor_.relativePath())
+          && StringUtils.isNotEmpty(fbFileDescriptor_.absolutePath())) {
+        return fbFileDescriptor_.absolutePath();
+      } else {
+        return rootPath + Path.SEPARATOR + fbFileDescriptor_.relativePath();
+      }
     }
 
     public String getPath() {
-      return StringUtils.isNotEmpty(fbFileDescriptor_.relativePath())
-          ? fbFileDescriptor_.relativePath() : fbFileDescriptor_.absolutePath();
+      if (StringUtils.isEmpty(fbFileDescriptor_.relativePath())
+          && StringUtils.isNotEmpty(fbFileDescriptor_.absolutePath())) {
+        return fbFileDescriptor_.absolutePath();
+      } else {
+        return fbFileDescriptor_.relativePath();
+      }
     }
 
     public long getFileLength() { return fbFileDescriptor_.length(); }
