@@ -23,6 +23,7 @@
 
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 
+#include "common/atomic.h"
 #include "common/names.h"
 #include "common/logging.h"
 
@@ -57,8 +58,8 @@ class SystemStateInfo {
 
   /// Network usage rates in bytes per second.
   struct NetworkUsage {
-    int64_t rx_rate;
-    int64_t tx_rate;
+    AtomicInt64 rx_rate;
+    AtomicInt64 tx_rate;
   };
 
   /// Returns a struct containing the network usage for the interval between the last two
@@ -67,8 +68,8 @@ class SystemStateInfo {
 
   /// Disk statistics rates in bytes per second
   struct DiskStats {
-    int64_t read_rate;
-    int64_t write_rate;
+    AtomicInt64 read_rate;
+    AtomicInt64 write_rate;
   };
 
   /// Returns a struct containing the disk throughput for the interval between the last

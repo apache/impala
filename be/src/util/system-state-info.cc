@@ -208,10 +208,10 @@ void SystemStateInfo::ComputeNetworkUsage(int64_t period_ms) {
   const NetworkValues& cur = network_values_[net_val_idx_];
   const NetworkValues& old = network_values_[1 - net_val_idx_];
   int64_t rx_bytes = cur[NET_RX_BYTES] - old[NET_RX_BYTES];
-  network_usage_.rx_rate = rx_bytes * 1000L / period_ms;
+  network_usage_.rx_rate.Store(rx_bytes * 1000L / period_ms);
 
   int64_t tx_bytes = cur[NET_TX_BYTES] - old[NET_TX_BYTES];
-  network_usage_.tx_rate = tx_bytes * 1000L / period_ms;
+  network_usage_.tx_rate.Store(tx_bytes * 1000L / period_ms);
 }
 
 void SystemStateInfo::ReadCurrentProcDiskStats() {
@@ -263,10 +263,10 @@ void SystemStateInfo::ComputeDiskStats(int64_t period_ms) {
   const DiskValues& cur = disk_values_[disk_val_idx_];
   const DiskValues& old = disk_values_[1 - disk_val_idx_];
   int64_t read_sectors = cur[DISK_SECTORS_READ] - old[DISK_SECTORS_READ];
-  disk_stats_.read_rate = read_sectors * BYTES_PER_SECTOR * 1000 / period_ms;
+  disk_stats_.read_rate.Store(read_sectors * BYTES_PER_SECTOR * 1000 / period_ms);
 
   int64_t write_sectors = cur[DISK_SECTORS_WRITTEN] - old[DISK_SECTORS_WRITTEN];
-  disk_stats_.write_rate = write_sectors * BYTES_PER_SECTOR * 1000 / period_ms;
+  disk_stats_.write_rate.Store(write_sectors * BYTES_PER_SECTOR * 1000 / period_ms);
 }
 
 } // namespace impala

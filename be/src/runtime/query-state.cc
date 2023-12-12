@@ -233,20 +233,20 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
     // Add network usage
     host_profile_->AddSamplingTimeSeriesCounter(
         "HostNetworkRx", TUnit::BYTES_PER_SECOND, [system_state_info] () {
-        return system_state_info->GetNetworkUsage().rx_rate;
+        return system_state_info->GetNetworkUsage().rx_rate.Load();
         });
     host_profile_->AddSamplingTimeSeriesCounter(
         "HostNetworkTx", TUnit::BYTES_PER_SECOND, [system_state_info] () {
-        return system_state_info->GetNetworkUsage().tx_rate;
+        return system_state_info->GetNetworkUsage().tx_rate.Load();
         });
     // Add disk stats
     host_profile_->AddSamplingTimeSeriesCounter(
         "HostDiskReadThroughput", TUnit::BYTES_PER_SECOND, [system_state_info] () {
-        return system_state_info->GetDiskStats().read_rate;
+        return system_state_info->GetDiskStats().read_rate.Load();
         });
     host_profile_->AddSamplingTimeSeriesCounter(
         "HostDiskWriteThroughput", TUnit::BYTES_PER_SECOND, [system_state_info] () {
-        return system_state_info->GetDiskStats().write_rate;
+        return system_state_info->GetDiskStats().write_rate.Load();
         });
   }
 
