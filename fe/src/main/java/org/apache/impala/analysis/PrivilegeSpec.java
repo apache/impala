@@ -56,6 +56,7 @@ public class PrivilegeSpec extends StmtNode {
   // Set/modified during analysis
   private String dbName_;
   private String serverName_;
+  private String ownerName_;
 
   private PrivilegeSpec(TPrivilegeLevel privilegeLevel, TPrivilegeScope scope,
       String serverName, String dbName, TableName tableName, HdfsUri uri,
@@ -232,14 +233,7 @@ public class PrivilegeSpec extends StmtNode {
       case SERVER:
         break;
       case DATABASE:
-        Preconditions.checkState(!Strings.isNullOrEmpty(dbName_));
-        try {
-          analyzer.getDb(dbName_, true);
-        } catch (AnalysisException e) {
-          throw new AnalysisException(String.format("Error setting/showing privileges " +
-              "for database '%s'. Verify that the database exists and that you have " +
-              "permissions to issue a GRANT/REVOKE/SHOW GRANT statement.", dbName_));
-        }
+        analyzeTargetDatabase(analyzer);
         break;
       case URI:
         Preconditions.checkNotNull(uri_);
@@ -325,6 +319,7 @@ public class PrivilegeSpec extends StmtNode {
       dbName_ = analyzer.getTargetDbName(tableName_);
       Preconditions.checkNotNull(dbName_);
       table = analyzer.getTable(dbName_, tableName_.getTbl(), /* must_exist */ true);
+      ownerName_ = table.getOwnerUser();
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);
     } catch (AnalysisException e) {
@@ -334,6 +329,18 @@ public class PrivilegeSpec extends StmtNode {
     }
     Preconditions.checkNotNull(table);
     return table;
+  }
+
+  private void analyzeTargetDatabase(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(!Strings.isNullOrEmpty(dbName_));
+    try {
+      FeDb db = analyzer.getDb(dbName_, /* throwIfDoesNotExist */ true);
+      ownerName_ = db.getOwnerUser();
+    } catch (AnalysisException e) {
+      throw new AnalysisException(String.format("Error setting/showing privileges " +
+          "for database '%s'. Verify that the database exists and that you have " +
+          "permissions to issue a GRANT/REVOKE/SHOW GRANT statement.", dbName_));
+    }
   }
 
   private void analyzeUdf(Analyzer analyzer) throws AnalysisException {
@@ -373,4 +380,6 @@ public class PrivilegeSpec extends StmtNode {
   public String getDbName() { return dbName_; }
 
   public String getServerName() { return serverName_; }
+
+  public String getOwnerName() { return ownerName_; }
 }

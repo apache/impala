@@ -65,6 +65,10 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     params.setPrincipal_type(principalType_);
     params.setHas_grant_opt(hasGrantOpt_);
     params.setPrivileges(privileges);
+    String ownerName = privilegeSpec_.getOwnerName();
+    if (ownerName != null) {
+      params.setOwner_name(ownerName);
+    }
     return params;
   }
 

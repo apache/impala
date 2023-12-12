@@ -38,6 +38,11 @@ from tests.util.filesystem_utils import WAREHOUSE_PREFIX, WAREHOUSE
 from tests.util.iceberg_util import get_snapshots
 
 ADMIN = "admin"
+OWNER_USER = getuser()
+NON_OWNER = "non_owner"
+ERROR_GRANT = "User doesn't have necessary permission to grant access"
+ERROR_REVOKE = "User doesn't have necessary permission to revoke access"
+
 RANGER_AUTH = ("admin", "admin")
 RANGER_HOST = "http://localhost:6080"
 REST_HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -1118,6 +1123,322 @@ class TestRanger(CustomClusterTestSuite):
       # *never* show owned tables. TODO(bharathv): Fix in a follow up commit
       pytest.xfail("getTableIfCached() faulty behavior, known issue")
       self._test_ownership()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_grant_revoke_by_owner_legacy_catalog(self, unique_name):
+    self._test_grant_revoke_by_owner(unique_name)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args=LOCAL_CATALOG_IMPALAD_ARGS,
+    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS)
+  def test_grant_revoke_by_owner_local_catalog(self, unique_name):
+    self._test_grant_revoke_by_owner(unique_name)
+
+  def _test_grant_revoke_by_owner(self, unique_name):
+    non_owner_user = NON_OWNER
+    non_owner_group = NON_OWNER
+    grantee_role = "grantee_role"
+    resource_owner_role = OWNER_USER
+    admin_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    table_name = "tbl"
+    column_names = ["a", "b"]
+    udf_uri = "/test-warehouse/impala-hive-udfs.jar"
+    udf_name = "identity"
+    test_data = [("USER", non_owner_user), ("GROUP", non_owner_group),
+        ("ROLE", grantee_role)]
+    privileges = ["alter", "drop", "create", "insert", "select", "refresh"]
+
+    try:
+      admin_client.execute("create role {}".format(grantee_role), user=ADMIN)
+      admin_client.execute("create role {}".format(resource_owner_role), user=ADMIN)
+      admin_client.execute("grant create on server to user {0}".format(OWNER_USER),
+          user=ADMIN)
+      # A user has to be granted the ALL privilege on the URI of the UDF as well to be
+      # able to create a UDF.
+      admin_client.execute("grant all on uri '{0}{1}' to user {2}"
+          .format(os.getenv("FILESYSTEM_PREFIX"), udf_uri, OWNER_USER), user=ADMIN)
+      self._run_query_as_user("create database {0}".format(unique_database), OWNER_USER,
+          True)
+      self._run_query_as_user("create table {0}.{1} ({2} int, {3} string)"
+          .format(unique_database, table_name, column_names[0], column_names[1]),
+          OWNER_USER, True)
+      self._run_query_as_user("create function {0}.{1} "
+          "location '{2}{3}' symbol='org.apache.impala.TestUdf'"
+          .format(unique_database, udf_name, os.getenv("FILESYSTEM_PREFIX"), udf_uri),
+          OWNER_USER, True)
+
+      for data in test_data:
+        grantee_type = data[0]
+        grantee = data[1]
+        for privilege in privileges:
+          # Case 1: when the resource is a database.
+          self._test_grant_revoke_by_owner_on_database(privilege, unique_database,
+              grantee_type, grantee, resource_owner_role)
+
+          # Case 2: when the resource is a table.
+          self._test_grant_revoke_by_owner_on_table(privilege, unique_database,
+              table_name, grantee_type, grantee, resource_owner_role)
+
+          # Case 3: when the resource is a column.
+          self._test_grant_revoke_by_owner_on_column(privilege, column_names,
+              unique_database, table_name, grantee_type, grantee, resource_owner_role)
+
+          # Case 4: when the resource is a UDF.
+          self._test_grant_revoke_by_owner_on_udf(privilege, unique_database, udf_name,
+              grantee_type, grantee)
+    finally:
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+          user=ADMIN)
+      admin_client.execute("drop role {}".format(grantee_role), user=ADMIN)
+      admin_client.execute("drop role {}".format(resource_owner_role), user=ADMIN)
+      admin_client.execute("revoke create on server from user {0}".format(OWNER_USER),
+          user=ADMIN)
+      admin_client.execute("revoke all on uri '{0}{1}' from user {2}"
+          .format(os.getenv("FILESYSTEM_PREFIX"), udf_uri, OWNER_USER), user=ADMIN)
+
+  def _test_grant_revoke_by_owner_on_database(self, privilege, unique_database,
+      grantee_type, grantee, resource_owner_role):
+    grant_database_stmt = "grant {0} on database {1} to {2} {3}"
+    revoke_database_stmt = "revoke {0} on database {1} from {2} {3}"
+    show_grant_database_stmt = "show grant {0} {1} on database {2}"
+    set_database_owner_user_stmt = "alter database {0} set owner user {1}"
+    set_database_owner_group_stmt = "alter database {0} set owner group {1}"
+    set_database_owner_role_stmt = "alter database {0} set owner role {1}"
+    resource_owner_group = OWNER_USER
+    admin_client = self.create_impala_client()
+
+    try:
+      self._run_query_as_user(grant_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+          True)
+      result = admin_client.execute(show_grant_database_stmt
+          .format(grantee_type, grantee, unique_database), user=ADMIN)
+      TestRanger._check_privileges(result, [
+          [grantee_type, grantee, unique_database, "", "", "", "", "", "*",
+           privilege, "false"],
+          [grantee_type, grantee, unique_database, "*", "*", "", "", "", "",
+           privilege, "false"]])
+
+      self._run_query_as_user(revoke_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+          True)
+      result = admin_client.execute(show_grant_database_stmt
+          .format(grantee_type, grantee, unique_database), user=ADMIN)
+      TestRanger._check_privileges(result, [])
+
+      # Set the owner of the database to a group that has the same name as 'OWNER_USER'
+      # and verify that the user 'OWNER_USER' is not able to grant or revoke a privilege
+      # on the database.
+      # We run the statement in Hive because currently
+      # ALTER DATABASE SET OWNER GROUP is not supported in Impala. Note that we
+      # need to force Impala to reload the metadata of database since the change
+      # is made through Hive.
+      self.run_stmt_in_hive(set_database_owner_group_stmt
+          .format(unique_database, resource_owner_group))
+      admin_client.execute("invalidate metadata", user=ADMIN)
+
+      result = self._run_query_as_user(grant_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+          False)
+      assert ERROR_GRANT in str(result)
+      result = self._run_query_as_user(revoke_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+          False)
+      assert ERROR_REVOKE in str(result)
+
+      # Set the owner of the database to a role that has the same name as 'OWNER_USER'
+      # and verify that the user 'OWNER_USER' is not able to grant or revoke a
+      # privilege on the database.
+      admin_client.execute(set_database_owner_role_stmt
+          .format(unique_database, resource_owner_role), user=ADMIN)
+
+      result = self._run_query_as_user(grant_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+          False)
+      assert ERROR_GRANT in str(result)
+      result = self._run_query_as_user(revoke_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+          False)
+      assert ERROR_REVOKE in str(result)
+      # Change the database owner back to the user 'OWNER_USER'.
+      admin_client.execute(set_database_owner_user_stmt
+          .format(unique_database, OWNER_USER), user=ADMIN)
+    finally:
+      # Revoke the privilege that was granted by 'OWNER_USER' in case any of the
+      # REVOKE statements submitted by 'owner_user' failed to prevent this test
+      # from interfering with other tests.
+      admin_client.execute(revoke_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), user=ADMIN)
+
+  def _test_grant_revoke_by_owner_on_table(self, privilege, unique_database, table_name,
+      grantee_type, grantee, resource_owner_role):
+    # The CREATE privilege on a table is not supported.
+    if privilege == "create":
+      return
+    grant_table_stmt = "grant {0} on table {1}.{2} to {3} {4}"
+    revoke_table_stmt = "revoke {0} on table {1}.{2} from {3} {4}"
+    show_grant_table_stmt = "show grant {0} {1} on table {2}.{3}"
+    resource_owner_group = OWNER_USER
+    admin_client = self.create_impala_client()
+    set_table_owner_user_stmt = "alter table {0}.{1} set owner user {2}"
+    set_table_owner_group_stmt = "alter table {0}.{1} set owner group {2}"
+    set_table_owner_role_stmt = "alter table {0}.{1} set owner role {2}"
+
+    try:
+      self._run_query_as_user(grant_table_stmt
+          .format(privilege, unique_database, table_name, grantee_type, grantee),
+          OWNER_USER, True)
+      result = admin_client.execute(show_grant_table_stmt
+          .format(grantee_type, grantee, unique_database, table_name),
+          user=ADMIN)
+      TestRanger._check_privileges(result, [
+          [grantee_type, grantee, unique_database, table_name, "*", "", "", "",
+          "", privilege, "false"]])
+
+      self._run_query_as_user(revoke_table_stmt
+          .format(privilege, unique_database, table_name, grantee_type, grantee),
+          OWNER_USER, True)
+      result = admin_client.execute(show_grant_table_stmt
+          .format(grantee_type, grantee, unique_database, table_name),
+          user=ADMIN)
+      TestRanger._check_privileges(result, [])
+
+      # Set the owner of the table to a group that has the same name as
+      # 'OWNER_USER' and verify that the user 'OWNER_USER' is not able to grant or
+      # revoke a privilege on the table.
+      # We run the statement in Hive because currently
+      # ALTER TABLE SET OWNER GROUP is not supported in Impala. Note that we
+      # need to force Impala to reload the metadata of table since the change
+      # is made through Hive.
+      self.run_stmt_in_hive(set_table_owner_group_stmt
+          .format(unique_database, table_name, resource_owner_group))
+      admin_client.execute("refresh {0}.{1}".format(unique_database, table_name),
+          user=ADMIN)
+
+      result = self._run_query_as_user(grant_table_stmt
+          .format(privilege, unique_database, table_name, grantee_type, grantee),
+          OWNER_USER, False)
+      assert ERROR_GRANT in str(result)
+      result = self._run_query_as_user(revoke_table_stmt
+          .format(privilege, unique_database, table_name, grantee_type, grantee),
+          OWNER_USER, False)
+      assert ERROR_REVOKE in str(result)
+
+      # Set the owner of the table to a role that has the same name as
+      # 'OWNER_USER' and verify that the user 'OWNER_USER' is not able to grant or
+      # revoke a privilege on the table.
+      admin_client.execute(set_table_owner_role_stmt
+          .format(unique_database, table_name, resource_owner_role), user=ADMIN)
+
+      result = self._run_query_as_user(grant_table_stmt
+          .format(privilege, unique_database, table_name, grantee_type, grantee),
+          OWNER_USER, False)
+      assert ERROR_GRANT in str(result)
+      result = self._run_query_as_user(revoke_table_stmt
+          .format(privilege, unique_database, table_name, grantee_type, grantee),
+          OWNER_USER, False)
+      assert ERROR_REVOKE in str(result)
+      # Change the table owner back to the user 'OWNER_USER'.
+      admin_client.execute(set_table_owner_user_stmt
+          .format(unique_database, table_name, OWNER_USER), user=ADMIN)
+    finally:
+      # Revoke the privilege that was granted by 'OWNER_USER' in case any of the
+      # REVOKE statements submitted by 'OWNER_USER' failed to prevent this test
+      # from interfering with other tests.
+      admin_client.execute(revoke_table_stmt
+          .format(privilege, unique_database, table_name, grantee_type, grantee),
+          user=ADMIN)
+
+  def _test_grant_revoke_by_owner_on_column(self, privilege, column_names,
+      unique_database, table_name, grantee_type, grantee, resource_owner_role):
+    # For a column, only the SELECT privilege is allowed.
+    if privilege != "select":
+      return
+    grant_column_stmt = "grant {0} ({1}) on table {2}.{3} to {4} {5}"
+    revoke_column_stmt = "revoke {0} ({1}) on table {2}.{3} from {4} {5}"
+    show_grant_column_stmt = "show grant {0} {1} on column {2}.{3}.{4}"
+    resource_owner_group = OWNER_USER
+    admin_client = self.create_impala_client()
+    set_table_owner_user_stmt = "alter table {0}.{1} set owner user {2}"
+    set_table_owner_group_stmt = "alter table {0}.{1} set owner group {2}"
+    set_table_owner_role_stmt = "alter table {0}.{1} set owner role {2}"
+
+    try:
+      self._run_query_as_user(grant_column_stmt
+          .format(privilege, column_names[0], unique_database, table_name,
+          grantee_type, grantee), OWNER_USER, True)
+      result = admin_client.execute(show_grant_column_stmt
+          .format(grantee_type, grantee, unique_database, table_name,
+          column_names[0]), user=ADMIN)
+      TestRanger._check_privileges(result, [
+          [grantee_type, grantee, unique_database, table_name, column_names[0],
+          "", "", "", "", privilege, "false"]])
+
+      self._run_query_as_user(revoke_column_stmt
+          .format(privilege, column_names[0], unique_database, table_name,
+          grantee_type, grantee), OWNER_USER, True)
+      result = admin_client.execute(show_grant_column_stmt
+          .format(grantee_type, grantee, unique_database, table_name,
+          column_names[0]), user=ADMIN)
+      TestRanger._check_privileges(result, [])
+
+      # Set the owner of the table to a group that has the same name as 'OWNER_USER'
+      # and verify that the user 'OWNER_USER' is not able to grant or revoke a
+      # privilege on a column in the table.
+      self.run_stmt_in_hive(set_table_owner_group_stmt
+          .format(unique_database, table_name, resource_owner_group))
+      admin_client.execute("refresh {0}.{1}".format(unique_database, table_name),
+          user=ADMIN)
+
+      result = self._run_query_as_user(grant_column_stmt
+          .format(privilege, column_names[0], unique_database, table_name,
+          grantee_type, grantee), OWNER_USER, False)
+      assert ERROR_GRANT in str(result)
+      result = self._run_query_as_user(revoke_column_stmt
+          .format(privilege, column_names[0], unique_database, table_name,
+          grantee_type, grantee), OWNER_USER, False)
+      assert ERROR_REVOKE in str(result)
+
+      # Set the owner of the table to a role that has the same name as 'OWNER_USER' and
+      # verify that the user 'OWNER_USER' is not able to grant or revoke a privilege on
+      # a column in the table.
+      admin_client.execute(set_table_owner_role_stmt
+          .format(unique_database, table_name, resource_owner_role), user=ADMIN)
+
+      result = self._run_query_as_user(grant_column_stmt
+          .format(privilege, column_names[0], unique_database, table_name,
+          grantee_type, grantee), OWNER_USER, False)
+      assert ERROR_GRANT in str(result)
+      result = self._run_query_as_user(revoke_column_stmt
+          .format(privilege, column_names[0], unique_database, table_name,
+          grantee_type, grantee), OWNER_USER, False)
+      assert ERROR_REVOKE in str(result)
+      # Change the table owner back to the user 'owner_user'.
+      admin_client.execute(set_table_owner_user_stmt
+          .format(unique_database, table_name, OWNER_USER), user=ADMIN)
+    finally:
+      # Revoke the privilege that was granted by 'OWNER_USER' in case any of the
+      # REVOKE statements submitted by 'OWNER_USER' failed to prevent this test
+      # from interfering with other tests.
+      admin_client.execute(revoke_column_stmt
+          .format(privilege, column_names[0], unique_database, table_name,
+          grantee_type, grantee), user=ADMIN)
+
+  def _test_grant_revoke_by_owner_on_udf(self, privilege, unique_database, udf_name,
+      grantee_type, grantee):
+    # Due to IMPALA-11743 and IMPALA-12685, the owner of a UDF could not grant
+    # or revoke the SELECT privilege.
+    result = self._run_query_as_user("grant {0} on user_defined_fn "
+        "{1}.{2} to {3} {4}".format(privilege, unique_database, udf_name,
+        grantee_type, grantee), OWNER_USER, False)
+    assert ERROR_GRANT in str(result)
+    result = self._run_query_as_user("revoke {0} on user_defined_fn "
+        "{1}.{2} from {3} {4}".format(privilege, unique_database, udf_name,
+        grantee_type, grantee), OWNER_USER, False)
+    assert ERROR_REVOKE in str(result)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

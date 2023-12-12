@@ -737,6 +737,9 @@ struct TGrantRevokePrivParams {
 
   // The type of principal
   5: required CatalogObjects.TPrincipalType principal_type
+
+  // The name of the resource owner.
+  6: optional string owner_name
 }
 
 // Parameters of DROP DATABASE commands

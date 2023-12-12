@@ -27,6 +27,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.ArrayType;
@@ -230,7 +231,7 @@ abstract class LocalTable implements FeTable {
       LOG.warn("Owner of {} is unknown due to msTable is unloaded", getFullName());
       return null;
     }
-    return msTable_.getOwner();
+    return msTable_.getOwnerType() == PrincipalType.USER ? msTable_.getOwner() : null;
   }
 
   @Override

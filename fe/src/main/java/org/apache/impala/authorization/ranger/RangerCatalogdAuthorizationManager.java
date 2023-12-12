@@ -226,7 +226,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         new User(header.getRequesting_user()).getShortName(), /*isGrant*/ true,
         /*user*/ null, Collections.emptyList(),
         Collections.singletonList(params.getPrincipal_name()),
-        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges(),
+        params.getOwner_name());
 
     grantPrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     // Update the authorization refresh marker so that the Impalads can refresh their
@@ -241,7 +242,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         new User(header.getRequesting_user()).getShortName(), /*isGrant*/ false,
         /*user*/ null, Collections.emptyList(),
         Collections.singletonList(params.getPrincipal_name()),
-        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges(),
+        params.getOwner_name());
 
     revokePrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     // Update the authorization refresh marker so that the Impalads can refresh their
@@ -255,7 +257,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
         new User(header.getRequesting_user()).getShortName(), /*isGrant*/ true,
         params.getPrincipal_name(), Collections.emptyList(), Collections.emptyList(),
-        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges(),
+        params.getOwner_name());
 
     grantPrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
@@ -267,7 +270,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
         new User(header.getRequesting_user()).getShortName(), /*isGrant*/ false,
         params.getPrincipal_name(), Collections.emptyList(), Collections.emptyList(),
-        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges(),
+        params.getOwner_name());
 
     revokePrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
@@ -280,7 +284,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         new User(header.getRequesting_user()).getShortName(), /*isGrant*/ true,
         /*user*/ null, Collections.singletonList(params.getPrincipal_name()),
         Collections.emptyList(), plugin_.get().getClusterName(), header.getClient_ip(),
-        params.getPrivileges());
+        params.getPrivileges(), params.getOwner_name());
 
     grantPrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
@@ -293,7 +297,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         new User(header.getRequesting_user()).getShortName(), /*isGrant*/ false,
         /*user*/ null, Collections.singletonList(params.getPrincipal_name()),
         Collections.emptyList(), plugin_.get().getClusterName(), header.getClient_ip(),
-        params.getPrivileges());
+        params.getPrivileges(), params.getOwner_name());
 
     revokePrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     // Update the authorization refresh marker so that the Impalads can refresh their
@@ -376,13 +380,15 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
 
   public static List<GrantRevokeRequest> createGrantRevokeRequests(String grantor,
       boolean isGrant, String user, List<String> groups, List<String> roles,
-      String clusterName, String clientIp, List<TPrivilege> privileges) {
+      String clusterName, String clientIp, List<TPrivilege> privileges,
+      String resourceOwner) {
     List<GrantRevokeRequest> requests = new ArrayList<>();
 
     for (TPrivilege p: privileges) {
       Function<Map<String, String>, GrantRevokeRequest> createRequest = (resource) ->
           createGrantRevokeRequest(grantor, user, groups, roles, clusterName,
-              p.has_grant_opt, isGrant, p.privilege_level, resource, clientIp);
+              p.has_grant_opt, isGrant, p.privilege_level, resource, resourceOwner,
+              clientIp);
 
       // Ranger Impala service definition defines 4 resources:
       // [DB -> Table -> Column]
@@ -419,7 +425,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   private static GrantRevokeRequest createGrantRevokeRequest(String grantor, String user,
       List<String> groups, List<String> roles, String clusterName, boolean withGrantOpt,
       boolean isGrant, TPrivilegeLevel level, Map<String, String> resource,
-      String clientIp) {
+      String resourceOwner, String clientIp) {
     GrantRevokeRequest request = new GrantRevokeRequest();
     request.setGrantor(grantor);
     // In a Kerberized environment, we also need to call setGrantorGroups() to provide
@@ -434,6 +440,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     request.setReplaceExistingPermissions(Boolean.FALSE);
     request.setClusterName(clusterName);
     request.setResource(resource);
+    if (resourceOwner != null) request.setOwnerUser(resourceOwner);
     request.setClientIPAddress(clientIp);
 
     // For revoke grant option, omit the privilege

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
@@ -325,6 +326,7 @@ public class LocalDb implements FeDb {
   @Override // FeDb
   public String getOwnerUser() {
     Database db = getMetaStoreDb();
-    return db == null? null : db.getOwnerName();
+    return db == null ? null :
+        (db.getOwnerType() == PrincipalType.USER ? db.getOwnerName() : null);
   }
 }

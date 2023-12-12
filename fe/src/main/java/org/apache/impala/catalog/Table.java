@@ -35,6 +35,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
@@ -925,7 +926,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       LOG.warn("Owner of {} is unknown due to table is unloaded", getFullName());
       return null;
     }
-    return msTable_.getOwner();
+    return msTable_.getOwnerType() == PrincipalType.USER ? msTable_.getOwner() : null;
   }
 
   public void setMetaStoreTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {

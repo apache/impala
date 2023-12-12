@@ -29,6 +29,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.catalog.events.InFlightEvents;
@@ -619,7 +620,8 @@ public class Db extends CatalogObjectImpl implements FeDb {
   @Override // FeDb
   public String getOwnerUser() {
     org.apache.hadoop.hive.metastore.api.Database db = getMetaStoreDb();
-    return db == null ? null : db.getOwnerName();
+    return db == null ? null :
+        (db.getOwnerType() == PrincipalType.USER ? db.getOwnerName() : null);
   }
 
   /**
