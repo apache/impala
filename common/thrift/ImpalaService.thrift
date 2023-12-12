@@ -873,6 +873,11 @@ enum TImpalaQueryOptions {
   // Select codegen optimization level from O0, O1, Os, O2, or O3. Higher levels will
   // overwrite existing codegen cache entries.
   CODEGEN_OPT_LEVEL = 167
+
+  // The reservation time (in seconds) for deleted impala-managed Kudu tables.
+  // During this time deleted Kudu tables can be recovered by Kudu's 'recall table' API.
+  // See KUDU-3326 for details.
+  KUDU_TABLE_RESERVE_SECONDS = 168
 }
 
 // The summary of a DML statement.

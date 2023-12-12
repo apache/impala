@@ -324,10 +324,13 @@ public class KuduCatalogOpExecutor {
   /**
    * Drops the table in Kudu. If the table does not exist and 'ifExists' is false, a
    * TableNotFoundException is thrown. If the table exists and could not be dropped,
-   * an ImpalaRuntimeException is thrown.
+   * an ImpalaRuntimeException is thrown. If 'kudu_table_reserve_seconds' is 0, the
+   * table will be deleted immediately, otherwise the table will be reserved in the
+   * kudu cluster for 'kudu_table_reserve_seconds'.
    */
   public static void dropTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
-      boolean ifExists) throws ImpalaRuntimeException, TableNotFoundException {
+      boolean ifExists, int kudu_table_reserve_seconds)
+      throws ImpalaRuntimeException, TableNotFoundException {
     Preconditions.checkState(KuduTable.isSynchronizedTable(msTbl));
     String tableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
@@ -341,7 +344,7 @@ public class KuduCatalogOpExecutor {
       // TODO: The IF EXISTS case should be handled by Kudu to ensure atomicity.
       // (see KUDU-1710).
       if (kudu.tableExists(tableName)) {
-        kudu.deleteTable(tableName);
+        kudu.deleteTable(tableName, kudu_table_reserve_seconds);
       } else if (!ifExists) {
         throw new TableNotFoundException(String.format(
             "Table '%s' does not exist in Kudu master(s) '%s'.", tableName, masterHosts));

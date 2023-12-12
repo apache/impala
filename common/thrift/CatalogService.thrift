@@ -108,6 +108,11 @@ struct TDdlQueryOptions {
 
   // Maximum wait time on an HMS ACID lock in seconds.
   3: optional i32 lock_max_wait_time_s
+
+  // The reservation time (in seconds) for deleted impala-managed kudu table.
+  // During this time deleted Kudu tables can be recovered by Kudu's 'recall table' API.
+  // See KUDU-3326 for details.
+  4: optional i32 kudu_table_reserve_seconds
 }
 
 // Request for executing a DDL operation (CREATE, ALTER, DROP).

@@ -1258,6 +1258,40 @@ class TestDropDb(KuduTestSuite):
       assert kudu_client.table_exists(kudu_table.name)
       assert not kudu_client.table_exists(managed_table_name)
 
+  @SkipIfKudu.hms_integration_enabled
+  def test_soft_drop_db_cascade(self, unique_cursor, kudu_client):
+    """Check that an attempt to drop a database will succeed but the managed Kudu tables
+       are not removed immediately if 'kudu_table_reserve_seconds' is greater than 0.
+       These Kudu tables are in 'soft_deleted' state and can be recalled during the
+       reservation period.
+    """
+    db_name = unique_cursor.conn.db_name
+    table_name_pattern = "managed_kudu_table_"
+    for i in range(10):
+      managed_table_name = table_name_pattern + str(i)
+      unique_cursor.execute("""
+          CREATE TABLE %s (a INT PRIMARY KEY) PARTITION BY HASH (a) PARTITIONS 3
+          STORED AS KUDU""" % managed_table_name)
+      kudu_tbl_name = KuduTestSuite.to_kudu_table_name(db_name, managed_table_name)
+      assert kudu_client.table_exists(kudu_tbl_name)
+
+    unique_cursor.execute("set kudu_table_reserve_seconds=300")
+    unique_cursor.execute("USE DEFAULT")
+    unique_cursor.execute("DROP DATABASE %s CASCADE" % db_name)
+    unique_cursor.execute("SHOW DATABASES")
+    assert (db_name, '') not in unique_cursor.fetchall()
+
+    for i in range(10):
+      kudu_tbl_name = \
+          KuduTestSuite.to_kudu_table_name(db_name, table_name_pattern + str(i))
+      assert kudu_client.table_exists(kudu_tbl_name)
+      assert kudu_tbl_name not in kudu_client.list_tables()
+      assert kudu_tbl_name in kudu_client.list_soft_deleted_tables()
+      table = kudu_client.table(kudu_tbl_name)
+      kudu_client.recall_table(table.id)
+      assert kudu_tbl_name in kudu_client.list_tables()
+      assert kudu_tbl_name not in kudu_client.list_soft_deleted_tables()
+
 class TestImpalaKuduIntegration(KuduTestSuite):
   @SkipIfKudu.hms_integration_enabled
   def test_replace_kudu_table(self, cursor, kudu_client):
@@ -1337,6 +1371,31 @@ class TestImpalaKuduIntegration(KuduTestSuite):
     cursor.execute("DROP TABLE %s.%s" % (unique_database, impala_tbl_name))
     cursor.execute("SHOW TABLES IN %s" % unique_database)
     assert (impala_tbl_name,) not in cursor.fetchall()
+
+  @SkipIfKudu.hms_integration_enabled
+  def test_soft_delete_kudu_table(self, cursor, kudu_client, unique_database):
+    """Check that the query option 'kudu_table_reserve_seconds' works for managed Kudu
+    table. If it is greater than 0, the underlying Kudu will not be deleted immediately.
+    During the reservation period, the Kudu table can be recalled."""
+    impala_tbl_name = "foo"
+    cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) PARTITION BY HASH (a)
+        PARTITIONS 3 STORED AS KUDU""" % (unique_database, impala_tbl_name))
+    kudu_tbl_name = KuduTestSuite.to_kudu_table_name(unique_database, impala_tbl_name)
+    assert kudu_client.table_exists(kudu_tbl_name)
+
+    cursor.execute("set kudu_table_reserve_seconds=300")
+    cursor.execute("DROP TABLE %s.%s" % (unique_database, impala_tbl_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (impala_tbl_name,) not in cursor.fetchall()
+
+    assert kudu_client.table_exists(kudu_tbl_name)
+    assert kudu_tbl_name not in kudu_client.list_tables()
+    assert kudu_tbl_name in kudu_client.list_soft_deleted_tables()
+
+    table = kudu_client.table(kudu_tbl_name)
+    kudu_client.recall_table(table.id)
+    assert kudu_tbl_name in kudu_client.list_tables()
+    assert kudu_tbl_name not in kudu_client.list_soft_deleted_tables()
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestKuduMemLimits(KuduTestSuite):

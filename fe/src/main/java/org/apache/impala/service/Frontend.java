@@ -885,6 +885,8 @@ public class Frontend {
       }
       ddlQueryOpts.setLock_max_wait_time_s(
           result.getQuery_options().lock_max_wait_time_s);
+      ddlQueryOpts.setKudu_table_reserve_seconds(
+          result.getQuery_options().kudu_table_reserve_seconds);
       ddl.getDdl_params().setQuery_options(ddlQueryOpts);
     } else if (ddl.getOp_type() == TCatalogOpType.RESET_METADATA) {
       ddl.getReset_metadata_params().setSync_ddl(ddl.isSync_ddl());

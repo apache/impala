@@ -678,6 +678,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   168: optional TCodeGenOptLevel codegen_opt_level = TCodeGenOptLevel.O2
+
+  // See comment in ImpalaService.thrift
+  169: optional i32 kudu_table_reserve_seconds = 0;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

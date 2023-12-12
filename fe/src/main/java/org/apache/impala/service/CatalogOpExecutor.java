@@ -520,7 +520,8 @@ public class CatalogOpExecutor {
           TDropDbParams drop_db_params = ddlRequest.getDrop_db_params();
           tTableName = Optional.of(new TTableName(drop_db_params.getDb(), ""));
           catalogOpTracker_.increment(ddlRequest, tTableName);
-          dropDatabase(drop_db_params, response);
+          dropDatabase(drop_db_params, response,
+              ddlRequest.getQuery_options().getKudu_table_reserve_seconds());
           break;
         case DROP_TABLE:
         case DROP_VIEW:
@@ -531,7 +532,8 @@ public class CatalogOpExecutor {
           // Dropped tables and views are already returned as minimal results, so don't
           // need to pass down wantMinimalResult here.
           dropTableOrView(drop_table_or_view_params, response,
-              ddlRequest.getQuery_options().getLock_max_wait_time_s());
+              ddlRequest.getQuery_options().getLock_max_wait_time_s(),
+              ddlRequest.getQuery_options().getKudu_table_reserve_seconds());
           break;
         case TRUNCATE_TABLE:
           TTruncateParams truncate_params = ddlRequest.getTruncate_params();
@@ -2652,8 +2654,8 @@ public class CatalogOpExecutor {
    * internal cache. Attempts to remove the HDFS cache directives of the underlying
    * tables. Re-throws any HMS exceptions encountered during the drop.
    */
-  private void dropDatabase(TDropDbParams params, TDdlExecResponse resp)
-      throws ImpalaException {
+  private void dropDatabase(TDropDbParams params, TDdlExecResponse resp,
+      int kudu_table_reserve_seconds) throws ImpalaException {
     Preconditions.checkNotNull(params);
     String dbName = params.getDb();
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
@@ -2677,7 +2679,9 @@ public class CatalogOpExecutor {
     getMetastoreDdlLock().lock();
     try {
       // Remove all the Kudu tables of 'db' from the Kudu storage engine.
-      if (db != null && params.cascade) dropTablesFromKudu(db);
+      if (db != null && params.cascade) {
+        dropTablesFromKudu(db, kudu_table_reserve_seconds);
+      }
 
       // The Kudu tables in the HMS should have been dropped at this point
       // with the Hive Metastore integration enabled.
@@ -2764,7 +2768,8 @@ public class CatalogOpExecutor {
    * metadata for Kudu tables cannot be loaded from HMS or if an error occurs while
    * trying to drop a table from Kudu.
    */
-  private void dropTablesFromKudu(Db db) throws ImpalaException {
+  private void dropTablesFromKudu(Db db, int kudu_table_reserve_seconds)
+      throws ImpalaException {
     // If the table format isn't available, because the table hasn't been loaded yet,
     // the metadata must be fetched from the Hive Metastore.
     List<String> incompleteTableNames = Lists.newArrayList();
@@ -2793,7 +2798,8 @@ public class CatalogOpExecutor {
       // some reason Kudu is permanently stuck in a non-functional state, the user is
       // expected to ALTER TABLE to either set the table to UNMANAGED or set the format
       // to something else.
-      KuduCatalogOpExecutor.dropTable(msTable, /*if exists*/ true);
+      KuduCatalogOpExecutor.dropTable(
+        msTable, /*if exists*/ true, kudu_table_reserve_seconds);
     }
   }
 
@@ -2837,7 +2843,7 @@ public class CatalogOpExecutor {
    * executing the drop operation.
    */
   private void dropTableOrView(TDropTableOrViewParams params, TDdlExecResponse resp,
-      int lockMaxWaitTime) throws ImpalaException {
+      int lockMaxWaitTime, int kudu_table_reserve_seconds) throws ImpalaException {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     Preconditions.checkState(!catalog_.isBlacklistedTable(tableName) || params.if_exists,
@@ -2882,7 +2888,7 @@ public class CatalogOpExecutor {
     }
 
     try {
-      dropTableOrViewInternal(params, tableName, resp);
+      dropTableOrViewInternal(params, tableName, resp, kudu_table_reserve_seconds);
     } finally {
       if (lockId > 0) catalog_.releaseTableLock(lockId);
     }
@@ -2892,7 +2898,8 @@ public class CatalogOpExecutor {
    * Helper function for dropTableOrView().
    */
   private void dropTableOrViewInternal(TDropTableOrViewParams params,
-      TableName tableName, TDdlExecResponse resp) throws ImpalaException {
+      TableName tableName, TDdlExecResponse resp, int kudu_table_reserve_seconds)
+      throws ImpalaException {
     TCatalogObject removedObject = new TCatalogObject();
     getMetastoreDdlLock().lock();
     try {
@@ -2950,7 +2957,8 @@ public class CatalogOpExecutor {
       boolean isSynchronizedKuduTable = msTbl != null &&
               KuduTable.isKuduTable(msTbl) && KuduTable.isSynchronizedTable(msTbl);
       if (isSynchronizedKuduTable) {
-        KuduCatalogOpExecutor.dropTable(msTbl, /* if exists */ true);
+        KuduCatalogOpExecutor.dropTable(
+            msTbl, /* if exists */ true, kudu_table_reserve_seconds);
       }
 
       long eventId;
@@ -3654,7 +3662,8 @@ public class CatalogOpExecutor {
       try {
         // Error creating the table in HMS, drop the synchronized table from Kudu.
         if (!KuduTable.isSynchronizedTable(newTable)) {
-          KuduCatalogOpExecutor.dropTable(newTable, false);
+          KuduCatalogOpExecutor.dropTable(
+            newTable, /* if exists */ false, /* kudu_table_reserve_seconds */ 0);
         }
       } catch (Exception logged) {
         String kuduTableName = newTable.getParameters().get(KuduTable.KEY_TABLE_NAME);

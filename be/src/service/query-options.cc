@@ -1166,6 +1166,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_codegen_opt_level(enum_type);
         break;
       }
+      case TImpalaQueryOptions::KUDU_TABLE_RESERVE_SECONDS: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckNonNegative<int32_t>(
+            option, value, &int32_t_val));
+        query_options->__set_kudu_table_reserve_seconds(int32_t_val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
