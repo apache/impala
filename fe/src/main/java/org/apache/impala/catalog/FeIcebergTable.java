@@ -71,6 +71,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbFileBlock;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsCompression;
@@ -1028,6 +1029,9 @@ public interface FeIcebergTable extends FeFsTable {
       Table icebergApiTable = icebergTable.getIcebergApiTable();
       Preconditions.checkNotNull(icebergApiTable);
       Map<String, String> properties = icebergApiTable.properties();
+      if (BackendConfig.INSTANCE.icebergRestrictDataFileLocation()) {
+        return true;
+      }
       return !(PropertyUtil.propertyAsBoolean(properties,
           TableProperties.OBJECT_STORE_ENABLED,
           TableProperties.OBJECT_STORE_ENABLED_DEFAULT)

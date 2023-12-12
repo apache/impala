@@ -274,4 +274,6 @@ struct TBackendGflags {
   121: required string hostname
 
   122: required bool allow_catalog_cache_op_from_masked_users
+
+  123: required bool iceberg_restrict_data_file_location
 }
