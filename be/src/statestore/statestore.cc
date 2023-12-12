@@ -775,14 +775,15 @@ Status Statestore::Init(int32_t state_store_port) {
         .ssl_version(ssl_version)
         .cipher_list(FLAGS_ssl_cipher_list);
   }
+  RETURN_IF_ERROR(subscriber_topic_update_threadpool_.Init());
+  RETURN_IF_ERROR(subscriber_priority_topic_update_threadpool_.Init());
+  RETURN_IF_ERROR(subscriber_heartbeat_threadpool_.Init());
+
   ThriftServer* server;
   RETURN_IF_ERROR(builder.metrics(metrics_).Build(&server));
   thrift_server_.reset(server);
   RETURN_IF_ERROR(thrift_server_->Start());
 
-  RETURN_IF_ERROR(subscriber_topic_update_threadpool_.Init());
-  RETURN_IF_ERROR(subscriber_priority_topic_update_threadpool_.Init());
-  RETURN_IF_ERROR(subscriber_heartbeat_threadpool_.Init());
   RETURN_IF_ERROR(Thread::Create("statestore-heartbeat", "heartbeat-monitoring-thread",
       &Statestore::MonitorSubscriberHeartbeat, this, &heartbeat_monitoring_thread_));
   RETURN_IF_ERROR(Thread::Create("statestore-update-catalogd", "update-catalogd-thread",
