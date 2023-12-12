@@ -445,7 +445,7 @@ bootstrap_dependencies() {
   fi
   # Use prebuilt Hadoop native binaries for aarch64
   if [[ "$(uname -p)" = "aarch64" ]]; then
-    cp $IMPALA_TOOLCHAIN_PACKAGES_HOME/hadoop-$IMPALA_HADOOP_CLIENT_BINARY_VERSION/lib/* \
+    cp $IMPALA_TOOLCHAIN_PACKAGES_HOME/hadoop-client-$IMPALA_HADOOP_CLIENT_VERSION/lib/* \
         $HADOOP_HOME/lib/native/
   fi
   if [[ "${USE_APACHE_HIVE}" = true ]]; then

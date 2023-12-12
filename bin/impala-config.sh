@@ -85,13 +85,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=8-62067ab072
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=378-62067ab072
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=11-8dbe785e9e
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=380-8dbe785e9e
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-62067ab072750a6395307499caf9ebaa65cb79b7}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-8dbe785e9e000c665722a11068f9a4a6b454cfeb}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -204,8 +204,8 @@ unset IMPALA_CLOUDFLAREZLIB_URL
 export IMPALA_CALLONCEHACK_VERSION=1.0.0
 unset IMPALA_CALLONCEHACK_URL
 if [[ $ARCH_NAME == 'aarch64' ]]; then
-  export IMPALA_HADOOP_CLIENT_BINARY_VERSION=3.3.6
-  unset IMPALA_HADOOP_CLIENT_BINARY_URL
+  export IMPALA_HADOOP_CLIENT_VERSION=3.3.6
+  unset IMPALA_HADOOP_CLIENT_URL
 fi
 # Thrift related environment variables.
 # IMPALA_THRIFT_POM_VERSION is used to populate IMPALA_THRIFT_JAVA_VERSION and

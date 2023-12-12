@@ -486,8 +486,7 @@ def get_toolchain_downloads():
       "protobuf", explicit_version=os.environ.get("IMPALA_PROTOBUF_CLANG_VERSION"))
   toolchain_packages += [protobuf_package_clang]
   if platform.machine() == 'aarch64':
-    toolchain_packages.append(ToolchainPackage("hadoop",
-        explicit_version=os.environ.get("IMPALA_HADOOP_CLIENT_BINARY_VERSION")))
+    toolchain_packages.append(ToolchainPackage("hadoop-client"))
   # Check whether this platform is supported (or whether a valid custom toolchain
   # has been provided).
   if not try_get_platform_release_label() \
