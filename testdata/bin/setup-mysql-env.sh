@@ -53,6 +53,13 @@ if [ $mysqld_status = "stopped" ];then
   exit 2
 fi
 
+# Check if mysqld.sock exists
+if [ $(docker exec -i mysql ls /var/run/mysqld/mysqld.sock > /dev/null 2>&1;\
+echo $?) -gt 0 ]; then
+  echo "Error: File /var/run/mysqld/mysqld.sock not found"
+  exit 30
+fi
+
 # Add permission to mysql socket file
 docker exec -i mysql chmod 777 /var/run/mysqld/mysqld.sock
 

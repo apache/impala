@@ -81,6 +81,8 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
         pytest.skip("These tests requireadd the docker to be added to sudoer's group")
       elif e.returncode == 20:
         pytest.skip("Can't connect to local MySQL server")
+      elif e.returncode == 30:
+        pytest.skip("File /var/run/mysqld/mysqld.sock not found")
       else:
         assert False, "Failed to setup MySQL testing environment"
 
