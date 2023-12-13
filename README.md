@@ -1,13 +1,13 @@
 # Welcome to Impala
 
 Lightning-fast, distributed [SQL](https://en.wikipedia.org/wiki/SQL) queries for petabytes
-of data stored in Apache Hadoop clusters.
+of data stored in open data and table formats.
 
 Impala is a modern, massively-distributed, massively-parallel, C++ query engine that lets
 you analyze, transform and combine data from a variety of data sources:
 
 * Best of breed performance and scalability.
-* Support for data stored in [HDFS](https://hadoop.apache.org/),
+* Support for data stored in [Apache Iceberg](https://iceberg.apache.org/), [HDFS](https://hadoop.apache.org/),
   [Apache HBase](https://hbase.apache.org/), [Apache Kudu](https://kudu.apache.org/),
   [Amazon S3](https://aws.amazon.com/s3/),
   [Azure Data Lake Storage](https://azure.microsoft.com/en-us/services/storage/data-lake-storage/),
