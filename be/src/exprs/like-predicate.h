@@ -79,6 +79,9 @@ class LikePredicate: public Predicate {
     /// Used for RLIKE and REGEXP predicates if the pattern is a constant argument.
     boost::scoped_ptr<re2::RE2> regex_;
 
+    /// Used for ILIKE and IREGEXP predicates if the pattern is not a constant argument.
+    bool case_sensitive_;
+
     LikePredicateState() : escape_char_('\\') {
     }
 

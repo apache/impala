@@ -290,3 +290,31 @@ class TestConstantFoldingNoTypeLoss(ImpalaTestSuite):
     query = "select typeof(cast(1 as bigint) + cast(rand() as tinyint))"
     result = self.execute_query_expect_success(self.client, query)
     assert result.data == ["BIGINT"]
+
+
+class TestNonConstPatternILike(ImpalaTestSuite):
+  """Tests for ILIKE and IREGEXP with non-constant patterns for IMPALA-12581.
+     These tests verify that ILIKE and IREGEXP work correctly when the pattern
+     is not a constant string."""
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNonConstPatternILike, cls).add_test_dimensions()
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  def test_non_const_pattern_ilike(self, vector, unique_database):
+    tbl_name = '`{0}`.`ilike_test`'.format(unique_database)
+
+    self.execute_query_expect_success(self.client,
+        "CREATE TABLE {0} (pattern_str string)".format(tbl_name))
+    self.execute_query_expect_success(self.client,
+        "INSERT INTO TABLE {0} VALUES('%b%'), ('.*b.*')".format(tbl_name))
+
+    ilike_result = self.execute_query_expect_success(self.client,
+        "SELECT count(*) FROM {0} WHERE 'ABC' ILIKE pattern_str".format(tbl_name))
+    assert int(ilike_result.get_data()) == 1
+    iregexp_result = self.execute_query_expect_success(self.client,
+        "SELECT count(*) FROM {0} WHERE 'ABC' IREGEXP pattern_str".format(tbl_name))
+    assert int(iregexp_result.get_data()) == 1

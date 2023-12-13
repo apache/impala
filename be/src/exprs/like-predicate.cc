@@ -64,8 +64,9 @@ void LikePredicate::LikePrepareInternal(FunctionContext* context,
     FunctionContext::FunctionStateScope scope, bool case_sensitive) {
   if (scope != FunctionContext::THREAD_LOCAL) return;
   LikePredicateState* state = new LikePredicateState();
-  state->function_ = LikeFn;
   context->SetFunctionState(scope, state);
+  state->function_ = LikeFn;
+  state->case_sensitive_ = case_sensitive;
   if (context->IsArgConstant(1)) {
     StringVal pattern_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     if (pattern_val.is_null) return;
@@ -136,6 +137,7 @@ void LikePredicate::RegexPrepareInternal(FunctionContext* context,
   LikePredicateState* state = new LikePredicateState();
   context->SetFunctionState(scope, state);
   state->function_ = RegexFn;
+  state->case_sensitive_ = case_sensitive;
   if (context->IsArgConstant(1)) {
     StringVal* pattern = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     if (pattern->is_null) return;
@@ -330,9 +332,10 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
     const StringVal& operand_value, const StringVal& pattern_value,
     bool is_like_pattern) {
   if (operand_value.is_null || pattern_value.is_null) return BooleanVal::null();
+
+  LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
+      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
   if (context->IsArgConstant(1)) {
-    LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
-        context->GetFunctionState(FunctionContext::THREAD_LOCAL));
     if (is_like_pattern) {
       return RE2::FullMatch(re2::StringPiece(reinterpret_cast<const char*>(
           operand_value.ptr), operand_value.len), *state->regex_.get());
@@ -343,6 +346,7 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
   } else {
     string re_pattern;
     RE2::Options opts;
+    opts.set_case_sensitive(state->case_sensitive_);
     StringFunctions::SetRE2MemOpt(&opts);
     if (is_like_pattern) {
       ConvertLikePattern(context, pattern_value, &re_pattern);
