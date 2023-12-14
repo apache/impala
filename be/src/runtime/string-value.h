@@ -70,6 +70,10 @@ public:
     string_impl_.Assign(ptr, len);
   }
 
+  void UnsafeAssign(char* ptr, int len) {
+    string_impl_.UnsafeAssign(ptr, len);
+  }
+
   void Clear() { string_impl_.Clear(); }
 
   bool IsSmall() const { return string_impl_.IsSmall(); }
@@ -93,6 +97,7 @@ public:
   char* IrPtr() const;
   void IrSetLen(int len);
   void IrAssign(char* ptr, int len);
+  void IrUnsafeAssign(char* ptr, int len);
   void IrClear();
   // END IR FUNCTIONS
 

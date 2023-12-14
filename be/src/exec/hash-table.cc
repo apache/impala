@@ -712,9 +712,9 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
   if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR) {
     llvm::Value* null_len = codegen->GetI32Constant(fnv_seed);
     llvm::Value* null_ptr = builder->CreateIntToPtr(null_len, codegen->ptr_type());
-    llvm::Function* str_assign_fn = codegen->GetFunction(
-      IRFunction::STRING_VALUE_ASSIGN, false);
-    builder->CreateCall(str_assign_fn,
+    llvm::Function* str_unsafe_assign_fn = codegen->GetFunction(
+      IRFunction::STRING_VALUE_UNSAFE_ASSIGN, false);
+    builder->CreateCall(str_unsafe_assign_fn,
         llvm::ArrayRef<llvm::Value*>({dst, null_ptr, null_len}));
   } else {
     llvm::Value* null_value = NULL;

@@ -96,7 +96,8 @@ class __attribute__((__packed__)) SmallableString {
     memcpy(this, &other, sizeof(*this));
   }
 
-  /// Assigns 'ptr' and 'len' to this string's long representation.
+  /// Assigns 'ptr' and 'len' to this string's long representation. Negative 'len'
+  /// is overwritten with 0.
   void Assign(char* ptr, int len) {
     // Invalid string values might have negative lengths. We also have backend tests
     // for this.
@@ -104,6 +105,12 @@ class __attribute__((__packed__)) SmallableString {
     rep.long_rep.ptr = ptr;
     rep.long_rep.len = len;
     DCHECK(!IsSmall());
+  }
+
+  /// Assigns 'ptr' and 'len' to this string's long representation without any checks.
+  void UnsafeAssign(char* ptr, int len) {
+    rep.long_rep.ptr = ptr;
+    rep.long_rep.len = len;
   }
 
   void Clear() { memset(this, 0, sizeof(*this)); }

@@ -30,6 +30,10 @@ IR_ALWAYS_INLINE void StringValue::IrAssign(char* ptr, int len) {
   Assign(ptr, len);
 }
 
+IR_ALWAYS_INLINE void StringValue::IrUnsafeAssign(char* ptr, int len) {
+  UnsafeAssign(ptr, len);
+}
+
 IR_ALWAYS_INLINE void StringValue::IrClear() { Clear(); }
 
 }

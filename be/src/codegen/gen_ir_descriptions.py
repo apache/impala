@@ -250,6 +250,7 @@ ir_functions = [
   ["STRING_VALUE_LEN", "_ZNK6impala11StringValue5IrLenEv"],
   ["STRING_VALUE_SETLEN", "_ZN6impala11StringValue8IrSetLenEi"],
   ["STRING_VALUE_ASSIGN", "_ZN6impala11StringValue8IrAssignEPci"],
+  ["STRING_VALUE_UNSAFE_ASSIGN", "_ZN6impala11StringValue14IrUnsafeAssignEPci"],
   ["STRING_VALUE_CLEAR", "_ZN6impala11StringValue7IrClearEv"],
 
   ["BOOL_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala16BoolMinMaxFilter10AlwaysTrueEv"],
