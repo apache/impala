@@ -695,6 +695,46 @@ Java_org_apache_impala_service_FeSupport_nativeParseDateString(JNIEnv* env,
   return result_bytes;
 }
 
+// Native method to make a request to catalog server to get the null partition name.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeGetNullPartitionName(
+    JNIEnv* env, jclass fe_support_class, jbyteArray thrift_struct) {
+  TGetNullPartitionNameRequest request;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), nullptr, nullptr);
+  TGetNullPartitionNameResponse result;
+  Status status = catalog_op_executor.GetNullPartitionName(request, &result);
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetDetail();
+    status.ToThrift(&result.status);
+  }
+  jbyteArray result_bytes = nullptr;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
+// Native method to make a request to catalog server to get the latest compactions.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeGetLatestCompactions(
+    JNIEnv* env, jclass fe_support_class, jbyteArray thrift_struct) {
+  TGetLatestCompactionsRequest request;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), nullptr, nullptr);
+  TGetLatestCompactionsResponse result;
+  Status status = catalog_op_executor.GetLatestCompactions(request, &result);
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetDetail();
+    status.ToThrift(&result.status);
+  }
+  jbyteArray result_bytes = nullptr;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -769,6 +809,14 @@ static JNINativeMethod native_methods[] = {
     const_cast<char*>("nativeParseDateString"),
     const_cast<char*>("(Ljava/lang/String;)[B"),
     (void*)::Java_org_apache_impala_service_FeSupport_nativeParseDateString
+  },
+  {
+    const_cast<char*>("NativeGetNullPartitionName"), const_cast<char*>("([B)[B"),
+    (void*) ::Java_org_apache_impala_service_FeSupport_NativeGetNullPartitionName
+  },
+  {
+    const_cast<char*>("NativeGetLatestCompactions"), const_cast<char*>("([B)[B"),
+    (void*) ::Java_org_apache_impala_service_FeSupport_NativeGetLatestCompactions
   },
 };
 

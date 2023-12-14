@@ -611,6 +611,21 @@ public class CatalogdMetaProviderTest {
     }
   }
 
+  @Test
+  public void testLoadNullPartitionKeyValue() throws Exception {
+    provider_.cache_.invalidateAll();
+    CacheStats stats = diffStats();
+    String nullPartitionName = provider_.loadNullPartitionKeyValue();
+    assertNotNull(nullPartitionName);
+    stats = diffStats();
+    assertEquals(1, stats.missCount());
+    assertEquals(0, stats.hitCount());
+    assertEquals(nullPartitionName, provider_.loadNullPartitionKeyValue());
+    stats = diffStats();
+    assertEquals(0, stats.missCount());
+    assertEquals(1, stats.hitCount());
+  }
+
   private void testFileMetadataAfterCompaction(String dbName, String tableName,
       String partition, boolean isMajorCompaction) throws Exception {
     String tableOrPartition = dbName + "." + tableName + " " + partition;

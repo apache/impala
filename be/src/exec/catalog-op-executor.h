@@ -80,6 +80,14 @@ class CatalogOpExecutor {
   Status UpdateTableUsage(const TUpdateTableUsageRequest& req,
       TUpdateTableUsageResponse* resp);
 
+  /// Makes an RPC to the catalog server to get the null partition name.
+  Status GetNullPartitionName(
+      const TGetNullPartitionNameRequest& req, TGetNullPartitionNameResponse* result);
+
+  /// Makes an RPC to the catalog server to get the latest compactions.
+  Status GetLatestCompactions(
+      const TGetLatestCompactionsRequest& req, TGetLatestCompactionsResponse* result);
+
   /// Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
   /// If called before Exec(), this will return NULL. Only set if the
   /// TCatalogOpType is DDL.

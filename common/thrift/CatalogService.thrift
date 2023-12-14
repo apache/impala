@@ -666,6 +666,35 @@ struct TGetPartitionStatsResponse {
   2: optional map<string, binary> partition_stats
 }
 
+// Request null partition name.
+struct TGetNullPartitionNameRequest {
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
+}
+
+// Response for null partition name request.
+struct TGetNullPartitionNameResponse {
+  1: required Status.TStatus status
+  // Null partition name.
+  2: required string partition_value
+}
+
+// Request latest compactions.
+struct TGetLatestCompactionsRequest {
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
+  2: required string db_name
+  3: required string table_name
+  4: required string non_parition_name
+  5: optional list<string> partition_names
+  6: required i64 last_compaction_id
+}
+
+// Response for latest compactions request.
+struct TGetLatestCompactionsResponse {
+  1: required Status.TStatus status
+  // Map of partition name to the compaction id
+  2: required map<string, i64> partition_to_compaction_id
+}
+
 // Instructs the Catalog Server to prioritizing loading of metadata for the specified
 // catalog objects. Currently only used for controlling the priority of loading
 // tables/views since Db/Function metadata is loaded on startup.
@@ -736,4 +765,10 @@ service CatalogService {
   // Update recently used tables and their usage counts in an impalad since the last
   // report.
   TUpdateTableUsageResponse UpdateTableUsage(1: TUpdateTableUsageRequest req);
+
+  // Gets the null partition name used at HMS.
+  TGetNullPartitionNameResponse GetNullPartitionName(1: TGetNullPartitionNameRequest req);
+
+  // Gets the latest compactions.
+  TGetLatestCompactionsResponse GetLatestCompactions(1: TGetLatestCompactionsRequest req);
 }

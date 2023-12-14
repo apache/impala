@@ -363,6 +363,34 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "UpdateTableUsage(): response.status=" << resp.status;
   }
 
+  void GetNullPartitionName(TGetNullPartitionNameResponse& resp,
+      const TGetNullPartitionNameRequest& req) override {
+    VLOG_RPC << "GetNullPartitionName(): request=" << ThriftDebugString(req);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->GetNullPartitionName(&resp);
+    }
+    if (!status.ok()) LOG(ERROR) << status.GetDetail();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    resp.__set_status(thrift_status);
+    VLOG_RPC << "GetNullPartitionName(): response=" << ThriftDebugStringNoThrow(resp);
+  }
+
+  void GetLatestCompactions(TGetLatestCompactionsResponse& resp,
+      const TGetLatestCompactionsRequest& req) override {
+    VLOG_RPC << "GetLatestCompactions(): request=" << ThriftDebugString(req);
+    Status status = CheckProtocolVersion(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->GetLatestCompactions(req, &resp);
+    }
+    if (!status.ok()) LOG(ERROR) << status.GetDetail();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    resp.__set_status(thrift_status);
+    VLOG_RPC << "GetLatestCompactions(): response=" << ThriftDebugStringNoThrow(resp);
+  }
+
  private:
   CatalogServer* catalog_server_;
 

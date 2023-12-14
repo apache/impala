@@ -743,39 +743,19 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   }
 
   /**
-   * Fetches the latest compaction id from HMS and compares with partition metadata in
-   * cache. If a partition is stale due to compaction, removes it from metas.
+   * Fetches the latest compactions from HMS
    */
-  public static List<PartitionRef> checkLatestCompaction(MetaStoreClientPool msClientPool,
-      String dbName, String tableName, TableMetaRef table,
-      Map<PartitionRef, PartitionMetadata> metas, String unPartitionedName)
-      throws TException {
-    Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
-    Preconditions.checkNotNull(metas, "Partition map must be non-null");
-    if (metas.isEmpty()) {
-      return Collections.emptyList();
-    }
-    Stopwatch sw = Stopwatch.createStarted();
-    List<PartitionRef> stalePartitions = new ArrayList<>();
-    if (!table.isTransactional() || metas.isEmpty()) return stalePartitions;
+  public static Map<String, Long> getLatestCompactions(MetaStoreClient client,
+      String dbName, String tableName, List<String> partitionNames,
+      String unPartitionedName, long lastCompactionId) throws TException {
     GetLatestCommittedCompactionInfoRequest request =
         new GetLatestCommittedCompactionInfoRequest(dbName, tableName);
-    if (table.isPartitioned()) {
-      request.setPartitionnames(metas.keySet().stream()
-          .map(PartitionRef::getName).collect(Collectors.toList()));
-    }
-    long lastCompactionId = metas.values().stream()
-        .mapToLong(p -> p.getLastCompactionId()).max().orElse(-1);
-    if (lastCompactionId > 0) {
-      request.setLastCompactionId(lastCompactionId);
-    }
-
+    request.setPartitionnames(partitionNames);
+    if (lastCompactionId > 0) request.setLastCompactionId(lastCompactionId);
     GetLatestCommittedCompactionInfoResponse response;
-    try (MetaStoreClientPool.MetaStoreClient client = msClientPool.getClient()) {
-      response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
-    }
+    response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
     Map<String, Long> partNameToCompactionId = new HashMap<>();
-    if (table.isPartitioned()) {
+    if (partitionNames != null) {
       for (CompactionInfoStruct ci : response.getCompactions()) {
         if (ci.getPartitionname() != null) {
           partNameToCompactionId.put(ci.getPartitionname(), ci.getId());
@@ -786,14 +766,41 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
         }
       }
     } else {
-      CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(),
-          null);
-      if (ci != null) {
-        partNameToCompactionId.put(unPartitionedName, ci.getId());
-      }
+      CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(), null);
+      if (ci != null) partNameToCompactionId.put(unPartitionedName, ci.getId());
     }
-    Iterator<Entry<PartitionRef, PartitionMetadata>> iter =
-        metas.entrySet().iterator();
+    return partNameToCompactionId;
+  }
+
+  /**
+   * Fetches the latest compaction id from HMS and compares with partition metadata in
+   * cache. If a partition is stale due to compaction, removes it from metas.
+   */
+  public static List<PartitionRef> checkLatestCompaction(MetaStoreClientPool msClientPool,
+      String dbName, String tableName, TableMetaRef table,
+      Map<PartitionRef, PartitionMetadata> metas, String unPartitionedName)
+      throws TException {
+    Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
+    Preconditions.checkNotNull(metas, "Partition map must be non-null");
+    if (!table.isTransactional() || metas.isEmpty()) return Collections.emptyList();
+    Stopwatch sw = Stopwatch.createStarted();
+    List<String> partitionNames = null;
+    if (table.isPartitioned()) {
+      partitionNames =
+          metas.keySet().stream().map(PartitionRef::getName).collect(Collectors.toList());
+    }
+    long lastCompactionId = metas.values()
+                                .stream()
+                                .mapToLong(PartitionMetadata::getLastCompactionId)
+                                .max()
+                                .orElse(-1);
+    Map<String, Long> partNameToCompactionId = Collections.emptyMap();
+    try (MetaStoreClientPool.MetaStoreClient client = msClientPool.getClient()) {
+      partNameToCompactionId = getLatestCompactions(
+          client, dbName, tableName, partitionNames, unPartitionedName, lastCompactionId);
+    }
+    List<PartitionRef> stalePartitions = new ArrayList<>();
+    Iterator<Entry<PartitionRef, PartitionMetadata>> iter = metas.entrySet().iterator();
     while (iter.hasNext()) {
       Map.Entry<PartitionRef, PartitionMetadata> entry = iter.next();
       if (partNameToCompactionId.containsKey(entry.getKey().getName())) {

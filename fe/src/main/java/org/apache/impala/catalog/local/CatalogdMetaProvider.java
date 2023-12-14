@@ -20,8 +20,10 @@ package org.apache.impala.catalog.local;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,6 +65,7 @@ import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
@@ -71,6 +74,7 @@ import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.FrontendProfile;
@@ -88,6 +92,8 @@ import org.apache.impala.thrift.TDbInfoSelector;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionName;
+import org.apache.impala.thrift.TGetLatestCompactionsRequest;
+import org.apache.impala.thrift.TGetLatestCompactionsResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsFileDesc;
@@ -117,6 +123,7 @@ import org.github.jamm.MemoryMeter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -260,11 +267,6 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   private final ListMap<TNetworkAddress> cacheHostIndex_ =
       new ListMap<TNetworkAddress>();
-
-  // TODO(todd): currently we haven't implemented catalogd thrift APIs for all pieces
-  // of metadata. In order to incrementally build this out, we delegate various calls
-  // to the "direct" provider for now and circumvent catalogd.
-  private DirectMetaProvider directProvider_ = new DirectMetaProvider();
 
   /**
    * Number of requests which piggy-backed on a concurrent request for the same key,
@@ -948,8 +950,8 @@ public class CatalogdMetaProvider implements MetaProvider {
         hostIndex, partitionRefs);
     if (BackendConfig.INSTANCE.isAutoCheckCompaction()) {
       // If any partitions are stale after compaction, they will be removed from refToMeta
-      List<PartitionRef> stalePartitions = directProvider_.checkLatestCompaction(
-          refImpl.dbName_, refImpl.tableName_, refImpl, refToMeta);
+      List<PartitionRef> stalePartitions =
+          checkLatestCompaction(refImpl.dbName_, refImpl.tableName_, refImpl, refToMeta);
       cache_.invalidateAll(stalePartitions.stream()
           .map(PartitionRefImpl.class::cast)
           .map(PartitionRefImpl::getId)
@@ -986,6 +988,55 @@ public class CatalogdMetaProvider implements MetaProvider {
       nameToMeta.put(e.getKey().getName(), e.getValue());
     }
     return nameToMeta;
+  }
+
+  /**
+   * Fetches the latest compactions from catalogd and compares with partition metadata in
+   * cache. If a partition is stale due to compaction, removes it from metas. And return
+   * the stale partitions.
+   */
+  private List<PartitionRef> checkLatestCompaction(String dbName, String tableName,
+      TableMetaRef table, Map<PartitionRef, PartitionMetadata> metas) throws TException {
+    Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
+    Preconditions.checkNotNull(metas, "Partition map must be non-null");
+    if (!table.isTransactional() || metas.isEmpty()) return Collections.emptyList();
+    Stopwatch sw = Stopwatch.createStarted();
+    TGetLatestCompactionsRequest req = new TGetLatestCompactionsRequest();
+    req.db_name = dbName;
+    req.table_name = tableName;
+    req.non_parition_name = HdfsTable.DEFAULT_PARTITION_NAME;
+    if (table.isPartitioned()) {
+      req.partition_names =
+          metas.keySet().stream().map(PartitionRef::getName).collect(Collectors.toList());
+    }
+    req.last_compaction_id = metas.values()
+                                 .stream()
+                                 .mapToLong(PartitionMetadata::getLastCompactionId)
+                                 .max()
+                                 .orElse(-1);
+    byte[] ret = FeSupport.GetLatestCompactions(
+        new TSerializer(new TBinaryProtocol.Factory()).serialize(req));
+    TGetLatestCompactionsResponse resp = new TGetLatestCompactionsResponse();
+    new TDeserializer(new TBinaryProtocol.Factory()).deserialize(resp, ret);
+    if (resp.status.status_code != TErrorCode.OK) {
+      throw new TException(Joiner.on("\n").join(resp.status.getError_msgs()));
+    }
+    Map<String, Long> partNameToCompactionId = resp.partition_to_compaction_id;
+    Preconditions.checkNotNull(
+        partNameToCompactionId, "Partition name to compaction id map must be non-null");
+    List<PartitionRef> stalePartitions = new ArrayList<>();
+    Iterator<Map.Entry<PartitionRef, PartitionMetadata>> iter =
+        metas.entrySet().iterator();
+    while (iter.hasNext()) {
+      Map.Entry<PartitionRef, PartitionMetadata> entry = iter.next();
+      if (partNameToCompactionId.containsKey(entry.getKey().getName())) {
+        stalePartitions.add(entry.getKey());
+        iter.remove();
+      }
+    }
+    LOG.info("Checked the latest compaction info for {}.{}. Time taken: {}", dbName,
+        tableName, PrintUtils.printTimeMs(sw.stop().elapsed(TimeUnit.MILLISECONDS)));
+    return stalePartitions;
   }
 
   /**
@@ -1189,7 +1240,7 @@ public class CatalogdMetaProvider implements MetaProvider {
           /** Called to load cache for cache misses */
           @Override
           public String call() throws Exception {
-            return directProvider_.loadNullPartitionKeyValue();
+            return FeSupport.GetNullPartitionName();
           }
         });
   }

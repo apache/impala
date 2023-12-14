@@ -137,6 +137,13 @@ class Catalog {
   /// report.
   Status UpdateTableUsage(const TUpdateTableUsageRequest& req);
 
+  /// Gets the null partition name.
+  Status GetNullPartitionName(TGetNullPartitionNameResponse* resp);
+
+  /// Gets the latest compactions for the request.
+  Status GetLatestCompactions(
+      const TGetLatestCompactionsRequest& req, TGetLatestCompactionsResponse* resp);
+
   /// Regenerate Catalog Service ID.
   /// The function should be called when the CatalogD becomes active.
   void RegenerateServiceId();
@@ -170,6 +177,8 @@ class Catalog {
   jmethodID update_table_usage_id_;
   jmethodID regenerate_service_id_; // JniCatalog.regenerateServiceId()
   jmethodID refresh_data_sources_; // JniCatalog.refreshDataSources()
+  jmethodID get_null_partition_name_id_; // JniCatalog.getNullPartitionName()
+  jmethodID get_latest_compactions_id_; // JniCatalog.getLatestCompactions()
 };
 
 }

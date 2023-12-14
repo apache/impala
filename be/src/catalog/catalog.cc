@@ -71,6 +71,8 @@ Catalog::Catalog() {
     {"updateTableUsage", "([B)V", &update_table_usage_id_},
     {"regenerateServiceId", "()V", &regenerate_service_id_},
     {"refreshDataSources", "()V", &refresh_data_sources_},
+    {"getNullPartitionName", "()[B", &get_null_partition_name_id_},
+    {"getLatestCompactions", "([B)[B", &get_latest_compactions_id_},
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -219,4 +221,13 @@ void Catalog::RegenerateServiceId() {
 
 Status Catalog::RefreshDataSources() {
   return JniUtil::CallJniMethod(catalog_, refresh_data_sources_);
+}
+
+Status Catalog::GetNullPartitionName(TGetNullPartitionNameResponse* resp) {
+  return JniUtil::CallJniMethod(catalog_, get_null_partition_name_id_, resp);
+}
+
+Status Catalog::GetLatestCompactions(
+    const TGetLatestCompactionsRequest& req, TGetLatestCompactionsResponse* resp) {
+  return JniUtil::CallJniMethod(catalog_, get_latest_compactions_id_, req, resp);
 }

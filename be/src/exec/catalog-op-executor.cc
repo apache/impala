@@ -422,3 +422,31 @@ Status CatalogOpExecutor::UpdateTableUsage(const TUpdateTableUsageRequest& req,
   RETURN_IF_ERROR(rpc_status.status);
   return Status::OK();
 }
+
+Status CatalogOpExecutor::GetNullPartitionName(
+    const TGetNullPartitionNameRequest& req, TGetNullPartitionNameResponse* result) {
+  int attempt = 0; // Used for debug action only.
+  CatalogServiceConnection::RpcStatus rpc_status =
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
+          &CatalogServiceClientWrapper::GetNullPartitionName, req,
+          FLAGS_catalog_client_connection_num_retries,
+          FLAGS_catalog_client_rpc_retry_interval_ms,
+          [&attempt]() { return CatalogRpcDebugFn(&attempt); }, result);
+  RETURN_IF_ERROR(rpc_status.status);
+  return Status::OK();
+}
+
+Status CatalogOpExecutor::GetLatestCompactions(
+    const TGetLatestCompactionsRequest& req, TGetLatestCompactionsResponse* result) {
+  int attempt = 0; // Used for debug action only.
+  CatalogServiceConnection::RpcStatus rpc_status =
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress().get(),
+          &CatalogServiceClientWrapper::GetLatestCompactions, req,
+          FLAGS_catalog_client_connection_num_retries,
+          FLAGS_catalog_client_rpc_retry_interval_ms,
+          [&attempt]() { return CatalogRpcDebugFn(&attempt); }, result);
+  RETURN_IF_ERROR(rpc_status.status);
+  return Status::OK();
+}

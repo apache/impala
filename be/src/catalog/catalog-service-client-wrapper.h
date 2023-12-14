@@ -110,6 +110,22 @@ class CatalogServiceClientWrapper : public CatalogServiceClient {
     *send_done = true;
     recv_UpdateTableUsage(_return);
   }
+
+  void GetNullPartitionName(TGetNullPartitionNameResponse& _return,
+      const TGetNullPartitionNameRequest& req, bool* send_done) {
+    DCHECK(!*send_done);
+    send_GetNullPartitionName(req);
+    *send_done = true;
+    recv_GetNullPartitionName(_return);
+  }
+
+  void GetLatestCompactions(TGetLatestCompactionsResponse& _return,
+      const TGetLatestCompactionsRequest& req, bool* send_done) {
+    DCHECK(!*send_done);
+    send_GetLatestCompactions(req);
+    *send_done = true;
+    recv_GetLatestCompactions(_return);
+  }
 #pragma clang diagnostic pop
 };
 

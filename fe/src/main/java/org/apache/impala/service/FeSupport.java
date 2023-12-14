@@ -36,6 +36,8 @@ import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TExprBatch;
+import org.apache.impala.thrift.TGetNullPartitionNameRequest;
+import org.apache.impala.thrift.TGetNullPartitionNameResponse;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TParseDateStringResult;
@@ -139,6 +141,12 @@ public class FeSupport {
   // TParseDateStringResult object. Different date string variations are accepted.
   // E.g.: '2011-01-01', '2011-01-1', '2011-1-01', '2011-01-01'.
   public native static byte[] nativeParseDateString(String date);
+
+  // Does an RPC to the Catalog Server to get the null partition name.
+  public native static byte[] NativeGetNullPartitionName(byte[] thriftReq);
+
+  // Does an RPC to the Catalog Server to get the latest compactions.
+  public native static byte[] NativeGetLatestCompactions(byte[] thriftReq);
 
   /**
    * Locally caches the jar at the specified HDFS location.
@@ -488,6 +496,40 @@ public class FeSupport {
     } catch (TException e) {
       throw new InternalException("Could not parse date string: " + e.getMessage(), e);
     }
+  }
+
+  private static byte[] GetNullPartitionName(byte[] thriftReq) {
+    try {
+      return NativeGetNullPartitionName(thriftReq);
+    } catch (UnsatisfiedLinkError e) { loadLibrary(); }
+    return NativeGetNullPartitionName(thriftReq);
+  }
+
+  public static String GetNullPartitionName() throws InternalException {
+    TGetNullPartitionNameRequest request = new TGetNullPartitionNameRequest();
+    TGetNullPartitionNameResponse response = new TGetNullPartitionNameResponse();
+    try {
+      byte[] result = GetNullPartitionName(
+          new TSerializer(new TBinaryProtocol.Factory()).serialize(request));
+      Preconditions.checkNotNull(result);
+      new TDeserializer(new TBinaryProtocol.Factory()).deserialize(response, result);
+      if (response.getStatus().getStatus_code() != TErrorCode.OK) {
+        throw new InternalException("Error requesting GetNullPartitionName: "
+            + Joiner.on("\n").join(response.getStatus().getError_msgs()));
+      }
+      Preconditions.checkNotNull(response.partition_value);
+      return response.partition_value;
+    } catch (TException e) {
+      // this should never happen
+      throw new InternalException("Error processing request: " + e.getMessage(), e);
+    }
+  }
+
+  public static byte[] GetLatestCompactions(byte[] thriftReq) {
+    try {
+      return NativeGetLatestCompactions(thriftReq);
+    } catch (UnsatisfiedLinkError e) { loadLibrary(); }
+    return NativeGetLatestCompactions(thriftReq);
   }
 
   /**

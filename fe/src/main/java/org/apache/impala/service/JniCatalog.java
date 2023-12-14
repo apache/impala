@@ -68,6 +68,9 @@ import org.apache.impala.thrift.TGetDbsParams;
 import org.apache.impala.thrift.TGetDbsResult;
 import org.apache.impala.thrift.TGetFunctionsRequest;
 import org.apache.impala.thrift.TGetFunctionsResponse;
+import org.apache.impala.thrift.TGetLatestCompactionsRequest;
+import org.apache.impala.thrift.TGetLatestCompactionsResponse;
+import org.apache.impala.thrift.TGetNullPartitionNameResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;
@@ -85,6 +88,7 @@ import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.AuthorizationUtil;
 import org.apache.impala.util.CatalogOpUtil;
 import org.apache.impala.util.GlogAppender;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.impala.util.TUniqueIdUtil;
@@ -561,5 +565,33 @@ public class JniCatalog {
    */
   public void refreshDataSources() throws TException {
     catalog_.refreshDataSources();
+  }
+
+  public byte[] getNullPartitionName() throws ImpalaException, TException {
+    return execAndSerialize("getNullPartitionName", "Getting null partition name", () -> {
+      TGetNullPartitionNameResponse response = new TGetNullPartitionNameResponse();
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        response.setPartition_value(
+            MetaStoreUtil.getNullPartitionKeyValue(msClient.getHiveClient()));
+        response.setStatus(new TStatus(TErrorCode.OK, Lists.newArrayList()));
+      }
+      return response;
+    });
+  }
+
+  public byte[] getLatestCompactions(byte[] thriftParams)
+      throws ImpalaException, TException {
+    TGetLatestCompactionsRequest request = new TGetLatestCompactionsRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftParams);
+    return execAndSerialize("getLatestCompactions", "Getting latest compactions", () -> {
+      TGetLatestCompactionsResponse response = new TGetLatestCompactionsResponse();
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        response.setPartition_to_compaction_id(MetastoreShim.getLatestCompactions(
+            msClient, request.db_name, request.table_name, request.partition_names,
+            request.non_parition_name, request.last_compaction_id));
+        response.setStatus(new TStatus(TErrorCode.OK, Lists.newArrayList()));
+      }
+      return response;
+    });
   }
 }

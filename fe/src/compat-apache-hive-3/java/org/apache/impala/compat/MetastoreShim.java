@@ -592,6 +592,15 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   /**
    * CDP Hive-3 only function.
    */
+  public static Map<String, Long> getLatestCompactions(MetaStoreClient client,
+      String dbName, String tableName, List<String> partitionNames,
+      String unPartitionedName, long lastCompactionId) throws TException {
+    throw new UnsupportedOperationException("getLatestCompactions is not supported.");
+  }
+
+  /**
+   * CDP Hive-3 only function.
+   */
   public static List<PartitionRef> checkLatestCompaction(MetaStoreClientPool msClientPool,
       String dbName, String tableName, TableMetaRef table,
       Map<PartitionRef, PartitionMetadata> metas, String unPartitionedName)
