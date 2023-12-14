@@ -47,9 +47,9 @@ class SystemStateInfo {
 
   /// Ratios use basis points as their unit (1/100th of a percent, i.e. 0.0001).
   struct CpuUsageRatios {
-    int32_t user;
-    int32_t system;
-    int32_t iowait;
+    AtomicInt32 user;
+    AtomicInt32 system;
+    AtomicInt32 iowait;
   };
 
   /// Returns a struct containing the CPU usage ratios for the interval between the last

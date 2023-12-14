@@ -146,9 +146,11 @@ void SystemStateInfo::ComputeCpuRatios() {
   DCHECK_GT(total_tics, 0);
   // Convert each ratio to basis points.
   const int BASIS_MAX = 10000;
-  cpu_ratios_.user = ((cur[CPU_USER] - old[CPU_USER]) * BASIS_MAX) / total_tics;
-  cpu_ratios_.system = ((cur[CPU_SYSTEM] - old[CPU_SYSTEM]) * BASIS_MAX) / total_tics;
-  cpu_ratios_.iowait = ((cur[CPU_IOWAIT] - old[CPU_IOWAIT]) * BASIS_MAX) / total_tics;
+  cpu_ratios_.user.Store(((cur[CPU_USER] - old[CPU_USER]) * BASIS_MAX) / total_tics);
+  cpu_ratios_.system.Store(
+      ((cur[CPU_SYSTEM] - old[CPU_SYSTEM]) * BASIS_MAX) / total_tics);
+  cpu_ratios_.iowait.Store(
+      ((cur[CPU_IOWAIT] - old[CPU_IOWAIT]) * BASIS_MAX) / total_tics);
 }
 
 void SystemStateInfo::ReadCurrentProcNetDev() {

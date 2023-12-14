@@ -220,15 +220,15 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
     SystemStateInfo* system_state_info = exec_env->system_state_info();
     host_profile_->AddSamplingTimeSeriesCounter(
         "HostCpuUserPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
-        return system_state_info->GetCpuUsageRatios().user;
+        return system_state_info->GetCpuUsageRatios().user.Load();
         });
     host_profile_->AddSamplingTimeSeriesCounter(
         "HostCpuSysPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
-        return system_state_info->GetCpuUsageRatios().system;
+        return system_state_info->GetCpuUsageRatios().system.Load();
         });
     host_profile_->AddSamplingTimeSeriesCounter(
         "HostCpuIoWaitPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
-        return system_state_info->GetCpuUsageRatios().iowait;
+        return system_state_info->GetCpuUsageRatios().iowait.Load();
         });
     // Add network usage
     host_profile_->AddSamplingTimeSeriesCounter(

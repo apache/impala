@@ -32,7 +32,7 @@ class SystemStateInfoTest : public testing::Test {
 
 TEST_F(SystemStateInfoTest, FirstCallReturnsZero) {
   const SystemStateInfo::CpuUsageRatios& r = info.GetCpuUsageRatios();
-  EXPECT_EQ(0, r.user + r.system + r.iowait);
+  EXPECT_EQ(0, r.user.Load() + r.system.Load() + r.iowait.Load());
 
   const SystemStateInfo::NetworkUsage& n = info.GetNetworkUsage();
   EXPECT_EQ(0, n.rx_rate.Load() + n.tx_rate.Load());
@@ -144,9 +144,9 @@ TEST_F(SystemStateInfoTest, ComputeCpuRatiosIntOverflow) {
   info.ReadProcStatString("cpu  100953598 534 18552882 6318826150 4119619 0 0 0 0 0");
   info.ComputeCpuRatios();
   const SystemStateInfo::CpuUsageRatios& r = info.GetCpuUsageRatios();
-  EXPECT_EQ(r.user, 1649);
-  EXPECT_EQ(r.system, 304);
-  EXPECT_EQ(r.iowait, 0);
+  EXPECT_EQ(r.user.Load(), 1649);
+  EXPECT_EQ(r.system.Load(), 304);
+  EXPECT_EQ(r.iowait.Load(), 0);
 }
 
 // Smoke test for the public interface.
@@ -158,7 +158,7 @@ TEST_F(SystemStateInfoTest, GetCpuUsageRatios) {
     SleepForMs(200);
     info.CaptureSystemStateSnapshot();
     const SystemStateInfo::CpuUsageRatios& r = info.GetCpuUsageRatios();
-    EXPECT_GT(r.user + r.system + r.iowait, 0);
+    EXPECT_GT(r.user.Load() + r.system.Load() + r.iowait.Load(), 0);
   }
   running.Store(false);
   t.join();
@@ -170,9 +170,9 @@ TEST_F(SystemStateInfoTest, ComputeCpuRatios) {
   info.ReadProcStatString("cpu  30 30 20 70 100 0 0 0 0 0");
   info.ComputeCpuRatios();
   const SystemStateInfo::CpuUsageRatios& r = info.GetCpuUsageRatios();
-  EXPECT_EQ(r.user, 5000);
-  EXPECT_EQ(r.system, 5000);
-  EXPECT_EQ(r.iowait, 0);
+  EXPECT_EQ(r.user.Load(), 5000);
+  EXPECT_EQ(r.system.Load(), 5000);
+  EXPECT_EQ(r.iowait.Load(), 0);
 }
 
 // Tests the computation logic for network usage.
