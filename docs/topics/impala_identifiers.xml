@@ -51,20 +51,22 @@ under the License.
 
       <li>
         <p>
-        The maximum length of an identifier is currently 128 characters, enforced by the metastore database.
+        The maximum length of an identifier is currently 128 characters except for column names which
+        can contain 767 characters, enforced by the metastore database.
         </p>
       </li>
 
       <li>
         <p>
-        An identifier must start with an alphanumeric or underscore character. Quoting the identifier with
-        backticks has no effect on the allowed characters in the name.
+        An identifier must start with an alphanumeric or underscore character except for column names which
+        can start with any unicode characters. Quoting the identifier with backticks has no effect on the allowed
+        characters in the name.
         </p>
       </li>
 
       <li>
         <p>
-        An identifier can contain only ASCII characters.
+        An identifier can contain only ASCII characters except for column names which can contain unicode characters.
         </p>
       </li>
 
