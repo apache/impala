@@ -601,11 +601,11 @@ aggregation(SUM, RowsRead): 7300
 ---- QUERY
 # Test on a larger ORC file that has multiple stripes and each stripe has multiple row
 # groups.
-select count(*) from tpch_orc_def.lineitem where l_orderkey = 1609411;
+select count(*) from tpch_orc_def.orders where o_orderkey = 1;
 ---- RESULTS
-7
+1
 ---- RUNTIME_PROFILE
-aggregation(SUM, RowsRead): 13501
+aggregation(SUM, RowsRead): 10000
 ====
 ---- QUERY
 # Test pushing down IN-list predicate with literals outside the value range.
