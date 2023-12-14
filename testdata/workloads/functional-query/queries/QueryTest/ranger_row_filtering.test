@@ -593,6 +593,7 @@ select id, b.item from functional_parquet.complextypestbl t, t.nested_struct.b
 ---- TYPES
 BIGINT,INT
 ====
+---- IS_HDFS_ONLY
 ---- QUERY
 select * from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files;
 ---- RESULTS

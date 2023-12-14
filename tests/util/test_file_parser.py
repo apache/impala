@@ -98,7 +98,7 @@ def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
   if section_names is None:
     section_names = ['QUERY', 'HIVE_QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP',
         'CATCH', 'ERRORS', 'USER', 'RUNTIME_PROFILE', 'SHELL', 'DML_RESULTS',
-        'HS2_TYPES', 'HIVE_MAJOR_VERSION', 'LINEAGE']
+        'HS2_TYPES', 'HIVE_MAJOR_VERSION', 'LINEAGE', 'IS_HDFS_ONLY']
   return parse_test_file(file_name, section_names, encoding=encoding,
       skip_unknown_sections=False)
 

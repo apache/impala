@@ -688,6 +688,9 @@ class ImpalaTestSuite(BaseTestSuite):
         if needed_hive_major_version != HIVE_MAJOR_VERSION:
           continue
 
+      if 'IS_HDFS_ONLY' in test_section and not IS_HDFS:
+        continue
+
       if 'SHELL' in test_section:
         assert len(test_section) == 1, \
             "SHELL test sections can't contain other sections"
