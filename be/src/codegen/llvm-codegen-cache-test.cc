@@ -18,7 +18,6 @@
 #include "codegen/llvm-codegen-cache.h"
 #include <boost/thread/thread.hpp>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include "llvm/Support/Process.h"
 #include "codegen/mcjit-mem-mgr.h"
 #include "common/object-pool.h"
 #include "runtime/fragment-state.h"
@@ -37,9 +36,6 @@ namespace impala {
 class LlvmCodeGenCacheTest : public testing::Test {
  public:
   virtual void SetUp() {
-    // Using single shard makes the logic of scenarios simple for capacity and
-    // eviction-related behavior.
-    FLAGS_cache_force_single_shard = true;
     FLAGS_codegen_cache_capacity = "0";
     metrics_.reset(new MetricGroup("codegen-cache-test"));
     profile_ = RuntimeProfile::Create(&obj_pool_, "codegen-cache-test");
@@ -52,11 +48,9 @@ class LlvmCodeGenCacheTest : public testing::Test {
     PlanFragmentCtxPB* fragment_ctx = qs->obj_pool()->Add(new PlanFragmentCtxPB());
     fragment_state_ =
         qs->obj_pool()->Add(new FragmentState(qs, *fragment, *fragment_ctx));
-    page_size_ = llvm::sys::Process::getPageSize();
   }
 
   virtual void TearDown() {
-    FLAGS_cache_force_single_shard = false;
     fragment_state_->ReleaseResources();
     fragment_state_ = nullptr;
     codegen_cache_.reset();
@@ -143,7 +137,6 @@ class LlvmCodeGenCacheTest : public testing::Test {
   shared_ptr<LlvmExecutionEngineWrapper> exec_engine_wrapper_;
   TQueryOptions query_options_;
   TCodeGenOptLevel::type opt_level_ = TCodeGenOptLevel::O2;
-  unsigned page_size_;
 };
 
 void LlvmCodeGenCacheTest::AddLlvmCodegenEcho(LlvmCodeGen* codegen) {
@@ -275,10 +268,19 @@ int64_t LlvmCodeGenCacheTest::GetMemCharge(
 /// Test the situation that the codegen cache hits the limit of capacity, in this case,
 /// eviction is needed when new insertion comes.
 void LlvmCodeGenCacheTest::TestAtCapacity(TCodeGenCacheMode::type mode) {
-  // LLVM allocates memory in pages, and for small examples allocates 3 pages.
-  int64_t codegen_cache_capacity = 3 * page_size_ +
-      sizeof(CodeGenCacheEntry) + CodeGenCacheKey::OptimalKeySize + sizeof(std::string);
+  int64_t codegen_cache_capacity = 196; // 196B
   bool is_normal_mode = !CodeGenCacheModeAnalyzer::is_optimal(mode);
+  // 150B for optimal mode, or 164B on ARM systems
+  if (!is_normal_mode) {
+#ifdef __aarch64__
+    codegen_cache_capacity = 164;
+#else
+    codegen_cache_capacity = 150;
+#endif
+  }
+  // Using single shard makes the logic of scenarios simple for capacity and
+  // eviction-related behavior.
+  FLAGS_cache_force_single_shard = true;
 
   // Create two LlvmCodeGen objects containing a different codegen function separately.
   scoped_ptr<LlvmCodeGen> codegen;
@@ -486,9 +488,7 @@ void LlvmCodeGenCacheTest::TestSwitchModeHelper(TCodeGenCacheMode::type mode, st
 
 // Test to switch among different modes.
 TEST_F(LlvmCodeGenCacheTest, SwitchMode) {
-  // Storage for 2 entries
-  int64_t codegen_cache_capacity = 2 * (3 * page_size_ +
-      sizeof(CodeGenCacheEntry) + CodeGenCacheKey::OptimalKeySize + sizeof(std::string));
+  int64_t codegen_cache_capacity = 512; // 512B
   codegen_cache_.reset(new CodeGenCache(metrics_.get()));
   EXPECT_OK(codegen_cache_->Init(codegen_cache_capacity));
   string key = "key";
@@ -579,9 +579,7 @@ void LlvmCodeGenCacheTest::TestConcurrentStore(int num_threads) {
 }
 
 TEST_F(LlvmCodeGenCacheTest, ConcurrentStore) {
-  // Storage for 2 entries
-  int64_t codegen_cache_capacity = 2 * (3 * page_size_ +
-      sizeof(CodeGenCacheEntry) + CodeGenCacheKey::OptimalKeySize + sizeof(std::string));
+  int64_t codegen_cache_capacity = 512; // 512B
   codegen_cache_.reset(new CodeGenCache(metrics_.get()));
   EXPECT_OK(codegen_cache_->Init(codegen_cache_capacity));
   TestConcurrentStore(8);

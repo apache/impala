@@ -39,8 +39,6 @@
 
 using std::unique_ptr;
 
-DECLARE_bool(cache_force_single_shard);
-
 namespace impala {
 
 class CodegenFnPtrTest : public testing:: Test {
@@ -581,9 +579,6 @@ class LlvmOptTest :
   TQueryOptions query_opts_;
 
   virtual void SetUp() {
-    // Using single shard makes the logic of scenarios simple for capacity and
-    // eviction-related behavior.
-    FLAGS_cache_force_single_shard = true;
     metrics_.reset(new MetricGroup("codegen-test"));
     test_env_.reset(new TestEnv());
     ASSERT_OK(test_env_->Init());
@@ -591,7 +586,6 @@ class LlvmOptTest :
   }
 
   virtual void TearDown() {
-    FLAGS_cache_force_single_shard = false;
     fragment_state_->ReleaseResources();
     fragment_state_ = nullptr;
     test_env_.reset();

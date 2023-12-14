@@ -105,12 +105,6 @@ public:
   /// This method is called from finalizeMemory.
   virtual void invalidateInstructionCache();
 
-  /// \brief Returns number of bytes allocated by the memory manager.
-  ///
-  /// Impala: added to track actual memory allocation (which is page-aligned)
-  /// rather than just requested memory.
-  int64_t bytes_allocated() const;
-
 private:
   struct FreeMemBlock {
     // The actual block of free memory
