@@ -636,6 +636,12 @@ class ImpalaServer : public ImpalaServiceIf,
     /// that need to be closed if the session closes or expires.
     boost::unordered_set<TUniqueId> inflight_queries;
 
+    /// Queries are added to inflight_queries via SetQueryInflight. Execution is async
+    /// and can start before SetQueryInflight is called. If a query is retried before
+    /// SetQueryInflight is called, the original may be cleaned up before it is added to
+    /// inflight_queries. In that case we add it to prestopped_queries instead.
+    std::set<TUniqueId> prestopped_queries;
+
     /// Total number of queries run as part of this session.
     int64_t total_queries;
 
@@ -755,13 +761,18 @@ class ImpalaServer : public ImpalaServiceIf,
       QueryHandle* query_handle) WARN_UNUSED_RESULT;
 
   /// Adds the query to the set of in-flight queries for the session. The query remains
-  /// in-flight until the query is unregistered.  Until a query is in-flight, an attempt
-  /// to cancel or close the query by the user will return an error status.  If the
-  /// session is closed before a query is in-flight, then the query cancellation is
-  /// deferred until after the issuing path has completed initializing the query.  Once
+  /// in-flight until the query is unregistered. Until a query is in-flight, an attempt
+  /// to cancel or close the query by the user will return an error status. A query that
+  /// retries may close the original query state before SetQueryInflight is called; in
+  /// that case it adds the query to prestopped_queries, which will bypass unnecessary
+  /// setup when SetQueryInflight is later called on it.
+  ///
+  /// If the session is closed before a query is in-flight, then the query cancellation
+  /// is deferred until after the issuing path has completed initializing the query. Once
   /// a query is in-flight, it can be cancelled/closed asynchronously by the user
   /// (e.g. via an RPC) and the session close path can close (cancel and unregister) it.
-  /// The query must have already been registered using RegisterQuery().  The caller
+  ///
+  /// The query must have already been registered using RegisterQuery(). The caller
   /// must have checked out the session state.
   Status SetQueryInflight(std::shared_ptr<SessionState> session_state,
       const QueryHandle& query_handle) WARN_UNUSED_RESULT;

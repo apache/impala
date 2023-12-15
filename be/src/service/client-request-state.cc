@@ -176,7 +176,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
 }
 
 ClientRequestState::~ClientRequestState() {
-  DCHECK(wait_thread_.get() == NULL) << "BlockOnWait() needs to be called!";
+  DCHECK(wait_thread_.get() == NULL) << "Finalize() needs to be called!";
   DCHECK(!track_rpcs_);  // Should get set to false in Finalize()
   DCHECK(pending_rpcs_.empty()); // Should get cleared in Finalize()
   UnRegisterRemainingRPCs(); // Avoid memory leaks if Finalize() didn't get called

@@ -762,6 +762,37 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+  def test_retrying_query_before_inflight(self):
+    """Trigger a query retry, and delay setting the original query inflight as that may
+    happen after the query is retried. Validate that the query succeeds. Set a really
+    high statestore heartbeat frequency so that killed impalads are not removed from
+    the cluster membership."""
+
+    # Kill an impalad, and run a query. The query should be retried.
+    self.cluster.impalads[1].kill()
+    query = self._count_query
+    handle = self.execute_query_async(query,
+        query_options={'retry_failed_queries': 'true',
+                       'debug_action': 'SET_QUERY_INFLIGHT:SLEEP@1000'})
+    self.__wait_until_retry_state(handle, 'RETRIED')
+
+    # SetQueryInflight will complete before execute_query_async returns because it will
+    # be completed before Impala acknowledges that the query has started.
+    page = self.cluster.get_first_impalad().service.get_debug_webpage_json('sessions')
+    for session in page['sessions']:
+      # Every session should have one completed query: either test setup, or the original
+      # query that's being retried.
+      assert session['inflight_queries'] < session['total_queries']
+
+    self.client.close_query(handle)
+    # If original query state closure is skipped, the coordinator will crash on a DCHECK.
+    time.sleep(2)
+    assert self.cluster.impalads[0].get_pid() is not None, "Coordinator crashed"
+    self.__validate_memz()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       impalad_args="--debug_actions=RETRY_DELAY_GET_QUERY_DRIVER:SLEEP@2000",
       statestored_args="--statestore_heartbeat_frequency_ms=60000")
   def test_retry_query_close_before_getting_query_driver(self):

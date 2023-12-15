@@ -372,8 +372,17 @@ void QueryDriver::RetryQueryFromThread(
   QueryHandle query_handle;
   query_handle.SetHandle(query_driver, request_state);
   // Do the work of close that needs to be done synchronously, otherwise we'll
-  // hit some illegal states in destroying the request_state.
-  DCHECK(query_handle->is_inflight());
+  // hit some illegal states in destroying the request_state. It's possible (but rare)
+  // that the query is not marked inflight yet; what happens in that case is:
+  //   1. RegisterQuery (adds the original ID to query_driver_map_), then Exec.
+  //   2. Query fails and retries with a new query ID (this function). The retried query
+  //      won't also retry on failure, so this problem doesn't recurse.
+  //   3. We Finalize the query and CloseClientRequestState; it will fail to remove the
+  //      original ID from inflight_queries, and add it to prestopped_queries for later.
+  //   4. At some point later SetQueryInflight executes; it will remove the original ID
+  //      from prestopped_queries and skip adding it to inflight_queries.
+  //   5. When the query is closed, UnregisterQuery calls query_driver->Unregister, which
+  //      removes both the original and retry query ID from query_driver_map_.
   query_handle->Finalize(nullptr);
   parent_server_->CloseClientRequestState(query_handle);
   parent_server_->MarkSessionInactive(session);
@@ -394,6 +403,13 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
     // returned immediately.
     query_ctx.client_request.query_options.__set_spool_all_results_for_retries(false);
     VLOG_QUERY << "Unset SPOOL_ALL_RESULTS_FOR_RETRIES when retrying query "
+        << PrintId(client_request_state_->query_id());
+  }
+  if (UNLIKELY(query_ctx.client_request.query_options.__isset.debug_action)) {
+    // We need to be able to test actions that don't reproduce in the retried query. If we
+    // later need to target retried queries, we can add a separate query option for that.
+    query_ctx.client_request.query_options.__set_debug_action("");
+    VLOG_QUERY << "Unset DEBUG_ACTION when retrying query "
         << PrintId(client_request_state_->query_id());
   }
   parent_server_->PrepareQueryContext(&query_ctx);

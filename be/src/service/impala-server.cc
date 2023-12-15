@@ -1461,6 +1461,7 @@ Status ImpalaServer::RegisterQuery(const TUniqueId& query_id,
 
 Status ImpalaServer::SetQueryInflight(
     shared_ptr<SessionState> session_state, const QueryHandle& query_handle) {
+  DebugActionNoFail(query_handle->query_options(), "SET_QUERY_INFLIGHT");
   const TUniqueId& query_id = query_handle->query_id();
   lock_guard<mutex> l(session_state->lock);
   // The session wasn't expired at the time it was checked out and it isn't allowed to
@@ -1472,9 +1473,21 @@ Status ImpalaServer::SetQueryInflight(
     VLOG(1) << "Session closed: cannot set " << PrintId(query_id) << " in-flight";
     return Status::Expected("Session closed");
   }
-  // Add query to the set that will be unregistered if sesssion is closed.
-  session_state->inflight_queries.insert(query_id);
+
+  // Acknowledge the query by incrementing total_queries.
   ++session_state->total_queries;
+  // If the query was already closed - only possible by query retry logic - skip
+  // scheduling it to be unregistered with the session and adding timeouts checks.
+  if (session_state->prestopped_queries.erase(query_id) > 0) {
+    VLOG_QUERY << "Query " << PrintId(query_id) << " closed, skipping in-flight.";
+    return Status::OK();
+  }
+  // Add query to the set that will be unregistered if session is closed.
+  auto inflight_it = session_state->inflight_queries.insert(query_id);
+  if (UNLIKELY(!inflight_it.second)) {
+    LOG(WARNING) << "Query " << PrintId(query_id) << " is already in-flight.";
+    DCHECK(false) << "SetQueryInflight called twice for query_id=" << PrintId(query_id);
+  }
 
   // If the query has a timeout or time limit, schedule checks.
   int32_t idle_timeout_s = query_handle->query_options().query_timeout_s;
@@ -1604,7 +1617,24 @@ void ImpalaServer::CloseClientRequestState(const QueryHandle& query_handle) {
 
   {
     lock_guard<mutex> l(query_handle->session()->lock);
-    query_handle->session()->inflight_queries.erase(query_handle->query_id());
+    if (query_handle->session()->inflight_queries.erase(query_handle->query_id()) == 0
+        && query_handle->IsSetRetriedId()) {
+      // Closing a ClientRequestState but the query is retrying with a new state and the
+      // original ID was not yet inflight: skip adding it later. We don't want to track
+      // other scenarios because they happen when the query was started and then errored
+      // before a call to SetQueryInflight; we don't expect it to ever be called.
+      auto prestopped_it =
+          query_handle->session()->prestopped_queries.insert(query_handle->query_id());
+      if (UNLIKELY(!prestopped_it.second)) {
+        LOG(WARNING) << "Query " << PrintId(query_handle->query_id())
+                     << " closed again before in-flight.";
+        DCHECK(false) << "CloseClientRequestState called twice for query_id="
+                      << PrintId(query_handle->query_id());
+      } else {
+        VLOG_QUERY << "Query " << PrintId(query_handle->query_id())
+                   << " closed before in-flight.";
+      }
+    }
   }
 
   if (query_handle->GetCoordinator() != nullptr) {
