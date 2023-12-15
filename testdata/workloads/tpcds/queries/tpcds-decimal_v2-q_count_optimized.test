@@ -1,0 +1,8 @@
+====
+---- QUERY: TPCDS-Q_COUNT_OPTIMIZED
+select count(*) from store_sales;
+---- RESULTS
+2880404
+---- TYPES
+BIGINT
+====

@@ -145,7 +145,6 @@ explain select 123, count(*), 321 from ice_tbl;
 ====
 ---- QUERY
 # Filtering by a partition column results in Iceberg doing the filtering instead of Impala.
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 2.
 select
   count(*)
 from
@@ -155,7 +154,7 @@ where
 ---- RESULTS
 4
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 2
 ====
 ---- QUERY
@@ -214,7 +213,6 @@ create table parq_tbl(col_i INT, col_s STRING) PARTITIONED BY(x INT) STORED AS P
 'Table has been created.'
 ====
 ---- QUERY
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 3.
 insert into parq_tbl PARTITION(x = 12340) values (0, "a");
 insert into parq_tbl PARTITION(x = 12341) values (1, "b");
 insert into parq_tbl PARTITION(x = 12342) values (2, "c");
@@ -222,7 +220,7 @@ select count(*) from parq_tbl;
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY

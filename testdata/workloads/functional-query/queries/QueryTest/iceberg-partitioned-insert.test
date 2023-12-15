@@ -174,13 +174,12 @@ aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 # When filtered only by partition column Iceberg can do the filtering and no need to read data in Impala.
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 1.
 select count(*) from ice_bigints
 where i = 0 and j = 0;
 ---- RESULTS
 1217
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, RowsRead): 0
 aggregation(SUM, NumFileMetadataRead): 1
 ====
@@ -282,7 +281,6 @@ select count(*) from alltypes_part;
 Expression 'timestamp_col' (type: TIMESTAMP) would need to be cast to STRING for column 'string_col'
 ====
 ---- QUERY
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where bool_col = true;
 ---- RESULTS
@@ -290,11 +288,10 @@ where bool_col = true;
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where float_col = 0;
 ---- RESULTS
@@ -302,11 +299,10 @@ where float_col = 0;
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where double_col = 0;
 ---- RESULTS
@@ -314,11 +310,10 @@ where double_col = 0;
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 2.
 select count(*) from alltypes_part
 where date_col = '2009-01-01';
 ---- RESULTS
@@ -326,11 +321,10 @@ where date_col = '2009-01-01';
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 2
 ====
 ---- QUERY
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 4.
 select count(*) from alltypes_part
 where string_col = '0';
 ---- RESULTS
@@ -338,7 +332,7 @@ where string_col = '0';
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY

@@ -1,0 +1,8 @@
+====
+---- QUERY: TPCDS-Q_COUNT_ZERO_SLOT
+select count(ss_sold_date_sk) from store_sales;
+---- RESULTS
+2750311
+---- TYPES
+BIGINT
+====

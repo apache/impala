@@ -437,31 +437,26 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     // Populate the single slot with the Parquet num rows statistic.
     int64_t tuple_buf_size;
     uint8_t* tuple_buf;
-    // We try to allocate a smaller row batch here because in most cases the number row
-    // groups in a file is much lower than the default row batch capacity.
-    int capacity = min(
-        static_cast<int>(file_metadata_.row_groups.size()), row_batch->capacity());
-    RETURN_IF_ERROR(RowBatch::ResizeAndAllocateTupleBuffer(state_,
-        row_batch->tuple_data_pool(), row_batch->row_desc()->GetRowSize(),
-        &capacity, &tuple_buf_size, &tuple_buf));
-    while (!row_batch->AtCapacity()) {
-      RETURN_IF_ERROR(NextRowGroup());
-      DCHECK_LE(row_group_idx_, file_metadata_.row_groups.size());
-      DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
-      if (row_group_idx_ == file_metadata_.row_groups.size()) break;
+    int capacity = 1;
+    RETURN_IF_ERROR(
+        RowBatch::ResizeAndAllocateTupleBuffer(state_, row_batch->tuple_data_pool(),
+            row_batch->row_desc()->GetRowSize(), &capacity, &tuple_buf_size, &tuple_buf));
+    if (file_metadata_.num_rows > 0) {
       COUNTER_ADD(num_file_metadata_read_, 1);
       Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
       TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
       InitTuple(template_tuple_, dst_tuple);
       int64_t* dst_slot =
           dst_tuple->GetBigIntSlot(scan_node_->parquet_count_star_slot_offset());
-      *dst_slot = file_metadata_.row_groups[row_group_idx_].num_rows;
-      row_group_rows_read_ += *dst_slot;
+      *dst_slot = 0;
+      for (const auto &row_group : file_metadata_.row_groups) {
+        *dst_slot += row_group.num_rows;
+      }
       dst_row->SetTuple(0, dst_tuple);
       row_batch->CommitLastRow();
-      tuple_buf += scan_node_->tuple_desc()->byte_size();
+      row_group_rows_read_ += *dst_slot;
     }
-    eos_ = row_group_idx_ == file_metadata_.row_groups.size();
+    eos_ = true;
     return Status::OK();
   } else if (scan_node_->IsZeroSlotTableScan()) {
     // There are no materialized slots and we are not optimizing count(*), e.g.

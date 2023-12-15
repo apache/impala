@@ -63,7 +63,6 @@ aggregation(SUM, NumRowGroups): 3
 ---- QUERY
 # Filtering only on a partition column is done by Iceberg and in Impala we can get the results
 # simply using file metadata.
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 3.
 select
   count(1)
 from
@@ -73,7 +72,7 @@ where
 ---- RESULTS
 9
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 3
 ====
 ---- QUERY
@@ -448,7 +447,6 @@ aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # NOT_IN could be answered using file metadata if only partition cols are included
-# IMPALA-11123: Behavior changes after a revert: NumRowGroups changed from 0 to 1.
 select
   count(1)
 from
@@ -458,7 +456,7 @@ where
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 1
 ====
 ---- QUERY

@@ -447,12 +447,6 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    if (canApplyCountStarOptimization(analyzer, fileFormats_)) {
-      Preconditions.checkState(desc_.getPath().destTable() != null);
-      Preconditions.checkState(collectionConjuncts_.isEmpty());
-      countStarSlot_ = applyCountStarOptimization(analyzer);
-    }
-
     computeMemLayout(analyzer);
 
     // This is towards the end, so that it can take all conjuncts, scan ranges and mem
@@ -1121,6 +1115,26 @@ public class HdfsScanNode extends ScanNode {
       sampledFiles_ = getFilesSample(percentBytes, 0, randomSeed);
     }
 
+    // Get partitions in the sample and initialize fileFormats_.
+    List<FeFsPartition> partitions = new ArrayList<>();
+    for (FeFsPartition partition : partitions_) {
+      Preconditions.checkState(partition.getId() >= 0);
+      if (sampledFiles_ != null && sampledFiles_.get(partition.getId()) == null) {
+        // If we are sampling, check whether this partition is included in the sample.
+        continue;
+      }
+      partitions.add(partition);
+      if (partition.getFileFormat() != HdfsFileFormat.ICEBERG) {
+        fileFormats_.add(partition.getFileFormat());
+      }
+    }
+
+    if (canApplyCountStarOptimization(analyzer, fileFormats_)) {
+      Preconditions.checkState(desc_.getPath().destTable() != null);
+      Preconditions.checkState(collectionConjuncts_.isEmpty());
+      countStarSlot_ = applyCountStarOptimization(analyzer);
+    }
+
     long scanRangeBytesLimit = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
     if (RuntimeEnv.INSTANCE.hasTableScanRangeLimit() && desc_.getTableName() != null) {
@@ -1158,7 +1172,7 @@ public class HdfsScanNode extends ScanNode {
     String lastFsScheme = null;
     String lastFsAuthority = null;
     FileSystem lastFileSytem = null;
-    for (FeFsPartition partition: partitions_) {
+    for (FeFsPartition partition : partitions) {
       // Save location to local variable beacuse getLocation() can be slow as it needs to
       // decompress the partition's location.
       String partitionLocation = partition.getLocation();
@@ -1191,25 +1205,18 @@ public class HdfsScanNode extends ScanNode {
                         : -1);
       // conservatively estimate 1 row per file
       simpleLimitNumRows += fileDescs.size();
-
       if (sampledFiles_ != null) {
-        // If we are sampling, check whether this partition is included in the sample.
+        // If we are sampling, get files in the sample.
         fileDescs = sampledFiles_.get(partition.getId());
-        if (fileDescs == null) continue;
       }
 
       long partitionNumRows = partition.getNumRows();
-
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
-      if (partition.getFileFormat() != HdfsFileFormat.ICEBERG) {
-        fileFormats_.add(partition.getFileFormat());
-      }
       if (!partition.getFileFormat().isParquetBased()) {
         allParquet = false;
       }
       allColumnarFormat =
           allColumnarFormat && VALID_COLUMNAR_FORMATS.contains(partition.getFileFormat());
-      Preconditions.checkState(partition.getId() >= 0);
 
       if (!fsHasBlocks) {
         // Limit the scan range length if generating scan ranges (and we're not
@@ -1253,9 +1260,19 @@ public class HdfsScanNode extends ScanNode {
         } else {
           // Skips files that have no associated blocks.
           if (fileDesc.getNumFileBlocks() == 0) continue;
-          Pair<Boolean, Long> result = transformBlocksToScanRanges(
-              partition, partitionLocation, fsType, fileDesc, fsHasBlocks,
-              scanRangeBytesLimit, analyzer);
+          // If parquet count star optimization is enabled, we only need the
+          // 'RowGroup.num_rows' in file metadata, thus only the scan range that contains
+          // a file footer is required.
+          // IMPALA-8834 introduced the optimization for partition key scan by generating
+          // one scan range for each HDFS file. With Parquet and ORC, we only need to get
+          // the scan range that contains a file footer for short-circuiting.
+          boolean isFooterOnly = countStarSlot_ != null
+              || (isPartitionKeyScan_
+                  && (partition.getFileFormat().isParquetBased()
+                      || partition.getFileFormat() == HdfsFileFormat.ORC));
+          Pair<Boolean, Long> result =
+              transformBlocksToScanRanges(partition, partitionLocation, fsType, fileDesc,
+                  fsHasBlocks, scanRangeBytesLimit, analyzer, isFooterOnly);
           partitionMaxScanRangeBytes =
               Math.max(partitionMaxScanRangeBytes, result.second);
           if (result.first) partitionMissingDiskIds = true;
@@ -1388,18 +1405,13 @@ public class HdfsScanNode extends ScanNode {
    */
   private Pair<Boolean, Long> transformBlocksToScanRanges(FeFsPartition partition,
       String partitionLocation, FileSystemUtil.FsType fsType, FileDescriptor fileDesc,
-      boolean fsHasBlocks, long scanRangeBytesLimit, Analyzer analyzer) {
+      boolean fsHasBlocks, long scanRangeBytesLimit, Analyzer analyzer,
+      boolean isFooterOnly) {
     Preconditions.checkArgument(fileDesc.getNumFileBlocks() > 0);
     boolean fileDescMissingDiskIds = false;
     long fileMaxScanRangeBytes = 0;
     int i = 0;
-    if (isPartitionKeyScan_ && (partition.getFileFormat().isParquetBased()
-        || partition.getFileFormat() == HdfsFileFormat.ORC)) {
-      // IMPALA-8834 introduced the optimization for partition key scan by generating
-      // one scan range for each HDFS file. With Parquet and ORC, we start with the last
-      // block to get a scan range that contains a file footer for short-circuiting.
-      i = fileDesc.getNumFileBlocks() - 1;
-    }
+    if (isFooterOnly) { i = fileDesc.getNumFileBlocks() - 1; }
     for (; i < fileDesc.getNumFileBlocks(); ++i) {
       FbFileBlock block = fileDesc.getFbFileBlock(i);
       int replicaHostCount = FileBlock.getNumReplicaHosts(block);
@@ -1438,6 +1450,11 @@ public class HdfsScanNode extends ScanNode {
         long currentLength = remainingLength;
         if (scanRangeBytesLimit > 0 && remainingLength > scanRangeBytesLimit) {
           currentLength = scanRangeBytesLimit;
+          if (isFooterOnly) {
+            // Only generate one scan range for footer only scans.
+            currentOffset += remainingLength - currentLength;
+            remainingLength = currentLength;
+          }
         }
         TScanRange scanRange = new TScanRange();
         THdfsFileSplit hdfsFileSplit = new THdfsFileSplit(fileDesc.getRelativePath(),

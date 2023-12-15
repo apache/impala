@@ -1,0 +1,8 @@
+====
+---- QUERY: TPCDS-Q_COUNT_UNOPTIMIZED
+select count(*) from store_sales where ss_ext_discount_amt != 0.3857
+---- RESULTS
+2750566
+---- TYPES
+BIGINT
+====

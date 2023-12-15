@@ -24,3 +24,10 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
+select max(year) from alltypessmall
+---- TYPES
+int
+---- RESULTS
+2009
+====
