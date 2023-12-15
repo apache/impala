@@ -86,6 +86,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
@@ -1412,7 +1413,6 @@ public class CatalogOpExecutor {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     boolean needsToUpdateHms = !isIcebergHmsIntegrationEnabled(tbl.getMetaStoreTable());
     try {
-      boolean needsTxn = true;
       org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(tbl);
       switch (params.getAlter_type()) {
         case ADD_COLUMNS:
@@ -1457,15 +1457,12 @@ public class CatalogOpExecutor {
           }
           break;
         case SET_PARTITION_SPEC:
-          // Set partition spec uses 'TableOperations', not transactions.
-          needsTxn = false;
           // Partition spec is not stored in HMS.
           needsToUpdateHms = false;
           TAlterTableSetPartitionSpecParams setPartSpecParams =
               params.getSet_partition_spec_params();
           IcebergCatalogOpExecutor.alterTableSetPartitionSpec(tbl,
-              setPartSpecParams.getPartition_spec(),
-              catalog_.getCatalogServiceId(), newCatalogVersion);
+              setPartSpecParams.getPartition_spec(), iceTxn);
           addSummary(response, "Updated partition spec.");
           break;
         case SET_TBL_PROPERTIES:
@@ -1492,17 +1489,15 @@ public class CatalogOpExecutor {
               "Unsupported ALTER TABLE operation for Iceberg tables: " +
               params.getAlter_type());
       }
-      if (needsTxn) {
-        if (!needsToUpdateHms) {
-          IcebergCatalogOpExecutor.addCatalogVersionToTxn(iceTxn,
-              catalog_.getCatalogServiceId(), newCatalogVersion);
-        }
-        if (debugAction != null) {
-          DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_COMMIT);
-        }
-        iceTxn.commitTransaction();
+      if (!needsToUpdateHms) {
+        IcebergCatalogOpExecutor.addCatalogVersionToTxn(iceTxn,
+            catalog_.getCatalogServiceId(), newCatalogVersion);
       }
-    } catch (IllegalArgumentException ex) {
+      if (debugAction != null) {
+        DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_COMMIT);
+      }
+      iceTxn.commitTransaction();
+    } catch (IllegalArgumentException | ValidationException ex) {
       throw new ImpalaRuntimeException(String.format(
           "Failed to ALTER table '%s': %s", params.getTable_name().table_name,
           ex.getMessage()));

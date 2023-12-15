@@ -57,11 +57,14 @@ import org.apache.iceberg.TableScan;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Literal;
+import org.apache.iceberg.expressions.Term;
 import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
+import org.apache.iceberg.transforms.Transforms;
 import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -244,11 +247,58 @@ public class IcebergUtil {
       } else if (transformType == TIcebergPartitionTransformType.VOID) {
         builder.alwaysNull(partitionField.getOrig_field_name());
       } else {
-        throw new ImpalaRuntimeException(String.format("Skip partition: %s, %s",
-            partitionField.getOrig_field_name(), transformType));
+        throw new ImpalaRuntimeException(
+            String.format("Unknown partition transform '%s' for field '%s",
+                transformType, partitionField.getOrig_field_name()));
       }
     }
     return builder.build();
+  }
+
+  /**
+   * Transforms TIcebergPartitionSpec to a list of Iceberg terms.
+   * @param partSpec The partition spec Thrift object
+   * @return List of Iceberg terms.
+   * @throws ImpalaRuntimeException When the transform type is not supported
+   */
+  public static List<Term> getPartitioningTerms(TIcebergPartitionSpec partSpec)
+      throws ImpalaRuntimeException {
+    List<Term> result = new ArrayList<>();
+    for (TIcebergPartitionField field : partSpec.getPartition_fields()) {
+      result.add(getPartitioningTerm(field));
+    }
+    return result;
+  }
+
+  /**
+   * Retrieves the Iceberg partitioning term for a given partition field.
+   * @param field partition field for which the partitioning term is generated.
+   * @return The Iceberg partitioning term as a Term.
+   * @throws ImpalaRuntimeException When the transform type is not supported
+   * @see TIcebergPartitionField
+   * @see Expressions
+   * @see Transforms
+   */
+  private static Term getPartitioningTerm(TIcebergPartitionField field)
+      throws ImpalaRuntimeException {
+    TIcebergPartitionTransformType transformType = field.getTransform()
+        .getTransform_type();
+      String fieldName = field.getOrig_field_name();
+    int transformParam = field.getTransform().getTransform_param();
+    switch (transformType) {
+      case IDENTITY: return Expressions.transform(fieldName, Transforms.identity());
+      case HOUR: return Expressions.hour(fieldName);
+      case DAY: return Expressions.day(fieldName);
+      case MONTH: return Expressions.month(fieldName);
+      case YEAR: return Expressions.year(fieldName);
+      case BUCKET: return Expressions.bucket(fieldName, transformParam);
+      case TRUNCATE: return Expressions.truncate(fieldName, transformParam);
+      case VOID: return Expressions.transform(fieldName, Transforms.alwaysNull());
+      default:
+        throw new ImpalaRuntimeException(
+            String.format("Unknown partition transform '%s' for field '%s",
+                transformType, fieldName));
+      }
   }
 
   /**

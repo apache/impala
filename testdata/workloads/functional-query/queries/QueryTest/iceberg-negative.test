@@ -686,12 +686,12 @@ AnalysisException: Source column 's' in table $DATABASE.iceberg_alter_part must 
 ---- QUERY
 ALTER TABLE iceberg_alter_part SET PARTITION SPEC (YEAR(i));
 ---- CATCH
-ImpalaRuntimeException: Failed to ALTER table 'iceberg_alter_part': Cannot partition type int by year
+ImpalaRuntimeException: Failed to ALTER table 'iceberg_alter_part': Cannot bind: year cannot transform int values from 'i'
 ====
 ---- QUERY
 ALTER TABLE iceberg_alter_part SET PARTITION SPEC (HOUR(d));
 ---- CATCH
-ImpalaRuntimeException: Failed to ALTER table 'iceberg_alter_part': Cannot partition type date by hour
+ImpalaRuntimeException: Failed to ALTER table 'iceberg_alter_part': Cannot bind: hour cannot transform date values from 'd'
 ====
 ---- QUERY
 CREATE TABLE clone_ice LIKE functional_parquet.alltypestiny STORED AS ICEBERG;

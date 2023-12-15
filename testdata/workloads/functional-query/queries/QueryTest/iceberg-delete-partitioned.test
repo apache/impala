@@ -368,10 +368,10 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/delete-.*
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=10/(?!delete-).*.parq','.*B','','.*'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/delete-.*parq','.*B','','.*'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/i=20/(?!delete-).*.parq','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/delete-.*parq','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=f/(?!delete-).*.parq','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc=t/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc_1=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc_1=f/delete-.*parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc_1=f/(?!delete-).*.parq','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/evolve_part/data/s_trunc_1=t/(?!delete-).*.parq','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====

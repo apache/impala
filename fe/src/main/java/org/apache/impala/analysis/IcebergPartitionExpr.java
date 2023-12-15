@@ -19,8 +19,10 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.transforms.Transforms;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.Type;
@@ -129,6 +131,12 @@ public class IcebergPartitionExpr extends Expr {
 
     List<PartitionField> partitionFields =
         partitionSpec_.getFieldsBySourceId(icebergColumn.getFieldId());
+    // Removing VOID transforms
+    partitionFields = partitionFields.stream().filter(
+        partitionField -> !partitionField.transform()
+            .equals(Transforms.alwaysNull())).collect(
+        Collectors.toList());
+
     if (partitionFields.isEmpty()) {
       throw new AnalysisException(
           "Partition exprs cannot contain non-partition column(s): " + toSql());

@@ -27,7 +27,7 @@ import random
 import re
 import time
 
-from subprocess import check_call
+from subprocess import check_call, check_output
 # noinspection PyUnresolvedReferences
 from parquet.ttypes import ConvertedType
 
@@ -667,7 +667,7 @@ class TestIcebergTable(IcebergTestSuite):
 
     os.remove(local_file)
 
-  # Get hdfs path to manifest list that belongs to the sanpshot identified by
+  # Get hdfs path to manifest list that belongs to the snapshot identified by
   # 'snapshot_counter'.
   def get_manifest_list_hdfs_path(self, tmp_path_prefix, db_name, table_name,
       snapshot_counter):
@@ -724,6 +724,130 @@ class TestIcebergTable(IcebergTestSuite):
           reader.close()
         os.remove(local_path)
     return datafiles
+
+  def get_latest_metadata_path(self, database_name, table_name):
+    describe = 'describe extended %s.%s ' % (database_name, table_name)
+    output = self.client.execute(describe)
+    metadata_location = [s for s in output.data if s.startswith('\tmetadata_location')]
+    assert len(metadata_location) == 1
+    metadata_location_split = metadata_location[0].split('\t')
+    assert len(metadata_location_split) == 3
+    metadata_path = metadata_location_split[2]
+    return metadata_path
+
+  # Get the current partition spec as JSON from the latest metadata file
+  def get_current_partition_spec(self, database_name, table_name):
+    hdfs_path = self.get_latest_metadata_path(database_name, table_name)
+    output = check_output(['hadoop', 'fs', '-cat', hdfs_path])
+
+    current_partition_spec = None
+    metadata = json.loads(output)
+
+    current_spec_id = metadata['default-spec-id']
+    for spec in metadata['partition-specs']:
+      if spec['spec-id'] == current_spec_id:
+        current_partition_spec = spec
+        break
+    return current_partition_spec
+
+  @SkipIf.not_dfs
+  def test_partition_spec_update_v1(self, vector, unique_database):
+    # Create table
+    table_name = "ice_part"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    create_table = 'create table %s ' \
+        '(s string, i int) partitioned by spec(truncate(5, s), identity(i)) ' \
+        'stored as iceberg' \
+        % qualified_table_name
+    self.client.execute(create_table)
+
+    partition_spec = self.get_current_partition_spec(unique_database, table_name)
+    assert len(partition_spec['fields']) == 2
+    truncate_s = partition_spec['fields'][0]
+    identity_i = partition_spec['fields'][1]
+    # At table creation, partition names does not contain the parameter value.
+    assert truncate_s['name'] == 's_trunc'
+    assert identity_i['name'] == 'i'
+    assert truncate_s['field-id'] == 1000
+    assert identity_i['field-id'] == 1001
+
+    # Partition evolution
+    partition_evolution = 'alter table %s set partition ' \
+        'spec(identity(i), truncate(6,s))' % qualified_table_name
+    self.client.execute(partition_evolution)
+
+    # V1 partition evolution keeps the old, modified fields, but changes their
+    # transform to VOID.
+    evolved_partition_spec = self.get_current_partition_spec(unique_database, table_name)
+    assert len(evolved_partition_spec['fields']) == 3
+    old_truncate_s = evolved_partition_spec['fields'][0]
+    identity_i = evolved_partition_spec['fields'][1]
+    truncate_s = evolved_partition_spec['fields'][2]
+    assert old_truncate_s['name'] == 's_trunc'
+    assert identity_i['name'] == 'i'
+    # Modified field name contains the parameter value.
+    assert truncate_s['name'] == 's_trunc_6'
+    assert old_truncate_s['field-id'] == 1000
+    assert identity_i['field-id'] == 1001
+    # field-id increases for the modified field.
+    assert truncate_s['field-id'] == 1002
+    assert old_truncate_s['transform'] == 'void'
+
+  @SkipIf.not_dfs
+  def test_partition_spec_update_v2(self, vector, unique_database):
+    # Create table
+    table_name = "ice_part"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    create_table = 'create table %s ' \
+        '(s string, i int) partitioned by spec(truncate(5, s), identity(i)) ' \
+        'stored as iceberg tblproperties ("format-version" = "2")' \
+        % qualified_table_name
+    self.client.execute(create_table)
+
+    partition_spec = self.get_current_partition_spec(unique_database, table_name)
+    assert len(partition_spec['fields']) == 2
+    truncate_s = partition_spec['fields'][0]
+    identity_i = partition_spec['fields'][1]
+    # At table creation, partition names does not contain the parameter value.
+    assert truncate_s['name'] == 's_trunc'
+    assert identity_i['name'] == 'i'
+    assert truncate_s['field-id'] == 1000
+    assert identity_i['field-id'] == 1001
+
+    # Partition evolution for s
+    partition_evolution = 'alter table %s set partition ' \
+        'spec(identity(i), truncate(6,s))' % qualified_table_name
+    self.client.execute(partition_evolution)
+
+    # V2 partition evolution updates the previous partitioning for
+    # the modified field.
+    evolved_partition_spec = self.get_current_partition_spec(unique_database, table_name)
+    assert len(evolved_partition_spec['fields']) == 2
+    identity_i = evolved_partition_spec['fields'][0]
+    truncate_s = evolved_partition_spec['fields'][1]
+    assert identity_i['name'] == 'i'
+    # Modified field name contains the parameter value.
+    assert truncate_s['name'] == 's_trunc_6'
+    assert identity_i['field-id'] == 1001
+    # field-id increased for the modified field.
+    assert truncate_s['field-id'] == 1002
+
+    # Partition evolution for i and s
+    partition_evolution = 'alter table %s set partition ' \
+        'spec(bucket(4, i), truncate(3,s))' \
+        % qualified_table_name
+    self.client.execute(partition_evolution)
+
+    evolved_partition_spec = self.get_current_partition_spec(unique_database, table_name)
+    assert len(evolved_partition_spec['fields']) == 2
+    bucket_i = evolved_partition_spec['fields'][0]
+    truncate_s = evolved_partition_spec['fields'][1]
+    # The field naming follows the transform changes.
+    assert bucket_i['name'] == 'i_bucket_4'
+    assert truncate_s['name'] == 's_trunc_3'
+    # field-id's are increasing with each modification
+    assert bucket_i['field-id'] == 1003
+    assert truncate_s['field-id'] == 1004
 
   @SkipIf.not_dfs
   def test_writing_metrics_to_metadata(self, vector, unique_database):

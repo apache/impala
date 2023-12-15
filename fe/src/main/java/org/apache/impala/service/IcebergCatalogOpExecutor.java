@@ -36,14 +36,14 @@ import org.apache.iceberg.ReplacePartitions;
 import org.apache.iceberg.RowDelta;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdatePartitionSpec;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.expressions.Term;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -178,21 +178,15 @@ public class IcebergCatalogOpExecutor {
    * Sets new default partition spec for an Iceberg table.
    */
   public static void alterTableSetPartitionSpec(FeIcebergTable feTable,
-      TIcebergPartitionSpec partSpec, String catalogServiceId, long catalogVersion)
-      throws TableLoadingException, ImpalaRuntimeException {
+      TIcebergPartitionSpec partSpec, Transaction transaction)
+      throws ImpalaRuntimeException {
     BaseTable iceTable = (BaseTable)feTable.getIcebergApiTable();
-    TableOperations tableOp = iceTable.operations();
-    TableMetadata metadata = tableOp.current();
-    Schema schema = metadata.schema();
-    PartitionSpec newPartSpec = IcebergUtil.createIcebergPartition(schema, partSpec);
-    TableMetadata newMetadata = metadata.updatePartitionSpec(newPartSpec);
-    Map<String, String> properties = new HashMap<>(newMetadata.properties());
-    properties.put(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
-                   catalogServiceId);
-    properties.put(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
-                   String.valueOf(catalogVersion));
-    newMetadata = newMetadata.replaceProperties(properties);
-    tableOp.commit(metadata, newMetadata);
+    UpdatePartitionSpec updatePartitionSpec = transaction.updateSpec();
+    iceTable.spec().fields().forEach(partitionField -> updatePartitionSpec.removeField(
+        partitionField.name()));
+    List<Term> partitioningTerms = IcebergUtil.getPartitioningTerms(partSpec);
+    partitioningTerms.forEach(updatePartitionSpec::addField);
+    updatePartitionSpec.commit();
   }
 
   /**
