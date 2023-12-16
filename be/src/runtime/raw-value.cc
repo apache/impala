@@ -206,6 +206,7 @@ void RawValue::WriteNonNullPrimitive(const void* value, void* dst, const ColumnT
     case TYPE_STRUCT: {
       // Structs should be handled by a different Write() function within this class.
       DCHECK(false);
+      break;
     }
     default:
       DCHECK(false) << "RawValue::WriteNonNullPrimitive(): bad type: "

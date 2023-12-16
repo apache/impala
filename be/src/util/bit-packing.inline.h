@@ -411,8 +411,10 @@ const uint8_t* BitPacking::UnpackUpTo31Values(const uint8_t* __restrict__ in,
 
 #pragma push_macro("UNPACK_VALUES_CASE")
 #define UNPACK_VALUES_CASE(ignore1, i, ignore2) \
-  case 31 - i: out[30 - i] = \
-      static_cast<OutType>(UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer));
+  case 31 - i: \
+    out[30 - i] = \
+        static_cast<OutType>(UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer)); \
+    [[fallthrough]];
 
   // Use switch with fall-through cases to minimise branching.
   switch (num_values) {
@@ -451,11 +453,14 @@ const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict
 
 #pragma push_macro("DECODE_VALUES_CASE")
 #define DECODE_VALUES_CASE(ignore1, i, ignore2) \
-  case 31 - i: { \
-    uint32_t idx = UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer); \
-    uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + (30 - i) * stride; \
-    DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), decode_error); \
-  }
+  case 31 - i: \
+    { \
+      uint32_t idx = UnpackValue<BIT_WIDTH, 30 - i, false>(in_buffer); \
+      uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + (30 - i) * stride; \
+      DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), \
+          decode_error); \
+    } \
+    [[fallthrough]];
 
   // Use switch with fall-through cases to minimise branching.
   switch (num_values) {

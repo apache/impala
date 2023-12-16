@@ -134,6 +134,7 @@ void CodegenAnyValReadWriteInfo::CodegenConvertToCanonicalForm() {
       llvm::Value* new_val = CodegenAnyVal::ConvertToCanonicalForm(codegen_, builder_,
           type_, GetSimpleVal());
       SetSimpleVal(new_val);
+      break;
     }
     default:
       ;

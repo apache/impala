@@ -1011,6 +1011,7 @@ CodegenAnyValReadWriteInfo CodegenAnyValToReadWriteInfo(CodegenAnyVal& any_val,
     case TYPE_STRUCT:
       DCHECK(false) << "Invalid type for this function. "
                     << "Call 'StoreStructToNativePtr()' instead.";
+      break;
     default:
       DCHECK(false) << "NYI: " << rwi.type().DebugString();
       break;
@@ -1074,6 +1075,7 @@ void SlotDescriptor::CodegenStoreNonNullAnyVal(
     case TYPE_STRUCT:
       DCHECK(false) << "Invalid type for this function. "
                     << "Call 'StoreStructToNativePtr()' instead.";
+      break;
     default:
       DCHECK(false) << "NYI: " << type.DebugString();
       break;

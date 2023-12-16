@@ -174,6 +174,7 @@ bool ColumnStatsReader::ReadFromString(StatsField stats_field,
               static_cast<Decimal16Value*>(slot));
         }
       DCHECK(false) << "Unknown decimal byte size: " << col_type_.GetByteSize();
+      break;
     case TYPE_DATE:
       return ColumnStats<DateValue>::DecodePlainValue(encoded_value, slot, element_.type);
     default:

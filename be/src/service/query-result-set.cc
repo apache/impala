@@ -472,6 +472,7 @@ int HS2ColumnarResultSet::AddRows(
         to->binaryVal.values.insert(to->binaryVal.values.end(),
             from->binaryVal.values.begin() + start_idx,
             from->binaryVal.values.begin() + start_idx + rows_added);
+        break;
       default:
         DCHECK(false) << "Unsupported type: "
                       << TypeToString(ThriftToType(

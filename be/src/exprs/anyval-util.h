@@ -330,7 +330,8 @@ class AnyValUtil {
 #endif
             return;
           default:
-            break;
+            DCHECK(false) << "Unknown decimal byte size: " << type.GetByteSize();
+            return;
         }
       case TYPE_DATE:
         *reinterpret_cast<DateVal*>(dst) =

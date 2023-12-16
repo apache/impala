@@ -63,6 +63,7 @@ string NameOfTypeOfJsonValue(const Value& value) {
     case rapidjson::kNumberType:
       if (value.IsInt()) return "Integer";
       if (value.IsDouble()) return "Float";
+      [[fallthrough]];
     default:
       DCHECK(false);
       return "Unknown";

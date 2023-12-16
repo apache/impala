@@ -154,6 +154,7 @@ class StringParser {
       switch (*s) {
         case '-':
           is_negative = true;
+          [[fallthrough]];
         case '+':
           ++s;
           --len;
@@ -310,6 +311,7 @@ class StringParser {
       case '-':
         negative = true;
         max_val = static_cast<UnsignedT>(std::numeric_limits<T>::max()) + 1;
+        [[fallthrough]];
       case '+': ++i;
     }
 
@@ -366,6 +368,7 @@ class StringParser {
       case '-':
         negative = true;
         max_val = static_cast<UnsignedT>(std::numeric_limits<T>::max()) + 1;
+        [[fallthrough]];
       case '+': i = 1;
     }
 
@@ -472,7 +475,9 @@ class StringParser {
     bool negative = false;
     int i = 0;
     switch (*s) {
-      case '-': negative = true;  // Fallthrough is intended.
+      case '-':
+        negative = true;
+        [[fallthrough]];
       case '+': i = 1;
     }
 

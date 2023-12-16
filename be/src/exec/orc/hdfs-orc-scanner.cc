@@ -689,6 +689,7 @@ void HdfsOrcScanner::SetSyntheticAcidFieldForOriginalFile(const SlotDescriptor* 
       break;
     case ACID_FIELD_ROWID_INDEX:
       file_position_ = slot_desc;
+      break;
     default:
       break;
   }

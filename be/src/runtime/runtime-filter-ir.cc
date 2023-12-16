@@ -37,12 +37,14 @@ bool IR_ALWAYS_INLINE RuntimeFilter::Eval(
           return filter->EvalOverlap(col_type, val, val);
         }
       }
+      break;
     }
     case TRuntimeFilterType::IN_LIST: {
       InListFilter* filter = get_in_list_filter();
       if (LIKELY(filter && !filter->AlwaysTrue())) {
         return filter->Find(val, col_type);
       }
+      break;
     }
   }
   return true;

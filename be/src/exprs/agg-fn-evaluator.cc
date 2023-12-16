@@ -260,7 +260,9 @@ void AggFnEvaluator::SetDstSlot(const AnyVal* src, const SlotDescriptor& dst_slo
 #endif
           return;
         default:
-          break;
+          DCHECK(false) << "Unknown decimal byte size: "
+                        << dst_slot_desc.type().GetByteSize();
+          return;
       }
     case TYPE_DATE:
       *reinterpret_cast<DateValue*>(slot) =

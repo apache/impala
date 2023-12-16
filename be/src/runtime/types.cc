@@ -146,6 +146,7 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype) {
     case TYPE_ARRAY:
     case TYPE_MAP:
       DCHECK(false) << "NYI: " << ptype;
+      [[fallthrough]];
     default: return TPrimitiveType::INVALID_TYPE;
   }
 }

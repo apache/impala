@@ -147,7 +147,8 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
           return reinterpret_cast<const Decimal16Value*>(v1)->value()
               == reinterpret_cast<const Decimal16Value*>(v2)->value();
         default:
-          break;
+          DCHECK(false) << "Unknown decimal byte size: " << type.GetByteSize();
+          return 0;
       }
     default:
       DCHECK(false) << type;

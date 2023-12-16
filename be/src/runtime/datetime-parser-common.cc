@@ -130,6 +130,7 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
         break;
       case MISPLACED_FX_MODIFIER_ERROR:
         ss << "PARSE ERROR: FX modifier should be at the beginning of the format string.";
+        break;
       case CONFLICTING_DAY_OF_WEEK_TOKENS_ERROR:
         ss << "PARSE ERROR: Multiple day of week tokens provided.";
         break;

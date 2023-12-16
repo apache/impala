@@ -62,10 +62,15 @@ TMP_STDERR=$(mktemp)
 STRCAT_MESSAGE="Impala-specific note: This can also be fixed using the StrCat() function \
 from be/src/gutil/strings strcat.h)"
 CLANG_STRING_CONCAT="performance-inefficient-string-concatenation"
+FALLTHROUGH_MESSAGE="Impala-specific note: Impala is a C++ 17 codebase, so the preferred \
+way to indicate intended fallthrough is C++ 17's [[fallthrough]]"
+CLANG_FALLTHROUGH="clang-diagnostic-implicit-fallthrough"
 trap "rm $TMP_STDERR" EXIT
 if ! run-clang-tidy.py -quiet -header-filter "${PIPE_DIRS%?}" \
                        -j"${CORES}" ${DIRS} 2> ${TMP_STDERR} | \
-  sed "/${CLANG_STRING_CONCAT}/ s#\$# ${STRCAT_MESSAGE}#";
+   sed "/${CLANG_STRING_CONCAT}/ s#\$# \n${STRCAT_MESSAGE}#" | \
+   sed "/${CLANG_FALLTHROUGH}/ s#\$# \n${FALLTHROUGH_MESSAGE}#" | \
+   sed 's#FALLTHROUGH_INTENDED#[[fallthrough]]#';
 then
   echo "run-clang-tidy.py hit an error, dumping stderr output"
   cat ${TMP_STDERR} >&2

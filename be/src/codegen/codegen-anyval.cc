@@ -598,6 +598,7 @@ void CodegenAnyVal::ConvertToCanonicalForm() {
       llvm::Value* new_val = ConvertToCanonicalForm(codegen_,
           builder_, type_, GetVal());
       SetVal(new_val);
+      break;
     }
     default:
       ;

@@ -91,7 +91,9 @@ inline int32_t AtoiUnsafe(const char* s, int len) {
   bool negative = false;
   int i = 0;
   switch (*s) {
-    case '-': negative = true;
+    case '-':
+      negative = true;
+      [[fallthrough]];
     case '+': ++i;
   }
 
@@ -107,25 +109,34 @@ inline int32_t AtoiUnrolled(const char* s, int len) {
     int32_t val = 0;
     bool negative = false;
     switch (*s) {
-      case '-': negative = true;
+      case '-':
+        negative = true;
+        [[fallthrough]];
       case '+': --len; ++s;
     }
 
     switch(len) {
       case 8:
         val += (DIGIT(s[len - 8])) * 10000;
+        [[fallthrough]];
       case 7:
         val += (DIGIT(s[len - 7])) * 10000;
+        [[fallthrough]];
       case 6:
         val += (DIGIT(s[len - 6])) * 10000;
+        [[fallthrough]];
       case 5:
         val += (DIGIT(s[len - 5])) * 10000;
+        [[fallthrough]];
       case 4:
         val += (DIGIT(s[len - 4])) * 1000;
+        [[fallthrough]];
       case 3:
         val += (DIGIT(s[len - 3])) * 100;
+        [[fallthrough]];
       case 2:
         val += (DIGIT(s[len - 2])) * 10;
+        [[fallthrough]];
       case 1:
         val += (DIGIT(s[len - 1]));
     }
@@ -140,7 +151,9 @@ inline int32_t AtoiCased(const char* s, int len) {
     int32_t val = 0;
     bool negative = false;
     switch (*s) {
-      case '-': negative = true;
+      case '-':
+        negative = true;
+        [[fallthrough]];
       case '+': --len; ++s;
     }
 

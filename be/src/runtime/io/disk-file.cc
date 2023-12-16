@@ -110,8 +110,10 @@ void MemBlock::Delete(bool* reserved, bool* allocated) {
       free(data_);
       data_ = nullptr;
       *allocated = true;
+      [[fallthrough]];
     case MemBlockStatus::RESERVED:
       *reserved = true;
+      [[fallthrough]];
     default:
       SetStatusLocked(lock, MemBlockStatus::DISABLED);
       DCHECK(data_ == nullptr);
