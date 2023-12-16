@@ -32,7 +32,7 @@
 # that were used by the binary. It gets the symbols for all
 # those libraries and resolves the minidump.
 #
-# Usage: resolve_minidump.py --minidump_file [file] --output_file [file]
+# Usage: resolve_minidumps.py --minidump_file [file] --output_file [file]
 # (optional -v or --verbose for more output)
 
 import errno
@@ -288,9 +288,22 @@ def dump_symbols_for_all_modules(dump_syms, objcopy, module_list, out_dir):
 
 
 def resolve_minidump(minidump_stackwalk, minidump_path, symbol_dir, verbose, out_file):
+  minidump_stackwalk_cmd = [minidump_stackwalk, minidump_path, symbol_dir]
+  # There are circumstances where the minidump_stackwalk can go wrong and become
+  # a runaway process capable of using all system memory. If the prlimit utility
+  # is present, we use it to apply a limit on the memory consumption.
+  #
+  # See if we have the prlimit utility
+  check_prlimit = subprocess.run(["prlimit", "-V"], stdout=subprocess.DEVNULL,
+      stderr=subprocess.DEVNULL)
+  if check_prlimit.returncode == 0:
+    # The prlimit utility is available, so wrap the minidump_stackwalk command
+    # to apply a 4GB limit on virtual memory. In normal operations, 4G is plenty.
+    prlimit_wrapper = ["prlimit", "--as={0}".format(4 * 1024 * 1024 * 1024)]
+    minidump_stackwalk_cmd = prlimit_wrapper + minidump_stackwalk_cmd
   with open(out_file, "w") as out_f:
     stderr_output = None if verbose else subprocess.DEVNULL
-    subprocess.run([minidump_stackwalk, minidump_path, symbol_dir], stdout=out_f,
+    subprocess.run(minidump_stackwalk_cmd, stdout=out_f,
                    stderr=stderr_output, check=True)
 
 
