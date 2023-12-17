@@ -43,6 +43,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 
 from argparse import ArgumentParser
 
@@ -130,6 +131,26 @@ def read_module_info(minidump_dump_contents):
     modules.append(ModuleInfo(code_file, code_identifier, debug_file, debug_identifier))
 
   return modules
+
+
+def filter_shared_library_modules(module_list, lib_allow_list):
+  """Filter the list of modules by eliminating any shared libaries that do not match
+  one of the prefixes in the allow list. This keeps all non-shared libaries
+  (such as the main binary).
+  """
+  filtered_module_list = []
+  for module in module_list:
+    code_file_basename = os.path.basename(module.code_file)
+    # Keep anything that is not a shared library (e.g. the main binary)
+    if ".so" not in code_file_basename:
+      filtered_module_list.append(module)
+      continue
+    # Only keep shared libraries that match an entry on the allow list.
+    for allow_lib in lib_allow_list:
+      if code_file_basename.startswith(allow_lib):
+        filtered_module_list.append(module)
+        break
+  return filtered_module_list
 
 
 def find_breakpad_home():
@@ -331,8 +352,37 @@ def parse_args():
   parser.add_argument('--minidump_file', required=True)
   parser.add_argument('--output_file', required=True)
   parser.add_argument('-v', '--verbose', action='store_true')
+  parser.add_argument('--safe_library_list',
+      default="libstdc++.so,libc.so,libjvm.so",
+      help="Comma-separate list of prefixes for allowed system libraries")
   args = parser.parse_args()
   return args
+
+
+def dump_syms_and_resolve_stack(modules, minidump_file, output_file, verbose):
+  """Dump the symbols for the listed modules and use them to resolve the minidump."""
+  # Create a temporary directory to store the symbols
+  # This automatically gets cleaned up
+  with tempfile.TemporaryDirectory() as tmp_dir:
+    # Dump symbols for all the modules into this temporary directory.
+    # Need both dump_syms and objcopy
+    dump_syms_bin = find_breakpad_binary("dump_syms")
+    if not dump_syms_bin:
+      logging.error("Could not find Breakpad dump_syms binary")
+      sys.exit(1)
+    objcopy_bin = find_objcopy_binary()
+    if not objcopy_bin:
+      logging.error("Could not find Binutils objcopy binary")
+      sys.exit(1)
+    dump_symbols_for_all_modules(dump_syms_bin, objcopy_bin, modules, tmp_dir)
+
+    # Resolve the minidump with the temporary symbol directory
+    minidump_stackwalk_bin = find_breakpad_binary("minidump_stackwalk")
+    if not minidump_stackwalk_bin:
+      logging.error("Could not find Breakpad minidump_stackwalk binary")
+      sys.exit(1)
+    resolve_minidump(find_breakpad_binary("minidump_stackwalk"), minidump_file,
+                     tmp_dir, verbose, output_file)
 
 
 def main():
@@ -361,28 +411,30 @@ def main():
     logging.error("Failed to read modules for {0}".format(args.minidump_file))
     sys.exit(1)
 
-  # Create a temporary directory to store the symbols.
-  # This automatically gets cleaned up.
-  with tempfile.TemporaryDirectory() as tmp_dir:
-    # Step 3: Dump symbols for all the modules into this temporary directory.
-    # Need both dump_syms and objcopy
-    dump_syms_bin = find_breakpad_binary("dump_syms")
-    if not dump_syms_bin:
-      logging.error("Could not find Breakpad dump_syms binary")
-      sys.exit(1)
-    objcopy_bin = find_objcopy_binary()
-    if not objcopy_bin:
-      logging.error("Could not find Binutils objcopy binary")
-      sys.exit(1)
-    dump_symbols_for_all_modules(dump_syms_bin, objcopy_bin, modules, tmp_dir)
+  # Step 3: Dump the symbols and use them to resolve the minidump
+  # Sometimes there are libraries with corrupt/problematic symbols
+  # that can cause minidump_stackwalk to go haywire and use excessive
+  # memory. First, we try using symbols from all of the shared libraries.
+  # If that fails, we fallback to using a "safe" list of shared libraries.
+  try:
+    # Dump the symbols and use them to resolve the minidump
+    dump_syms_and_resolve_stack(modules, args.minidump_file, args.output_file,
+                                args.verbose)
+    return
+  except Exception:
+    logging.warning("Encountered error: {0}".format(traceback.format_exc()))
+    logging.warning("Falling back to resolution using the safe library list")
+    logging.warning("Safe library list: {0}".format(args.safe_library_list))
 
-    # Step 4: Resolve the minidump with the temporary symbol directory
-    minidump_stackwalk_bin = find_breakpad_binary("minidump_stackwalk")
-    if not minidump_stackwalk_bin:
-      logging.error("Could not find Breakpad minidump_stackwalk binary")
-      sys.exit(1)
-    resolve_minidump(find_breakpad_binary("minidump_stackwalk"), args.minidump_file,
-                     tmp_dir, args.verbose, args.output_file)
+  # Limit the shared libraries to the "safe" list of shared libraries and
+  # try again.
+  if len(args.safe_library_list) == 0:
+    safe_library_list = []
+  else:
+    safe_library_list = args.safe_library_list.split(",")
+  safe_modules = filter_shared_library_modules(modules, safe_library_list)
+  dump_syms_and_resolve_stack(safe_modules, args.minidump_file, args.output_file,
+                              args.verbose)
 
 
 if __name__ == "__main__":
