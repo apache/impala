@@ -907,6 +907,15 @@ enum TImpalaQueryOptions {
   // ceil(N / MAX_NUM_FILTERS_AGGREGATED_PER_HOST). Setting 1, 0, or negative value
   // will disable the intermediate aggregator feature. Default to -1 (disabled).
   MAX_NUM_FILTERS_AGGREGATED_PER_HOST = 172
+
+  // Divide the CPU requirement of a query to fit the total available CPU in
+  // the executor group. For example, setting value 2 will fit the query with CPU
+  // requirement 2X to an executor group with total available CPU X. Note that setting
+  // with a fractional value less than 1 effectively multiplies the query CPU
+  // requirement. A valid value is > 0.0.
+  // If this query option is not set, value of backend flag --query_cpu_count_divisor
+  // (default to 1.0) will be picked up instead.
+  QUERY_CPU_COUNT_DIVISOR = 173
 }
 
 // The summary of a DML statement.

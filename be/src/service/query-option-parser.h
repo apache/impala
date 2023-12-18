@@ -69,6 +69,16 @@ class QueryOptionValidator {
     return Status::OK();
   }
 
+  static inline Status ExclusiveLowerBound(
+      TImpalaQueryOptions::type option, const T value, const T lower) {
+    if (value <= lower) {
+      std::stringstream ss;
+      ss << "Value must be greater than " << lower << ", actual value: " << value;
+      return CreateValidationErrorStatus(option, ss.str());
+    }
+    return Status::OK();
+  }
+
   static inline Status NotEquals(
       TImpalaQueryOptions::type option, const T value, const T other) {
     if (value == other) {
@@ -154,6 +164,14 @@ class QueryOptionParser {
     Status status = Parse(option, value, result);
     RETURN_IF_ERROR(status);
     return QueryOptionValidator<T>::InclusiveLowerBound(option, *result, lower);
+  }
+
+  template <typename T>
+  static Status ParseAndCheckExclusiveLowerBound(TImpalaQueryOptions::type option,
+      const std::string& value, const T lower, T* result) {
+    Status status = Parse(option, value, result);
+    RETURN_IF_ERROR(status);
+    return QueryOptionValidator<T>::ExclusiveLowerBound(option, *result, lower);
   }
 
   template <typename T>

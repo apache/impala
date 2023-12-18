@@ -1195,6 +1195,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_num_filters_aggregated_per_host(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::QUERY_CPU_COUNT_DIVISOR: {
+        double double_val = 0.0f;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckExclusiveLowerBound<double>(
+            option, value, 0.0, &double_val));
+        query_options->__set_query_cpu_count_divisor(double_val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

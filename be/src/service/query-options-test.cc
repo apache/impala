@@ -428,6 +428,23 @@ TEST(QueryOptions, SetSpecialOptions) {
     TestError("8191"); // default value of FLAGS_min_buffer_size is 8KB
     TestOk("64KB", 64 * 1024);
   }
+  // QUERY_CPU_COUNT_DIVISOR should be greater than 0.0.
+  {
+    OptionDef<double> key_def = MAKE_OPTIONDEF(query_cpu_count_divisor);
+    auto TestOk = MakeTestOkFn(options, key_def);
+    auto TestError = MakeTestErrFn(options, key_def);
+    TestOk("0.5", 0.5);
+    TestOk("0.0000000001", 0.0000000001);
+    TestOk("0.999999999", 0.999999999);
+    TestOk(" 0.9", 0.9);
+    TestOk("1", 1.0);
+    TestOk("1.1", 1.1);
+    TestOk("1000.00", 1000.0);
+    TestError("0");
+    TestError("-1");
+    TestError("-0.1");
+    TestError("Not a number!");
+  }
 }
 
 TEST(QueryOptions, ParseQueryOptions) {

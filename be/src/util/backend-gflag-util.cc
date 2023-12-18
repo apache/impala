@@ -210,6 +210,7 @@ DEFINE_string(ignored_dir_prefix_list, ".,_tmp.,_spark_metadata",
     " skip in loading file metadata.");
 
 DEFINE_double_hidden(query_cpu_count_divisor, 1.0,
+    "(Deprecated) this is now deprecated in favor of query option with the same name. "
     "(Advance) Divide the CPU requirement of a query to fit the total available CPU in "
     "the executor group. For example, setting value 2 will fit the query with CPU "
     "requirement 2X to an executor group with total available CPU X. Note that setting "

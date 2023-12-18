@@ -1221,11 +1221,31 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
         ["Executor Group: root.small-group",
          "CpuAsk: 6", "EffectiveParallelism: 11",
-         "ExecutorGroupsConsidered: 2"])
+         "CpuCountDivisor: 2", "ExecutorGroupsConsidered: 2"])
+
+    # Test that QUERY_CPU_COUNT_DIVISOR option can override
+    # query_cpu_count_divisor flag.
+    self._set_query_options({'QUERY_CPU_COUNT_DIVISOR': '1.0'})
+    self._run_query_and_verify_profile(CPU_TEST_QUERY,
+        ["Executor Group: root.small-group",
+         "CpuAsk: 11", "EffectiveParallelism: 11",
+         "CpuCountDivisor: 1", "ExecutorGroupsConsidered: 2"])
+    self._set_query_options({'QUERY_CPU_COUNT_DIVISOR': '0.5'})
+    self._run_query_and_verify_profile(CPU_TEST_QUERY,
+        ["Executor Group: root.large-group",
+         "CpuAsk: 22", "EffectiveParallelism: 11",
+         "CpuCountDivisor: 0.5", "ExecutorGroupsConsidered: 3"])
+    self._set_query_options({'QUERY_CPU_COUNT_DIVISOR': '2.0'})
+    self._run_query_and_verify_profile(CPU_TEST_QUERY,
+        ["Executor Group: root.small-group",
+         "CpuAsk: 6", "EffectiveParallelism: 11",
+         "CpuCountDivisor: 2", "ExecutorGroupsConsidered: 2"])
 
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.small", 1)
-    self._verify_total_admitted_queries("root.small", 1)
+    self._verify_query_num_for_resource_pool("root.small", 3)
+    self._verify_query_num_for_resource_pool("root.large", 1)
+    self._verify_total_admitted_queries("root.small", 3)
+    self._verify_total_admitted_queries("root.large", 1)
 
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_fraction(self):

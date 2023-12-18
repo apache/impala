@@ -2080,9 +2080,13 @@ public class Frontend {
     planCtx.compilationState_.captureState();
     boolean isComputeCost = queryOptions.isCompute_processing_cost();
 
+    double cpuCountDivisor = BackendConfig.INSTANCE.getQueryCpuCountDivisor();
     if (isComputeCost) {
+      if (queryOptions.isSetQuery_cpu_count_divisor()) {
+        cpuCountDivisor = queryOptions.getQuery_cpu_count_divisor();
+      }
       FrontendProfile.getCurrent().setToCounter(CPU_COUNT_DIVISOR, TUnit.DOUBLE_VALUE,
-          Double.doubleToLongBits(BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
+          Double.doubleToLongBits(cpuCountDivisor));
     }
 
     TExecutorGroupSet group_set = null;
@@ -2199,9 +2203,8 @@ public class Frontend {
               + queryOptions.getMax_fragment_instances_per_node() + ").");
         }
 
-        scaled_cores_requirement = (int) Math.min(Integer.MAX_VALUE,
-            Math.ceil(
-                cores_requirement / BackendConfig.INSTANCE.getQueryCpuCountDivisor()));
+        scaled_cores_requirement = (int) Math.min(
+            Integer.MAX_VALUE, Math.ceil(cores_requirement / cpuCountDivisor));
         cpuReqSatisfied = scaled_cores_requirement <= available_cores;
 
         addCounter(
