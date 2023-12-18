@@ -560,7 +560,8 @@ class TestObservability(ImpalaTestSuite):
     assert "  MemoryUsage" not in profile
     assert "- MemoryUsage" in profile
 
-    assert "ExchangeScanRatio: 4.63" in profile
+    # Usually 4.63. Ignoring last digit to deflake test (IMPALA-12500).
+    assert "ExchangeScanRatio: 4.6" in profile
 
     keys = ["TotalBytesSent", "TotalScanBytesSent", "TotalInnerBytesSent"]
     counters = defaultdict(int)
