@@ -840,11 +840,13 @@ update functional_parquet.iceberg_int_partitioned set file__position = 42;
 ---- CATCH
 AnalysisException: Left-hand side in assignment expression 'file__position=42' must be a column reference
 ====
+---- IS_HDFS_ONLY
 ---- HIVE_QUERY
 CREATE TABLE $DATABASE.ice_v2_timestamptz (i int, ts TIMESTAMP WITH LOCAL TIME ZONE)
 STORED BY ICEBERG
 TBLPROPERTIES ('format-version'='2');
 ====
+---- IS_HDFS_ONLY
 ---- QUERY
 invalidate metadata $DATABASE.ice_v2_timestamptz;
 update ice_v2_timestamptz set i = 3;
