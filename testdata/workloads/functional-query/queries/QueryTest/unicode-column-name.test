@@ -149,9 +149,11 @@ describe $DATABASE.testtbl_orc;
 ---- TYPES
 STRING, STRING, STRING
 ====
+---- IS_HDFS_ONLY
 ---- HIVE_QUERY
 insert into table $DATABASE.testtbl_orc values(1, 'Alice');
 ====
+---- IS_HDFS_ONLY
 ---- HIVE_QUERY
 select * from $DATABASE.testtbl_orc;
 ---- RESULTS
@@ -192,9 +194,11 @@ describe $DATABASE.testtbl_avro;
 ---- TYPES
 STRING, STRING, STRING
 ====
+---- IS_HDFS_ONLY
 ---- HIVE_QUERY
 insert into table $DATABASE.testtbl_avro values(1, 'Alice');
 ====
+---- IS_HDFS_ONLY
 ---- HIVE_QUERY
 select * from $DATABASE.testtbl_avro;
 ---- RESULTS
