@@ -494,8 +494,36 @@ DELETE FROM ice_t where i = 3;
     <title>Updating data int Iceberg tables</title>
     <conbody>
       <p>
-        Impala does not yet support the UPDATE statement. One can mimic its behaviour by calling
-        DELETE + INSERT statements one after the other, but please note that this creates two transactions.
+        Since <keyword keyref="impala44"/> Impala is able to run <codeph>UPDATE</codeph> statements against
+        Iceberg V2 tables. E.g.:
+        <codeblock>
+UPDATE ice_t SET val = val + 1;
+UPDATE ice_t SET k = 4 WHERE i = 5;
+UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where ice_t.id = o.id;
+        </codeblock>
+      </p>
+      <p>
+        The UPDATE FROM statement can be used to update a target Iceberg table based on a source table (or view) that doesn't need
+        to be an Iceberg table. If there are multiple matches on the JOIN condition, Impala will raise an error.
+      </p>
+      <p>
+        Limitations:
+        <ul>
+          <li>Only the merge-on-read update mode is supported.</li>
+          <li>Only writes position delete files, i.e. no support for writing equality deletes.</li>
+          <li>Cannot update tables with complex types.</li>
+          <li>
+            Can only write data and delete files in Parquet format. This means if table properties 'write.format.default'
+            and 'write.delete.format.default' are set, their values must be PARQUET.
+          </li>
+          <li>
+            Updating partitioning column with non-constant expression via the UPDATE FROM statement is not allowed.
+            The upcoming MERGE statement will not have this limitation.
+          </li>
+        </ul>
+      </p>
+      <p>
+        More information about the <codeph>UPDATE</codeph> statement can be found at <xref href="impala_update.xml#update"/>.
       </p>
     </conbody>
   </concept>

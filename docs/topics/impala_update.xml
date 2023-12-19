@@ -27,6 +27,7 @@ under the License.
       <data name="Category" value="Impala"/>
       <data name="Category" value="SQL"/>
       <data name="Category" value="Kudu"/>
+      <data name="Category" value="Iceberg"/>
       <data name="Category" value="ETL"/>
       <data name="Category" value="Ingest"/>
       <data name="Category" value="DML"/>
@@ -39,8 +40,8 @@ under the License.
 
     <p>
       <indexterm audience="hidden">UPDATE statement</indexterm>
-      Updates an arbitrary number of rows in a Kudu table.
-      This statement only works for Impala tables that use the Kudu storage engine.
+      This statement only works for Kudu and Iceberg tables.
+      Updates an arbitrary number of rows in a target table.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -68,6 +69,23 @@ UPDATE [<varname>database_name</varname>.]<varname>table_name</varname> SET <var
       If the <codeph>WHERE</codeph> clause is omitted, all rows in the table are updated.
     </p>
 
+    <p>
+      The number of affected rows is reported in an <cmdname>impala-shell</cmdname> message
+      and in the query profile.
+    </p>
+
+    <p>
+      The optional <codeph>FROM</codeph> clause lets you restrict the
+      updates to only the rows in the specified table that are part
+      of the result set for a join query. The join clauses can include
+      tables with any format, but the table from which the rows are deleted
+      must be a Kudu or Iceberg table.
+    </p>
+
+
+    <p>
+      <b>Kudu considerations</b>
+    </p>
     <p>
       The conditions in the <codeph>WHERE</codeph> clause can refer to
       any combination of primary key columns or other columns. Referring to
@@ -101,19 +119,6 @@ UPDATE [<varname>database_name</varname>.]<varname>table_name</varname> SET <var
       </li>
     </ul>
 
-    <p>
-      The number of affected rows is reported in an <cmdname>impala-shell</cmdname> message
-      and in the query profile.
-    </p>
-
-    <p>
-      The optional <codeph>FROM</codeph> clause lets you restrict the
-      updates to only the rows in the specified table that are part
-      of the result set for a join query. The join clauses can include
-      non-Kudu tables, but the table from which the rows are deleted
-      must be a Kudu table.
-    </p>
-
     <p conref="../shared/impala_common.xml#common/dml_blurb_kudu"/>
 
     <note conref="../shared/impala_common.xml#common/compute_stats_next"/>
@@ -129,16 +134,16 @@ UPDATE [<varname>database_name</varname>.]<varname>table_name</varname> SET <var
 -- Set all rows to the same value for column c3.
 -- In this case, c1 and c2 are primary key columns
 -- and so cannot be updated.
-UPDATE kudu_table SET c3 = 'not applicable';
+UPDATE target_table SET c3 = 'not applicable';
 
 -- Update only the rows that match the condition.
-UPDATE kudu_table SET c3 = NULL WHERE c1 > 100 AND c3 IS NULL;
+UPDATE target_table SET c3 = NULL WHERE c1 > 100 AND c3 IS NULL;
 
 -- Does not update any rows, because the WHERE condition is always false.
-UPDATE kudu_table SET c3 = 'impossible' WHERE 1 = 0;
+UPDATE target_table SET c3 = 'impossible' WHERE 1 = 0;
 
 -- Change the values of multiple columns in a single UPDATE statement.
-UPDATE kudu_table SET c3 = upper(c3), c4 = FALSE, c5 = 0 WHERE c6 = TRUE;
+UPDATE target_table SET c3 = upper(c3), c4 = FALSE, c5 = 0 WHERE c6 = TRUE;
 </codeblock>
 
     <p>
@@ -149,22 +154,22 @@ UPDATE kudu_table SET c3 = upper(c3), c4 = FALSE, c5 = 0 WHERE c6 = TRUE;
 <codeblock>
 -- Uppercase a column value, only for rows that have
 -- an ID that matches the value from another table.
-UPDATE kudu_table SET c3 = upper(c3)
-  FROM kudu_table JOIN non_kudu_table
-  ON kudu_table.id = non_kudu_table.id;
+UPDATE target_table SET c3 = upper(c3)
+  FROM target_table JOIN other_table
+  ON target_table.id = other_table.id;
 
 -- Same effect as previous statement.
 -- Assign table aliases in FROM clause, then refer to
 -- short names elsewhere in the statement.
 UPDATE t1 SET c3 = upper(c3)
-  FROM kudu_table t1 JOIN non_kudu_table t2
+  FROM target_table t1 JOIN other_table t2
   ON t1.id = t2.id;
 
 -- Same effect as previous statements, but more efficient.
 -- Use WHERE clause to skip updating values that are
 -- already uppercase.
 UPDATE t1 SET c3 = upper(c3)
-  FROM kudu_table t1 JOIN non_kudu_table t2
+  FROM target_table t1 JOIN other_table t2
   ON t1.id = t2.id
   WHERE c3 != upper(c3);
 </codeblock>
