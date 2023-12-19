@@ -1057,7 +1057,9 @@ class TestImpalaShell(ImpalaTestSuite):
       assert "Could not resolve table reference: 'non_existence_large_table'" \
           in result.stderr
       end_time = time()
-      time_limit_s = 20
+      # Use higher timeout in ASAN/UBSAN to avoid flakiness (IMPALA-11921).
+      build_runs_slowly = ImpalaTestClusterProperties.get_instance().runs_slowly()
+      time_limit_s = 60 if build_runs_slowly else 20
       actual_time_s = end_time - start_time
       assert actual_time_s <= time_limit_s, (
           "It took {0} seconds to execute the query. Time limit is {1} seconds.".format(
