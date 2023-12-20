@@ -1407,10 +1407,10 @@ class TestIcebergV2Table(IcebergTestSuite):
 
     hive_results = get_hive_results("ice_id_partitioned", "i")
     assert hive_results == \
-        "1,0,Impala\n"     \
+        "1,0,Apache Impala\n"     \
         "2,0,iceberg\n"    \
         "3,0,hive\n"       \
-        "4,1,spark\n"      \
+        "4,1,Apache Spark\n"      \
         "5,2,Kudu\n"
 
     hive_results = get_hive_results("ice_bucket_transform", "i")

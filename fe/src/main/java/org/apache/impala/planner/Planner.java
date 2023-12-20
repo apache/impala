@@ -170,9 +170,6 @@ public class Planner {
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
     } else {
-      QueryStmt queryStmt = ctx_.getQueryStmt();
-      queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
-      List<Expr> resultExprs = queryStmt.getResultExprs();
       if (ctx_.isUpdate() || ctx_.isDelete()) {
         DmlStatementBase stmt;
         if (ctx_.isUpdate()) {
@@ -181,6 +178,7 @@ public class Planner {
           stmt = ctx_.getAnalysisResult().getDeleteStmt();
         }
         Preconditions.checkNotNull(stmt);
+        stmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
         if (stmt.getTargetTable() instanceof FeIcebergTable) {
           rootFragment = createIcebergDmlPlanFragment(
               rootFragment, distributedPlanner, stmt, fragments);
@@ -188,6 +186,9 @@ public class Planner {
         // Set up update sink for root fragment
         rootFragment.setSink(stmt.createDataSink());
       } else if (ctx_.isQuery()) {
+        QueryStmt queryStmt = ctx_.getQueryStmt();
+        queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
+        List<Expr> resultExprs = queryStmt.getResultExprs();
         rootFragment.setSink(
             ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
       }

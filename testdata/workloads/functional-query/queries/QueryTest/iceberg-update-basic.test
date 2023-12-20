@@ -248,6 +248,24 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_id_partitioned/data/p=1/del
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
+# Update partitioned Iceberg table based on VIEW
+create table ref_table_1 (ri int, rs string);
+insert into ref_table_1 values (1, 'Apache Impala');
+create table ref_table_2 (ri int, rs string);
+insert into ref_table_2 values (4, 'Apache Spark');
+create view ref_view as select * from ref_table_1 union select * from ref_table_2;
+update ice_id_partitioned SET s = rs
+FROM ice_id_partitioned JOIN ref_view ON (i = ri);
+---- DML_RESULTS: ice_id_partitioned
+1,0,'Apache Impala'
+2,0,'iceberg'
+3,0,'hive'
+4,1,'Apache Spark'
+5,2,'Kudu'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
 # Negative test for UPDATE part 3:
 # updating partition column AND right side is non-constant value AND we have a FROM clause with multiple table refs.
 # For such operations, if there are multiple matches in the JOIN, the duplicated records can

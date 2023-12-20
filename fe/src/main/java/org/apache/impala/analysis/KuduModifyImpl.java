@@ -140,6 +140,7 @@ abstract class KuduModifyImpl extends ModifyImpl {
 
   @Override
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    super.substituteResultExprs(smap, analyzer);
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
   }
 

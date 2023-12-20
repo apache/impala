@@ -662,13 +662,37 @@ select * from $UNIQUE_DB.masked_tbl;
 INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
 ====
 ---- QUERY
-# Test UPDATE stmt
+# Test UPDATE stmt for Kudu target when source is a masked table.
 create table $UNIQUE_DB.masked_kudu (id int primary key, string_col string) stored as kudu;
 insert into $UNIQUE_DB.masked_kudu select id, string_col from alltypestiny;
 insert into $UNIQUE_DB.masked_kudu values (1, NULL), (3, NULL), (5, NULL);
 update k set k.string_col=a.string_col
 from $UNIQUE_DB.masked_kudu k JOIN alltypestiny a ON (k.id=a.id);
 select * from $UNIQUE_DB.masked_kudu;
+---- RESULTS
+0,'0aaa'
+1,'NULL'
+3,'NULL'
+5,'NULL'
+100,'1aaa'
+200,'0aaa'
+300,'1aaa'
+400,'0aaa'
+500,'1aaa'
+600,'0aaa'
+700,'1aaa'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Test UPDATE stmt for Iceberg target when source is a masked table.
+create table $UNIQUE_DB.masked_iceberg (id int, string_col string)
+stored as iceberg tblproperties ('format-version'='2');
+insert into $UNIQUE_DB.masked_iceberg select id, string_col from alltypestiny;
+insert into $UNIQUE_DB.masked_iceberg values (1, NULL), (3, NULL), (5, NULL);
+update k set k.string_col=a.string_col
+from $UNIQUE_DB.masked_iceberg k JOIN alltypestiny a ON (k.id=a.id);
+select * from $UNIQUE_DB.masked_iceberg;
 ---- RESULTS
 0,'0aaa'
 1,'NULL'

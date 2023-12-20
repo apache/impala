@@ -135,15 +135,14 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
       if (expr == null) expr = createSlotRef(analyzer, col.getName());
       insertResultExprs_.add(expr);
     }
-    selectList.addAll(ExprUtil.exprsAsSelectList(insertResultExprs_));
     IcebergUtil.populatePartitionExprs(analyzer, null, columns,
         insertResultExprs_, originalTargetTable_, insertPartitionKeyExprs_, null);
-
     deletePartitionKeyExprs_ = getDeletePartitionExprs(analyzer);
     deleteResultExprs_ = getDeleteResultExprs(analyzer);
-    selectList.addAll(ExprUtil.exprsAsSelectList(deletePartitionKeyExprs_));
+    selectList.addAll(ExprUtil.exprsAsSelectList(insertResultExprs_));
+    selectList.addAll(ExprUtil.exprsAsSelectList(insertPartitionKeyExprs_));
     selectList.addAll(ExprUtil.exprsAsSelectList(deleteResultExprs_));
-
+    selectList.addAll(ExprUtil.exprsAsSelectList(deletePartitionKeyExprs_));
     addSortColumns();
   }
 

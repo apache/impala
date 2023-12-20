@@ -55,12 +55,16 @@ abstract class ModifyImpl {
   /**
    * Substitutes the result expressions, partition key expressions with smap.
    * Preserves the original types of those expressions during the substitution.
-   * It is usually invoked when a SORT node is added to the plan because the
+   * It is usually invoked when a SORT node or a VIEW is involved.
    * SORT node materializes sort expressions into the sort tuple, so after the
    * SORT node we only need to have slot refs to the materialized exprs. 'smap'
    * contains the mapping from the original exprs to the materialized slot refs.
+   * When VIEWs are involved, the slot references also need to be substituted with
+   * references to the actual base tables.
    */
-  abstract void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer);
+  void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    sourceStmt_.substituteResultExprs(smap, analyzer);
+  }
 
   // The Modify statement for this modify impl. The ModifyStmt class holds information
   // about the statement (e.g. target table type, FROM, WHERE clause, etc.)

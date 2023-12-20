@@ -78,6 +78,7 @@ abstract class IcebergModifyImpl extends ModifyImpl {
 
   @Override
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    super.substituteResultExprs(smap, analyzer);
     sortExprs_ = Expr.substituteList(sortExprs_, smap, analyzer, true);
     deleteResultExprs_ = Expr.substituteList(deleteResultExprs_, smap, analyzer, true);
     deletePartitionKeyExprs_ = Expr.substituteList(
