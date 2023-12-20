@@ -59,36 +59,36 @@
 
     <table cellpadding="4" cellspacing="0" summary="" id="shutdown__simpletable_sly_wrf_rfb" border="1" class="simpletable"><col style="width:25%" /><col style="width:25%" /><col style="width:25%" /><col style="width:25%" /><thead><tr class="sthead">
 
-        <th style="vertical-align:bottom;text-align:left;" id="d207174e96" class="stentry">Argument</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d207124e96" class="stentry">Argument</th>
 
 
-        <th style="vertical-align:bottom;text-align:left;" id="d207174e99" class="stentry">Type</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d207124e99" class="stentry">Type</th>
 
 
-        <th style="vertical-align:bottom;text-align:left;" id="d207174e102" class="stentry">Default</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d207124e102" class="stentry">Default</th>
 
 
-        <th style="vertical-align:bottom;text-align:left;" id="d207174e105" class="stentry">Description</th>
+        <th style="vertical-align:bottom;text-align:left;" id="d207124e105" class="stentry">Description</th>
 
 
       </tr>
 </thead><tbody><tr class="strow">
 
-        <td style="vertical-align:top;" headers="d207174e96" class="stentry"><code class="ph codeph"><var class="keyword varname">host_name</var></code>
+        <td style="vertical-align:top;" headers="d207124e96" class="stentry"><code class="ph codeph"><var class="keyword varname">host_name</var></code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e99" class="stentry"><code class="ph codeph">STRING</code>
+        <td style="vertical-align:top;" headers="d207124e99" class="stentry"><code class="ph codeph">STRING</code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e102" class="stentry">The current <code class="ph codeph">impalad</code> host to whom the
+        <td style="vertical-align:top;" headers="d207124e102" class="stentry">The current <code class="ph codeph">impalad</code> host to whom the
             <code class="ph codeph">SHUTDOWN</code> statement is submitted.</td>
 
 
-        <td style="vertical-align:top;" headers="d207174e105" class="stentry">
+        <td style="vertical-align:top;" headers="d207124e105" class="stentry">
 
           <p class="p">
             Address of the <code class="ph codeph">impalad</code> to be shut down.
@@ -101,17 +101,17 @@
       </tr>
 <tr class="strow">
 
-        <td style="vertical-align:top;" headers="d207174e96" class="stentry"><code class="ph codeph"><var class="keyword varname">port_number</var></code>
+        <td style="vertical-align:top;" headers="d207124e96" class="stentry"><code class="ph codeph"><var class="keyword varname">port_number</var></code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e99" class="stentry"><code class="ph codeph">INT</code>
+        <td style="vertical-align:top;" headers="d207124e99" class="stentry"><code class="ph codeph">INT</code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e102" class="stentry">
+        <td style="vertical-align:top;" headers="d207124e102" class="stentry">
 
           <ul class="ul">
             <li class="li">
@@ -131,7 +131,7 @@
         </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e105" class="stentry">Specifies the port by which the <code class="ph codeph">impalad</code> can be
+        <td style="vertical-align:top;" headers="d207124e105" class="stentry">Specifies the port by which the <code class="ph codeph">impalad</code> can be
           contacted. <ul class="ul">
             <li class="li">
               In Impala 3.1, use the same <code class="ph codeph">impalad</code> port used for the thrift
@@ -153,21 +153,21 @@
       </tr>
 <tr class="strow">
 
-        <td style="vertical-align:top;" headers="d207174e96" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code>
+        <td style="vertical-align:top;" headers="d207124e96" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e99" class="stentry"><code class="ph codeph">INT</code>
+        <td style="vertical-align:top;" headers="d207124e99" class="stentry"><code class="ph codeph">INT</code>
 
         </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e102" class="stentry">The value of the <code class="ph codeph">‑‑shutdown_deadline_s</code> flag,
+        <td style="vertical-align:top;" headers="d207124e102" class="stentry">The value of the <code class="ph codeph">‑‑shutdown_deadline_s</code> flag,
           which defaults to 1 hour. </td>
 
 
-        <td style="vertical-align:top;" headers="d207174e105" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code> must be a non-negative
+        <td style="vertical-align:top;" headers="d207124e105" class="stentry"><code class="ph codeph"><var class="keyword varname">deadline</var></code> must be a non-negative
           number, specified in seconds. <p class="p">
             The value, 0, for <var class="keyword varname">deadline</var> specifies an immediate shutdown.
           </p>
