@@ -104,12 +104,12 @@ Status IcebergMetadataScanNode::CreateFieldAccessors() {
       // STRUCT node that stores the primitive type. Because, that struct node has the
       // field id list of its childs.
       int root_type_index = slot_desc->col_path()[0];
-      ColumnType current_type =
-          tuple_desc_->table_desc()->col_descs()[root_type_index].type();
+      ColumnType* current_type = &const_cast<ColumnType&>(
+          tuple_desc_->table_desc()->col_descs()[root_type_index].type());
       for (int i = 1; i < slot_desc->col_path().size() - 1; ++i) {
-        current_type = current_type.children[slot_desc->col_path()[i]];
+        current_type = &current_type->children[slot_desc->col_path()[i]];
       }
-      int field_id = current_type.field_ids[slot_desc->col_path().back()];
+      int field_id = current_type->field_ids[slot_desc->col_path().back()];
       RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
     } else {
       // For primitives in the top level tuple, use the ColumnDescriptor
