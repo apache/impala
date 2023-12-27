@@ -37,6 +37,7 @@ CREATE TABLE alltypes_jdbc_datasource (
 PRODUCED BY DATA SOURCE TestJdbcDataSource(
 '{"database.type":"MYSQL",
 "jdbc.url":"jdbc:mysql://localhost:3306/functional",
+"jdbc.properties":"autoReconnect=false, useUnicode=false",
 "jdbc.driver":"com.mysql.cj.jdbc.Driver",
 "driver.url":"$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/mysql-jdbc.jar",
 "dbcp.username":"hiveuser",

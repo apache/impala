@@ -36,7 +36,6 @@ public class ImpalaDatabaseAccessor extends GenericJdbcDatabaseAccessor {
     }
   }
 
-
   @Override
   protected String addLimitToQuery(String sql, int limit) {
     if (limit != -1) {
@@ -46,4 +45,18 @@ public class ImpalaDatabaseAccessor extends GenericJdbcDatabaseAccessor {
     }
   }
 
+  @Override
+  protected boolean isAdditionalPropertiesSupported() {
+    return true;
+  }
+
+  @Override
+  protected String getPropertiesDelimiter(boolean precededDelimiter) {
+    /* Query options can be set in optional, semicolon-separated key/value string
+     * in JDBC connection string in following format:
+     *     jdbc:impala://[host][:port]/[database][;optionName1=optionValue1]
+     *     [;optionName2=optionValue2]...
+     */
+    return ";";
+  }
 }

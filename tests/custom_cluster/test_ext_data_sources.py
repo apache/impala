@@ -16,8 +16,9 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-import pytest
 import os
+import pytest
+import requests
 import subprocess
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -228,3 +229,18 @@ class TestImpalaExtJdbcTables(CustomClusterTestSuite):
     """Run tests for external jdbc tables in Impala cluster"""
     self.run_test_case(
         'QueryTest/impala-ext-jdbc-tables', vector, use_db=unique_database)
+    # Verify the settings of query options with Queries Web page on Impala coordinator
+    response = requests.get("http://localhost:25000/queries?json")
+    response_json = response.text
+    assert "SET MAX_ERRORS=10000" in response_json, \
+        "No matching option MAX_ERRORS found in the queries site."
+    assert "SET MEM_LIMIT=1000000000" in response_json, \
+        "No matching option MEM_LIMIT found in the queries site."
+    assert "SET ENABLED_RUNTIME_FILTER_TYPES=\\\"BLOOM,MIN_MAX\\\"" in response_json, \
+        "No matching option ENABLED_RUNTIME_FILTER_TYPES found in the queries site."
+    assert "SET QUERY_TIMEOUT_S=600" in response_json, \
+        "No matching option QUERY_TIMEOUT_S found in the queries site."
+    assert "SET REQUEST_POOL=\\\"default-pool\\\"" in response_json, \
+        "No matching option REQUEST_POOL found in the queries site."
+    assert "SET DEBUG_ACTION" not in response_json, \
+        "Matching option DEBUG_ACTION found in the queries site."

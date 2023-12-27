@@ -45,6 +45,12 @@ public enum JdbcStorageConfig {
   DBCP_PASSWORD_KEYSTORE("dbcp.password.keystore", false),
   // Number of rows to fetch in a batch.
   JDBC_FETCH_SIZE("jdbc.fetch.size", false),
+  // Additional properties applied to database engine, like Impala Query options.
+  // Properties are specified as comma-delimited key=value string. For example,
+  // "jdbc.properties":"MEM_LIMIT=1000000000, MAX_ERRORS=10000".
+  // Comma in string type of value is allowed. For example,
+  // "jdbc.properties":"ENABLED_RUNTIME_FILTER_TYPES=\"BLOOM,MIN_MAX\"".
+  JDBC_OPTIONS("jdbc.properties", false),
   // SQL query which specify how to get data from external database.
   // User need to specify either “table” or “query” in the create table statement.
   QUERY("query", false),

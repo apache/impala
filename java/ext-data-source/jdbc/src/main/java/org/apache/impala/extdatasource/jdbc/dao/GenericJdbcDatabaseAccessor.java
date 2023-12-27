@@ -30,6 +30,8 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
 
@@ -48,6 +50,7 @@ import org.apache.impala.thrift.TStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -173,6 +176,36 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
     return name;
   }
 
+  protected boolean isAdditionalPropertiesSupported() {
+    return false;
+  }
+
+  protected String getPropertiesDelimiter(boolean precededDelimiter) {
+    return null;
+  }
+
+  protected String getAdditionalProperties(String configProperties) {
+    if (Strings.isNullOrEmpty(configProperties)) return null;
+    String delimiter = getPropertiesDelimiter(/* precededDelimiter */ false);
+    Preconditions.checkState(!Strings.isNullOrEmpty(delimiter));
+    // Extract valid query options.
+    Pattern pattern = Pattern.compile("(\\w*\\s*)=(\\s*\"[^\"]*\"|[^,]*)");
+    Matcher matcher = pattern.matcher(configProperties);
+    StringBuilder sb = new StringBuilder();
+    while (matcher.find()) {
+      Preconditions.checkState(!Strings.isNullOrEmpty(matcher.group(1)));
+      if (Strings.isNullOrEmpty(matcher.group(2))) {
+        LOG.info("Ignore invalid query option '{}'", matcher.group(1));
+        continue;
+      }
+      if (sb.length() > 0) sb.append(delimiter);
+      sb.append(matcher.group(1).trim());
+      sb.append("=");
+      sb.append(matcher.group(2).trim());
+    }
+    return sb.toString();
+  }
+
   /**
    * Uses generic JDBC escape functions to add a limit and offset clause to a query
    * string
@@ -291,10 +324,21 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
 
     // essential properties
     String jdbcUrl = conf.get(JdbcStorageConfig.JDBC_URL.getPropertyName());
+    boolean precededDelimiter = true;
     String jdbcAuth = conf.get(JdbcStorageConfig.JDBC_AUTH.getPropertyName());
     if (!Strings.isNullOrEmpty(jdbcAuth)) {
-      jdbcUrl += ";" + jdbcAuth;
+      jdbcUrl += getPropertiesDelimiter(precededDelimiter) + jdbcAuth;
+      precededDelimiter = false;
     }
+    if (isAdditionalPropertiesSupported()) {
+      String additionalProperties = getAdditionalProperties(
+          conf.get(JdbcStorageConfig.JDBC_OPTIONS.getPropertyName()));
+      if (!Strings.isNullOrEmpty(additionalProperties)) {
+        jdbcUrl += getPropertiesDelimiter(precededDelimiter) + additionalProperties;
+        if (precededDelimiter) precededDelimiter = false;
+      }
+    }
+    LOG.trace("JDBC URL: {}", jdbcUrl);
     dbProperties.put("url", jdbcUrl);
     dbProperties.put("driverClassName",
         conf.get(JdbcStorageConfig.JDBC_DRIVER_CLASS.getPropertyName()));

@@ -46,4 +46,18 @@ public class MySqlDatabaseAccessor extends GenericJdbcDatabaseAccessor {
     }
   }
 
+  @Override
+  protected boolean isAdditionalPropertiesSupported() {
+    return true;
+  }
+
+  @Override
+  protected String getPropertiesDelimiter(boolean precededDelimiter) {
+    /* Additional properties can be set in optional, preceded by ? and ampersand
+     * separated key/value string in JDBC connection string in following format:
+     *     jdbc:mysql://[host][,failoverhost...][:port]/[database]
+     *     [?propertyName1=propertyValue1][&propertyName2=propertyValue2]...
+     */
+    return precededDelimiter ? "?" : "&";
+  }
 }

@@ -54,4 +54,19 @@ public class PostgresDatabaseAccessor extends GenericJdbcDatabaseAccessor {
     }
     return sql + " LIMIT " + limit;
   }
+
+  @Override
+  protected boolean isAdditionalPropertiesSupported() {
+    return true;
+  }
+
+  @Override
+  protected String getPropertiesDelimiter(boolean precededDelimiter) {
+    /* Additional properties can be set in optional, ampersand-separated key/value string
+     * in JDBC connection string in following format:
+     *     jdbc:postgresql://[host][:port]/[database][?propertyName1=propertyValue1]
+     *     [&propertyName2=propertyValue2]...
+     */
+    return precededDelimiter ? "?" : "&";
+  }
 }

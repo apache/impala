@@ -18,6 +18,7 @@
 #include "service/query-options.h"
 
 #include <limits>
+#include <regex>
 #include <sstream>
 
 #include <boost/algorithm/string.hpp>
@@ -836,14 +837,25 @@ Status impala::SetQueryOption(const string& key, const string& value,
       }
       case TImpalaQueryOptions::ENABLED_RUNTIME_FILTER_TYPES: {
         std::set<TRuntimeFilterType::type> filter_types;
-        if (iequals(value, "all")) {
+        // Impala backend expects comma separated values to be in quotes when executing
+        // SET statement. This is usually the case when running
+        // SET query_option="value1,value2" using a jdbc driver. When using Impala-shell
+        // client, the SET statement is not executed immediately but query options are
+        // updated in the client and applied as part of following statement, so no quotes
+        // are required for Impala-shell SET query_option=value1,value2.
+        // By removing double quotes from the beginning and ending of the option value,
+        // SET ENABLED_RUNTIME_FILTER_TYPES="BLOOM,MIN_MAX" works for jdbc driver,
+        // both SET ENABLED_RUNTIME_FILTER_TYPES="BLOOM,MIN_MAX" and
+        // SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM,MIN_MAX work for Impala-shell.
+        const string filter_value = std::regex_replace(value, std::regex("^\"|\"$"), "");
+        if (iequals(filter_value, "all")) {
           for (const auto& kv : _TRuntimeFilterType_VALUES_TO_NAMES) {
             filter_types.insert(static_cast<TRuntimeFilterType::type>(kv.first));
           }
         } else {
           // Parse and verify the enabled runtime filter types.
           vector<string> str_types;
-          split(str_types, value, is_any_of(","), token_compress_on);
+          split(str_types, filter_value, is_any_of(","), token_compress_on);
           for (const auto& t : str_types) {
             TRuntimeFilterType::type filter_type;
             RETURN_IF_ERROR(GetThriftEnum(t, "runtime filter type",

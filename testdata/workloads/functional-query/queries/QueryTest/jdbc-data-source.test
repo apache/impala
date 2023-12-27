@@ -37,6 +37,7 @@ CREATE TABLE alltypes_jdbc_datasource (
 PRODUCED BY DATA SOURCE TestJdbcDataSource(
 '{"database.type":"POSTGRES",
 "jdbc.url":"jdbc:postgresql://$INTERNAL_LISTEN_HOST:5432/functional",
+"jdbc.properties":"connect_timeout=20, application_name=\"myapp\"",
 "jdbc.driver":"org.postgresql.Driver",
 "driver.url":"$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
 "dbcp.username":"hiveuser",
