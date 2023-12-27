@@ -2362,6 +2362,10 @@ Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_grou
     // Start a new scratch batch.
     RETURN_IF_ERROR(scratch_batch_->Reset(state_));
     InitTupleBuffer(template_tuple_, scratch_batch_->tuple_mem, scratch_batch_->capacity);
+    // Adjust complete_micro_batch_ length to new scratch_batch_->capacity after
+    // ScratchTupleBatch::Reset
+    complete_micro_batch_.AdjustLength(scratch_batch_->capacity);
+
     // Late Materialization
     // 1. Filter rows only materializing the columns in 'filter_readers_'
     // 2. Transfer the surviving rows
@@ -2499,6 +2503,9 @@ Status HdfsParquetScanner::FillScratchMicroBatches(
               col_reader->schema_element().name, filename()));
         }
       }
+      // Ensure that the length of the micro_batch is less than
+      // or equal to the capacity of scratch_batch_.
+      DCHECK_LE(micro_batches[r].length, scratch_batch_->capacity);
       uint8_t* next_tuple_mem = scratch_batch_->tuple_mem
           + (scratch_batch_->tuple_byte_size * micro_batches[r].start);
       if (col_reader->max_rep_level() > 0) {

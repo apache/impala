@@ -30,6 +30,14 @@ struct ScratchMicroBatch {
   int start;
   int end;
   int length;
+
+  // Adjusts the micro batch length to new capacity if needed.
+  void AdjustLength(int new_capacity) {
+    if (length > new_capacity) {
+      length = new_capacity;
+      end = length - 1;
+    }
+  }
 };
 
 /// Helper struct that holds a batch of tuples allocated from a mem pool, as well

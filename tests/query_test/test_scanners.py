@@ -1268,6 +1268,42 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case(
         "QueryTest/parquet-decimal-precision-and-scale-altering", vector, unique_database)
 
+  def test_row_size_gt_4096_queries(self, unique_database):
+    table_format = 'parquet'
+    table_name = "{0}.{1}_{2}".format(
+        unique_database, "t_row_size_gt_4096", table_format)
+
+    # create table
+    field_string = ', '.join('field{} STRING'.format(i) for i in range(1, 601))
+    create_sql = "CREATE TABLE {} (id INT, {}) STORED AS {}".format(
+        table_name, field_string, table_format)
+    self.client.execute(create_sql)
+
+    # insert data
+    id_generation_sql = """
+    WITH ten AS (
+      SELECT 0 AS n
+      UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3
+      UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
+      UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+    )
+    SELECT
+      row_number() OVER (ORDER BY a.n) AS id
+    FROM
+      ten a, ten b, ten c, ten d
+    LIMIT
+      2000
+    """
+    field_string = ', '.join(['CAST(RAND() AS STRING) AS field{}'.format(i)
+                                for i in range(1, 601)])
+    insert_sql = "INSERT INTO {} SELECT CAST(s.id AS INT), {} FROM ({}) s;".format(
+        table_name, field_string, id_generation_sql)
+    self.execute_query_expect_success(self.client, insert_sql)
+
+    # do a query
+    query_sql = "SELECT * FROM {} where field1 = '123'".format(table_name)
+    self.execute_query_expect_success(self.client, query_sql)
+
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
