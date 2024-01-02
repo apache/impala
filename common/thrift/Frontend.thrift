@@ -617,7 +617,7 @@ struct TConvertTableRequest {
 
 // Result of call to createExecRequest()
 struct TExecRequest {
-  1: required Types.TStmtType stmt_type
+  1: required Types.TStmtType stmt_type = TStmtType.UNKNOWN
 
   // Copied from the corresponding TClientRequest
   2: required Query.TQueryOptions query_options

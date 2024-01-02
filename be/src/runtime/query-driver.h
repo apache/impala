@@ -149,8 +149,8 @@ class QueryDriver {
   /// query string (TQueryCtx::TClientRequest::stmt).
   Status RunFrontendPlanner(const TQueryCtx& query_ctx) WARN_UNUSED_RESULT;
 
-  /// Similar to RunFrontendPlanner but takes TExecRequest from and external planner
-  Status SetExternalPlan(const TQueryCtx& query_ctx, const TExecRequest& exec_request);
+  /// Similar to RunFrontendPlanner but takes TExecRequest from an external planner
+  Status SetExternalPlan(const TQueryCtx& query_ctx, TExecRequest exec_request);
 
   /// Returns the ClientRequestState corresponding to the given query id.
   ClientRequestState* GetClientRequestState(const TUniqueId& query_id);
@@ -225,6 +225,12 @@ class QueryDriver {
       std::unique_ptr<ClientRequestState>* retry_request_state,
       std::shared_ptr<ImpalaServer::SessionState>* session);
 
+  /// Does the work of RunFrontendPlanner so we can also use it to dump the planner
+  /// result from SetExternalPlan to dump_exec_request_path without redundant work.
+  /// Set use_request to false to skip saving the TExecRequest produced in exec_request_.
+  Status DoFrontendPlanning(const TQueryCtx& query_ctx,
+      bool use_request = true) WARN_UNUSED_RESULT;
+
   /// Helper method for handling failures when retrying a query. 'status' is the reason
   /// why the retry failed and is expected to be in the error state. Additional details
   /// are added to the 'status'. Once the 'status' has been updated, it is set as the
@@ -248,12 +254,12 @@ class QueryDriver {
   std::unique_ptr<ClientRequestState> retried_client_request_state_;
 
   /// The TExecRequest for the query. Created in 'CreateClientRequestState' and loaded in
-  /// 'RunFrontendPlanner'.
-  std::unique_ptr<TExecRequest> exec_request_;
+  /// 'RunFrontendPlanner'. Not thread safe.
+  std::unique_ptr<const TExecRequest> exec_request_;
 
-  /// The TExecRequest for the retried query. Created in
+  /// The TExecRequest for the retried query. Created and initialized in
   /// 'CreateRetriedClientRequestState'.
-  std::unique_ptr<TExecRequest> retry_exec_request_;
+  std::unique_ptr<const TExecRequest> retry_exec_request_;
 
   /// Thread to process query retry requests. Done in a separate thread to avoid blocking
   /// control service RPC threads.

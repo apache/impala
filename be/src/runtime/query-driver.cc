@@ -29,6 +29,11 @@
 #include "common/names.h"
 #include "common/thread-debug-info.h"
 
+// Dumps used for debugging and diffing ExecRequests in text form.
+DEFINE_string(dump_exec_request_path, "",
+    "If set, dump TExecRequest structures to {dump_exec_request_path}/"
+    "TExecRequest-{internal|external}.{query_id.hi}-{query_id.lo}");
+
 DECLARE_string(debug_actions);
 
 namespace impala {
@@ -47,51 +52,94 @@ void QueryDriver::CreateClientRequestState(const TQueryCtx& query_ctx,
   DCHECK(client_request_state_ == nullptr);
   ExecEnv* exec_env = ExecEnv::GetInstance();
   lock_guard<SpinLock> l(client_request_state_lock_);
-  exec_request_ = make_unique<TExecRequest>();
   client_request_state_ =
       make_unique<ClientRequestState>(query_ctx, exec_env->frontend(), parent_server_,
-          session_state, exec_request_.get(), query_handle->query_driver().get());
+          session_state, query_handle->query_driver().get());
   DCHECK(query_handle != nullptr);
   (*query_handle).SetClientRequestState(client_request_state_.get());
 }
 
-Status QueryDriver::RunFrontendPlanner(const TQueryCtx& query_ctx) {
+void DumpTExecReq(const TExecRequest& exec_request, const char* dump_type,
+    const TUniqueId& query_id) {
+  if (FLAGS_dump_exec_request_path.empty()) return;
+  int depth = 0;
+  std::stringstream tmpstr;
+  string fn(Substitute("$0/TExecRequest-$1.$2", FLAGS_dump_exec_request_path,
+      dump_type, PrintId(query_id, "-")));
+  std::ofstream ofs(fn);
+  tmpstr << exec_request;
+  std::string s = tmpstr.str();
+  const char *p = s.c_str();
+  const int len = s.length();
+  for (int i = 0; i < len; ++i) {
+    const char ch = p[i];
+    ofs << ch;
+    if (ch == '(') {
+      depth++;
+    } else if (ch == ')' && depth > 0) {
+      depth--;
+    } else if (ch == ',') {
+    } else {
+      continue;
+    }
+    ofs << '\n' << std::setw(depth) << " ";
+  }
+}
+
+Status QueryDriver::DoFrontendPlanning(const TQueryCtx& query_ctx, bool use_request) {
   // Takes the TQueryCtx and calls into the frontend to initialize the TExecRequest for
   // this query.
-  DCHECK(client_request_state_ != nullptr);
-  DCHECK(exec_request_ != nullptr);
+  TExecRequest exec_request;
   RETURN_IF_ERROR(
       DebugAction(query_ctx.client_request.query_options, "FRONTEND_PLANNER"));
   RETURN_IF_ERROR(client_request_state_->UpdateQueryStatus(
-      ExecEnv::GetInstance()->frontend()->GetExecRequest(
-          query_ctx, exec_request_.get())));
+      ExecEnv::GetInstance()->frontend()->GetExecRequest(query_ctx, &exec_request)));
+
+  DumpTExecReq(exec_request, "internal", client_request_state_->query_id());
+  if (use_request) exec_request_.reset(new TExecRequest(move(exec_request)));
+  return Status::OK();
+}
+
+Status QueryDriver::RunFrontendPlanner(const TQueryCtx& query_ctx) {
+  DCHECK(client_request_state_ != nullptr);
+  DCHECK(exec_request_ == nullptr);
+  RETURN_IF_ERROR(DoFrontendPlanning(query_ctx));
+
+  client_request_state_->SetExecRequest(exec_request_.get());
   return Status::OK();
 }
 
 Status QueryDriver::SetExternalPlan(
-    const TQueryCtx& query_ctx, const TExecRequest& external_exec_request) {
-  // Takes the TQueryCtx and calls into the frontend to initialize the TExecRequest for
-  // this query.
+    const TQueryCtx& query_ctx, TExecRequest external_exec_request) {
   DCHECK(client_request_state_ != nullptr);
-  DCHECK(exec_request_ != nullptr);
+  DCHECK(exec_request_ == nullptr);
+
+  if (!FLAGS_dump_exec_request_path.empty()) {
+    // Create and dump Impala planner results so we can compare with the external plan.
+    RETURN_IF_ERROR(DoFrontendPlanning(query_ctx, false));
+  }
+
   RETURN_IF_ERROR(
       DebugAction(query_ctx.client_request.query_options, "FRONTEND_PLANNER"));
-  *exec_request_.get() = external_exec_request;
   // Update query_id in the external request
-  exec_request_->query_exec_request.query_ctx.__set_query_id(
+  external_exec_request.query_exec_request.query_ctx.__set_query_id(
       client_request_state_->query_id());
   // Update coordinator related internal addresses in the external request
-  exec_request_->query_exec_request.query_ctx.__set_coord_hostname(
+  external_exec_request.query_exec_request.query_ctx.__set_coord_hostname(
       ExecEnv::GetInstance()->configured_backend_address().hostname);
   const TNetworkAddress& address =
       FromNetworkAddressPB(ExecEnv::GetInstance()->krpc_address());
   DCHECK(IsResolvedAddress(address));
-  exec_request_->query_exec_request.query_ctx.__set_coord_ip_address(address);
+  external_exec_request.query_exec_request.query_ctx.__set_coord_ip_address(address);
   // Update local_time_zone in the external request
-  exec_request_->query_exec_request.query_ctx.__set_local_time_zone(
+  external_exec_request.query_exec_request.query_ctx.__set_local_time_zone(
       query_ctx.local_time_zone);
-  exec_request_->query_exec_request.query_ctx.__set_now_string(
+  external_exec_request.query_exec_request.query_ctx.__set_now_string(
       query_ctx.now_string);
+  exec_request_.reset(new TExecRequest(move(external_exec_request)));
+
+  DumpTExecReq(*exec_request_, "external", client_request_state_->query_id());
+  client_request_state_->SetExecRequest(exec_request_.get());
   return Status::OK();
 }
 
@@ -126,6 +174,7 @@ void QueryDriver::TryQueryRetry(
   const TUniqueId& query_id = client_request_state->query_id();
   DCHECK(client_request_state->schedule() != nullptr);
 
+  DCHECK(exec_request_ != nullptr);
   if (exec_request_->query_options.retry_failed_queries) {
     lock_guard<mutex> l(*client_request_state->lock());
 
@@ -396,8 +445,8 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
   // query has been retried. Making a copy avoids any race conditions on the
   // exec_request_ since the retry_exec_request_ needs to set a new query id on the
   // TExecRequest object.
-  retry_exec_request_ = make_unique<TExecRequest>(*exec_request_);
-  TQueryCtx query_ctx = retry_exec_request_->query_exec_request.query_ctx;
+  unique_ptr<TExecRequest> exec_request = make_unique<TExecRequest>(*exec_request_);
+  TQueryCtx query_ctx = exec_request->query_exec_request.query_ctx;
   if (query_ctx.client_request.query_options.spool_all_results_for_retries) {
     // Reset this flag in the retry query since we won't retry again, so results can be
     // returned immediately.
@@ -413,7 +462,9 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
         << PrintId(client_request_state_->query_id());
   }
   parent_server_->PrepareQueryContext(&query_ctx);
-  retry_exec_request_->query_exec_request.__set_query_ctx(query_ctx);
+  exec_request->query_exec_request.__set_query_ctx(query_ctx);
+  // Move to a const owner to ensure TExecRequest will not be modified after this.
+  retry_exec_request_ = move(exec_request);
 
   ScopedThreadContext tdi_context(GetThreadDebugInfo(), query_ctx.query_id);
 
@@ -421,14 +472,13 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
   ExecEnv* exec_env = ExecEnv::GetInstance();
   *retry_request_state =
       make_unique<ClientRequestState>(query_ctx, exec_env->frontend(), parent_server_,
-          *session, retry_exec_request_.get(), request_state->parent_driver());
+          *session, request_state->parent_driver());
+  (*retry_request_state)->SetExecRequest(retry_exec_request_.get());
   (*retry_request_state)->SetOriginalId(request_state->query_id());
-  (*retry_request_state)
-      ->set_user_profile_access(
-          (*retry_request_state)->exec_request().user_has_profile_access);
-  if ((*retry_request_state)->exec_request().__isset.result_set_metadata) {
-    (*retry_request_state)
-        ->set_result_metadata((*retry_request_state)->exec_request().result_set_metadata);
+  (*retry_request_state)->set_user_profile_access(
+      retry_exec_request_->user_has_profile_access);
+  if (retry_exec_request_->__isset.result_set_metadata) {
+    (*retry_request_state)->set_result_metadata(retry_exec_request_->result_set_metadata);
   }
 }
 

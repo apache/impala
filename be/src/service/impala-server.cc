@@ -349,11 +349,6 @@ DEFINE_int32(query_event_hook_nthreads, 1, "Number of threads to use for "
     "QueryEventHook execution. If this number is >1 then hooks will execute "
     "concurrently.");
 
-// Dumps used for debugging and diffing ExecRequests in text form.
-DEFINE_string(dump_exec_request_path, "",
-    "If set, dump TExecRequest structures to {dump_exec_request_path}/"
-    "TExecRequest-{internal|external}.{query_id.hi}-{query_id.lo}");
-
 DECLARE_bool(compact_catalog_topic);
 
 DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
@@ -1256,33 +1251,6 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> sess
   return status;
 }
 
-void DumpTExecReq(const TExecRequest& exec_request, const char* dump_type,
-    const TUniqueId& query_id) {
-  if (FLAGS_dump_exec_request_path.empty()) return;
-  int depth = 0;
-  std::stringstream tmpstr;
-  string fn(Substitute("$0/TExecRequest-$1.$2", FLAGS_dump_exec_request_path,
-      dump_type, PrintId(query_id, "-")));
-  std::ofstream ofs(fn);
-  tmpstr << exec_request;
-  std::string s = tmpstr.str();
-  const char *p = s.c_str();
-  const int len = s.length();
-  for (int i = 0; i < len; ++i) {
-    const char ch = p[i];
-    ofs << ch;
-    if (ch == '(') {
-      depth++;
-    } else if (ch == ')' && depth > 0) {
-      depth--;
-    } else if (ch == ',') {
-    } else {
-      continue;
-    }
-    ofs << '\n' << std::setw(depth) << " ";
-  }
-}
-
 Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     const TExecRequest* external_exec_request, shared_ptr<SessionState> session_state,
     bool* registered_query, QueryHandle* query_handle) {
@@ -1329,17 +1297,6 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
           statement_length, max_statement_length));
     }
 
-    Status exec_status = Status::OK();
-    TUniqueId query_id = (*query_handle)->query_id();
-    // Generate TExecRequest here if one was not passed in or we want one
-    // from the Impala planner to compare with
-    if (!is_external_req || !FLAGS_dump_exec_request_path.empty()) {
-      // Takes the TQueryCtx and calls into the frontend to initialize the TExecRequest
-      // for this query.
-      RETURN_IF_ERROR(query_handle->query_driver()->RunFrontendPlanner(query_ctx));
-      DumpTExecReq((*query_handle)->exec_request(), "internal", query_id);
-    }
-
     if (is_external_req) {
       // Use passed in exec_request
       RETURN_IF_ERROR(query_handle->query_driver()->SetExternalPlan(
@@ -1349,8 +1306,9 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
         RETURN_IF_ERROR(exec_env_->frontend()->addTransaction(
             external_exec_request->query_exec_request.query_ctx));
       }
-      exec_status = Status::OK();
-      DumpTExecReq((*query_handle)->exec_request(), "external", query_id);
+    } else {
+      // Generate TExecRequest here if one was not passed in
+      RETURN_IF_ERROR(query_handle->query_driver()->RunFrontendPlanner(query_ctx));
     }
 
     const TExecRequest& result = (*query_handle)->exec_request();
@@ -2531,12 +2489,10 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& query
 
 void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& query_handle) {
   id = query_handle.query_id();
-  const TExecRequest& request = query_handle.exec_request();
 
   const string* plan_str = query_handle.summary_profile()->GetInfoString("Plan");
   if (plan_str != nullptr) plan = *plan_str;
   stmt = query_handle.sql_stmt();
-  stmt_type = request.stmt_type;
   effective_user = query_handle.effective_user();
   default_db = query_handle.default_db();
   start_time_us = query_handle.start_time_us();
@@ -2579,9 +2535,10 @@ void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& query_handle
 
   query_handle.query_events()->ToThrift(&event_sequence);
 
+  const TExecRequest& request = query_handle.exec_request();
+  stmt_type = request.stmt_type;
   // Save the query fragments so that the plan can be visualised.
-  for (const TPlanExecInfo& plan_exec_info:
-      query_handle.exec_request().query_exec_request.plan_exec_info) {
+  for (const TPlanExecInfo& plan_exec_info: request.query_exec_request.plan_exec_info) {
     fragments.insert(fragments.end(),
         plan_exec_info.fragments.begin(), plan_exec_info.fragments.end());
   }

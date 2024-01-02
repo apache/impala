@@ -1206,14 +1206,15 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
       lock_guard<mutex> l(*(*query_handle).lock());
       query_status = query_handle->query_status();
       stmt = query_handle->sql_stmt();
-      plan = query_handle->exec_request().query_exec_request.query_plan;
+      const TExecRequest& exec_request = query_handle->exec_request();
+      plan = exec_request.query_exec_request.query_plan;
       if ((include_json_plan || include_summary)
           && query_handle->GetCoordinator() != nullptr) {
         query_handle->GetCoordinator()->GetTExecSummary(&summary);
       }
       if (include_json_plan) {
         for (const TPlanExecInfo& plan_exec_info:
-            query_handle->exec_request().query_exec_request.plan_exec_info) {
+            exec_request.query_exec_request.plan_exec_info) {
           for (const TPlanFragment& fragment: plan_exec_info.fragments) {
             fragments.push_back(fragment);
           }

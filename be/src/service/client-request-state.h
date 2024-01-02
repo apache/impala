@@ -78,14 +78,19 @@ class QuerySchedulePB;
 class ClientRequestState {
  public:
   ClientRequestState(const TQueryCtx& query_ctx, Frontend* frontend, ImpalaServer* server,
-      std::shared_ptr<ImpalaServer::SessionState> session, TExecRequest* exec_request,
-      QueryDriver* query_driver);
+      std::shared_ptr<ImpalaServer::SessionState> session, QueryDriver* query_driver);
 
   ~ClientRequestState();
 
   enum class ExecState { INITIALIZED, PENDING, RUNNING, FINISHED, ERROR };
 
   enum class RetryState { RETRYING, RETRIED, NOT_RETRIED };
+
+  /// Initialize TExecRequest. Prior to this, exec_request() returns a place-holder.
+  void SetExecRequest(const TExecRequest* exec_request) {
+    DCHECK(exec_request_.Load()->stmt_type == TStmtType::UNKNOWN);
+    exec_request_.Store(exec_request);
+  }
 
   /// Sets the profile that is produced by the frontend. The frontend creates the
   /// profile during planning and returns it to the backend via TExecRequest,
@@ -234,7 +239,7 @@ class ClientRequestState {
   /// Queries are run and authorized on behalf of the effective_user.
   const std::string& effective_user() const;
   const std::string& connected_user() const { return query_ctx_.session.connected_user; }
-  bool user_has_profile_access() const { return user_has_profile_access_; }
+  bool user_has_profile_access() const { return user_has_profile_access_.Load(); }
   const std::string& do_as_user() const { return query_ctx_.session.delegated_user; }
   TSessionType::type session_type() const { return query_ctx_.session.session_type; }
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
@@ -253,14 +258,15 @@ class ClientRequestState {
   /// control.
   /// Admission control resource pool associated with this query.
   std::string request_pool() const {
-    if (is_planning_done_.load() && exec_request_ != nullptr
-        && exec_request_->query_exec_request.query_ctx.__isset.request_pool) {
-      // If the request pool has been set by Planner, return the request pool selected
-      // by Planner.
-      return exec_request_->query_exec_request.query_ctx.request_pool;
-    } else {
-      return query_ctx_.__isset.request_pool ? query_ctx_.request_pool : "";
+    if (is_planning_done_.load()) {
+      const TExecRequest& exec_req = exec_request();
+      if (exec_req.query_exec_request.query_ctx.__isset.request_pool) {
+        // If the request pool has been set by Planner, return the request pool selected
+        // by Planner.
+        return exec_req.query_exec_request.query_ctx.request_pool;
+      }
     }
+    return query_ctx_.__isset.request_pool ? query_ctx_.request_pool : "";
   }
 
   int num_rows_fetched() const { return num_rows_fetched_; }
@@ -270,18 +276,18 @@ class ClientRequestState {
   const TResultSetMetadata* result_metadata() const { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_ctx_.query_id; }
   /// Returns the TExecRequest for the query associated with this ClientRequestState.
-  /// Contents are only valid after InitExecRequest(TQueryCtx) initializes the
+  /// Contents are a place-holder until GetExecRequest(TQueryCtx) initializes the
   /// TExecRequest.
   const TExecRequest& exec_request() const {
-    DCHECK(exec_request_ != nullptr);
-    return *exec_request_;
+    DCHECK(exec_request_.Load() != nullptr);
+    return *exec_request_.Load();
   }
-  TStmtType::type stmt_type() const { return exec_request_->stmt_type; }
+  TStmtType::type stmt_type() const { return exec_request().stmt_type; }
   TCatalogOpType::type catalog_op_type() const {
-    return exec_request_->catalog_op_request.op_type;
+    return exec_request().catalog_op_request.op_type;
   }
   TDdlType::type ddl_type() const {
-    return exec_request_->catalog_op_request.ddl_params.ddl_type;
+    return exec_request().catalog_op_request.ddl_params.ddl_type;
   }
   std::mutex* lock() { return &lock_; }
   std::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
@@ -302,7 +308,7 @@ class ClientRequestState {
   const Status& query_status() const { return query_status_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
   void set_user_profile_access(bool user_has_profile_access) {
-    user_has_profile_access_ = user_has_profile_access;
+    user_has_profile_access_.Store(user_has_profile_access);
   }
   const RuntimeProfile* profile() const { return profile_; }
   const RuntimeProfile* summary_profile() const { return summary_profile_; }
@@ -316,7 +322,7 @@ class ClientRequestState {
   TUniqueId parent_query_id() const { return query_ctx_.parent_query_id; }
 
   const std::vector<std::string>& GetAnalysisWarnings() const {
-    return exec_request_->analysis_warnings;
+    return exec_request().analysis_warnings;
   }
 
   inline int64_t last_active_ms() const {
@@ -660,14 +666,16 @@ class ClientRequestState {
   /// UpdateQueryStatus(Status) or MarkAsRetrying(Status).
   Status query_status_;
 
+  /// Default TExecRequest to return until SetExecRequest is called.
+  static const TExecRequest unknown_exec_request_;
+
   /// The TExecRequest for the query tracked by this ClientRequestState. The TExecRequest
-  /// is initialized in QueryDriver::RunFrontendPlanner(TQueryCtx).The TExecRequest is
-  /// owned by the parent QueryDriver.
-  TExecRequest* exec_request_;
+  /// is initialized once it's finalized. It's owned by the parent QueryDriver.
+  AtomicPtr<const TExecRequest> exec_request_{&unknown_exec_request_};
 
   /// If true, effective_user() has access to the runtime profile and execution
   /// summary.
-  bool user_has_profile_access_ = true;
+  AtomicBool user_has_profile_access_{true};
 
   TResultSetMetadata result_metadata_; // metadata for select query
   int num_rows_fetched_ = 0; // number of rows fetched by client for the entire query
