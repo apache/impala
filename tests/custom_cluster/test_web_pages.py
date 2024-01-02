@@ -23,7 +23,9 @@ import requests
 import psutil
 import pytest
 
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.custom_cluster_test_suite import (
+  DEFAULT_CLUSTER_SIZE,
+  CustomClusterTestSuite)
 from tests.shell.util import run_impala_shell_cmd
 
 
@@ -316,3 +318,41 @@ class TestWebPage(CustomClusterTestSuite):
     assert op["status"] == "FINISHED"
     assert op["catalog_op_name"] == "DROP_DATABASE"
     assert op["target_name"] == unique_database
+
+  def _verify_topic_size_metrics(self):
+    # Calculate the total topic metrics from the /topics page
+    response = requests.get("http://localhost:25010/topics?json")
+    assert response.status_code == requests.codes.ok
+    topics_json = json.loads(response.text)
+    total_key_size = 0
+    total_value_size = 0
+    total_topic_size = 0
+    for topic in topics_json["topics"]:
+      total_key_size += topic["key_size_bytes"]
+      total_value_size += topic["value_size_bytes"]
+      total_topic_size += topic["total_size_bytes"]
+
+    # Retrieve and verify the total topic metrics from the /metrics page
+    response = requests.get("http://localhost:25010/metrics?json")
+    assert response.status_code == requests.codes.ok
+    metrics_json = json.loads(response.text)["metric_group"]["metrics"]
+    for metric in metrics_json:
+      if metric["name"] == "statestore.total-key-size-bytes":
+        assert metric["value"] == total_key_size
+      elif metric["name"] == "statestore.total-value-size-bytes":
+        assert metric["value"] == total_value_size
+      elif metric["name"] == "statestore.total-topic-size-bytes":
+        assert metric["value"] == total_topic_size
+
+  @CustomClusterTestSuite.with_args()
+  def test_transient_topic_size(self):
+    self._verify_topic_size_metrics()
+    # Kill an impalad and wait until it's removed
+    killed_impalad = self.cluster.impalads[2]
+    killed_impalad.kill()
+    # Before we kill an impalad, there are DEFAULT_CLUSTER_SIZE + 1 subscribers
+    # (DEFAULT_CLUSTER_SIZE impalads and 1 for catalogd). After we kill one impalad,
+    # there should be DEFAULT_CLUSTER_SIZE subscribers.
+    self.cluster.statestored.service.wait_for_live_subscribers(DEFAULT_CLUSTER_SIZE)
+    # Verify the topic metrics again
+    self._verify_topic_size_metrics()

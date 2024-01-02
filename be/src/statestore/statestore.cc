@@ -446,8 +446,6 @@ void Statestore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
     // entry
     topic_update_log_.erase(version);
     topic_update_log_.emplace(++last_version_, key);
-    value_size_metric_->Increment(entry_it->second.value().size());
-    topic_size_metric_->Increment(entry_it->second.value().size());
     entry_it->second.SetDeleted(true);
     entry_it->second.SetVersion(last_version_);
   }
@@ -543,6 +541,11 @@ void Statestore::Topic::ToJson(Document* document, Value* topic_json) {
       PrettyPrinter::Print(key_size + value_size, TUnit::BYTES).c_str(),
       document->GetAllocator());
   topic_json->AddMember("total_size", total_size_json, document->GetAllocator());
+
+  topic_json->AddMember("key_size_bytes", key_size, document->GetAllocator());
+  topic_json->AddMember("value_size_bytes", value_size, document->GetAllocator());
+  topic_json->AddMember("total_size_bytes", key_size + value_size,
+      document->GetAllocator());
   topic_json->AddMember("prioritized", IsPrioritizedTopic(topic_id_),
       document->GetAllocator());
 }
