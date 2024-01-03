@@ -713,6 +713,8 @@ public class LdapHS2Test {
 
   /**
    * Tests LDAP for reading Impala table through JDBC external data source.
+   * Assume that Impala JDBC driver has been downloaded and copied to
+   * ${FILESYSTEM_PREFIX}/test-warehouse/data-sources/jdbc-drivers/.
    */
   @Test
   public void testImpalaExtJdbcTables() throws Exception {
@@ -732,12 +734,6 @@ public class LdapHS2Test {
     TSessionHandle session = openResp.getSessionHandle();
     // One successful authentication.
     verifyMetrics(1, 0);
-
-    // Download Impala JDBC driver.
-    String downloadImpalaJdbcDriver = new File(System.getenv("IMPALA_HOME"),
-        "testdata/bin/download-impala-jdbc-driver.sh").getPath();
-    String[] cmd = { downloadImpalaJdbcDriver };
-    RunShellCommand.Run(cmd, /*shouldSucceed*/ true, "", "");
 
     // Define queries.
     String fileSystemPrefix = System.getenv("FILESYSTEM_PREFIX");

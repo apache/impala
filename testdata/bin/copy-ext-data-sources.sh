@@ -71,3 +71,6 @@ fi
 hadoop credential create hiveuser -provider \
   jceks://${FILESYSTEM_URI_SCHEME}/test-warehouse/data-sources/test.jceks -v password\
   > /dev/null 2>&1
+
+# Download Impala JDBC driver
+${IMPALA_HOME}/testdata/bin/download-impala-jdbc-driver.sh
