@@ -28,8 +28,7 @@ insert into alltypes partition (year, month, date_col, date_string_col)
         year,
         month,
         cast(date_string_col as date format 'MM/DD/YY') as date_col,
-        # removing '/' until Iceberg issue #7612 is fixed
-        replace(date_string_col, "/", "")
+        date_string_col
     from functional.alltypes t;
 insert into alltypes partition (year, month, date_col, date_string_col)
 values (10000, true, 1, 2, 3, 4, 5.1, 6.2, "str", "2023-05-01 01:02:03", 2023, 5,
@@ -319,6 +318,7 @@ create table special_chars (i int) partitioned by (s string) stored as parquet;
 insert into special_chars partition (s='11 22-33&44%55"') values (1);
 insert into special_chars partition (s='aa - bb') values (2);
 insert into special_chars partition (s=null) values (3);
+insert into special_chars partition (s='11/22/33') values (4);
 alter table special_chars convert to iceberg;
 ---- RESULTS
 'Table has been migrated.'
@@ -329,6 +329,7 @@ select * from special_chars;
 1,'11 22-33&44%55"'
 2,'aa - bb'
 3,'NULL'
+4,'11/22/33'
 ---- TYPES
 int, string
 ====
@@ -347,9 +348,9 @@ select * from special_chars where s is null;
 int, string
 ====
 ---- QUERY
-create table special_chars_with_slash (i int) partitioned by (s1 string, s2 string) stored as parquet;
-insert into special_chars_with_slash partition (s1='abcde', s2='11/22/33') values (1);
-alter table special_chars_with_slash convert to iceberg;
----- CATCH
-AnalysisException: Can't migrate table with '/' in the partition values until Iceberg #7612 is fixed. '11/22/33'
+select * from special_chars where s='11/22/33';
+---- RESULTS
+4,'11/22/33'
+---- TYPES
+INT,STRING
 ====

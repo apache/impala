@@ -120,20 +120,6 @@ public class ConvertTableToIcebergStmt extends StatementBase {
           "location may change");
     }
 
-    // TODO: this is a temporary check until https://github.com/apache/iceberg/issues/7612
-    // is fixed.
-    for (PrunablePartition partition : ((FeFsTable) table).getPartitions()) {
-      for (LiteralExpr partitionExpr : partition.getPartitionValues()) {
-        if (!partitionExpr.getType().isStringType()) continue;
-        String partitionValue = partitionExpr.getStringValue();
-        if (partitionValue == null) continue;
-        if (partitionValue.contains("/")) {
-          throw new AnalysisException ("Can't migrate table with '/' in the partition " +
-              "values until Iceberg #7612 is fixed. '" + partitionValue + "'");
-        }
-      }
-    }
-
     createSubQueryStrings((FeFsTable) table);
   }
 
