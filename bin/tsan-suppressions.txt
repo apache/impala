@@ -44,3 +44,13 @@ race:impala::RpcMgrKerberizedTest
 
 # TODO: IMPALA-9403: Allow TSAN to be set on codegen
 race:impala::HdfsColumnarScanner::ProcessScratchBatchCodegenOrInterpret
+
+# This race condition exists when the Impala UI is refreshed while the frontend planner
+# is updating the TExecRequest in the QueryDriver or the ClientRequestState since it holds
+# a pointer. The implications are the UI displays slightly outdated data until the next
+# refresh. Correcting this condition would require holding a lock during the entire
+# planning phase.
+# The SimultaneousMultipleQueriesOneSession test within internal-server-test.cc surfaced
+# this data race. Since this test runs multiple threads, it is not the test function
+# itself but rather the threads it launches that cause the data race .
+race:impala::internalservertest::runTestQueries
