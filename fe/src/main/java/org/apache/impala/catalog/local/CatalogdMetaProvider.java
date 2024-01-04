@@ -464,8 +464,8 @@ public class CatalogdMetaProvider implements MetaProvider {
       case DATA_SOURCE_NOT_FOUND:
         invalidateCacheForObject(req.object_desc);
         throw new InconsistentMetadataFetchException(
-            String.format("Fetching %s failed. Could not find %s",
-                req.object_desc.type.name(), req.object_desc.toString()));
+            String.format("Fetching %s failed: %s. Could not find %s",
+                req.object_desc.type, resp.lookup_status, req.object_desc));
       default: break;
     }
     Preconditions.checkState(resp.lookup_status == CatalogLookupStatus.OK);
@@ -897,9 +897,13 @@ public class CatalogdMetaProvider implements MetaProvider {
     if (existing == null) return null;
     if (!(existing instanceof Future)) return existing;
     try {
-      return ((Future<Object>)existing).get();
-    } catch (InterruptedException | ExecutionException e) {
-      Throwables.propagateIfPossible(e, TException.class);
+      return Uninterruptibles.getUninterruptibly((Future<Object>) existing);
+    } catch (ExecutionException e) {
+      // Try throwing the cause which is the error in the loading thread.
+      // This is consistent with the error handling in loadWithCaching().
+      // So failures like InconsistentMetadataFetchException can be caught
+      // and retry in Frontend#getTExecRequest().
+      Throwables.propagateIfPossible(e.getCause(), TException.class);
       throw new RuntimeException(e);
     }
   }

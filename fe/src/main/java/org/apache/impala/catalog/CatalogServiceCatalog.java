@@ -3646,7 +3646,8 @@ public class CatalogServiceCatalog extends Catalog {
       try {
         Db db = getDb(dbDesc.getDb_name());
         if (db == null) {
-          return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
+          return createGetPartialCatalogObjectError(req,
+              CatalogLookupStatus.DB_NOT_FOUND);
         }
 
         return db.getPartialInfo(req);
@@ -3672,14 +3673,16 @@ public class CatalogServiceCatalog extends Catalog {
             objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name(),
             tableLoadReason, writeIdList, tableId);
       } catch (DatabaseNotFoundException e) {
-        return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
+        return createGetPartialCatalogObjectError(req, CatalogLookupStatus.DB_NOT_FOUND);
       }
       if (table == null) {
-        return createGetPartialCatalogObjectError(CatalogLookupStatus.TABLE_NOT_FOUND);
+        return createGetPartialCatalogObjectError(req,
+            CatalogLookupStatus.TABLE_NOT_FOUND);
       } else if (!table.isLoaded()) {
         // Table can still remain in an incomplete state if there was a concurrent
         // invalidate request.
-        return createGetPartialCatalogObjectError(CatalogLookupStatus.TABLE_NOT_LOADED);
+        return createGetPartialCatalogObjectError(req,
+            CatalogLookupStatus.TABLE_NOT_LOADED);
       }
       Map<HdfsPartition, TPartialPartitionInfo> missingPartialInfos;
       TGetPartialCatalogObjectResponse resp;
@@ -3706,12 +3709,13 @@ public class CatalogServiceCatalog extends Catalog {
       try {
         Db db = getDb(objectDesc.fn.name.db_name);
         if (db == null) {
-          return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
+          return createGetPartialCatalogObjectError(req,
+              CatalogLookupStatus.DB_NOT_FOUND);
         }
 
         List<Function> funcs = db.getFunctions(objectDesc.fn.name.function_name);
         if (funcs.isEmpty()) {
-          return createGetPartialCatalogObjectError(
+          return createGetPartialCatalogObjectError(req,
               CatalogLookupStatus.FUNCTION_NOT_FOUND);
         }
         TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
@@ -3854,9 +3858,11 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   private static TGetPartialCatalogObjectResponse createGetPartialCatalogObjectError(
-      CatalogLookupStatus status) {
+      TGetPartialCatalogObjectRequest req, CatalogLookupStatus status) {
     TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
     resp.setLookup_status(status);
+    LOG.warn("Fetching {} failed: {}. Could not find {}", req.object_desc.type,
+        status, req.object_desc);
     return resp;
   }
 

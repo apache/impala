@@ -449,6 +449,40 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     for i in t.imap_unordered(do_table, range(NUM_ITERS)):
       pass
 
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true "
+                   "--inject_failure_ratio_in_catalog_fetch=0.1 "
+                   "--inject_latency_after_catalog_fetch_ms=100",
+      catalogd_args="--catalog_topic_mode=minimal")
+  def test_fetch_metadata_retry_in_piggybacked_failures(self, unique_database):
+    test_self = self
+
+    class ThreadLocalClient(threading.local):
+      def __init__(self):
+        self.c = test_self.create_impala_client()
+
+    NUM_THREADS = 8
+    t = ThreadPool(processes=NUM_THREADS)
+    tls = ThreadLocalClient()
+
+    self.execute_query(
+        "create table {0}.tbl (i int) partitioned by (p int)".format(unique_database))
+    self.execute_query(
+        "insert into {0}.tbl partition(p) values (0,0)".format(unique_database))
+
+    def read_part(i):
+      self.execute_query_expect_success(
+          tls.c, "select * from {0}.tbl where p=0".format(unique_database))
+
+    # Prior to fixing IMPALA-12670, this test would fail within 20 iterations,
+    # so 100 should be quite reliable as a regression test.
+    NUM_ITERS = 100
+    for k in range(NUM_ITERS):
+      # Read the same partition in concurrent queries so requests can be piggybacked.
+      for i in t.imap_unordered(read_part, range(NUM_THREADS)):
+        pass
+      # Refresh to invalidate the partition in local catalog cache
+      self.execute_query("refresh {0}.tbl partition(p=0)".format(unique_database))
 
 class TestLocalCatalogObservability(CustomClusterTestSuite):
   def get_catalog_cache_metrics(self, impalad):

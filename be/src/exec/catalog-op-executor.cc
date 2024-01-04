@@ -57,6 +57,10 @@ DEFINE_int32_hidden(inject_latency_before_catalog_fetch_ms, 0,
     "Latency (ms) to be injected before fetching catalog data from the catalogd");
 DEFINE_int32_hidden(inject_latency_after_catalog_fetch_ms, 0,
     "Latency (ms) to be injected after fetching catalog data from the catalogd");
+DEFINE_double_hidden(inject_failure_ratio_in_catalog_fetch, -1,
+    "Ratio to randomly fail the GetPartialCatalogObject RPC with TABLE_NOT_LOADED "
+    "status. 0.1 means fail it in a possibility of 10%. Negative values disable this. "
+    "values >= 1 will always make the RPC fail");
 
 /// Used purely for debug actions. The DEBUG_ACTION is only executed on the first RPC
 /// attempt.
@@ -376,6 +380,10 @@ Status CatalogOpExecutor::GetPartialCatalogObject(
   RETURN_IF_ERROR(rpc_status.status);
   if (FLAGS_inject_latency_after_catalog_fetch_ms > 0) {
     SleepForMs(FLAGS_inject_latency_after_catalog_fetch_ms);
+  }
+  if (FLAGS_inject_failure_ratio_in_catalog_fetch > 0
+      && rand() < FLAGS_inject_failure_ratio_in_catalog_fetch * (RAND_MAX + 1L)) {
+    resp->lookup_status = CatalogLookupStatus::TABLE_NOT_LOADED;
   }
   return Status::OK();
 }
