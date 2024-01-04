@@ -122,6 +122,9 @@ class DatabaseTest {
   public:
     DatabaseTest(const shared_ptr<ImpalaServer> impala_server, const string name_prefix,
         const bool create_table = false, const int record_count = 5000) {
+      // See the warning on the category_count_ class member definition.
+      EXPECT_LE(category_count_, 11);
+
       this->impala_server_ = impala_server;
       this->database_name_ = StrCat(name_prefix, "_", GetCurrentTimeMicros());
       TUniqueId query_id;
@@ -146,9 +149,9 @@ class DatabaseTest {
           int cat = (i % category_count_) + 1;
           double price = cat * .01;
           // Calculate a first sold offset.
-          int first_sold = secs_per_year * (cat * cat);
+          uint32_t first_sold = secs_per_year * (cat * cat);
           // Calculate a last sold offset that is a minimum 1 year after first_sold.
-          int last_sold = first_sold - (secs_per_year * cat);
+          uint32_t last_sold = first_sold - (secs_per_year * cat);
           sql1 += StrCat("(", i, ",", cat, ",'prod_", i,
               "',seconds_sub(now(),", first_sold, "),seconds_sub(now(),", last_sold,
               "),cast(", price, " as DECIMAL(30, 2)))");
@@ -169,7 +172,7 @@ class DatabaseTest {
           int cat = (i % category_count_) + 1;
           double price = cat * .01;
           // Calculate a sold offset.
-          int sold = secs_per_year * (cat * cat);
+          uint32_t sold = secs_per_year * (cat * cat);
           sql2 += StrCat("(", i, ",", cat, ",'prod_", i,
               "',seconds_sub(now(),", sold, "),cast(", price, " as DECIMAL(30, 2)))");
 
@@ -202,6 +205,7 @@ class DatabaseTest {
     }
 
   private:
+    // WARNING: Values greater than 11 will overflow the uint32_t variables.
     const int category_count_ = 10;
     mutable string database_name_;
     mutable string table_name_;
