@@ -1308,8 +1308,9 @@ void TmpFileMgrTest::TestCompressBufferManagement(
       }
       EXPECT_EQ(tmp_file->DiskFile()->GetFileStatus(), io::DiskFileStatus::PERSISTED);
       // Remove the local buffer to enforce reading from the remote file.
-      tmp_file->GetWriteFile()->SetStatus(io::DiskFileStatus::DELETED);
-      EXPECT_OK(FileSystemUtil::RemovePaths({tmp_file->GetWriteFile()->path()}));
+      unique_lock<shared_mutex> buffer_file_lock(
+          *(tmp_file->GetWriteFile()->GetFileLock()));
+      EXPECT_OK(tmp_file->GetWriteFile()->Delete(buffer_file_lock));
     };
     wait_upload_func(compressed_handle->file_);
     wait_upload_func(uncompressed_handle->file_);

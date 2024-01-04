@@ -28,7 +28,7 @@ class LocalFileWriter : public FileWriter {
  public:
   LocalFileWriter(DiskIoMgr* io_mgr, const char* file_path, int64_t file_size = 0)
     : FileWriter(io_mgr, file_path, file_size) {}
-  ~LocalFileWriter() {}
+  ~LocalFileWriter();
 
   virtual Status Open() override;
   virtual Status Write(WriteRange* range, int64_t* written_bytes) override;

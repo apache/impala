@@ -37,6 +37,11 @@ Status DiskFile::Delete(const unique_lock<shared_mutex>& lock) {
   // No support for remote file deletion yet.
   if (disk_type_ == DiskFileType::LOCAL_BUFFER || disk_type_ == DiskFileType::LOCAL) {
     if (is_deleted(status_l)) return DISK_FILE_DELETE_FAILED_INCORRECT_STATUS;
+    if (file_writer_ != nullptr) {
+      // Close the file writer to release the file handle.
+      RETURN_IF_ERROR(file_writer_->Close());
+    }
+    // Remove the local physical file if it exists.
     RETURN_IF_ERROR(FileSystemUtil::RemovePaths({path_}));
     SetStatusLocked(io::DiskFileStatus::DELETED, status_l);
   }

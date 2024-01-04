@@ -30,6 +30,11 @@
 namespace impala {
 namespace io {
 
+LocalFileWriter::~LocalFileWriter() {
+  // Ensure the file handle is released.
+  DCHECK(file_ == nullptr);
+}
+
 Status LocalFileWriter::Open() {
   lock_guard<mutex> lock(lock_);
   if (file_ != nullptr) return Status::OK();

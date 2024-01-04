@@ -2220,6 +2220,7 @@ TEST_F(DiskIoMgrTest, WriteToRemotePartialFileSuccess) {
   EXPECT_EQ(*(int32_t*)client_buffer.data(), *data);
   scan_range->ReturnBuffer(move(io_buffer));
 
+  ASSERT_TRUE((*new_tmp_file_obj)->Remove().ok());
   num_ranges_written_ = 0;
   tmp_file_grp->Close();
   io_mgr.UnregisterContext(io_ctx.get());

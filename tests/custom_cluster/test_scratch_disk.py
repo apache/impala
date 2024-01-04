@@ -24,12 +24,13 @@ import pytest
 import re
 import shutil
 import stat
+import subprocess
 import tempfile
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.verifiers.metric_verifier import MetricVerifier
 from tests.common.skip import SkipIf
 from tests.util.hdfs_util import NAMENODE
+from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestScratchDir(CustomClusterTestSuite):
   @classmethod
@@ -96,6 +97,7 @@ class TestScratchDir(CustomClusterTestSuite):
   def teardown_method(self, method):
     for dir_path in self.created_dirs:
       shutil.rmtree(dir_path, ignore_errors=True)
+    self.check_deleted_file_fd()
 
   @pytest.mark.execute_serially
   def test_multiple_dirs(self, vector):
@@ -278,6 +280,29 @@ class TestScratchDir(CustomClusterTestSuite):
 
   def dfs_tmp_path(self):
     return "{}/tmp".format(NAMENODE)
+
+  def find_deleted_files_in_fd(self, pid):
+    fd_path = "/proc/{}/fd".format(pid)
+    command = "find {} -ls | grep '(deleted)'".format(fd_path)
+    try:
+      result = subprocess.check_output(command, shell=True)
+      return result.strip()
+    except subprocess.CalledProcessError as e:
+      if not e.output:
+        # If there is no output, return None.
+        return None
+      return "Error checking the fd path with error '{}'".format(e)
+
+  def check_deleted_file_fd(self):
+    # Check if we have deleted but still referenced files in fd.
+    # Regression test for IMPALA-12681.
+    pids = []
+    for impalad in self.cluster.impalads:
+      pids.append(impalad.get_pid())
+    assert pids
+    for pid in pids:
+      deleted_files = self.find_deleted_files_in_fd(pid)
+      assert deleted_files is None
 
   @pytest.mark.execute_serially
   @SkipIf.not_scratch_fs
