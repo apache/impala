@@ -53,6 +53,7 @@ LOG.setLevel(level=logging.DEBUG)
 KUDU_MASTER_HOSTS = os.getenv("KUDU_MASTER_HOSTS", "127.0.0.1")
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get("IMPALA_MAX_LOG_FILES", 10)
 INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST", "localhost")
+TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 
 # Options
 parser = OptionParser()
@@ -168,6 +169,10 @@ parser.add_option("--enable_statestored_ha", dest="enable_statestored_ha",
                   action="store_true", default=False,
                   help="If true, enables StatestoreD HA - the cluster will be launched "
                   "with two statestored instances as Active-Passive HA pair.")
+parser.add_option("--reduce_disk_io_threads", default="True", type="choice",
+                  choices=["true", "True", "false", "False"],
+                  help="If true, reduce the number of disk io mgr threads for "
+                  "filesystems that are not the TARGET_FILESYSTEM.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -576,6 +581,34 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
           "-state_store_2_port={state_store_2_port}".format(
               args=args, state_store_port=state_store_port,
               state_store_2_port=state_store_2_port)
+
+    if options.reduce_disk_io_threads.lower() == 'true':
+      # This leaves the default value for the TARGET_FILESYSTEM, but it reduces the thread
+      # count for every other filesystem that is not the TARGET_FILESYSTEM.
+      if TARGET_FILESYSTEM != 'abfs':
+        args = "{args} -num_abfs_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 'adls':
+        args = "{args} -num_adls_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 'cosn':
+        args = "{args} -num_cos_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 'gs':
+        args = "{args} -num_gcs_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 'hdfs':
+        args = "{args} -num_remote_hdfs_file_oper_io_threads=1".format(args=args)
+        args = "{args} -num_remote_hdfs_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 'obs':
+        args = "{args} -num_obs_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 'oss':
+        args = "{args} -num_oss_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 'ozone':
+        args = "{args} -num_ozone_io_threads=1".format(args=args)
+      if TARGET_FILESYSTEM != 's3':
+        args = "{args} -num_s3_io_threads=1".format(args=args)
+        args = "{args} -num_s3_file_oper_io_threads=1".format(args=args)
+
+      # SFS (single-file system) doesn't have a corresponding TARGET_FILESYSTEM, and
+      # it can always be restricted.
+      args = "{args} -num_sfs_io_threads=1".format(args=args)
 
     if "geospatial_library" not in args:
       args = "{args} -geospatial_library={geospatial_library}".format(
