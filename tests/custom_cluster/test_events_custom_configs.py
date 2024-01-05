@@ -614,7 +614,7 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     EventProcessorUtils.wait_for_event_processing(self)
     prev_events_skipped = EventProcessorUtils.get_int_metric('events-skipped', 0)
     self.run_stmt_in_hive(
-      """"ALTER TABLE {}.{} SET TBLPROPERTIES('somekey'='somevalue')"""
+      """ALTER TABLE {}.{} SET TBLPROPERTIES('somekey'='somevalue')"""
       .format(unique_database, test_table))
     self.client.execute(
       """ALTER TABLE {}.{} SET TBLPROPERTIES ('impala.disableHmsSync'='false')"""
