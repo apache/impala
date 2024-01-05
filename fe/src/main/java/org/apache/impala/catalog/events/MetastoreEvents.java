@@ -2392,6 +2392,15 @@ public class MetastoreEvents {
     }
 
     /**
+     * Same as the above but returns the event time.
+     */
+    @Override
+    public long getEventTime() {
+      Preconditions.checkState(!batchedEvents_.isEmpty());
+      return batchedEvents_.get(batchedEvents_.size() - 1).getEventTime();
+    }
+
+    /**
      *
      * @param event The event under consideration to be batched into this event. It can
      *              be added to the batch if it can be batched into the last event of the
