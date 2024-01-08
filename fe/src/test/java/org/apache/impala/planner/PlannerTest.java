@@ -1405,12 +1405,8 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testProcessingCost() {
-    TQueryOptions options = tpcdsParquetQueryOptions();
-    options.setCompute_processing_cost(true);
-    options.setProcessing_cost_min_threads(2);
-    options.setMax_fragment_instances_per_node(16);
-    runPlannerTestFile(
-        "tpcds-processing-cost", "tpcds_partitioned_parquet_snap", options,
+    TQueryOptions options = tpcdsParquetCpuCostQueryOptions();
+    runPlannerTestFile("tpcds-processing-cost", "tpcds_partitioned_parquet_snap", options,
         tpcdsParquetTestOptions());
   }
 

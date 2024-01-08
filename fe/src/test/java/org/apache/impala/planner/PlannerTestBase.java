@@ -411,6 +411,13 @@ public class PlannerTestBase extends FrontendTestBase {
     return options;
   }
 
+  protected static TQueryOptions tpcdsParquetCpuCostQueryOptions() {
+    return tpcdsParquetQueryOptions()
+        .setCompute_processing_cost(true)
+        .setProcessing_cost_min_threads(2)
+        .setMax_fragment_instances_per_node(16);
+  }
+
   protected static Set<PlannerTestOption> tpcdsParquetTestOptions() {
     return ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
         PlannerTestOption.INCLUDE_RESOURCE_HEADER, PlannerTestOption.VALIDATE_RESOURCES,
