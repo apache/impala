@@ -569,10 +569,11 @@ export ENABLE_IMPALA_IR_DEBUG_INFO=${ENABLE_IMPALA_IR_DEBUG_INFO-false}
 #   the Breakpad scripts have been modified to handle it, but there may
 #   be other tools that do not know how to use it. This reduces the size
 #   of binaries by 50+%.
-# Both of these are disabled by default.
-# TODO: Explore enabling IMPALA_COMPRESSED_DEBUG_INFO by default.
+#
+# Due to the major reduction in binary size and broad support in debugging
+# tools, compressed debug information is enabled by default.
 export IMPALA_MINIMAL_DEBUG_INFO=${IMPALA_MINIMAL_DEBUG_INFO-false}
-export IMPALA_COMPRESSED_DEBUG_INFO=${IMPALA_COMPRESSED_DEBUG_INFO-false}
+export IMPALA_COMPRESSED_DEBUG_INFO=${IMPALA_COMPRESSED_DEBUG_INFO-true}
 
 # Download and use the CDH components from S3. It can be useful to set this to false if
 # building against a custom local build using HIVE_SRC_DIR_OVERRIDE,
