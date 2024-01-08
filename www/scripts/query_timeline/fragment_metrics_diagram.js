@@ -283,6 +283,13 @@ export function updateFragmentMetricsChartOnClick(click_event) {
   toogleFragmentMetricsVisibility();
 }
 
+export function closeFragmentMetricsChart() {
+  fragment_id_selections.clear();
+  fragment_metrics_chart = destroyChart(fragment_metrics_chart, fragment_metrics_diagram);
+  toogleFragmentMetricsVisibility();
+  setTimingDiagramDimensions();
+}
+
 fragment_metrics_resize_bar.addEventListener('mousedown',
     function dragResizeBarBegin(mousedown_e) {
   fragment_metrics_resize_bar.removeEventListener('mousedown', dragResizeBarBegin);
@@ -294,12 +301,7 @@ fragment_metrics_resize_bar.addEventListener('mousedown',
   });
 });
 
-fragment_metrics_close_btn.addEventListener('click', function() {
-  fragment_id_selections.clear();
-  fragment_metrics_chart = destroyChart(fragment_metrics_chart, fragment_metrics_diagram);
-  toogleFragmentMetricsVisibility();
-  setTimingDiagramDimensions();
-});
+fragment_metrics_close_btn.addEventListener('click', closeFragmentMetricsChart);
 
 fragment_metrics_close_btn.style.height = `${diagram_controls_height}px`;
 fragment_metrics_close_btn.style.fontSize = `${diagram_controls_height / 2}px`;

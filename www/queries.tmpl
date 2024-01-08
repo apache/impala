@@ -17,9 +17,17 @@ specific language governing permissions and limitations
 under the License.
 -->
 {{> www/common-header.tmpl }}
+
+<style>
+#json_profile_chooser {
+  display: none;
+}
+</style>
+
 <h2>Queries</h2>
-<p class="lead">This page lists all running queries, plus any completed queries that are
-archived in memory. The size of that archive is controlled with the
+<p class="lead">This page lists all running queries plus completed queries
+that are archived in memory, and imported query profiles.
+The size of that archive is controlled with the
 <samp>--query_log_size</samp> command line parameter.</p>
 <p>The length of the statements are controlled with the <samp>--query_stmt_size</samp>
 command line parameter.</p>
@@ -205,6 +213,37 @@ command line parameter.</p>
 {{/completed_queries}}
 </table>
 
+<h3 id="imported_queries_header">
+  0 Imported Query Profiles
+  <sup><a href='#' data-toggle="tooltip" title="These are locally stored queries parsed from JSON query profiles.">[?]</a></sup>
+  <input id="json_profile_chooser" type="file" accept=".json" onchange="uploadProfile();" multiple/>
+  <label for="json_profile_chooser">
+    <span class="btn btn-primary">Import JSON Profile</span>
+  </label>
+  <input id="clear_profiles_button" type="button" class="btn btn-primary" title="Clear All" onclick="clearProfiles();" value="X"/>
+</h3>
+
+<table id="imported_queries_table" class='table table-hover table-border'>
+  <tr>
+    <th title="{{tips_query_id}}">Query ID</th>
+    <th title="{{tips_user}}">User</th>
+    <th title="{{tips_default_db}}">Default Db</th>
+    <th title="{{tips_query_type}}">Query Type</th>
+    <th title="{{tips_start_time}}">Start Time</th>
+    <th title="{{tips_end_time}}">End Time</th>
+    <th>
+      <span title="{{tips_bytes_read}}">Bytes&nbsp;Read</span>
+      <hr style="margin-top:0px;margin-bottom:0px;"/>
+      <span title="{{tips_bytes_sent}}">Bytes&nbsp;Sent</span>
+    </th>
+    <th title="{{tips_state}}">State</th>
+    <th title="{{tips_rows_fetched}}"># rows fetched</th>
+    <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_statement}}">Statement</th>
+    <th>Delete</th>
+  </tr>
+</table>
+
 <h3>Query Locations</h3>
 
 <table class='table table-hover table-bordered'>
@@ -221,5 +260,153 @@ command line parameter.</p>
   </tr>
 {{/query_locations}}
 </table>
+<script>
+  var dbOpenReq = indexedDB.open("imported_queries");
+  var db;
 
+  function insertRowVal(row, val) {
+    row.insertCell().innerHTML = val;
+  }
+
+  function setScrollReload() {
+    localStorage.setItem("imported", "T");
+    window.location.reload();
+  }
+
+  function deleteProfile(el) {
+    var row = el.parentElement.parentElement;
+    var profileStore = db.transaction("profiles", "readwrite").objectStore("profiles");
+    profileStore.delete(row.cells[0].textContent).onsuccess = () => {
+      setScrollReload();
+    };
+  }
+
+  function clearProfiles() {
+    db.transaction("profiles", "readwrite").objectStore("profiles").clear();
+    setScrollReload();
+  }
+
+  function uploadProfile() {
+    var uploadCount = 0;
+    for (var i = 0; i < json_profile_chooser.files.length; i++) {
+      var fileReader = new FileReader();
+      fileReader.readAsText(json_profile_chooser.files[i]);
+      fileReader.onload = (e) => {
+        try {
+          var profile = JSON.parse(e.target.result).contents;
+          var val = profile.profile_name;
+          var query = {};
+          query.id = val.substring(val.indexOf("=") + 1, val.length - 1);
+          query.user = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "User").value;
+          query.default_db = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "Default Db").value;
+          query.type = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "Query Type").value;
+          query.start_time = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "Start Time").value;
+          query.end_time = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "End Time").value;
+          query.bytes_read = profile.child_profiles[2].counters
+              .find(({counter_name}) => counter_name === "TotalBytesRead").value;
+          query.bytes_read = getReadableSize(query.bytes_read, 2);
+          query.bytes_sent = profile.child_profiles[2].counters
+              .find(({counter_name}) => counter_name === "TotalBytesSent").value;
+          query.bytes_sent = getReadableSize(query.bytes_sent, 2);
+          query.state = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "Query State").value;
+          query.rows_fetched = profile.child_profiles[1].counters
+              .find(({counter_name}) => counter_name === "NumRowsFetched").value;
+          query.resource_pool = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "Request Pool").value;
+          query.statement = profile.child_profiles[0].info_strings
+              .find(({key}) => key === "Sql Statement").value;
+          if (query.statement.length > 250) {
+            query.statement = query.statement.substring(0, 250) + "...";
+          }
+          query.profile = profile;
+
+          var profileStore = db.transaction("profiles", "readwrite").objectStore("profiles");
+          profileStore.put(query).onsuccess = () => {
+            uploadCount++;
+            if (uploadCount == json_profile_chooser.files.length) {
+              setScrollReload();
+            }
+          };
+        } catch (err) {
+          var alertMessage = document.createElement("span");
+          alertMessage.className = "alert-sm alert-danger";
+          alertMessage.textContent = "Error parsing some JSON profiles";
+          setTimeout(setScrollReload, 1500);
+          imported_queries_header.appendChild(alertMessage);
+          console.log(err);
+        }
+      };
+    }
+  }
+
+  dbOpenReq.onupgradeneeded = (e) => {
+    db = e.target.result;
+    var profileStore = db.createObjectStore("profiles", { keyPath : "id" });
+
+    profileStore.createIndex("start_time", "start_time");
+  };
+
+  dbOpenReq.onsuccess = (e) => {
+    db = e.target.result;
+    db.onerror = (e) => {
+      console.log("IndexedDB error");
+      console.log(e);
+    }
+
+    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
+    var countReq = profileStore.count();
+
+    countReq.onsuccess = () => {
+      if (countReq.result) {
+        imported_queries_header.innerHTML = imported_queries_header.innerHTML
+            .replace("0", String(countReq.result));
+      } else {
+        clear_profiles_button.remove();
+      }
+    };
+
+    profileStore.index("start_time").openCursor(null, "prev").onsuccess = (e) => {
+      var cursor = e.target.result;
+      if (cursor) {
+        var query = cursor.value;
+        var row = imported_queries_table.insertRow();
+        var query_link = document.createElement("a");
+        query_link.href = `/query_timeline?query_id=${query.id}&imported=true`;
+        query_link.innerHTML = query.id;
+        insertRowVal(row, query_link.outerHTML);
+        insertRowVal(row, query.user);
+        insertRowVal(row, query.default_db);
+        insertRowVal(row, query.type);
+        insertRowVal(row, query.start_time);
+        insertRowVal(row, query.end_time);
+        insertRowVal(row, `${query.bytes_read}
+          <hr style="margin-top:0px;margin-bottom:0px;"/>${query.bytes_sent}`);
+        insertRowVal(row, query.state);
+        insertRowVal(row, query.rows_fetched);
+        insertRowVal(row, query.resource_pool);
+        insertRowVal(row, query.statement);
+        var deleteButton = document.createElement("input");
+        deleteButton.type = "button";
+        deleteButton.value = "X";
+        deleteButton.className = "btn btn-primary";
+        deleteButton.setAttribute("onclick", "deleteProfile(this);");
+        insertRowVal(row, deleteButton.outerHTML);
+        cursor.continue();
+      }
+    };
+  };
+
+  window.onload = () => {
+    if (localStorage.getItem("imported") == "T") {
+      imported_queries_header.scrollIntoView({ behavior : "instant", block : "start" });
+      localStorage.setItem("imported", "F");
+    }
+  };
+</script>
 {{> www/common-footer.tmpl }}

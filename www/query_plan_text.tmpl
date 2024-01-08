@@ -21,10 +21,50 @@ under the License.
 
 {{> www/query_detail_tabs.tmpl }}
 
-<pre>{{plan}}</pre>
+<pre id="query_plan">{{plan}}</pre>
 
 <script>
 $("#plan-text-tab").addClass("active");
+
+
+var dbOpenReq = indexedDB.open("imported_queries");
+var db;
+
+var supported_tabs = ["Query", "Timeline", "Text plan"];
+
+if (window.location.search.includes("imported")) {
+  var alertMessage = document.getElementsByClassName("alert alert-danger")[0];
+  if (alertMessage) {
+    alertMessage.remove();
+  }
+  var nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  nav_links = nav_links.getElementsByClassName("nav-link");
+  for (var i = 0; i < nav_links.length;) {
+    if (supported_tabs.includes(nav_links[i].textContent)) {
+      nav_links[i].href =  `${nav_links[i].href}&imported=true`;
+      i++;
+    } else {
+      nav_links[i].parentElement.remove();
+    }
+  }
+
+  dbOpenReq.onsuccess = (e) => {
+    db = e.target.result;
+    db.onerror = (e) => {
+      console.log("IndexedDB error");
+      console.log(e);
+    }
+    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
+    var query = {};
+    query.id = window.location.search;
+    query.id = query.id.substring(10, query.id.indexOf("&"));
+    profileStore.get(query.id).onsuccess = (e) => {
+      query = e.target.result;
+      query_plan.textContent = query.profile.child_profiles[0].info_strings
+          .find(({key}) => key === "Plan").value;
+    };
+  };
+}
 </script>
 
 {{> www/common-footer.tmpl }}

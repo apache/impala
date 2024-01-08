@@ -162,37 +162,83 @@ $("#plan-timing-tab").addClass("active");
 
 import {renderTimingDiagram, collectFragmentEventsFromProfile, ntics, set_ntics} from
     "./www/scripts/query_timeline/fragment_diagram.js";
-import {collectUtilizationFromProfile, toogleUtilizationVisibility} from
-    "/www/scripts/query_timeline/host_utilization_diagram.js";
-import {collectFragmentMetricsFromProfile} from
+import {collectUtilizationFromProfile, toogleUtilizationVisibility,
+    destroyUtilizationChart}
+    from "/www/scripts/query_timeline/host_utilization_diagram.js";
+import {collectFragmentMetricsFromProfile, closeFragmentMetricsChart} from
     "/www/scripts/query_timeline/fragment_metrics_diagram.js";
-import {profile, set_profile, diagram_width, set_diagram_width, border_stroke_width,
-    resizeHorizontalAll, maxts} from "/www/scripts/query_timeline/global_members.js";
+import {profile, set_profile, maxts, set_maxts, diagram_width, set_diagram_width,
+    border_stroke_width, resizeHorizontalAll}
+    from "/www/scripts/query_timeline/global_members.js";
 
 var chart_export_style;
 var last_maxts;
 
-window.onload = function refresh() {
-  var req = new XMLHttpRequest();
-  req.onload = function() {
-    if (req.status == 200) {
-      set_profile(JSON.parse(req.responseText)["profile_json"]);
-      collectFragmentEventsFromProfile();
-      collectUtilizationFromProfile();
-      collectFragmentMetricsFromProfile();
-      if (last_maxts != maxts) {
-        renderTimingDiagram();
-        last_maxts = maxts;
-      }
-      toogleUtilizationVisibility();
-      if (profile.child_profiles[0].info_strings.find(({key}) =>
-          key === "End Time").value == "") {
-        setTimeout(refresh, 1000);
-      }
+var dbOpenReq = indexedDB.open("imported_queries");
+var db;
+
+var supported_tabs = ["Query", "Timeline", "Text plan"];
+
+function refreshView() {
+  collectFragmentEventsFromProfile();
+  collectUtilizationFromProfile();
+  collectFragmentMetricsFromProfile();
+  if (last_maxts != maxts) {
+    renderTimingDiagram();
+    last_maxts = maxts;
+  }
+  toogleUtilizationVisibility();
+}
+
+
+if (window.location.search.includes("imported")) {
+  var alertMessage = document.getElementsByClassName("alert alert-danger")[0];
+  if (alertMessage) {
+    alertMessage.remove();
+  }
+  var nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  nav_links = nav_links.getElementsByClassName("nav-link");
+  for (var i = 0; i < nav_links.length;) {
+    if (supported_tabs.includes(nav_links[i].textContent)) {
+      nav_links[i].href =  `${nav_links[i].href}&imported=true`;
+      i++;
+    } else {
+      nav_links[i].parentElement.remove();
     }
   }
-  req.open("GET", make_url("/query_timeline?query_id={{query_id}}&json"), true);
-  req.send();
+
+  dbOpenReq.onsuccess = (e) => {
+    db = e.target.result;
+    db.onerror = (e) => {
+      console.log("IndexedDB error");
+      console.log(e);
+    }
+    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
+    var query = {};
+    query.id = window.location.search;
+    query.id = query.id.substring(10, query.id.indexOf("&"));
+    profileStore.get(query.id).onsuccess = (e) => {
+      query = e.target.result;
+      set_profile(query.profile);
+      refreshView();
+    };
+  };
+} else {
+  window.onload = function refreshProfile() {
+    var req = new XMLHttpRequest();
+    req.onload = function() {
+      if (req.status == 200) {
+        set_profile(JSON.parse(req.responseText)["profile_json"]);
+        refreshView();
+        if (profile.child_profiles[0].info_strings.find(({key}) =>
+            key === "End Time").value == "") {
+          setTimeout(refreshProfile, 1000);
+        }
+      }
+    }
+    req.open("GET", make_url("/query_timeline?query_id={{query_id}}&json"), true);
+    req.send();
+  }
 }
 
 window.addEventListener('mousemove', function(e) {

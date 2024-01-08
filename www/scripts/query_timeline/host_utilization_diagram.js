@@ -134,6 +134,7 @@ function initializeUtilizationChart() {
     unload : true
   });
   var chart_width = diagram_width - margin_chart_end - name_width;
+  prev_utilization_num_samples = 0;
   host_utilization_resize_bar.style.marginLeft = `${name_width + chart_width / 4}px`;
   host_utilization_resize_bar.style.width = `${chart_width / 2}px`;
   host_utilization_resize_bar.style.marginRight = `${chart_width / 4}px`;
@@ -302,6 +303,12 @@ export function collectUtilizationFromProfile() {
   }
 }
 
+export function destroyUtilizationChart() {
+  host_utilization_chart = destroyChart(host_utilization_chart, host_utilization_diagram);
+  toogleUtilizationVisibility();
+  setTimingDiagramDimensions();
+}
+
 host_utilization_resize_bar.addEventListener('mousedown',
     function dragResizeBarBegin(mousedown_e) {
   host_utilization_resize_bar.removeEventListener('mousedown', dragResizeBarBegin);
@@ -316,9 +323,7 @@ host_utilization_resize_bar.addEventListener('mousedown',
 
 host_utilization_close_btn.addEventListener('click', function(e) {
   host_utilization_visible = false;
-  host_utilization_chart = destroyChart(host_utilization_chart, host_utilization_diagram);
-  toogleUtilizationVisibility();
-  setTimingDiagramDimensions();
+  destroyUtilizationChart();
 });
 
 host_utilization_close_btn.style.height = `${diagram_controls_height}px`;
