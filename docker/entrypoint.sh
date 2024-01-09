@@ -164,7 +164,7 @@ function boot_container() {
   #
   # "sed -i" in place doesn't work on Docker, because /etc/hosts is a bind mount.
   sed -e /$(hostname)/d /etc/hosts > /tmp/hosts
-  echo "127.0.0.1 $(hostname -s) $(hostname)" >> /tmp/hosts
+  echo "127.0.0.1 $(hostname) $(hostname -s)" >> /tmp/hosts
   sudo cp /tmp/hosts /etc/hosts
 
   echo Hostname: $(hostname)

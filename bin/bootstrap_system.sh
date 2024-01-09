@@ -454,7 +454,8 @@ ssh localhost whoami
 #  Traceback (most recent call last):
 #    ...
 #  ...ConnectionError: ('Connection aborted.', error(111, 'Connection refused'))
-echo -e "\n127.0.0.1 $(hostname -s) $(hostname)" | sudo tee -a /etc/hosts
+# Prefer the FQDN first for rpc-mgr-kerberized-test as newer krb5 requires FQDN.
+echo -e "\n127.0.0.1 $(hostname) $(hostname -s)" | sudo tee -a /etc/hosts
 #
 # In Docker, one can change /etc/hosts as above but not with sed -i. The error message is
 # "sed: cannot rename /etc/sedc3gPj8: Device or resource busy". The following lines are
