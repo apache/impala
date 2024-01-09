@@ -1027,7 +1027,7 @@ public interface FeIcebergTable extends FeFsTable {
       Table icebergApiTable = icebergTable.getIcebergApiTable();
       Preconditions.checkNotNull(icebergApiTable);
       Map<String, String> properties = icebergApiTable.properties();
-      if (BackendConfig.INSTANCE.icebergRestrictDataFileLocation()) {
+      if (BackendConfig.INSTANCE.icebergAllowDatafileInTableLocationOnly()) {
         return true;
       }
       return !(PropertyUtil.propertyAsBoolean(properties,

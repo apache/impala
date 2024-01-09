@@ -20,33 +20,35 @@ import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
-SELECT_STATEMENT = "SELECT COUNT(1) FROM " \
-  "functional_parquet.iceberg_multiple_storage_locations"
-EXCEPTION = "IcebergTableLoadingException: " \
-  "Error loading metadata for Iceberg table"
-
 
 class TestIcebergStrictDataFileLocation(CustomClusterTestSuite):
   """Tests for checking the behaviour of startup flag
-   'iceberg_restrict_data_file_location'."""
+   'iceberg_allow_datafiles_in_table_location_only'."""
+
+  SELECT_STATEMENT = "SELECT COUNT(1) FROM " \
+    "functional_parquet.iceberg_multiple_storage_locations"
+  EXCEPTION = "IcebergTableLoadingException: " \
+    "Error loading metadata for Iceberg table"
+
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @CustomClusterTestSuite.with_args(
-      catalogd_args='--iceberg_restrict_data_file_location=true')
+      catalogd_args='--iceberg_allow_datafiles_in_table_location_only=true')
   @pytest.mark.execute_serially
   def test_restricted_location(self, vector):
     """If the flag is enabled, tables with multiple storage locations will fail
     to load their datafiles."""
-    result = self.execute_query_expect_failure(self.client, SELECT_STATEMENT)
-    assert EXCEPTION in str(result)
+    result = self.execute_query_expect_failure(self.client, self.SELECT_STATEMENT)
+    assert self.EXCEPTION in str(result)
 
   @CustomClusterTestSuite.with_args(
-      catalogd_args='--iceberg_restrict_data_file_location=false')
+      catalogd_args='--iceberg_allow_datafiles_in_table_location_only=false')
   @pytest.mark.execute_serially
   def test_disabled(self, vector):
     """If the flag is disabled, and tables with multiple storage locations
     are configured properly, the tables load successfully."""
-    result = self.execute_query_expect_success(self.client, SELECT_STATEMENT)
+    result = self.execute_query_expect_success(self.client, self.SELECT_STATEMENT)
     assert '9' in result.data
+    self.run_test_case('QueryTest/iceberg-multiple-storage-locations-table', vector)

@@ -429,8 +429,12 @@ public class BackendConfig {
     return backendCfg_.iceberg_reload_new_files_threshold;
   }
 
-  public boolean icebergRestrictDataFileLocation() {
-    return backendCfg_.iceberg_restrict_data_file_location;
+  public boolean icebergAllowDatafileInTableLocationOnly() {
+    return backendCfg_.iceberg_allow_datafiles_in_table_location_only;
+  }
+
+  public void setIcebergAllowDatafileInTableLocationOnly(boolean flag) {
+    backendCfg_.iceberg_allow_datafiles_in_table_location_only = flag;
   }
 
   public boolean isJsonScannerEnabled() {

@@ -111,7 +111,7 @@ DECLARE_string(java_weigher);
 DECLARE_int32(iceberg_reload_new_files_threshold);
 DECLARE_bool(enable_skipping_older_events);
 DECLARE_bool(enable_json_scanner);
-DECLARE_bool(iceberg_restrict_data_file_location);
+DECLARE_bool(iceberg_allow_datafiles_in_table_location_only);
 DECLARE_int32(catalog_operation_log_size);
 DECLARE_string(hostname);
 DECLARE_bool(allow_catalog_cache_op_from_masked_users);
@@ -443,8 +443,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_iceberg_reload_new_files_threshold(FLAGS_iceberg_reload_new_files_threshold);
   cfg.__set_enable_skipping_older_events(FLAGS_enable_skipping_older_events);
   cfg.__set_enable_json_scanner(FLAGS_enable_json_scanner);
-  cfg.__set_iceberg_restrict_data_file_location(
-    FLAGS_iceberg_restrict_data_file_location);
+  cfg.__set_iceberg_allow_datafiles_in_table_location_only(
+      FLAGS_iceberg_allow_datafiles_in_table_location_only);
   cfg.__set_max_filter_error_rate_from_full_scan(
       FLAGS_max_filter_error_rate_from_full_scan);
   cfg.__set_catalog_operation_log_size(FLAGS_catalog_operation_log_size);

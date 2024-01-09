@@ -34,6 +34,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.IcebergUtil;
@@ -291,6 +292,7 @@ public class FileMetadataLoaderTest {
   @Test
   public void testIcebergMultipleStorageLocations() throws IOException, CatalogException {
     CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+    BackendConfig.INSTANCE.setIcebergAllowDatafileInTableLocationOnly(false);
     IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_multiple_storage_locations",
         /* oldFds = */ Collections.emptyList(),

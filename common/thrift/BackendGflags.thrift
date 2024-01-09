@@ -275,5 +275,5 @@ struct TBackendGflags {
 
   122: required bool allow_catalog_cache_op_from_masked_users
 
-  123: required bool iceberg_restrict_data_file_location
+  123: required bool iceberg_allow_datafiles_in_table_location_only
 }

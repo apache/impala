@@ -165,6 +165,9 @@ function start-impala {
   : ${START_CLUSTER_ARGS=""}
   # Use a fast statestore update so that DDL operations run faster.
   START_CLUSTER_ARGS_INT="--state_store_args=--statestore_update_frequency_ms=50"
+  # Disable strict datafile location checks for Iceberg tables
+  DATAFILE_LOCATION_CHECK="-iceberg_allow_datafiles_in_table_location_only=false"
+  START_CLUSTER_ARGS_INT+=("--catalogd_args=$DATAFILE_LOCATION_CHECK")
   if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
     START_CLUSTER_ARGS_INT+=("--impalad_args=--abort_on_config_error=false -s 1")
   else
