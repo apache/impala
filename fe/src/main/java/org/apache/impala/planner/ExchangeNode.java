@@ -234,7 +234,7 @@ public class ExchangeNode extends PlanNode {
     float conjunctsCost = ExprUtil.computeExprsTotalCost(conjuncts_);
     float materializationCost = estimateSerializationCostPerRow();
     processingCost_ = ProcessingCost.basicCost(getDisplayLabel() + "(receiving)",
-        getChild(0).getCardinality(), conjunctsCost, materializationCost);
+        getChild(0).getFilteredCardinality(), conjunctsCost, materializationCost);
 
     if (isBroadcastExchange()) {
       processingCost_ = ProcessingCost.broadcastCost(processingCost_,
