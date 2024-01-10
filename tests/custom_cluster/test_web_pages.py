@@ -22,7 +22,9 @@ import re
 import requests
 import psutil
 import pytest
+import time
 
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import (
   DEFAULT_CLUSTER_SIZE,
   CustomClusterTestSuite)
@@ -260,6 +262,22 @@ class TestWebPage(CustomClusterTestSuite):
       assert 'Content-Security-Policy' not in response.headers, \
         "CSP header present despite being disabled (port %s)" % port
 
+  @staticmethod
+  def _get_inflight_catalog_operations():
+    response = requests.get("http://localhost:25020/operations?json")
+    assert response.status_code == requests.codes.ok
+    operations = json.loads(response.text)
+    assert "inflight_catalog_operations" in operations
+    return operations["inflight_catalog_operations"]
+
+  @staticmethod
+  def _get_finished_catalog_operations():
+    response = requests.get("http://localhost:25020/operations?json")
+    assert response.status_code == requests.codes.ok
+    operations = json.loads(response.text)
+    assert "finished_catalog_operations" in operations
+    return operations["finished_catalog_operations"]
+
   @CustomClusterTestSuite.with_args(catalogd_args="--catalog_operation_log_size=2")
   def test_catalog_operations_limit(self, unique_database):
     tbl = unique_database + ".tbl"
@@ -267,11 +285,7 @@ class TestWebPage(CustomClusterTestSuite):
     self.execute_query("create table {0}_2 (id int)".format(tbl))
     self.execute_query("create table {0}_3 (id int)".format(tbl))
     self.execute_query("drop table {0}_1".format(tbl))
-    response = requests.get("http://localhost:25020/operations?json")
-    assert response.status_code == requests.codes.ok
-    operations = json.loads(response.text)
-    assert "finished_catalog_operations" in operations
-    finished_operations = operations["finished_catalog_operations"]
+    finished_operations = self._get_finished_catalog_operations()
     # Verify only 2 operations are shown
     assert len(finished_operations) == 2
     op = finished_operations[0]
@@ -293,11 +307,7 @@ class TestWebPage(CustomClusterTestSuite):
     num = 500
     for i in range(num):
       self.execute_query("invalidate metadata " + tbl)
-    response = requests.get("http://localhost:25020/operations?json")
-    assert response.status_code == requests.codes.ok
-    operations = json.loads(response.text)
-    assert "finished_catalog_operations" in operations
-    finished_operations = operations["finished_catalog_operations"]
+    finished_operations = self._get_finished_catalog_operations()
     # Verify all operations are in the history. There are one DROP_DATABASE, one
     # CREATE_DATABASE, one CREATE_TABLE and 'num' INVALIDATEs in the list.
     assert len(finished_operations) == 3 + num
@@ -318,6 +328,46 @@ class TestWebPage(CustomClusterTestSuite):
     assert op["status"] == "FINISHED"
     assert op["catalog_op_name"] == "DROP_DATABASE"
     assert op["target_name"] == unique_database
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--catalog_client_rpc_timeout_ms=10 "
+                 "--catalog_client_rpc_retry_interval_ms=10 "
+                 "--catalog_client_connection_num_retries=2")
+  def test_catalog_operations_with_rpc_retry(self):
+    """Test that catalog RPC retries are all shown in the /operations page"""
+    # Run a DESCRIBE to ensure the table is loaded. So the first RPC attempt will
+    # time out in its real work.
+    self.execute_query("describe functional.alltypes")
+    try:
+      self.execute_query("refresh functional.alltypes", {
+        "debug_action": "catalogd_refresh_hdfs_listing_delay:SLEEP@30"
+      })
+    except ImpalaBeeswaxException as e:
+      assert "RPC recv timed out" in str(e)
+    # In impalad side, the query fails by the above error. However, in catalogd side,
+    # the RPCs are still running. Check the in-flight operations.
+    inflight_operations = self._get_inflight_catalog_operations()
+    assert len(inflight_operations) == 2
+    for op in inflight_operations:
+      assert op["status"] == "STARTED"
+      assert op["catalog_op_name"] == "REFRESH"
+      assert op["target_name"] == "functional.alltypes"
+    assert inflight_operations[0]["query_id"] == inflight_operations[1]["query_id"]
+    assert inflight_operations[0]["thread_id"] != inflight_operations[1]["thread_id"]
+
+    # Wait until the catalog operations finish
+    while len(self._get_inflight_catalog_operations()) != 0:
+      time.sleep(1)
+
+    # Verify both RPC attempts are shown as finished operations.
+    finished_operations = self._get_finished_catalog_operations()
+    assert len(finished_operations) == 2
+    for op in finished_operations:
+      assert op["status"] == "FINISHED"
+      assert op["catalog_op_name"] == "REFRESH"
+      assert op["target_name"] == "functional.alltypes"
+    assert finished_operations[0]["query_id"] == finished_operations[1]["query_id"]
+    assert finished_operations[0]["thread_id"] != finished_operations[1]["thread_id"]
 
   def _verify_topic_size_metrics(self):
     # Calculate the total topic metrics from the /topics page

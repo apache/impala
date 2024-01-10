@@ -29,6 +29,9 @@ import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
+import org.apache.impala.util.TUniqueIdUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,29 +51,59 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  *  are also kept in memory and the size is controlled by 'catalog_operation_log_size'.
  */
 public final class CatalogOperationTracker {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(CatalogOperationTracker.class);
   public final static CatalogOperationTracker INSTANCE = new CatalogOperationTracker();
 
   // Keeps track of the on-going DDL operations
-  CatalogDdlCounter catalogDdlCounter;
+  CatalogDdlCounter catalogDdlCounter_;
 
   // Keeps track of the on-going reset metadata requests (refresh/invalidate)
-  CatalogResetMetadataCounter catalogResetMetadataCounter;
+  CatalogResetMetadataCounter catalogResetMetadataCounter_;
 
   // Keeps track of the on-going finalize DML requests (insert/CTAS/upgrade)
-  CatalogFinalizeDmlCounter catalogFinalizeDmlCounter;
+  CatalogFinalizeDmlCounter catalogFinalizeDmlCounter_;
 
-  private final Map<TUniqueId, TCatalogOpRecord> inFlightOperations =
+  /**
+   * Key to track in-flight catalog operations. Each operation is triggered by an RPC.
+   * Each RPC is identified by the query id and the thrift thread id that handles it.
+   * Note that the thread id is important to identify different RPC retries.
+   */
+  private static class RpcKey {
+    private final TUniqueId queryId_;
+    private final long threadId_;
+
+    public RpcKey(TUniqueId queryId) {
+      queryId_ = queryId;
+      threadId_ = Thread.currentThread().getId();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof RpcKey)) return false;
+      RpcKey key = (RpcKey) o;
+      return queryId_.equals(key.queryId_) && threadId_ == key.threadId_;
+    }
+
+    @Override
+    public int hashCode() {
+      return queryId_.hashCode() * 31 + Long.hashCode(threadId_);
+    }
+  }
+
+  private final Map<RpcKey, TCatalogOpRecord> inFlightOperations_ =
       new ConcurrentHashMap<>();
-  private final Queue<TCatalogOpRecord> finishedOperations =
+  private final Queue<TCatalogOpRecord> finishedOperations_ =
       new ConcurrentLinkedQueue<>();
-  private final int catalogOperationLogSize;
+  private final int catalogOperationLogSize_;
 
   private CatalogOperationTracker() {
-    catalogDdlCounter = new CatalogDdlCounter();
-    catalogResetMetadataCounter = new CatalogResetMetadataCounter();
-    catalogFinalizeDmlCounter = new CatalogFinalizeDmlCounter();
-    catalogOperationLogSize = BackendConfig.INSTANCE.catalogOperationLogSize();
-    Preconditions.checkState(catalogOperationLogSize >= 0);
+    catalogDdlCounter_ = new CatalogDdlCounter();
+    catalogResetMetadataCounter_ = new CatalogResetMetadataCounter();
+    catalogFinalizeDmlCounter_ = new CatalogFinalizeDmlCounter();
+    catalogOperationLogSize_ = BackendConfig.INSTANCE.catalogOperationLogSize();
+    Preconditions.checkState(catalogOperationLogSize_ >= 0);
   }
 
   private void addRecord(TCatalogServiceRequestHeader header,
@@ -91,29 +124,33 @@ public final class CatalogOperationTracker {
     if (queryId != null) {
       TCatalogOpRecord record = new TCatalogOpRecord(Thread.currentThread().getId(),
           queryId, clientIp, coordinator, catalogOpName,
-          catalogDdlCounter.getTableName(tTableName), user,
+          catalogDdlCounter_.getTableName(tTableName), user,
           System.currentTimeMillis(), -1, "STARTED", details);
-      inFlightOperations.put(queryId, record);
+      inFlightOperations_.put(new RpcKey(queryId), record);
     }
   }
 
   private void archiveRecord(TUniqueId queryId, String errorMsg) {
-    if (queryId != null && inFlightOperations.containsKey(queryId)) {
-      TCatalogOpRecord record = inFlightOperations.remove(queryId);
-      if (catalogOperationLogSize == 0) return;
-      record.setFinish_time_ms(System.currentTimeMillis());
-      if (errorMsg != null) {
-        record.setStatus("FAILED");
-        record.setDetails(record.getDetails() + ", error=" + errorMsg);
-      } else {
-        record.setStatus("FINISHED");
+    if (queryId == null) return;
+    RpcKey key = new RpcKey(queryId);
+    TCatalogOpRecord record = inFlightOperations_.remove(key);
+    if (record == null) {
+      LOG.error("Null record for query {}", TUniqueIdUtil.PrintId(queryId));
+      return;
+    }
+    if (catalogOperationLogSize_ == 0) return;
+    record.setFinish_time_ms(System.currentTimeMillis());
+    if (errorMsg != null) {
+      record.setStatus("FAILED");
+      record.setDetails(record.getDetails() + ", error=" + errorMsg);
+    } else {
+      record.setStatus("FINISHED");
+    }
+    synchronized (finishedOperations_) {
+      if (finishedOperations_.size() >= catalogOperationLogSize_) {
+        finishedOperations_.poll();
       }
-      synchronized (finishedOperations) {
-        if (finishedOperations.size() >= catalogOperationLogSize) {
-          finishedOperations.poll();
-        }
-        finishedOperations.add(record);
-      }
+      finishedOperations_.add(record);
     }
   }
 
@@ -129,13 +166,13 @@ public final class CatalogOperationTracker {
       String details = "query_options=" + ddlRequest.query_options.toString();
       addRecord(ddlRequest.getHeader(), getDdlType(ddlRequest), tTableName, details);
     }
-    catalogDdlCounter.incrementOperation(ddlRequest.ddl_type, tTableName);
+    catalogDdlCounter_.incrementOperation(ddlRequest.ddl_type, tTableName);
   }
 
   public void decrement(TDdlType tDdlType, TUniqueId queryId,
       Optional<TTableName> tTableName, String errorMsg) {
     archiveRecord(queryId, errorMsg);
-    catalogDdlCounter.decrementOperation(tDdlType, tTableName);
+    catalogDdlCounter_.decrementOperation(tDdlType, tTableName);
   }
 
   public void increment(TResetMetadataRequest req) {
@@ -152,14 +189,14 @@ public final class CatalogOperationTracker {
           CatalogResetMetadataCounter.getResetMetadataType(req, tTableName).name(),
           tTableName, details);
     }
-    catalogResetMetadataCounter.incrementOperation(req);
+    catalogResetMetadataCounter_.incrementOperation(req);
   }
 
   public void decrement(TResetMetadataRequest req, String errorMsg) {
     if (req.isSetHeader()) {
       archiveRecord(req.getHeader().getQuery_id(), errorMsg);
     }
-    catalogResetMetadataCounter.decrementOperation(req);
+    catalogResetMetadataCounter_.decrementOperation(req);
   }
 
   public void increment(TUpdateCatalogRequest req) {
@@ -181,14 +218,14 @@ public final class CatalogOperationTracker {
           CatalogFinalizeDmlCounter.getDmlType(req.getHeader().redacted_sql_stmt).name(),
           tTableName, details);
     }
-    catalogFinalizeDmlCounter.incrementOperation(req);
+    catalogFinalizeDmlCounter_.incrementOperation(req);
   }
 
   public void decrement(TUpdateCatalogRequest req, String errorMsg) {
     if (req.isSetHeader()) {
       archiveRecord(req.getHeader().getQuery_id(), errorMsg);
     }
-    catalogFinalizeDmlCounter.decrementOperation(req);
+    catalogFinalizeDmlCounter_.decrementOperation(req);
   }
 
   /**
@@ -197,14 +234,14 @@ public final class CatalogOperationTracker {
    */
   public TGetOperationUsageResponse getOperationMetrics() {
     List<TOperationUsageCounter> merged = new ArrayList<>();
-    merged.addAll(catalogDdlCounter.getOperationUsage());
-    merged.addAll(catalogResetMetadataCounter.getOperationUsage());
-    merged.addAll(catalogFinalizeDmlCounter.getOperationUsage());
+    merged.addAll(catalogDdlCounter_.getOperationUsage());
+    merged.addAll(catalogResetMetadataCounter_.getOperationUsage());
+    merged.addAll(catalogFinalizeDmlCounter_.getOperationUsage());
     TGetOperationUsageResponse res = new TGetOperationUsageResponse(merged);
-    for (TCatalogOpRecord record : inFlightOperations.values()) {
+    for (TCatalogOpRecord record : inFlightOperations_.values()) {
       res.addToIn_flight_catalog_operations(record);
     }
-    List<TCatalogOpRecord> records = new ArrayList<>(finishedOperations);
+    List<TCatalogOpRecord> records = new ArrayList<>(finishedOperations_);
     // Reverse the list to show recent operations first.
     Collections.reverse(records);
     res.setFinished_catalog_operations(records);
