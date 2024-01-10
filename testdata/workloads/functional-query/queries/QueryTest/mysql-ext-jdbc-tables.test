@@ -31,7 +31,7 @@ CREATE TABLE alltypes_jdbc_datasource (
  bigint_col BIGINT,
  float_col FLOAT,
  double_col DOUBLE,
- date_string_col STRING,
+ date_col DATE,
  string_col STRING,
  timestamp_col TIMESTAMP)
 PRODUCED BY DATA SOURCE TestJdbcDataSource(
@@ -58,7 +58,7 @@ CREATE TABLE alltypes_jdbc_datasource_2 (
  bigint_col BIGINT,
  float_col FLOAT,
  double_col DOUBLE,
- date_string_col STRING,
+ date_col DATE,
  string_col STRING,
  timestamp_col TIMESTAMP)
 PRODUCED BY DATA SOURCE TestJdbcDataSource(
@@ -69,7 +69,7 @@ PRODUCED BY DATA SOURCE TestJdbcDataSource(
 "dbcp.username":"hiveuser",
 "dbcp.password":"password",
 "table":"AllTypesCaseSensitiveNames",
-"column.mapping":"id=id, bool_col=Bool_col, tinyint_col=Tinyint_col, smallint_col=Smallint_col, int_col=Int_col, bigint_col=Bigint_col, float_col=Float_col, double_col=Double_col, date_string_col=Date_string_col, string_col=String_col, timestamp=Timestamp"}');
+"column.mapping":"id=id, bool_col=Bool_col, tinyint_col=Tinyint_col, smallint_col=Smallint_col, int_col=Int_col, bigint_col=Bigint_col, float_col=Float_col, double_col=Double_col, date_col=Date_col, string_col=String_col, timestamp=Timestamp"}');
 ---- RESULTS
 'Table has been created.'
 ====
@@ -98,42 +98,42 @@ select *
 from alltypes_jdbc_datasource
 where id > 10 and int_col< 5 limit 5
 ---- RESULTS
-11,false,1,1,1,10,1.100000023841858,10.1,'01/02/09','1',2009-01-02 00:11:00
-12,false,2,2,2,20,2.200000047683716,20.2,'01/02/09','2',2009-01-02 00:12:00
-13,false,3,3,3,30,3.299999952316284,30.3,'01/02/09','3',2009-01-02 00:13:00
-14,false,4,4,4,40,4.400000095367432,40.4,'01/02/09','4',2009-01-02 00:14:01
-20,false,0,0,0,0,0,0,'01/03/09','0',2009-01-03 00:20:01
+11,false,1,1,1,10,1.100000023841858,10.1,2009-01-02,'1',2009-01-02 00:11:00
+12,false,2,2,2,20,2.200000047683716,20.2,2009-01-02,'2',2009-01-02 00:12:00
+13,false,3,3,3,30,3.299999952316284,30.3,2009-01-02,'3',2009-01-02 00:13:00
+14,false,4,4,4,40,4.400000095367432,40.4,2009-01-02,'4',2009-01-02 00:14:01
+20,false,0,0,0,0,0,0,2009-01-03,'0',2009-01-03 00:20:01
 ---- TYPES
-INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
 ====
 ---- QUERY
 # Gets specified columns.
-select id, bool_col, smallint_col, float_col, double_col, date_string_col
+select id, bool_col, smallint_col, float_col, double_col, date_col
 from alltypes_jdbc_datasource
 where id > 10 and int_col< 5 limit 5
 ---- RESULTS
-11,false,1,1.100000023841858,10.1,'01/02/09'
-12,false,2,2.200000047683716,20.2,'01/02/09'
-13,false,3,3.299999952316284,30.3,'01/02/09'
-14,false,4,4.400000095367432,40.4,'01/02/09'
-20,false,0,0,0,'01/03/09'
+11,false,1,1.100000023841858,10.1,2009-01-02
+12,false,2,2.200000047683716,20.2,2009-01-02
+13,false,3,3.299999952316284,30.3,2009-01-02
+14,false,4,4.400000095367432,40.4,2009-01-02
+20,false,0,0,0,2009-01-03
 ---- TYPES
-INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, STRING
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ====
 ---- QUERY
 # Gets specified columns from external jdbc table with case sensitive column names
 # and table name.
-select id, bool_col, smallint_col, float_col, double_col, date_string_col
+select id, bool_col, smallint_col, float_col, double_col, date_col
 from alltypes_jdbc_datasource_2
 where id > 10 and int_col< 5 limit 5
 ---- RESULTS
-11,false,1,1.100000023841858,10.1,'01/02/09'
-12,false,2,2.200000047683716,20.2,'01/02/09'
-13,false,3,3.299999952316284,30.3,'01/02/09'
-14,false,4,4.400000095367432,40.4,'01/02/09'
-20,false,0,0,0,'01/03/09'
+11,false,1,1.100000023841858,10.1,2009-01-02
+12,false,2,2.200000047683716,20.2,2009-01-02
+13,false,3,3.299999952316284,30.3,2009-01-02
+14,false,4,4.400000095367432,40.4,2009-01-02
+20,false,0,0,0,2009-01-03
 ---- TYPES
-INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, STRING
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ====
 ---- QUERY
 # Inner join with a non jdbc table
@@ -175,6 +175,128 @@ order by a.id, b.id limit 10
 2,2
 ---- TYPES
 INT, INT
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '='.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col = DATE '2009-01-09' order by id limit 5;
+---- RESULTS
+80,false,0,0,0,2009-01-09
+81,false,1,1.100000023841858,10.1,2009-01-09
+82,false,2,2.200000047683716,20.2,2009-01-09
+83,false,3,3.299999952316284,30.3,2009-01-09
+84,false,4,4.400000095367432,40.4,2009-01-09
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '='
+# with empty results.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col = DATE '1990-01-01' order by id limit 5;
+---- RESULTS
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '>'.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col > DATE '2009-01-02' order by id limit 5;
+---- RESULTS
+20,false,0,0,0,2009-01-03
+21,false,1,1.100000023841858,10.1,2009-01-03
+22,false,2,2.200000047683716,20.2,2009-01-03
+23,false,3,3.299999952316284,30.3,2009-01-03
+24,false,4,4.400000095367432,40.4,2009-01-03
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '>'
+# with empty results.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col > DATE '2990-01-01' order by id limit 5;
+---- RESULTS
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '<'.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col < DATE '2009-01-02' order by id limit 5;
+---- RESULTS
+0,false,0,0,0,2009-01-01
+1,false,1,1.100000023841858,10.1,2009-01-01
+2,false,2,2.200000047683716,20.2,2009-01-01
+3,false,3,3.299999952316284,30.3,2009-01-01
+4,false,4,4.400000095367432,40.4,2009-01-01
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '<'
+# with empty results.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col < DATE '1990-01-01' order by id limit 5;
+---- RESULTS
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '>='.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col >= DATE '2009-01-02' order by id limit 5;
+---- RESULTS
+10,false,0,0,0,2009-01-02
+11,false,1,1.100000023841858,10.1,2009-01-02
+12,false,2,2.200000047683716,20.2,2009-01-02
+13,false,3,3.299999952316284,30.3,2009-01-02
+14,false,4,4.400000095367432,40.4,2009-01-02
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '<='.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col <= DATE '2009-01-02' order by id limit 5;
+---- RESULTS
+0,false,0,0,0,2009-01-01
+1,false,1,1.100000023841858,10.1,2009-01-01
+2,false,2,2.200000047683716,20.2,2009-01-01
+3,false,3,3.299999952316284,30.3,2009-01-01
+4,false,4,4.400000095367432,40.4,2009-01-01
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '!='.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col != DATE '2009-01-01' order by id limit 5;
+---- RESULTS
+10,false,0,0,0,2009-01-02
+11,false,1,1.100000023841858,10.1,2009-01-02
+12,false,2,2.200000047683716,20.2,2009-01-02
+13,false,3,3.299999952316284,30.3,2009-01-02
+14,false,4,4.400000095367432,40.4,2009-01-02
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator 'between'.
+select id, bool_col, smallint_col, float_col, double_col, date_col
+from alltypes_jdbc_datasource
+where date_col between DATE '2009-03-01' and DATE '2009-04-01' order by id limit 5;
+---- RESULTS
+590,false,0,0,0,2009-03-01
+591,false,1,1.100000023841858,10.1,2009-03-01
+592,false,2,2.200000047683716,20.2,2009-03-01
+593,false,3,3.299999952316284,30.3,2009-03-01
+594,false,4,4.400000095367432,40.4,2009-03-01
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ====
 ---- QUERY
 # Drop table

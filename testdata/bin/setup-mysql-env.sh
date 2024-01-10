@@ -93,7 +93,7 @@ CREATE TABLE alltypes
     bigint_col      BIGINT,
     float_col       FLOAT,
     double_col      DOUBLE PRECISION,
-    date_string_col VARCHAR(8),
+    date_col        DATE,
     string_col      VARCHAR(10),
     timestamp_col   TIMESTAMP
 );
@@ -114,7 +114,7 @@ CREATE TABLE AllTypesCaseSensitiveNames
     Bigint_col    BIGINT,
     Float_col     FLOAT,
     Double_col    DOUBLE PRECISION,
-    Date_string_col VARCHAR(8),
+    Date_col      DATE,
     String_col    VARCHAR(10),
     Timestamp_col TIMESTAMP
 );
@@ -128,11 +128,17 @@ cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/mysql_jdbc_alltypes.csv
 docker cp /tmp/mysql_jdbc_alltypes.csv mysql:/tmp
 
 loadCmd="LOAD DATA LOCAL INFILE '/tmp/mysql_jdbc_alltypes.csv' INTO TABLE alltypes \
-  COLUMNS TERMINATED BY ','"
+  COLUMNS TERMINATED BY ',' (id, bool_col, tinyint_col, smallint_col, int_col, \
+  bigint_col, float_col, double_col, @date_col, string_col, timestamp_col) \
+  set date_col = STR_TO_DATE(@date_col, '%m/%d/%Y')"
+
 docker exec -i mysql mysql -uroot -psecret functional --local-infile=1 <<<  "$loadCmd"
 
 loadCmd="LOAD DATA LOCAL INFILE '/tmp/mysql_jdbc_alltypes.csv' INTO TABLE \
-  AllTypesCaseSensitiveNames COLUMNS TERMINATED BY ','"
+  AllTypesCaseSensitiveNames COLUMNS TERMINATED BY ',' (id, bool_col, tinyint_col, \
+  smallint_col, int_col, bigint_col, float_col, double_col, @date_col, string_col, \
+  timestamp_col) set date_col = STR_TO_DATE(@date_col, '%m/%d/%Y')"
+
 docker exec -i mysql mysql -uroot -psecret functional --local-infile=1 <<<  "$loadCmd"
 
 EXT_DATA_SOURCE_SRC_PATH=${IMPALA_HOME}/java/ext-data-source

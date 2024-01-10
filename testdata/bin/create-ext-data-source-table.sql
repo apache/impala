@@ -62,7 +62,7 @@ CREATE TABLE alltypes_jdbc_datasource (
  bigint_col BIGINT,
  float_col FLOAT,
  double_col DOUBLE,
- date_string_col STRING,
+ date_col DATE,
  string_col STRING,
  timestamp_col TIMESTAMP)
 PRODUCED BY DATA SOURCE JdbcDataSource(
@@ -84,7 +84,7 @@ CREATE TABLE alltypes_jdbc_datasource_2 (
  bigint_col BIGINT,
  float_col FLOAT,
  double_col DOUBLE,
- date_string_col STRING,
+ date_col DATE,
  string_col STRING,
  timestamp_col TIMESTAMP)
 PRODUCED BY DATA SOURCE JdbcDataSource(

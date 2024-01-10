@@ -291,7 +291,7 @@ public class JdbcDataSource implements ExternalDataSource {
     }
     sb.append(jdbcTableName);
     String condition = QueryConditionUtil
-        .buildCondition(params.getPredicates(), columnMapping);
+        .buildCondition(params.getPredicates(), columnMapping, dbAccessor_);
     if (StringUtils.isNotBlank(condition)) {
       sb.append(" WHERE ").append(condition);
     }

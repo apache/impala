@@ -247,3 +247,9 @@ class TestImpalaExtJdbcTables(CustomClusterTestSuite):
         "No matching option REQUEST_POOL found in the queries site."
     assert "SET DEBUG_ACTION" not in response_json, \
         "Matching option DEBUG_ACTION found in the queries site."
+
+  @pytest.mark.execute_serially
+  def test_impala_ext_jdbc_tables_predicates(self, vector, unique_database):
+    """Run tests for external jdbc tables in Impala cluster for new predicates"""
+    self.run_test_case(
+        'QueryTest/impala-ext-jdbc-tables-predicates', vector, use_db=unique_database)

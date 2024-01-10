@@ -25,9 +25,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -69,6 +72,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
   protected static final int CACHE_EXPIRE_TIMEOUT_S = 1800;
   protected static final int CACHE_SIZE = 100;
   protected String jdbcDriverLocalPath = null;
+  protected static final long MILLI_SECONDS_PER_DAY = 86400000;
 
   protected DataSource dbcpDataSource = null;
   // Cache datasource for sharing
@@ -204,6 +208,19 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
       sb.append(matcher.group(2).trim());
     }
     return sb.toString();
+  }
+
+  /**
+   * This function converts the date represented in epoch days to
+   * a string format of "yyyy-MM-dd"
+  */
+  @Override
+  public String getDateString(int dateVal) {
+    SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+    formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+    String dateToString = formatter.format(new Date(((long)dateVal) *
+        MILLI_SECONDS_PER_DAY));
+    return dateToString;
   }
 
   /**

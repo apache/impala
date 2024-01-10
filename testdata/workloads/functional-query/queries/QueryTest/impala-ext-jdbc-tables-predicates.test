@@ -35,146 +35,16 @@ CREATE TABLE alltypes_jdbc_datasource (
  string_col STRING,
  timestamp_col TIMESTAMP)
 PRODUCED BY DATA SOURCE TestJdbcDataSource(
-'{"database.type":"POSTGRES",
-"jdbc.url":"jdbc:postgresql://$INTERNAL_LISTEN_HOST:5432/functional",
-"jdbc.properties":"connect_timeout=20, application_name=\"myapp\"",
-"jdbc.driver":"org.postgresql.Driver",
-"driver.url":"$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
-"dbcp.username":"hiveuser",
-"dbcp.password":"password",
-"table":"alltypes"}');
+'{"database.type":"IMPALA",
+"jdbc.url":"jdbc:impala://$INTERNAL_LISTEN_HOST:21050/functional",
+"jdbc.auth":"AuthMech=0",
+"jdbc.driver":"com.cloudera.impala.jdbc.Driver",
+"driver.url":"$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
+"dbcp.username":"impala",
+"dbcp.password":"cloudera",
+"table":"alltypes_with_date"}');
 ---- RESULTS
 'Table has been created.'
-====
----- QUERY
-# Create external JDBC DataSource table
-DROP TABLE IF EXISTS alltypes_jdbc_datasource_2;
-CREATE TABLE alltypes_jdbc_datasource_2 (
- id INT,
- bool_col BOOLEAN,
- tinyint_col TINYINT,
- smallint_col SMALLINT,
- int_col INT,
- bigint_col BIGINT,
- float_col FLOAT,
- double_col DOUBLE,
- date_col DATE,
- string_col STRING,
- timestamp_col TIMESTAMP)
-PRODUCED BY DATA SOURCE TestJdbcDataSource(
-'{"database.type":"POSTGRES",
-"jdbc.url":"jdbc:postgresql://$INTERNAL_LISTEN_HOST:5432/functional",
-"jdbc.driver":"org.postgresql.Driver",
-"driver.url":"$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
-"dbcp.username":"hiveuser",
-"dbcp.password":"password",
-"table":"AllTypesWithQuote",
-"column.mapping":"id=id, bool_col=Bool_col, tinyint_col=Tinyint_col, smallint_col=Smallint_col, int_col=Int_col, bigint_col=Bigint_col, float_col=Float_col, double_col=Double_col, date_col=date_col, string_col=String_col, timestamp=Timestamp"}');
----- RESULTS
-'Table has been created.'
-====
----- QUERY
-# Test the jdbc DataSource
-# count(*) with a predicate evaluated by Impala
-select count(*) from alltypes_jdbc_datasource
-where float_col = 0 and string_col is not NULL
----- RESULTS
-730
----- TYPES
-BIGINT
-====
----- QUERY
-# count(*) with no predicates has no materialized slots
-select count(*) from alltypes_jdbc_datasource
----- RESULTS
-7300
----- TYPES
-BIGINT
-====
----- QUERY
-# Gets all types including a row with a NULL value. The predicate pushed to
-# the DataSource.
-select *
-from alltypes_jdbc_datasource
-where id > 10 and int_col< 5 limit 5
----- RESULTS
-11,false,1,1,1,10,1.100000023841858,10.1,2009-01-02,'1',2009-01-02 00:11:00.450000000
-12,true,2,2,2,20,2.200000047683716,20.2,2009-01-02,'2',2009-01-02 00:12:00.460000000
-13,false,3,3,3,30,3.299999952316284,30.3,2009-01-02,'3',2009-01-02 00:13:00.480000000
-14,true,4,4,4,40,4.400000095367432,40.4,2009-01-02,'4',2009-01-02 00:14:00.510000000
-20,true,0,0,0,0,0,0,2009-01-03,'0',2009-01-03 00:20:00.900000000
----- TYPES
-INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
-====
----- QUERY
-# Gets specified columns.
-select id, bool_col, smallint_col, float_col, double_col, date_col
-from alltypes_jdbc_datasource
-where id > 10 and int_col< 5 limit 5
----- RESULTS
-11,false,1,1.100000023841858,10.1,2009-01-02
-12,true,2,2.200000047683716,20.2,2009-01-02
-13,false,3,3.299999952316284,30.3,2009-01-02
-14,true,4,4.400000095367432,40.4,2009-01-02
-20,true,0,0,0,2009-01-03
----- TYPES
-INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
-====
----- QUERY
-# Gets specified columns from external jdbc table with case sensitive column names
-# and table name.
-select id, bool_col, smallint_col, float_col, double_col, date_col
-from alltypes_jdbc_datasource_2
-where id > 10 and int_col< 5 limit 5
----- RESULTS
-11,false,1,1.100000023841858,10.1,2009-01-02
-12,true,2,2.200000047683716,20.2,2009-01-02
-13,false,3,3.299999952316284,30.3,2009-01-02
-14,true,4,4.400000095367432,40.4,2009-01-02
-20,true,0,0,0,2009-01-03
----- TYPES
-INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
-====
----- QUERY
-# Inner join with a non jdbc table
-select a.id, b.int_col
-from alltypes_jdbc_datasource a inner join functional.alltypes b on (a.id = b.id)
-where a.id = 1
----- RESULTS
-1,1
----- TYPES
-INT, INT
-====
----- QUERY
-# Inner join with another jdbc table
-select a.id, b.int_col
-from alltypes_jdbc_datasource a inner join alltypes_jdbc_datasource_2 b on (a.id = b.id)
-where a.id < 3 group by a.id, b.int_col
----- RESULTS
-0,0
-1,1
-2,2
----- TYPES
-INT, INT
-====
----- QUERY
-# Cross join
-select a.id, b.id
-from alltypes_jdbc_datasource a cross join alltypes_jdbc_datasource b
-where (a.id < 3 and b.id < 3)
-order by a.id, b.id limit 10
----- RESULTS
-0,0
-0,1
-0,2
-1,0
-1,1
-1,2
-2,0
-2,1
-2,2
----- TYPES
-INT, INT
 ====
 ---- QUERY
 # Gets specified columns based on date predicate with operator '='.
@@ -191,8 +61,8 @@ where date_col = DATE '2009-01-02' order by id limit 5;
 INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ====
 ---- QUERY
-# Gets specified columns based on date predicate with operator '='
-# with empty result.
+# Gets specified columns based on date predicate with operator '='.
+# with empty result
 select id, bool_col, smallint_col, float_col, double_col, date_col
 from alltypes_jdbc_datasource
 where date_col = DATE '1990-01-01' order by id limit 5;
@@ -213,8 +83,8 @@ where date_col > DATE '2009-01-02' order by id limit 5;
 INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ====
 ---- QUERY
-# Gets specified columns based on date predicate with operator '>'
-# with empty result.
+# Gets specified columns based on date predicate with operator '>'.
+# with empty result
 select id, bool_col, smallint_col, float_col, double_col, date_col
 from alltypes_jdbc_datasource
 where date_col > DATE '2990-01-01' order by id limit 5;
@@ -235,8 +105,8 @@ where date_col < DATE '2009-01-02' order by id limit 5;
 INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ====
 ---- QUERY
-# Gets specified columns based on date predicate with operator '<'
-# with empty result.
+# Gets specified columns based on date predicate with operator '<'.
+# with empty result
 select id, bool_col, smallint_col, float_col, double_col, date_col
 from alltypes_jdbc_datasource
 where date_col < DATE '1990-01-01' order by id limit 5;
@@ -301,12 +171,6 @@ INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ---- QUERY
 # Drop table
 DROP TABLE alltypes_jdbc_datasource;
----- RESULTS
-'Table has been dropped.'
-====
----- QUERY
-# Drop table
-DROP TABLE alltypes_jdbc_datasource_2;
 ---- RESULTS
 'Table has been dropped.'
 ====

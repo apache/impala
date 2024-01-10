@@ -42,7 +42,7 @@ CREATE TABLE alltypes
     bigint_col      BIGINT,
     float_col       FLOAT,
     double_col      DOUBLE PRECISION,
-    date_string_col VARCHAR(8),
+    date_col        DATE,
     string_col      VARCHAR(10),
     timestamp_col   TIMESTAMP
 );
@@ -62,7 +62,7 @@ CREATE TABLE "AllTypesWithQuote"
     "Bigint_col"    BIGINT,
     "Float_col"     FLOAT,
     "Double_col"    DOUBLE PRECISION,
-    "Date_string_col" VARCHAR(8),
+    "date_col"      DATE,
     "String_col"    VARCHAR(10),
     "Timestamp_col" TIMESTAMP
 );
@@ -77,6 +77,36 @@ sudo -u postgres psql -d functional -c "$loadCmd"
 loadCmd="COPY \"AllTypesWithQuote\" FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
 sudo -u postgres psql -d functional -c "$loadCmd"
 
+# Create impala tables and load data
+cat > /tmp/impala_jdbc_alltypes.sql <<__EOT__
+USE FUNCTIONAL;
+DROP TABLE IF EXISTS alltypes_with_date;
+CREATE TABLE alltypes_with_date
+(
+    id              INT,
+    bool_col        BOOLEAN,
+    tinyint_col     SMALLINT,
+    smallint_col    SMALLINT,
+    int_col         INT,
+    bigint_col      BIGINT,
+    float_col       FLOAT,
+    double_col      DOUBLE,
+    date_col        DATE,
+    string_col      STRING,
+    timestamp_col   TIMESTAMP
+) STORED as PARQUET;
+
+INSERT INTO alltypes_with_date
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+  double_col, CAST(to_timestamp(date_string_col, 'MM/dd/yy') as DATE), string_col,
+  timestamp_col
+FROM FUNCTIONAL.alltypes;
+__EOT__
+
+IMPALAD=${IMPALAD:-localhost}
+${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -f /tmp/impala_jdbc_alltypes.sql
+
 # Clean tmp files
 rm /tmp/jdbc_alltypes.*
 rm /tmp/jdbc_alltypes_with_quote.*
+rm /tmp/impala_jdbc_alltypes.sql

@@ -23,6 +23,7 @@ import java.util.StringJoiner;
 
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
+import org.apache.impala.extdatasource.jdbc.dao.DatabaseAccessor;
 import org.apache.impala.extdatasource.thrift.TBinaryPredicate;
 import org.apache.impala.extdatasource.thrift.TComparisonOp;
 import org.apache.impala.thrift.TColumnValue;
@@ -42,7 +43,7 @@ public class QueryConditionUtil {
   private final static Logger LOG = LoggerFactory.getLogger(QueryConditionUtil.class);
 
   public static String buildCondition(List<List<TBinaryPredicate>> predicates,
-      Map<String, String> columnMapping) {
+      Map<String, String> columnMapping, DatabaseAccessor dbAccessor_) {
     List<String> condition = Lists.newArrayList();
     for (List<TBinaryPredicate> tBinaryPredicates : predicates) {
       StringJoiner joiner = new StringJoiner(" OR ", "(", ")");
@@ -50,7 +51,7 @@ public class QueryConditionUtil {
         String name = predicate.getCol().getName();
         name = columnMapping.getOrDefault(name, name);
         String op = converse(predicate.getOp());
-        String value = getTColumnValueAsString(predicate.getValue());
+        String value = getTColumnValueAsString(predicate.getValue(), dbAccessor_);
         joiner.add(String.format("%s %s %s", name, op, value));
       }
       condition.add(joiner.toString());
@@ -64,7 +65,8 @@ public class QueryConditionUtil {
    *
    * @see org.apache.impala.planner.DataSourceScanNode#literalToColumnValue
    */
-  public static String getTColumnValueAsString(TColumnValue value) {
+  public static String getTColumnValueAsString(TColumnValue value,
+      DatabaseAccessor dbAccessor_) {
     Preconditions.checkState(value != null);
     StringBuilder sb = new StringBuilder();
     if (value.isSetBool_val()) {
@@ -81,6 +83,8 @@ public class QueryConditionUtil {
       sb.append(value.double_val);
     } else if (value.isSetString_val()) {
       sb.append(String.format("'%s'", value.string_val));
+    } else if (value.isSetDate_val()) {
+      sb.append(String.format("'%s'", dbAccessor_.getDateString(value.date_val)));
     } else {
       // TODO: Support data types of DECIMAL, TIMESTAMP, DATE and binary for predicates.
       // Keep in-sync with DataSourceScanNode.literalToColumnValue().

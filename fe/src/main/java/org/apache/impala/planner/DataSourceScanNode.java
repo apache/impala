@@ -29,6 +29,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.CompoundPredicate;
+import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
@@ -135,8 +136,10 @@ public class DataSourceScanNode extends ScanNode {
       case STRING:
         return new TColumnValue().setString_val(
             ((StringLiteral) expr).getUnescapedValue());
-      case DECIMAL:
       case DATE:
+        return new TColumnValue().setDate_val(
+            (int) ((DateLiteral) expr).getValue());
+      case DECIMAL:
       case DATETIME:
       case TIMESTAMP:
         // TODO: we support DECIMAL, TIMESTAMP and DATE but no way to specify it in SQL.

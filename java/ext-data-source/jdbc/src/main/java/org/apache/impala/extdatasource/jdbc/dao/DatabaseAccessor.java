@@ -32,4 +32,6 @@ public interface DatabaseAccessor {
   void close(boolean cleanCache);
 
   String getCaseSensitiveName(String name);
+
+  String getDateString(int dateVal);
 }
