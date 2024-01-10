@@ -498,7 +498,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     msg.limit = limit_;
 
     TExecStats estimatedStats = new TExecStats();
-    estimatedStats.setCardinality(cardinality_);
+    estimatedStats.setCardinality(
+        filteredCardinality_ > -1 ? filteredCardinality_ : cardinality_);
     estimatedStats.setMemory_used(nodeResourceProfile_.getMemEstimateBytes());
     msg.setLabel(getDisplayLabel());
     msg.setLabel_detail(getDisplayLabelDetail());

@@ -872,6 +872,24 @@ class TestObservability(ImpalaTestSuite):
     assert len(re.findall('Single node plan created:', runtime_profile, re.M)) == 2
     assert len(re.findall('Distributed plan created:', runtime_profile, re.M)) == 2
 
+  def test_reduced_cardinality_by_filter(self):
+    """IMPALA-12702: Check that ExecSummary shows the reduced cardinality estimation."""
+    query_opts = {'compute_processing_cost': True}
+    query = """select STRAIGHT_JOIN count(*) from
+        (select l_orderkey from tpch_parquet.lineitem) a
+        join (select o_orderkey, o_custkey from tpch_parquet.orders) l1
+          on a.l_orderkey = l1.o_orderkey
+        where l1.o_custkey < 1000"""
+    result = self.execute_query(query, query_opts)
+    scan = result.exec_summary[10]
+    assert scan['operator'] == '00:SCAN HDFS'
+    assert scan['num_rows'] == 39563
+    assert scan['est_num_rows'] == 575771
+    assert scan['detail'] == 'tpch_parquet.lineitem'
+    runtime_profile = result.runtime_profile
+    assert "cardinality=575.77K(filtered from 6.00M)" in runtime_profile
+
+
 class TestQueryStates(ImpalaTestSuite):
   """Test that the 'Query State' and 'Impala Query State' are set correctly in the
   runtime profile."""

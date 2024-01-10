@@ -27,7 +27,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+608.*
 ====
 
 
@@ -59,7 +59,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+608.*
 ====
 
 
@@ -321,7 +321,7 @@ with t1 as (select month x, bigint_col y from alltypes limit 7301),
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+1.82K.*
 ====
 
 
