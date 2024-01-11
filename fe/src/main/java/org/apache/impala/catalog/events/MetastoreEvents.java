@@ -1451,6 +1451,8 @@ public class MetastoreEvents {
     private final Boolean eventSyncAfterFlag_;
     // value of the db flag at the time of event creation
     private final boolean dbFlagVal;
+    // true if this alter event was due to a truncate operation in metastore
+    private final boolean isTruncateOp_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -1467,6 +1469,7 @@ public class MetastoreEvents {
         msTbl_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
         tableAfter_ = Preconditions.checkNotNull(alterTableMessage.getTableObjAfter());
         tableBefore_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
+        isTruncateOp_ = alterTableMessage.getIsTruncateOp();
       } catch (Exception e) {
         throw new MetastoreNotificationException(
             debugString("Unable to parse the alter table message"), e);
@@ -1563,7 +1566,8 @@ public class MetastoreEvents {
             + "which can be ignored.");
         return;
       }
-      skipFileMetadataReload_ = canSkipFileMetadataReload(tableBefore_, tableAfter_);
+      skipFileMetadataReload_ = !isTruncateOp_ && canSkipFileMetadataReload(tableBefore_,
+          tableAfter_);
       long startNs = System.nanoTime();
       if (wasEventSyncTurnedOn()) {
         handleEventSyncTurnedOn();
@@ -1715,6 +1719,11 @@ public class MetastoreEvents {
       // along with insert events. Check if the alter table event is such a trivial
       // event by setting those parameters equal before and after the event and
       // comparing the objects.
+
+      // alter table event from truncate ops always can't be skipped.
+      if (isTruncateOp_) {
+        return false;
+      }
 
       // Avoid modifying the object from event.
       org.apache.hadoop.hive.metastore.api.Table tblAfter = tableAfter_.deepCopy();
@@ -2190,6 +2199,8 @@ public class MetastoreEvents {
     private final long versionNumberFromEvent_;
     // the service id from the partition parameters of the event.
     private final String serviceIdFromEvent_;
+    // true if this alter event was due to a truncate operation in metastore
+    private final boolean isTruncateOp_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -2208,6 +2219,7 @@ public class MetastoreEvents {
             Preconditions.checkNotNull(alterPartitionMessage.getPtnObjBefore());
         partitionAfter_ =
             Preconditions.checkNotNull(alterPartitionMessage.getPtnObjAfter());
+        isTruncateOp_ = alterPartitionMessage.getIsTruncateOp();
         msTbl_ = alterPartitionMessage.getTableObj();
         Map<String, String> parameters = partitionAfter_.getParameters();
         versionNumberFromEvent_ = Long.parseLong(
@@ -2302,9 +2314,13 @@ public class MetastoreEvents {
             partitionAfter_);
         try {
           // load file metadata only if storage descriptor of partitionAfter_ differs
-          // from sd of HdfsPartition
-          reloadPartitions(Arrays.asList(partitionAfter_),
-              FileMetadataLoadOpts.LOAD_IF_SD_CHANGED, "ALTER_PARTITION event");
+          // from sd of HdfsPartition. If the alter_partition event type is of truncate
+          // then force load the file metadata.
+          FileMetadataLoadOpts fileMetadataLoadOpts =
+              isTruncateOp_ ? FileMetadataLoadOpts.FORCE_LOAD :
+                  FileMetadataLoadOpts.LOAD_IF_SD_CHANGED;
+          reloadPartitions(Arrays.asList(partitionAfter_), fileMetadataLoadOpts,
+              "ALTER_PARTITION event");
         } catch (CatalogException e) {
           throw new MetastoreNotificationNeedsInvalidateException(
               debugString("Refresh partition on table {} partition {} failed. Event " +
@@ -2322,6 +2338,11 @@ public class MetastoreEvents {
       // along with insert events. Check if the alter table event is such a trivial
       // event by setting those parameters equal before and after the event and
       // comparing the objects.
+
+      // alter partition event from truncate ops always can't be skipped.
+      if (isTruncateOp_) {
+        return false;
+      }
 
       // Avoid modifying the object from event.
       Partition afterPartition = partitionAfter_.deepCopy();
@@ -2426,17 +2447,22 @@ public class MetastoreEvents {
       // Ignore the event if this is a trivial event. See javadoc for
       // isTrivialAlterPartitionEvent() for examples.
       List<T> eventsToProcess = new ArrayList<>();
+      List<Partition> partitionEventsToForceReload = new ArrayList<>();
       for (T event : batchedEvents_) {
         if (isOlderEvent(event.getPartitionForBatching())) {
           infoLog("Not processing the current event id {} as it is an older event",
               event.getEventId());
           continue;
         }
-        if (!event.canBeSkipped()) {
+        boolean isTruncateOp = (event instanceof AlterPartitionEvent &&
+            ((AlterPartitionEvent)event).isTruncateOp_);
+        if (isTruncateOp) {
+          partitionEventsToForceReload.add(event.getPartitionForBatching());
+        } else if (!event.canBeSkipped()){
           eventsToProcess.add(event);
         }
       }
-      if (eventsToProcess.isEmpty()) {
+      if (eventsToProcess.isEmpty() && partitionEventsToForceReload.isEmpty()) {
         LOG.info(
             "Ignoring events from event id {} to {} since they modify parameters "
             + " which can be ignored", getFirstEventId(), getLastEventId());
@@ -2459,10 +2485,17 @@ public class MetastoreEvents {
             reloadPartitions(partitions, FileMetadataLoadOpts.FORCE_LOAD,
                 getEventType().toString() + " event");
           } else {
-            // alter partition event. Reload file metadata of only those partitions
-            // for which sd has changed
-            reloadPartitions(partitions, FileMetadataLoadOpts.LOAD_IF_SD_CHANGED,
-                getEventType().toString() + " event");
+            if (!partitionEventsToForceReload.isEmpty()) {
+              // force reload truncated partitions
+              reloadPartitions(partitionEventsToForceReload,
+                  FileMetadataLoadOpts.FORCE_LOAD, getEventType().toString() + " event");
+            }
+            if (!partitions.isEmpty()) {
+              // alter partition event. Reload file metadata of only those partitions
+              // for which sd has changed
+              reloadPartitions(partitions, FileMetadataLoadOpts.LOAD_IF_SD_CHANGED,
+                  getEventType().toString() + " event");
+            }
           }
         } catch (CatalogException e) {
           throw new MetastoreNotificationNeedsInvalidateException(String.format(

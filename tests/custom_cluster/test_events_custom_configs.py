@@ -1086,3 +1086,61 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
       assert parts_added_before == parts_added_after
       assert parts_refreshed_before == parts_refreshed_after
       assert events_skipped_after > events_skipped_before
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=5")
+  def test_truncate_table_from_hive(self, unique_database):
+    """IMPALA-12636: verify truncate table from hive reloads file metadata in Impala"""
+    hive_tbl = "tbl_in_hive"
+    values = "values (10),(20),(30)"
+
+    def verify_truncate_op_in_hive(tbl_name, is_transactional, is_partitioned,
+        is_batched):
+      create_query = " ".join(["create", "table `{}`.`{}` (i int)",
+        " partitioned by (year int) " if is_partitioned else '',
+          self.__get_transactional_tblproperties(is_transactional)])
+      self.execute_query(create_query.format(unique_database, tbl_name))
+      insert_query = " ".join(["insert into `{}`.`{}`", "partition (year=2024)"
+        if is_partitioned else '', values])
+      self.run_stmt_in_hive(insert_query.format(unique_database, tbl_name))
+      EventProcessorUtils.wait_for_event_processing(self)
+      self.client.execute("refresh {}.{}".format(unique_database, tbl_name))
+      truncate_query = " ".join(["truncate table `{}`.`{}`", "partition (year=2024)"
+        if is_partitioned else ''])
+      self.run_stmt_in_hive(truncate_query.format(unique_database, tbl_name))
+      if is_batched:
+        self.run_stmt_in_hive(
+          "insert into {}.{} partition (year=2024) values (1),(2)"
+          .format(unique_database, tbl_name))
+      EventProcessorUtils.wait_for_event_processing(self)
+      data = int(self.execute_scalar("select count(*) from {0}.{1}".format(
+        unique_database, tbl_name)))
+      assert data == 2 if is_batched else data == 0
+      self.client.execute("drop table {}.{}".format(unique_database, tbl_name))
+    # Case-I: truncate single partition
+    verify_truncate_op_in_hive(hive_tbl, False, False, False)
+    verify_truncate_op_in_hive(hive_tbl, True, False, False)
+    verify_truncate_op_in_hive(hive_tbl, False, True, False)
+    verify_truncate_op_in_hive(hive_tbl, False, True, True)
+    verify_truncate_op_in_hive(hive_tbl, True, True, False)
+    verify_truncate_op_in_hive(hive_tbl, True, True, True)
+
+    # Case-II: truncate partition in multi partition
+    hive_tbl = "multi_part_tbl"
+    self.client.execute("create table {}.{} (i int) partitioned by "
+      "(p int, q int)".format(unique_database, hive_tbl))
+    self.client.execute("insert into {}.{} partition(p, q) values "
+      "(0,0,0), (0,0,1), (0,0,2)".format(unique_database, hive_tbl))
+    self.client.execute("insert into {}.{} partition(p, q) values "
+      "(0,1,0), (0,1,1)".format(unique_database, hive_tbl))
+    self.run_stmt_in_hive("truncate table {}.{} partition(p=0)"
+      .format(unique_database, hive_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    data = int(self.execute_scalar("select count(*) from {0}.{1}".format(
+      unique_database, hive_tbl)))
+    assert data == 2
+    self.run_stmt_in_hive("truncate table {}.{}"
+      .format(unique_database, hive_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    data = int(self.execute_scalar("select count(*) from {0}.{1}".format(
+      unique_database, hive_tbl)))
+    assert data == 0
