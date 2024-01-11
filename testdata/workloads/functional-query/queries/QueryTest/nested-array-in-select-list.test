@@ -150,6 +150,143 @@ select 1 from (select int_array from complextypestbl) s
 tinyint
 ====
 ---- QUERY
+# Regression test for IMPALA-12695.
+with v as (select arr1 from complextypes_arrays
+  union all select arr1 from complextypes_arrays)
+select am.item from v, v.arr1 am;
+---- RESULTS
+1
+2
+3
+4
+5
+1
+NULL
+3
+4
+5
+10
+9
+8
+10
+10
+NULL
+12
+1
+2
+1
+2
+3
+1
+2
+3
+4
+5
+1
+NULL
+3
+4
+5
+10
+9
+8
+10
+10
+NULL
+12
+1
+2
+1
+2
+3
+---- TYPES
+int
+====
+---- QUERY
+# Filtering an unnested collection that comes from a UNION [ALL] is not supported, see
+# IMPALA-12753.
+with v as (select arr1 from complextypes_arrays
+  union all select arr1 from complextypes_arrays)
+select am.item from v, v.arr1 am where am.item is NULL;
+---- CATCH
+AnalysisException: Filtering an unnested collection that comes from a UNION [ALL] is not supported yet.
+====
+---- QUERY
+# Regression test for IMPALA-12695 with varlen collection item and an additional inline view layer.
+with v0 as (select arr2 from complextypes_arrays
+  union all select arr2 from complextypes_arrays),
+     v1 as (select am.item from v0, v0.arr2 am)
+select item from v1;
+---- RESULTS
+'one'
+'two'
+'three'
+'four'
+'five'
+'one'
+'two'
+'three'
+'NULL'
+'five'
+'ten'
+'ten'
+'nine'
+'eight'
+'ten'
+'eleven'
+'twelve'
+'thirteen'
+'str1'
+'str2'
+'str1'
+'str2'
+'one'
+'two'
+'three'
+'four'
+'five'
+'one'
+'two'
+'three'
+'NULL'
+'five'
+'ten'
+'ten'
+'nine'
+'eight'
+'ten'
+'eleven'
+'twelve'
+'thirteen'
+'str1'
+'str2'
+'str1'
+'str2'
+---- TYPES
+string
+====
+---- QUERY
+# Filtering an unnested collection that comes from a UNION [ALL] is not supported, see
+# IMPALA-12753.
+with v0 as (select arr2 from complextypes_arrays
+  union all select arr2 from complextypes_arrays),
+     v1 as (select am.item from v0, v0.arr2 am)
+select item from v1 where item="one";
+---- CATCH
+AnalysisException: Filtering an unnested collection that comes from a UNION [ALL] is not supported yet.
+====
+---- QUERY
+# Filtering an unnested collection that comes from a UNION [ALL] is not supported, see
+# IMPALA-12753. The query contains an extra inline view layer above the union.
+with v0 as (select arr2 from complextypes_arrays
+  union all select arr2 from complextypes_arrays),
+     v1 as (select 1, arr2 from v0),
+     v2 as (select am.item from v1, v1.arr2 am)
+select item from v2 where item="one";
+---- CATCH
+AnalysisException: Filtering an unnested collection that comes from a UNION [ALL] is not supported yet.
+====
+---- QUERY
 select id, int_array from (select id, int_array from complextypestbl) s;
 ---- RESULTS
 1,'[1,2,3]'

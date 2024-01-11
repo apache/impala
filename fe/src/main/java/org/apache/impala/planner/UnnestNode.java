@@ -17,13 +17,18 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -79,6 +84,61 @@ public class UnnestNode extends PlanNode {
     // Unnest is like a scan and must materialize the slots of its conjuncts.
     analyzer.materializeSlots(conjuncts_);
     computeMemLayout(analyzer);
+
+    checkUnnestFromUnionWithPredicate(analyzer);
+  }
+
+  // Filtering an unnested collection that comes from a UNION [ALL] is not supported, see
+  // IMPALA-12753.
+  private void checkUnnestFromUnionWithPredicate(Analyzer analyzer)
+      throws AnalysisException {
+    PlanNode subplanInputNode = containingSubplanNode_.getChild(0);
+    if (!(subplanInputNode instanceof UnionNode)) return;
+
+    UnionNode union = (UnionNode) subplanInputNode;
+
+    // Tuple descriptors of the UNION and their descendants (for complex types).
+    List<TupleDescriptor> unionDescs = new ArrayList<>();
+    for (TupleId tid : union.getTupleIds()) {
+      TupleDescriptor tuple = analyzer.getDescTbl().getTupleDesc(tid);
+      getCollTupleDescs(tuple, unionDescs);
+    }
+
+    for (CollectionTableRef collTblRef : tblRefs_) {
+      final TupleDescriptor collItemTupleDesc = collTblRef.getDesc();
+
+      if (!unionDescs.contains(collItemTupleDesc)) continue;
+
+      List<Expr> predicates = analyzer.getConjuncts();
+      for (Expr pred : predicates) {
+        if (!pred.isAuxExpr()) {
+          List<Expr> matching = new ArrayList();
+          pred.collect(expr -> (expr instanceof SlotRef) &&
+              ((SlotRef) expr).getDesc().getParent().equals(collItemTupleDesc),
+              matching);
+          if (!matching.isEmpty()) {
+            throw new AnalysisException("Filtering an unnested collection that comes " +
+                "from a UNION [ALL] is not supported yet.");
+          }
+        }
+      }
+    }
+  }
+
+  // Returns the TupleDescriptors contained by 'tuple' (includes item tuple descs of
+  // collections).
+  private void getCollTupleDescs(TupleDescriptor tuple,
+      List<TupleDescriptor> tupleList) {
+    tupleList.add(tuple);
+    for (SlotDescriptor slot : tuple.getSlots()) {
+      if (slot.getType().isCollectionType()) {
+        TupleDescriptor itemTuple = slot.getItemTupleDesc();
+        Preconditions.checkNotNull(itemTuple);
+        tupleList.add(itemTuple);
+        // TODO: Continue recursively (for collections and probably also
+        // structs) once IMPALA-12751 is solved.
+      }
+    }
   }
 
   @Override

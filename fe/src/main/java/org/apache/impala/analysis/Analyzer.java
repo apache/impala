@@ -604,6 +604,10 @@ public class Analyzer {
     // Shows how many zipping unnests were in the query;
     public int numZippingUnnests = 0;
 
+    // Ids of (collection-typed) SlotDescriptors that were registered with
+    // 'duplicateIfCollections=true' in 'Analyzer.registerSlotRef()'.
+    public Set<SlotId> duplicateCollectionSlots = new HashSet<>();
+
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
       this.stmtTableCache = stmtTableCache;
@@ -1600,7 +1604,9 @@ public class Analyzer {
       if (slotPath.destType().isCollectionType() && duplicateIfCollections) {
         // Register a new slot descriptor for collection types. The BE currently
         // relies on this behavior for setting unnested collection slots to NULL.
-        return createAndRegisterRawSlotDesc(slotPath, false);
+        SlotDescriptor res = createAndRegisterRawSlotDesc(slotPath, false);
+        globalState_.duplicateCollectionSlots.add(res.getId());
+        return res;
       }
       // SlotRefs with scalar or struct types are registered against the slot's
       // fully-qualified lowercase path.
@@ -1610,8 +1616,38 @@ public class Analyzer {
       SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
       if (existingSlotDesc != null) return existingSlotDesc;
 
+      SlotDescriptor existingInTuple = findPathInCurrentTuple(slotPath);
+      if (existingInTuple != null) return existingInTuple;
+
       return createAndRegisterSlotDesc(slotPath);
     }
+  }
+
+  // It is possible that another Analyzer, for example a child Analyzer in an inline view,
+  // has already inserted a SlotDescriptor with the current path in the current tuple. But
+  // because it was a different Analyzer, the path is not present in this Analyzer's
+  // 'slotPathMap_'. We should reuse the existing SlotDescriptor unless it was explicitly
+  // added with 'duplicateIfCollections=true' in 'registerSlotRef()'.
+  //
+  // Returns the existing SlotDescriptor with the same path in the current tuple if it
+  // exists or 'null' if it doesn't.
+  private SlotDescriptor findPathInCurrentTuple(Path slotPath) {
+    Preconditions.checkNotNull(slotPath);
+
+    TupleDescriptor currentTupleDesc = tupleStack_.peek();
+    Preconditions.checkNotNull(currentTupleDesc);
+
+    final List<String> slotPathFQR = slotPath.getFullyQualifiedRawPath();
+    Preconditions.checkNotNull(slotPathFQR);
+
+    for (SlotDescriptor slotDesc : currentTupleDesc.getSlots()) {
+      final List<String> tupleSlotFQR = slotDesc.getPath().getFullyQualifiedRawPath();
+      if (slotPathFQR.equals(tupleSlotFQR) &&
+            !globalState_.duplicateCollectionSlots.contains(slotDesc.getId())) {
+        return slotDesc;
+      }
+    }
+    return null;
   }
 
   private SlotDescriptor createAndRegisterSlotDesc(Path slotPath)

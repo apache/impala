@@ -169,9 +169,6 @@ tinyint,string
 ====
 ---- QUERY
 # Constants in the select list of unions also lead to a "non-pass-through" union.
-select 1, int_map, int_map_array from complextypestbl
-  union all select 2, int_map, int_map_array from complextypestbl;
-
 select 1, map_1d, map_3d from collection_tbl
   union all select 2, map_1d, map_3d from collection_tbl
 ---- RESULTS
@@ -208,6 +205,40 @@ select 1 from (select int_map from complextypestbl) s
 1
 ---- TYPES
 tinyint
+====
+---- QUERY
+# Regression test for IMPALA-12695.
+with v0 as (select int_map from complextypestbl
+  union all select int_map from complextypestbl),
+     v1 as (select m.key from v0, v0.int_map m)
+select key from v1;
+---- RESULTS
+'k1'
+'k1'
+'k2'
+'k1'
+'k2'
+'k1'
+'k3'
+'k1'
+'k1'
+'k2'
+'k1'
+'k2'
+'k1'
+'k3'
+---- TYPES
+string
+====
+---- QUERY
+# Filtering an unnested collection that comes from a UNION [ALL] is not supported, see
+# IMPALA-12753.
+with v0 as (select int_map from complextypestbl
+  union all select int_map from complextypestbl),
+     v1 as (select m.key from v0, v0.int_map m)
+select key from v1 where key="k1";
+---- CATCH
+AnalysisException: Filtering an unnested collection that comes from a UNION [ALL] is not supported yet.
 ====
 ---- QUERY
 select id, int_map from (select id, int_map from complextypestbl) s;

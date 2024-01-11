@@ -230,3 +230,55 @@ where arr1.item < 3;
 10,2,2
 ---- TYPES
 INT,INT,INT
+====
+---- QUERY
+with v as (select arr1 from complextypes_arrays
+  union all select arr1 from complextypes_arrays)
+select unnest(arr1) a from v
+---- RESULTS
+1
+2
+3
+4
+5
+1
+NULL
+3
+4
+5
+10
+9
+8
+10
+10
+NULL
+12
+1
+2
+1
+2
+3
+1
+2
+3
+4
+5
+1
+NULL
+3
+4
+5
+10
+9
+8
+10
+10
+NULL
+12
+1
+2
+1
+2
+3
+---- TYPES
+INT

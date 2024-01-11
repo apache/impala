@@ -372,6 +372,7 @@ public class InlineViewRef extends TableRef {
         // We don't recurse deeper and only add the immediate item child to the
         // substitution map. This is enough both for collections in select list and in
         // from clause.
+        // TODO: Revisit for IMPALA-12160.
         putExprsIntoSmaps(analyzer, itemSlotDesc, srcItemSlotRef, baseTableItemSlotRef,
             false);
       }

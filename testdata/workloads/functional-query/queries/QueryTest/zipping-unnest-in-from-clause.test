@@ -409,3 +409,55 @@ where t1.id = 3 and t2.id < 3;
 3,2,8,'NULL'
 ---- TYPES
 INT,INT,INT,STRING
+====
+---- QUERY
+with v as (select arr1 from complextypes_arrays
+  union all select arr1 from complextypes_arrays)
+select arr1.item from v, unnest(v.arr1);
+---- RESULTS
+1
+2
+3
+4
+5
+1
+NULL
+3
+4
+5
+10
+9
+8
+10
+10
+NULL
+12
+1
+2
+1
+2
+3
+1
+2
+3
+4
+5
+1
+NULL
+3
+4
+5
+10
+9
+8
+10
+10
+NULL
+12
+1
+2
+1
+2
+3
+---- TYPES
+INT
