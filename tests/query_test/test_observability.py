@@ -188,6 +188,20 @@ class TestObservability(ImpalaTestSuite):
     expected_str = expected_str.format(timezone=server_timezone)
     assert expected_str in profile, profile
 
+  def test_profile(self):
+    """Test that expected fields are populated in the profile."""
+    query = """select count(distinct a.int_col) from functional.alltypes a
+        inner join functional.alltypessmall b on (a.id = b.id + cast(sleep(15) as INT))"""
+    result = self.execute_query(query)
+
+    assert "Query Type: QUERY" in result.runtime_profile
+    assert "Query State: " in result.runtime_profile
+    assert "Default Db: default" in result.runtime_profile
+    tables = re.search(r'\n\s+Tables Queried:\s+(.*?)\n', result.runtime_profile)
+    assert tables is not None
+    assert sorted(tables.group(1).split(",")) \
+        == ["functional.alltypes", "functional.alltypessmall"]
+
   def test_exec_summary(self):
     """Test that the exec summary is populated correctly in every query state"""
     query = "select count(*) from functional.alltypes"

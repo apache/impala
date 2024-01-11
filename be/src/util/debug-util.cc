@@ -277,6 +277,15 @@ string PrintNumericPath(const SchemaPath& path) {
   return ss.str();
 }
 
+string PrintTableList(const vector<TTableName>& tbls) {
+  stringstream ss;
+  for (int i = 0; i < tbls.size(); ++i) {
+    if (i != 0) ss << ",";
+    ss << tbls[i].db_name << "." << tbls[i].table_name;
+  }
+  return ss.str();
+}
+
 string GetBuildVersion(bool compact) {
   stringstream ss;
   ss << GetDaemonBuildVersion()

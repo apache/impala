@@ -68,4 +68,5 @@ enum TQueryTableColumn {
     PERNODE_PEAK_MEM_MEAN
     SQL
     PLAN
+    TABLES_QUERIED
 }

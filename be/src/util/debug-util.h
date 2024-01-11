@@ -91,6 +91,9 @@ template<typename ThriftStruct> std::string PrintThrift(const ThriftStruct& t) {
   return apache::thrift::ThriftDebugString(t);
 }
 
+/// Return a list of TTableName as a comma-separated string.
+std::string PrintTableList(const std::vector<TTableName>& tbls);
+
 /// Parse 's' into a TUniqueId object.  The format of s needs to be the output format
 /// from PrintId.  (<hi_part>:<low_part>)
 /// Returns true if parse succeeded.

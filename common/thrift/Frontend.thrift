@@ -678,6 +678,8 @@ struct TExecRequest {
 
   // Request for "ALTER TABLE ... CONVERT TO" statements.
   19: optional TConvertTableRequest convert_table_request
+
+  20: optional list<CatalogObjects.TTableName> tables
 }
 
 // Parameters to FeSupport.cacheJar().

@@ -98,6 +98,18 @@ class TestQueryLive(CustomClusterTestSuite):
         'select * from sys.impala_query_live where cluster_id = "test_query_live_0"')
     assert len(result5.data) == 0
 
+    result = self.execute_query("""
+        select count(*) from functional.alltypestiny a
+          inner join functional.alltypes b on a.id = b.id
+          inner join functional.alltypessmall c on b.id = c.id
+    """)
+    result5 = self.execute_query(
+        'select tables_queried from sys.impala_query_live where query_id = "'
+        + result.query_id + '"')
+    assert len(result5.data) == 1
+    assert result5.data[0] == \
+        "functional.alltypes,functional.alltypestiny,functional.alltypessmall"
+
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",

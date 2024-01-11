@@ -335,6 +335,11 @@ Status QueryScanner::MaterializeNextTuple(
         RETURN_IF_ERROR(WriteStringSlot(
             trim_left_copy_if(record.plan, is_any_of("\n")), pool, slot));
         break;
+      case TQueryTableColumn::TABLES_QUERIED:
+        if (!query.tables.empty()) {
+          RETURN_IF_ERROR(WriteStringSlot(PrintTableList(query.tables), pool, slot));
+        }
+        break;
       default:
         DCHECK(false) << "Unknown column position " << slot_desc->col_pos();
     }

@@ -411,6 +411,12 @@ const std::list<FieldDefinition> FIELD_DEFINITIONS = {
               << "'";
         }),
 
+    // Tables Queried
+    FieldDefinition("tables_queried", TPrimitiveType::STRING,
+        [](FieldParserContext& ctx){
+          ctx.sql << "'" << PrintTableList(ctx.record->tables) << "'";
+        }),
+
     }; // FIELDS_PARSERS constant list
 
 } //namespace workload_management

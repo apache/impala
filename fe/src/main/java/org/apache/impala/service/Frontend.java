@@ -2412,6 +2412,9 @@ public class Frontend {
     }
     Preconditions.checkNotNull(analysisResult.getStmt());
     TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);
+    for (TableName table : stmtTableCache.tables.keySet()) {
+      result.addToTables(table.toThrift());
+    }
 
     // Transfer the expected number of executors in executor group set to
     // analyzer's global state. The info is needed to compute the number of nodes to be

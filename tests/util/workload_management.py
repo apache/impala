@@ -25,7 +25,7 @@ from tests.util.assert_time import assert_time_str, convert_to_nanos
 from tests.util.memory import assert_byte_str, convert_to_bytes
 
 DEDICATED_COORD_SAFETY_BUFFER_BYTES = 104857600
-EXPECTED_QUERY_COLS = 48
+EXPECTED_QUERY_COLS = 49
 
 
 CLUSTER_ID = "CLUSTER_ID"
@@ -76,6 +76,7 @@ PERNODE_PEAK_MEM_MAX = "PERNODE_PEAK_MEM_MAX"
 PERNODE_PEAK_MEM_MEAN = "PERNODE_PEAK_MEM_MEAN"
 SQL = "SQL"
 PLAN = "PLAN"
+TABLES_QUERIED = "TABLES_QUERIED"
 
 
 def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impalad=None,
@@ -698,6 +699,18 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   else:
     assert plan is not None
     assert data[index] == plan.group(1)
+
+  # Tables Queried
+  index += 1
+  assert sql_results.column_labels[index] == TABLES_QUERIED
+  ret_data[TABLES_QUERIED] = data[index]
+  tables = re.search(r'\n\s+Tables Queried:\s+(.*?)\n', profile_text)
+  if query_state_value == "EXCEPTION" or query_type == "DDL":
+    assert tables is None
+    assert data[index] == ""
+  else:
+    assert tables is not None
+    assert data[index] == tables.group(1)
 
   return ret_data
 # function assert_query

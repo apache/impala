@@ -203,6 +203,7 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
       .query_exec_request.dedicated_coord_mem_estimate;
   row_materialization_rate = exec_state.row_materialization_rate();
   row_materialization_time = exec_state.row_materialization_timer();
+  tables = exec_state.tables();
 
   // Update name_rows_fetched with the final count after query close.
   base_state->num_rows_fetched = exec_state.num_rows_fetched_counter();

@@ -340,6 +340,9 @@ struct QueryStateExpanded {
   /// Events Timeline Iterator
   EventsTimelineIterator EventsTimeline() const;
 
+  // Source tables accessed by this query.
+  std::vector<TTableName> tables;
+
   /// Required data will be copied from the provided ClientRequestState into members of
   /// the struct.
   QueryStateExpanded(const ClientRequestState& exec_state,

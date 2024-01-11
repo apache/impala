@@ -229,12 +229,16 @@ void ClientRequestState::SetBlacklistedExecutorAddresses(
 Status ClientRequestState::Exec() {
   MarkActive();
 
+  const TExecRequest& exec_req = exec_request();
   profile_->AddChild(server_profile_);
   summary_profile_->AddInfoString("Query Type", PrintValue(stmt_type()));
   summary_profile_->AddInfoString("Query Options (set by configuration)",
       DebugQueryOptions(query_ctx_.client_request.query_options));
   summary_profile_->AddInfoString("Query Options (set by configuration and planner)",
-      DebugQueryOptions(exec_request().query_options));
+      DebugQueryOptions(exec_req.query_options));
+  if (!exec_req.tables.empty()) {
+    summary_profile_->AddInfoString("Tables Queried", PrintTableList(exec_req.tables));
+  }
   if (query_ctx_.__isset.overridden_mt_dop_value) {
     DCHECK(query_ctx_.client_request.query_options.__isset.mt_dop);
     summary_profile_->AddInfoString("MT_DOP limited by admission control",
@@ -243,7 +247,6 @@ Status ClientRequestState::Exec() {
             query_ctx_.client_request.query_options.mt_dop));
   }
 
-  const TExecRequest& exec_req = exec_request();
   switch (exec_req.stmt_type) {
     case TStmtType::QUERY:
     case TStmtType::DML:
@@ -533,38 +536,21 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
   if (!query_exec_request.query_ctx.__isset.parent_query_id &&
       query_exec_request.query_ctx.__isset.tables_missing_stats &&
       !query_exec_request.query_ctx.tables_missing_stats.empty()) {
-    stringstream ss;
-    const vector<TTableName>& tbls = query_exec_request.query_ctx.tables_missing_stats;
-    for (int i = 0; i < tbls.size(); ++i) {
-      if (i != 0) ss << ",";
-      ss << tbls[i].db_name << "." << tbls[i].table_name;
-    }
-    summary_profile_->AddInfoString(TABLES_MISSING_STATS_KEY, ss.str());
+    summary_profile_->AddInfoString(TABLES_MISSING_STATS_KEY,
+        PrintTableList(query_exec_request.query_ctx.tables_missing_stats));
   }
 
   if (!query_exec_request.query_ctx.__isset.parent_query_id &&
       query_exec_request.query_ctx.__isset.tables_with_corrupt_stats &&
       !query_exec_request.query_ctx.tables_with_corrupt_stats.empty()) {
-    stringstream ss;
-    const vector<TTableName>& tbls =
-        query_exec_request.query_ctx.tables_with_corrupt_stats;
-    for (int i = 0; i < tbls.size(); ++i) {
-      if (i != 0) ss << ",";
-      ss << tbls[i].db_name << "." << tbls[i].table_name;
-    }
-    summary_profile_->AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
+    summary_profile_->AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY,
+        PrintTableList(query_exec_request.query_ctx.tables_with_corrupt_stats));
   }
 
   if (query_exec_request.query_ctx.__isset.tables_missing_diskids &&
       !query_exec_request.query_ctx.tables_missing_diskids.empty()) {
-    stringstream ss;
-    const vector<TTableName>& tbls =
-        query_exec_request.query_ctx.tables_missing_diskids;
-    for (int i = 0; i < tbls.size(); ++i) {
-      if (i != 0) ss << ",";
-      ss << tbls[i].db_name << "." << tbls[i].table_name;
-    }
-    summary_profile_->AddInfoString(TABLES_WITH_MISSING_DISK_IDS_KEY, ss.str());
+    summary_profile_->AddInfoString(TABLES_WITH_MISSING_DISK_IDS_KEY,
+        PrintTableList(query_exec_request.query_ctx.tables_missing_diskids));
   }
 
   {

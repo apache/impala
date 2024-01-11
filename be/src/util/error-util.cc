@@ -16,6 +16,7 @@
 // under the License.
 
 #include "util/error-util-internal.h"
+#include "util/debug-util.h"
 #include "util/string-util.h"
 
 #include <errno.h>
@@ -47,12 +48,7 @@ string GetTablesMissingStatsWarning(const vector<TTableName>& tables_missing_sta
   stringstream ss;
   if (tables_missing_stats.empty()) return string("");
   ss << "WARNING: The following tables are missing relevant table and/or column "
-     << "statistics.\n";
-  for (int i = 0; i < tables_missing_stats.size(); ++i) {
-    const TTableName& table_name = tables_missing_stats[i];
-    if (i != 0) ss << ",";
-    ss << table_name.db_name << "." << table_name.table_name;
-  }
+     << "statistics.\n" << PrintTableList(tables_missing_stats);
   return ss.str();
 }
 

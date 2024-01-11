@@ -334,6 +334,7 @@ class ClientRequestState {
   }
   /// Returns 0:0 if this is a root query
   TUniqueId parent_query_id() const { return query_ctx_.parent_query_id; }
+  const vector<TTableName>& tables() const { return exec_request().tables; }
 
   const std::vector<std::string>& GetAnalysisWarnings() const {
     return exec_request().analysis_warnings;
