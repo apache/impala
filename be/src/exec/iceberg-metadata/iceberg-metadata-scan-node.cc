@@ -91,30 +91,27 @@ Status IcebergMetadataScanNode::CreateFieldAccessors() {
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
   for (SlotDescriptor* slot_desc: tuple_desc_->slots()) {
-    if (slot_desc->type().IsStructType()) {
-      // Get the top level struct's field id from the ColumnDescriptor then recursively
-      // get the field ids for struct fields
-      int field_id = tuple_desc_->table_desc()->GetColumnDesc(slot_desc).field_id();
-      RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
-      RETURN_IF_ERROR(CreateFieldAccessors(env, slot_desc));
-    } else if (slot_desc->col_path().size() > 1) {
-      DCHECK(!slot_desc->type().IsComplexType());
-      // Slot that is child of a struct without tuple, can occur when a struct member is
-      // in the select list. ColumnType has a tree structure, and this loop finds the
-      // STRUCT node that stores the primitive type. Because, that struct node has the
-      // field id list of its childs.
+    int field_id = -1;
+    if (slot_desc->col_path().size() == 1) {
+      // Top level slots have ColumnDescriptors that store the field ids.
+      field_id = tuple_desc_->table_desc()->GetColumnDesc(slot_desc).field_id();
+    } else {
+      // Non top level slots are fields of a nested type. This code path is to handle
+      // slots that does not have their nested type's tuple available.
+      // This loop finds the struct ColumnType node that stores the slot as it has the
+      // field id list of its children.
       int root_type_index = slot_desc->col_path()[0];
       ColumnType* current_type = &const_cast<ColumnType&>(
           tuple_desc_->table_desc()->col_descs()[root_type_index].type());
       for (int i = 1; i < slot_desc->col_path().size() - 1; ++i) {
         current_type = &current_type->children[slot_desc->col_path()[i]];
       }
-      int field_id = current_type->field_ids[slot_desc->col_path().back()];
-      RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
-    } else {
-      // For primitives in the top level tuple, use the ColumnDescriptor
-      int field_id = tuple_desc_->table_desc()->GetColumnDesc(slot_desc).field_id();
-      RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
+      field_id = current_type->field_ids[slot_desc->col_path().back()];
+    }
+    DCHECK_NE(field_id, -1);
+    RETURN_IF_ERROR(AddAccessorForFieldId(env, field_id, slot_desc->id()));
+    if (slot_desc->type().IsStructType()) {
+      RETURN_IF_ERROR(CreateFieldAccessors(env, slot_desc));
     }
   }
   return Status::OK();

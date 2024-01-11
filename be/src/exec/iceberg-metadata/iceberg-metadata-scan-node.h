@@ -121,10 +121,10 @@ class IcebergMetadataScanNode : public ScanNode {
   Status GetCatalogTable(jobject* jtable);
 
   /// Populates the jaccessors_ map by creating the accessors for the columns in the JVM.
-  /// To create a field accessor for a column the Iceberg field id is needed. For
-  /// primitive type columns that are not a field of a struct, this can be found in the
-  /// ColumnDescriptor. However, ColumnDescriptors are not available for struct fields,
-  /// in this case the SlotDescriptor can be used.
+  /// To create a field accessor for a column the Iceberg field id is needed. For columns
+  /// that are not a field of a struct, this can be found in the ColumnDescriptor.
+  /// However, ColumnDescriptors are not available for struct fields, in this case the
+  /// ColumnType of the SlotDescriptor can be used.
   Status CreateFieldAccessors();
 
   /// Recursive part of the Accessor collection, when there is a struct in the tuple.
