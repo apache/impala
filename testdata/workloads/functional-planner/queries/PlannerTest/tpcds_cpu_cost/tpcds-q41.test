@@ -1,90 +1,76 @@
 # TPCDS-Q41
-SELECT distinct(i_product_name)
-FROM item i1
-WHERE i_manufact_id BETWEEN 738 AND 738+40
-  AND
-    (SELECT count(*) AS item_cnt
-     FROM item
-     WHERE (i_manufact = i1.i_manufact
-            AND ((i_category = 'Women'
-                  AND (i_color = 'powder'
-                       OR i_color = 'khaki')
-                  AND (i_units = 'Ounce'
-                       OR i_units = 'Oz')
-                  AND (i_size = 'medium'
-                       OR i_size = 'extra large'))
-                 OR (i_category = 'Women'
-                     AND (i_color = 'brown'
-                          OR i_color = 'honeydew')
-                     AND (i_units = 'Bunch'
-                          OR i_units = 'Ton')
-                     AND (i_size = 'N/A'
-                          OR i_size = 'small'))
-                 OR (i_category = 'Men'
-                     AND (i_color = 'floral'
-                          OR i_color = 'deep')
-                     AND (i_units = 'N/A'
-                          OR i_units = 'Dozen')
-                     AND (i_size = 'petite'
-                          OR i_size = 'petite'))
-                 OR (i_category = 'Men'
-                     AND (i_color = 'light'
-                          OR i_color = 'cornflower')
-                     AND (i_units = 'Box'
-                          OR i_units = 'Pound')
-                     AND (i_size = 'medium'
-                          OR i_size = 'extra large'))))
-       OR (i_manufact = i1.i_manufact
-           AND ((i_category = 'Women'
-                 AND (i_color = 'midnight'
-                      OR i_color = 'snow')
-                 AND (i_units = 'Pallet'
-                      OR i_units = 'Gross')
-                 AND (i_size = 'medium'
-                      OR i_size = 'extra large'))
-                OR (i_category = 'Women'
-                    AND (i_color = 'cyan'
-                         OR i_color = 'papaya')
-                    AND (i_units = 'Cup'
-                         OR i_units = 'Dram')
-                    AND (i_size = 'N/A'
-                         OR i_size = 'small'))
-                OR (i_category = 'Men'
-                    AND (i_color = 'orange'
-                         OR i_color = 'frosted')
-                    AND (i_units = 'Each'
-                         OR i_units = 'Tbl')
-                    AND (i_size = 'petite'
-                         OR i_size = 'petite'))
-                OR (i_category = 'Men'
-                    AND (i_color = 'forest'
-                         OR i_color = 'ghost')
-                    AND (i_units = 'Lb'
-                         OR i_units = 'Bundle')
-                    AND (i_size = 'medium'
-                         OR i_size = 'extra large'))))) > 0
-ORDER BY i_product_name
-LIMIT 100;
+# start query 41 in stream 0 using template query41.tpl using seed 1813495740
+select  distinct(i_product_name)
+ from item i1
+ where i_manufact_id between 732 and 732+40
+   and (select count(*) as item_cnt
+        from item
+        where (i_manufact = i1.i_manufact and
+        ((i_category = 'Women' and
+        (i_color = 'beige' or i_color = 'spring') and
+        (i_units = 'Tsp' or i_units = 'Ton') and
+        (i_size = 'petite' or i_size = 'extra large')
+        ) or
+        (i_category = 'Women' and
+        (i_color = 'white' or i_color = 'pale') and
+        (i_units = 'Box' or i_units = 'Dram') and
+        (i_size = 'large' or i_size = 'economy')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'midnight' or i_color = 'frosted') and
+        (i_units = 'Bunch' or i_units = 'Carton') and
+        (i_size = 'small' or i_size = 'N/A')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'azure' or i_color = 'goldenrod') and
+        (i_units = 'Pallet' or i_units = 'Gross') and
+        (i_size = 'petite' or i_size = 'extra large')
+        ))) or
+       (i_manufact = i1.i_manufact and
+        ((i_category = 'Women' and
+        (i_color = 'brown' or i_color = 'hot') and
+        (i_units = 'Tbl' or i_units = 'Cup') and
+        (i_size = 'petite' or i_size = 'extra large')
+        ) or
+        (i_category = 'Women' and
+        (i_color = 'powder' or i_color = 'honeydew') and
+        (i_units = 'Bundle' or i_units = 'Unknown') and
+        (i_size = 'large' or i_size = 'economy')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'antique' or i_color = 'purple') and
+        (i_units = 'N/A' or i_units = 'Dozen') and
+        (i_size = 'small' or i_size = 'N/A')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'lavender' or i_color = 'tomato') and
+        (i_units = 'Lb' or i_units = 'Oz') and
+        (i_size = 'petite' or i_size = 'extra large')
+        )))) > 0
+ order by i_product_name
+ limit 100;
+
+# end query 41 in stream 0 using template query41.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=4.38MB Threads=1
+Max Per-Host Resource Reservation: Memory=5.31MB Threads=1
 Per-Host Resource Estimates: Memory=42MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=42.00MB mem-reservation=4.38MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[69619, 90610, 100, 100]
+|  Per-Instance Resources: mem-estimate=42.00MB mem-reservation=5.31MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[592384, 1013866, 100, 100]
 PLAN-ROOT SINK
 |  output exprs: (i_product_name)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=100
 |
 05:TOP-N [LIMIT=100]
 |  order by: (i_product_name) ASC
-|  mem-estimate=2.93KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=30B cardinality=100 cost=100
+|  mem-estimate=3.40KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=35B cardinality=100 cost=100
 |  in pipelines: 05(GETNEXT), 04(OPEN)
 |
 04:AGGREGATE [FINALIZE]
 |  group by: (i_product_name)
-|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=30B cardinality=1.80K cost=1800
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=36000
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -92,7 +78,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  other predicates: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2N row-size=89B cardinality=1.80K cost=1801
+|  tuple-ids=0,2N row-size=93B cardinality=36.00K cost=36018
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:AGGREGATE [FINALIZE]
@@ -100,38 +86,38 @@ PLAN-ROOT SINK
 |  |  group by: i_manufact
 |  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=1 cost=16
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=356
 |  |  in pipelines: 02(GETNEXT), 01(OPEN)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     predicates: ((i_category = 'Women' AND ((i_color IN ('powder', 'khaki') AND i_units IN ('Ounce', 'Oz') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('brown', 'honeydew') AND i_units IN ('Bunch', 'Ton') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('floral', 'deep') AND i_units IN ('N/A', 'Dozen') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('light', 'cornflower') AND i_units IN ('Box', 'Pound') AND i_size IN ('medium', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('midnight', 'snow') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('cyan', 'papaya') AND i_units IN ('Cup', 'Dram') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('orange', 'frosted') AND i_units IN ('Each', 'Tbl') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('forest', 'ghost') AND i_units IN ('Lb', 'Bundle') AND i_size IN ('medium', 'extra large'))))
+|     predicates: ((i_category = 'Women' AND ((i_color IN ('beige', 'spring') AND i_units IN ('Tsp', 'Ton') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('white', 'pale') AND i_units IN ('Box', 'Dram') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('midnight', 'frosted') AND i_units IN ('Bunch', 'Carton') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('azure', 'goldenrod') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('petite', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('brown', 'hot') AND i_units IN ('Tbl', 'Cup') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('powder', 'honeydew') AND i_units IN ('Bundle', 'Unknown') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('antique', 'purple') AND i_units IN ('N/A', 'Dozen') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('lavender', 'tomato') AND i_units IN ('Lb', 'Oz') AND i_size IN ('petite', 'extra large'))))
 |     stored statistics:
-|       table: rows=18.00K size=1.73MB
+|       table: rows=360.00K size=33.54MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=18.00K
-|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=1 row-size=91B cardinality=8 cost=69603
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=1 row-size=91B cardinality=178 cost=592028
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item i1]
    HDFS partitions=1/1 files=1 size=1.73MB
-   predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    stored statistics:
-     table: rows=18.00K size=1.73MB
+     table: rows=360.00K size=33.54MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=18.00K
-   parquet statistics predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
-   parquet dictionary predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   extrapolated-rows=disabled max-scan-range-rows=101.54K
+   parquet statistics predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
+   parquet dictionary predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-   tuple-ids=0 row-size=57B cardinality=1.80K cost=87009
+   tuple-ids=0 row-size=62B cardinality=36.00K cost=941848
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=18.31MB Threads=8
-Per-Host Resource Estimates: Memory=99MB
+Max Per-Host Resource Reservation: Memory=14.81MB Threads=6
+Per-Host Resource Estimates: Memory=80MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[104] cpu-comparison-result=2 [max(1 (self) vs 2 (sum children))]
+|  max-parallelism=1 segment-costs=[104] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: (i_product_name)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=100
@@ -139,37 +125,37 @@ PLAN-ROOT SINK
 11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: (i_product_name) ASC
 |  limit: 100
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=30B cardinality=100 cost=4
+|  mem-estimate=16.03KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=35B cardinality=100 cost=4
 |  in pipelines: 05(GETNEXT)
 |
-F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=1 instances=2 (adjusted from 1)
-Per-Instance Resources: mem-estimate=10.08MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=2 segment-costs=[1860, 100, 4] cpu-comparison-result=2 [max(2 (self) vs 2 (sum children))]
+F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=10.45MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=4 segment-costs=[37366, 100, 4] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 05:TOP-N [LIMIT=100]
 |  order by: (i_product_name) ASC
-|  mem-estimate=2.93KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=30B cardinality=100 cost=100
+|  mem-estimate=3.40KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=35B cardinality=100 cost=100
 |  in pipelines: 05(GETNEXT), 10(OPEN)
 |
 10:AGGREGATE [FINALIZE]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=30B cardinality=1.80K cost=1800
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=36000
 |  in pipelines: 10(GETNEXT), 00(OPEN)
 |
 09:EXCHANGE [HASH((i_product_name))]
-|  mem-estimate=86.84KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=30B cardinality=1.80K cost=60
+|  mem-estimate=461.72KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=1366
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Instance Resources: mem-estimate=26.27MB mem-reservation=2.50MB thread-reservation=1
-max-parallelism=1 segment-costs=[90609, 60] cpu-comparison-result=2 [max(1 (self) vs 2 (sum children))]
+F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=26.61MB mem-reservation=2.50MB thread-reservation=1
+max-parallelism=4 segment-costs=[1013848, 1366] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 04:AGGREGATE [STREAMING]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=30B cardinality=1.80K cost=1800
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=36000
 |  in pipelines: 00(GETNEXT)
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -178,77 +164,77 @@ max-parallelism=1 segment-costs=[90609, 60] cpu-comparison-result=2 [max(1 (self
 |  fk/pk conjuncts: none
 |  other predicates: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2N row-size=89B cardinality=1.80K cost=1800
+|  tuple-ids=0,2N row-size=93B cardinality=36.00K cost=36000
 |  in pipelines: 00(GETNEXT), 07(OPEN)
 |
-|--F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F05:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 |  |  Per-Instance Resources: mem-estimate=1.95MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[2] cpu-comparison-result=2 [max(1 (self) vs 2 (sum children))]
+|  |  max-parallelism=4 segment-costs=[22] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_manufact
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=18
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=1 cost=1
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=4
 |  |  in pipelines: 07(GETNEXT)
 |  |
-|  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=1 instances=2 (adjusted from 1)
+|  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=10.14MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=2 segment-costs=[17, 1] cpu-comparison-result=2 [max(2 (self) vs 1 (sum children))]
+|  max-parallelism=4 segment-costs=[363, 1] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 |  07:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: i_manufact
 |  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=1 cost=16
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=356
 |  |  in pipelines: 07(GETNEXT), 01(OPEN)
 |  |
 |  06:EXCHANGE [HASH(i_manufact)]
-|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=8 cost=1
+|  |  mem-estimate=25.90KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=178 cost=7
 |  |  in pipelines: 01(GETNEXT)
 |  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=2.12MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[69619, 1]
+|  F01:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  Per-Instance Resources: mem-estimate=26.55MB mem-reservation=2.50MB thread-reservation=1
+|  max-parallelism=4 segment-costs=[592384, 7]
 |  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: i_manufact
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=8 cost=16
+|  |  tuple-ids=2 row-size=31B cardinality=178 cost=356
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     predicates: ((i_category = 'Women' AND ((i_color IN ('powder', 'khaki') AND i_units IN ('Ounce', 'Oz') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('brown', 'honeydew') AND i_units IN ('Bunch', 'Ton') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('floral', 'deep') AND i_units IN ('N/A', 'Dozen') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('light', 'cornflower') AND i_units IN ('Box', 'Pound') AND i_size IN ('medium', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('midnight', 'snow') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('cyan', 'papaya') AND i_units IN ('Cup', 'Dram') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('orange', 'frosted') AND i_units IN ('Each', 'Tbl') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('forest', 'ghost') AND i_units IN ('Lb', 'Bundle') AND i_size IN ('medium', 'extra large'))))
+|     predicates: ((i_category = 'Women' AND ((i_color IN ('beige', 'spring') AND i_units IN ('Tsp', 'Ton') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('white', 'pale') AND i_units IN ('Box', 'Dram') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('midnight', 'frosted') AND i_units IN ('Bunch', 'Carton') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('azure', 'goldenrod') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('petite', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('brown', 'hot') AND i_units IN ('Tbl', 'Cup') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('powder', 'honeydew') AND i_units IN ('Bundle', 'Unknown') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('antique', 'purple') AND i_units IN ('N/A', 'Dozen') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('lavender', 'tomato') AND i_units IN ('Lb', 'Oz') AND i_size IN ('petite', 'extra large'))))
 |     stored statistics:
-|       table: rows=18.00K size=1.73MB
+|       table: rows=360.00K size=33.54MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=18.00K
-|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=1 row-size=91B cardinality=8 cost=69603
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=1 row-size=91B cardinality=178 cost=592028
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item i1, RANDOM]
    HDFS partitions=1/1 files=1 size=1.73MB
-   predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    stored statistics:
-     table: rows=18.00K size=1.73MB
+     table: rows=360.00K size=33.54MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=18.00K
-   parquet statistics predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
-   parquet dictionary predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   extrapolated-rows=disabled max-scan-range-rows=101.54K
+   parquet statistics predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
+   parquet dictionary predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-   tuple-ids=0 row-size=57B cardinality=1.80K cost=87009
+   tuple-ids=0 row-size=62B cardinality=36.00K cost=941848
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=18.31MB Threads=8
-Per-Host Resource Estimates: Memory=99MB
+Max Per-Host Resource Reservation: Memory=14.81MB Threads=6
+Per-Host Resource Estimates: Memory=80MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[104] cpu-comparison-result=2 [max(1 (self) vs 2 (sum children))]
+|  max-parallelism=1 segment-costs=[104] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: (i_product_name)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=100
@@ -256,37 +242,37 @@ PLAN-ROOT SINK
 11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: (i_product_name) ASC
 |  limit: 100
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=30B cardinality=100 cost=4
+|  mem-estimate=16.03KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=35B cardinality=100 cost=4
 |  in pipelines: 05(GETNEXT)
 |
-F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=1 instances=2 (adjusted from 1)
-Per-Instance Resources: mem-estimate=10.08MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=2 segment-costs=[1860, 100, 4] cpu-comparison-result=2 [max(2 (self) vs 2 (sum children))]
+F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=10.45MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=4 segment-costs=[37366, 100, 4] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 05:TOP-N [LIMIT=100]
 |  order by: (i_product_name) ASC
-|  mem-estimate=2.93KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=30B cardinality=100 cost=100
+|  mem-estimate=3.40KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=35B cardinality=100 cost=100
 |  in pipelines: 05(GETNEXT), 10(OPEN)
 |
 10:AGGREGATE [FINALIZE]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=30B cardinality=1.80K cost=1800
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=36000
 |  in pipelines: 10(GETNEXT), 00(OPEN)
 |
 09:EXCHANGE [HASH((i_product_name))]
-|  mem-estimate=86.84KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=30B cardinality=1.80K cost=60
+|  mem-estimate=461.72KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=1366
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Instance Resources: mem-estimate=26.27MB mem-reservation=2.50MB thread-reservation=1
-max-parallelism=1 segment-costs=[90609, 60] cpu-comparison-result=2 [max(1 (self) vs 2 (sum children))]
+F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=26.61MB mem-reservation=2.50MB thread-reservation=1
+max-parallelism=4 segment-costs=[1013848, 1366] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 04:AGGREGATE [STREAMING]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=30B cardinality=1.80K cost=1800
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=36000
 |  in pipelines: 00(GETNEXT)
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -295,69 +281,69 @@ max-parallelism=1 segment-costs=[90609, 60] cpu-comparison-result=2 [max(1 (self
 |  fk/pk conjuncts: none
 |  other predicates: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2N row-size=89B cardinality=1.80K cost=1800
+|  tuple-ids=0,2N row-size=93B cardinality=36.00K cost=36000
 |  in pipelines: 00(GETNEXT), 07(OPEN)
 |
-|--F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F05:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 |  |  Per-Instance Resources: mem-estimate=1.95MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[2] cpu-comparison-result=2 [max(1 (self) vs 2 (sum children))]
+|  |  max-parallelism=4 segment-costs=[22] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_manufact
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=18
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=1 cost=1
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=4
 |  |  in pipelines: 07(GETNEXT)
 |  |
-|  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=1 instances=2 (adjusted from 1)
+|  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=10.14MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=2 segment-costs=[17, 1] cpu-comparison-result=2 [max(2 (self) vs 1 (sum children))]
+|  max-parallelism=4 segment-costs=[363, 1] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 |  07:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: i_manufact
 |  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=1 cost=16
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=356
 |  |  in pipelines: 07(GETNEXT), 01(OPEN)
 |  |
 |  06:EXCHANGE [HASH(i_manufact)]
-|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=8 cost=1
+|  |  mem-estimate=25.90KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=178 cost=7
 |  |  in pipelines: 01(GETNEXT)
 |  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=2.12MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[69619, 1]
+|  F01:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  Per-Instance Resources: mem-estimate=26.55MB mem-reservation=2.50MB thread-reservation=1
+|  max-parallelism=4 segment-costs=[592384, 7]
 |  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: i_manufact
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=8 cost=16
+|  |  tuple-ids=2 row-size=31B cardinality=178 cost=356
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     predicates: ((i_category = 'Women' AND ((i_color IN ('powder', 'khaki') AND i_units IN ('Ounce', 'Oz') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('brown', 'honeydew') AND i_units IN ('Bunch', 'Ton') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('floral', 'deep') AND i_units IN ('N/A', 'Dozen') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('light', 'cornflower') AND i_units IN ('Box', 'Pound') AND i_size IN ('medium', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('midnight', 'snow') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('cyan', 'papaya') AND i_units IN ('Cup', 'Dram') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('orange', 'frosted') AND i_units IN ('Each', 'Tbl') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('forest', 'ghost') AND i_units IN ('Lb', 'Bundle') AND i_size IN ('medium', 'extra large'))))
+|     predicates: ((i_category = 'Women' AND ((i_color IN ('beige', 'spring') AND i_units IN ('Tsp', 'Ton') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('white', 'pale') AND i_units IN ('Box', 'Dram') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('midnight', 'frosted') AND i_units IN ('Bunch', 'Carton') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('azure', 'goldenrod') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('petite', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('brown', 'hot') AND i_units IN ('Tbl', 'Cup') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('powder', 'honeydew') AND i_units IN ('Bundle', 'Unknown') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('antique', 'purple') AND i_units IN ('N/A', 'Dozen') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('lavender', 'tomato') AND i_units IN ('Lb', 'Oz') AND i_size IN ('petite', 'extra large'))))
 |     stored statistics:
-|       table: rows=18.00K size=1.73MB
+|       table: rows=360.00K size=33.54MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=18.00K
-|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=1 row-size=91B cardinality=8 cost=69603
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=1 row-size=91B cardinality=178 cost=592028
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item i1, RANDOM]
    HDFS partitions=1/1 files=1 size=1.73MB
-   predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    stored statistics:
-     table: rows=18.00K size=1.73MB
+     table: rows=360.00K size=33.54MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=18.00K
-   parquet statistics predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
-   parquet dictionary predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   extrapolated-rows=disabled max-scan-range-rows=101.54K
+   parquet statistics predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
+   parquet dictionary predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-   tuple-ids=0 row-size=57B cardinality=1.80K cost=87009
+   tuple-ids=0 row-size=62B cardinality=36.00K cost=941848
    in pipelines: 00(GETNEXT)
 ====

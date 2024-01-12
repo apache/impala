@@ -24,8 +24,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
@@ -34,7 +32,6 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
-import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.PartitionStatsUtil;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessLevel;
@@ -234,7 +231,11 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public long getNumRows() {
-    return FeCatalogUtils.getRowCount(hmsParameters_);
+    long rowCount = FeCatalogUtils.getRowCount(hmsParameters_);
+    if (table_.getDebugMetadataScale() > 1.0 && rowCount > 0) {
+      rowCount *= table_.getDebugMetadataScale();
+    }
+    return rowCount;
   }
 
   @Override

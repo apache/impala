@@ -212,6 +212,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   protected volatile long lastRefreshEventId_ = -1L;
 
+  // Test only stats that will be injected in place of stats obtained from HMS.
+  protected SideloadTableStats testStats_ = null;
+
+  // Scale factor to multiply table stats with. Only used for testing.
+  protected double testMetadataScale_ = 1.0;
+
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     msTable_ = msTable;
@@ -220,6 +226,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     owner_ = owner;
     tableStats_ = new TTableStats(-1);
     tableStats_.setTotal_file_bytes(-1);
+    if (db != null && RuntimeEnv.INSTANCE.hasSideloadStats(db.getName(), name)) {
+      testStats_ = RuntimeEnv.INSTANCE.getSideloadStats(db.getName(), name);
+    }
     initMetrics();
   }
 
@@ -429,8 +438,15 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * Sets 'tableStats_' by extracting the table statistics from the given HMS table.
    */
   public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    tableStats_ = new TTableStats(FeCatalogUtils.getRowCount(msTbl.getParameters()));
-    tableStats_.setTotal_file_bytes(FeCatalogUtils.getTotalSize(msTbl.getParameters()));
+    long rowCount = FeCatalogUtils.getRowCount(msTbl.getParameters());
+    if (testStats_ != null) {
+      tableStats_.setTotal_file_bytes(testStats_.getTotalSize());
+      testMetadataScale_ = (double) testStats_.getNumRows() / rowCount;
+      rowCount = testStats_.getNumRows();
+    } else {
+      tableStats_.setTotal_file_bytes(FeCatalogUtils.getTotalSize(msTbl.getParameters()));
+    }
+    tableStats_.setNum_rows(rowCount);
   }
 
   public void addColumn(Column col) {
@@ -489,7 +505,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         LOG.warn("Could not load column statistics for: " + getFullName(), e);
         return;
       }
-      FeCatalogUtils.injectColumnStats(colStats, this);
+      FeCatalogUtils.injectColumnStats(colStats, this, testStats_);
     } finally {
       columnStatsLdContext.stop();
     }
@@ -1087,4 +1103,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       setLastSyncedEventId(eventId);
     }
   }
+
+  public double getDebugMetadataScale() { return testMetadataScale_; }
 }

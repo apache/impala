@@ -41,6 +41,7 @@ import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.SideloadTableStats;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -48,6 +49,7 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -86,6 +88,12 @@ abstract class LocalTable implements FeTable {
 
   // Virtual columns of this table.
   protected final ArrayList<VirtualColumn> virtualCols_ = new ArrayList<>();
+
+  // Test only stats that will be injected in place of stats obtained from HMS.
+  protected SideloadTableStats testStats_ = null;
+
+  // Scale factor to multiply table stats with. Only used for testing.
+  protected double testMetadataScale_ = 1.0;
 
   /**
    * Table reference as provided by the initial call to the metadata provider.
@@ -166,10 +174,21 @@ abstract class LocalTable implements FeTable {
     this.ref_ = ref;
     this.msTable_ = msTbl;
 
-    tableStats_ = new TTableStats(
-        FeCatalogUtils.getRowCount(msTable_.getParameters()));
-    tableStats_.setTotal_file_bytes(
-        FeCatalogUtils.getTotalSize(msTable_.getParameters()));
+    if (RuntimeEnv.INSTANCE.hasSideloadStats(db.getName(), name_)) {
+      testStats_ = RuntimeEnv.INSTANCE.getSideloadStats(db.getName(), name_);
+    }
+
+    tableStats_ = new TTableStats(-1);
+    long rowCount = FeCatalogUtils.getRowCount(msTable_.getParameters());
+    if (testStats_ != null) {
+      tableStats_.setTotal_file_bytes(testStats_.getTotalSize());
+      testMetadataScale_ = (double) testStats_.getNumRows() / rowCount;
+      rowCount = testStats_.getNumRows();
+    } else {
+      tableStats_.setTotal_file_bytes(
+          FeCatalogUtils.getTotalSize(msTable_.getParameters()));
+    }
+    tableStats_.setNum_rows(rowCount);
   }
 
   public LocalTable(LocalDb db, Table msTbl, TableMetaRef ref) {
@@ -334,11 +353,13 @@ abstract class LocalTable implements FeTable {
     try {
       List<ColumnStatisticsObj> stats = db_.getCatalog().getMetaProvider()
           .loadTableColumnStatistics(ref_, getColumnNames());
-      FeCatalogUtils.injectColumnStats(stats, this);
+      FeCatalogUtils.injectColumnStats(stats, this, testStats_);
     } catch (TException e) {
       LOG.warn("Could not load column statistics for: " + getFullName(), e);
     }
   }
+
+  protected double getDebugMetadataScale() { return testMetadataScale_; }
 
   protected static class ColumnMap {
     private final ArrayType type_;

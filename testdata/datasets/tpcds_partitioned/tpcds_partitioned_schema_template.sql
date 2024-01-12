@@ -44,7 +44,7 @@ date_dim
 ---- COLUMNS
 d_date_sk                 int
 d_date_id                 string
-d_date                    string
+d_date                    date
 d_month_seq               int
 d_week_seq                int
 d_quarter_seq             int
@@ -180,10 +180,10 @@ tpcds_partitioned
 ---- BASE_TABLE_NAME
 item
 ---- COLUMNS
-i_item_sk                 bigint
+i_item_sk                 int
 i_item_id                 string
-i_rec_start_date          string
-i_rec_end_date            string
+i_rec_start_date          date
+i_rec_end_date            date
 i_item_desc               string
 i_current_price           decimal(7,2)
 i_wholesale_cost          decimal(7,2)
@@ -205,7 +205,54 @@ i_product_name            string
 primary key (i_item_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+(
+  i_item_sk,
+  i_item_id,
+  i_rec_start_date,
+  i_rec_end_date,
+  i_item_desc,
+  i_current_price,
+  i_wholesale_cost,
+  i_brand_id,
+  i_brand,
+  i_class_id,
+  i_class,
+  i_category_id,
+  i_category,
+  i_manufact_id,
+  i_manufact,
+  i_size,
+  i_formulation,
+  i_color,
+  i_units,
+  i_container,
+  i_manager_id,
+  i_product_name
+)
+SELECT
+  CAST(i_item_sk AS INT),
+  i_item_id,
+  i_rec_start_date,
+  i_rec_end_date,
+  i_item_desc,
+  i_current_price,
+  i_wholesale_cost,
+  i_brand_id,
+  i_brand,
+  i_class_id,
+  i_class,
+  i_category_id,
+  i_category,
+  i_manufact_id,
+  i_manufact,
+  i_size,
+  i_formulation,
+  i_color,
+  i_units,
+  i_container,
+  i_manager_id,
+  i_product_name
+FROM tpcds.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -238,8 +285,8 @@ call_center
 ---- COLUMNS
 cc_call_center_sk         int
 cc_call_center_id         string
-cc_rec_start_date         string
-cc_rec_end_date           string
+cc_rec_start_date         date
+cc_rec_end_date           date
 cc_closed_date_sk         int
 cc_open_date_sk           int
 cc_name                   string
@@ -296,16 +343,56 @@ c_birth_year              int
 c_birth_country           string
 c_login                   string
 c_email_address           string
-c_last_review_date        string
+c_last_review_date_sk     int
 primary key (c_customer_sk) DISABLE NOVALIDATE RELY
 foreign key (c_current_addr_sk) references {db_name}{db_suffix}.customer_address (ca_address_sk) DISABLE NOVALIDATE RELY
 foreign key (c_current_cdemo_sk) references {db_name}{db_suffix}.customer_demographics (cd_demo_sk) DISABLE NOVALIDATE RELY
 foreign key (c_current_hdemo_sk) references {db_name}{db_suffix}.household_demographics (hd_demo_sk) DISABLE NOVALIDATE RELY
 foreign key (c_first_sales_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 foreign key (c_first_shipto_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
+foreign key (c_last_review_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+(
+  c_customer_sk,
+  c_customer_id,
+  c_current_cdemo_sk,
+  c_current_hdemo_sk,
+  c_current_addr_sk,
+  c_first_shipto_date_sk,
+  c_first_sales_date_sk,
+  c_salutation,
+  c_first_name,
+  c_last_name,
+  c_preferred_cust_flag,
+  c_birth_day,
+  c_birth_month,
+  c_birth_year,
+  c_birth_country,
+  c_login,
+  c_email_address,
+  c_last_review_date_sk
+)
+SELECT
+  c_customer_sk,
+  c_customer_id,
+  c_current_cdemo_sk,
+  c_current_hdemo_sk,
+  c_current_addr_sk,
+  c_first_shipto_date_sk,
+  c_first_sales_date_sk,
+  c_salutation,
+  c_first_name,
+  c_last_name,
+  c_preferred_cust_flag,
+  c_birth_day,
+  c_birth_month,
+  c_birth_year,
+  c_birth_country,
+  c_login,
+  c_email_address,
+  CAST(c_last_review_date AS INT)
+FROM tpcds.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -316,7 +403,7 @@ p_promo_sk                int
 p_promo_id                string
 p_start_date_sk           int
 p_end_date_sk             int
-p_item_sk                 bigint
+p_item_sk                 int
 p_cost                    decimal(15,2)
 p_response_target         int
 p_promo_name              string
@@ -337,7 +424,48 @@ foreign key (p_end_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk)
 foreign key (p_item_sk) references {db_name}{db_suffix}.item (i_item_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+(
+  p_promo_sk,
+  p_promo_id,
+  p_start_date_sk,
+  p_end_date_sk,
+  p_item_sk,
+  p_cost,
+  p_response_target,
+  p_promo_name,
+  p_channel_dmail,
+  p_channel_email,
+  p_channel_catalog,
+  p_channel_tv,
+  p_channel_radio,
+  p_channel_press,
+  p_channel_event,
+  p_channel_demo,
+  p_channel_details,
+  p_purpose,
+  p_discount_active
+)
+SELECT
+  p_promo_sk,
+  p_promo_id,
+  p_start_date_sk,
+  p_end_date_sk,
+  CAST(p_item_sk AS INT),
+  p_cost,
+  p_response_target,
+  p_promo_name,
+  p_channel_dmail,
+  p_channel_email,
+  p_channel_catalog,
+  p_channel_tv,
+  p_channel_radio,
+  p_channel_press,
+  p_channel_event,
+  p_channel_demo,
+  p_channel_details,
+  p_purpose,
+  p_discount_active
+FROM tpcds.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -346,8 +474,8 @@ store
 ---- COLUMNS
 s_store_sk                int
 s_store_id                string
-s_rec_start_date          string
-s_rec_end_date            string
+s_rec_start_date          date
+s_rec_end_date            date
 s_closed_date_sk          int
 s_store_name              string
 s_number_employees        int
@@ -407,8 +535,8 @@ web_page
 ---- COLUMNS
 wp_web_page_sk            int
 wp_web_page_id            string
-wp_rec_start_date         string
-wp_rec_end_date           string
+wp_rec_start_date         date
+wp_rec_end_date           date
 wp_creation_date_sk       int
 wp_access_date_sk         int
 wp_autogen_flag           string
@@ -434,8 +562,8 @@ web_site
 ---- COLUMNS
 web_site_sk           int
 web_site_id           string
-web_rec_start_date    string
-web_rec_end_date      string
+web_rec_start_date    date
+web_rec_end_date      date
 web_name              string
 web_open_date_sk      int
 web_close_date_sk     int
@@ -470,7 +598,7 @@ tpcds_partitioned
 ---- BASE_TABLE_NAME
 inventory
 ---- COLUMNS
-inv_item_sk                bigint
+inv_item_sk                int
 inv_warehouse_sk           int
 inv_quantity_on_hand       int
 primary key (inv_item_sk, inv_warehouse_sk) DISABLE NOVALIDATE RELY
@@ -489,9 +617,15 @@ SET MAX_SCAN_RANGE_LENGTH=1mb;
 -- overwrite query.
 SET MT_DOP=4;
 
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(inv_date_sk)
-SELECT
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+(
   inv_item_sk,
+  inv_warehouse_sk,
+  inv_quantity_on_hand
+)
+PARTITION (inv_date_sk)
+SELECT
+  CAST(inv_item_sk AS INT),
   inv_warehouse_sk,
   inv_quantity_on_hand,
   inv_date_sk
@@ -516,7 +650,7 @@ cs_call_center_sk         int
 cs_catalog_page_sk        int
 cs_ship_mode_sk           int
 cs_warehouse_sk           int
-cs_item_sk                bigint
+cs_item_sk                int
 cs_promo_sk               int
 cs_order_number           bigint
 cs_quantity               int
@@ -556,8 +690,8 @@ foreign key (cs_promo_sk) references {db_name}{db_suffix}.promotion (p_promo_sk)
 ---- PARTITION_COLUMNS
 cs_sold_date_sk           int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(cs_sold_date_sk)
-SELECT
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+(
   cs_sold_time_sk,
   cs_ship_date_sk,
   cs_bill_customer_sk,
@@ -590,6 +724,42 @@ SELECT
   cs_net_paid_inc_tax,
   cs_net_paid_inc_ship,
   cs_net_paid_inc_ship_tax,
+  cs_net_profit
+)
+PARTITION (cs_sold_date_sk)
+SELECT
+  cs_sold_time_sk,
+  cs_ship_date_sk,
+  cs_bill_customer_sk,
+  cs_bill_cdemo_sk,
+  cs_bill_hdemo_sk,
+  cs_bill_addr_sk,
+  cs_ship_customer_sk,
+  cs_ship_cdemo_sk,
+  cs_ship_hdemo_sk,
+  cs_ship_addr_sk,
+  cs_call_center_sk,
+  cs_catalog_page_sk,
+  cs_ship_mode_sk,
+  cs_warehouse_sk,
+  CAST(cs_item_sk AS INT),
+  cs_promo_sk,
+  cs_order_number,
+  cs_quantity,
+  cs_wholesale_cost,
+  cs_list_price,
+  cs_sales_price,
+  cs_ext_discount_amt,
+  cs_ext_sales_price,
+  cs_ext_wholesale_cost,
+  cs_ext_list_price,
+  cs_ext_tax,
+  cs_coupon_amt,
+  cs_ext_ship_cost,
+  cs_net_paid,
+  cs_net_paid_inc_tax,
+  cs_net_paid_inc_ship,
+  cs_net_paid_inc_ship_tax,
   cs_net_profit,
   cs_sold_date_sk
 FROM tpcds.{table_name};
@@ -600,7 +770,7 @@ tpcds_partitioned
 catalog_returns
 ---- COLUMNS
 cr_returned_time_sk       int
-cr_item_sk                bigint
+cr_item_sk                int
 cr_refunded_customer_sk   int
 cr_refunded_cdemo_sk      int
 cr_refunded_hdemo_sk      int
@@ -646,10 +816,39 @@ foreign key (cr_item_sk, cr_order_number) references {db_name}{db_suffix}.catalo
 ---- PARTITION_COLUMNS
 cr_returned_date_sk       int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(cr_returned_date_sk)
-SELECT
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+(
   cr_returned_time_sk,
   cr_item_sk,
+  cr_refunded_customer_sk,
+  cr_refunded_cdemo_sk,
+  cr_refunded_hdemo_sk,
+  cr_refunded_addr_sk,
+  cr_returning_customer_sk,
+  cr_returning_cdemo_sk,
+  cr_returning_hdemo_sk,
+  cr_returning_addr_sk,
+  cr_call_center_sk,
+  cr_catalog_page_sk,
+  cr_ship_mode_sk,
+  cr_warehouse_sk,
+  cr_reason_sk,
+  cr_order_number,
+  cr_return_quantity,
+  cr_return_amount,
+  cr_return_tax,
+  cr_return_amt_inc_tax,
+  cr_fee,
+  cr_return_ship_cost,
+  cr_refunded_cash,
+  cr_reversed_charge,
+  cr_store_credit,
+  cr_net_loss
+)
+PARTITION (cr_returned_date_sk)
+SELECT
+  cr_returned_time_sk,
+  CAST(cr_item_sk AS INT),
   cr_refunded_customer_sk,
   cr_refunded_cdemo_sk,
   cr_refunded_hdemo_sk,
@@ -683,7 +882,7 @@ tpcds_partitioned
 store_sales
 ---- COLUMNS
 ss_sold_time_sk           int
-ss_item_sk                bigint
+ss_item_sk                int
 ss_customer_sk            int
 ss_cdemo_sk               int
 ss_hdemo_sk               int
@@ -717,9 +916,35 @@ foreign key (ss_promo_sk) references {db_name}{db_suffix}.promotion (p_promo_sk)
 ---- PARTITION_COLUMNS
 ss_sold_date_sk int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
-SELECT ss_sold_time_sk,
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+(
+  ss_sold_time_sk,
   ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit
+)
+PARTITION (ss_sold_date_sk)
+SELECT
+  ss_sold_time_sk,
+  CAST(ss_item_sk AS INT),
   ss_customer_sk,
   ss_cdemo_sk,
   ss_hdemo_sk,
@@ -749,7 +974,7 @@ tpcds_partitioned
 store_returns
 ---- COLUMNS
 sr_return_time_sk         int
-sr_item_sk                bigint
+sr_item_sk                int
 sr_customer_sk            int
 sr_cdemo_sk               int
 sr_hdemo_sk               int
@@ -781,10 +1006,32 @@ foreign key (sr_item_sk, sr_ticket_number) references {db_name}{db_suffix}.store
 ---- PARTITION_COLUMNS
 sr_returned_date_sk       int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(sr_returned_date_sk)
-SELECT
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+(
   sr_return_time_sk,
   sr_item_sk,
+  sr_customer_sk,
+  sr_cdemo_sk,
+  sr_hdemo_sk,
+  sr_addr_sk,
+  sr_store_sk,
+  sr_reason_sk,
+  sr_ticket_number,
+  sr_return_quantity,
+  sr_return_amt,
+  sr_return_tax,
+  sr_return_amt_inc_tax,
+  sr_fee,
+  sr_return_ship_cost,
+  sr_refunded_cash,
+  sr_reversed_charge,
+  sr_store_credit,
+  sr_net_loss
+)
+PARTITION (sr_returned_date_sk)
+SELECT
+  sr_return_time_sk,
+  CAST(sr_item_sk AS INT),
   sr_customer_sk,
   sr_cdemo_sk,
   sr_hdemo_sk,
@@ -812,7 +1059,7 @@ web_sales
 ---- COLUMNS
 ws_sold_time_sk           int
 ws_ship_date_sk           int
-ws_item_sk                bigint
+ws_item_sk                int
 ws_bill_customer_sk       int
 ws_bill_cdemo_sk          int
 ws_bill_hdemo_sk          int
@@ -864,11 +1111,47 @@ foreign key (ws_promo_sk) references {db_name}{db_suffix}.promotion (p_promo_sk)
 ---- PARTITION_COLUMNS
 ws_sold_date_sk           int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(ws_sold_date_sk)
-SELECT
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+(
   ws_sold_time_sk,
   ws_ship_date_sk,
   ws_item_sk,
+  ws_bill_customer_sk,
+  ws_bill_cdemo_sk,
+  ws_bill_hdemo_sk,
+  ws_bill_addr_sk,
+  ws_ship_customer_sk,
+  ws_ship_cdemo_sk,
+  ws_ship_hdemo_sk,
+  ws_ship_addr_sk,
+  ws_web_page_sk,
+  ws_web_site_sk,
+  ws_ship_mode_sk,
+  ws_warehouse_sk,
+  ws_promo_sk,
+  ws_order_number,
+  ws_quantity,
+  ws_wholesale_cost,
+  ws_list_price,
+  ws_sales_price,
+  ws_ext_discount_amt,
+  ws_ext_sales_price,
+  ws_ext_wholesale_cost,
+  ws_ext_list_price,
+  ws_ext_tax,
+  ws_coupon_amt,
+  ws_ext_ship_cost,
+  ws_net_paid,
+  ws_net_paid_inc_tax,
+  ws_net_paid_inc_ship,
+  ws_net_paid_inc_ship_tax,
+  ws_net_profit
+)
+PARTITION (ws_sold_date_sk)
+SELECT
+  ws_sold_time_sk,
+  ws_ship_date_sk,
+  CAST(ws_item_sk AS INT),
   ws_bill_customer_sk,
   ws_bill_cdemo_sk,
   ws_bill_hdemo_sk,
@@ -908,7 +1191,7 @@ tpcds_partitioned
 web_returns
 ---- COLUMNS
 wr_returned_time_sk       int
-wr_item_sk                bigint
+wr_item_sk                int
 wr_refunded_customer_sk   int
 wr_refunded_cdemo_sk      int
 wr_refunded_hdemo_sk      int
@@ -948,10 +1231,36 @@ foreign key (wr_item_sk, wr_order_number) references {db_name}{db_suffix}.web_sa
 ---- PARTITION_COLUMNS
 wr_returned_date_sk       int
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(wr_returned_date_sk)
-SELECT
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+(
   wr_returned_time_sk,
   wr_item_sk,
+  wr_refunded_customer_sk,
+  wr_refunded_cdemo_sk,
+  wr_refunded_hdemo_sk,
+  wr_refunded_addr_sk,
+  wr_returning_customer_sk,
+  wr_returning_cdemo_sk,
+  wr_returning_hdemo_sk,
+  wr_returning_addr_sk,
+  wr_web_page_sk,
+  wr_reason_sk,
+  wr_order_number,
+  wr_return_quantity,
+  wr_return_amt,
+  wr_return_tax,
+  wr_return_amt_inc_tax,
+  wr_fee,
+  wr_return_ship_cost,
+  wr_refunded_cash,
+  wr_reversed_charge,
+  wr_account_credit,
+  wr_net_loss
+)
+PARTITION (wr_returned_date_sk)
+SELECT
+  wr_returned_time_sk,
+  CAST(wr_item_sk AS INT),
   wr_refunded_customer_sk,
   wr_refunded_cdemo_sk,
   wr_refunded_hdemo_sk,

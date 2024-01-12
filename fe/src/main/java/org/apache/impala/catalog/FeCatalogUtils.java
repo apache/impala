@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.Expr;
@@ -159,8 +160,8 @@ public abstract class FeCatalogUtils {
    * Given the list of column stats returned from the metastore, inject those
    * stats into matching columns in 'table'.
    */
-  public static void injectColumnStats(List<ColumnStatisticsObj> colStats,
-      FeTable table) {
+  public static void injectColumnStats(
+      List<ColumnStatisticsObj> colStats, FeTable table, SideloadTableStats testStats) {
     for (ColumnStatisticsObj stats: colStats) {
       Column col = table.getColumn(stats.getColName());
       Preconditions.checkNotNull(col, "Unable to find column %s in table %s",
@@ -171,8 +172,15 @@ public abstract class FeCatalogUtils {
             "has type %s", table.getFullName(), col.getName(), col.getType()));
         continue;
       }
+      ColumnStatisticsData colStatsData = stats.getStatsData();
+      if (testStats != null && testStats.hasColumn(stats.getColName())) {
+        colStatsData = testStats.getColumnStats(stats.getColName());
+        Preconditions.checkNotNull(colStatsData);
+        LOG.info("Sideload stats for " + table.getFullName() + "." + stats.getColName()
+            + ". " + colStatsData);
+      }
 
-      if (!col.updateStats(stats.getStatsData())) {
+      if (!col.updateStats(colStatsData)) {
         LOG.warn(String.format(
             "Failed to load column stats for %s, column %s. Stats may be " +
             "incompatible with column type %s. Consider regenerating statistics " +

@@ -1123,6 +1123,14 @@ public class HdfsScanNode extends ScanNode {
 
     long scanRangeBytesLimit = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
+    if (RuntimeEnv.INSTANCE.hasTableScanRangeLimit() && desc_.getTableName() != null) {
+      long testLimit = RuntimeEnv.INSTANCE.getTableScanRangeLimit(
+          desc_.getTableName().getDb(), desc_.getTableName().getTbl());
+      if (testLimit > 0
+          && (scanRangeBytesLimit == 0 || scanRangeBytesLimit > testLimit)) {
+        scanRangeBytesLimit = testLimit;
+      }
+    }
     scanRangeSpecs_ = new TScanRangeSpec();
 
     numPartitionsPerFs_ = new TreeMap<>();
@@ -1746,8 +1754,11 @@ public class HdfsScanNode extends ScanNode {
             ++numLocalRanges;
           }
         }
-        totalNodes =
-            Math.min(scanRangeSpecs_.concrete_ranges.size(), dummyHostIndex.size());
+        totalNodes = Math.min(scanRangeSpecs_.concrete_ranges.size(),
+            analyzer.getQueryOptions().getReplica_preference().equals(
+                TReplicaPreference.REMOTE) ?
+                analyzer.numExecutorsForPlanning() :
+                dummyHostIndex.size());
         totalInstances = Math.min(scanRangeSpecs_.concrete_ranges.size(),
             totalNodes * maxInstancesPerNode);
         LOG.info(String.format("Planner running in DEBUG mode. ScanNode: %s, "

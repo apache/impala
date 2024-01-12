@@ -1,501 +1,615 @@
 # TPCDS-Q84
-SELECT c_customer_id AS customer_id ,
-       concat(concat(coalesce(c_last_name, '') , ', '), coalesce(c_first_name, '')) AS customername
-FROM customer ,
-     customer_address ,
-     household_demographics ,
-     income_band ,
-     store_returns
-WHERE ca_city = 'Edgewood'
-  AND c_current_addr_sk = ca_address_sk
-  AND ib_lower_bound >= 38128
-  AND ib_upper_bound <= 38128 + 50000
-  AND ib_income_band_sk = hd_income_band_sk
-  AND sr_cdemo_sk = c_current_cdemo_sk
-  AND hd_demo_sk = c_current_hdemo_sk
-ORDER BY c_customer_id
-LIMIT 100;
+# start query 84 in stream 0 using template query84.tpl using seed 946371925
+select  c_customer_id as customer_id
+       , coalesce(c_last_name,'') || ', ' || coalesce(c_first_name,'') as customername
+ from customer
+     ,customer_address
+     ,customer_demographics
+     ,household_demographics
+     ,income_band
+     ,store_returns
+ where ca_city	        =  'Antioch'
+   and c_current_addr_sk = ca_address_sk
+   and ib_lower_bound   >=  55019
+   and ib_upper_bound   <=  55019 + 50000
+   and ib_income_band_sk = hd_income_band_sk
+   and cd_demo_sk = c_current_cdemo_sk
+   and hd_demo_sk = c_current_hdemo_sk
+   and sr_cdemo_sk = cd_demo_sk
+ order by c_customer_id
+ limit 100;
+
+# end query 84 in stream 0 using template query84.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=14.02MB Threads=1
-Per-Host Resource Estimates: Memory=88MB
+Max Per-Host Resource Reservation: Memory=81.52MB Threads=1
+Per-Host Resource Estimates: Memory=3.45GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=87.88MB mem-reservation=14.02MB thread-reservation=1 runtime-filters-memory=4.00MB
-|  max-parallelism=1 segment-costs=[100452084, 38]
+|  Per-Instance Resources: mem-estimate=3.45GB mem-reservation=81.52MB thread-reservation=1 runtime-filters-memory=5.00MB
+|  max-parallelism=1 segment-costs=[15056793716, 200]
 PLAN-ROOT SINK
 |  output exprs: c_customer_id, concat(concat(coalesce(c_last_name, ''), ', '), coalesce(c_first_name, ''))
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=38
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=200
 |
-09:TOP-N [LIMIT=100]
+11:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC
-|  mem-estimate=1.19KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=19 cost=19
-|  in pipelines: 09(GETNEXT), 04(OPEN)
+|  mem-estimate=6.25KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=64B cardinality=100 cost=100
+|  in pipelines: 11(GETNEXT), 05(OPEN)
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: hd_income_band_sk = ib_income_band_sk
+|  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
+|  runtime filters: RF000[bloom] <- ib_income_band_sk, RF001[min_max] <- ib_income_band_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,2,0,1,3,4 row-size=129B cardinality=1.46M cost=14584044
+|  in pipelines: 05(GETNEXT), 04(OPEN)
+|
+|--04:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band]
+|     HDFS partitions=1/1 files=1 size=1.21KB
+|     predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     stored statistics:
+|       table: rows=20 size=1.22KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=20
+|     parquet statistics predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     parquet dictionary predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+|     tuple-ids=4 row-size=12B cardinality=2 cost=50041
+|     in pipelines: 04(GETNEXT)
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: c_current_hdemo_sk = hd_demo_sk
+|  fk/pk conjuncts: c_current_hdemo_sk = hd_demo_sk
+|  runtime filters: RF002[bloom] <- hd_demo_sk, RF003[min_max] <- hd_demo_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,2,0,1,3 row-size=117B cardinality=14.58M cost=14947740
+|  in pipelines: 05(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
+|     HDFS partitions=1/1 files=1 size=41.69KB
+|     runtime filters: RF001[min_max] -> hd_income_band_sk, RF000[bloom] -> hd_income_band_sk
+|     stored statistics:
+|       table: rows=7.20K size=41.69KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=7.20K
+|     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
+|     tuple-ids=3 row-size=8B cardinality=7.20K cost=50057
+|     in pipelines: 03(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: sr_cdemo_sk = c_current_cdemo_sk
-|  fk/pk conjuncts: none
-|  runtime filters: RF000[bloom] <- c_current_cdemo_sk, RF001[min_max] <- c_current_cdemo_sk
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
+|  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=19 cost=36
-|  in pipelines: 04(GETNEXT), 02(OPEN)
+|  tuple-ids=5,2,0,1 row-size=109B cardinality=14.94M cost=13165788964
+|  in pipelines: 05(GETNEXT), 01(OPEN)
 |
-|--07:HASH JOIN [INNER JOIN]
-|  |  hash predicates: hd_income_band_sk = ib_income_band_sk
-|  |  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
-|  |  runtime filters: RF002[bloom] <- ib_income_band_sk, RF003[min_max] <- ib_income_band_sk
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17 cost=168
-|  |  in pipelines: 02(GETNEXT), 03(OPEN)
-|  |
-|  |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
-|  |     predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=20
-|  |     parquet statistics predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     parquet dictionary predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
-|  |     tuple-ids=3 row-size=12B cardinality=2 cost=50041
-|  |     in pipelines: 03(GETNEXT)
-|  |
-|  06:HASH JOIN [INNER JOIN]
-|  |  hash predicates: hd_demo_sk = c_current_hdemo_sk
-|  |  fk/pk conjuncts: hd_demo_sk = c_current_hdemo_sk
-|  |  runtime filters: RF004[bloom] <- c_current_hdemo_sk, RF005[min_max] <- c_current_hdemo_sk
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1 row-size=109B cardinality=166 cost=340
-|  |  in pipelines: 02(GETNEXT), 00(OPEN)
-|  |
-|  |--05:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: c_current_addr_sk = ca_address_sk
-|  |  |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
-|  |  |  runtime filters: RF006[bloom] <- ca_address_sk, RF007[min_max] <- ca_address_sk
-|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=170 cost=247
-|  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
-|  |  |
-|  |  |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
-|  |  |     HDFS partitions=1/1 files=1 size=1.16MB
-|  |  |     predicates: ca_city = 'Edgewood'
-|  |  |     stored statistics:
-|  |  |       table: rows=50.00K size=1.16MB
-|  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=50.00K
-|  |  |     parquet statistics predicates: ca_city = 'Edgewood'
-|  |  |     parquet dictionary predicates: ca_city = 'Edgewood'
-|  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |  |     tuple-ids=1 row-size=25B cardinality=73 cost=101218
-|  |  |     in pipelines: 01(GETNEXT)
-|  |  |
-|  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
-|  |     runtime filters: RF007[min_max] -> c_current_addr_sk, RF006[bloom] -> c_current_addr_sk
-|  |     stored statistics:
-|  |       table: rows=100.00K size=5.49MB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=100.00K
-|  |     mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-|  |     tuple-ids=0 row-size=76B cardinality=174(filtered from 100.00K) cost=50013
-|  |     in pipelines: 00(GETNEXT)
-|  |
-|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
-|     HDFS partitions=1/1 files=1 size=41.69KB
-|     runtime filters: RF003[min_max] -> hd_income_band_sk, RF005[min_max] -> hd_demo_sk, RF002[bloom] -> hd_income_band_sk, RF004[bloom] -> hd_demo_sk
+|--01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
+|     HDFS partitions=1/1 files=1 size=1.16MB
+|     predicates: ca_city = 'Antioch'
 |     stored statistics:
-|       table: rows=7.20K size=41.69KB
+|       table: rows=15.00M size=307.36MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=7.20K
-|     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
-|     tuple-ids=2 row-size=8B cardinality=170(filtered from 7.20K) cost=50002
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_city = 'Antioch'
+|     parquet dictionary predicates: ca_city = 'Antioch'
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=25B cardinality=15.14K cost=15865513
+|     in pipelines: 01(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: cd_demo_sk = c_current_cdemo_sk
+|  fk/pk conjuncts: none
+|  runtime filters: RF006[bloom] <- c_current_cdemo_sk, RF007[min_max] <- c_current_cdemo_sk
+|  mem-estimate=3.29GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5,2,0 row-size=84B cardinality=13.17G cost=883409856
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+|--00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
+|     HDFS partitions=1/1 files=1 size=5.49MB
+|     runtime filters: RF003[min_max] -> c_current_hdemo_sk, RF005[min_max] -> c_current_addr_sk, RF002[bloom] -> c_current_hdemo_sk, RF004[bloom] -> c_current_addr_sk
+|     stored statistics:
+|       table: rows=30.00M size=1.55GB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.10M
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=0 row-size=76B cardinality=30.00M cost=2725609
+|     in pipelines: 00(GETNEXT)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: sr_cdemo_sk = cd_demo_sk
+|  fk/pk conjuncts: sr_cdemo_sk = cd_demo_sk
+|  runtime filters: RF008[bloom] <- cd_demo_sk, RF009[min_max] <- cd_demo_sk
+|  mem-estimate=55.33MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5,2 row-size=8B cardinality=853.41M cost=855330656
+|  in pipelines: 05(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics]
+|     HDFS partitions=1/1 files=1 size=7.49MB
+|     runtime filters: RF007[min_max] -> cd_demo_sk, RF006[bloom] -> cd_demo_sk
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=4B cardinality=1.92M cost=507504
 |     in pipelines: 02(GETNEXT)
 |
-04:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
-   HDFS partitions=2004/2004 files=2004 size=33.80MB
-   runtime filters: RF001[min_max] -> sr_cdemo_sk, RF000[bloom] -> sr_cdemo_sk
+05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
+   HDFS partitions=2004/2004 files=2004 size=33.63MB
+   runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_cdemo_sk, RF009[min_max] -> sr_cdemo_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_cdemo_sk, RF008[bloom] -> sr_cdemo_sk
    stored statistics:
-     table: rows=287.51K size=33.80MB
-     partitions: 2004/2004 rows=287.51K
+     table: rows=863.99M size=48.14GB
+     partitions: 2004/2004 rows=863.99M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=10.01K
-   mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=4 row-size=4B cardinality=19(filtered from 287.51K) cost=100200000
-   in pipelines: 04(GETNEXT)
+   extrapolated-rows=disabled max-scan-range-rows=30.09M
+   mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+   tuple-ids=5 row-size=4B cardinality=853.41M(filtered from 863.99M) cost=103533632
+   in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=30.65MB Threads=13
-Per-Host Resource Estimates: Memory=155MB
-F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[40] cpu-comparison-result=12 [max(1 (self) vs 12 (sum children))]
+Max Per-Host Resource Reservation: Memory=850.96MB Threads=44
+Per-Host Resource Estimates: Memory=1.44GB
+F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.78MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[207] cpu-comparison-result=220 [max(1 (self) vs 220 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: c_customer_id, concat(concat(coalesce(c_last_name, ''), ', '), coalesce(c_first_name, ''))
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=38
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=200
 |
-14:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_customer_id ASC
 |  limit: 100
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=19 cost=2
-|  in pipelines: 09(GETNEXT)
+|  mem-estimate=797.15KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=64B cardinality=100 cost=7
+|  in pipelines: 11(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=12 (adjusted from 48)
-Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-Per-Instance Resources: mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=1
-max-parallelism=12 segment-costs=[100200038, 2] cpu-comparison-result=12 [max(12 (self) vs 4 (sum children))]
-09:TOP-N [LIMIT=100]
+F03:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=11.57MB mem-reservation=0B thread-reservation=1
+max-parallelism=1410 segment-costs=[14062042891, 7] cpu-comparison-result=220 [max(220 (self) vs 192 (sum children))]
+11:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC
-|  mem-estimate=1.19KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=19 cost=19
-|  in pipelines: 09(GETNEXT), 04(OPEN)
+|  mem-estimate=6.25KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=64B cardinality=100 cost=100
+|  in pipelines: 11(GETNEXT), 05(OPEN)
 |
-08:HASH JOIN [INNER JOIN, BROADCAST]
+10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
-|  hash predicates: sr_cdemo_sk = c_current_cdemo_sk
-|  fk/pk conjuncts: none
+|  hash predicates: hd_income_band_sk = ib_income_band_sk
+|  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=19 cost=19
-|  in pipelines: 04(GETNEXT), 02(OPEN)
+|  tuple-ids=5,2,0,1,3,4 row-size=129B cardinality=1.46M cost=14584042
+|  in pipelines: 05(GETNEXT), 04(OPEN)
 |
-|--F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=8.77MB mem-reservation=8.75MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=3 segment-costs=[26] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+|--F08:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[12]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
-|  |  build expressions: c_current_cdemo_sk
-|  |  runtime filters: RF000[bloom] <- c_current_cdemo_sk, RF001[min_max] <- c_current_cdemo_sk
-|  |  mem-estimate=7.75MB mem-reservation=7.75MB spill-buffer=64.00KB thread-reservation=0 cost=17
+|  |  build expressions: ib_income_band_sk
+|  |  runtime filters: RF000[bloom] <- ib_income_band_sk, RF001[min_max] <- ib_income_band_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=2
 |  |
-|  13:EXCHANGE [BROADCAST]
+|  17:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17 cost=9
-|  |  in pipelines: 02(GETNEXT)
+|  |  tuple-ids=4 row-size=12B cardinality=2 cost=10
+|  |  in pipelines: 04(GETNEXT)
 |  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
-|  Per-Instance Resources: mem-estimate=16.53MB mem-reservation=64.00KB thread-reservation=1
-|  max-parallelism=1 segment-costs=[50341]
-|  07:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash-table-id=01
-|  |  hash predicates: hd_income_band_sk = ib_income_band_sk
-|  |  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17 cost=166
-|  |  in pipelines: 02(GETNEXT), 03(OPEN)
+|  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[50042]
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.21KB
+|     predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     stored statistics:
+|       table: rows=20 size=1.22KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=20
+|     parquet statistics predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     parquet dictionary predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+|     tuple-ids=4 row-size=12B cardinality=2 cost=50041
+|     in pipelines: 04(GETNEXT)
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: c_current_hdemo_sk = hd_demo_sk
+|  fk/pk conjuncts: c_current_hdemo_sk = hd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,2,0,1,3 row-size=117B cardinality=14.58M cost=14940540
+|  in pipelines: 05(GETNEXT), 03(OPEN)
+|
+|--F09:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.32MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[8050]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: hd_demo_sk
+|  |  runtime filters: RF002[bloom] <- hd_demo_sk, RF003[min_max] <- hd_demo_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7200
 |  |
-|  |--F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  max-parallelism=1 segment-costs=[3]
-|  |  JOIN BUILD
-|  |  |  join-table-id=01 plan-id=02 cohort-id=02
-|  |  |  build expressions: ib_income_band_sk
-|  |  |  runtime filters: RF002[bloom] <- ib_income_band_sk, RF003[min_max] <- ib_income_band_sk
-|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=2
-|  |  |
-|  |  12:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=3 row-size=12B cardinality=2 cost=1
-|  |  |  in pipelines: 03(GETNEXT)
-|  |  |
-|  |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[50042]
-|  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
-|  |     predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=20
-|  |     parquet statistics predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     parquet dictionary predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
-|  |     tuple-ids=3 row-size=12B cardinality=2 cost=50041
-|  |     in pipelines: 03(GETNEXT)
+|  16:EXCHANGE [BROADCAST]
+|  |  mem-estimate=68.25KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=3 row-size=8B cardinality=7.20K cost=850
+|  |  in pipelines: 03(GETNEXT)
 |  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash-table-id=02
-|  |  hash predicates: hd_demo_sk = c_current_hdemo_sk
-|  |  fk/pk conjuncts: hd_demo_sk = c_current_hdemo_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1 row-size=109B cardinality=166 cost=170
-|  |  in pipelines: 02(GETNEXT), 00(OPEN)
-|  |
-|  |--F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=2.97MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  max-parallelism=1 segment-costs=[189] cpu-comparison-result=2 [max(2 (self) vs 2 (sum children))]
-|  |  JOIN BUILD
-|  |  |  join-table-id=02 plan-id=03 cohort-id=02
-|  |  |  build expressions: c_current_hdemo_sk
-|  |  |  runtime filters: RF004[bloom] <- c_current_hdemo_sk, RF005[min_max] <- c_current_hdemo_sk
-|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=170
-|  |  |
-|  |  11:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=34.83KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=170 cost=19
-|  |  |  in pipelines: 00(GETNEXT)
-|  |  |
-|  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  |  Per-Instance Resources: mem-estimate=16.43MB mem-reservation=4.00MB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[50206]
-|  |  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  |  hash-table-id=03
-|  |  |  hash predicates: c_current_addr_sk = ca_address_sk
-|  |  |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
-|  |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=170 cost=174
-|  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
-|  |  |
-|  |  |--F09:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  |  max-parallelism=1 segment-costs=[76]
-|  |  |  JOIN BUILD
-|  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
-|  |  |  |  build expressions: ca_address_sk
-|  |  |  |  runtime filters: RF006[bloom] <- ca_address_sk, RF007[min_max] <- ca_address_sk
-|  |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=73
-|  |  |  |
-|  |  |  10:EXCHANGE [BROADCAST]
-|  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=1 row-size=25B cardinality=73 cost=3
-|  |  |  |  in pipelines: 01(GETNEXT)
-|  |  |  |
-|  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=16.11MB mem-reservation=512.00KB thread-reservation=1
-|  |  |  max-parallelism=1 segment-costs=[101221]
-|  |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.16MB
-|  |  |     predicates: ca_city = 'Edgewood'
-|  |  |     stored statistics:
-|  |  |       table: rows=50.00K size=1.16MB
-|  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=50.00K
-|  |  |     parquet statistics predicates: ca_city = 'Edgewood'
-|  |  |     parquet dictionary predicates: ca_city = 'Edgewood'
-|  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |  |     tuple-ids=1 row-size=25B cardinality=73 cost=101218
-|  |  |     in pipelines: 01(GETNEXT)
-|  |  |
-|  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
-|  |     runtime filters: RF007[min_max] -> c_current_addr_sk, RF006[bloom] -> c_current_addr_sk
-|  |     stored statistics:
-|  |       table: rows=100.00K size=5.49MB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=100.00K
-|  |     mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-|  |     tuple-ids=0 row-size=76B cardinality=174(filtered from 100.00K) cost=50013
-|  |     in pipelines: 00(GETNEXT)
-|  |
-|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
+|  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=64.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[50142]
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
-|     runtime filters: RF003[min_max] -> hd_income_band_sk, RF005[min_max] -> hd_demo_sk, RF002[bloom] -> hd_income_band_sk, RF004[bloom] -> hd_demo_sk
+|     runtime filters: RF001[min_max] -> hd_income_band_sk, RF000[bloom] -> hd_income_band_sk
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=7.20K
 |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
-|     tuple-ids=2 row-size=8B cardinality=170(filtered from 7.20K) cost=50002
+|     tuple-ids=3 row-size=8B cardinality=7.20K cost=50057
+|     in pipelines: 03(GETNEXT)
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=02
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,2,0,1 row-size=109B cardinality=14.94M cost=13165773824
+|  in pipelines: 05(GETNEXT), 01(OPEN)
+|
+|--F10:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.89MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[19430]
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: ca_address_sk
+|  |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=15140
+|  |
+|  15:EXCHANGE [BROADCAST]
+|  |  mem-estimate=658.46KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=25B cardinality=15.14K cost=4290
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=16.11MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=10 segment-costs=[15865942]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.16MB
+|     predicates: ca_city = 'Antioch'
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_city = 'Antioch'
+|     parquet dictionary predicates: ca_city = 'Antioch'
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=25B cardinality=15.14K cost=15865513
+|     in pipelines: 01(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=03
+|  hash predicates: cd_demo_sk = c_current_cdemo_sk
+|  fk/pk conjuncts: none
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5,2,0 row-size=84B cardinality=13.17G cost=853409856
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+|--F11:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=120
+|  |  Per-Instance Resources: mem-estimate=45.78MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=120 segment-costs=[32342796]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: c_current_cdemo_sk
+|  |  runtime filters: RF006[bloom] <- c_current_cdemo_sk, RF007[min_max] <- c_current_cdemo_sk
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0 cost=30000000
+|  |
+|  14:EXCHANGE [HASH(c_current_cdemo_sk)]
+|  |  mem-estimate=10.78MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0 row-size=76B cardinality=30.00M cost=2342796
+|  |  in pipelines: 00(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Instance Resources: mem-estimate=53.48MB mem-reservation=1.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[5068405]
+|  00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
+|     HDFS partitions=1/1 files=1 size=5.49MB
+|     runtime filters: RF003[min_max] -> c_current_hdemo_sk, RF005[min_max] -> c_current_addr_sk, RF002[bloom] -> c_current_hdemo_sk, RF004[bloom] -> c_current_addr_sk
+|     stored statistics:
+|       table: rows=30.00M size=1.55GB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.10M
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=0 row-size=76B cardinality=30.00M cost=2725609
+|     in pipelines: 00(GETNEXT)
+|
+13:EXCHANGE [HASH(cd_demo_sk)]
+|  mem-estimate=11.56MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5,2 row-size=8B cardinality=853.41M cost=13334529
+|  in pipelines: 05(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
+Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+Per-Instance Resources: mem-estimate=23.50MB mem-reservation=512.00KB thread-reservation=1
+max-parallelism=100 segment-costs=[970278017]
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
+|  hash predicates: sr_cdemo_sk = cd_demo_sk
+|  fk/pk conjuncts: sr_cdemo_sk = cd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5,2 row-size=8B cardinality=853.41M cost=853409856
+|  in pipelines: 05(GETNEXT), 02(OPEN)
+|
+|--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=348.41MB mem-reservation=341.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[2070870]
+|  JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |  build expressions: cd_demo_sk
+|  |  runtime filters: RF008[bloom] <- cd_demo_sk, RF009[min_max] <- cd_demo_sk
+|  |  mem-estimate=340.00MB mem-reservation=340.00MB spill-buffer=2.00MB thread-reservation=0 cost=1920800
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=7.41MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=4B cardinality=1.92M cost=150070
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[522511]
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
+|     HDFS partitions=1/1 files=1 size=7.49MB
+|     runtime filters: RF007[min_max] -> cd_demo_sk, RF006[bloom] -> cd_demo_sk
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=4B cardinality=1.92M cost=507504
 |     in pipelines: 02(GETNEXT)
 |
-04:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-   HDFS partitions=2004/2004 files=2004 size=33.80MB
-   runtime filters: RF001[min_max] -> sr_cdemo_sk, RF000[bloom] -> sr_cdemo_sk
+05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
+   HDFS partitions=2004/2004 files=2004 size=33.63MB
+   runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_cdemo_sk, RF009[min_max] -> sr_cdemo_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_cdemo_sk, RF008[bloom] -> sr_cdemo_sk
    stored statistics:
-     table: rows=287.51K size=33.80MB
-     partitions: 2004/2004 rows=287.51K
+     table: rows=863.99M size=48.14GB
+     partitions: 2004/2004 rows=863.99M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=10.01K
-   mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=4 row-size=4B cardinality=19(filtered from 287.51K) cost=100200000
-   in pipelines: 04(GETNEXT)
+   extrapolated-rows=disabled max-scan-range-rows=30.09M
+   mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+   tuple-ids=5 row-size=4B cardinality=853.41M(filtered from 863.99M) cost=103533632
+   in pipelines: 05(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=30.65MB Threads=13
-Per-Host Resource Estimates: Memory=155MB
-F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[40] cpu-comparison-result=12 [max(1 (self) vs 12 (sum children))]
+Max Per-Host Resource Reservation: Memory=850.96MB Threads=44
+Per-Host Resource Estimates: Memory=1.44GB
+F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.78MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[207] cpu-comparison-result=220 [max(1 (self) vs 220 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: c_customer_id, concat(concat(coalesce(c_last_name, ''), ', '), coalesce(c_first_name, ''))
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=38
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=200
 |
-14:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_customer_id ASC
 |  limit: 100
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=19 cost=2
-|  in pipelines: 09(GETNEXT)
+|  mem-estimate=797.15KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=64B cardinality=100 cost=7
+|  in pipelines: 11(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=12 (adjusted from 48)
-Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-Per-Instance Resources: mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=1
-max-parallelism=12 segment-costs=[100200038, 2] cpu-comparison-result=12 [max(12 (self) vs 4 (sum children))]
-09:TOP-N [LIMIT=100]
+F03:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=11.57MB mem-reservation=0B thread-reservation=1
+max-parallelism=1410 segment-costs=[14062042891, 7] cpu-comparison-result=220 [max(220 (self) vs 192 (sum children))]
+11:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC
-|  mem-estimate=1.19KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=19 cost=19
-|  in pipelines: 09(GETNEXT), 04(OPEN)
+|  mem-estimate=6.25KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=64B cardinality=100 cost=100
+|  in pipelines: 11(GETNEXT), 05(OPEN)
 |
-08:HASH JOIN [INNER JOIN, BROADCAST]
+10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
-|  hash predicates: sr_cdemo_sk = c_current_cdemo_sk
-|  fk/pk conjuncts: none
+|  hash predicates: hd_income_band_sk = ib_income_band_sk
+|  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=19 cost=19
-|  in pipelines: 04(GETNEXT), 02(OPEN)
+|  tuple-ids=5,2,0,1,3,4 row-size=129B cardinality=1.46M cost=14584042
+|  in pipelines: 05(GETNEXT), 04(OPEN)
 |
-|--F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=8.77MB mem-reservation=8.75MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=3 segment-costs=[26] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+|--F08:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[12]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
-|  |  build expressions: c_current_cdemo_sk
-|  |  runtime filters: RF000[bloom] <- c_current_cdemo_sk, RF001[min_max] <- c_current_cdemo_sk
-|  |  mem-estimate=7.75MB mem-reservation=7.75MB spill-buffer=64.00KB thread-reservation=0 cost=17
+|  |  build expressions: ib_income_band_sk
+|  |  runtime filters: RF000[bloom] <- ib_income_band_sk, RF001[min_max] <- ib_income_band_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=2
 |  |
-|  13:EXCHANGE [BROADCAST]
+|  17:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17 cost=9
-|  |  in pipelines: 02(GETNEXT)
+|  |  tuple-ids=4 row-size=12B cardinality=2 cost=10
+|  |  in pipelines: 04(GETNEXT)
 |  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
-|  Per-Instance Resources: mem-estimate=16.53MB mem-reservation=64.00KB thread-reservation=1
-|  max-parallelism=1 segment-costs=[50341]
-|  07:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash-table-id=01
-|  |  hash predicates: hd_income_band_sk = ib_income_band_sk
-|  |  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17 cost=166
-|  |  in pipelines: 02(GETNEXT), 03(OPEN)
+|  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[50042]
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.21KB
+|     predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     stored statistics:
+|       table: rows=20 size=1.22KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=20
+|     parquet statistics predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     parquet dictionary predicates: ib_lower_bound >= CAST(55019 AS INT), ib_upper_bound <= CAST(105019 AS INT)
+|     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+|     tuple-ids=4 row-size=12B cardinality=2 cost=50041
+|     in pipelines: 04(GETNEXT)
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: c_current_hdemo_sk = hd_demo_sk
+|  fk/pk conjuncts: c_current_hdemo_sk = hd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,2,0,1,3 row-size=117B cardinality=14.58M cost=14940540
+|  in pipelines: 05(GETNEXT), 03(OPEN)
+|
+|--F09:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.32MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[8050]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: hd_demo_sk
+|  |  runtime filters: RF002[bloom] <- hd_demo_sk, RF003[min_max] <- hd_demo_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7200
 |  |
-|  |--F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  max-parallelism=1 segment-costs=[3]
-|  |  JOIN BUILD
-|  |  |  join-table-id=01 plan-id=02 cohort-id=02
-|  |  |  build expressions: ib_income_band_sk
-|  |  |  runtime filters: RF002[bloom] <- ib_income_band_sk, RF003[min_max] <- ib_income_band_sk
-|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=2
-|  |  |
-|  |  12:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=3 row-size=12B cardinality=2 cost=1
-|  |  |  in pipelines: 03(GETNEXT)
-|  |  |
-|  |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[50042]
-|  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
-|  |     predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=20
-|  |     parquet statistics predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     parquet dictionary predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
-|  |     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
-|  |     tuple-ids=3 row-size=12B cardinality=2 cost=50041
-|  |     in pipelines: 03(GETNEXT)
+|  16:EXCHANGE [BROADCAST]
+|  |  mem-estimate=68.25KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=3 row-size=8B cardinality=7.20K cost=850
+|  |  in pipelines: 03(GETNEXT)
 |  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash-table-id=02
-|  |  hash predicates: hd_demo_sk = c_current_hdemo_sk
-|  |  fk/pk conjuncts: hd_demo_sk = c_current_hdemo_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1 row-size=109B cardinality=166 cost=170
-|  |  in pipelines: 02(GETNEXT), 00(OPEN)
-|  |
-|  |--F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=2.97MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  max-parallelism=1 segment-costs=[189] cpu-comparison-result=2 [max(2 (self) vs 2 (sum children))]
-|  |  JOIN BUILD
-|  |  |  join-table-id=02 plan-id=03 cohort-id=02
-|  |  |  build expressions: c_current_hdemo_sk
-|  |  |  runtime filters: RF004[bloom] <- c_current_hdemo_sk, RF005[min_max] <- c_current_hdemo_sk
-|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=170
-|  |  |
-|  |  11:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=34.83KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=170 cost=19
-|  |  |  in pipelines: 00(GETNEXT)
-|  |  |
-|  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  |  Per-Instance Resources: mem-estimate=16.43MB mem-reservation=4.00MB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[50206]
-|  |  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  |  hash-table-id=03
-|  |  |  hash predicates: c_current_addr_sk = ca_address_sk
-|  |  |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
-|  |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=170 cost=174
-|  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
-|  |  |
-|  |  |--F09:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  |  max-parallelism=1 segment-costs=[76]
-|  |  |  JOIN BUILD
-|  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
-|  |  |  |  build expressions: ca_address_sk
-|  |  |  |  runtime filters: RF006[bloom] <- ca_address_sk, RF007[min_max] <- ca_address_sk
-|  |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=73
-|  |  |  |
-|  |  |  10:EXCHANGE [BROADCAST]
-|  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=1 row-size=25B cardinality=73 cost=3
-|  |  |  |  in pipelines: 01(GETNEXT)
-|  |  |  |
-|  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=16.11MB mem-reservation=512.00KB thread-reservation=1
-|  |  |  max-parallelism=1 segment-costs=[101221]
-|  |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.16MB
-|  |  |     predicates: ca_city = 'Edgewood'
-|  |  |     stored statistics:
-|  |  |       table: rows=50.00K size=1.16MB
-|  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=50.00K
-|  |  |     parquet statistics predicates: ca_city = 'Edgewood'
-|  |  |     parquet dictionary predicates: ca_city = 'Edgewood'
-|  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |  |     tuple-ids=1 row-size=25B cardinality=73 cost=101218
-|  |  |     in pipelines: 01(GETNEXT)
-|  |  |
-|  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
-|  |     runtime filters: RF007[min_max] -> c_current_addr_sk, RF006[bloom] -> c_current_addr_sk
-|  |     stored statistics:
-|  |       table: rows=100.00K size=5.49MB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=100.00K
-|  |     mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-|  |     tuple-ids=0 row-size=76B cardinality=174(filtered from 100.00K) cost=50013
-|  |     in pipelines: 00(GETNEXT)
-|  |
-|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
+|  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=64.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[50142]
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
-|     runtime filters: RF003[min_max] -> hd_income_band_sk, RF005[min_max] -> hd_demo_sk, RF002[bloom] -> hd_income_band_sk, RF004[bloom] -> hd_demo_sk
+|     runtime filters: RF001[min_max] -> hd_income_band_sk, RF000[bloom] -> hd_income_band_sk
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=7.20K
 |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
-|     tuple-ids=2 row-size=8B cardinality=170(filtered from 7.20K) cost=50002
+|     tuple-ids=3 row-size=8B cardinality=7.20K cost=50057
+|     in pipelines: 03(GETNEXT)
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=02
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,2,0,1 row-size=109B cardinality=14.94M cost=13165773824
+|  in pipelines: 05(GETNEXT), 01(OPEN)
+|
+|--F10:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.89MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[19430]
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: ca_address_sk
+|  |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=15140
+|  |
+|  15:EXCHANGE [BROADCAST]
+|  |  mem-estimate=658.46KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=25B cardinality=15.14K cost=4290
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=16.11MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=10 segment-costs=[15865942]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.16MB
+|     predicates: ca_city = 'Antioch'
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_city = 'Antioch'
+|     parquet dictionary predicates: ca_city = 'Antioch'
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=25B cardinality=15.14K cost=15865513
+|     in pipelines: 01(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=03
+|  hash predicates: cd_demo_sk = c_current_cdemo_sk
+|  fk/pk conjuncts: none
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5,2,0 row-size=84B cardinality=13.17G cost=853409856
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+|--F11:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=120
+|  |  Per-Instance Resources: mem-estimate=45.78MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=120 segment-costs=[32342796]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: c_current_cdemo_sk
+|  |  runtime filters: RF006[bloom] <- c_current_cdemo_sk, RF007[min_max] <- c_current_cdemo_sk
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0 cost=30000000
+|  |
+|  14:EXCHANGE [HASH(c_current_cdemo_sk)]
+|  |  mem-estimate=10.78MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0 row-size=76B cardinality=30.00M cost=2342796
+|  |  in pipelines: 00(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Instance Resources: mem-estimate=53.48MB mem-reservation=1.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[5068405]
+|  00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
+|     HDFS partitions=1/1 files=1 size=5.49MB
+|     runtime filters: RF003[min_max] -> c_current_hdemo_sk, RF005[min_max] -> c_current_addr_sk, RF002[bloom] -> c_current_hdemo_sk, RF004[bloom] -> c_current_addr_sk
+|     stored statistics:
+|       table: rows=30.00M size=1.55GB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.10M
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=0 row-size=76B cardinality=30.00M cost=2725609
+|     in pipelines: 00(GETNEXT)
+|
+13:EXCHANGE [HASH(cd_demo_sk)]
+|  mem-estimate=11.56MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5,2 row-size=8B cardinality=853.41M cost=13334529
+|  in pipelines: 05(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
+Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+Per-Instance Resources: mem-estimate=23.50MB mem-reservation=512.00KB thread-reservation=1
+max-parallelism=100 segment-costs=[970278017]
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
+|  hash predicates: sr_cdemo_sk = cd_demo_sk
+|  fk/pk conjuncts: sr_cdemo_sk = cd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5,2 row-size=8B cardinality=853.41M cost=853409856
+|  in pipelines: 05(GETNEXT), 02(OPEN)
+|
+|--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=348.41MB mem-reservation=341.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[2070870]
+|  JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |  build expressions: cd_demo_sk
+|  |  runtime filters: RF008[bloom] <- cd_demo_sk, RF009[min_max] <- cd_demo_sk
+|  |  mem-estimate=340.00MB mem-reservation=340.00MB spill-buffer=2.00MB thread-reservation=0 cost=1920800
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=7.41MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=4B cardinality=1.92M cost=150070
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[522511]
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
+|     HDFS partitions=1/1 files=1 size=7.49MB
+|     runtime filters: RF007[min_max] -> cd_demo_sk, RF006[bloom] -> cd_demo_sk
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=4B cardinality=1.92M cost=507504
 |     in pipelines: 02(GETNEXT)
 |
-04:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-   HDFS partitions=2004/2004 files=2004 size=33.80MB
-   runtime filters: RF001[min_max] -> sr_cdemo_sk, RF000[bloom] -> sr_cdemo_sk
+05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
+   HDFS partitions=2004/2004 files=2004 size=33.63MB
+   runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_cdemo_sk, RF009[min_max] -> sr_cdemo_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_cdemo_sk, RF008[bloom] -> sr_cdemo_sk
    stored statistics:
-     table: rows=287.51K size=33.80MB
-     partitions: 2004/2004 rows=287.51K
+     table: rows=863.99M size=48.14GB
+     partitions: 2004/2004 rows=863.99M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=10.01K
-   mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=4 row-size=4B cardinality=19(filtered from 287.51K) cost=100200000
-   in pipelines: 04(GETNEXT)
+   extrapolated-rows=disabled max-scan-range-rows=30.09M
+   mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+   tuple-ids=5 row-size=4B cardinality=853.41M(filtered from 863.99M) cost=103533632
+   in pipelines: 05(GETNEXT)
 ====

@@ -38,10 +38,12 @@ import org.apache.impala.analysis.ColumnLineageGraph;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.SideloadTableStats;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.Frontend.PlanCtx;
+import org.apache.impala.testutil.StatsJsonParser;
 import org.apache.impala.testutil.TestFileParser;
 import org.apache.impala.testutil.TestFileParser.Section;
 import org.apache.impala.testutil.TestFileParser.TestCase;
@@ -65,6 +67,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TReplicaPreference;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableDescriptor;
@@ -90,8 +93,8 @@ import com.google.common.collect.Sets;
 public class PlannerTestBase extends FrontendTestBase {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
   private final static boolean GENERATE_OUTPUT_FILE = true;
-  private final java.nio.file.Path testDir_ = Paths.get("functional-planner", "queries",
-      "PlannerTest");
+  private final static java.nio.file.Path testDir_ =
+      Paths.get("functional-planner", "queries", "PlannerTest");
   protected static java.nio.file.Path outDir_;
   private static KuduClient kuduClient_;
 
@@ -102,15 +105,14 @@ public class PlannerTestBase extends FrontendTestBase {
   // Map from table ID (TTableId) to the table descriptor with that ID.
   private final Map<Integer, TTableDescriptor> tableMap_ = Maps.newHashMap();
 
-  @BeforeClass
-  public static void setUp() throws Exception {
-    // Mimic the 3 node test mini-cluster.
+  protected static void setUpWithSize(int num_executors, int expected_num_executors)
+      throws Exception {
     TUpdateExecutorMembershipRequest updateReq = new TUpdateExecutorMembershipRequest();
     updateReq.setIp_addresses(Sets.newHashSet("127.0.0.1"));
     updateReq.setHostnames(Sets.newHashSet("localhost"));
     TExecutorGroupSet group_set = new TExecutorGroupSet();
-    group_set.curr_num_executors = 3;
-    group_set.expected_num_executors = 20; // default num_expected_executors startup flag
+    group_set.curr_num_executors = num_executors;
+    group_set.expected_num_executors = expected_num_executors;
     updateReq.setExec_group_sets(new ArrayList<TExecutorGroupSet>());
     updateReq.getExec_group_sets().add(group_set);
     ExecutorMembershipSnapshot.update(updateReq);
@@ -119,6 +121,13 @@ public class PlannerTestBase extends FrontendTestBase {
     String logDir = System.getenv("IMPALA_FE_TEST_LOGS_DIR");
     if (logDir == null) logDir = "/tmp";
     outDir_ = Paths.get(logDir, "PlannerTest");
+  }
+
+  @BeforeClass
+  public static void setUp() throws Exception {
+    // Mimic the 3 node test mini-cluster.
+    // 20 is the default num_expected_executors startup flag.
+    setUpWithSize(3, 20);
   }
 
   @Before
@@ -414,8 +423,9 @@ public class PlannerTestBase extends FrontendTestBase {
   protected static TQueryOptions tpcdsParquetCpuCostQueryOptions() {
     return tpcdsParquetQueryOptions()
         .setCompute_processing_cost(true)
-        .setProcessing_cost_min_threads(2)
-        .setMax_fragment_instances_per_node(16);
+        .setMax_fragment_instances_per_node(12)
+        .setReplica_preference(TReplicaPreference.REMOTE)
+        .setPlanner_testcase_mode(true);
   }
 
   protected static Set<PlannerTestOption> tpcdsParquetTestOptions() {
@@ -1009,5 +1019,13 @@ public class PlannerTestBase extends FrontendTestBase {
    */
   protected boolean scanRangeLocationsCheckEnabled() {
     return true;
+  }
+
+  protected static Map<String, Map<String, SideloadTableStats>> loadStatsJson(
+      String statsJsonPath) {
+    String fileName = testDir_.resolve(statsJsonPath).toString();
+    StatsJsonParser statsParser = new StatsJsonParser(fileName);
+    statsParser.parseFile();
+    return statsParser.getDbStatsMap();
   }
 }
