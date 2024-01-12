@@ -176,7 +176,18 @@ row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
 INT,BIGINT,BIGINT,BIGINT
 
 ####
-# Test 1 : Test select list
+# Test 1 : Test query empty table's metadata
+####
+====
+---- QUERY
+create table empty_ice_tbl (id int) stored by iceberg;
+select * from $DATABASE.empty_ice_tbl.entries;
+---- RESULTS
+---- TYPES
+INT,BIGINT,BIGINT,BIGINT
+
+####
+# Test 2 : Test select list
 ####
 ====
 ---- QUERY
@@ -218,7 +229,7 @@ select record_count + file_count from functional_parquet.iceberg_query_metadata.
 BIGINT
 
 ####
-# Test 2 : Test filtering
+# Test 3 : Test filtering
 ####
 ====
 ---- QUERY
@@ -285,7 +296,7 @@ row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 
 ####
-# Test 2 : Test joins
+# Test 4 : Test joins
 ####
 ====
 ---- QUERY
@@ -328,7 +339,7 @@ $OVERWRITE_SNAPSHOT_ID
 BIGINT
 
 ####
-# Test 3 : Inline query
+# Test 5 : Inline query
 ####
 ====
 ---- QUERY
@@ -343,7 +354,7 @@ row_regex:[1-9]\d*|0
 BIGINT
 
 ####
-# Test 4 : Complex types
+# Test 6 : Complex types
 # Currently not supported, complex type slots are set to NULL (IMPALA-12205)
 ####
 ====
@@ -358,7 +369,7 @@ row_regex:[1-9]\d*|0,'NULL'
 BIGINT,STRING
 
 ####
-# Test 5 : Multiple RowBatch results
+# Test 7 : Multiple RowBatch results
 ####
 ====
 ---- QUERY
@@ -372,9 +383,8 @@ row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,t
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 
-
 ####
-# Test 6 : Timetravel
+# Test 8 : Timetravel
 # Timetravel is not supported currently, related Jira IMPALA-11991.
 ####
 ====
@@ -385,7 +395,7 @@ AnalysisException: FOR SYSTEM_VERSION AS OF clause is only supported for Iceberg
 ====
 
 ####
-# Test 7 : Use-cases
+# Test 9 : Use-cases
 ####
 ====
 ---- QUERY
@@ -415,7 +425,7 @@ row_regex:[1-9]\d*|0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/i
 INT,STRING,BIGINT
 
 ####
-# Test 8 : Invalid operations
+# Test 10 : Invalid operations
 # In most cases the parser catches the table reference.
 ####
 ====
@@ -456,7 +466,7 @@ ParseException: Syntax error in line 1
 ====
 
 ####
-# Test 9 : Query nested type columns
+# Test 11 : Query nested type columns
 ####
 ====
 ---- QUERY
@@ -563,8 +573,9 @@ AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Ic
 ====
 
 ####
-# Test 10 : Describe all the metadata tables once
+# Test 12 : Describe all the metadata tables once
 ####
+====
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.snapshots;
 ---- RESULTS

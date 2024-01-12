@@ -102,11 +102,11 @@ public class IcebergMetadataScanner {
    */
   public StructLike GetNext() {
     // Return the next row in the DataRows iterator
-    if (dataRowsIterator_.hasNext()) {
+    if (dataRowsIterator_ != null && dataRowsIterator_.hasNext()) {
       return dataRowsIterator_.next();
     }
     // Otherwise this DataTask is empty, find a FileScanTask that has a non-empty DataTask
-    if(FindFileScanTaskWithRows()) {
+    if (FindFileScanTaskWithRows()) {
       return dataRowsIterator_.next();
     }
     return null;
