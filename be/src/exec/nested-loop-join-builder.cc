@@ -174,6 +174,11 @@ Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
 
 Status NljBuilder::Open(RuntimeState* state) {
   RETURN_IF_ERROR(DataSink::Open(state));
+
+  for (const FilterContext& ctx : filter_ctxs_) {
+    RETURN_IF_ERROR(ctx.expr_eval->Open(state));
+  }
+
   AllocateRuntimeFilters();
   return Status::OK();
 }

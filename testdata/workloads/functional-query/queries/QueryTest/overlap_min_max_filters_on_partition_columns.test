@@ -71,3 +71,17 @@ select count(*) from functional_parquet.alltypes where month <=
 aggregation(SUM, Files processed): 24
 aggregation(SUM, Files rejected): 20
 ====
+---- QUERY
+# Test case for IMPALA-12582.
+set runtime_filter_wait_time_ms=$RUNTIME_FILTER_WAIT_TIME_MS;
+set enabled_runtime_filter_types=MIN_MAX;
+create table test_runtime_filter (id int) partitioned by (dt string) stored as parquet;
+insert into table test_runtime_filter partition(dt) select 1, '20240112';
+select dt from test_runtime_filter Where dt between
+  (select cast(to_timestamp(max(dt), 'yyyyMMdd') as string) From test_runtime_filter)
+  and (select min(dt) From test_runtime_filter);
+---- RESULTS
+'20240112'
+---- TYPES
+string
+====
