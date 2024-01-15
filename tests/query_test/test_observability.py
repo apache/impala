@@ -872,6 +872,7 @@ class TestObservability(ImpalaTestSuite):
     assert len(re.findall('Single node plan created:', runtime_profile, re.M)) == 2
     assert len(re.findall('Distributed plan created:', runtime_profile, re.M)) == 2
 
+  @SkipIfNotHdfsMinicluster.plans
   def test_reduced_cardinality_by_filter(self):
     """IMPALA-12702: Check that ExecSummary shows the reduced cardinality estimation."""
     query_opts = {'compute_processing_cost': True}
@@ -882,7 +883,7 @@ class TestObservability(ImpalaTestSuite):
         where l1.o_custkey < 1000"""
     result = self.execute_query(query, query_opts)
     scan = result.exec_summary[10]
-    assert scan['operator'] == '00:SCAN HDFS'
+    assert '00:SCAN' in scan['operator']
     assert scan['num_rows'] == 39563
     assert scan['est_num_rows'] == 575771
     assert scan['detail'] == 'tpch_parquet.lineitem'
