@@ -167,11 +167,18 @@ class ClientRequestState {
   /// If current status is already != ok, no update is made (we preserve the first error)
   /// If called with a non-ok argument, the expectation is that the query will be aborted
   /// quickly.
+  /// If 'log_error' is true, log the error when query status become non-ok. This is used
+  /// when running DDLs in async threads. The async thread should take care of the logging
+  /// since the main thread only checks whether the thread creation succeeds.
+  /// E.g. ExecDdlRequest() returns the query status in sync mode, but returns the thread
+  /// creation status in async mode. So LOG_AND_RETURN_IF_ERROR(ExecDdlRequest()) doesn't
+  /// log the query failure in async mode.
   /// Returns the status argument (so we can write
   /// RETURN_IF_ERROR(UpdateQueryStatus(SomeOperation())).
   /// Does not take lock_, but requires it: caller must ensure lock_
   /// is taken before calling UpdateQueryStatus
-  Status UpdateQueryStatus(const Status& status) WARN_UNUSED_RESULT;
+  Status UpdateQueryStatus(const Status& status, bool log_error=false)
+      WARN_UNUSED_RESULT;
 
   /// Cancels the child queries and the coordinator with the given cause.
   /// If cause is NULL, it assumes this was deliberately cancelled by the user while in

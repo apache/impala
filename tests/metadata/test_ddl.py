@@ -32,10 +32,10 @@ from tests.common.file_utils import create_table_from_orc
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfFS, SkipIfKudu, SkipIfLocal,
-                               SkipIfCatalogV2, SkipIfHive2)
+                               SkipIfCatalogV2, SkipIfHive2, SkipIfDockerizedCluster)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import (create_exec_option_dimension,
-    create_client_protocol_dimension)
+    create_client_protocol_dimension, create_exec_option_dimension_from_dict)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import (
     get_fs_path,
@@ -1140,6 +1140,25 @@ class TestAsyncDDLTiming(TestDdlBase):
         assert(exec_time >= 10)
     finally:
       client.close()
+
+
+class TestDdlLogs(TestDdlBase):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestDdlLogs, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension_from_dict({
+        'enable_async_ddl_execution': [True, False]}))
+
+  @SkipIfDockerizedCluster.daemon_logs_not_exposed
+  def test_error_logs(self, vector, unique_database):
+    query_opts = vector.get_value('exec_option')
+    tbl_name = 'test_async' if query_opts['enable_async_ddl_execution'] else 'test_sync'
+    tbl_name = unique_database + '.' + tbl_name
+    result = self.execute_query_expect_failure(
+        self.client, 'invalidate metadata ' + tbl_name, query_opts)
+    err = "TableNotFoundException: Table not found: " + tbl_name
+    assert err in str(result)
+    self.assert_impalad_log_contains('INFO', err)
 
 
 # IMPALA-2002: Tests repeated adding/dropping of .jar and .so in the lib cache.

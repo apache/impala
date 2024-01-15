@@ -695,6 +695,7 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
 
   // Indirectly check if running in thread async_exec_thread_.
   if (exec_in_worker_thread) {
+    VLOG_QUERY << "Running in worker thread";
     DCHECK(exec_state() == ExecState::PENDING);
 
     // 1. For any non-CTAS DDLs, transition to RUNNING
@@ -710,7 +711,7 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
   query_events_->MarkEvent("CatalogDdlRequest finished");
   {
     lock_guard<mutex> l(lock_);
-    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
   }
 
   if (catalog_op_executor_->ddl_exec_response() != nullptr &&
@@ -739,7 +740,7 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
       exec_request_->query_options.sync_ddl, query_options(), query_events_);
   {
     lock_guard<mutex> l(lock_);
-    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
   }
 
   if (is_CTAS) {
@@ -802,6 +803,7 @@ Status ClientRequestState::ExecDdlRequest() {
 
 void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
   if (exec_in_worker_thread) {
+    VLOG_QUERY << "Running in worker thread";
     DCHECK(exec_state() == ExecState::PENDING);
     UpdateNonErrorExecState(ExecState::RUNNING);
   }
@@ -815,7 +817,7 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
   }
   {
     lock_guard<mutex> l(lock_);
-    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
   }
 
   request_result_set_.reset(new vector<TResultRow>);
@@ -840,7 +842,7 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
       *ExecEnv::GetInstance()->GetCatalogdAddress().get(), &status);
   {
     lock_guard<mutex> l(lock_);
-    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
   }
 
   TUpdateCatalogResponse resp;
@@ -848,7 +850,7 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
       &CatalogServiceClientWrapper::UpdateCatalog, catalog_update, &resp);
   {
     lock_guard<mutex> l(lock_);
-    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
   }
 
   status = parent_server_->ProcessCatalogUpdateResult(
@@ -856,7 +858,7 @@ void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
       exec_request_->query_options.sync_ddl, query_options(), query_events_);
   {
     lock_guard<mutex> l(lock_);
-    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
   }
 }
 
@@ -1332,12 +1334,13 @@ void ClientRequestState::MarkAsRetrying(const Status& status) {
   summary_profile_->AddInfoStringRedacted("Retry Cause", query_status_.GetDetail());
 }
 
-Status ClientRequestState::UpdateQueryStatus(const Status& status) {
+Status ClientRequestState::UpdateQueryStatus(const Status& status, bool log_error) {
   // Preserve the first non-ok status
   if (!status.ok() && query_status_.ok()) {
     UpdateExecState(ExecState::ERROR);
     query_status_ = status;
     summary_profile_->AddInfoStringRedacted(QUERY_STATUS_KEY, query_status_.GetDetail());
+    if (log_error) VLOG_QUERY << status.GetDetail();
   }
 
   return status;
