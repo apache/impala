@@ -803,6 +803,11 @@ class ClientRequestState {
   /// the transaction will be closed when this function returns.
   Status UpdateCatalog() WARN_UNUSED_RESULT;
 
+  /// Fills 'cat_ice_op' based on 'finalize_params'. Returns false if there is no
+  /// need to update the Catalog (no records changed), returns true otherwise.
+  bool CreateIcebergCatalogOps(const TFinalizeParams& finalize_params,
+      TIcebergOperationParam* cat_ice_op);
+
   /// Copies results into request_result_set_
   /// TODO: Have the FE return list<Data.TResultRow> so that this isn't necessary
   void SetResultSet(const TDdlExecResponse* ddl_resp);

@@ -1548,26 +1548,11 @@ Status ClientRequestState::UpdateCatalog() {
         catalog_update.__set_write_id(finalize_params.write_id);
       }
       if (finalize_params.__isset.iceberg_params) {
-        const TIcebergDmlFinalizeParams& ice_finalize_params =
-            finalize_params.iceberg_params;
         TIcebergOperationParam& cat_ice_op = catalog_update.iceberg_operation;
         catalog_update.__isset.iceberg_operation = true;
-        cat_ice_op.__set_operation(ice_finalize_params.operation);
-        cat_ice_op.__set_initial_snapshot_id(
-            ice_finalize_params.initial_snapshot_id);
-        cat_ice_op.__set_spec_id(ice_finalize_params.spec_id);
-        if (ice_finalize_params.operation == TIcebergOperation::INSERT) {
-          cat_ice_op.__set_iceberg_data_files_fb(
-              dml_exec_state->CreateIcebergDataFilesVector());
-          cat_ice_op.__set_is_overwrite(finalize_params.is_overwrite);
-        } else if (ice_finalize_params.operation == TIcebergOperation::DELETE) {
-          cat_ice_op.__set_iceberg_delete_files_fb(
-              dml_exec_state->CreateIcebergDeleteFilesVector());
-        } else if (ice_finalize_params.operation == TIcebergOperation::UPDATE) {
-          cat_ice_op.__set_iceberg_data_files_fb(
-              dml_exec_state->CreateIcebergDataFilesVector());
-          cat_ice_op.__set_iceberg_delete_files_fb(
-              dml_exec_state->CreateIcebergDeleteFilesVector());
+        if (!CreateIcebergCatalogOps(finalize_params, &cat_ice_op)) {
+          // No change, no need to update catalog.
+          return Status::OK();
         }
       }
 
@@ -1615,6 +1600,39 @@ Status ClientRequestState::UpdateCatalog() {
   }
   query_events_->MarkEvent("DML Metastore update finished");
   return Status::OK();
+}
+
+bool ClientRequestState::CreateIcebergCatalogOps(
+    const TFinalizeParams& finalize_params, TIcebergOperationParam* cat_ice_op) {
+  DCHECK(cat_ice_op != nullptr);
+  const TIcebergDmlFinalizeParams& ice_finalize_params = finalize_params.iceberg_params;
+  DmlExecState* dml_exec_state = GetCoordinator()->dml_exec_state();
+  bool update_catalog = true;
+  cat_ice_op->__set_operation(ice_finalize_params.operation);
+  cat_ice_op->__set_initial_snapshot_id(
+      ice_finalize_params.initial_snapshot_id);
+  cat_ice_op->__set_spec_id(ice_finalize_params.spec_id);
+  if (ice_finalize_params.operation == TIcebergOperation::INSERT) {
+    cat_ice_op->__set_iceberg_data_files_fb(
+        dml_exec_state->CreateIcebergDataFilesVector());
+    cat_ice_op->__set_is_overwrite(finalize_params.is_overwrite);
+    if (cat_ice_op->iceberg_data_files_fb.empty()) update_catalog = false;
+  } else if (ice_finalize_params.operation == TIcebergOperation::DELETE) {
+    cat_ice_op->__set_iceberg_delete_files_fb(
+        dml_exec_state->CreateIcebergDeleteFilesVector());
+    if (cat_ice_op->iceberg_delete_files_fb.empty()) update_catalog = false;
+  } else if (ice_finalize_params.operation == TIcebergOperation::UPDATE) {
+    cat_ice_op->__set_iceberg_data_files_fb(
+        dml_exec_state->CreateIcebergDataFilesVector());
+    cat_ice_op->__set_iceberg_delete_files_fb(
+        dml_exec_state->CreateIcebergDeleteFilesVector());
+    if (cat_ice_op->iceberg_delete_files_fb.empty()) {
+      DCHECK(cat_ice_op->iceberg_data_files_fb.empty());
+      update_catalog = false;
+    }
+  }
+  if (!update_catalog) query_events_->MarkEvent("No-op Iceberg DML statement");
+  return update_catalog;
 }
 
 void ClientRequestState::SetResultSet(const TDdlExecResponse* ddl_resp) {

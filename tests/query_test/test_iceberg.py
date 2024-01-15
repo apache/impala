@@ -1516,8 +1516,25 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_update_basic(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-update-basic', vector,
         unique_database)
+    self._test_update_basic_snapshots(unique_database)
     if IS_HDFS and self.should_run_for_hive(vector):
       self._update_basic_hive_tests(unique_database)
+
+  def _test_update_basic_snapshots(self, db):
+    """Verifies that the tables have the expected number of snapshots, and
+    the parent ids match the previous snapshot ids. See IMPALA-12708."""
+    def validate_snapshots(tbl, expected_snapshots):
+      tbl_name = "{}.{}".format(db, tbl)
+      snapshots = get_snapshots(self.client, tbl_name,
+          expected_result_size=expected_snapshots)
+      parent_id = None
+      for s in snapshots:
+        assert s.get_parent_id() == parent_id
+        parent_id = s.get_snapshot_id()
+
+    validate_snapshots("single_col", 3)
+    validate_snapshots("ice_alltypes", 17)
+    validate_snapshots("ice_id_partitioned", 4)
 
   def _update_basic_hive_tests(self, db):
     def get_hive_results(tbl, order_by_col):

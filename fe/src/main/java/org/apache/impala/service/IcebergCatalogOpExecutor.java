@@ -22,10 +22,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.DeleteFiles;
 import org.apache.iceberg.ExpireSnapshots;
 import org.apache.iceberg.FileMetadata;
@@ -61,6 +63,7 @@ import org.apache.impala.thrift.TAlterTableExecuteExpireSnapshotsParams;
 import org.apache.impala.thrift.TAlterTableExecuteRollbackParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.apache.impala.thrift.TIcebergOperation;
 import org.apache.impala.thrift.TIcebergOperationParam;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TRollbackType;
@@ -349,46 +352,94 @@ public class IcebergCatalogOpExecutor {
     switch (icebergOp.operation) {
       case INSERT: appendFiles(feIcebergTable, txn, icebergOp); break;
       case DELETE: deleteRows(feIcebergTable, txn, icebergOp); break;
-      case UPDATE: {
-        deleteRows(feIcebergTable, txn, icebergOp);
-        appendFiles(feIcebergTable, txn, icebergOp);
-      } break;
+      case UPDATE: updateRows(feIcebergTable, txn, icebergOp); break;
       default: throw new ImpalaRuntimeException(
           "Unknown Iceberg operation: " + icebergOp.operation);
     }
   }
 
-  public static void deleteRows(FeIcebergTable feIcebergTable, Transaction txn,
+  private static void deleteRows(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
     org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
     List<ByteBuffer> deleteFilesFb = icebergOp.getIceberg_delete_files_fb();
     RowDelta rowDelta = txn.newRowDelta();
     for (ByteBuffer buf : deleteFilesFb) {
-      FbIcebergDataFile deleteFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
-
-      PartitionSpec partSpec = nativeIcebergTable.specs().get(deleteFile.specId());
-      IcebergPartitionSpec impPartSpec = feIcebergTable.getPartitionSpec(
-          deleteFile.specId());
-      Metrics metrics = buildDataFileMetrics(deleteFile);
-      FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(partSpec)
-          .ofPositionDeletes()
-          .withMetrics(metrics)
-          .withPath(deleteFile.path())
-          .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(deleteFile.format()))
-          .withRecordCount(deleteFile.recordCount())
-          .withFileSizeInBytes(deleteFile.fileSizeInBytes());
-      IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromDataFile(
-          partSpec.partitionType(), impPartSpec, deleteFile);
-      if (partitionData != null) builder.withPartition(partitionData);
-      rowDelta.addDeletes(builder.build());
+      DeleteFile deleteFile = createDeleteFile(feIcebergTable, buf);
+      rowDelta.addDeletes(deleteFile);
     }
+    validateAndCommitRowDelta(rowDelta, icebergOp.getInitial_snapshot_id());
+  }
+
+  private static void updateRows(FeIcebergTable feIcebergTable, Transaction txn,
+      TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
+    org.apache.iceberg.Table nativeIcebergTable = feIcebergTable.getIcebergApiTable();
+    List<ByteBuffer> deleteFilesFb = icebergOp.getIceberg_delete_files_fb();
+    List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
+    RowDelta rowDelta = txn.newRowDelta();
+    for (ByteBuffer buf : deleteFilesFb) {
+      DeleteFile deleteFile = createDeleteFile(feIcebergTable, buf);
+      rowDelta.addDeletes(deleteFile);
+    }
+    for (ByteBuffer buf : dataFilesFb) {
+      DataFile dataFile = createDataFile(feIcebergTable, buf);
+      rowDelta.addRows(dataFile);
+    }
+    validateAndCommitRowDelta(rowDelta, icebergOp.getInitial_snapshot_id());
+  }
+
+  private static void validateAndCommitRowDelta(RowDelta rowDelta,
+      long initialSnapshotId) throws ImpalaRuntimeException {
     try {
-      rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
+      rowDelta.validateFromSnapshot(initialSnapshotId);
       rowDelta.validateNoConflictingDataFiles();
       rowDelta.commit();
     } catch (ValidationException e) {
       throw new ImpalaRuntimeException(e.getMessage(), e);
     }
+  }
+
+  private static DataFile createDataFile(FeIcebergTable feIcebergTable, ByteBuffer buf)
+      throws ImpalaRuntimeException {
+    FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
+
+    PartitionSpec partSpec = feIcebergTable.getIcebergApiTable().specs().get(
+        dataFile.specId());
+    IcebergPartitionSpec impPartSpec =
+        feIcebergTable.getPartitionSpec(dataFile.specId());
+    Metrics metrics = buildDataFileMetrics(dataFile);
+    DataFiles.Builder builder =
+        DataFiles.builder(partSpec)
+        .withMetrics(metrics)
+        .withPath(dataFile.path())
+        .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(dataFile.format()))
+        .withRecordCount(dataFile.recordCount())
+        .withFileSizeInBytes(dataFile.fileSizeInBytes());
+    IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromDataFile(
+        partSpec.partitionType(), impPartSpec, dataFile);
+    if (partitionData != null) builder.withPartition(partitionData);
+    return builder.build();
+  }
+
+  private static DeleteFile createDeleteFile(FeIcebergTable feIcebergTable,
+      ByteBuffer buf) throws ImpalaRuntimeException {
+    FbIcebergDataFile deleteFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
+
+    PartitionSpec partSpec = feIcebergTable.getIcebergApiTable().specs().get(
+        deleteFile.specId());
+    IcebergPartitionSpec impPartSpec = feIcebergTable.getPartitionSpec(
+        deleteFile.specId());
+    Metrics metrics = buildDataFileMetrics(deleteFile);
+    FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(partSpec)
+        .ofPositionDeletes()
+        .withMetrics(metrics)
+        .withPath(deleteFile.path())
+        .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(deleteFile.format()))
+        .withRecordCount(deleteFile.recordCount())
+        .withFileSizeInBytes(deleteFile.fileSizeInBytes());
+    IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromDataFile(
+        partSpec.partitionType(), impPartSpec, deleteFile);
+    if (partitionData != null) builder.withPartition(partitionData);
+    return builder.build();
   }
 
   /**
@@ -406,25 +457,8 @@ public class IcebergCatalogOpExecutor {
       batchWrite = new Append(txn);
     }
     for (ByteBuffer buf : dataFilesFb) {
-      FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
-      Preconditions.checkState(dataFile.specId() == icebergOp.getSpec_id());
-      int specId = icebergOp.getSpec_id();
-
-      PartitionSpec partSpec = nativeIcebergTable.specs().get(specId);
-      IcebergPartitionSpec impPartSpec =
-          feIcebergTable.getPartitionSpec(specId);
-      Metrics metrics = buildDataFileMetrics(dataFile);
-      DataFiles.Builder builder =
-          DataFiles.builder(partSpec)
-          .withMetrics(metrics)
-          .withPath(dataFile.path())
-          .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(dataFile.format()))
-          .withRecordCount(dataFile.recordCount())
-          .withFileSizeInBytes(dataFile.fileSizeInBytes());
-      IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromDataFile(
-          partSpec.partitionType(), impPartSpec, dataFile);
-      if (partitionData != null) builder.withPartition(partitionData);
-      batchWrite.addFile(builder.build());
+      DataFile dataFile = createDataFile(feIcebergTable, buf);
+      batchWrite.addFile(dataFile);
     }
     try {
       batchWrite.commit();
