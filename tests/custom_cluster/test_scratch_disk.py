@@ -283,7 +283,12 @@ class TestScratchDir(CustomClusterTestSuite):
 
   def find_deleted_files_in_fd(self, pid):
     fd_path = "/proc/{}/fd".format(pid)
-    command = "find {} -ls | grep '(deleted)'".format(fd_path)
+    # Look for the files with keywords 'scratch' and '(deleted)'.
+    # Limited to keyword 'scratch' because in IMPALA-12698 the process may
+    # create some reference deleted hdfs files, but the files are eventually
+    # removed in a few minutes. This limitation helps to mitigate false-positive
+    # checks.
+    command = "find {} -ls | grep -E 'scratch.*(deleted)'".format(fd_path)
     try:
       result = subprocess.check_output(command, shell=True)
       return result.strip()
