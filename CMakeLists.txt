@@ -24,8 +24,6 @@ set(NO_TESTS 1)
 # initialized.
 project(Impala)
 
-option(BUILD_PACKAGES "Build deployment packages")
-
 include(cmake_modules/kudu_cmake_fns.txt)
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
@@ -418,35 +416,7 @@ add_subdirectory(fe)
 add_subdirectory(impala-parent)
 add_subdirectory(ext-data-source)
 add_subdirectory(query-event-hook-api)
-
-install(DIRECTORY "www/" DESTINATION ${IMPALA_INSTALLDIR}/www)
-install(FILES fe/target/impala-frontend-$ENV{IMPALA_VERSION}.jar
-  DESTINATION ${IMPALA_INSTALLDIR}/lib/jars)
-
-FILE(GLOB gcc_lib ${GCC_ROOT}/lib64/libgcc_s.so.1*)
-install(FILES ${gcc_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib/native)
-
-FILE(GLOB cpp_lib ${GCC_ROOT}/lib64/libstdc++.so.6*)
-install(FILES ${cpp_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib/native)
-
-set(KUDU_HOME $ENV{IMPALA_TOOLCHAIN}/kudu-$ENV{IMPALA_KUDU_VERSION}/release)
-# The parent folder is lib64 on centos/redhat, while on ubuntu it's lib.
-FILE(GLOB kudu_lib ${KUDU_HOME}/lib*/libkudu_client.so*)
-install(FILES ${kudu_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib/native)
-
-FILE(GLOB hadoop_lib $ENV{HADOOP_LIB_DIR}/native/libhadoop.so*)
-install(FILES ${hadoop_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib/native)
-
-install(DIRECTORY fe/target/dependency/ DESTINATION ${IMPALA_INSTALLDIR}/lib/jars
-  FILES_MATCHING PATTERN "*.jar")
-
-install(DIRECTORY shell/build/impala-shell-$ENV{IMPALA_VERSION}/
-  DESTINATION ${IMPALA_INSTALLDIR}/shell
-  USE_SOURCE_PERMISSIONS PATTERN "*.pyc" EXCLUDE)
-
-install(DIRECTORY package/bin/ DESTINATION ${IMPALA_INSTALLDIR}/bin
-  USE_SOURCE_PERMISSIONS FILES_MATCHING PATTERN "*.sh")
-install(DIRECTORY package/conf/ DESTINATION ${IMPALA_INSTALLDIR}/conf)
+add_subdirectory(package)
 
 # Build target for all generated files which most backend code depends on
 add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps)
@@ -482,72 +452,3 @@ if (DUMP_INCLUDE_PATHS)
 endif(DUMP_INCLUDE_PATHS)
 
 SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libstdc++")
-
-# packaging
-if (BUILD_PACKAGES)
-  if (EXISTS "/etc/redhat-release")
-    set(IMPALA_LINUX_ID_FILE "/etc/redhat-release")
-  elseif (EXISTS "/etc/os-release")
-    set(IMPALA_LINUX_ID_FILE "/etc/os-release")
-  elseif (EXISTS "/etc/issue")
-    set(IMPALA_LINUX_ID_FILE "/etc/issue")
-  else()
-    message(FATAL_ERROR "Can not determine OS version!")
-  endif()
-  file(READ ${IMPALA_LINUX_ID_FILE} IMPALA_OS_INFO)
-
-  string(TOLOWER ${IMPALA_OS_INFO} IMPALA_OS_INFO)
-  if (${IMPALA_OS_INFO} MATCHES "(redhat|centos)")
-    set(CPACK_GENERATOR "RPM")
-  elseif (${IMPALA_OS_INFO} MATCHES "ubuntu")
-    set(CPACK_GENERATOR "DEB")
-  else()
-    message(WARNING "OS is ${IMPALA_OS_INFO}. No packages will be generated.")
-  endif()
-
-  if (CPACK_GENERATOR)
-    message(STATUS "Packaging enabled: ${CPACK_GENERATOR}")
-    set(CPACK_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
-    set(CPACK_PACKAGE_VENDOR "Apache")
-    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "An open source massively parallel processing SQL query engine.")
-    set(CPACK_PACKAGE_CONTACT "dev@impala.apache.org")
-    set(CPACK_PACKAGE_HOMEPAGE_URL "https://impala.apache.org")
-    set(CPACK_PACKAGE_VERSION "$ENV{IMPALA_VERSION}")
-    set(CPACK_RPM_PACKAGE_LICENSE "ASL-2.0")
-    # Set a meaningful package name, e.g. Impala-4.3.0-SNAPSHOT_hive-3.1.3000.7.2.18.0-41-x86_64
-    set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
-    set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}_hive-$ENV{IMPALA_HIVE_VERSION}")
-    set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
-    message(STATUS "Package name: ${CPACK_PACKAGE_FILE_NAME}")
-
-    if ($ENV{STRIP_DEPLOYMENT_IMPALAD})
-      set(CPACK_STRIP_FILES ${IMPALA_INSTALLDIR}/bin/impalad)
-      message("Binaries in the package will be stripped")
-    endif()
-
-    set(CPACK_PACKAGING_INSTALL_PREFIX "/opt")
-    set(CPACK_PACKAGE_INSTALL_DIRECTORY "impala")
-
-    execute_process(
-      COMMAND bash -c "${CMAKE_SOURCE_DIR}/docker/install_os_packages.sh --dry-run | tail -n1"
-      OUTPUT_VARIABLE PKG_LIST
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    if ("${PKG_LIST}" STREQUAL "")
-      message(FATAL_ERROR "Package list is empty: '${PKG_LIST}'")
-    else()
-      message(STATUS "Get required package list: '${PKG_LIST}'")
-    endif()
-
-    if (${CPACK_GENERATOR} MATCHES "RPM")
-      set(CPACK_RPM_PACKAGE_AUTOREQPROV " no")
-      set(CPACK_RPM_PACKAGE_RELOCATABLE TRUE)
-      set(CPACK_RPM_PACKAGE_REQUIRES ${PKG_LIST})
-    else()
-      set(CPACK_DEBIAN_PACKAGE_DEPENDS ${PKG_LIST})
-    endif()
-  endif()
-
-include(CPack)
-
-endif()

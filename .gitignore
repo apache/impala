@@ -39,6 +39,9 @@ build.ninja
 rules.ninja
 CMakeDoxyfile.in
 CMakeDoxygenDefaults.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+_CPack_Packages
 
 # Build timestamp files
 .*timestamp
