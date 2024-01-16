@@ -326,7 +326,7 @@ class TestDdlStatements(TestDdlBase):
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
   @UniqueDatabase.parametrize(sync_ddl=True)
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_create_kudu(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False
     vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"

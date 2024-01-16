@@ -68,8 +68,8 @@ class TestKuduOperations(CustomKuduTest):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=\
       "--use_local_tz_for_unix_timestamp_conversions=true")
-  @SkipIfKudu.no_hybrid_clock
-  @SkipIfKudu.hms_integration_enabled
+  @SkipIfKudu.no_hybrid_clock()
+  @SkipIfKudu.hms_integration_enabled()
   def test_local_tz_conversion_ops(self, vector, unique_database):
     """IMPALA-5539: Test Kudu timestamp reads/writes are correct with the
        use_local_tz_for_unix_timestamp_conversions flag."""
@@ -79,7 +79,7 @@ class TestKuduOperations(CustomKuduTest):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_master_hosts=")
-  @SkipIfKudu.hms_integration_enabled
+  @SkipIfKudu.hms_integration_enabled()
   def test_kudu_master_hosts(self, cursor, kudu_client):
     """Check behavior when -kudu_master_hosts is not provided to catalogd."""
     with self.temp_kudu_table(kudu_client, [INT32]) as kudu_table:
@@ -101,7 +101,7 @@ class TestKuduOperations(CustomKuduTest):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_error_buffer_size=1024")
-  @SkipIfKudu.hms_integration_enabled
+  @SkipIfKudu.hms_integration_enabled()
   def test_error_buffer_size(self, cursor, unique_database):
     """Check that queries fail if the size of the Kudu client errors they generate is
     greater than kudu_error_buffer_size."""
@@ -133,7 +133,7 @@ class TestKuduClientTimeout(CustomKuduTest):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_operation_timeout_ms=1")
-  @SkipIfKudu.hms_integration_enabled
+  @SkipIfKudu.hms_integration_enabled()
   def test_impalad_timeout(self, vector):
     """Check impalad behavior when -kudu_operation_timeout_ms is too low."""
     self.run_test_case('QueryTest/kudu-timeouts-impalad', vector)
@@ -167,7 +167,7 @@ class TestKuduHMSIntegration(CustomKuduTest):
     super(TestKuduHMSIntegration, cls).teardown_class()
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000")
   def test_create_managed_kudu_tables(self, vector, unique_database):
     """Tests the Create table operation when using a kudu table with Kudu's integration
@@ -178,7 +178,7 @@ class TestKuduHMSIntegration(CustomKuduTest):
     self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000 "
                                     "--lineage_event_log_dir={0}"
                                     .format(START_END_TIME_LINEAGE_LOG_DIR))
@@ -347,11 +347,11 @@ class TestKuduHMSIntegration(CustomKuduTest):
       cursor.execute("SHOW TABLES")
       assert (external_table_name,) not in cursor.fetchall()
 
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_hms_alter', vector, use_db=unique_database)
 
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_create_kudu_table_like(self, vector, unique_database):
     self.run_test_case(
       'QueryTest/kudu_create_table_like_table',
@@ -621,40 +621,40 @@ class TestKuduTransaction(TestKuduTransactionBase):
   _duplicate_key_error = "Kudu reported write operation errors during transaction."
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_kudu_txn_succeed(self, cursor, unique_database):
     self._test_kudu_txn_succeed(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_kudu_txn_not_implemented(self, cursor, unique_database):
     self._test_kudu_txn_not_implemented(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_kudu_txn_abort_dup_key(self, cursor, unique_database):
     self._test_kudu_txn_abort_dup_key(cursor, unique_database, True,
         self._duplicate_key_error)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_kudu_txn_ctas(self, cursor, unique_database):
     self._test_kudu_txn_ctas(cursor, unique_database, True, self._duplicate_key_error)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   def test_kudu_txn_abort_row_batch(self, cursor, unique_database):
     self._test_kudu_txn_abort_row_batch(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   def test_kudu_txn_abort_partial_rows(self, cursor, unique_database):
     self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
     self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
@@ -672,46 +672,46 @@ class TestKuduTransactionNoIgnore(TestKuduTransactionBase):
   _duplicate_key_error = "Key already present in Kudu table"
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_succeed(self, cursor, unique_database):
     self._test_kudu_txn_succeed(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_not_implemented(self, cursor, unique_database):
     self._test_kudu_txn_not_implemented(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_abort_dup_key(self, cursor, unique_database):
     self._test_kudu_txn_abort_dup_key(cursor, unique_database, True,
         self._duplicate_key_error)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_ctas(self, cursor, unique_database):
     self._test_kudu_txn_ctas(cursor, unique_database, True, self._duplicate_key_error)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_abort_row_batch(self, cursor, unique_database):
     self._test_kudu_txn_abort_row_batch(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_abort_partial_rows(self, cursor, unique_database):
     self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
@@ -729,13 +729,13 @@ class TestKuduTransactionIgnoreConflict(TestKuduTransactionBase):
       "--kudu_ignore_conflicts_in_transaction=true"
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_dup_key(self, cursor, unique_database):
     self._test_kudu_txn_abort_dup_key(cursor, unique_database, False, "no error")
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_ctas(self, cursor, unique_database):
     self._test_kudu_txn_ctas(cursor, unique_database, False, "no error")
@@ -773,7 +773,7 @@ class TestKuduTxnKeepalive(CustomKuduTest):
     super(TestKuduTxnKeepalive, cls).teardown_class()
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   def test_kudu_txn_heartbeat(self, cursor, unique_database):
     # Create Kudu table.
@@ -906,7 +906,7 @@ class TestKuduDmlConflictNoError(TestKuduDmlConflictBase):
   """
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   def test_insert_update_delete(self, cursor, unique_database):
     self._test_insert_update_delete(cursor, unique_database, False)
 
@@ -920,7 +920,7 @@ class TestKuduDmlConflictLogError(TestKuduDmlConflictBase):
   _impalad_args = "--kudu_ignore_conflicts=false"
 
   @pytest.mark.execute_serially
-  @SkipIfKudu.no_hybrid_clock
+  @SkipIfKudu.no_hybrid_clock()
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_insert_update_delete(self, cursor, unique_database):
     self._test_insert_update_delete(cursor, unique_database, True)

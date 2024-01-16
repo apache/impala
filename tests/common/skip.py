@@ -89,13 +89,24 @@ class SkipIfFS:
   eventually_consistent = pytest.mark.skipif(IS_ADLS or IS_COS or IS_OSS or IS_OBS,
       reason="The client is slow to realize changes to file metadata")
 
+
 class SkipIfKudu:
-  no_hybrid_clock = pytest.mark.skipif(
-      get_kudu_master_flag("--use_hybrid_clock") == "false",
-      reason="Test relies on --use_hybrid_clock=true in Kudu.")
-  hms_integration_enabled = pytest.mark.skipif(
-      get_kudu_master_flag("--hive_metastore_uris") != "",
-      reason="Test assumes Kudu/HMS integration is not enabled.")
+  """Expose decorators as methods so that kudu web pages can be checked lazily when
+     needed, instead of whenever this module is imported. This helps to run Kudu
+     unrelated tests without launching the Kudu cluster."""
+
+  @classmethod
+  def no_hybrid_clock(cls):
+    return pytest.mark.skipif(
+        get_kudu_master_flag("--use_hybrid_clock") == "false",
+        reason="Test relies on --use_hybrid_clock=true in Kudu.")
+
+  @classmethod
+  def hms_integration_enabled(cls):
+    return pytest.mark.skipif(
+        get_kudu_master_flag("--hive_metastore_uris") != "",
+        reason="Test assumes Kudu/HMS integration is not enabled.")
+
 
 class SkipIf:
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
