@@ -1405,13 +1405,16 @@ public class CatalogOpExecutor {
 
   /**
    * Executes the ALTER TABLE command for an Iceberg table and reloads its metadata.
+   * Returns true if we also need to update the table definition in HMS. Returns false
+   * if the HMS table is already updated by Iceberg, or there is nothing to update in
+   * HMS (the change is internal to Iceberg).
    */
   private boolean alterIcebergTable(TAlterTableParams params, TDdlExecResponse response,
       IcebergTable tbl, long newCatalogVersion, boolean wantMinimalResult,
       String debugAction)
       throws ImpalaException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
-    boolean needsToUpdateHms = !isIcebergHmsIntegrationEnabled(tbl.getMetaStoreTable());
+    boolean needsToUpdateHms = !IcebergUtil.isHiveCatalog(tbl.getMetaStoreTable());
     try {
       org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(tbl);
       switch (params.getAlter_type()) {

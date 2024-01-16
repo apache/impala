@@ -72,6 +72,9 @@ class TestIcebergTable(IcebergTestSuite):
   def test_alter_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-alter', vector, use_db=unique_database)
 
+  def test_external_iceberg_tables(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-external', vector, unique_database)
+
   def test_expire_snapshots(self, unique_database):
     tbl_name = unique_database + ".expire_snapshots"
     iceberg_catalogs = IcebergCatalogs(unique_database)

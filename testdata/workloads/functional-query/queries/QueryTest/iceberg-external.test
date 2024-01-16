@@ -1,0 +1,71 @@
+====
+---- QUERY
+create table ice_hive_ext (i int)
+stored by iceberg
+tblproperties ('external.table.purge'='false');
+insert into ice_hive_ext values (4);
+---- DML_RESULTS: ice_hive_ext
+4
+---- TYPES
+INT
+====
+---- QUERY
+alter table ice_hive_ext add column j int;
+select * from ice_hive_ext;
+---- RESULTS
+4,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+insert into ice_hive_ext values (5,5);
+---- DML_RESULTS: ice_hive_ext
+4,NULL
+5,5
+---- TYPES
+INT,INT
+====
+---- QUERY
+alter table ice_hive_ext set tblproperties ('external.table.purge'='true');
+insert into ice_hive_ext values (6,6);
+describe formatted ice_hive_ext
+---- RESULTS: VERIFY_IS_SUBSET
+'','external.table.purge','true                '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+create table ice_hadoop_tables_ext (i int)
+stored by iceberg
+tblproperties ('iceberg.catalog'='hadoop.tables', 'external.table.purge'='false');
+insert into ice_hadoop_tables_ext values (4);
+---- DML_RESULTS: ice_hadoop_tables_ext
+4
+---- TYPES
+INT
+====
+---- QUERY
+alter table ice_hadoop_tables_ext add column j int;
+select * from ice_hadoop_tables_ext;
+---- RESULTS
+4,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+insert into ice_hadoop_tables_ext values (5,5);
+---- DML_RESULTS: ice_hadoop_tables_ext
+4,NULL
+5,5
+---- TYPES
+INT,INT
+====
+---- QUERY
+alter table ice_hadoop_tables_ext set tblproperties ('external.table.purge'='true');
+insert into ice_hadoop_tables_ext values (6,6);
+describe formatted ice_hadoop_tables_ext
+---- RESULTS: VERIFY_IS_SUBSET
+'','external.table.purge','true                '
+---- TYPES
+STRING,STRING,STRING
+====
