@@ -2,6 +2,5 @@
 -log_dir=/var/log/statestore
 -log_filename=statestored
 -minidump_path=/var/log/impala-minidumps
--webserver_doc_root=/opt/impala
 -v=1
 -max_log_size=200
