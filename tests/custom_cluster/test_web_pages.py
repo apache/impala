@@ -330,17 +330,19 @@ class TestWebPage(CustomClusterTestSuite):
     assert op["target_name"] == unique_database
 
   @CustomClusterTestSuite.with_args(
-    impalad_args="--catalog_client_rpc_timeout_ms=10 "
+    impalad_args="--catalog_client_rpc_timeout_ms=100 "
                  "--catalog_client_rpc_retry_interval_ms=10 "
                  "--catalog_client_connection_num_retries=2")
   def test_catalog_operations_with_rpc_retry(self):
     """Test that catalog RPC retries are all shown in the /operations page"""
     # Run a DESCRIBE to ensure the table is loaded. So the first RPC attempt will
-    # time out in its real work.
+    # time out in its real work. This triggers a PrioritizeLoad RPC which usually
+    # finishes in 40ms. So 100ms for catalog RPC timeout is enough.
     self.execute_query("describe functional.alltypes")
     try:
+      # This runs around 600ms with the debug action so the catalog RPC will timeout.
       self.execute_query("refresh functional.alltypes", {
-        "debug_action": "catalogd_refresh_hdfs_listing_delay:SLEEP@30"
+        "debug_action": "catalogd_refresh_hdfs_listing_delay:SLEEP@100"
       })
     except ImpalaBeeswaxException as e:
       assert "RPC recv timed out" in str(e)
