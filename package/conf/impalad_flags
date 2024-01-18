@@ -11,6 +11,5 @@
 -local_library_dir=/var/lib/impala/udfs
 -fair_scheduler_allocation_path=/opt/impala/conf/fair-scheduler.xml
 -llama_site_path=/opt/impala/conf/llama-site.xml
--webserver_doc_root=/opt/impala
 -v=1
 -max_log_size=200
