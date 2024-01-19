@@ -121,21 +121,54 @@ class BitUtil {
   constexpr static inline uint32_t RoundDownNumi64(uint32_t bits) { return bits >> 6; }
 
   /// Returns whether the given byte is the start byte of a UTF-8 character.
-  constexpr static inline bool IsUtf8StartByte(uint8_t b) {
+  constexpr static inline bool IsUtf8StartByteRaw(uint8_t b) {
+    // If the byte is not 10xxxxxx, it is a start byte.
     return (b & 0xC0) != 0x80;
   }
 
   /// Returns the byte length of a *legal* UTF-8 character (code point) given its first
-  /// byte. If the first byte is between 0xC0 and 0xDF, the UTF-8 character has two
-  /// bytes; if it is between 0xE0 and 0xEF, the UTF-8 character has 3 bytes; and if it
-  /// is 0xF0 and 0xFF, the UTF-8 character has 4 bytes.
-  constexpr static inline int NumBytesInUTF8Encoding(int8_t first_byte) {
-    if (first_byte >= 0) return 1;
-    switch (first_byte & 0xF0) {
-      case 0xE0: return 3;
-      case 0xF0: return 4;
-      default: return 2;
-    }
+  /// byte. The mapping table is as follows:
+  ///   Char. number range  |        UTF-8 octet sequence
+  ///      (hexadecimal)    |              (binary)
+  ///   --------------------+---------------------------------------------
+  ///   0000 0000-0000 007F | 0xxxxxxx
+  ///   0000 0080-0000 07FF | 110xxxxx 10xxxxxx
+  ///   0000 0800-0000 FFFF | 1110xxxx 10xxxxxx 10xxxxxx
+  ///   0001 0000-0010 FFFF | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+  /// See more details: https://www.rfc-editor.org/rfc/rfc3629.html#section-3
+  constexpr static inline int8_t NumBytesInUtf8EncodingRaw(uint8_t first_byte) {
+    // If the first byte is 0xxxxxxx, the UTF-8 character has 1 byte.
+    if ((first_byte & 0x80) == 0x00) return 1;
+    // If the first byte is 110xxxxx, the UTF-8 character has 2 bytes.
+    if ((first_byte & 0xE0) == 0xC0) return 2;
+    // If the first byte is 1110xxxx, the UTF-8 character has 3 bytes.
+    if ((first_byte & 0xF0) == 0xE0) return 3;
+    // If the first byte is 11110xxx, the UTF-8 character has 4 bytes.
+    if ((first_byte & 0xF8) == 0xF0) return 4;
+    // Otherwise, the byte is continuation (10xxxxxx) or invalid (11111xxx),
+    // just returns 1 for safe.
+    return 1;
+  }
+
+  template <class T, size_t... Is>
+  constexpr static auto GenerateTable(T(*func)(uint8_t), std::index_sequence<Is...>) {
+    return std::array<T, sizeof...(Is)>{{func(Is)...}};
+  }
+
+  /// Same as IsUtf8StartByteRaw() but returns the result using the byte value as an index
+  /// from a precalculated table.
+  static inline bool IsUtf8StartByte(uint8_t byte) {
+    constexpr static auto is_utf8_start_byte_table =
+        GenerateTable(IsUtf8StartByteRaw, std::make_index_sequence<256>{});
+    return is_utf8_start_byte_table[byte];
+  }
+
+  /// Same as NumBytesInUtf8EncodingRaw() but returns the byte length of a UTF-8 character
+  /// using the first byte value as an index from a precalculated table.
+  static inline int NumBytesInUtf8Encoding(uint8_t first_byte) {
+    constexpr static auto utf8_byte_length_table =
+        GenerateTable(NumBytesInUtf8EncodingRaw, std::make_index_sequence<256>{});
+    return utf8_byte_length_table[first_byte];
   }
 
   /// Non hw accelerated pop count.

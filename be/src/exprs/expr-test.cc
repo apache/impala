@@ -10987,6 +10987,15 @@ TEST_P(ExprTest, Utf8Test) {
       "\U0001f467\u200d\U0001f467\u200d\U0001f468\u200d\U0001f468"
       "\u0bbf\u0ba8\u0940\u0928");
 
+  // Tests utf8_*trim() with UTF-8 characters.
+  TestStringValue("utf8_trim(' hello你好👋 ')", "hello你好👋");
+  TestStringValue("utf8_rtrim(' hello你好👋 ')", " hello你好👋");
+  TestStringValue("utf8_ltrim(' hello你好👋 ')", "hello你好👋 ");
+  TestStringValue("utf8_btrim(' hello你好👋 ')", "hello你好👋");
+  TestStringValue("utf8_rtrim('hello你好👋', '👋hello')", "hello你好");
+  TestStringValue("utf8_ltrim('hello你好👋', '👋hello')", "你好👋");
+  TestStringValue("utf8_btrim('hello你好👋', '👋hello')", "你好");
+
   executor_->PushExecOption("utf8_mode=true");
   // Each Chinese character is encoded into 3 bytes. But in UTF-8 mode, the positions
   // are counted by UTF-8 characters.
@@ -11098,6 +11107,29 @@ TEST_P(ExprTest, Utf8Test) {
   TestStringValue("upper('ábć\\0èfğ')", string("ÁBĆ\0ÈFĞ", 11));
   TestStringValue("lower('ÁBĆ\\0ÈFĞ')", string("ábć\0èfğ", 11));
   TestStringValue("initcap('ábć\\0ÈFĞ')", string("Ábć\0èfğ", 11));
+
+  // Tests *trim() with UTF-8 characters in UTF8_MODE.
+  TestStringValue("trim('  hello 你好 👋 ')", "hello 你好 👋");
+  TestStringValue("ltrim(' hello 你好 👋 ')", "hello 你好 👋 ");
+  TestStringValue("rtrim(' hello 你好 👋 ')", " hello 你好 👋");
+  TestStringValue("btrim(' hello 你好 👋 ')", "hello 你好 👋");
+
+  TestStringValue("ltrim('ÁáBbĆć', 'ÁBĆábć')", "");
+  TestStringValue("rtrim('price价格，', '，')", "price价格");
+
+  TestStringValue("rtrim('hello你好👋', '👋hello')", "hello你好");
+  TestStringValue("ltrim('hello你好👋', '👋hello')", "你好👋");
+  TestStringValue("btrim('hello你好👋', '👋hello')", "你好");
+
+  TestStringValue("rtrim('🍎🍐🍊🍋🍌', '🍌🍋🍐🍎')", "🍎🍐🍊");
+  TestStringValue("ltrim('🍎🍐🍊🍋🍌', '🍌🍋🍐🍎')", "🍊🍋🍌");
+  TestStringValue("btrim('🍎🍐🍊🍋🍌', '🍌🍋🍐🍎')", "🍊");
+
+  TestStringValue("btrim('water💧水вода', 'вода水💧water')", "");
+  TestStringValue("btrim('fire🔥火огонь', 'огонь火🔥fire')", "");
+
+  // There are 'Zero Width Joiner' between emojis.
+  TestStringValue("btrim('👨‍👩‍👧‍👦', '👧‍👦')", "👨‍👩");
 
   executor_->PopExecOption();
 }

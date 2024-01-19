@@ -54,6 +54,38 @@ class StringFunctions {
     TRAILING, // Trim from the right, or trailing end
     BOTH // Trim from both ends of string
   };
+
+  // A utility class for supporting the UTF-8 Trim() function, initialized with the input
+  // string to be trimmed. After Reset(), the Contains function can be used to determine
+  // if a character needs to be trimmed.
+  class TrimContext {
+   public:
+    TrimContext(bool utf8_mode) : utf8_mode_(utf8_mode) { }
+
+    void Reset(const StringVal& chars_to_trim);
+
+    inline bool Contains(uint8_t single_char) const {
+      return single_byte_chars_.test(single_char);
+    }
+
+    inline bool Contains(const uint8_t* utf8_char, int len) const;
+
+    bool utf8_mode() const { return utf8_mode_; }
+
+   private:
+    const bool utf8_mode_;
+
+    // The bitset to hold the unique characters to trim, used for non-UTF-8 characters
+    // or single-byte UTF-8 characters.
+    std::bitset<256> single_byte_chars_;
+
+    // Pointers to multi-byte UTF-8 characters used to check whether characters of the
+    // corresponding byte count need to be trimmed.
+    std::vector<const uint8_t*> double_byte_chars_;
+    std::vector<const uint8_t*> triple_byte_chars_;
+    std::vector<const uint8_t*> quadruple_byte_chars_;
+  };
+
   static StringVal Substring(FunctionContext*, const StringVal& str, const BigIntVal& pos,
       const BigIntVal& len);
   static StringVal Substring(FunctionContext*, const StringVal& str,
@@ -99,6 +131,7 @@ class StringFunctions {
 
   /// Sets up arguments and function context for the *TrimString functions below.
   static void TrimPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
+  static void Utf8TrimPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
   /// Cleans up the work done by TrimPrepare above.
   static void TrimClose(FunctionContext*, FunctionContext::FunctionStateScope);
 
@@ -205,6 +238,10 @@ class StringFunctions {
 
  private:
   static uint64_t re2_mem_limit_;
+
+  static void DoTrimPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope, bool utf8_mode);
+
   /// Templatized implementation of the actual string trimming function.
   /// The first parameter, 'D', is one of StringFunctions::TrimPosition values.
   /// The second parameter, 'IS_IMPLICIT_WHITESPACE', is true when the set of characters
@@ -213,6 +250,12 @@ class StringFunctions {
   template <TrimPosition D, bool IS_IMPLICIT_WHITESPACE>
   static StringVal DoTrimString(FunctionContext* ctx, const StringVal& str,
       const StringVal& chars_to_trim);
+
+  /// Templatized implementation of the actual string trimming function with UTF-8
+  /// character handling.
+  /// The first parameter, 'D', is one of the values of StringFunctions::TrimPosition.
+  template <StringFunctions::TrimPosition D>
+  static StringVal DoUtf8TrimString(const StringVal& str, const TrimContext& trim_ctx);
 };
 }
 #endif

@@ -310,3 +310,88 @@ select id, upper(name), lower(name), initcap(name) from utf8_str_tiny;
 ---- TYPES
 INT,STRING,STRING,STRING
 ====
+---- QUERY
+set utf8_mode=true;
+select id, name, ltrim(name, substr(name, 1, 1)) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','三'
+2,'李四','四'
+3,'王五','五'
+4,'李小龙','小龙'
+5,'Alice','lice'
+6,'陈Bob','Bob'
+7,'Бopиc','opиc'
+8,'Jörg','örg'
+9,'ひなた','なた'
+10,'서연','연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, rtrim(name, substr(name, 2)) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张'
+2,'李四','李'
+3,'王五','王'
+4,'李小龙','李'
+5,'Alice','A'
+6,'陈Bob','陈'
+7,'Бopиc','Б'
+8,'Jörg','J'
+9,'ひなた','ひ'
+10,'서연','서'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, ltrim(name, '张李王小A陈БJひ서') from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','三'
+2,'李四','四'
+3,'王五','五'
+4,'李小龙','龙'
+5,'Alice','lice'
+6,'陈Bob','Bob'
+7,'Бopиc','opиc'
+8,'Jörg','örg'
+9,'ひなた','なた'
+10,'서연','연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, rtrim(name, '三四五小龙') from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张'
+2,'李四','李'
+3,'王五','王'
+4,'李小龙','李'
+5,'Alice','Alice'
+6,'陈Bob','陈Bob'
+7,'Бopиc','Бopиc'
+8,'Jörg','Jörg'
+9,'ひなた','ひなた'
+10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, btrim(name, '！？。，：；‘’“”≠≥≤∞ε∑∫√') from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张三'
+2,'李四','李四'
+3,'王五','王五'
+4,'李小龙','李小龙'
+5,'Alice','Alice'
+6,'陈Bob','陈Bob'
+7,'Бopиc','Бopиc'
+8,'Jörg','Jörg'
+9,'ひなた','ひなた'
+10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====

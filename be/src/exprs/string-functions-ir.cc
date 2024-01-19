@@ -42,6 +42,7 @@
 
 using namespace impala_udf;
 using std::bitset;
+using std::any_of;
 
 // NOTE: be careful not to use string::append.  It is not performant.
 namespace impala {
@@ -690,35 +691,90 @@ StringVal StringFunctions::Translate(FunctionContext* context, const StringVal& 
   return result;
 }
 
-void StringFunctions::TrimPrepare(
-    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+void StringFunctions::TrimContext::Reset(const StringVal& chars_to_trim) {
+  single_byte_chars_.reset();
+  double_byte_chars_.clear();
+  triple_byte_chars_.clear();
+  quadruple_byte_chars_.clear();
+
+  if (!utf8_mode_) {
+    for (size_t i = 0; i < chars_to_trim.len; ++i) {
+      single_byte_chars_.set(chars_to_trim.ptr[i], true);
+    }
+    return;
+  }
+
+  for (size_t i = 0, char_size = 0; i < chars_to_trim.len; i += char_size) {
+    char_size = BitUtil::NumBytesInUtf8Encoding(chars_to_trim.ptr[i]);
+
+    // If the remaining number of bytes does not match the number of bytes specified by
+    // the UTF-8 character, we may have encountered an illegal UTF-8 character.
+    // In order to prevent subsequent data access from going out of bounds, restrictions
+    // are placed here to ensure that accessing pointers to multi-byte characters is
+    // always safe.
+    if (UNLIKELY(i + char_size > chars_to_trim.len)) {
+      char_size = chars_to_trim.len - i;
+    }
+
+    switch (char_size) {
+      case 1: single_byte_chars_.set(chars_to_trim.ptr[i], true); break;
+      case 2: double_byte_chars_.push_back(&chars_to_trim.ptr[i]); break;
+      case 3: triple_byte_chars_.push_back(&chars_to_trim.ptr[i]); break;
+      case 4: quadruple_byte_chars_.push_back(&chars_to_trim.ptr[i]); break;
+      default: DCHECK(false); break;
+    }
+  }
+}
+
+bool StringFunctions::TrimContext::Contains(const uint8_t* utf8_char, int len) const {
+  auto eq = [&](const uint8_t* c){ return memcmp(c, utf8_char, len) == 0; };
+  switch (len) {
+    case 1: return single_byte_chars_.test(*utf8_char);
+    case 2: return any_of(double_byte_chars_.begin(), double_byte_chars_.end(), eq);
+    case 3: return any_of(triple_byte_chars_.begin(), triple_byte_chars_.end(), eq);
+    case 4: return any_of(quadruple_byte_chars_.begin(), quadruple_byte_chars_.end(), eq);
+    default: DCHECK(false); return false;
+  }
+}
+
+void StringFunctions::TrimPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  bool utf8_mode = context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE);
+  DoTrimPrepare(context, scope, utf8_mode);
+}
+
+void StringFunctions::Utf8TrimPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  DoTrimPrepare(context, scope, true /* utf8_mode */);
+}
+
+void StringFunctions::DoTrimPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope, bool utf8_mode) {
   if (scope != FunctionContext::THREAD_LOCAL) return;
-  // Create a bitset to hold the unique characters to trim.
-  bitset<256>* unique_chars = new bitset<256>();
-  context->SetFunctionState(scope, unique_chars);
+  TrimContext* trim_ctx = new TrimContext(utf8_mode);
+  context->SetFunctionState(scope, trim_ctx);
+
   // If the caller didn't specify the set of characters to trim, it means
   // that we're only trimming whitespace. Return early in that case.
   // There can be either 1 or 2 arguments.
   DCHECK(context->GetNumArgs() == 1 || context->GetNumArgs() == 2);
   if (context->GetNumArgs() == 1) {
-    unique_chars->set(static_cast<int>(' '), true);
+    trim_ctx->Reset(StringVal(" "));
     return;
   }
   if (!context->IsArgConstant(1)) return;
   DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
   StringVal* chars_to_trim = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
   if (chars_to_trim->is_null) return; // We shouldn't peek into Null StringVals
-  for (int32_t i = 0; i < chars_to_trim->len; ++i) {
-    unique_chars->set(static_cast<int>(chars_to_trim->ptr[i]), true);
-  }
+  trim_ctx->Reset(*chars_to_trim);
 }
 
 void StringFunctions::TrimClose(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope != FunctionContext::THREAD_LOCAL) return;
-  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
-      context->GetFunctionState(scope));
-  delete unique_chars;
+  TrimContext* trim_ctx =
+      reinterpret_cast<TrimContext*>(context->GetFunctionState(scope));
+  delete trim_ctx;
   context->SetFunctionState(scope, nullptr);
 }
 
@@ -726,34 +782,67 @@ template <StringFunctions::TrimPosition D, bool IS_IMPLICIT_WHITESPACE>
 StringVal StringFunctions::DoTrimString(FunctionContext* ctx,
     const StringVal& str, const StringVal& chars_to_trim) {
   if (str.is_null) return StringVal::null();
-  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
+  TrimContext* trim_ctx = reinterpret_cast<TrimContext*>(
       ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
-  // When 'chars_to_trim' is unique for each element (e.g. when 'chars_to_trim'
-  // is each element of a table column), we need to prepare a bitset of unique
-  // characters here instead of using the bitset from function context.
+
+  // When 'chars_to_trim' is not a constant, we need to reset TrimContext with new
+  // 'chars_to_trim'.
   if (!IS_IMPLICIT_WHITESPACE && !ctx->IsArgConstant(1)) {
     if (chars_to_trim.is_null) return str;
-    unique_chars->reset();
-    for (int32_t i = 0; i < chars_to_trim.len; ++i) {
-      unique_chars->set(static_cast<int>(chars_to_trim.ptr[i]), true);
-    }
+    trim_ctx->Reset(chars_to_trim);
   }
-  // Find new starting position.
+
+  // When dealing with UTF-8 characters in UTF-8 mode, use DoUtf8TrimString().
+  if (trim_ctx->utf8_mode()) {
+    return DoUtf8TrimString<D>(str, *trim_ctx);
+  }
+
+  // Otherwise, we continue to maintain the old behavior.
   int32_t begin = 0;
   int32_t end = str.len - 1;
-  if (D == LEADING || D == BOTH) {
-    while (begin < str.len &&
-        unique_chars->test(static_cast<int>(str.ptr[begin]))) {
+  // Find new starting position.
+  if constexpr (D == LEADING || D == BOTH) {
+    while (begin < str.len && trim_ctx->Contains(str.ptr[begin])) {
       ++begin;
     }
   }
   // Find new ending position.
-  if (D == TRAILING || D == BOTH) {
-    while (end >= begin && unique_chars->test(static_cast<int>(str.ptr[end]))) {
+  if constexpr (D == TRAILING || D == BOTH) {
+    while (end >= begin && trim_ctx->Contains(str.ptr[end])) {
       --end;
     }
   }
   return StringVal(str.ptr + begin, end - begin + 1);
+}
+
+template <StringFunctions::TrimPosition D>
+StringVal StringFunctions::DoUtf8TrimString(const StringVal& str,
+    const TrimContext& trim_ctx) {
+  if (UNLIKELY(str.len == 0)) return str;
+
+  const uint8_t* begin = str.ptr;
+  const uint8_t* end = begin + str.len;
+  // Find new starting position.
+  if constexpr (D == LEADING || D == BOTH) {
+    while (begin < end) {
+      size_t char_size = BitUtil::NumBytesInUtf8Encoding(*begin);
+      if (UNLIKELY(begin + char_size > end)) char_size = end - begin;
+      if (!trim_ctx.Contains(begin, char_size)) break;
+      begin += char_size;
+    }
+  }
+  // Find new ending position.
+  if constexpr (D == TRAILING || D == BOTH) {
+    while (begin < end) {
+      int char_index = FindUtf8PosBackward(begin, end - begin, 0);
+      DCHECK_NE(char_index, -1);
+      const uint8_t* char_begin = begin + char_index;
+      if (!trim_ctx.Contains(char_begin, end - char_begin)) break;
+      end = char_begin;
+    }
+  }
+
+  return StringVal(const_cast<uint8_t*>(begin), end - begin);
 }
 
 StringVal StringFunctions::Trim(FunctionContext* context, const StringVal& str) {

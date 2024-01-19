@@ -102,7 +102,7 @@ int FindUtf8PosForward(const uint8_t* ptr, const int len, int index) {
       --index;
     }
     if (index == 0 || pos == len) break;
-    pos += BitUtil::NumBytesInUTF8Encoding(ptr[pos]);
+    pos += BitUtil::NumBytesInUtf8Encoding(ptr[pos]);
     --index;
   }
   if (pos >= len) return len;
@@ -123,7 +123,7 @@ int FindUtf8PosBackward(const uint8_t* ptr, const int len, int index) {
       return -1;
     }
     // Get bytes length of the located character.
-    int bytes_len = BitUtil::NumBytesInUTF8Encoding(ptr[pos]);
+    int bytes_len = BitUtil::NumBytesInUtf8Encoding(ptr[pos]);
     // If there are not enough bytes after the first byte, i.e. last_pos-pos < bytes_len,
     // we consider the bytes belong to a malformed character, and count them as one
     // character.
