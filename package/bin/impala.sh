@@ -48,7 +48,7 @@ status() {
   local service=
   while [[ $# -gt 0 ]]; do
     case ${1} in
-      impalad|catalogd|statestored) service=${1} && shift && break ;;
+      impalad|catalogd|admissiond|statestored) service=${1} && shift && break ;;
       *) usage && exit 1 ;;
     esac
   done
@@ -89,7 +89,7 @@ stop() {
     case ${1} in
       -c) counts=${2} && shift 2 ;;
       -p) period=${2} && shift 2 ;;
-      impalad|catalogd|statestored) service=${1} && shift && break ;;
+      impalad|catalogd|admissiond|statestored) service=${1} && shift && break ;;
       *) usage && exit 1 ;;
     esac
   done
@@ -147,7 +147,7 @@ start() {
     case ${1} in
       -c) counts=${2} && shift 2 ;;
       -p) period=${2} && shift 2 ;;
-      impalad|catalogd|statestored) service=${1} && shift && break ;;
+      impalad|catalogd|admissiond|statestored) service=${1} && shift && break ;;
       *) usage && exit 1 ;;
     esac
   done
@@ -178,7 +178,7 @@ health() {
     case ${1} in
       -c) counts=${2} && shift 2 ;;
       -p) period=${2} && shift 2 ;;
-      impalad|catalogd|statestored) service=${1} && shift ;;
+      impalad|catalogd|admissiond|statestored) service=${1} && shift ;;
       *) usage && exit 1 ;;
     esac
   done
@@ -200,6 +200,7 @@ health() {
     case ${service} in
       impalad) port=25000;;
       catalogd) port=25020;;
+      admissiond) port=25030;;
       statestored) port=25010;;
     esac
   fi
@@ -225,7 +226,7 @@ usage() {
   echo "       $0 --version"
   echo "       $0 --help"
   echo "  command: {start|stop|restart|status|health}"
-  echo "  service: {impalad|catalogd|statestored}"
+  echo "  service: {impalad|catalogd|admissiond|statestored}"
   echo "  flags: in pattern '-key=val...'."
   echo
   echo "  start: start an Impala daemon service, wait until service is ready."
