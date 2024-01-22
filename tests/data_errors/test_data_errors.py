@@ -28,6 +28,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
+from tests.util.test_file_parser import QueryTestSectionReader
 
 
 class TestDataErrors(ImpalaTestSuite):
@@ -164,7 +165,10 @@ class TestHdfsJsonScanNodeErrors(TestHdfsScanNodeErrors):
 
   def test_hdfs_json_scan_node_errors(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
-    self.run_test_case('DataErrorsTest/hdfs-json-scan-node-errors', vector)
+    table_format = vector.get_value('table_format')
+    db_name = QueryTestSectionReader.get_db_name(table_format)
+    self.run_test_case('DataErrorsTest/hdfs-json-scan-node-errors', vector,
+        use_db=db_name)
 
 
 class TestAvroErrors(TestDataErrors):

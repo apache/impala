@@ -2,66 +2,66 @@
 ---- QUERY
 select * from alltypeserror order by id
 ---- ERRORS
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.bool_col, type: BOOLEAN, data: 'errtrue'
-Error converting column: functional_json.alltypeserror.tinyint_col, type: TINYINT, data: 'err9'
-Error converting column: functional_json.alltypeserror.smallint_col, type: SMALLINT, data: 'err9'
-Error converting column: functional_json.alltypeserror.int_col, type: INT, data: 'err9'
-Error converting column: functional_json.alltypeserror.bigint_col, type: BIGINT, data: 'err90'
-Error converting column: functional_json.alltypeserror.float_col, type: FLOAT, data: 'err9.000000'
-Error converting column: functional_json.alltypeserror.double_col, type: DOUBLE, data: 'err90.900000'
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0000-01-01 00:00:00'
+Error converting column: $DATABASE.alltypeserror.bool_col, type: BOOLEAN, data: 'errtrue'
+Error converting column: $DATABASE.alltypeserror.tinyint_col, type: TINYINT, data: 'err9'
+Error converting column: $DATABASE.alltypeserror.smallint_col, type: SMALLINT, data: 'err9'
+Error converting column: $DATABASE.alltypeserror.int_col, type: INT, data: 'err9'
+Error converting column: $DATABASE.alltypeserror.bigint_col, type: BIGINT, data: 'err90'
+Error converting column: $DATABASE.alltypeserror.float_col, type: FLOAT, data: 'err9.000000'
+Error converting column: $DATABASE.alltypeserror.double_col, type: DOUBLE, data: 'err90.900000'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0000-01-01 00:00:00'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.double_col, type: DOUBLE, data: 'err70.700000'
+Error converting column: $DATABASE.alltypeserror.double_col, type: DOUBLE, data: 'err70.700000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.float_col, type: FLOAT, data: 'err6.000000'
+Error converting column: $DATABASE.alltypeserror.float_col, type: FLOAT, data: 'err6.000000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.bigint_col, type: BIGINT, data: 'err50'
+Error converting column: $DATABASE.alltypeserror.bigint_col, type: BIGINT, data: 'err50'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.int_col, type: INT, data: 'err4'
+Error converting column: $DATABASE.alltypeserror.int_col, type: INT, data: 'err4'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.smallint_col, type: SMALLINT, data: 'err3'
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2002-14-10 00:00:00'
+Error converting column: $DATABASE.alltypeserror.smallint_col, type: SMALLINT, data: 'err3'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2002-14-10 00:00:00'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.tinyint_col, type: TINYINT, data: 'err2'
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '1999-10-10 90:10:10'
+Error converting column: $DATABASE.alltypeserror.tinyint_col, type: TINYINT, data: 'err2'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '1999-10-10 90:10:10'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.bool_col, type: BOOLEAN, data: 'errfalse'
+Error converting column: $DATABASE.alltypeserror.bool_col, type: BOOLEAN, data: 'errfalse'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.float_col, type: FLOAT, data: 'xyz3.000000'
-Error converting column: functional_json.alltypeserror.double_col, type: DOUBLE, data: 'xyz30.300000'
+Error converting column: $DATABASE.alltypeserror.float_col, type: FLOAT, data: 'xyz3.000000'
+Error converting column: $DATABASE.alltypeserror.double_col, type: DOUBLE, data: 'xyz30.300000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.tinyint_col, type: TINYINT, data: 'xyz5'
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0009-01-01 00:00:00'
+Error converting column: $DATABASE.alltypeserror.tinyint_col, type: TINYINT, data: 'xyz5'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0009-01-01 00:00:00'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.double_col, type: DOUBLE, data: 'xyz70.700000'
+Error converting column: $DATABASE.alltypeserror.double_col, type: DOUBLE, data: 'xyz70.700000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-20-10 10:10:10.123'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-20-10 10:10:10.123'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.bool_col, type: BOOLEAN, data: 't\rue'
-Error converting column: functional_json.alltypeserror.tinyint_col, type: TINYINT, data: 'err30'
-Error converting column: functional_json.alltypeserror.smallint_col, type: SMALLINT, data: 'err30'
-Error converting column: functional_json.alltypeserror.int_col, type: INT, data: 'err30'
-Error converting column: functional_json.alltypeserror.bigint_col, type: BIGINT, data: 'err300'
-Error converting column: functional_json.alltypeserror.float_col, type: FLOAT, data: 'err30..000000'
-Error converting column: functional_json.alltypeserror.double_col, type: DOUBLE, data: 'err300.900000'
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0000-01-01 00:00:00'
+Error converting column: $DATABASE.alltypeserror.bool_col, type: BOOLEAN, data: 't\rue'
+Error converting column: $DATABASE.alltypeserror.tinyint_col, type: TINYINT, data: 'err30'
+Error converting column: $DATABASE.alltypeserror.smallint_col, type: SMALLINT, data: 'err30'
+Error converting column: $DATABASE.alltypeserror.int_col, type: INT, data: 'err30'
+Error converting column: $DATABASE.alltypeserror.bigint_col, type: BIGINT, data: 'err300'
+Error converting column: $DATABASE.alltypeserror.float_col, type: FLOAT, data: 'err30..000000'
+Error converting column: $DATABASE.alltypeserror.double_col, type: DOUBLE, data: 'err300.900000'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '0000-01-01 00:00:00'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.int_col, type: INT, data: 'abc9'
+Error converting column: $DATABASE.alltypeserror.int_col, type: INT, data: 'abc9'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.tinyint_col, type: TINYINT, data: 'abc7'
+Error converting column: $DATABASE.alltypeserror.tinyint_col, type: TINYINT, data: 'abc7'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.int_col, type: INT, data: 'abc5'
+Error converting column: $DATABASE.alltypeserror.int_col, type: INT, data: 'abc5'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-10-10 10:70:10.123'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-10-10 10:70:10.123'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.smallint_col, type: SMALLINT, data: 'abc3'
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-10-10 60:10:10.123'
+Error converting column: $DATABASE.alltypeserror.smallint_col, type: SMALLINT, data: 'abc3'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-10-10 60:10:10.123'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-10-40 10:10:10.123'
+Error converting column: $DATABASE.alltypeserror.timestamp_col, type: TIMESTAMP, data: '2020-10-40 10:10:10.123'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
 ---- RESULTS
 0,NULL,NULL,0,0,0,0.0,0.0,'01/01/09','0',NULL,2009,1
@@ -101,48 +101,48 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 ---- QUERY
 select * from alltypeserrornonulls order by id
 ---- ERRORS
-Error converting column: functional_json.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '123456'
+Error converting column: $DATABASE.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '123456'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.bool_col, type: BOOLEAN, data: 'errfalse'
-Error converting column: functional_json.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '1990-00-01 10:10:10'
+Error converting column: $DATABASE.alltypeserrornonulls.bool_col, type: BOOLEAN, data: 'errfalse'
+Error converting column: $DATABASE.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '1990-00-01 10:10:10'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'err2'
+Error converting column: $DATABASE.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'err2'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.smallint_col, type: SMALLINT, data: 'err3'
+Error converting column: $DATABASE.alltypeserrornonulls.smallint_col, type: SMALLINT, data: 'err3'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.int_col, type: INT, data: 'err4'
+Error converting column: $DATABASE.alltypeserrornonulls.int_col, type: INT, data: 'err4'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.bigint_col, type: BIGINT, data: 'err50'
+Error converting column: $DATABASE.alltypeserrornonulls.bigint_col, type: BIGINT, data: 'err50'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.float_col, type: FLOAT, data: 'err6.000000'
+Error converting column: $DATABASE.alltypeserrornonulls.float_col, type: FLOAT, data: 'err6.000000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.double_col, type: DOUBLE, data: 'err70.700000'
+Error converting column: $DATABASE.alltypeserrornonulls.double_col, type: DOUBLE, data: 'err70.700000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.bool_col, type: BOOLEAN, data: 'errtrue'
-Error converting column: functional_json.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'err9'
-Error converting column: functional_json.alltypeserrornonulls.smallint_col, type: SMALLINT, data: 'err9'
-Error converting column: functional_json.alltypeserrornonulls.int_col, type: INT, data: 'err9'
-Error converting column: functional_json.alltypeserrornonulls.bigint_col, type: BIGINT, data: 'err90'
-Error converting column: functional_json.alltypeserrornonulls.float_col, type: FLOAT, data: 'err9.000000'
-Error converting column: functional_json.alltypeserrornonulls.double_col, type: DOUBLE, data: 'err90.900000'
+Error converting column: $DATABASE.alltypeserrornonulls.bool_col, type: BOOLEAN, data: 'errtrue'
+Error converting column: $DATABASE.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'err9'
+Error converting column: $DATABASE.alltypeserrornonulls.smallint_col, type: SMALLINT, data: 'err9'
+Error converting column: $DATABASE.alltypeserrornonulls.int_col, type: INT, data: 'err9'
+Error converting column: $DATABASE.alltypeserrornonulls.bigint_col, type: BIGINT, data: 'err90'
+Error converting column: $DATABASE.alltypeserrornonulls.float_col, type: FLOAT, data: 'err9.000000'
+Error converting column: $DATABASE.alltypeserrornonulls.double_col, type: DOUBLE, data: 'err90.900000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.float_col, type: FLOAT, data: 'xyz3.000000'
-Error converting column: functional_json.alltypeserrornonulls.double_col, type: DOUBLE, data: 'xyz30.300000'
+Error converting column: $DATABASE.alltypeserrornonulls.float_col, type: FLOAT, data: 'xyz3.000000'
+Error converting column: $DATABASE.alltypeserrornonulls.double_col, type: DOUBLE, data: 'xyz30.300000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'xyz5'
+Error converting column: $DATABASE.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'xyz5'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.double_col, type: DOUBLE, data: 'xyz70.700000'
+Error converting column: $DATABASE.alltypeserrornonulls.double_col, type: DOUBLE, data: 'xyz70.700000'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.smallint_col, type: SMALLINT, data: 'abc3'
+Error converting column: $DATABASE.alltypeserrornonulls.smallint_col, type: SMALLINT, data: 'abc3'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.int_col, type: INT, data: 'abc5'
-Error converting column: functional_json.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '2012-Mar-22 11:20:01.123'
+Error converting column: $DATABASE.alltypeserrornonulls.int_col, type: INT, data: 'abc5'
+Error converting column: $DATABASE.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '2012-Mar-22 11:20:01.123'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'abc7'
+Error converting column: $DATABASE.alltypeserrornonulls.tinyint_col, type: TINYINT, data: 'abc7'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '11:20:01.123 2012-03-22 '
+Error converting column: $DATABASE.alltypeserrornonulls.timestamp_col, type: TIMESTAMP, data: '11:20:01.123 2012-03-22 '
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
-Error converting column: functional_json.alltypeserrornonulls.int_col, type: INT, data: 'abc9'
+Error converting column: $DATABASE.alltypeserrornonulls.int_col, type: INT, data: 'abc9'
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
 ---- RESULTS
 0,true,0,0,0,0,0,0,'01/01/09','0',NULL,2009,1
