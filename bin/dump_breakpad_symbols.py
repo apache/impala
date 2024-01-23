@@ -137,6 +137,8 @@ def parse_args():
       to process, use with -s""")
   parser.add_argument('-s', '--symbol_pkg', '--debuginfo_rpm', help="""RPM/DEB file
       containing the debug symbols matching the binaries in -r""")
+  parser.add_argument('--no_symbol_pkg', '--no_debuginfo_rpm', action='store_true',
+      help="""Don't require a symbol pkg when processing a RPM/DEB package with -r""")
   parser.add_argument('--objcopy', help='Path to the objcopy binary from Binutils')
   parser.add_argument('--num_processes', type=int, default=multiprocessing.cpu_count(),
       help="Number of parallel processes to use.")
@@ -144,9 +146,9 @@ def parse_args():
 
   # Post processing checks
   # Check that either both pkg and debuginfo_rpm/deb are specified, or none.
-  if bool(args.pkg) != bool(args.symbol_pkg):
+  if not args.no_symbol_pkg and bool(args.pkg) != bool(args.symbol_pkg):
     parser.print_usage()
-    die('Either both -r and -s have to be specified, or none')
+    die("The -r option requires a corresponding -s unless --no_symbol_pkg is specified")
   input_flags = [args.build_dir, args.binary_files, args.stdin_files, args.pkg]
   if sum(1 for flag in input_flags if flag) != 1:
     die('You need to specify exactly one way to locate input files (-b/-f/-i/-r,-s)')
@@ -218,30 +220,37 @@ def enumerate_pkg_files(pkg, symbol_pkg):
   """Return a generator over BinarySymbolInfo tuples for all ELF files in 'pkg'.
 
   This function extracts both RPM/DEB files, then walks the binary pkg directory to
-  enumerate all ELF files, matches them to the location of their respective .debug files
-  and yields all tuples thereof. We use a generator here to keep the temporary directory
-  and its contents around until the consumer of the generator has finished its processing.
+  enumerate all ELF files. If there is no separate symbol pkg, it simply yields
+  all ELF files. If there is a separate symbol pkg, it matches the binaries
+  to the location of their respective .debug files and yields the matching tuples.
+  We use a generator here to keep the temporary directory and its contents around
+  until the consumer of the generator has finished its processing.
   """
   IMPALA_BINARY_BASE = os.path.join('usr', 'lib', 'impala')
   IMPALA_SYMBOL_BASE = os.path.join('usr', 'lib', 'debug', IMPALA_BINARY_BASE)
   assert_file_exists(pkg)
-  assert_file_exists(symbol_pkg)
+  if symbol_pkg:
+    assert_file_exists(symbol_pkg)
   tmp_dir = tempfile.mkdtemp()
   try:
     # Extract pkg
     logging.info('Extracting to %s: %s' % (tmp_dir, pkg))
     extract_pkg(os.path.abspath(pkg), tmp_dir)
-    # Extract symbol_pkg
-    logging.info('Extracting to %s: %s' % (tmp_dir, symbol_pkg))
-    extract_pkg(os.path.abspath(symbol_pkg), tmp_dir)
-    # Walk pkg path and find elf files
     binary_base = os.path.join(tmp_dir, IMPALA_BINARY_BASE)
-    symbol_base = os.path.join(tmp_dir, IMPALA_SYMBOL_BASE)
+    if symbol_pkg:
+      # Extract symbol_pkg
+      logging.info('Extracting to %s: %s' % (tmp_dir, symbol_pkg))
+      extract_pkg(os.path.abspath(symbol_pkg), tmp_dir)
+      symbol_base = os.path.join(tmp_dir, IMPALA_SYMBOL_BASE)
+    # Walk pkg path and find elf files
     # Find folder with .debug file in symbol_pkg path
     for binary_path in find_elf_files(binary_base):
       # Add tuple to output
-      rel_dir = os.path.relpath(os.path.dirname(binary_path), binary_base)
-      debug_dir = os.path.join(symbol_base, rel_dir)
+      if symbol_pkg:
+        rel_dir = os.path.relpath(os.path.dirname(binary_path), binary_base)
+        debug_dir = os.path.join(symbol_base, rel_dir)
+      else:
+        debug_dir = None
       yield BinarySymbolInfo(binary_path, debug_dir)
   finally:
     shutil.rmtree(tmp_dir)
