@@ -353,20 +353,30 @@ def main():
   assert objcopy
   status = 0
   ensure_dir_exists(args.dest_dir)
-  # Use a thread pool to go parallel
-  thread_pool = ThreadPool(processes=args.num_processes)
+  # The logic for handling DEB/RPM packages does not currently work with
+  # parallelism, so disable parallelism if using the -r/--pkg option.
+  if args.num_processes > 1 and not bool(args.pkg):
+    # Use a thread pool to go parallel
+    thread_pool = ThreadPool(processes=args.num_processes)
 
-  def processing_fn(binary):
-    return process_binary(dump_syms, objcopy, binary, args.dest_dir)
+    def processing_fn(binary):
+      return process_binary(dump_syms, objcopy, binary, args.dest_dir)
 
-  for result in thread_pool.imap_unordered(processing_fn, enumerate_binaries(args)):
-    if not result:
-      thread_pool.terminate()
-      status = 1
-      break
+    for result in thread_pool.imap_unordered(processing_fn, enumerate_binaries(args)):
+      if not result:
+        thread_pool.terminate()
+        status = 1
+        break
 
-  thread_pool.close()
-  thread_pool.join()
+    thread_pool.close()
+    thread_pool.join()
+  else:
+    # For serial cases, simply avoid the ThreadPool altogether, as that makes it
+    # easy to reason about.
+    for binary in enumerate_binaries(args):
+      if not process_binary(dump_syms, objcopy, binary, args.dest_dir):
+        status = 1
+        break
   sys.exit(status)
 
 
