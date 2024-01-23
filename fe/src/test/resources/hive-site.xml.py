@@ -65,7 +65,10 @@ CONFIG.update({
   'hive.repl.bootstrap.dump.open.txn.timeout': '120s',
 
   # allow both hs2 and hs2-http protocols
-  'hive.server2.transport.mode': 'all'
+  'hive.server2.transport.mode': 'all',
+
+  # Don't filter out incremental stats of Impala. The default is "impala_intermediate_stats_chunk%".
+  'hive.metastore.partitions.parameters.exclude.pattern': '""',
 })
 
 if variant == 'changed_external_dir':
