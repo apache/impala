@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.catalog.Catalog;
@@ -32,6 +33,7 @@ import org.apache.impala.catalog.HBaseColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
+import org.apache.impala.planner.IcebergScanPlanner;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
@@ -51,6 +53,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 // All planner tests, except for S3 specific tests should go here.
 public class PlannerTest extends PlannerTestBase {
@@ -1510,5 +1513,26 @@ public class PlannerTest extends PlannerTestBase {
   public void testRuntimeFilterCardinalityReductionOnKudu() {
     runPlannerTestFile("runtime-filter-cardinality-reduction-on-kudu", "tpch_kudu",
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
+   * Test that how the different equality delete field ID lists are ordered for reading.
+   */
+  @Test
+  public void testEqualityDeleteFieldIdOrdering() {
+    Map<List<Integer>, Long> inp = Maps.newHashMap();
+    inp.put(Lists.newArrayList(2, 3), 2L);
+    inp.put(Lists.newArrayList(1, 2, 3), 2L);
+    inp.put(Lists.newArrayList(1, 2), 2L);
+    inp.put(Lists.newArrayList(4), 3L);
+    inp.put(Lists.newArrayList(1), 3L);
+    Assert.assertEquals(
+        Lists.newArrayList(
+            Lists.newArrayList(1),
+            Lists.newArrayList(4),
+            Lists.newArrayList(1, 2, 3),
+            Lists.newArrayList(1, 2),
+            Lists.newArrayList(2, 3)),
+        IcebergScanPlanner.getOrderedEqualityFieldIds(inp));
   }
 }

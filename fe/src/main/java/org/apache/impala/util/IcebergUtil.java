@@ -1057,6 +1057,12 @@ public class IcebergUtil {
     if (spec != null && !spec.fields().isEmpty()) {
       partKeysOffset = createPartitionKeys(feTbl, fbb, spec, cf);
     }
+    int eqFieldIdsOffset = -1;
+    List<Integer> eqFieldIds = cf.equalityFieldIds();
+    if (eqFieldIds != null && !eqFieldIds.isEmpty()) {
+      eqFieldIdsOffset = FbIcebergMetadata.createEqualityFieldIdsVector(fbb,
+          eqFieldIds.stream().mapToInt(i -> i).sorted().toArray());
+    }
     FbIcebergMetadata.startFbIcebergMetadata(fbb);
     byte fileFormat = -1;
     if (cf.format() == FileFormat.PARQUET) fileFormat = FbIcebergDataFileFormat.PARQUET;
@@ -1081,6 +1087,11 @@ public class IcebergUtil {
       // for manifest entries with status DELETED (older Iceberg versions)."
       FbIcebergMetadata.addDataSequenceNumber(fbb, -1l);
     }
+
+    if (eqFieldIdsOffset != -1) {
+      FbIcebergMetadata.addEqualityFieldIds(fbb, eqFieldIdsOffset);
+    }
+
     return FbIcebergMetadata.endFbIcebergMetadata(fbb);
   }
 

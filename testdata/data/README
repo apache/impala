@@ -803,12 +803,6 @@ Steps:
     (2, 'str2_updated', to_date('2023-12-13'));
 4-Impala: delete from functional_parquet.iceberg_v2_delete_both_eq_and_pos where i = 1;
 
-iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_different_equality_ids:
-Used a hacked Impala to write Iceberg metadata where one equality delete file deletes by
-field ID [1] while another deletes by field IDs [1,2]. Note, the underlying delete files
-are position delete files written by Impala. It's not possible to add this table to the
-data load because it'd give a TableLoadingException when doing a refresh on the table.
-
 iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_partitioned:
 Flink is used for creating this test table. The statements executed are the follow:
 1: Create the table with the partition column part of the primary key. This is enforced
@@ -816,7 +810,7 @@ by Flink:
   create table ice.iceberg_v2_delete_equality_partitioned
     (i int, s string, d date, primary key (d, s) not enforced)
     partitioned by (d)
-  w  ith ('format-version'='2', 'write.upsert.enabled'='true');
+  with ('format-version'='2', 'write.upsert.enabled'='true');
 2: Populate one partition.
   insert into ice.iceberg_v2_delete_equality_partitioned partition (d='2023-12-24') values
     (1, 'str1'), (2, 'str2'), (3, 'str3');
@@ -847,6 +841,54 @@ Impala is used for doing some partition evolution on this table.
 4-Impala:
   alter table functional_parquet.iceberg_v2_delete_equality_partition_evolution
     set partition spec (d, i);
+
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_multi_eq_ids:
+Used Impala and Nifi to create a table that has equality delete files with different
+equality field ID lists. Steps:
+1-Impala:
+  create table functional_parquet.iceberg_v2_delete_equality_multi_eq_ids
+      (i int not null, s string not null, primary key(i))
+      STORED AS ICEBERG
+      TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+              'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
+              'iceberg.table_identifier'='ice.iceberg_v2_delete_equality_multi_eq_ids',
+              'format-version'='2');
+2-Nifi: Insert 3 rows in one data file:
+  (1, "str1"), (2, "str2"), (3, "str3")
+3-Nifi: Update a row using column 'i' as PK:
+  (3, "str3_updated")
+4: Manually edited 'identifier-field-ids' from [1] to [2]
+5-Nifi: In One step insert new rows and update existing ones using column 's' as PK:
+  Insert (4, "str4"), (5, "str5")
+  Update (2222, "str2"), (3333, "str3_updated")
+6: Manually edited 'identifier-field-ids' from [2] to [1,2]
+7: Update rows using columns [i,s] as PK:
+  (4, "str4") -> (4, "str4_updated"), (3333, "str3_updated") -> (33, "str3_updated_twice")
+
+iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_pos_and_multi_eq_ids:
+Used Flink and Impala to create a table that has both positional and equality delete
+files where some of the equality deletes have different equality field IDs.
+1-Flink:
+  create table hadoop_catalog.ice.iceberg_v2_delete_pos_and_multi_eq_ids
+      (i int not null, s string not null, d date not null, primary key(i,s) not enforced)
+      with ('format-version'='2', 'write.upsert.enabled'='true');
+2-Flink:
+  insert into hadoop_catalog.ice.iceberg_v2_delete_pos_and_multi_eq_ids values
+      (1, 'str1', to_date('2024-01-23')),
+      (2, 'str2', to_date('2024-01-24')),
+      (3, 'str3', to_date('2024-01-25'));
+3-Flink:
+  insert into hadoop_catalog.ice.iceberg_v2_delete_pos_and_multi_eq_ids values
+      (1, 'str1', to_date('2020-12-01')),
+      (4, 'str4', to_date('2024-01-26'));
+4-Impala:
+  delete from functional_parquet.iceberg_v2_delete_pos_and_multi_eq_ids where s = 'str2';
+5: Manually edited 'identifier-field-ids' from [1,2] to [3,2].
+6: Restarted Flink to forget the table metadata.
+7-Flink:
+  insert into hadoop_catalog.ice.iceberg_v2_delete_pos_and_multi_eq_ids values
+      (333333, 'str3', to_date('2024-01-25')),
+      (5, 'str5', to_date('2024-01-27'));
 
 iceberg_test/iceberg_migrated_alter_test
 Generated and migrated by Hive

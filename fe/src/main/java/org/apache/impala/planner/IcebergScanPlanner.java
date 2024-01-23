@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.curator.shaded.com.google.common.collect.Lists;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DeleteFile;
@@ -76,6 +78,7 @@ import org.apache.impala.common.IcebergPredicateConverter;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
@@ -117,16 +120,21 @@ public class IcebergScanPlanner {
   private List<FileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
   private List<FileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
   private Set<FileDescriptor> positionDeleteFiles_ = new HashSet<>();
-  private Set<FileDescriptor> equalityDeleteFiles_ = new HashSet<>();
-  // The equality field IDs to be used for the equality delete files.
-  private Set<Integer> equalityIds_ = new HashSet<>();
+
+  // Holds all the equalityFieldIds from the equality delete file descriptors involved in
+  // this query.
+  private Set<Integer> allEqualityFieldIds_ = new HashSet<>();
+  private Map<List<Integer>, Set<FileDescriptor>> equalityIdsToDeleteFiles_ =
+      new HashMap<>();
+
 
   // Statistics about the data and delete files. Useful for memory estimates of the
   // ANTI JOIN
   private long positionDeletesRecordCount_ = 0;
-  private long equalityDeletesRecordCount_ = 0;
   private long dataFilesWithDeletesSumPaths_ = 0;
   private long dataFilesWithDeletesMaxPath_ = 0;
+  // Stores how many delete records are involved broken down by equality field ID lists.
+  private Map<List<Integer>, Long> equalityDeletesRecordCount_ = new HashMap<>();
   private Set<Long> equalityDeleteSequenceNumbers_ = new HashSet<>();
 
   private final long snapshotId_;
@@ -174,14 +182,13 @@ public class IcebergScanPlanner {
     dataFilesWithoutDeletes_ = fileStore.getDataFilesWithoutDeletes();
     dataFilesWithDeletes_ = fileStore.getDataFilesWithDeletes();
     positionDeleteFiles_ = new HashSet<>(fileStore.getPositionDeleteFiles());
-    equalityDeleteFiles_ = new HashSet<>(fileStore.getEqualityDeleteFiles());
-    equalityIds_ = fileStore.getEqualityIds();
+    initEqualityIds(fileStore.getEqualityDeleteFiles());
 
     updateDeleteStatistics();
   }
 
   private boolean noDeleteFiles() {
-    return positionDeleteFiles_.isEmpty() && equalityDeleteFiles_.isEmpty();
+    return positionDeleteFiles_.isEmpty() && equalityIdsToDeleteFiles_.isEmpty();
   }
 
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
@@ -198,7 +205,7 @@ public class IcebergScanPlanner {
     PlanNode joinNode = null;
     if (!positionDeleteFiles_.isEmpty()) joinNode = createPositionJoinNode();
 
-    if (!equalityDeleteFiles_.isEmpty()) joinNode = createEqualityJoinNode(joinNode);
+    if (!equalityIdsToDeleteFiles_.isEmpty()) joinNode = createEqualityJoinNode(joinNode);
     Preconditions.checkNotNull(joinNode);
 
     // If the count star query can be optimized for Iceberg V2 table, the number of rows
@@ -245,7 +252,7 @@ public class IcebergScanPlanner {
         Arrays.asList(deleteTable.getDb().getName(), deleteTable.getName()),
         tblRef_.getUniqueAlias() + "-position-delete");
     addDataVirtualPositionSlots(tblRef_);
-    if (!equalityDeleteFiles_.isEmpty()) addSlotsForEqualityDelete(equalityIds_, tblRef_);
+    if (!equalityIdsToDeleteFiles_.isEmpty()) addAllSlotsForEqualityDeletes(tblRef_);
     addDeletePositionSlots(deleteDeltaRef);
     IcebergScanNode dataScanNode = new IcebergScanNode(
         dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
@@ -296,15 +303,20 @@ public class IcebergScanPlanner {
     filePosSlotDesc.setStats(virtualFilePositionStats());
   }
 
-  private void addSlotsForEqualityDelete(Set<Integer> equalityIds, TableRef tblRef)
+  private void addAllSlotsForEqualityDeletes(TableRef tblRef) throws AnalysisException {
+    addSlotsForEqualityDeletes(Lists.newArrayList(allEqualityFieldIds_), tblRef);
+  }
+
+  private void addSlotsForEqualityDeletes(List<Integer> equalityFieldIds, TableRef tblRef)
       throws AnalysisException {
+    Preconditions.checkState(!equalityFieldIds.isEmpty());
+
     List<String> rawPath = Lists.newArrayList(
         tblRef.getUniqueAlias(), VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER.getName());
     SlotDescriptor slotDesc = SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
     slotDesc.setStats(virtualDataSeqNumStats());
 
-    Preconditions.checkState(!equalityIds.isEmpty());
-    for (Integer eqId : equalityIds) {
+    for (Integer eqId : equalityFieldIds) {
       String eqColName = getIceTable().getIcebergSchema().findColumnName(eqId);
       Preconditions.checkNotNull(eqColName);
       rawPath = Lists.newArrayList(tblRef.getUniqueAlias(), eqColName);
@@ -424,8 +436,7 @@ public class IcebergScanPlanner {
 
   private PlanNode createEqualityJoinNode(PlanNode positionJoinNode)
       throws ImpalaException {
-    Preconditions.checkState(!equalityDeleteFiles_.isEmpty());
-    Preconditions.checkState(equalityDeletesRecordCount_ > 0);
+    Preconditions.checkState(!equalityIdsToDeleteFiles_.isEmpty());
 
     if (getIceTable().getPartitionSpecs().size() > 1) {
       throw new ImpalaRuntimeException("Equality delete files are not supported for " +
@@ -440,51 +451,100 @@ public class IcebergScanPlanner {
       IcebergScanNode dataScanNode = new IcebergScanNode(
           dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
           nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_);
-      addSlotsForEqualityDelete(equalityIds_, tblRef_);
+      addAllSlotsForEqualityDeletes(tblRef_);
       dataScanNode.init(analyzer_);
 
       leftSideOfJoin = dataScanNode;
     }
 
+    List<List<Integer>> orderedEqualityFieldIds =
+        getOrderedEqualityFieldIds(equalityDeletesRecordCount_);
     JoinNode joinNode = null;
-    PlanNodeId deleteScanNodeId = ctx_.getNextNodeId();
-    IcebergEqualityDeleteTable deleteTable =
-        new IcebergEqualityDeleteTable(getIceTable(),
-            getIceTable().getName() + "-EQUALITY-DELETE-" + deleteScanNodeId.toString(),
-            equalityDeleteFiles_, equalityIds_, equalityDeletesRecordCount_);
-    analyzer_.addVirtualTable(deleteTable);
+    for (List<Integer> equalityIds : orderedEqualityFieldIds) {
+      Set<FileDescriptor> equalityDeleteFiles =
+          equalityIdsToDeleteFiles_.get(equalityIds);
+      Preconditions.checkState(equalityDeleteFiles != null &&
+          !equalityDeleteFiles.isEmpty());
+      Long numRecordsInDeletes = equalityDeletesRecordCount_.get(equalityIds);
+      Preconditions.checkState(numRecordsInDeletes != null && numRecordsInDeletes > 0);
 
-    TableRef deleteTblRef = TableRef.newTableRef(analyzer_,
-        Arrays.asList(deleteTable.getDb().getName(), deleteTable.getName()),
-        tblRef_.getUniqueAlias() + "-equality-delete-" + deleteScanNodeId.toString());
-    addSlotsForEqualityDelete(equalityIds_, deleteTblRef);
+      PlanNodeId deleteScanNodeId = ctx_.getNextNodeId();
+      IcebergEqualityDeleteTable deleteTable =
+          new IcebergEqualityDeleteTable(getIceTable(),
+              getIceTable().getName() + "-EQUALITY-DELETE-" + deleteScanNodeId.toString(),
+              equalityDeleteFiles, equalityIds, numRecordsInDeletes);
+      analyzer_.addVirtualTable(deleteTable);
 
-    // TODO IMPALA-12608: As an optimization we can populate the conjuncts below that are
-    // relevant for the delete scan node.
-    IcebergScanNode deleteScanNode = new IcebergScanNode(
-        deleteScanNodeId,
-        deleteTblRef,
-        Collections.emptyList(), /*conjuncts*/
-        aggInfo_,
-        Lists.newArrayList(equalityDeleteFiles_),
-        Collections.emptyList(), /*nonIdentityConjuncts*/
-        Collections.emptyList(), /*skippedConjuncts*/
-        snapshotId_);
-    deleteScanNode.init(analyzer_);
+      TableRef deleteTblRef = TableRef.newTableRef(analyzer_,
+          Arrays.asList(deleteTable.getDb().getName(), deleteTable.getName()),
+          tblRef_.getUniqueAlias() + "-equality-delete-" + deleteScanNodeId.toString());
+      addSlotsForEqualityDeletes(equalityIds, deleteTblRef);
 
-    Pair<List<BinaryPredicate>, List<Expr>> equalityJoinConjuncts =
-        createEqualityJoinConjuncts(
-        analyzer_, tblRef_.getDesc(), deleteTblRef.getDesc());
+      // TODO IMPALA-12608: As an optimization we can populate the conjuncts below that
+      // are relevant for the delete scan node.
+      IcebergScanNode deleteScanNode = new IcebergScanNode(
+          deleteScanNodeId,
+          deleteTblRef,
+          Collections.emptyList(), /*conjuncts*/
+          aggInfo_,
+          Lists.newArrayList(equalityDeleteFiles),
+          Collections.emptyList(), /*nonIdentityConjuncts*/
+          Collections.emptyList(),
+          snapshotId_); /*skippedConjuncts*/
+      deleteScanNode.init(analyzer_);
 
-    joinNode = new HashJoinNode(leftSideOfJoin, deleteScanNode,
-        /*straight_join=*/true, DistributionMode.NONE, JoinOperator.LEFT_ANTI_JOIN,
-        equalityJoinConjuncts.first, equalityJoinConjuncts.second);
-    joinNode.setId(ctx_.getNextNodeId());
-    joinNode.init(analyzer_);
+      Pair<List<BinaryPredicate>, List<Expr>> equalityJoinConjuncts =
+          createEqualityJoinConjuncts(
+              analyzer_, tblRef_.getDesc(), deleteTblRef.getDesc());
+
+      joinNode = new HashJoinNode(leftSideOfJoin, deleteScanNode,
+          /*straight_join=*/true, DistributionMode.NONE, JoinOperator.LEFT_ANTI_JOIN,
+          equalityJoinConjuncts.first, equalityJoinConjuncts.second);
+      joinNode.setId(ctx_.getNextNodeId());
+      joinNode.init(analyzer_);
+      leftSideOfJoin = joinNode;
+    }
     return joinNode;
   }
 
+  /**
+   * Based on the equality delete fields ID lists and the number of delete rows associated
+   * to them this function gives back the equality field ID lists in an order we'd like to
+   * use them for join node creation.
+   * The more delete rows are involved the earlier the equality field ID list is placed in
+   * the ordering. If some equality field ID lists have the same amount of delete rows
+   * then the order between them is decided by preferring the longest lists first and in
+   * case of equal length the numerical order of the field IDs in the lists is used.
+   * E.g. If they have the same amount of delete rows then [1,2] comes before [1] because
+   * of the length and comes before [2,3] because of the numerical order.
+   */
+  static List<List<Integer>> getOrderedEqualityFieldIds(
+      Map<List<Integer>, Long> equalityDeletesRecordCount) {
+    Preconditions.checkState(!equalityDeletesRecordCount.isEmpty());
+
+    return equalityDeletesRecordCount.entrySet().stream()
+        .sorted(Map.Entry.<List<Integer>, Long>comparingByValue().reversed()
+            .thenComparing((e1, e2) -> {
+                List<Integer> list1 = e1.getKey();
+                List<Integer> list2 = e2.getKey();
+                // Order the longest equality field ID lists first.
+                if (list1.size() < list2.size()) return 1;
+                if (list2.size() < list1.size()) return -1;
+
+                for (int i = 0; i < list1.size(); ++i) {
+                  if (list1.get(i) < list2.get(i)) return -1;
+                  if (list2.get(i) < list1.get(i)) return 1;
+                }
+                return 0;
+            }))
+        .map(e -> e.getKey())
+        .collect(Collectors.toList());
+  }
+
   private void filterFileDescriptors() throws ImpalaException {
+    Preconditions.checkState(allEqualityFieldIds_.isEmpty());
+    Preconditions.checkState(equalityIdsToDeleteFiles_.isEmpty());
+
     TimeTravelSpec timeTravelSpec = tblRef_.getTimeTravelSpec();
 
     try (CloseableIterable<FileScanTask> fileScanTasks =
@@ -506,8 +566,7 @@ public class IcebergScanPlanner {
             Pair<FileDescriptor, Boolean> delFileDesc = getFileDescriptor(delFile);
             if (!delFileDesc.second) ++dataFilesCacheMisses;
             if (delFile.content() == FileContent.EQUALITY_DELETES) {
-              equalityDeleteFiles_.add(delFileDesc.first);
-              addEqualityIds(delFile.equalityFieldIds());
+              addEqualityDeletesAndIds(delFileDesc.first);
             } else {
               Preconditions.checkState(delFile.content() == FileContent.POSITION_DELETES);
               positionDeleteFiles_.add(delFileDesc.first);
@@ -528,17 +587,23 @@ public class IcebergScanPlanner {
     updateDeleteStatistics();
   }
 
-
-  private void addEqualityIds(List<Integer> equalityFieldIds)
-      throws ImpalaRuntimeException {
-    if (equalityIds_.isEmpty()) {
-      equalityIds_.addAll(equalityFieldIds);
-    } else if (equalityIds_.size() != equalityFieldIds.size() ||
-        !equalityIds_.containsAll(equalityFieldIds)) {
-      throw new ImpalaRuntimeException(String.format("Equality delete files with " +
-          "different equality field ID lists aren't supported. %s vs %s", equalityIds_,
-          equalityFieldIds));
+  private void addEqualityDeletesAndIds(FileDescriptor fd) {
+    FbIcebergMetadata fileMetadata = fd.getFbFileMetadata().icebergMetadata();
+    List<Integer> eqFieldIdList = new ArrayList<>();
+    for (int i = 0; i < fileMetadata.equalityFieldIdsLength(); ++i) {
+      eqFieldIdList.add(fileMetadata.equalityFieldIds(i));
+      allEqualityFieldIds_.add(fileMetadata.equalityFieldIds(i));
     }
+    if (!equalityIdsToDeleteFiles_.containsKey(eqFieldIdList)) {
+      equalityIdsToDeleteFiles_.put(eqFieldIdList, new HashSet<>());
+    }
+    equalityIdsToDeleteFiles_.get(eqFieldIdList).add(fd);
+  }
+
+  private void initEqualityIds(List<FileDescriptor> equalityDeleteFiles) {
+    Preconditions.checkState(allEqualityFieldIds_.isEmpty());
+    Preconditions.checkState(equalityIdsToDeleteFiles_.isEmpty());
+    for (FileDescriptor fd : equalityDeleteFiles) addEqualityDeletesAndIds(fd);
   }
 
   private void filterConjuncts() {
@@ -585,8 +650,9 @@ public class IcebergScanPlanner {
     for (FileDescriptor fd : positionDeleteFiles_) {
       updatePositionDeleteFilesStatistics(fd);
     }
-    for (FileDescriptor fd : equalityDeleteFiles_) {
-      updateEqualityDeleteFilesStatistics(fd);
+    for (Map.Entry<List<Integer>, Set<FileDescriptor>> entry :
+        equalityIdsToDeleteFiles_.entrySet()) {
+      updateEqualityDeleteFilesStatistics(entry.getKey(), entry.getValue());
     }
   }
 
@@ -603,10 +669,15 @@ public class IcebergScanPlanner {
     positionDeletesRecordCount_ += getRecordCount(fd);
   }
 
-  private void updateEqualityDeleteFilesStatistics(FileDescriptor fd) {
-    equalityDeletesRecordCount_ += getRecordCount(fd);
-    equalityDeleteSequenceNumbers_.add(
-        fd.getFbFileMetadata().icebergMetadata().dataSequenceNumber());
+  private void updateEqualityDeleteFilesStatistics(List<Integer> equalityIds,
+      Set<FileDescriptor> fileDescriptors) {
+    long numRecords = 0;
+    for (FileDescriptor fd : fileDescriptors) {
+      numRecords += getRecordCount(fd);
+      equalityDeleteSequenceNumbers_.add(
+          fd.getFbFileMetadata().icebergMetadata().dataSequenceNumber());
+    }
+    equalityDeletesRecordCount_.put(equalityIds, numRecords);
   }
 
   private long getRecordCount(FileDescriptor fd) {

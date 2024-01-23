@@ -1,23 +1,24 @@
 {
   "format-version" : 2,
-  "table-uuid" : "3d258856-43d4-4715-9ed9-7824750c4652",
-  "location" : "/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_different_equality_ids",
+  "table-uuid" : "0f020fe9-a36d-4e02-9963-a55946c487e2",
+  "location" : "/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_multi_eq_ids",
   "last-sequence-number" : 2,
-  "last-updated-ms" : 1702391268756,
+  "last-updated-ms" : 1707392778729,
   "last-column-id" : 2,
   "current-schema-id" : 0,
   "schemas" : [ {
     "type" : "struct",
     "schema-id" : 0,
+    "identifier-field-ids" : [ 2 ],
     "fields" : [ {
       "id" : 1,
       "name" : "i",
-      "required" : false,
+      "required" : true,
       "type" : "int"
     }, {
       "id" : 2,
       "name" : "s",
-      "required" : false,
+      "required" : true,
       "type" : "string"
     } ]
   } ],
@@ -42,69 +43,71 @@
     "write.update.mode" : "merge-on-read",
     "storage_handler" : "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler",
     "iceberg.catalog" : "hadoop.catalog",
-    "iceberg.table_identifier" : "ice.iceberg_v2_delete_different_equality_ids"
+    "iceberg.table_identifier" : "ice.iceberg_v2_delete_equality_multi_eq_ids"
   },
-  "current-snapshot-id" : 8494861454990126958,
+  "current-snapshot-id" : 8127619959873391049,
   "refs" : {
     "main" : {
-      "snapshot-id" : 8494861454990126958,
+      "snapshot-id" : 8127619959873391049,
       "type" : "branch"
     }
   },
   "snapshots" : [ {
     "sequence-number" : 1,
-    "snapshot-id" : 397031335297740726,
-    "timestamp-ms" : 1702391239615,
+    "snapshot-id" : 2374780975027972430,
+    "timestamp-ms" : 1707392713570,
     "summary" : {
-      "operation" : "append",
+      "operation" : "overwrite",
       "added-data-files" : "1",
       "added-records" : "3",
-      "added-files-size" : "616",
+      "added-files-size" : "655",
       "changed-partition-count" : "1",
       "total-records" : "3",
-      "total-files-size" : "616",
+      "total-files-size" : "655",
       "total-data-files" : "1",
       "total-delete-files" : "0",
       "total-position-deletes" : "0",
       "total-equality-deletes" : "0"
     },
-    "manifest-list" : "hdfs://localhost:20500/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_different_equality_ids/metadata/snap-397031335297740726-1-2d3fafd7-bce6-483f-be82-e0ccce9203fc.avro",
+    "manifest-list" : "/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_multi_eq_ids/metadata/snap-2374780975027972430-1-ea25da34-c91b-4a0f-a003-3958e87caffd.avro",
     "schema-id" : 0
   }, {
     "sequence-number" : 2,
-    "snapshot-id" : 8494861454990126958,
-    "parent-snapshot-id" : 397031335297740726,
-    "timestamp-ms" : 1702391268756,
+    "snapshot-id" : 8127619959873391049,
+    "parent-snapshot-id" : 2374780975027972430,
+    "timestamp-ms" : 1707392778729,
     "summary" : {
       "operation" : "overwrite",
+      "added-data-files" : "1",
       "added-equality-delete-files" : "1",
       "added-delete-files" : "1",
-      "added-files-size" : "1630",
+      "added-records" : "1",
+      "added-files-size" : "1156",
       "added-equality-deletes" : "1",
       "changed-partition-count" : "1",
-      "total-records" : "3",
-      "total-files-size" : "2246",
-      "total-data-files" : "1",
+      "total-records" : "4",
+      "total-files-size" : "1811",
+      "total-data-files" : "2",
       "total-delete-files" : "1",
       "total-position-deletes" : "0",
       "total-equality-deletes" : "1"
     },
-    "manifest-list" : "hdfs://localhost:20500/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_different_equality_ids/metadata/snap-8494861454990126958-1-8bd425d8-25fb-4603-8cc7-aeb5ad2a3917.avro",
+    "manifest-list" : "/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_multi_eq_ids/metadata/snap-8127619959873391049-1-b8fe0a34-e755-4ba0-92f1-c72bef85a82a.avro",
     "schema-id" : 0
   } ],
   "statistics" : [ ],
   "snapshot-log" : [ {
-    "timestamp-ms" : 1702391239615,
-    "snapshot-id" : 397031335297740726
+    "timestamp-ms" : 1707392713570,
+    "snapshot-id" : 2374780975027972430
   }, {
-    "timestamp-ms" : 1702391268756,
-    "snapshot-id" : 8494861454990126958
+    "timestamp-ms" : 1707392778729,
+    "snapshot-id" : 8127619959873391049
   } ],
   "metadata-log" : [ {
-    "timestamp-ms" : 1702391192239,
-    "metadata-file" : "hdfs://localhost:20500/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_different_equality_ids/metadata/v1.metadata.json"
+    "timestamp-ms" : 1707392530371,
+    "metadata-file" : "/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_multi_eq_ids/metadata/v1.metadata.json"
   }, {
-    "timestamp-ms" : 1702391239615,
-    "metadata-file" : "hdfs://localhost:20500/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_different_equality_ids/metadata/v2.metadata.json"
+    "timestamp-ms" : 1707392713570,
+    "metadata-file" : "/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_equality_multi_eq_ids/metadata/v2.metadata.json"
   } ]
 }

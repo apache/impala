@@ -36,7 +36,7 @@ import org.apache.iceberg.types.Types.NestedField;
 public class IcebergEqualityDeleteTable extends IcebergDeleteTable  {
 
   public IcebergEqualityDeleteTable(FeIcebergTable baseTable, String name,
-      Set<FileDescriptor> deleteFiles, Set<Integer> equalityIds, long deleteRecordsCount)
+      Set<FileDescriptor> deleteFiles, List<Integer> equalityIds, long deleteRecordsCount)
       throws ImpalaRuntimeException {
     super(baseTable, name, deleteFiles, deleteRecordsCount);
 

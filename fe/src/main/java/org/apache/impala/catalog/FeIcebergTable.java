@@ -789,8 +789,7 @@ public interface FeIcebergTable extends FeFsTable {
       }
       for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
         pathHashAndFd = getPathHashAndFd(deleteFile, table, hdfsFileDescMap);
-        fileStore.addEqualityDeleteFile(pathHashAndFd.first, pathHashAndFd.second,
-            deleteFile.equalityFieldIds());
+        fileStore.addEqualityDeleteFile(pathHashAndFd.first, pathHashAndFd.second);
       }
       return fileStore;
     }

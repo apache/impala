@@ -50,6 +50,7 @@ table FbIcebergMetadata {
   data_sequence_number : long;
   spec_id : ushort;
   partition_keys : [FbIcebergPartitionTransformValue];
+  equality_field_ids : [int];
 }
 
 table FbIcebergColumnStats {

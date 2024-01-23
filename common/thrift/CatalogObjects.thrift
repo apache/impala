@@ -630,10 +630,9 @@ struct TIcebergContentFileStore {
   2: optional map<string, THdfsFileDesc> path_hash_to_data_file_with_deletes
   3: optional map<string, THdfsFileDesc> path_hash_to_position_delete_file
   4: optional map<string, THdfsFileDesc> path_hash_to_equality_delete_file
-  5: optional list<i32> equality_ids
-  6: optional bool has_avro
-  7: optional bool has_orc
-  8: optional bool has_parquet
+  5: optional bool has_avro
+  6: optional bool has_orc
+  7: optional bool has_parquet
 }
 
 // Represents a drop partition request for Iceberg tables

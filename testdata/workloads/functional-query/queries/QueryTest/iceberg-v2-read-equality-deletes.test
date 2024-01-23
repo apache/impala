@@ -71,3 +71,65 @@ select * from functional_parquet.iceberg_v2_delete_equality_partitioned order by
 ---- TYPES
 INT,STRING,DATE
 ====
+---- QUERY
+# There are equality deletes with different equality field ids.
+select * from functional_parquet.iceberg_v2_delete_equality_multi_eq_ids;
+---- RESULTS
+1,'str1'
+2222,'str2'
+33,'str3_updated_twice'
+4,'str4_updated'
+5,'str5'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Similar as above, but do a time travel to the latest snapshot so that we can exercise a
+# different code path.
+select * from functional_parquet.iceberg_v2_delete_equality_multi_eq_ids
+  for system_version as of 4077234998626563290;
+---- RESULTS
+1,'str1'
+2222,'str2'
+33,'str3_updated_twice'
+4,'str4_updated'
+5,'str5'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Do a time travel to have a single equality field id list.
+select * from functional_parquet.iceberg_v2_delete_equality_multi_eq_ids
+  for system_version as of 8127619959873391049;
+---- RESULTS
+1,'str1'
+2,'str2'
+3,'str3_updated'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# The table has both equality and positional delete files where some of the equality
+# delete files have different equality field ids.
+select * from functional_parquet.iceberg_v2_delete_pos_and_multi_eq_ids;
+---- RESULTS
+1,'str1',2020-12-01
+333333,'str3',2024-01-25
+4,'str4',2024-01-26
+5,'str5',2024-01-27
+---- TYPES
+INT,STRING,DATE
+====
+---- QUERY
+# Similar as above, but do a time travel to the latest snapshot so that we can exercise a
+# different code path.
+select * from functional_parquet.iceberg_v2_delete_pos_and_multi_eq_ids
+  for system_version as of 152862018760071153;
+---- RESULTS
+1,'str1',2020-12-01
+333333,'str3',2024-01-25
+4,'str4',2024-01-26
+5,'str5',2024-01-27
+---- TYPES
+INT,STRING,DATE
+====

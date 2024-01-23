@@ -88,6 +88,8 @@ table_name:iceberg_v2_delete_equality_nulls, constraint:restrict_to, table_forma
 table_name:iceberg_v2_delete_both_eq_and_pos, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_delete_equality_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_delete_equality_partition_evolution, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_v2_delete_equality_multi_eq_ids, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_v2_delete_pos_and_multi_eq_ids, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_no_deletes, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_no_deletes_orc, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_positional_update_all_rows, constraint:restrict_to, table_format:parquet/none/none
