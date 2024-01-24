@@ -36,7 +36,7 @@ import org.apache.impala.thrift.TQueryOptions;
  * insert records to data files and delete files simultaneously.
  */
 public class MultiDataSink extends DataSink {
-  private List<DataSink> dataSinks_ = new ArrayList<>();
+  protected List<DataSink> dataSinks_ = new ArrayList<>();
 
   public MultiDataSink() {}
 
@@ -86,7 +86,7 @@ public class MultiDataSink extends DataSink {
   @Override
   public void appendSinkExplainString(String prefix, String detailPrefix,
       TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
-    output.append(String.format("%sMULTI DATA SINK\n", prefix));
+    output.append(String.format("%s%s\n", prefix, getLabel()));
     for (DataSink dsink : dataSinks_) {
       dsink.appendSinkExplainString(prefix + "|->", detailPrefix + "  ",
           queryOptions, explainLevel, output);

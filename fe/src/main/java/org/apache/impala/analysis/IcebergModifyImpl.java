@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.DmlStatementBase.createSlotRef;
+
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.common.AnalysisException;
@@ -111,18 +113,9 @@ abstract class IcebergModifyImpl extends ModifyImpl {
       throws AnalysisException {
     List<Expr> ret = new ArrayList<>();
     for (String col : cols) {
-      ret.add(createSlotRef(analyzer, col));
+      ret.add(createSlotRef(analyzer, modifyStmt_.targetTableRef_.getUniqueAlias(), col));
     }
     return ret;
-  }
-
-  protected SlotRef createSlotRef(Analyzer analyzer, String colName)
-      throws AnalysisException {
-    List<String> path = Path.createRawPath(modifyStmt_.targetTableRef_.getUniqueAlias(),
-        colName);
-    SlotRef ref = new SlotRef(path);
-    ref.analyze(analyzer);
-    return ref;
   }
 
   abstract String getModifyMode();

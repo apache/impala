@@ -17,10 +17,13 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Map;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.thrift.TSortingOrder;
 
@@ -73,9 +76,7 @@ public abstract class DmlStatementBase extends StatementBase {
   /**
    * Return bytes of Kudu transaction token.
    */
-  public java.nio.ByteBuffer getKuduTransactionToken() {
-    return kuduTxnToken_;
-  }
+  public java.nio.ByteBuffer getKuduTransactionToken() { return kuduTxnToken_; }
 
   /**
    * Set Kudu transaction token.
@@ -84,5 +85,59 @@ public abstract class DmlStatementBase extends StatementBase {
     Preconditions.checkState(table_ instanceof FeKuduTable);
     Preconditions.checkNotNull(kuduTxnToken);
     kuduTxnToken_ = java.nio.ByteBuffer.wrap(kuduTxnToken.clone());
+  }
+
+  public static void checkSubQuery(SlotRef lhsSlotRef, Expr rhsExpr)
+      throws AnalysisException {
+    if (rhsExpr.contains(Subquery.class)) {
+      throw new AnalysisException(String.format(
+          "Subqueries are not supported as update expressions for column '%s'",
+          lhsSlotRef.toSql()));
+    }
+  }
+
+  public static void checkCorrectTargetTable(SlotRef lhsSlotRef, Expr rhsExpr,
+      TableRef tableRef) throws AnalysisException {
+    if (!lhsSlotRef.isBoundByTupleIds(tableRef.getId().asList())) {
+      throw new AnalysisException(String.format(
+          "Left-hand side column '%s' in assignment expression '%s=%s' does not "
+              + "belong to target table '%s'",
+          lhsSlotRef.toSql(), lhsSlotRef.toSql(), rhsExpr.toSql(),
+          tableRef.getDesc().getTable().getFullName()));
+    }
+  }
+
+  public static void checkLhsIsColumnRef(SlotRef lhsSlotRef, Expr rhsExpr)
+      throws AnalysisException {
+    Column c = lhsSlotRef.getResolvedPath().destColumn();
+    if (c == null) {
+      throw new AnalysisException(String.format(
+          "Left-hand side in assignment expression '%s=%s' must be a column reference",
+          lhsSlotRef.toSql(), rhsExpr.toSql()));
+    }
+  }
+
+  public static Expr checkTypeCompatibility(Analyzer analyzer, Column c, Expr rhsExpr,
+      TableRef tableRef) throws AnalysisException {
+    return StatementBase.checkTypeCompatibility(
+        tableRef.getDesc().getTable().getFullName(), c, rhsExpr, analyzer,
+        null /*widestTypeSrcExpr*/);
+  }
+
+  public static void checkLhsOnlyAppearsOnce(Map<Integer, Expr> colToExprs, Column c,
+      SlotRef lhsSlotRef, Expr rhsExpr) throws AnalysisException {
+    if (colToExprs.containsKey(c.getPosition())) {
+      throw new AnalysisException(
+          String.format("Left-hand side in assignment appears multiple times '%s=%s'",
+              lhsSlotRef.toSql(), rhsExpr.toSql()));
+    }
+  }
+
+  public static SlotRef createSlotRef(Analyzer analyzer, String tableName, String colName)
+      throws AnalysisException {
+    List<String> path = Path.createRawPath(tableName, colName);
+    SlotRef ref = new SlotRef(path);
+    ref.analyze(analyzer);
+    return ref;
   }
 }

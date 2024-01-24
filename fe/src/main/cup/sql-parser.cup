@@ -316,8 +316,8 @@ terminal
   KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
   KW_INTERMEDIATE, KW_INTERSECT, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP, KW_IS,
   KW_JDBC, KW_JOIN, KW_JSONFILE, KW_KUDU, KW_LAST, KW_LEFT, KW_LEXICAL, KW_LIKE, KW_LIMIT,
-  KW_LINES, KW_LOAD, KW_LOCATION, KW_LOGICAL_OR, KW_MANAGED_LOCATION, KW_MAP, KW_MERGE_FN,
-  KW_METADATA, KW_MINUS, KW_NON, KW_NORELY, KW_NOT,
+  KW_LINES, KW_LOAD, KW_LOCATION, KW_LOGICAL_OR, KW_MANAGED_LOCATION, KW_MAP, KW_MATCHED,
+  KW_MERGE, KW_MERGE_FN, KW_METADATA, KW_MINUS, KW_NON, KW_NORELY, KW_NOT,
   KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OF, KW_OFFSET, KW_ON, KW_OPTIMIZE, KW_OR,
   KW_ORC, KW_ORDER, KW_OUTER,
   KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED,
@@ -464,6 +464,15 @@ nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt, upsert_stmt;
 nonterminal UpdateStmt update_stmt;
 nonterminal DeleteStmt delete_stmt;
+nonterminal MergeStmt merge_stmt;
+nonterminal List<MergeCase> merge_case_list;
+nonterminal MergeCase merge_case;
+nonterminal MergeCase merge_when_matched;
+nonterminal MergeCase merge_when_not_matched;
+nonterminal MergeCase merge_matched;
+nonterminal MergeUpdate merge_update;
+nonterminal MergeDelete merge_delete;
+nonterminal MergeInsert merge_insert;
 nonterminal OptimizeStmt optimize_stmt;
 nonterminal List<Pair<SlotRef, Expr>> update_set_expr_list;
 nonterminal StatementBase explain_stmt;
@@ -676,6 +685,8 @@ stmt ::=
   {: RESULT = upsert; :}
   | delete_stmt:delete
   {: RESULT = delete; :}
+  | merge_stmt:merge
+  {: RESULT = merge; :}
   | optimize_stmt:optimize
   {: RESULT = optimize; :}
   | use_stmt:use
@@ -846,6 +857,11 @@ explain_stmt ::=
      delete.setIsExplain();
      RESULT = delete;
   :}
+  | KW_EXPLAIN merge_stmt:merge
+  {:
+     merge.setIsExplain();
+     RESULT = merge;
+  :}
   | KW_EXPLAIN optimize_stmt:optimize
   {:
      optimize.setIsExplain();
@@ -999,6 +1015,67 @@ delete_stmt ::=
   where_clause:where
   {: RESULT = new DeleteStmt(target_table, from, where); :}
   ;
+
+merge_stmt ::=
+  KW_MERGE KW_INTO table_ref:target_table KW_USING table_ref:source
+  KW_ON expr:on merge_case_list:cases
+  {:
+    RESULT = new MergeStmt(target_table, source, on, cases);
+  :};
+
+merge_case_list ::=
+  merge_case:merge_case
+  {:
+    RESULT = Lists.newArrayList(merge_case);
+  :}
+  | merge_case_list:cases merge_case:merge_case
+  {:
+    cases.add(merge_case);
+    RESULT = cases;
+  :};
+
+merge_case ::=
+  merge_when_matched:matched
+  {: RESULT = matched; :}
+  | merge_when_not_matched:not_matched
+  {: RESULT = not_matched; :};
+
+merge_when_matched ::=
+  KW_WHEN KW_MATCHED KW_THEN merge_matched:matched
+  {: RESULT = matched; :}
+  | KW_WHEN KW_MATCHED KW_AND expr_list:exprs KW_THEN merge_matched:matched
+  {:
+    matched.setFilterExprs(exprs);
+    RESULT = matched;
+  :};
+
+merge_when_not_matched ::=
+  KW_WHEN KW_NOT KW_MATCHED KW_THEN merge_insert:insert
+  {: RESULT = insert; :}
+  | KW_WHEN KW_NOT KW_MATCHED KW_AND expr_list:exprs KW_THEN merge_insert:insert
+  {:
+    insert.setFilterExprs(exprs);
+    RESULT = insert;
+  :};
+
+merge_matched ::=
+  merge_update:update
+  {: RESULT = update; :}
+  | merge_delete:delete
+  {: RESULT = delete; :};
+
+merge_update ::=
+  KW_UPDATE KW_SET update_set_expr_list:values
+  {: RESULT = new MergeUpdate(values); :};
+
+merge_insert ::=
+  KW_INSERT LPAREN opt_ident_list:columns RPAREN KW_VALUES LPAREN select_list:operands RPAREN
+  {: RESULT = new MergeInsert(columns, operands); :}
+  | KW_INSERT KW_VALUES LPAREN select_list:operands RPAREN
+  {: RESULT = new MergeInsert(Collections.emptyList(), operands); :};
+
+merge_delete ::= KW_DELETE
+  {: RESULT = new MergeDelete(); :};
 
 optimize_stmt ::=
   KW_OPTIMIZE KW_TABLE table_name:table
@@ -4451,6 +4528,10 @@ word ::=
   | KW_MANAGED_LOCATION:r
   {: RESULT = r.toString(); :}
   | KW_MAP:r
+  {: RESULT = r.toString(); :}
+  | KW_MATCHED:r
+  {: RESULT = r.toString(); :}
+  | KW_MERGE:r
   {: RESULT = r.toString(); :}
   | KW_MERGE_FN:r
   {: RESULT = r.toString(); :}

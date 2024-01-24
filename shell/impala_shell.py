@@ -1599,6 +1599,9 @@ class ImpalaShell(cmd.Cmd, object):
   def do_insert(self, args):
     return self.__do_dml(self.orig_cmd, args)
 
+  def do_merge(self, args):
+    return self.__do_dml(self.orig_cmd, args)
+
   def do_explain(self, args):
     """Explain the query execution plan"""
     return self._execute_stmt(

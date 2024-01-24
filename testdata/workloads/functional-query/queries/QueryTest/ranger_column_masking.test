@@ -784,6 +784,13 @@ update functional_parquet.iceberg_v2_delete_positional set `data` = concat(`data
 AuthorizationException: User '$USER' does not have privileges to access: functional_parquet.iceberg_v2_delete_positional
 ====
 ---- QUERY
+# Merges on masked tables should be blocked.
+merge into functional_parquet.iceberg_v2_delete_positional target using functional_parquet.iceberg_v2_delete_positional source
+on target.id = source.id when matched then update set `data` = concat(source.`data`, 'a');
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to access: functional_parquet.iceberg_v2_delete_positional
+====
+---- QUERY
 # Select masked INPUT_FILE__NAME plus all cols
 select input__file__name, * from alltypestiny order by id;
 ---- RESULTS

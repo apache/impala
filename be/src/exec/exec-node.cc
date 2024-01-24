@@ -38,6 +38,7 @@
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/iceberg-delete-node.h"
+#include "exec/iceberg-merge-node.h"
 #include "exec/iceberg-metadata/iceberg-metadata-scan-node.h"
 #include "exec/kudu/kudu-scan-node-mt.h"
 #include "exec/kudu/kudu-scan-node.h"
@@ -234,6 +235,9 @@ Status PlanNode::CreatePlanNode(
       break;
     case TPlanNodeType::TUPLE_CACHE_NODE:
       *node = pool->Add(new TupleCachePlanNode());
+      break;
+    case TPlanNodeType::ICEBERG_MERGE_NODE:
+      *node = pool->Add(new IcebergMergePlanNode());
       break;
     default:
       map<int, const char*>::const_iterator i =

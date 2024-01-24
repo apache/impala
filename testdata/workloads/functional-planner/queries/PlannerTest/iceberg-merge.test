@@ -1,0 +1,722 @@
+# Merge into an unpartitioned Iceberg table with a delete clause
+merge into functional_parquet.iceberg_v2_no_deletes target
+using functional_parquet.iceberg_partitioned source
+on target.i = source.id
+when matched then delete
+---- PLAN
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.i, target.s
+|  |  type: DELETE
+|  row-size=80B cardinality=3
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: target.i = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=80B cardinality=3
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target]
+   HDFS partitions=1/1 files=1 size=625B
+   runtime filters: RF000 -> target.i
+   Iceberg snapshot id: 728158873687794725
+   row-size=36B cardinality=3
+---- DISTRIBUTEDPLAN
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.i, target.s
+|  |  type: DELETE
+|  row-size=80B cardinality=3
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: target.i = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=80B cardinality=3
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target]
+   HDFS partitions=1/1 files=1 size=625B
+   runtime filters: RF000 -> target.i
+   Iceberg snapshot id: 728158873687794725
+   row-size=36B cardinality=3
+====
+# Merge into an unpartitioned Iceberg table with an insert clause
+merge into functional_parquet.iceberg_v2_no_deletes target
+using functional_parquet.iceberg_partitioned source
+on target.i = source.id
+when not matched then insert values(source.id, source.user)
+---- PLAN
+WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
+|
+03:MERGE
+|  CASE 0: NOT MATCHED
+|  |  result expressions: source.id, source.`user`
+|  |  type: INSERT
+|  row-size=80B cardinality=23
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: target.i = source.id
+|  row-size=80B cardinality=23
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target]
+   HDFS partitions=1/1 files=1 size=625B
+   Iceberg snapshot id: 728158873687794725
+   row-size=36B cardinality=3
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
+|
+03:MERGE
+|  CASE 0: NOT MATCHED
+|  |  result expressions: source.id, source.`user`
+|  |  type: INSERT
+|  row-size=80B cardinality=23
+|
+02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: target.i = source.id
+|  row-size=80B cardinality=23
+|
+|--05:EXCHANGE [HASH(source.id)]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+04:EXCHANGE [HASH(target.i)]
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target]
+   HDFS partitions=1/1 files=1 size=625B
+   Iceberg snapshot id: 728158873687794725
+   row-size=36B cardinality=3
+====
+# Merge into an unpartitioned Iceberg table with an update clause
+merge into functional_parquet.iceberg_v2_no_deletes target
+using functional_parquet.iceberg_partitioned source
+on target.i = source.id
+when matched then update set s = source.action
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.i, source.action
+|  |  type: UPDATE
+|  row-size=80B cardinality=3
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: target.i = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=80B cardinality=3
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target]
+   HDFS partitions=1/1 files=1 size=625B
+   runtime filters: RF000 -> target.i
+   Iceberg snapshot id: 728158873687794725
+   row-size=36B cardinality=3
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.i, source.action
+|  |  type: UPDATE
+|  row-size=80B cardinality=3
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: target.i = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=80B cardinality=3
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target]
+   HDFS partitions=1/1 files=1 size=625B
+   runtime filters: RF000 -> target.i
+   Iceberg snapshot id: 728158873687794725
+   row-size=36B cardinality=3
+====
+# Merge into a partitioned Iceberg table with an update clause
+merge into functional_parquet.iceberg_v2_partitioned_position_deletes target
+using functional_parquet.iceberg_non_partitioned source
+on target.id = source.id
+when matched then update set event_time = source.event_time
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+06:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=10
+|
+05:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.`user`, target.action, source.event_time
+|  |  type: UPDATE
+|  row-size=124B cardinality=10
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: target.id = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=124B cardinality=10
+|
+|--03:SCAN HDFS [functional_parquet.iceberg_non_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=44B cardinality=20
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=80B cardinality=10
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   runtime filters: RF000 -> target.id
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+10:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=10
+|
+09:EXCHANGE [HASH(target.action)]
+|
+05:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.`user`, target.action, source.event_time
+|  |  type: UPDATE
+|  row-size=124B cardinality=10
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: target.id = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=124B cardinality=10
+|
+|--08:EXCHANGE [HASH(source.id)]
+|  |
+|  03:SCAN HDFS [functional_parquet.iceberg_non_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=44B cardinality=20
+|
+07:EXCHANGE [HASH(target.id)]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=80B cardinality=10
+|
+|--06:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   runtime filters: RF000 -> target.id
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+====
+# Merge into a partitioned Iceberg table with a SORT BY column and using an update clause
+merge into functional_parquet.iceberg_partition_transforms_zorder target
+using functional_parquet.iceberg_non_partitioned source
+on target.i = source.id
+when matched then update set ts = source.event_time
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=false, PARTITION-KEYS=(year(target.ts),iceberg_bucket_transform(target.s, 5))]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_partition_transforms_zorder-POSITION-DELETE]
+|
+04:SORT
+|  order by: LEXICAL: year(target.ts) ASC NULLS LAST, iceberg_bucket_transform(target.s, 5) ASC NULLS LAST, ZORDER: i, j
+|  row-size=81B cardinality=1
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: source.event_time, target.s, target.i, target.j
+|  |  type: UPDATE
+|  row-size=116B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: target.i = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=116B cardinality=1
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_non_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder target]
+   HDFS partitions=1/1 files=1 size=1.08KB
+   runtime filters: RF000 -> target.i
+   Iceberg snapshot id: 1652763117401970330
+   row-size=72B cardinality=1
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=false, PARTITION-KEYS=(year(target.ts),iceberg_bucket_transform(target.s, 5))]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_partition_transforms_zorder-POSITION-DELETE]
+|
+05:SORT
+|  order by: LEXICAL: year(target.ts) ASC NULLS LAST, iceberg_bucket_transform(target.s, 5) ASC NULLS LAST, ZORDER: i, j
+|  row-size=81B cardinality=1
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: source.event_time, target.s, target.i, target.j
+|  |  type: UPDATE
+|  row-size=116B cardinality=1
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: target.i = source.id
+|  runtime filters: RF000 <- source.id
+|  row-size=116B cardinality=1
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_non_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder target]
+   HDFS partitions=1/1 files=1 size=1.08KB
+   runtime filters: RF000 -> target.i
+   Iceberg snapshot id: 1652763117401970330
+   row-size=72B cardinality=1
+====
+# Merge into a partitioned Iceberg table using multiple WHEN MATCHED/NOT MATCHED clauses
+merge into functional_parquet.iceberg_v2_partitioned_position_deletes target
+using functional_parquet.iceberg_non_partitioned source
+on target.id = source.id and target.id > 1
+when matched and target.id = 2 then update set event_time = source.event_time
+when not matched and source.id > 10 then insert values (source.id, source.user, source.action, target.event_time)
+when matched and target.id > 10 then delete
+when not matched then insert(id, user) values(source.id, source.user)
+when matched then update set user = concat(source.user, "string");
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+06:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=30
+|
+05:MERGE
+|  CASE 0: MATCHED
+|  |  filter predicates: target.id = 2
+|  |  result expressions: target.id, target.`user`, target.action, source.event_time
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED
+|  |  filter predicates: source.id > 10
+|  |  result expressions: source.id, source.`user`, source.action, target.event_time
+|  |  type: INSERT
+|  CASE 2: MATCHED
+|  |  filter predicates: target.id > 10
+|  |  result expressions: target.id, target.`user`, target.action, target.event_time
+|  |  type: DELETE
+|  CASE 3: NOT MATCHED
+|  |  result expressions: source.id, source.`user`, NULL, NULL
+|  |  type: INSERT
+|  CASE 4: MATCHED
+|  |  result expressions: target.id, concat(source.`user`, 'string'), target.action, target.event_time
+|  |  type: UPDATE
+|  row-size=124B cardinality=30
+|
+04:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: target.id = source.id
+|  other join predicates: target.id > 1
+|  row-size=124B cardinality=30
+|
+|--03:SCAN HDFS [functional_parquet.iceberg_non_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=44B cardinality=20
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=80B cardinality=10
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+10:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=30
+|
+09:EXCHANGE [HASH(target.action)]
+|
+05:MERGE
+|  CASE 0: MATCHED
+|  |  filter predicates: target.id = 2
+|  |  result expressions: target.id, target.`user`, target.action, source.event_time
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED
+|  |  filter predicates: source.id > 10
+|  |  result expressions: source.id, source.`user`, source.action, target.event_time
+|  |  type: INSERT
+|  CASE 2: MATCHED
+|  |  filter predicates: target.id > 10
+|  |  result expressions: target.id, target.`user`, target.action, target.event_time
+|  |  type: DELETE
+|  CASE 3: NOT MATCHED
+|  |  result expressions: source.id, source.`user`, NULL, NULL
+|  |  type: INSERT
+|  CASE 4: MATCHED
+|  |  result expressions: target.id, concat(source.`user`, 'string'), target.action, target.event_time
+|  |  type: UPDATE
+|  row-size=124B cardinality=30
+|
+04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: target.id = source.id
+|  other join predicates: target.id > 1
+|  row-size=124B cardinality=30
+|
+|--08:EXCHANGE [HASH(source.id)]
+|  |
+|  03:SCAN HDFS [functional_parquet.iceberg_non_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=44B cardinality=20
+|
+07:EXCHANGE [HASH(target.id)]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=80B cardinality=10
+|
+|--06:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+====
+# Merge into a partitioned Iceberg table using an UPDATE clause from an inline view
+merge into functional_parquet.iceberg_v2_partitioned_position_deletes target
+using (select base64encode(user) as encoded_user, id + 10 as id from functional_parquet.iceberg_non_partitioned group by base64encode(user), id + 10) source
+on target.id = source.id
+when matched then update set user = base64decode(source.encoded_user);
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+07:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=10
+|
+06:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, base64decode(base64encode(`user`)), target.action, target.event_time
+|  |  type: UPDATE
+|  row-size=100B cardinality=10
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: target.id = id + 10
+|  runtime filters: RF000 <- id + 10
+|  row-size=100B cardinality=10
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: base64encode(`user`), id + 10
+|  |  row-size=20B cardinality=20
+|  |
+|  03:SCAN HDFS [functional_parquet.iceberg_non_partitioned]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=16B cardinality=20
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=80B cardinality=10
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   runtime filters: RF000 -> target.id
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+13:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=10
+|
+12:EXCHANGE [HASH(target.action)]
+|
+06:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, base64decode(base64encode(`user`)), target.action, target.event_time
+|  |  type: UPDATE
+|  row-size=100B cardinality=10
+|
+05:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: target.id = id + 10
+|  runtime filters: RF000 <- id + 10
+|  row-size=100B cardinality=10
+|
+|--11:EXCHANGE [HASH(id + 10)]
+|  |
+|  09:AGGREGATE [FINALIZE]
+|  |  group by: base64encode(`user`), id + 10
+|  |  row-size=20B cardinality=20
+|  |
+|  08:EXCHANGE [HASH(base64encode(`user`),id + 10)]
+|  |
+|  04:AGGREGATE [STREAMING]
+|  |  group by: base64encode(`user`), id + 10
+|  |  row-size=20B cardinality=20
+|  |
+|  03:SCAN HDFS [functional_parquet.iceberg_non_partitioned]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 93996984692289973
+|     row-size=16B cardinality=20
+|
+10:EXCHANGE [HASH(target.id)]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=80B cardinality=10
+|
+|--07:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   runtime filters: RF000 -> target.id
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+====
+# Merge into a partitioned Iceberg table where partition evolution is present using multiple merge cases
+merge into functional_parquet.iceberg_partition_evolution target
+using functional_parquet.iceberg_partitioned source
+on target.id = source.id
+when matched then update set string_col = action
+when not matched then insert (id, string_col) values(source.id, source.action)
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_partition_evolution, OVERWRITE=false, PARTITION-KEYS=(year,iceberg_truncate_transform(target.date_string_col, 4),month)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_partition_evolution-POSITION-DELETE]
+|
+04:SORT
+|  order by: year ASC NULLS LAST, iceberg_truncate_transform(target.date_string_col, 4) ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=14.62K
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.int_col, action, target.date_string_col, target.`year`, target.`month`
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED
+|  |  result expressions: source.id, NULL, source.action, NULL, NULL, NULL
+|  |  type: INSERT
+|  row-size=120B cardinality=14.62K
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: target.id = source.id
+|  row-size=120B cardinality=14.62K
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution target]
+   HDFS partitions=1/1 files=1460 size=2.49MB
+   Iceberg snapshot id: 547864005421580562
+   row-size=76B cardinality=14.60K
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_partition_evolution, OVERWRITE=false, PARTITION-KEYS=(year,iceberg_truncate_transform(target.date_string_col, 4),month)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_partition_evolution-POSITION-DELETE]
+|
+07:SORT
+|  order by: year ASC NULLS LAST, iceberg_truncate_transform(target.date_string_col, 4) ASC NULLS LAST, month ASC NULLS LAST
+|  row-size=89B cardinality=14.62K
+|
+06:EXCHANGE [HASH(target.`year`,iceberg_truncate_transform(target.date_string_col, 4),target.`month`)]
+|
+03:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.int_col, action, target.date_string_col, target.`year`, target.`month`
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED
+|  |  result expressions: source.id, NULL, source.action, NULL, NULL, NULL
+|  |  type: INSERT
+|  row-size=120B cardinality=14.62K
+|
+02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: target.id = source.id
+|  row-size=120B cardinality=14.62K
+|
+|--05:EXCHANGE [HASH(source.id)]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
+|     HDFS partitions=1/1 files=20 size=22.90KB
+|     Iceberg snapshot id: 8270633197658268308
+|     row-size=44B cardinality=20
+|
+04:EXCHANGE [HASH(target.id)]
+|
+00:SCAN HDFS [functional_parquet.iceberg_partition_evolution target]
+   HDFS partitions=1/1 files=1460 size=2.49MB
+   Iceberg snapshot id: 547864005421580562
+   row-size=76B cardinality=14.60K
+====
+# Merge into a partitioned Iceberg table using multiple merge cases and a using table with partition evolution as source
+merge into functional_parquet.iceberg_v2_partitioned_position_deletes target
+using (select * from functional_parquet.iceberg_partition_evolution) source
+on target.id = source.id
+when matched then update set action = string_col
+when not matched then insert (id, user, action) values(source.id, source.string_col, concat("something ", source.string_col))
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+06:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=14.61K
+|
+05:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.`user`, functional_parquet.iceberg_partition_evolution.string_col, target.event_time
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED
+|  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
+|  |  type: INSERT
+|  row-size=120B cardinality=14.61K
+|
+04:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: target.id = functional_parquet.iceberg_partition_evolution.id
+|  row-size=120B cardinality=14.61K
+|
+|--03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+|     HDFS partitions=1/1 files=1460 size=2.49MB
+|     Iceberg snapshot id: 547864005421580562
+|     row-size=40B cardinality=14.60K
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=80B cardinality=10
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+10:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=14.61K
+|
+09:EXCHANGE [HASH(target.action)]
+|
+05:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.`user`, functional_parquet.iceberg_partition_evolution.string_col, target.event_time
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED
+|  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
+|  |  type: INSERT
+|  row-size=120B cardinality=14.61K
+|
+04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: target.id = functional_parquet.iceberg_partition_evolution.id
+|  row-size=120B cardinality=14.61K
+|
+|--08:EXCHANGE [HASH(functional_parquet.iceberg_partition_evolution.id)]
+|  |
+|  03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+|     HDFS partitions=1/1 files=1460 size=2.49MB
+|     Iceberg snapshot id: 547864005421580562
+|     row-size=40B cardinality=14.60K
+|
+07:EXCHANGE [HASH(target.id)]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=80B cardinality=10
+|
+|--06:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+====

@@ -115,52 +115,6 @@ abstract class ModifyImpl {
 
   abstract public List<Expr> getPartitionKeyExprs();
 
-  protected void checkSubQuery(SlotRef lhsSlotRef, Expr rhsExpr)
-      throws AnalysisException {
-    if (rhsExpr.contains(Subquery.class)) {
-      throw new AnalysisException(
-          format("Subqueries are not supported as update expressions for column '%s'",
-              lhsSlotRef.toSql()));
-    }
-  }
-
-  protected void checkCorrectTargetTable(SlotRef lhsSlotRef, Expr rhsExpr)
-      throws AnalysisException {
-    if (!lhsSlotRef.isBoundByTupleIds(modifyStmt_.targetTableRef_.getId().asList())) {
-      throw new AnalysisException(
-          format("Left-hand side column '%s' in assignment expression '%s=%s' does not "
-              + "belong to target table '%s'", lhsSlotRef.toSql(), lhsSlotRef.toSql(),
-              rhsExpr.toSql(),
-              modifyStmt_.targetTableRef_.getDesc().getTable().getFullName()));
-    }
-  }
-
-  protected void checkLhsIsColumnRef(SlotRef lhsSlotRef, Expr rhsExpr)
-      throws AnalysisException {
-    Column c = lhsSlotRef.getResolvedPath().destColumn();
-    if (c == null) {
-      throw new AnalysisException(
-          format("Left-hand side in assignment expression '%s=%s' must be a column " +
-              "reference", lhsSlotRef.toSql(), rhsExpr.toSql()));
-    }
-  }
-
-  protected Expr checkTypeCompatiblity(Analyzer analyzer, Column c, Expr rhsExpr)
-      throws AnalysisException {
-    return StatementBase.checkTypeCompatibility(
-        modifyStmt_.targetTableRef_.getDesc().getTable().getFullName(),
-        c, rhsExpr, analyzer, null /*widestTypeSrcExpr*/);
-  }
-
-  protected void checkLhsOnlyAppearsOnce(Map<Integer, Expr> colToExprs, Column c,
-      SlotRef lhsSlotRef, Expr rhsExpr) throws AnalysisException {
-    if (colToExprs.containsKey(c.getPosition())) {
-      throw new AnalysisException(
-          format("Left-hand side in assignment appears multiple times '%s=%s'",
-              lhsSlotRef.toSql(), rhsExpr.toSql()));
-    }
-  }
-
   public List<Expr> getSortExprs() {
     return Collections.emptyList();
   }

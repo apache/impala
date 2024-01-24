@@ -37,6 +37,8 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.MergeCase;
+import org.apache.impala.analysis.MergeStmt;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
@@ -137,6 +139,10 @@ public class Planner {
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
 
+    if(ctx_.isMerge()) {
+      singleNodePlan = addMergeNode(singleNodePlan, ctx_.getRootAnalyzer());
+    }
+
     SingleNodePlanner.validatePlan(ctx_, singleNodePlan);
 
     if (ctx_.isSingleNodeExec()) {
@@ -171,12 +177,15 @@ public class Planner {
       createPreInsertSort(insertStmt, rootFragment, ctx_.getRootAnalyzer());
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
-    } else if (ctx_.isUpdate() || ctx_.isDelete() || ctx_.isOptimize()) {
+    } else if (ctx_.isUpdate() || ctx_.isDelete() || ctx_.isOptimize()
+        || ctx_.isMerge()) {
       DmlStatementBase stmt;
       if (ctx_.isUpdate()) {
         stmt = ctx_.getAnalysisResult().getUpdateStmt();
       } else if (ctx_.isDelete()) {
         stmt = ctx_.getAnalysisResult().getDeleteStmt();
+      } else if (ctx_.isMerge()) {
+        stmt = ctx_.getAnalysisResult().getMergeStmt();
       } else {
         stmt = ctx_.getAnalysisResult().getOptimizeStmt();
       }
@@ -216,8 +225,9 @@ public class Planner {
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
-      // Lineage is disabled for UPDATE AND DELETE statements
-      if (ctx_.isUpdateOrDelete()) return fragments;
+      // Lineage is disabled for UPDATE, DELETE and MERGE statements
+      if (ctx_.isUpdate() || ctx_.isDelete() || ctx_.isMerge())
+        return fragments;
       // Compute the column lineage graph
       if (ctx_.isInsertOrCtas()) {
         InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
@@ -1023,5 +1033,11 @@ public class Planner {
     node.init(analyzer);
 
     inputFragment.setPlanRoot(node);
+  }
+
+  private PlanNode addMergeNode(PlanNode planNode, Analyzer analyzer)
+      throws ImpalaException {
+    MergeStmt merge = ctx_.getAnalysisResult().getMergeStmt();
+    return merge.getPlanNode(ctx_, planNode, analyzer);
   }
 }

@@ -34,6 +34,7 @@ enum TDataSinkType {
   NESTED_LOOP_JOIN_BUILDER = 4
   ICEBERG_DELETE_BUILDER = 5
   MULTI_DATA_SINK = 6
+  MERGE_SINK = 7
 }
 
 enum TSinkAction {
@@ -41,6 +42,13 @@ enum TSinkAction {
   UPDATE = 1
   UPSERT = 2
   DELETE = 3
+  MERGE = 4
+}
+
+enum TIcebergMergeSinkAction{
+  DATA = 1
+  DELETE = 2
+  BOTH = 3
 }
 
 enum TTableSinkType {

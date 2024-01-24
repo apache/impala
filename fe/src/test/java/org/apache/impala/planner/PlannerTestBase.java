@@ -513,7 +513,8 @@ public class PlannerTestBase extends FrontendTestBase {
           && firstPlanFragment.output_sink.isSetTable_sink()) {
         TTableSink tableSink = firstPlanFragment.output_sink.table_sink;
         if (!seenTableIds.contains(tableSink.target_table_id)
-            || tableSink.target_table_id != DescriptorTable.TABLE_SINK_ID) {
+            || (tableSink.target_table_id != DescriptorTable.TABLE_SINK_ID
+            && !tableSink.isSetIceberg_delete_sink())) {
           throw new IllegalStateException("Table sink id error for target table:\n" +
               tableSink.toString());
         }

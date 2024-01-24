@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import static org.apache.impala.analysis.DmlStatementBase.createSlotRef;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -75,14 +77,16 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
       lhsSlotRef.analyze(analyzer);
 
       Expr rhsExpr = valueAssignment.second;
-      checkSubQuery(lhsSlotRef, rhsExpr);
+      DmlStatementBase.checkSubQuery(lhsSlotRef, rhsExpr);
       rhsExpr.analyze(analyzer);
 
-      checkCorrectTargetTable(lhsSlotRef, rhsExpr);
-      checkLhsIsColumnRef(lhsSlotRef, rhsExpr);
+      DmlStatementBase.checkCorrectTargetTable(lhsSlotRef, rhsExpr,
+          modifyStmt_.targetTableRef_);
+      DmlStatementBase.checkLhsIsColumnRef(lhsSlotRef, rhsExpr);
 
       IcebergColumn c = (IcebergColumn)lhsSlotRef.getResolvedPath().destColumn();
-      rhsExpr = checkTypeCompatiblity(analyzer, c, rhsExpr);
+      rhsExpr = DmlStatementBase.checkTypeCompatibility(analyzer, c, rhsExpr,
+          modifyStmt_.targetTableRef_);
       // In case of a JOIN, and if duplicated rows are shuffled independently, we cannot
       // do duplicate checking in the SINK. This is the case when the following
       // conditions are true:
@@ -101,14 +105,17 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
                 "statement with multiple table refs, and when right-hand side '%s' is " +
                 "non-constant. ", lhsSlotRef.toSql(), rhsExpr.toSql()));
       }
-      checkLhsOnlyAppearsOnce(colToExprs, c, lhsSlotRef, rhsExpr);
+      DmlStatementBase.checkLhsOnlyAppearsOnce(colToExprs, c, lhsSlotRef, rhsExpr);
       colToExprs.put(c.getPosition(), rhsExpr);
     }
 
     List<Column> columns = modifyStmt_.table_.getColumns();
     for (Column col : columns) {
       Expr expr = colToExprs.get(col.getPosition());
-      if (expr == null) expr = createSlotRef(analyzer, col.getName());
+      if (expr == null) {
+        expr = createSlotRef(analyzer, modifyStmt_.targetTableRef_.getUniqueAlias(),
+            col.getName());
+      }
       insertResultExprs_.add(expr);
     }
     IcebergUtil.populatePartitionExprs(analyzer, null, columns,

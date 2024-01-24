@@ -29,6 +29,7 @@
 #include "catalog/catalog-service-client-wrapper.h"
 #include "common/status.h"
 #include "exprs/timezone_db.h"
+#include "gen-cpp/Types_types.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "rpc/rpc-mgr.inline.h"
 #include "runtime/coordinator.h"
@@ -1684,6 +1685,17 @@ bool ClientRequestState::CreateIcebergCatalogOps(
         cat_ice_op->__set_replaced_data_files_without_deletes(
             optimize_params.selected_data_files_without_deletes);
       }
+    }
+  } else if (ice_finalize_params.operation == TIcebergOperation::MERGE) {
+    cat_ice_op->__set_iceberg_data_files_fb(
+        dml_exec_state->CreateIcebergDataFilesVector());
+    cat_ice_op->__set_iceberg_delete_files_fb(
+        dml_exec_state->CreateIcebergDeleteFilesVector());
+    cat_ice_op->__set_data_files_referenced_by_position_deletes(
+        dml_exec_state->DataFilesReferencedByPositionDeletes());
+    if (cat_ice_op->iceberg_delete_files_fb.empty()
+        && cat_ice_op->iceberg_data_files_fb.empty()) {
+      update_catalog = false;
     }
   }
   if (!update_catalog) query_events_->MarkEvent("No-op Iceberg DML statement");

@@ -1980,6 +1980,57 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestMerge(){
+    ParsesOk("merge into t using s on t.id = s.id "
+        + "when matched then update set t.a = s.a");
+    ParsesOk("merge into target t using source s on t.id = s.id "
+        + "when matched then update set t.a = s.a");
+    ParsesOk("merge into t using s on t.id = s.id when matched then delete");
+    ParsesOk("merge into t using s on t.id = s.id when not matched "
+        + "then insert (a,b,c) values (a,b,c)");
+    ParsesOk("merge into t using s on t.id = s.id when matched and t.a > s.b "
+        + "then delete");
+    ParsesOk("merge into t using s on t.id = s.id "
+        + "when matched and t.a > s.b or t.b < s.c then update set t.a = s.a");
+    ParsesOk("merge into t using s on t.id = s.id "
+        + "when matched and t.a > s.b or t.b < s.c then update set t.a = s.a "
+        + "when not matched then insert (a,b,c) values (a,b,c)");
+    ParsesOk("merge into t using s on t.id = s.id "
+        + "when matched and t.a > s.b or t.b < s.c then update set t.a = s.a "
+        + "when not matched then insert (a,b,c) values (a,b,c) "
+        + "when matched then delete");
+    ParsesOk("merge into t using (select a, b, c, d, id) as s on t.id = s.id "
+        + "when matched and t.a > s.b or t.b < s.c then update set t.a = s.a "
+        + "when matched then update set t.a = s.a "
+        + "when not matched then insert (a,b,c) values (a,b,c)");
+    ParsesOk("merge into t using (select id from s) s on t.id = s.id "
+        + "when matched then update set t.a = s.a");
+    ParsesOk("merge into t using s on t.id = s.id when matched "
+        + "then update set t.a = s.a");
+    ParsesOk("merge into t using s on t.id = s.id when not matched "
+        + "then insert values(a,b,c)");
+
+    ParserError("merge into t using s on t.id = s.id "
+        + "when matched and t.a > s.b then delete from");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when matched and t.a > s.b then insert (a,b,c) values (a,b,c)");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched and t.a > s.b then update set a = b");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched and t.a > s.b then delete");
+
+    // Invalid column permutation
+    ParserError("merge into target t using (select * from source) s "
+        + "on t.id = s.id "
+        + "when not matched then insert (t.id, t.a, t.b) values(id, a, b)");
+    // Multiple values clause
+    ParserError("merge into target t using (select * from source) s "
+        + "on t.id = s.id "
+        + "when not matched then "
+        + "insert (t.id, t.a, t.b) values(id, a, b), (a,b,c)");
+  }
+
+  @Test
   public void TestUse() {
     ParserError("USE");
     ParserError("USE db1 db2");
@@ -3621,8 +3672,8 @@ public class ParserTest extends FrontendTestBase {
         "^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, COMMENT, COMPUTE, COPY, CREATE, DELETE, DESCRIBE, DROP, " +
-            "EXPLAIN, GRANT, INSERT, INVALIDATE, LOAD, OPTIMIZE, REFRESH, REVOKE, " +
-            "SELECT, SET, SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, VALUES, WITH\n");
+        "EXPLAIN, GRANT, INSERT, INVALIDATE, LOAD, MERGE, OPTIMIZE, REFRESH, REVOKE, " +
+        "SELECT, SET, SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",

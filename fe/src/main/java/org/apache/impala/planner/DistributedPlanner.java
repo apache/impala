@@ -157,6 +157,9 @@ public class DistributedPlanner {
       Preconditions.checkState(childFragments.size() == 2);
       result = createIcebergDeleteFragment((IcebergDeleteNode) root,
           childFragments.get(0), childFragments.get(1));
+    } else if (root instanceof IcebergMergeNode) {
+      childFragments.get(0).addPlanRoot(root);
+      result = childFragments.get(0);
     } else {
       throw new InternalException("Cannot create plan fragment for this node type: "
           + root.getExplainString(ctx_.getQueryOptions()));

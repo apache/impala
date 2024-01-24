@@ -118,6 +118,7 @@ enum TIcebergOperation {
   DELETE = 1
   UPDATE = 2
   OPTIMIZE = 3
+  MERGE = 4
 }
 
 // Level of verboseness for "explain" output.

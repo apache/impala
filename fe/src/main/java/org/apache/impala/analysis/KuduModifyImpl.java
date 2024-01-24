@@ -103,12 +103,13 @@ abstract class KuduModifyImpl extends ModifyImpl {
       lhsSlotRef.analyze(analyzer);
 
       Expr rhsExpr = valueAssignment.second;
-      checkSubQuery(lhsSlotRef, rhsExpr);
+      DmlStatementBase.checkSubQuery(lhsSlotRef, rhsExpr);
       rhsExpr.analyze(analyzer);
 
-      checkCorrectTargetTable(lhsSlotRef, rhsExpr);
+      DmlStatementBase.checkCorrectTargetTable(lhsSlotRef, rhsExpr,
+          modifyStmt_.targetTableRef_);
       // TODO(Kudu) Add test for this code-path when Kudu supports nested types
-      checkLhsIsColumnRef(lhsSlotRef, rhsExpr);
+      DmlStatementBase.checkLhsIsColumnRef(lhsSlotRef, rhsExpr);
 
       Column c = lhsSlotRef.getResolvedPath().destColumn();
 

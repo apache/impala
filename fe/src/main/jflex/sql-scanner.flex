@@ -189,6 +189,8 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("location", SqlParserSymbols.KW_LOCATION);
     keywordMap.put("managedlocation", SqlParserSymbols.KW_MANAGED_LOCATION);
     keywordMap.put("map", SqlParserSymbols.KW_MAP);
+    keywordMap.put("matched", SqlParserSymbols.KW_MATCHED);
+    keywordMap.put("merge", SqlParserSymbols.KW_MERGE);
     keywordMap.put("merge_fn", SqlParserSymbols.KW_MERGE_FN);
     keywordMap.put("metadata", SqlParserSymbols.KW_METADATA);
     keywordMap.put("minus", SqlParserSymbols.KW_MINUS);

@@ -1604,4 +1604,9 @@ public class PlannerTest extends PlannerTestBase {
   public void testRuntimeFilterRepeatedExpr() {
     runPlannerTestFile("runtime-filter-repeated-expr", "functional");
   }
+
+  @Test
+  public void testIcebergMerge() {
+    runPlannerTestFile("iceberg-merge");
+  }
 }

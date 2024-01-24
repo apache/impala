@@ -70,6 +70,10 @@ public class StmtRewriter {
       queryStmt = ((DeleteStmt) analysisResult.getStmt()).getQueryStmt();
     } else if (analysisResult.isTestCaseStmt()) {
       queryStmt = ((CopyTestCaseStmt) analysisResult.getStmt()).getQueryStmt();
+    } else if (analysisResult.isMergeStmt()) {
+      // TODO: IMPALA-13324
+      throw new AnalysisException("Unable to rewrite MERGE query statement: "
+          + ((MergeStmt) analysisResult.getStmt()).getQueryStmt().toSql());
     } else {
       throw new AnalysisException("Unsupported statement: " + stmt.toSql());
     }

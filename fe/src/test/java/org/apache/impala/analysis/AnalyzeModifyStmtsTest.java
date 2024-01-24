@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
 /**
@@ -234,5 +233,219 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
     AnalysisError("update functional.allcomplextypes.int_array_col set item = 10",
         "'functional.allcomplextypes.int_array_col' is not a valid table alias or " +
         "reference.");
+  }
+
+  @Test
+  public void TestIcebergMerge() {
+    // UPDATE
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using (select * from functional_parquet.iceberg_non_partitioned) "
+        + "source "
+        + "on target.id = source.id "
+        + "when matched and target.id > 10 then update set user = source.user");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes "
+        + "using "
+        + "(select * from functional_parquet.iceberg_non_partitioned) source "
+        + "on functional_parquet.iceberg_v2_partitioned_position_deletes.id = source.id "
+        + "when matched and "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes.id > 10 "
+        + "then update set user = source.user, action = source.action");
+    // LHS expression targets source
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+            + "using "
+            + "(select * from functional_parquet.iceberg_non_partitioned) "
+            + "source "
+            + "on target.id = source.id when matched and target.id > 10 "
+            + "then update set source.user = target.user;",
+        "Left-hand side column 'source.`user`' in assignment "
+            + "expression 'source.`user`=target.`user`' does not belong to "
+            + "target table "
+            + "'functional_parquet.iceberg_v2_partitioned_position_deletes'");
+    // DELETE
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using "
+        + "(select * from functional_parquet.iceberg_non_partitioned) source "
+        + "on target.id = source.id "
+        + "when matched and target.id > 10 then delete");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using "
+        + "(select * from functional_parquet.iceberg_non_partitioned) source "
+        + "on target.id = source.id when matched then delete");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned "
+        + "on target.id = functional_parquet.iceberg_non_partitioned.id "
+        + "when matched then delete");
+
+    // INSERT
+    // Inserting values originated from the target table (NULL values)
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+        + "using (select * from functional_parquet.iceberg_non_partitioned) s "
+        + "on t.id = s.id "
+        + "when not matched "
+        + "then insert (id, user, action) values(t.id, t.user, t.action)");
+    // Regular cases
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+        + "using (select * from functional_parquet.iceberg_non_partitioned) s "
+        + "on t.id = s.id "
+        + "when not matched "
+        + "then insert (id, user, action) values(s.id, s.user, s.action)");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+        + "using (select * from functional_parquet.iceberg_non_partitioned) s "
+        + "on t.id = s.id "
+        + "when not matched then "
+        + "insert values(s.id, s.user, s.action, s.event_time)");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+        + "using (select * from functional_parquet.iceberg_non_partitioned) s "
+        + "on t.id = s.id "
+        + "when not matched then "
+        + "insert values(s.id, s.user, s.action, s.event_time) "
+        + "when not matched and t.id = 1 "
+        + "then insert values(s.id, s.user, s.action, s.event_time)");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+        + "using (select * from functional_parquet.iceberg_non_partitioned) s "
+        + "on t.id = s.id and t.user = s.user "
+        + "when not matched then "
+        + "insert values(s.id, s.user, s.action, s.event_time) "
+        + "when not matched and t.id = 1 then "
+        + "insert values(s.id, s.user, s.action, s.event_time)");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+        + "using (select * from functional_parquet.iceberg_non_partitioned) s "
+        + "on t.id = s.id and t.user <> s.user "
+        + "when not matched then "
+        + "insert values(s.id, s.user, s.action, s.event_time) "
+        + "when not matched and t.id = 1 "
+        + "then insert values(s.id, s.user, s.action, s.event_time)");
+    // Multiple MATCHED and NOT MATCHED cases
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id "
+        + "when matched and target.id = 10 then update set user = 'b' "
+        + "when matched and target.id = 11 then delete "
+        + "when not matched and s.id = 13 then "
+        + "insert values(s.id, s.user, target.user, target.event_time) "
+        + "when matched and target.id = 14 then update set user = 'a' "
+        + "when matched then delete "
+        + "when not matched and s.id = 14 "
+        + "then insert (id, user) values (s.id, concat(s.user, 'string'))"
+        + "when not matched then "
+        + "insert values (s.id, s.user, 'ab', s.event_time);");
+
+    // Inline view as target
+    AnalysisError("merge into "
+            + "(select * from "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes) t "
+            + "using "
+            + "(select * from functional_parquet.iceberg_non_partitioned) s "
+            + "on t.id = s.id "
+            + "when not matched then "
+            + "insert (id, user, action) values(id, user, action)",
+        "Cannot modify view: "
+            + "(SELECT * FROM "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes) t");
+    // Referencing source as target
+    AnalysisError("merge into source_alias target_alias "
+            + "using functional_parquet.iceberg_non_partitioned source_alias "
+            + "on target_alias.id = source_alias.id "
+            + "when not matched then "
+            + "insert (id, user, action) values(id, user, action)",
+        "Could not resolve table reference: 'source_alias'");
+    // Ambiguous column reference
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+            + "using "
+            + "(select * from functional_parquet.iceberg_non_partitioned) s "
+            + "on t.id = s.id "
+            + "when not matched then "
+            + "insert (id, user, action) values(id, user, action)",
+        "Column/field reference is ambiguous: 'id'");
+    // Ambiguous table reference
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes "
+            + "using functional_parquet.iceberg_v2_partitioned_position_deletes "
+            + "on iceberg_v2_partitioned_position_deletes.id = "
+            + "iceberg_v2_partitioned_position_deletes.id "
+            + "when not matched then "
+            + "insert (id, user, action) values(id, user, action)",
+        "Duplicate table alias: "
+            + "'functional_parquet.iceberg_v2_partitioned_position_deletes'");
+    // Star in values clause
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+            + "using "
+            + "(select * from functional_parquet.iceberg_non_partitioned) s "
+            + "on t.id = s.id "
+            + "when not matched then insert (id, user, action) values(t.*)",
+        "Invalid expression: t.*");
+    // Fewer columns in VALUES
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+            + "using "
+            + "(select * from functional_parquet.iceberg_non_partitioned) s "
+            + "on t.id = s.id "
+            + "when not matched then insert (id, user, action) values(t.user)",
+        "Column permutation mentions more columns (3) than "
+            + "the VALUES clause returns (1)");
+    // More columns in VALUES
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+            + "using "
+            + "(select * from functional_parquet.iceberg_non_partitioned) s "
+            + "on t.id = s.id "
+            + "when not matched then "
+            + "insert (id) values(t.id, t.user, t.action)",
+        "Column permutation mentions fewer columns (1) than "
+            + "the VALUES clause returns (3)");
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+            + "using "
+            + "(select * from functional_parquet.iceberg_non_partitioned) s "
+            + "on t.id = s.id "
+            + "when not matched then insert (id, user, action) "
+            + "values(t.id, t.action, t.user, t.user)",
+        "Column permutation mentions fewer columns (3) than "
+            + "the VALUES clause returns (4)");
+    // Unresolved reference in WHEN NOT MATCHED clause
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+            + "using (select * from functional_parquet.iceberg_non_partitioned) s "
+            + "on t.id = s.id "
+            + "when not matched then "
+            + "insert values(s.id, s.user, s.action, s.event_time) "
+            + "when not matched and a.id = 1 then "
+            + "insert values(s.id, s.user, s.action)",
+        "Could not resolve column/field reference: 'a.id'");
+    AnalysisError("merge into "
+            + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
+            + "using (select * from functional_parquet.iceberg_non_partitioned "
+            + "where id = t.id) s "
+            + "on t.id = s.id "
+            + "when matched then delete",
+        "Could not resolve column/field reference: 't.id'");
+    // Integer as filter expression
+    AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
+            + "using functional_parquet.iceberg_non_partitioned s "
+            + "on t.id = s.id "
+            + "when matched and s.id then delete",
+        "Filter expression requires return type 'BOOLEAN'. Actual type is 'INT'");
+    // Subquery rewrite in query statement
+    AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
+            + "using (select * from functional_parquet.iceberg_non_partitioned where "
+            + "id in (select max(id) from functional_parquet.iceberg_non_partitioned)) s "
+            + "on t.id = s.id "
+            + "when matched and s.id > 2 then delete",
+        "Unable to rewrite MERGE query statement");
   }
 }

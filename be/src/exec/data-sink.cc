@@ -28,9 +28,10 @@
 #include "exec/hdfs-table-sink.h"
 #include "exec/iceberg-delete-builder.h"
 #include "exec/iceberg-delete-sink-config.h"
-#include "exec/multi-table-sink.h"
+#include "exec/iceberg-merge-sink.h"
 #include "exec/kudu/kudu-table-sink.h"
 #include "exec/kudu/kudu-util.h"
+#include "exec/multi-table-sink.h"
 #include "exec/nested-loop-join-builder.h"
 #include "exec/partitioned-hash-join-builder.h"
 #include "exec/plan-root-sink.h"
@@ -128,6 +129,10 @@ Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
     }
     case TDataSinkType::MULTI_DATA_SINK: {
       *data_sink = pool->Add(new MultiTableSinkConfig());
+      break;
+    }
+    case TDataSinkType::MERGE_SINK: {
+      *data_sink = pool->Add(new IcebergMergeSinkConfig());
       break;
     }
     default:

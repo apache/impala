@@ -85,6 +85,8 @@ add_library(Exec
   iceberg-delete-sink-config.cc
   incr-stats-util.cc
   join-builder.cc
+  iceberg-merge-node.cc
+  iceberg-merge-sink.cc
   multi-table-sink.cc
   nested-loop-join-builder.cc
   nested-loop-join-node.cc

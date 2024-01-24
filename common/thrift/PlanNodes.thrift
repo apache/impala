@@ -55,6 +55,7 @@ enum TPlanNodeType {
   ICEBERG_METADATA_SCAN_NODE = 19
   TUPLE_CACHE_NODE = 20
   SYSTEM_TABLE_SCAN_NODE = 21
+  ICEBERG_MERGE_NODE = 22
 }
 
 // phases of an execution node
@@ -725,6 +726,37 @@ struct TTupleCacheNode {
   2: required list<i32> input_scan_node_ids;
 }
 
+enum TMergeCaseType {
+  UPDATE = 0
+  INSERT = 1
+  DELETE = 2
+}
+
+enum TIcebergMergeRowPresent {
+  BOTH = 0
+  SOURCE = 1
+  TARGET = 2
+}
+
+struct TIcebergMergeCase {
+  // Output expressions that will transform the values of the incoming
+  // merge result set.
+  1: required list<Exprs.TExpr> output_expressions
+  // Filter expressions whose are evaluated after matching the case.
+  2: optional list<Exprs.TExpr> filter_conjuncts
+  // Type of the merge case that reflects the operation in it.
+  3: required TMergeCaseType type
+}
+
+struct TIcebergMergeNode {
+  1: required list<TIcebergMergeCase> cases
+  2: required Exprs.TExpr row_present
+  3: required list<Exprs.TExpr> position_meta_exprs
+  4: required list<Exprs.TExpr> partition_meta_exprs
+  5: required Types.TTupleId merge_action_tuple_id
+  6: required Types.TTupleId target_tuple_id
+}
+
 // See PipelineMembership in the frontend for details.
 struct TPipelineMembership {
   1: required Types.TPlanNodeId pipe_id
@@ -766,6 +798,7 @@ struct TPlanNode {
   19: optional TAnalyticNode analytic_node
   20: optional TUnnestNode unnest_node
   21: optional TIcebergMetadataScanNode iceberg_scan_metadata_node
+  30: optional TIcebergMergeNode merge_node
 
   // Label that should be used to print this node to the user.
   22: optional string label

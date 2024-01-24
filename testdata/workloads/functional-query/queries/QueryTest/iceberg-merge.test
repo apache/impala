@@ -1,0 +1,334 @@
+====
+---- QUERY
+# Table structure creation and initial data loading
+create table target(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  stored as iceberg tblproperties("format-version"="2");
+
+create table target_part(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  partitioned by spec (bucket(5, int_col), truncate(3, decimal_col), year(date_col), truncate(3, string_col))
+  stored as iceberg tblproperties("format-version"="2");
+
+create table target_part_sort(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  partitioned by spec (bucket(5, int_col), truncate(3, decimal_col), year(date_col), truncate(3, string_col))
+  sort by (int_col)
+  stored as iceberg tblproperties("format-version"="2") ;
+
+create table source(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  stored as iceberg tblproperties("format-version"="2");
+
+insert into source select id, bool_col, int_col,
+  float_col, cast(bigint_col as decimal(20,0)), to_date(timestamp_col),
+  string_col from functional.alltypes order by id limit 7;
+====
+---- QUERY
+# Merge into unpartitioned target table from the source table
+# using when not matched insert case as the target table is empty now
+merge into target using source on target.id = source.id
+when not matched then insert values(
+    source.id, source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, source.string_col)
+---- DML_RESULTS: target
+3,false,3,3.29999995232,30,2009-01-01,'3'
+5,false,5,5.5,50,2009-01-01,'5'
+1,false,1,1.10000002384,10,2009-01-01,'1'
+4,true,4,4.40000009537,40,2009-01-01,'4'
+0,true,0,0.0,0,2009-01-01,'0'
+6,true,6,6.59999990463,60,2009-01-01,'6'
+2,true,2,2.20000004768,20,2009-01-01,'2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 7
+NumDeletedRows: 0
+====
+---- QUERY
+# Merge into unpartitioned target table from the source table
+# using update case to update int_col to a constant values
+merge into target using source on target.id = source.id
+when matched and source.id % 2 = 1 then update set int_col = 555
+when matched and source.id % 2 = 0 then update set int_col = 222
+---- DML_RESULTS: target
+3,false,555,3.29999995232,30,2009-01-01,'3'
+5,false,555,5.5,50,2009-01-01,'5'
+1,false,555,1.10000002384,10,2009-01-01,'1'
+4,true,222,4.40000009537,40,2009-01-01,'4'
+0,true,222,0.0,0,2009-01-01,'0'
+6,true,222,6.59999990463,60,2009-01-01,'6'
+2,true,222,2.20000004768,20,2009-01-01,'2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 7
+NumDeletedRows: 7
+====
+---- QUERY
+# Merge into unpartitioned target table from the source table
+# Using when matched delete case to delete some values from the target table
+merge into target using source on target.id = source.id
+when matched and source.id % 2 = 1 then delete
+---- DML_RESULTS: target
+4,true,222,4.40000009537,40,2009-01-01,'4'
+0,true,222,0.0,0,2009-01-01,'0'
+6,true,222,6.59999990463,60,2009-01-01,'6'
+2,true,222,2.20000004768,20,2009-01-01,'2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 3
+====
+---- QUERY
+# Merge into unpartitioned target table from the source table
+# using multiple cases to insert/update/delete specific rows
+merge into target using source on target.id = source.id
+when matched and source.id = 6 then delete
+when matched and target.id % 2 = 0 then update set string_col = concat(source.string_col, " case 2")
+when not matched and source.id = 5 then insert (id, int_col) values (source.id, source.int_col)
+---- DML_RESULTS: target
+4,true,222,4.40000009537,40,2009-01-01,'4 case 2'
+0,true,222,0.0,0,2009-01-01,'0 case 2'
+2,true,222,2.20000004768,20,2009-01-01,'2 case 2'
+5,NULL,5,NULL,NULL,NULL,'NULL'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 4
+NumDeletedRows: 4
+====
+---- QUERY
+# Validate the number of snapshots written to target
+select count(1) snapshots from $DATABASE.target.snapshots
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Validate the files written for target
+show files in target
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target/data/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target/data/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target/data/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target/data/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target/data/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target/data/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Merge into partitioned target table from the source table
+# Using insert to fill target_part table
+merge into target_part target using source on target.id = source.id
+when not matched then insert values(
+    cast(source.id + 10 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, 'constant string value')
+---- DML_RESULTS: target_part
+13,false,3,3.29999995232,30,2009-01-01,'constant string value'
+15,false,5,5.5,50,2009-01-01,'constant string value'
+11,false,1,1.10000002384,10,2009-01-01,'constant string value'
+14,true,4,4.40000009537,40,2009-01-01,'constant string value'
+10,true,0,0.0,0,2009-01-01,'constant string value'
+16,true,6,6.59999990463,60,2009-01-01,'constant string value'
+12,true,2,2.20000004768,20,2009-01-01,'constant string value'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned target table from the source table
+# Using update clause to update string_col value and delete clause
+# to delete rows where source.id is lower than 3
+merge into target_part target using source on target.id = source.id + 10
+when matched and source.id < 3 then delete
+when matched then update set string_col = source.string_col
+---- DML_RESULTS: target_part
+13,false,3,3.29999995232,30,2009-01-01,'3'
+15,false,5,5.5,50,2009-01-01,'5'
+14,true,4,4.40000009537,40,2009-01-01,'4'
+16,true,6,6.59999990463,60,2009-01-01,'6'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned target table from itself shifted by 1
+# using update clause to update string_col and int_col
+merge into target_part target using target_part source on target.id = source.id + 1
+when matched then update set string_col = source.string_col, int_col = cast(source.int_col + 100 as int)
+---- DML_RESULTS: target_part
+13,false,3,3.29999995232,30,2009-01-01,'3'
+15,false,104,5.5,50,2009-01-01,'4'
+14,true,103,4.40000009537,40,2009-01-01,'3'
+16,true,105,6.59999990463,60,2009-01-01,'5'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Validate the number of snapshots written to target_part
+select count(1) snapshots from $DATABASE.target_part.snapshots
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Validate the files written for target_part
+show files in target_part
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=0/decimal_col_trunc=30/date_col_year=2009/string_col_trunc=3/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=0/decimal_col_trunc=30/date_col_year=2009/string_col_trunc=con/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=0/decimal_col_trunc=30/date_col_year=2009/string_col_trunc=con/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=0/decimal_col_trunc=39/date_col_year=2009/string_col_trunc=4/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=0/decimal_col_trunc=39/date_col_year=2009/string_col_trunc=4/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=0/decimal_col_trunc=39/date_col_year=2009/string_col_trunc=con/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=0/decimal_col_trunc=39/date_col_year=2009/string_col_trunc=con/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=1/decimal_col_trunc=0/date_col_year=2009/string_col_trunc=con/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=1/decimal_col_trunc=0/date_col_year=2009/string_col_trunc=con/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=1/decimal_col_trunc=9/date_col_year=2009/string_col_trunc=con/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=1/decimal_col_trunc=9/date_col_year=2009/string_col_trunc=con/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=2/decimal_col_trunc=18/date_col_year=2009/string_col_trunc=con/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=2/decimal_col_trunc=18/date_col_year=2009/string_col_trunc=con/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=2/decimal_col_trunc=48/date_col_year=2009/string_col_trunc=4/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=3/decimal_col_trunc=48/date_col_year=2009/string_col_trunc=5/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=3/decimal_col_trunc=48/date_col_year=2009/string_col_trunc=5/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=3/decimal_col_trunc=48/date_col_year=2009/string_col_trunc=con/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=3/decimal_col_trunc=48/date_col_year=2009/string_col_trunc=con/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=4/decimal_col_trunc=39/date_col_year=2009/string_col_trunc=3/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=4/decimal_col_trunc=60/date_col_year=2009/string_col_trunc=5/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=4/decimal_col_trunc=60/date_col_year=2009/string_col_trunc=6/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=4/decimal_col_trunc=60/date_col_year=2009/string_col_trunc=6/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=4/decimal_col_trunc=60/date_col_year=2009/string_col_trunc=con/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/int_col_bucket=4/decimal_col_trunc=60/date_col_year=2009/string_col_trunc=con/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as an inline view
+# using inserts as the target table is empty
+merge into target_part_sort target using (select * from source) source on target.id = source.id
+when not matched and source.id % 2 = 0 then insert values(
+    cast(source.id + 1000 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, 'constant string value')
+when not matched then insert values(
+    cast(source.id + 2000 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, concat(source.string_col, " case 2"))
+---- DML_RESULTS: target_part_sort
+1000,true,0,0,0,2009-01-01,'constant string value'
+1002,true,2,2.200000047683716,20,2009-01-01,'constant string value'
+1004,true,4,4.400000095367432,40,2009-01-01,'constant string value'
+1006,true,6,6.599999904632568,60,2009-01-01,'constant string value'
+2001,false,1,1.100000023841858,10,2009-01-01,'1 case 2'
+2003,false,3,3.299999952316284,30,2009-01-01,'3 case 2'
+2005,false,5,5.5,50,2009-01-01,'5 case 2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as
+# an union of inline views duplicating the source rows
+# causing query abortion on the backend
+merge into target_part_sort target using (select * from source union all select * from source) source on target.id = source.id + 1002
+when not matched then insert values(
+    cast(source.id + 1000 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, 'constant string value')
+---- CATCH
+Duplicate row found
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as
+# an inline view using an update to combine target and source values as a source value
+merge into target_part_sort target using (select * from source) source on target.id = source.id + 1000
+when matched then update set float_col = cast(target.float_col + source.float_col as float)
+---- DML_RESULTS: target_part_sort
+1000,true,0,0,0,2009-01-01,'constant string value'
+1002,true,2,4.400000095367432,20,2009-01-01,'constant string value'
+1004,true,4,8.8000001907348632,40,2009-01-01,'constant string value'
+1006,true,6,13.19999980926514,60,2009-01-01,'constant string value'
+2001,false,1,1.100000023841858,10,2009-01-01,'1 case 2'
+2003,false,3,3.299999952316284,30,2009-01-01,'3 case 2'
+2005,false,5,5.5,50,2009-01-01,'5 case 2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as
+# an inline view using an update to combine target and source values as a source value
+# using join condition on string columns
+merge into target_part_sort target using (select * from source) source on target.string_col = concat(source.string_col, ' case 2')
+when matched then update set float_col = cast(target.float_col + source.float_col as float)
+---- DML_RESULTS: target_part_sort
+1000,true,0,0,0,2009-01-01,'constant string value'
+1002,true,2,4.400000095367432,20,2009-01-01,'constant string value'
+1004,true,4,8.8000001907348632,40,2009-01-01,'constant string value'
+1006,true,6,13.19999980926514,60,2009-01-01,'constant string value'
+2001,false,1,2.200000047683716,10,2009-01-01,'1 case 2'
+2003,false,3,6.599999904632568,30,2009-01-01,'3 case 2'
+2005,false,5,11,50,2009-01-01,'5 case 2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Modifying the partition layout of 'target_part' by removing bucket partitions from int_col
+alter table target_part set partition spec (truncate(3, decimal_col), year(date_col), truncate(3, string_col))
+====
+---- QUERY
+# Merge into partitioned target table from the source table as
+# an inline view using an update to set the value of int_col
+merge into target_part target using (select * from source) source on target.id = source.id + 10
+when matched then update set int_col = source.int_col, id = source.id
+---- DML_RESULTS: target_part
+3,false,3,3.29999995232,30,2009-01-01,'3'
+5,false,5,5.5,50,2009-01-01,'4'
+4,true,4,4.40000009537,40,2009-01-01,'3'
+6,true,6,6.59999990463,60,2009-01-01,'5'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Validate the files written for target_part (different partitioning)
+show files in target_part
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=30/date_col_year=2009/string_col_trunc=3/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=39/date_col_year=2009/string_col_trunc=3/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=48/date_col_year=2009/string_col_trunc=4/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=60/date_col_year=2009/string_col_trunc=5/(?!delete-).*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Modifying the partition layout of 'target_part' by removing all partition transforms
+alter table target_part set partition spec (void(int_col))
+====
+---- QUERY
+# Merge into partitioned target table from the source table as
+# an inline view using an update to set the value of int_col
+merge into target_part target using (select * from source) source on target.id = source.id
+when matched then update set int_col = cast(source.int_col + 10 as int)
+---- DML_RESULTS: target_part
+3,false,13,3.29999995232,30,2009-01-01,'3'
+5,false,15,5.5,50,2009-01-01,'4'
+4,true,14,4.40000009537,40,2009-01-01,'3'
+6,true,16,6.59999990463,60,2009-01-01,'5'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Validate the files written for target_part (no partitioning)
+show files in target_part
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/[a-z0-9_-]+_data\.0\.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=30/date_col_year=2009/string_col_trunc=3/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=39/date_col_year=2009/string_col_trunc=3/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=48/date_col_year=2009/string_col_trunc=4/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target_part/data/decimal_col_trunc=60/date_col_year=2009/string_col_trunc=5/delete-.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====

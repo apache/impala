@@ -2754,7 +2754,7 @@ public class Frontend {
       } else {
         Preconditions.checkState(
             analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt() ||
-                analysisResult.isOptimizeStmt());
+                analysisResult.isOptimizeStmt() || analysisResult.isMergeStmt());
         result.stmt_type = TStmtType.DML;
         result.query_exec_request.stmt_type = TStmtType.DML;
         if (analysisResult.isDeleteStmt()) {
@@ -2766,6 +2766,9 @@ public class Frontend {
         } else if (analysisResult.isOptimizeStmt()) {
           addFinalizationParamsForIcebergOptimize(queryCtx, queryExecRequest,
               analysisResult.getOptimizeStmt());
+        } else if (analysisResult.isMergeStmt()) {
+          addFinalizationParamsForIcebergModify(queryCtx, queryExecRequest,
+              analysisResult.getMergeStmt(), TIcebergOperation.MERGE);
         }
       }
       return result;
@@ -2830,8 +2833,8 @@ public class Frontend {
   }
 
   /**
-   * Add the finalize params to the queryExecRequest for an Iceberg modify statement:
-   * DELETE and UPDATE.
+   * Add the finalize params to the queryExecRequest for a non-INSERT Iceberg DML
+   * statement: DELETE, UPDATE, and MERGE.
    */
   private static void addFinalizationParamsForIcebergModify(TQueryCtx queryCtx,
       TQueryExecRequest queryExecRequest, DmlStatementBase dmlStmt,

@@ -656,3 +656,10 @@ update functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_f
 ---- CATCH
 AuthorizationException: User '$USER' does not have privileges to access: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files
 ====
+---- QUERY
+# Merges on masked tables should be blocked.
+merge into functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files target using functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files source
+on target.s = source.s when matched then update set s = concat(source.s, 'a');
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to access: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files
+====

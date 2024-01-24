@@ -95,6 +95,7 @@ public class AnalysisContext {
     public boolean isQueryStmt() { return stmt_ instanceof QueryStmt; }
     public boolean isSetOperationStmt() { return stmt_ instanceof SetOperationStmt; }
     public boolean isInsertStmt() { return stmt_ instanceof InsertStmt; }
+    public boolean isMergeStmt() { return stmt_ instanceof MergeStmt; }
     public boolean isOptimizeStmt() { return stmt_ instanceof OptimizeStmt; }
     public boolean isDropDbStmt() { return stmt_ instanceof DropDbStmt; }
     public boolean isDropTableOrViewStmt() {
@@ -192,7 +193,8 @@ public class AnalysisContext {
     }
 
     public boolean isDmlStmt() {
-      return isInsertStmt() || isUpdateStmt() || isDeleteStmt() || isOptimizeStmt();
+      return isInsertStmt() || isUpdateStmt() || isDeleteStmt()
+          || isOptimizeStmt() || isMergeStmt();
     }
 
     /**
@@ -202,7 +204,7 @@ public class AnalysisContext {
     public boolean isHierarchicalAuthStmt() {
       return isQueryStmt() || isInsertStmt() || isUpdateStmt() || isDeleteStmt()
           || isCreateTableAsSelectStmt() || isCreateViewStmt() || isAlterViewStmt()
-          || isOptimizeStmt() || isTestCaseStmt();
+          || isOptimizeStmt() || isTestCaseStmt() || isMergeStmt();
     }
 
     /**
@@ -305,6 +307,11 @@ public class AnalysisContext {
     public OptimizeStmt getOptimizeStmt() {
       Preconditions.checkState(isOptimizeStmt());
       return (OptimizeStmt) stmt_;
+    }
+
+    public MergeStmt getMergeStmt() {
+      Preconditions.checkState(isMergeStmt());
+      return (MergeStmt) stmt_;
     }
 
     public InsertStmt getInsertStmt() {

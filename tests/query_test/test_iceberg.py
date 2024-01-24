@@ -1914,6 +1914,13 @@ class TestIcebergV2Table(IcebergTestSuite):
     # All partitions have delete files, therefore the entire table is rewritten.
     self._check_file_filtering(tbl_name, 100, "REWRITE_ALL", True)
 
+  def test_merge(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-merge', vector, unique_database)
+
+  def test_merge_long(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-merge-long', vector, unique_database)
+
+
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it
 # runs also with the V2 optimizations setting turned off, some tests were moved here.

@@ -32,10 +32,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.iceberg.types.Types;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
@@ -465,17 +463,7 @@ public class InsertStmt extends DmlStatementBase {
 
     // We do not support (in|up)serting into tables with unsupported column types.
     for (Column c: table_.getColumns()) {
-      if (!c.getType().isSupported()) {
-        throw new AnalysisException(String.format("Unable to %s into target table " +
-            "(%s) because the column '%s' has an unsupported type '%s'.",
-            getOpName(), targetTableName_, c.getName(), c.getType().toSql()));
-      }
-      if (c.getType().isComplexType()) {
-        throw new AnalysisException(String.format("Unable to %s into target table " +
-            "(%s) because the column '%s' has a complex type '%s' and Impala doesn't " +
-            "support inserting into tables containing complex type columns",
-            getOpName(), targetTableName_, c.getName(), c.getType().toSql()));
-      }
+      checkSupportedColumn(c, getOpName(), targetTableName_);
     }
 
     // Perform operation-specific analysis.
@@ -492,6 +480,21 @@ public class InsertStmt extends DmlStatementBase {
 
     // Add target table to descriptor table.
     analyzer.getDescTbl().setTargetTable(table_);
+  }
+
+  public static void checkSupportedColumn(Column c, String opName, TableName tableName)
+      throws AnalysisException {
+    if (!c.getType().isSupported()) {
+      throw new AnalysisException(String.format("Unable to %s into target table " +
+              "(%s) because the column '%s' has an unsupported type '%s'.",
+          opName, tableName, c.getName(), c.getType().toSql()));
+    }
+    if (c.getType().isComplexType()) {
+      throw new AnalysisException(String.format("Unable to %s into target table " +
+              "(%s) because the column '%s' has a complex type '%s' and Impala doesn't " +
+              "support inserting into tables containing complex type columns",
+          opName, tableName, c.getName(), c.getType().toSql()));
+    }
   }
 
   /**

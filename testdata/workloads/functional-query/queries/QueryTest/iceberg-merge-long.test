@@ -1,0 +1,300 @@
+====
+---- QUERY
+CREATE TABLE target (
+  d1_1 DOUBLE, s2_2 STRING, ts1_3 TIMESTAMP, d3_5 DOUBLE, d6_6 DOUBLE, d7_7 DOUBLE, d8_8 DOUBLE, ts2_9 TIMESTAMP, ts3_10 TIMESTAMP,
+  s4_11 STRING, s5_12 STRING, d9_13 DOUBLE, d10_14 DOUBLE, d11_15 DOUBLE, d12_16 DOUBLE, d13_17 DOUBLE, d14_18 DOUBLE, d15_19 DOUBLE,
+  d16_20 DOUBLE, d17_21 DOUBLE, d18_22 DOUBLE, d19_23 DOUBLE, d20_24 DOUBLE, ts4_25 TIMESTAMP, d21_26 DOUBLE, ts5_27 TIMESTAMP, d22_28 DOUBLE,
+  ts6_29 TIMESTAMP, d23_30 DOUBLE, d24_31 DOUBLE, d25_32 DOUBLE, d26_33 DOUBLE, d27_34 DOUBLE, s6_35 STRING, s7_36 STRING, s8_37 STRING,
+  s9_38 STRING, s10_39 STRING, d28_40 DOUBLE, s11_41 STRING, s12_42 STRING, s13_43 STRING, s14_44 STRING, s15_45 STRING, s16_46 STRING,
+  s17_47 STRING, s18_48 STRING, s19_49 STRING, s20_50 STRING, s21_51 STRING, s22_52 STRING, d29_53 DOUBLE, s23_54 STRING, s24_55 STRING,
+  s25_56 STRING, s26_57 STRING, val1_58 DECIMAL(22,7), val2_59 DECIMAL(1,0), s27_60 STRING, s28_61 STRING, s29_62 STRING, s30_63 STRING,
+  s31_64 STRING, s32_65 STRING, s33_66 STRING, s34_67 STRING
+)
+STORED AS iceberg
+TBLPROPERTIES('format-version'='2');
+CREATE TABLE source (
+    s1_1 string, s2_2 string, s3_3 string, s4_4 string, s5_5 string, s6_6 string, s7_7 string, s8_8 string, s9_9 string,
+    s10_10 string, s11_11 string, s12_12 string, s13_13 string, s14_14 string, s15_15 string, s16_16 string, s17_17 string,
+    s18_18 string, s19_19 string, s20_20 string, s21_21 string, s22_22 string, s23_23 string, s24_24 string, s25_25 string,
+    s26_26 string, s27_27 string, s28_28 string, s29_29 string, s30_30 string, s31_31 string, s32_32 string, s33_33 string,
+    s34_34 string
+)
+STORED AS iceberg
+TBLPROPERTIES('format-version'='2');
+CREATE VIEW source_view AS SELECT
+    CAST(20231109 AS DOUBLE) AS t0c0,
+    t0.s1_1 AS t0c1,
+    from_unixtime(unix_timestamp(t0.s2_2, 'yyyyMMdd'), 'yyyy-MM-dd') AS t0c2,
+    CAST(0 AS DOUBLE) AS t0c3,
+    CAST(0 AS DOUBLE) AS t0c4,
+    CAST(0 AS DOUBLE) AS t0c5,
+    CAST(0 AS DOUBLE) AS t0c6,
+    from_unixtime(unix_timestamp(t0.s3_3, 'yyyyMMdd'), 'yyyy-MM-dd') AS t0c7,
+    from_unixtime(unix_timestamp(t0.s3_3, 'yyyyMMdd'), 'yyyy-MM-dd') AS t0c8,
+    if(nullvalue(t0.s4_4), '***', t0.s4_4) AS t0c9,
+    t0.s5_5 AS t0c10,
+    CAST(
+      REGEXP_REPLACE(REGEXP_REPLACE(t0.s6_6, '\\\\+', ''), ',', '.') AS DOUBLE
+    ) AS t0c11,
+    CAST(
+      REGEXP_REPLACE(REGEXP_REPLACE(t0.s7_7, '\\\\+', ''), ',', '.') AS DOUBLE
+    ) AS t0c12,
+    CAST(0 AS DOUBLE) AS t0c13,
+    CAST(0 AS DOUBLE) AS t0c14,
+    CAST(
+      REGEXP_REPLACE(REGEXP_REPLACE(t0.s8_8, '\\\\+', ''), ',', '.') AS DOUBLE
+    ) AS t0c15,
+    CAST(0 AS DOUBLE) AS t0c16,
+    CAST(
+      if(
+        REGEXP_REPLACE(t0.s9_9, ' ', '') = '',
+        0,
+        CAST(REGEXP_REPLACE(REGEXP_REPLACE(t0.s9_9, '\\\\+', ''), ',', '.') AS DOUBLE)
+      ) AS DOUBLE
+    ) AS t0c17,
+    CAST(0 AS DOUBLE) AS t0c18,
+    CAST(0 AS DOUBLE) AS t0c19,
+    CAST(0 AS DOUBLE) AS t0c20,
+    CAST(
+      (
+        CAST(
+          if(
+            REGEXP_REPLACE(t0.s10_10, ' ', '') = '',
+            0,
+            CAST(REGEXP_REPLACE(REGEXP_REPLACE(t0.s10_10, '\\\\+', ''), ',', '.') AS DOUBLE)
+          ) AS DOUBLE
+        )
+      ) AS DECIMAL(18, 6)
+    ) AS t0c21,
+    CAST(
+      (
+        CAST(
+          if(
+            REGEXP_REPLACE(t0.s11_11, ' ', '') = '',
+            0,
+            CAST(t0.s11_11 AS DOUBLE)
+          ) AS DOUBLE
+        )
+      ) AS DECIMAL(18, 6)
+    ) AS t0c22,
+    if(
+      t0.s12_12 = '00000000',
+      from_unixtime(
+        unix_timestamp('19000101', 'yyyyMMdd'),
+        'yyyy-MM-dd'
+      ),
+      from_unixtime(
+        unix_timestamp(t0.s12_12, 'yyyyMMdd'),
+        'yyyy-MM-dd'
+      )
+    ) AS t0c23,
+    CAST(
+      (
+        CAST(
+          if(
+            REGEXP_REPLACE(t0.s13_13, ' ', '') = '',
+            0,
+            ROUND(
+              CAST(REGEXP_REPLACE(
+                REGEXP_REPLACE(t0.s13_13, '\\\\+', ''),
+                ',',
+                '.'
+              ) AS DOUBLE)
+            )
+          ) AS DECIMAL(18, 0)
+        )
+      ) AS DECIMAL(18, 6)
+    ) AS t0c24,
+    if(
+      t0.s15_15 = '00000000',
+      from_unixtime(
+        unix_timestamp('19000101', 'yyyyMMdd'),
+        'yyyy-MM-dd'
+      ),
+      from_unixtime(
+        unix_timestamp(t0.s15_15, 'yyyyMMdd'),
+        'yyyy-MM-dd'
+      )
+    ) AS t0c25,
+    CAST(
+      (
+        CAST(
+          if(
+            REGEXP_REPLACE(t0.s14_14, ' ', '') = '',
+            0,
+            ROUND(
+              CAST(REGEXP_REPLACE(
+                REGEXP_REPLACE(t0.s14_14, '\\\\+', ''),
+                ',',
+                '.'
+              ) AS DOUBLE)
+            )
+          ) AS DECIMAL(18, 0)
+        )
+      ) AS DECIMAL(18, 6)
+    ) AS t0c26,
+    if(
+      t0.s15_15 = '00000000',
+      from_unixtime(
+        unix_timestamp('19000101', 'yyyyMMdd'),
+        'yyyy-MM-dd'
+      ),
+      from_unixtime(
+        unix_timestamp(t0.s16_16, 'yyyyMMdd'),
+        'yyyy-MM-dd'
+      )
+    ) AS t0c27,
+    CAST((CAST(0 AS DOUBLE)) AS DECIMAL(18, 0)) AS t0c28,
+    CAST((CAST(0 AS DOUBLE)) AS DECIMAL(18, 0)) AS t0c29,
+    CAST((CAST(0 AS DOUBLE)) AS DECIMAL(18, 0)) AS t0c30,
+    CAST(
+      (
+        CAST(
+          if(REGEXP_REPLACE(t0.s17_17, ' ', '') = 'NO', 0, 1) AS DOUBLE
+        )
+      ) AS DECIMAL(18, 0)
+    ) AS t0c31,
+    CAST(0 AS DOUBLE) AS t0c32,
+    '***' AS t0c33,
+    '***' AS t0c34,
+    t0.s18_18 AS t0c35,
+    t0.s19_19 AS t0c36,
+    t0.s20_20 AS t0c37,
+    CAST(
+      (
+        CAST(
+          if(
+            REGEXP_REPLACE(t0.s21_21, ' ', '') = '',
+            0,
+            ROUND(CAST(t0.s21_21 AS DOUBLE))
+          ) AS DECIMAL(18, 0)
+        )
+      ) AS DECIMAL(18, 0)
+    ) AS t0c38,
+    t0.s22_22 AS t0c39,
+    t0.s23_23 AS t0c40,
+    '***' AS t0c41,
+    '***' AS t0c42,
+    t0.s24_24 AS t0c43,
+    '***' AS t0c44,
+    t0.s25_25 AS t0c45,
+    t0.s26_26 AS t0c46,
+    t0.s27_27 AS t0c47,
+    t0.s28_28 AS t0c48,
+    '***' AS t0c49,
+    t0.s29_29 AS t0c50,
+    CAST((CAST(0 AS DOUBLE)) AS DECIMAL(28, 7)) AS t0c51,
+    t0.s23_23 AS t0c52,
+    t0.s30_30 AS t0c53,
+    '***' AS t0c54,
+    t0.s31_31 AS t0c55,
+    CAST(
+      (
+        CAST(
+          REGEXP_REPLACE(REGEXP_REPLACE(t0.s6_6, '\\\\+', ''), ',', '.') AS DOUBLE
+        )
+      ) AS DECIMAL(22, 7)
+    ) AS t0c56,
+    CAST((CAST(0 AS DOUBLE)) AS DECIMAL(1, 0)) AS t0c57,
+    '***' AS t0c58,
+    t0.s32_32 AS t0c59,
+    t0.s33_33 AS t0c60,
+    t0.s34_34 AS t0c61,
+    t0.s20_20 AS t0c62,
+    '***' AS t0c63,
+    '***' AS t0c64,
+    '***' AS t0c65
+  FROM
+    (
+      SELECT
+        *
+      FROM
+        source
+    ) AS t0;
+CREATE VIEW random_first_row AS SELECT id_string s1_1, date_string s2_2, date_string s3_3, short_string s4_4, id_string s5_5, backslash_number s6_6, backslash_number s7_7, backslash_number s8_8, empty_number s9_9, whitespace_number s10_10, whitespace_number s11_11, date_string s12_12, whitespace_number s13_13, whitespace_number s14_14, date_string s15_15, date_string s16_16, whitespace_number s17_17, id_string s18_18, short_string s19_19, id_string s20_20, whitespace_number s21_21, id_string s22_22, short_string s23_23, id_string s24_24, short_string s25_25, id_string s26_26, short_string s27_27, id_string s28_28, short_string s29_29, id_string s30_30, short_string s31_31, id_string s32_32, short_string s33_33, id_string s34_34 from ( SELECT lpad(base64encode(cast(random() as string)), 10,"") short_string, '1' id_string, concat('20', lpad(cast(cast(5 +random(32)*20 as tinyint) as string),2, '0'), lpad(cast(cast(1+random(65)*11 as int) as string), 2, '0'), lpad(cast(cast(1+random(65)*27 as int) as string), 2, '0')) date_string, concat(cast(cast(1 + random(76)*999 as int) as string), " ", cast(cast(1 + random(43)*1000 as int) as string)) whitespace_number, concat(cast(cast(1 + random(89)*999 as int) as string), "\\", cast(cast(1 + random(12)*999 as int) as string), ",", cast(cast(1 + random(64)*1000 as int) as string)) backslash_number, " " empty_number) random_data;
+CREATE VIEW random_rows AS SELECT id_string s1_1, date_string s2_2, date_string s3_3, short_string s4_4, id_string s5_5, backslash_number s6_6, backslash_number s7_7, backslash_number s8_8, empty_number s9_9, whitespace_number s10_10, whitespace_number s11_11, date_string s12_12, whitespace_number s13_13, whitespace_number s14_14, date_string s15_15, date_string s16_16, whitespace_number s17_17, id_string s18_18, short_string s19_19, id_string s20_20, whitespace_number s21_21, id_string s22_22, short_string s23_23, id_string s24_24, short_string s25_25, id_string s26_26, short_string s27_27, id_string s28_28, short_string s29_29, id_string s30_30, short_string s31_31, id_string s32_32, short_string s33_33, id_string s34_34 from (SELECT lpad(base64encode(cast(random() as string)), 10,"") short_string, cast(cast(max_id.max_id as int) + cast(s1_1 as int) as string) id_string, random() *100 small_double, random()* 200000 medium_double, concat('20', lpad(cast(cast(5 +random(32)*20 as tinyint) as string),2, '0'), lpad(cast(cast(1+random(65)*11 as int) as string), 2, '0'), lpad(cast(cast(1+random(65)*27 as int) as string), 2, '0')) date_string, concat(cast(cast(1 + random(76)*999 as int) as string), " ", cast(cast(1 + random(43)*1000 as int) as string)) whitespace_number, concat(cast(cast(1 + random(89)*999 as int) as string), "\\", cast(cast(1 + random(12)*999 as int) as string), ",", cast(cast(1 + random(64)*1000 as int) as string)) backslash_number, " " empty_number from source, (SELECT cast(max(cast(s1_1 as int)) as string) max_id from source) max_id) random_data;
+# Initial row
+INSERT INTO source SELECT * FROM random_first_row;
+# 2^16 rows
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+INSERT INTO source SELECT * FROM random_rows;
+====
+---- QUERY
+MERGE INTO target AS t2 USING source_view AS t1 ON t2.s2_2 = t0c1
+WHEN MATCHED THEN UPDATE SET
+  d1_1 = t0c0, ts1_3 = t0c2, d3_5 = t0c3, d6_6 = t0c4, d7_7 = t0c5, d8_8 = t0c6, ts2_9 = t0c7, ts3_10 = t0c8, s4_11 = t0c9,
+  s5_12 = t0c10, d9_13 = t0c11, d10_14 = t0c12, d11_15 = t0c13, d12_16 = t0c14, d13_17 = t0c15, d14_18 = t0c16, d15_19 = t0c17,
+  d16_20 = t0c18, d17_21 = t0c19, d18_22 = t0c20, d19_23 = t0c21, d20_24 = t0c22, ts4_25 = t0c23, d21_26 = t0c24, ts5_27 = t0c25,
+  d22_28 = t0c26, ts6_29 = t0c27, d23_30 = t0c28, d24_31 = t0c29, d25_32 = t0c30, d26_33 = t0c31, d27_34 = t0c32, s6_35 = t0c33,
+  s7_36 = t0c34, s8_37 = t0c35, s9_38 = t0c36, s10_39 = t0c37, d28_40 = t0c38, s11_41 = t0c39, s12_42 = t0c40, s13_43 = t0c41,
+  s14_44 = t0c42, s15_45 = t0c43, s16_46 = t0c44, s17_47 = t0c45, s18_48 = t0c46, s19_49 = t0c47, s20_50 = t0c48, s21_51 = t0c49,
+  s22_52 = t0c50, d29_53 = t0c51, s23_54 = t0c52, s24_55 = t0c53, s25_56 = t0c54, s26_57 = t0c55, val1_58 = t0c56, val2_59 = t0c57,
+  s27_60 = t0c58, s28_61 = t0c59, s29_62 = t0c60, s30_63 = t0c61, s31_64 = t0c62, s32_65 = t0c63, s33_66 = t0c64, s34_67 = t0c65
+WHEN NOT MATCHED THEN INSERT (
+  d1_1, s2_2, ts1_3, d3_5, d6_6, d7_7, d8_8, ts2_9, ts3_10, s4_11, s5_12, d9_13, d10_14, d11_15,
+  d12_16, d13_17, d14_18, d15_19, d16_20, d17_21, d18_22, d19_23, d20_24, ts4_25, d21_26, ts5_27, d22_28,
+  ts6_29, d23_30, d24_31, d25_32, d26_33, d27_34, s6_35, s7_36, s8_37, s9_38, s10_39, d28_40, s11_41,
+  s12_42, s13_43, s14_44, s15_45, s16_46, s17_47, s18_48, s19_49, s20_50, s21_51, s22_52, d29_53, s23_54,
+  s24_55, s25_56, s26_57, val1_58, val2_59, s27_60, s28_61, s29_62, s30_63, s31_64, s32_65, s33_66, s34_67
+)
+VALUES (
+  t0c0, t0c1, t0c2, t0c3, t0c4, t0c5, t0c6, t0c7, t0c8, t0c9, t0c10, t0c11, t0c12, t0c13, t0c14, t0c15,
+  t0c16, t0c17, t0c18, t0c19, t0c20, t0c21, t0c22, t0c23, t0c24, t0c25, t0c26, t0c27, t0c28, t0c29, t0c30,
+  t0c31, t0c32, t0c33, t0c34, t0c35, t0c36, t0c37, t0c38, t0c39, t0c40, t0c41, t0c42, t0c43, t0c44, t0c45,
+  t0c46, t0c47, t0c48, t0c49, t0c50, t0c51, t0c52, t0c53, t0c54, t0c55, t0c56, t0c57, t0c58, t0c59, t0c60,
+  t0c61, t0c62, t0c63, t0c64, t0c65
+);
+====
+---- QUERY
+SELECT count(1) FROM (SELECT * FROM target MINUS SELECT * FROM source_view) compared_result;
+---- RESULTS
+0
+====
+---- QUERY
+UPDATE source SET s19_19 = "updated string column";
+====
+---- QUERY
+MERGE INTO target AS t2 USING source_view AS t1 ON t2.s2_2 = t0c1
+WHEN MATCHED THEN UPDATE SET
+  d1_1 = t0c0, ts1_3 = t0c2, d3_5 = t0c3, d6_6 = t0c4, d7_7 = t0c5, d8_8 = t0c6, ts2_9 = t0c7, ts3_10 = t0c8, s4_11 = t0c9,
+  s5_12 = t0c10, d9_13 = t0c11, d10_14 = t0c12, d11_15 = t0c13, d12_16 = t0c14, d13_17 = t0c15, d14_18 = t0c16, d15_19 = t0c17,
+  d16_20 = t0c18, d17_21 = t0c19, d18_22 = t0c20, d19_23 = t0c21, d20_24 = t0c22, ts4_25 = t0c23, d21_26 = t0c24, ts5_27 = t0c25,
+  d22_28 = t0c26, ts6_29 = t0c27, d23_30 = t0c28, d24_31 = t0c29, d25_32 = t0c30, d26_33 = t0c31, d27_34 = t0c32, s6_35 = t0c33,
+  s7_36 = t0c34, s8_37 = t0c35, s9_38 = t0c36, s10_39 = t0c37, d28_40 = t0c38, s11_41 = t0c39, s12_42 = t0c40, s13_43 = t0c41,
+  s14_44 = t0c42, s15_45 = t0c43, s16_46 = t0c44, s17_47 = t0c45, s18_48 = t0c46, s19_49 = t0c47, s20_50 = t0c48, s21_51 = t0c49,
+  s22_52 = t0c50, d29_53 = t0c51, s23_54 = t0c52, s24_55 = t0c53, s25_56 = t0c54, s26_57 = t0c55, val1_58 = t0c56, val2_59 = t0c57,
+  s27_60 = t0c58, s28_61 = t0c59, s29_62 = t0c60, s30_63 = t0c61, s31_64 = t0c62, s32_65 = t0c63, s33_66 = t0c64, s34_67 = t0c65
+WHEN NOT MATCHED THEN INSERT (
+  d1_1, s2_2, ts1_3, d3_5, d6_6, d7_7, d8_8, ts2_9, ts3_10, s4_11, s5_12, d9_13, d10_14, d11_15,
+  d12_16, d13_17, d14_18, d15_19, d16_20, d17_21, d18_22, d19_23, d20_24, ts4_25, d21_26, ts5_27, d22_28,
+  ts6_29, d23_30, d24_31, d25_32, d26_33, d27_34, s6_35, s7_36, s8_37, s9_38, s10_39, d28_40, s11_41,
+  s12_42, s13_43, s14_44, s15_45, s16_46, s17_47, s18_48, s19_49, s20_50, s21_51, s22_52, d29_53, s23_54,
+  s24_55, s25_56, s26_57, val1_58, val2_59, s27_60, s28_61, s29_62, s30_63, s31_64, s32_65, s33_66, s34_67
+)
+VALUES (
+  t0c0, t0c1, t0c2, t0c3, t0c4, t0c5, t0c6, t0c7, t0c8, t0c9, t0c10, t0c11, t0c12, t0c13, t0c14, t0c15,
+  t0c16, t0c17, t0c18, t0c19, t0c20, t0c21, t0c22, t0c23, t0c24, t0c25, t0c26, t0c27, t0c28, t0c29, t0c30,
+  t0c31, t0c32, t0c33, t0c34, t0c35, t0c36, t0c37, t0c38, t0c39, t0c40, t0c41, t0c42, t0c43, t0c44, t0c45,
+  t0c46, t0c47, t0c48, t0c49, t0c50, t0c51, t0c52, t0c53, t0c54, t0c55, t0c56, t0c57, t0c58, t0c59, t0c60,
+  t0c61, t0c62, t0c63, t0c64, t0c65
+);
+====
+---- QUERY
+SELECT count(1) FROM (SELECT * FROM target MINUS SELECT * FROM source_view) compared_result;
+---- RESULTS
+0
+====

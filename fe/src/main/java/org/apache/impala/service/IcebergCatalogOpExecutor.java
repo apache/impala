@@ -365,6 +365,7 @@ public class IcebergCatalogOpExecutor {
     switch (icebergOp.operation) {
       case INSERT: appendFiles(feIcebergTable, txn, icebergOp); break;
       case DELETE: deleteRows(feIcebergTable, txn, icebergOp); break;
+      case MERGE:
       case UPDATE: updateRows(feIcebergTable, txn, icebergOp); break;
       case OPTIMIZE: optimizeTable(feIcebergTable, txn, icebergOp); break;
       default: throw new ImpalaRuntimeException(
