@@ -609,6 +609,7 @@ struct TIcebergPartitionField {
   3: required string orig_field_name
   4: required string field_name
   5: required TIcebergPartitionTransform transform
+  6: required Types.TScalarType type
 }
 
 struct TIcebergPartitionSpec {

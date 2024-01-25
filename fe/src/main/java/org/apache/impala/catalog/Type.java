@@ -434,6 +434,23 @@ public abstract class Type {
     return t.first;
   }
 
+  public static Type fromTScalarType(TScalarType scalarType) {
+    if (scalarType.getType() == TPrimitiveType.CHAR) {
+      Preconditions.checkState(scalarType.isSetLen());
+      return ScalarType.createCharType(scalarType.getLen());
+    } else if (scalarType.getType() == TPrimitiveType.VARCHAR) {
+      Preconditions.checkState(scalarType.isSetLen());
+      return ScalarType.createVarcharType(scalarType.getLen());
+    } else if (scalarType.getType() == TPrimitiveType.DECIMAL) {
+      Preconditions.checkState(scalarType.isSetPrecision()
+          && scalarType.isSetScale());
+      return ScalarType.createDecimalType(scalarType.getPrecision(),
+          scalarType.getScale());
+    } else {
+      return ScalarType.createType(PrimitiveType.fromThrift(scalarType.getType()));
+    }
+  }
+
   /**
    * Constructs a ColumnType rooted at the TTypeNode at nodeIdx in TColumnType.
    * Returned pair: The resulting ColumnType and the next nodeIdx that is not a child
@@ -445,22 +462,7 @@ public abstract class Type {
     switch (node.getType()) {
       case SCALAR: {
         Preconditions.checkState(node.isSetScalar_type());
-        TScalarType scalarType = node.getScalar_type();
-        if (scalarType.getType() == TPrimitiveType.CHAR) {
-          Preconditions.checkState(scalarType.isSetLen());
-          type = ScalarType.createCharType(scalarType.getLen());
-        } else if (scalarType.getType() == TPrimitiveType.VARCHAR) {
-          Preconditions.checkState(scalarType.isSetLen());
-          type = ScalarType.createVarcharType(scalarType.getLen());
-        } else if (scalarType.getType() == TPrimitiveType.DECIMAL) {
-          Preconditions.checkState(scalarType.isSetPrecision()
-              && scalarType.isSetScale());
-          type = ScalarType.createDecimalType(scalarType.getPrecision(),
-              scalarType.getScale());
-        } else {
-          type = ScalarType.createType(
-              PrimitiveType.fromThrift(scalarType.getType()));
-        }
+        type = fromTScalarType(node.getScalar_type());
         ++nodeIdx;
         break;
       }

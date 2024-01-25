@@ -17,6 +17,9 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Preconditions;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
@@ -43,18 +46,23 @@ public class IcebergPartitionField extends StmtNode {
   // Partition transform type and transform param for this partition field.
   private IcebergPartitionTransform transform_;
 
+  // Result type of the partition field. Must be a primitive type.
+  private ScalarType type_;
+
   public IcebergPartitionField(int sourceId, int fieldId, String origFieldName,
-      String fieldName, IcebergPartitionTransform transform) {
+      String fieldName, IcebergPartitionTransform transform, Type type) {
+    Preconditions.checkState(type.isScalarType());
     sourceId_ = sourceId;
     fieldId_ = fieldId;
     origFieldName_ = origFieldName;
     fieldName_ = fieldName;
     transform_ = transform;
+    type_ = (ScalarType)type;
   }
 
   // This constructor is called when creating a partitioned Iceberg table.
   public IcebergPartitionField(String fieldName, IcebergPartitionTransform transform) {
-    this(0, 0, fieldName, fieldName, transform);
+    this(0, 0, fieldName, fieldName, transform, Type.NULL);
   }
 
   public String getFieldName() {
@@ -97,6 +105,7 @@ public class IcebergPartitionField extends StmtNode {
     result.setOrig_field_name(origFieldName_);
     result.setField_name(fieldName_);
     result.setTransform(transform_.toThrift());
+    result.setType(type_.toTScalarType());
     return result;
   }
 }

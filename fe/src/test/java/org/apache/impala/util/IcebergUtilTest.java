@@ -305,7 +305,8 @@ public class IcebergUtilTest {
       IcebergPartitionTransform icebergPartitionTransform =
           new IcebergPartitionTransform(TIcebergPartitionTransformType.IDENTITY);
       IcebergPartitionField field =
-          new IcebergPartitionField(id, 106, "name", "name", icebergPartitionTransform);
+          new IcebergPartitionField(id, 106, "name", "name", icebergPartitionTransform,
+              column.getType());
       ImmutableList<IcebergPartitionField> fieldList = ImmutableList.of(field);
       IcebergPartitionSpec icebergPartitionSpec = new IcebergPartitionSpec(4, fieldList);
       assertTrue(isPartitionColumn(column, icebergPartitionSpec));
@@ -319,7 +320,8 @@ public class IcebergUtilTest {
       IcebergPartitionTransform icebergPartitionTransform =
           new IcebergPartitionTransform(TIcebergPartitionTransformType.IDENTITY);
       IcebergPartitionField field =
-          new IcebergPartitionField(107, 106, "name", "name", icebergPartitionTransform);
+          new IcebergPartitionField(107, 106, "name", "name", icebergPartitionTransform,
+              column.getType());
       ImmutableList<IcebergPartitionField> fieldList = ImmutableList.of(field);
       IcebergPartitionSpec icebergPartitionSpec = new IcebergPartitionSpec(4, fieldList);
       assertFalse(isPartitionColumn(column, icebergPartitionSpec));

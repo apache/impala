@@ -264,8 +264,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
     for (const TIcebergPartitionField& spec_field : spec.partition_fields) {
       auto transform_type = spec_field.transform.transform_type;
       if (transform_type == TIcebergPartitionTransformType::VOID) continue;
-      iceberg_non_void_partition_names_.push_back(spec_field.field_name);
-      iceberg_non_void_partition_transforms_.push_back(transform_type);
+      iceberg_non_void_partition_fields_.push_back(spec_field);
     }
     iceberg_parquet_compression_codec_ = tdesc.icebergTable.parquet_compression_codec;
     iceberg_parquet_row_group_size_ = tdesc.icebergTable.parquet_row_group_size;

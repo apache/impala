@@ -53,6 +53,7 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.SnapshotSummary;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.IcebergPartitionField;
@@ -87,6 +88,7 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.HdfsCachingUtil;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TResultRowBuilder;
@@ -889,21 +891,24 @@ public interface FeIcebergTable extends FeFsTable {
     public static List<IcebergPartitionSpec> loadPartitionSpecByIceberg(
         FeIcebergTable table) throws ImpalaRuntimeException {
       List<IcebergPartitionSpec> ret = new ArrayList<>();
-      for (PartitionSpec spec : table.getIcebergApiTable().specs().values()) {
-        ret.add(convertPartitionSpec(spec));
+      Table iceApiTable = table.getIcebergApiTable();
+      for (PartitionSpec spec : iceApiTable.specs().values()) {
+        ret.add(convertPartitionSpec(iceApiTable.schema(), spec));
       }
       return ret;
     }
 
-    public static IcebergPartitionSpec convertPartitionSpec(PartitionSpec spec)
-        throws ImpalaRuntimeException {
+    public static IcebergPartitionSpec convertPartitionSpec(Schema schema,
+        PartitionSpec spec) throws ImpalaRuntimeException {
       List<IcebergPartitionField> fields = new ArrayList<>();
       Map<String, Integer> transformParams =
           IcebergUtil.getPartitionTransformParams(spec);
       for (PartitionField field : spec.fields()) {
         fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
             spec.schema().findColumnName(field.sourceId()), field.name(),
-            IcebergUtil.getPartitionTransform(field, transformParams)));
+            IcebergUtil.getPartitionTransform(field, transformParams),
+            IcebergSchemaConverter.toImpalaType(
+                field.transform().getResultType(schema.findType(field.sourceId())))));
       }
       return new IcebergPartitionSpec(spec.specId(), fields);
     }

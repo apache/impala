@@ -62,12 +62,47 @@ Status IcebergDeleteSinkBase::Open(RuntimeState* state) {
   return Status::OK();
 }
 
+inline bool IsDate(const TScalarType& tscalar) {
+  return tscalar.type == TPrimitiveType::DATE;
+}
+
+inline bool IsTimestamp(const TScalarType& tscalar) {
+  return tscalar.type == TPrimitiveType::TIMESTAMP;
+}
+
+inline bool IsDateTime(const TScalarType& tscalar) {
+  return tscalar.type == TPrimitiveType::DATETIME;
+}
+
 std::string IcebergDeleteSinkBase::HumanReadablePartitionValue(
-    TIcebergPartitionTransformType::type transform_type, const std::string& value,
+    const TIcebergPartitionField& part_field, const std::string& value,
     Status* transform_result) {
-  if (!iceberg::IsTimeBasedPartition(transform_type) ||
-    value == table_desc_->null_partition_key_value()) {
-    *transform_result = Status::OK();
+  *transform_result = Status::OK();
+  TIcebergPartitionTransformType::type transform_type =
+      part_field.transform.transform_type;
+  if (value == table_desc_->null_partition_key_value()) {
+    // We don't need to transfrom NULL values.
+    return value;
+  }
+  if (transform_type == TIcebergPartitionTransformType::IDENTITY) {
+    const TScalarType& scalar_type = part_field.type;
+    // Timestamp and DateTime (not even implemented yet) types are not supported for
+    // IDENTITY-partitioning.
+    if (IsTimestamp(scalar_type) || IsDateTime(scalar_type)) {
+      *transform_result = Status(Substitute(
+        "Unsupported type for IDENTITY-partitioning: $0", to_string(scalar_type.type)));
+      return value;
+    }
+    if (IsDate(scalar_type)) {
+      // With IDENTITY partitioning, only DATEs are problematic, because DATEs are stored
+      // as an offset from the unix epoch. So we need to handle the values similarly to
+      // the DAY-transformed values.
+      return iceberg::HumanReadableTime(
+          TIcebergPartitionTransformType::DAY, value, transform_result);
+    }
+  }
+  if (!iceberg::IsTimeBasedPartition(transform_type)) {
+    // Don't need to convert values of non-time transforms.
     return value;
   }
   return iceberg::HumanReadableTime(transform_type, value, transform_result);
@@ -105,13 +140,11 @@ Status IcebergDeleteSinkBase::ConstructPartitionInfo(int32_t spec_id,
   }
   output_partition->iceberg_spec_id = spec_id;
 
-  vector<string> non_void_partition_names;
-  vector<TIcebergPartitionTransformType::type> non_void_partition_transforms;
+  vector<TIcebergPartitionField> non_void_partition_fields;
   if (LIKELY(spec_id == table_desc_->IcebergSpecId())) {
     // If 'spec_id' is the default spec id, then just copy the already populated
-    // non void partition names and transforms.
-    non_void_partition_names = table_desc_->IcebergNonVoidPartitionNames();
-    non_void_partition_transforms = table_desc_->IcebergNonVoidPartitionTransforms();
+    // non void partition fields.
+    non_void_partition_fields = table_desc_->IcebergNonVoidPartitionFields();
   } else {
     // Otherwise collect the non-void partition names belonging to 'spec_id'.
     const TIcebergPartitionSpec& partition_spec =
@@ -119,13 +152,12 @@ Status IcebergDeleteSinkBase::ConstructPartitionInfo(int32_t spec_id,
     for (const TIcebergPartitionField& spec_field : partition_spec.partition_fields) {
       auto transform_type = spec_field.transform.transform_type;
       if (transform_type != TIcebergPartitionTransformType::VOID) {
-        non_void_partition_names.push_back(spec_field.field_name);
-        non_void_partition_transforms.push_back(transform_type);
+        non_void_partition_fields.push_back(spec_field);
       }
     }
   }
 
-  if (non_void_partition_names.empty()) {
+  if (non_void_partition_fields.empty()) {
     DCHECK(partition_values_str.empty());
     return Status::OK();
   }
@@ -142,23 +174,21 @@ Status IcebergDeleteSinkBase::ConstructPartitionInfo(int32_t spec_id,
     partition_values_decoded.push_back(std::move(decoded_val));
   }
 
-  DCHECK_EQ(partition_values_decoded.size(), non_void_partition_names.size());
-  DCHECK_EQ(partition_values_decoded.size(), non_void_partition_transforms.size());
+  DCHECK_EQ(partition_values_decoded.size(), non_void_partition_fields.size());
 
   stringstream url_encoded_partition_name_ss;
 
   for (int i = 0; i < partition_values_decoded.size(); ++i) {
-    auto transform_type = non_void_partition_transforms[i];
+    const TIcebergPartitionField& part_field = non_void_partition_fields[i];
     stringstream raw_partition_key_value_ss;
     stringstream url_encoded_partition_key_value_ss;
 
-    raw_partition_key_value_ss << non_void_partition_names[i] << "=";
-    url_encoded_partition_key_value_ss << non_void_partition_names[i] << "=";
+    raw_partition_key_value_ss << part_field.field_name << "=";
+    url_encoded_partition_key_value_ss << part_field.field_name << "=";
 
     string& value_str = partition_values_decoded[i];
     Status transform_status;
-    value_str = HumanReadablePartitionValue(
-        transform_type, value_str, &transform_status);
+    value_str = HumanReadablePartitionValue(part_field, value_str, &transform_status);
     if (!transform_status.ok()) return transform_status;
     raw_partition_key_value_ss << value_str;
 

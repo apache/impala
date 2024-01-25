@@ -53,12 +53,13 @@ class IcebergDeleteSinkBase : public TableSinkBase {
   /// Returns the human-readable representation of a partition transform value. It is used
   /// to create the file paths. IcebergUtil.partitionDataFromDataFile() also expects
   /// partition values in this representation.
-  /// E.g. if 'transform_type' is MONTH and 'value' is "7" this function returns
-  /// "1970-08".
+  /// E.g. if 'part_field' has transform MONTH and 'value' is "7" this function returns
+  /// "1970-08". If 'part_field' has transform IDENTITY but the column is DATE we also
+  /// need to transform the partition value to a human-readable format.
   /// Parse errors are set in 'transform_result'. If it is not OK, the return value
   /// of this function does not contain any meaningful value.
   std::string HumanReadablePartitionValue(
-      TIcebergPartitionTransformType::type transform_type, const std::string& value,
+      const TIcebergPartitionField& part_field, const std::string& value,
       Status* transform_result);
 };
 

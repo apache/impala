@@ -141,7 +141,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
         "Exception caught during generating Iceberg schema:", ex);
     }
     IcebergPartitionSpec resolvedIcebergSpec =
-        FeIcebergTable.Utils.convertPartitionSpec(iceSpec);
+        FeIcebergTable.Utils.convertPartitionSpec(iceSchema_, iceSpec);
     partitionSpecs_.add(resolvedIcebergSpec);
   }
 

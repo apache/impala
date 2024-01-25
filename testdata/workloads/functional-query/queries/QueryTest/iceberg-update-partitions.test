@@ -458,3 +458,26 @@ UPDATE numeric_truncate SET dec_10_2 = 75.20, dec_8_0 = 531, bigint_col = 2111, 
 ---- TYPES
 INT,INT,BIGINT,DECIMAL,DECIMAL
 ====
+---- QUERY
+create table ice_alltypes_part_v2 (i INT NULL, p_bool BOOLEAN NULL, p_int INT NULL, p_bigint BIGINT NULL,
+    p_float FLOAT NULL, p_double DOUBLE NULL, p_decimal DECIMAL(6,3) NULL, p_date DATE NULL, p_string STRING NULL)
+PARTITIONED BY SPEC (p_bool, p_int, p_bigint, p_float, p_double, p_decimal, p_date, p_string)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='2');
+insert into ice_alltypes_part_v2 select * from functional_parquet.iceberg_alltypes_part;
+---- DML_RESULTS: ice_alltypes_part_v2
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+update ice_alltypes_part_v2 set i = cast(i + 1 as int);
+update ice_alltypes_part_v2 set p_int = i;
+update ice_alltypes_part_v2 set p_date = add_months(p_date, i);
+---- DML_RESULTS: ice_alltypes_part_v2
+2,true,2,11,1.100000023841858,2.222,123.321,2022-04-22,'impala'
+3,true,3,11,1.100000023841858,2.222,123.321,2022-05-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====

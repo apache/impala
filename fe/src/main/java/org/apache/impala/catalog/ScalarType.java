@@ -215,38 +215,37 @@ public class ScalarType extends Type {
     return StringUtils.repeat(' ', lpad) + toSql();
   }
 
-  @Override
-  public void toThrift(TColumnType container) {
-    TTypeNode node = new TTypeNode();
-    container.types.add(node);
+  public TScalarType toTScalarType() {
+    TScalarType scalarType = new TScalarType();
     switch(type_) {
       case VARCHAR:
       case CHAR:
       case FIXED_UDA_INTERMEDIATE: {
-        node.setType(TTypeNodeType.SCALAR);
-        TScalarType scalarType = new TScalarType();
         scalarType.setType(type_.toThrift());
         scalarType.setLen(len_);
-        node.setScalar_type(scalarType);
         break;
       }
       case DECIMAL: {
-        node.setType(TTypeNodeType.SCALAR);
-        TScalarType scalarType = new TScalarType();
         scalarType.setType(type_.toThrift());
         scalarType.setScale(scale_);
         scalarType.setPrecision(precision_);
-        node.setScalar_type(scalarType);
         break;
       }
       default: {
-        node.setType(TTypeNodeType.SCALAR);
-        TScalarType scalarType = new TScalarType();
         scalarType.setType(type_.toThrift());
-        node.setScalar_type(scalarType);
         break;
       }
     }
+    return scalarType;
+  }
+
+  @Override
+  public void toThrift(TColumnType container) {
+    TTypeNode node = new TTypeNode();
+    container.types.add(node);
+    TScalarType scalarType = toTScalarType();
+    node.setType(TTypeNodeType.SCALAR);
+    node.setScalar_type(scalarType);
   }
 
   public int decimalPrecision() {

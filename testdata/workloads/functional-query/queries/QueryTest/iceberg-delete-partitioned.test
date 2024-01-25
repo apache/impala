@@ -783,3 +783,23 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/numeric_truncate/data/int_col_t
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
+---- QUERY
+create table ice_alltypes_part_v2 (i INT NULL, p_bool BOOLEAN NULL, p_int INT NULL, p_bigint BIGINT NULL,
+    p_float FLOAT NULL, p_double DOUBLE NULL, p_decimal DECIMAL(6,3) NULL, p_date DATE NULL, p_string STRING NULL)
+PARTITIONED BY SPEC (p_bool, p_int, p_bigint, p_float, p_double, p_decimal, p_date, p_string)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='2');
+insert into ice_alltypes_part_v2 select * from functional_parquet.iceberg_alltypes_part;
+---- DML_RESULTS: ice_alltypes_part_v2
+1,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
+---- QUERY
+delete from ice_alltypes_part_v2 where i=1;
+---- DML_RESULTS: ice_alltypes_part_v2
+2,true,1,11,1.100000023841858,2.222,123.321,2022-02-22,'impala'
+---- TYPES
+INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
+====
