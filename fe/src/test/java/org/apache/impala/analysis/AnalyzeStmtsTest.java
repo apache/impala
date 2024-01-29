@@ -1016,7 +1016,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Empty star expansion, but non empty result exprs.
     AnalyzesOk("select 1, * from only_complex_types");
 
-    // Struct in select list works only if codegen is OFF.
+    // Struct in select list.
     AnalysisContext ctx = createAnalysisCtx();
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
     AnalyzesOk("select int_array_col from functional.allcomplextypes");
@@ -1030,7 +1030,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "collection 'int_array_col' of type 'ARRAY<INT>'");
     AnalysisError("select tiny_struct from functional_orc_def.complextypes_structs " +
         "union all select tiny_struct from functional_orc_def.complextypes_structs", ctx,
-        "Set operations don't support STRUCT type. STRUCT<b:BOOLEAN> in tiny_struct");
+        "Set operations don't support STRUCT types or types containing STRUCT types." +
+        " STRUCT<b:BOOLEAN> in tiny_struct");
+    AnalysisError("select all_mix from functional_parquet.collection_struct_mix " +
+        "union all select all_mix from functional_parquet.collection_struct_mix", ctx,
+        "Set operations don't support STRUCT types or types containing STRUCT types. " +
+        "MAP<INT,STRUCT<big:STRUCT<arr:ARRAY<STRUCT<inner_arr:ARRAY<ARRAY<INT>>," +
+        "m:TIMESTAMP>>,n:INT>,small:STRUCT<str:STRING,i:INT>>> in all_mix.");
     AnalyzesOk("select 1 from " +
         "(select int_array_col from functional.allcomplextypes) v");
     AnalyzesOk("select int_array_col from " +

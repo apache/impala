@@ -549,3 +549,9 @@ from collection_struct_mix, collection_struct_mix.arr_contains_nested_struct arr
 ---- TYPES
 INT,STRING,SMALLINT
 ====
+---- QUERY
+# Union of types containing structs are not allowed.
+select all_mix from collection_struct_mix union all select all_mix from collection_struct_mix
+---- CATCH
+AnalysisException: Set operations don't support STRUCT types or types containing STRUCT types. MAP<INT,STRUCT<big:STRUCT<arr:ARRAY<STRUCT<inner_arr:ARRAY<ARRAY<INT>>,m:TIMESTAMP>>,n:INT>,small:STRUCT<str:STRING,i:INT>>> in all_mix.
+====

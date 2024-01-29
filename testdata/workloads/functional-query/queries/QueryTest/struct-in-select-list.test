@@ -603,7 +603,7 @@ select id, tiny_struct from complextypes_structs
 union all
 select id, tiny_struct from complextypes_structs;
 ---- CATCH
-AnalysisException: Set operations don't support STRUCT type. STRUCT<b:BOOLEAN> in tiny_struct
+AnalysisException: Set operations don't support STRUCT types or types containing STRUCT types. STRUCT<b:BOOLEAN> in tiny_struct.
 ====
 ---- QUERY
 # Ordering by struct column is not supported.

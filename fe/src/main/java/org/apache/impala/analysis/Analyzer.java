@@ -48,6 +48,7 @@ import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.FeCatalog;
@@ -62,6 +63,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.IcebergTimeTravelTable;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
@@ -3400,10 +3402,10 @@ public class Analyzer {
       // Initialize with type of i-th expr in first list.
       Type compatibleType = firstList.get(i).getType();
       if (firstList.get(i) instanceof SlotRef &&
-          compatibleType.isStructType()) {
+          compatibleType.containsStruct()) {
         throw new AnalysisException(String.format(
-            "Set operations don't support STRUCT type. %s in %s", compatibleType.toSql(),
-            firstList.get(i).toSql()));
+            "Set operations don't support STRUCT types or types containing " +
+            "STRUCT types. %s in %s.", compatibleType.toSql(), firstList.get(i).toSql()));
       }
       widestExprs.add(firstList.get(i));
 

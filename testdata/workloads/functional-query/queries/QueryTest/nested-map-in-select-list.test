@@ -193,7 +193,7 @@ tinyint,string,string
 select 1, struct_contains_map, all_mix from collection_struct_mix
   union all select 2, struct_contains_map, all_mix from collection_struct_mix
 ---- CATCH
-AnalysisException: Set operations don't support STRUCT type. STRUCT<m:MAP<INT,STRING>> in struct_contains_map
+AnalysisException: Set operations don't support STRUCT types or types containing STRUCT types. STRUCT<m:MAP<INT,STRING>> in struct_contains_map.
 ====
 ---- QUERY
 select 1 from (select int_map from complextypestbl) s

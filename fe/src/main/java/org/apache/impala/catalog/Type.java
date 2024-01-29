@@ -245,6 +245,28 @@ public abstract class Type {
 
   /**
    * Returns true if this type
+   *  - is a struct type or
+   *  - contains a struct type (recursively); for example
+   *    ARRAY<STRUCT<i: INT>>.
+   */
+  public boolean containsStruct() {
+    if (isStructType()) return true;
+
+    if (isArrayType()) {
+      ArrayType arrayType = (ArrayType) this;
+      return arrayType.getItemType().containsStruct();
+    } else if (isMapType()) {
+      MapType mapType = (MapType) this;
+      return mapType.getKeyType().containsStruct() ||
+          mapType.getValueType().containsStruct();
+    }
+
+    return false;
+  }
+
+
+  /**
+   * Returns true if this type
    *  - is a collection type or
    *  - contains a collection type (recursively).
    */
