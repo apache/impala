@@ -294,6 +294,27 @@ where snapshot_id = $OVERWRITE_SNAPSHOT_ID or snapshot_id = 1;
 row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
+====
+---- QUERY
+# Test LIMIT
+select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots limit 2;
+---- RESULTS
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test LIMIT
+set BATCH_SIZE=1;
+select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots limit 3;
+---- RESULTS
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+row_regex:[1-9]\d*|0
+---- TYPES
+BIGINT
+====
 
 ####
 # Test 4 : Test joins

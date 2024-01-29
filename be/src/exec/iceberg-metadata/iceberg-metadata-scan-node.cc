@@ -163,7 +163,7 @@ Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch
       &tuple_buffer));
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
   tuple->Init(tuple_buffer_size);
-  while (!row_batch->AtCapacity()) {
+  while (!ReachedLimit() && !row_batch->AtCapacity()) {
     int row_idx = row_batch->AddRow();
     TupleRow* tuple_row = row_batch->GetRow(row_idx);
     tuple_row->SetTuple(0, tuple);
@@ -188,12 +188,14 @@ Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch
       row_batch->CommitLastRow();
       tuple = reinterpret_cast<Tuple*>(
           reinterpret_cast<uint8_t*>(tuple) + tuple_desc_->byte_size());
+      IncrementNumRowsReturned(1);
     } else {
       // Reset the null bits, everyhing else will be overwritten
       Tuple::ClearNullBits(tuple, tuple_desc_->null_bytes_offset(),
           tuple_desc_->num_null_bytes());
     }
   }
+  if (ReachedLimit()) *eos = true;
   return Status::OK();
 }
 
