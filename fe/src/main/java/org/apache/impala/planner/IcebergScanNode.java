@@ -52,7 +52,13 @@ import com.google.common.collect.Lists;
 public class IcebergScanNode extends HdfsScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(IcebergScanNode.class);
 
+  // List of files needed to be scanned by this scan node. The list is sorted in case of
+  // partitioned tables, so partition range scans are scheduled more evenly.
+  // See IMPALA-12765 for details.
   private List<FileDescriptor> fileDescs_;
+
+  // Indicates that the files in 'fileDescs_' are sorted.
+  private boolean filesAreSorted_ = false;
 
   // Conjuncts on columns not involved in IDENTITY-partitioning. Subset of 'conjuncts_',
   // but this does not include conjuncts on IDENTITY-partitioned columns, because such
@@ -89,6 +95,12 @@ public class IcebergScanNode extends HdfsScanNode {
     Preconditions.checkState(partitions_.size() == 1);
 
     fileDescs_ = fileDescs;
+    if (((FeIcebergTable)tblRef.getTable()).isPartitioned()) {
+      // Let's order the file descriptors for better scheduling.
+      // See IMPALA-12765 for details.
+      Collections.sort(fileDescs_);
+      filesAreSorted_ = true;
+    }
     nonIdentityConjuncts_ = nonIdentityConjuncts;
     //TODO IMPALA-11577: optimize file format counting
     boolean hasParquet = false;
@@ -203,7 +215,9 @@ public class IcebergScanNode extends HdfsScanNode {
 
     // Ensure a consistent ordering of files for repeatable runs.
     List<FileDescriptor> orderedFds = Lists.newArrayList(fileDescs_);
-    Collections.sort(orderedFds);
+    if (!filesAreSorted_) {
+      Collections.sort(orderedFds);
+    }
 
     Preconditions.checkState(partitions_.size() == 1);
     FeFsPartition part = partitions_.get(0);
