@@ -39,7 +39,7 @@ CONFIGS=(
   # Test gcc builds with and without -so:
   "-skiptests -noclean"
   "-skiptests -noclean -release"
-  "-skiptests -noclean -release -package"
+  "-notests -noclean -release -package"
   "-skiptests -noclean -release -so -ninja"
   # clang sanitizer builds:
   "-skiptests -noclean -asan"
@@ -47,7 +47,7 @@ CONFIGS=(
   "-skiptests -noclean -ubsan -so -ninja"
   # USE_APACHE_HIVE=true build:
   "-skiptests -noclean -use_apache_hive"
-  "-skiptests -noclean -use_apache_hive -package"
+  "-notests -noclean -use_apache_hive -package"
 )
 
 FAILED=""
