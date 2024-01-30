@@ -170,7 +170,9 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
       elif e.returncode == 30:
         pytest.skip("File /var/run/mysqld/mysqld.sock not found")
       else:
-        assert False, "Failed to setup MySQL testing environment"
+        # The mysql docker container creation and mysqld can fail due to multiple
+        # reasons. This could be an Intermittent issue and need to re-run the test.
+        pytest.xfail(reason="Failed to setup MySQL testing environment")
 
   @classmethod
   def _remove_mysql_test_env(cls):
