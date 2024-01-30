@@ -155,6 +155,10 @@ DEFINE_int32(catalog_operation_log_size, 100, "Number of catalog operation log r
 DEFINE_bool(catalogd_ha_reset_metadata_on_failover, false, "If true, reset all metadata "
     "when the catalogd becomes active.");
 
+DEFINE_int32(topic_update_log_gc_frequency, 1000, "Frequency at which the entries "
+    "of the catalog topic update log are garbage collected. An entry may survive "
+    "for (2 * TOPIC_UPDATE_LOG_GC_FREQUENCY) - 1 topic updates.");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);

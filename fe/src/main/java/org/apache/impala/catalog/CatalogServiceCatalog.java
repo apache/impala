@@ -189,7 +189,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  *   modify them. Each entry includes the number of times a catalog object has
  *   skipped a topic update, which version of the object was last sent in a topic update
  *   and what was the version of that topic update. Entries of the topic update log are
- *   garbage-collected every TOPIC_UPDATE_LOG_GC_FREQUENCY topic updates by the topic
+ *   garbage-collected every topicUpdateLogGcFrequency_ topic updates by the topic
  *   update processing thread to prevent the log from growing indefinitely. Metadata
  *   operations using SYNC_DDL are inspecting this log to identify the catalog topic
  *   version that the issuing impalad must wait for in order to ensure that the effects
@@ -200,10 +200,10 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  *   operations that use SYNC_DDL to hang while waiting for specific topic update log
  *   entries. That could happen if the thread processing the metadata operation stalls
  *   for a long period of time (longer than the time to process
- *   TOPIC_UPDATE_LOG_GC_FREQUENCY topic updates) between the time the operation was
+ *   topicUpdateLogGcFrequency_ topic updates) between the time the operation was
  *   applied in the catalog cache and the time the SYNC_DDL version was checked. To reduce
  *   the probability of such an event, we set the value of the
- *   TOPIC_UPDATE_LOG_GC_FREQUENCY to a large value. Also, to prevent metadata operations
+ *   topicUpdateLogGcFrequency_ to a large value. Also, to prevent metadata operations
  *   from hanging in that path due to unknown issues (e.g. bugs), operations using
  *   SYNC_DDL are not allowed to wait indefinitely for specific topic log entries and an
  *   exception is thrown if the specified max wait time is exceeded. See
@@ -3300,18 +3300,19 @@ public class CatalogServiceCatalog extends Catalog {
   public CatalogDeltaLog getDeleteLog() { return deleteLog_; }
 
   /**
-   * Returns the version of the topic update that an operation using SYNC_DDL must wait
-   * for in order to ensure that its result set ('result') has been broadcast to all the
-   * coordinators. For operations that don't produce a result set, e.g. INVALIDATE
-   * METADATA, return the version specified in 'result.version'.
+   * Returns the catalog version of the topic update that an operation using SYNC_DDL
+   * must wait for in order to ensure that its result set ('result') has been broadcast
+   * to all the coordinators. For operations that don't produce a result set,
+   * e.g. INVALIDATE METADATA, return the version specified in 'result.version'.
    */
   public long waitForSyncDdlVersion(TCatalogUpdateResult result) throws CatalogException {
-    if (!result.isSetUpdated_catalog_objects() &&
-        !result.isSetRemoved_catalog_objects()) {
+    if (result.getVersion() <= topicUpdateLog_.getOldestTopicUpdateToGc()
+        || (!result.isSetUpdated_catalog_objects() &&
+        !result.isSetRemoved_catalog_objects())) {
       return result.getVersion();
     }
     long lastSentTopicUpdate = lastSentTopicUpdate_.get();
-    // Maximum number of attempts (topic updates) to find the catalog topic version that
+    // Maximum number of attempts (topic updates) to find the catalog version that
     // an operation using SYNC_DDL must wait for.
     // this maximum attempt limit is only applicable when topicUpdateTblLockMaxWaitTimeMs_
     // is disabled (set to 0). This is due to the fact that the topic update thread will
@@ -3338,7 +3339,7 @@ public class CatalogServiceCatalog extends Catalog {
       long topicVersionForDeletes =
           getCoveringTopicUpdateVersion(result.getRemoved_catalog_objects());
       if (topicVersionForUpdates == -1 || topicVersionForDeletes == -1) {
-        LOG.info("Topic version for {} not found yet. Last sent topic version: {}. " +
+        LOG.info("Topic update for {} not found yet. Last sent catalog version: {}. " +
                 "Updated objects: {}, deleted objects: {}",
             topicVersionForUpdates == -1 ? "updates" : "deletes",
             lastSentTopicUpdate_.get(),
@@ -3358,11 +3359,11 @@ public class CatalogServiceCatalog extends Catalog {
         if (lastSentTopicUpdate != currentTopicUpdate) {
           ++numAttempts;
           if (shouldTimeOut(numAttempts, maxNumAttempts, begin)) {
-            LOG.error(String.format("Couldn't retrieve the covering topic version for "
+            LOG.error(String.format("Couldn't retrieve the covering topic update for "
                     + "catalog objects. Updated objects: %s, deleted objects: %s",
                 FeCatalogUtils.debugString(result.updated_catalog_objects),
                 FeCatalogUtils.debugString(result.removed_catalog_objects)));
-            throw new CatalogException("Couldn't retrieve the catalog topic version " +
+            throw new CatalogException("Couldn't retrieve the catalog topic update " +
                 "for the SYNC_DDL operation after " + numAttempts + " attempts and " +
                 "elapsed time of " + (System.currentTimeMillis() - begin) + " msec. " +
                 "The operation has been successfully executed but its effects may have " +
@@ -3375,9 +3376,9 @@ public class CatalogServiceCatalog extends Catalog {
       }
     }
     Preconditions.checkState(versionToWaitFor >= 0);
-    LOG.info("Operation using SYNC_DDL is waiting for catalog topic version: " +
-        versionToWaitFor + ". Time to identify topic version (msec): " +
-        (System.currentTimeMillis() - begin));
+    LOG.info("Operation using SYNC_DDL is waiting for catalog version {} " +
+            "to be sent. Time to identify topic update (msec): {}.",
+        versionToWaitFor, (System.currentTimeMillis() - begin));
     return versionToWaitFor;
   }
 
@@ -3421,7 +3422,7 @@ public class CatalogServiceCatalog extends Catalog {
       // a) It corresponds to a new catalog object that hasn't been processed by a catalog
       // update yet.
       // b) It corresponds to a catalog object that hasn't been modified for at least
-      // TOPIC_UPDATE_LOG_GC_FREQUENCY updates and hence its entry was garbage
+      // topicUpdateLogGcFrequency_ updates and hence its entry was garbage
       // collected.
       // In both cases, -1 is returned to indicate that we're waiting for the
       // entry to show up in the topic update log.

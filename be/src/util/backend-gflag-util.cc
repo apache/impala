@@ -115,6 +115,7 @@ DECLARE_bool(iceberg_allow_datafiles_in_table_location_only);
 DECLARE_int32(catalog_operation_log_size);
 DECLARE_string(hostname);
 DECLARE_bool(allow_catalog_cache_op_from_masked_users);
+DECLARE_int32(topic_update_log_gc_frequency);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -451,6 +452,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_hostname(FLAGS_hostname);
   cfg.__set_allow_catalog_cache_op_from_masked_users(
       FLAGS_allow_catalog_cache_op_from_masked_users);
+  cfg.__set_topic_update_log_gc_frequency(FLAGS_topic_update_log_gc_frequency);
   return Status::OK();
 }
 

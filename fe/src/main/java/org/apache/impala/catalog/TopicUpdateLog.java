@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
+import org.apache.impala.service.BackendConfig;
+
 // A log of topic update information for each catalog object. An entry is added to
 // the log when a catalog object is processed (added/removed/skipped) in a topic
 // update and it is replaced every time the catalog object is processed in a
@@ -33,18 +35,19 @@ import com.google.common.base.Strings;
 //
 // To prevent the log from growing indefinitely, the oldest entries
 // (in terms of last topic update that processed the associated catalog objects) are
-// garbage collected every TOPIC_UPDATE_LOG_GC_FREQUENCY topic updates. That will cause
+// garbage collected every topicUpdateLogGcFrequency_ topic updates. That will cause
 // entries of deleted catalog objects or entries of objects that haven't been processed
-// by the catalog for at least TOPIC_UPDATE_LOG_GC_FREQUENCY updates to be removed from
+// by the catalog for at least topicUpdateLogGcFrequency_ updates to be removed from
 // the log.
 public class TopicUpdateLog {
   private static final Logger LOG = LoggerFactory.getLogger(TopicUpdateLog.class);
   // Frequency at which the entries of the topic update log are garbage collected.
-  // An entry may survive for (2 * TOPIC_UPDATE_LOG_GC_FREQUENCY) - 1 topic updates.
-  private final static int TOPIC_UPDATE_LOG_GC_FREQUENCY = 1000;
+  // An entry may survive for (2 * topicUpdateLogGcFrequency_) - 1 topic updates.
+  private int topicUpdateLogGcFrequency_ = BackendConfig.INSTANCE
+      .getBackendCfg().topic_update_log_gc_frequency;
 
   // Number of topic updates left to trigger a gc of topic update log entries.
-  private int numTopicUpdatesToGc_ = TOPIC_UPDATE_LOG_GC_FREQUENCY;
+  private int numTopicUpdatesToGc_ = topicUpdateLogGcFrequency_;
 
   // In the next gc cycle of topic update log entries, all the entries that were last
   // added to a topic update with version less than or equal to
@@ -109,7 +112,7 @@ public class TopicUpdateLog {
 
   /**
    * Garbage-collects topic update log entries. These are entries that haven't been
-   * added to any of the last TOPIC_UPDATE_LOG_GC_FREQUENCY topic updates.
+   * added to any of the last topicUpdateLogGcFrequency_ topic updates.
    */
   public void garbageCollectUpdateLogEntries(long lastTopicUpdateVersion) {
     if (oldestTopicUpdateToGc_ == -1) {
@@ -130,7 +133,7 @@ public class TopicUpdateLog {
           }
         }
       }
-      numTopicUpdatesToGc_ = TOPIC_UPDATE_LOG_GC_FREQUENCY;
+      numTopicUpdatesToGc_ = topicUpdateLogGcFrequency_;
       oldestTopicUpdateToGc_ = lastTopicUpdateVersion;
       LOG.info("Topic update log GC finished. Removed {} entries.",
           numEntriesRemoved);
@@ -158,6 +161,10 @@ public class TopicUpdateLog {
     Entry entry = topicLogEntries_.get(catalogObjectKey);
     if (entry == null) entry = new Entry();
     return entry;
+  }
+
+  public long getOldestTopicUpdateToGc() {
+    return oldestTopicUpdateToGc_;
   }
 }
 
