@@ -1503,6 +1503,13 @@ class TestIcebergV2Table(IcebergTestSuite):
     hive_output = self.run_stmt_in_hive("SELECT count(*) FROM {}.{}".format(
         db, "ice_store_sales"))
     assert hive_output == "_c0\n2601498\n"
+    hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{}".format(
+        db, "ice_alltypes_part_v2"))
+    # Cut off the long header line.
+    hive_output = hive_output.split("\n", 1)
+    hive_output = hive_output[1]
+    assert hive_output == \
+        "2,true,1,11,1.1,2.222,123.321,2022-02-22,impala\n"
 
   @SkipIfFS.hive
   def test_delete_hive_read(self, vector, unique_database):
@@ -1701,6 +1708,18 @@ class TestIcebergV2Table(IcebergTestSuite):
     hive_results = get_hive_results("numeric_truncate", "id")
     assert hive_results == \
         "11,21,2111,531,75.20\n"
+
+    # HIVE-28048: Hive cannot run ORDER BY queries for Iceberg tables partitioned by
+    # decimal columns, so we order the results ourselves.
+    hive_results = self.run_stmt_in_hive("SELECT * FROM {}.{}".format(
+        db, "ice_alltypes_part_v2"))
+    # Throw away the header line and sort the results.
+    hive_results = hive_results.split("\n", 1)[1]
+    hive_results = hive_results.strip().split("\n")
+    hive_results.sort()
+    assert hive_results == [
+        "2,true,2,11,1.1,2.222,123.321,2022-04-22,impala",
+        "3,true,3,11,1.1,2.222,123.321,2022-05-22,impala"]
 
   def test_optimize(self, vector, unique_database):
     tbl_name = unique_database + ".optimize_iceberg"
