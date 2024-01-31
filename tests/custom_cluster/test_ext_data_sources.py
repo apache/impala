@@ -238,7 +238,8 @@ class TestImpalaExtJdbcTables(CustomClusterTestSuite):
         "No matching option MAX_ERRORS found in the queries site."
     assert "SET MEM_LIMIT=1000000000" in response_json, \
         "No matching option MEM_LIMIT found in the queries site."
-    assert "SET ENABLED_RUNTIME_FILTER_TYPES=\\\"BLOOM,MIN_MAX\\\"" in response_json, \
+    assert "SET ENABLED_RUNTIME_FILTER_TYPES=\\\"BLOOM,MIN_MAX\\\"" in response_json or \
+        "SET ENABLED_RUNTIME_FILTER_TYPES='BLOOM,MIN_MAX'" in response_json, \
         "No matching option ENABLED_RUNTIME_FILTER_TYPES found in the queries site."
     assert "SET QUERY_TIMEOUT_S=600" in response_json, \
         "No matching option QUERY_TIMEOUT_S found in the queries site."
