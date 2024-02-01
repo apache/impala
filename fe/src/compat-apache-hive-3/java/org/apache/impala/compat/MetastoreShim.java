@@ -74,6 +74,7 @@ import org.apache.impala.catalog.Hive3MetastoreShimBase;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor.MetaDataFilter;
 import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
@@ -979,5 +980,10 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     // Unsupported operation IMetaStoreClient.getAllDataConnectorNames() and
     // IMetaStoreClient.getDataConnector().
     return null;
+  }
+
+  public static void setNotificationEventRequestWithFilter(
+      NotificationEventRequest eventRequest, MetaDataFilter metaDataFilter) {
+    // noop for non-existent fields of NotificationEventRequest
   }
 }

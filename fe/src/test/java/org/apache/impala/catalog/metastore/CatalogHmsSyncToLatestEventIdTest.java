@@ -459,7 +459,7 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
     @Test
     public void testAlterTableRename() throws Exception {
         LOG.info("Executing testALterTableRename");
-        String tblName = "test_alter_table_rename_" + tableType_ + "_tbl";
+        String tblName = ("test_alter_table_rename_" + tableType_ + "_tbl").toLowerCase();
         String newTblName = tblName + "_new";
         try {
             createDatabaseInCatalog(TEST_DB_NAME);

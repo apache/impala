@@ -60,6 +60,7 @@ import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.impala.analysis.FunctionName;
@@ -96,6 +97,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor.MetaDataFilter;
 import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -3960,6 +3962,80 @@ public class MetastoreEventsProcessorTest {
       assertTrue(table instanceof IncompleteTable);
       assertNull(table.getValidWriteIds());
     }
+  }
+
+  @Test
+  public void testNotificationEventRequest() throws Exception {
+    long currentEventId = eventsProcessor_.getCurrentEventId();
+    int EVENTS_BATCH_SIZE_PER_RPC = 1000;
+    // Generate some DB only related events
+    createDatabaseFromImpala(TEST_DB_NAME, null);
+    String testDbParamKey = "testKey", testDbParamVal = "testVal";
+    String testTable1 = "testNotifyTable1", testTable2 = "testNotifyTable2";
+    addDatabaseParameters(testDbParamKey, testDbParamVal);
+    eventsProcessor_.processEvents();
+    // Verify DB related events only.
+
+    // Generate some table events for managed table
+    testInsertIntoTransactionalTable(testTable1, true, false);
+    alterTableAddColsFromImpala(
+        TEST_DB_NAME, testTable1, "newCol", TPrimitiveType.STRING);
+    alterTableRemoveColFromImpala(TEST_DB_NAME, testTable1, "newCol");
+    eventsProcessor_.processEvents();
+
+    // Generate some table events for external table
+    createTable(testTable2, false);
+    eventsProcessor_.processEvents();
+    alterTableSetOwnerFromImpala(TEST_DB_NAME, testTable2, "testowner");
+    alterTableSetFileFormatFromImpala(
+        TEST_DB_NAME, testTable2, THdfsFileFormat.TEXT);
+    eventsProcessor_.processEvents();
+
+    // verify DB only events
+    NotificationFilter filter = event ->
+        MetastoreEvents.CreateDatabaseEvent.EVENT_TYPE
+        .equals(event.getEventType());
+    MetaDataFilter metaDataFilter = new MetaDataFilter(filter,
+        MetastoreShim.getDefaultCatalogName(), TEST_DB_NAME);
+    assertEquals(MetastoreEventsProcessor
+        .getNextMetastoreEventsWithFilterInBatches(catalog_, currentEventId,
+            metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 1);
+    Db db = catalog_.getDb(TEST_DB_NAME);
+    metaDataFilter.setNotificationFilter(
+        MetastoreEventsProcessor.getDbNotificationEventFilter(db));
+    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 2);
+
+    // verify events for table 1
+    filter = event -> "ALTER_TABLE".equals(event.getEventType());
+    metaDataFilter = new MetaDataFilter(filter, MetastoreShim.getDefaultCatalogName(),
+        TEST_DB_NAME, testTable1);
+    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 2);
+    metaDataFilter.setNotificationFilter(null);
+    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 3);
+
+    // verify events for table 2
+    filter = event -> "ALTER_TABLE".equals(event.getEventType());
+    metaDataFilter = new MetaDataFilter(filter, MetastoreShim.getDefaultCatalogName(),
+        TEST_DB_NAME, testTable2);
+    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 2);
+    metaDataFilter.setNotificationFilter(null);
+    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 3);
+
+    // verify all events
+    filter = event -> "ALTER_TABLE".equals(event.getEventType());
+    metaDataFilter = new MetaDataFilter(filter, MetastoreShim.getDefaultCatalogName(),
+        TEST_DB_NAME);
+    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 4);
+    metaDataFilter.setNotificationFilter(null);
+    // 2 DB + 6 table events
+    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 8);
   }
 
   private void createDatabase(String catName, String dbName,

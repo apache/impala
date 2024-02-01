@@ -66,6 +66,7 @@ import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TEventBatchProgressInfo;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.ThreadNameAnnotator;
@@ -296,7 +297,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         eventType.equals(notificationEvent.getEventType())
             && catName.equalsIgnoreCase(notificationEvent.getCatName())
             && dbName.equalsIgnoreCase(notificationEvent.getDbName());
-    return getNextMetastoreEventsInBatches(catalog, eventId, filter, eventType);
+    MetaDataFilter metaDataFilter = new MetaDataFilter(filter, catName, dbName);
+    return getNextMetastoreEventsWithFilterInBatches(catalog, eventId, metaDataFilter,
+        EVENTS_BATCH_SIZE_PER_RPC, eventType);
   }
 
   public static List<NotificationEvent> getNextMetastoreEventsInBatchesForTable(
@@ -318,7 +321,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
             && catName.equalsIgnoreCase(notificationEvent.getCatName())
             && dbName.equalsIgnoreCase(notificationEvent.getDbName())
             && tblName.equalsIgnoreCase(notificationEvent.getTableName());
-    return getNextMetastoreEventsInBatches(catalog, eventId, filter,
+    MetaDataFilter metaDataFilter = new MetaDataFilter(filter, catName, dbName, tblName);
+    return getNextMetastoreEventsWithFilterInBatches(catalog, eventId, metaDataFilter,
         EVENTS_BATCH_SIZE_PER_RPC, eventType);
   }
 
@@ -329,27 +333,37 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         EVENTS_BATCH_SIZE_PER_RPC, eventTypes);
   }
 
-  /**
-   * Gets the next list of {@link NotificationEvent} from Hive Metastore which are
-   * greater than the given eventId and filtered according to the provided filter.
-   * @param catalog The CatalogServiceCatalog used to get the metastore client
-   * @param eventId The eventId after which the events are needed.
-   * @param filter The {@link NotificationFilter} used to filter the list of fetched
-   *               events. Note that this is a client side filter not a server side
-   *               filter. Unfortunately, HMS doesn't provide a similar mechanism to
-   *               do server side filtering.
-   * @param eventsBatchSize the batch size for fetching the events from metastore.
-   * @return List of {@link NotificationEvent} which are all greater than eventId and
-   * satisfy the given filter.
-   * @throws MetastoreNotificationFetchException in case of RPC errors to metastore.
-   */
   @VisibleForTesting
   public static List<NotificationEvent> getNextMetastoreEventsInBatches(
       CatalogServiceCatalog catalog, long eventId, NotificationFilter filter,
       int eventsBatchSize, String... eventTypes)
       throws MetastoreNotificationFetchException {
+    MetaDataFilter metaDataFilter = new MetaDataFilter(filter);
+    return getNextMetastoreEventsWithFilterInBatches(catalog, eventId, metaDataFilter,
+        eventsBatchSize, eventTypes);
+  }
+
+      /**
+       * Gets the next list of {@link NotificationEvent} from Hive Metastore which are
+       * greater than the given eventId and filtered according to the provided filter.
+       * @param catalog The CatalogServiceCatalog used to get the metastore client
+       * @param eventId The eventId after which the events are needed.
+       * @param metaDataFilter The {@link MetaDataFilter} used to filter the list of
+       *               fetched events based on catName/dbName/tableName and then filter
+       *               by required event types. Note that this is a server side filter.
+       * @param eventsBatchSize the batch size for fetching the events from metastore.
+       * @return List of {@link NotificationEvent} which are all greater than eventId and
+       * satisfy the given filter.
+       * @throws MetastoreNotificationFetchException in case of RPC errors to metastore.
+       */
+  @VisibleForTesting
+  public static List<NotificationEvent> getNextMetastoreEventsWithFilterInBatches(
+      CatalogServiceCatalog catalog, long eventId, MetaDataFilter metaDataFilter,
+      int eventsBatchSize, String... eventTypes)
+      throws MetastoreNotificationFetchException {
     Preconditions.checkArgument(eventsBatchSize > 0);
     List<NotificationEvent> result = new ArrayList<>();
+    NotificationFilter filter = metaDataFilter.getNotificationFilter();
     try (MetaStoreClient msc = catalog.getMetaStoreClient()) {
       long toEventId = msc.getHiveClient().getCurrentNotificationEventId()
           .getEventId();
@@ -376,6 +390,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         NotificationEventRequest eventRequest = new NotificationEventRequest();
         eventRequest.setMaxEvents(batchSize);
         eventRequest.setLastEvent(currentEventId);
+        // Need to set table/dbnames in the request according to the filter
+        MetastoreShim.setNotificationEventRequestWithFilter(eventRequest,
+            metaDataFilter);
         NotificationEventResponse notificationEventResponse =
             MetastoreShim.getNextNotification(msc.getHiveClient(), eventRequest,
                 eventTypeSkipList);
@@ -432,8 +449,18 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     String annotation = String.format("sync table %s to latest HMS event id",
         tbl.getFullName());
     try(ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
-      List<NotificationEvent> events = getNextMetastoreEventsInBatches(catalog,
-          lastEventId, getTableNotificationEventFilter(tbl));
+      MetaDataFilter metaDataFilter;
+      // For ACID tables, events may include commit_txn and abort_txn which doesn't have
+      // db_name and table_name. So it makes sense to fetch all the events and filter
+      // them in catalogD.
+      if (AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())) {
+        metaDataFilter = new MetaDataFilter(getTableNotificationEventFilter(tbl));
+      } else {
+        metaDataFilter = new MetaDataFilter(getTableNotificationEventFilter(tbl),
+            MetastoreShim.getDefaultCatalogName(), tbl.getDb().getName(), tbl.getName());
+      }
+      List<NotificationEvent> events = getNextMetastoreEventsWithFilterInBatches(catalog,
+          lastEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC);
 
       if (events.isEmpty()) {
         LOG.debug("table {} synced till event id {}. No new HMS events to process from "
@@ -494,8 +521,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
     String annotation = String.format("sync db %s to latest HMS event id", db.getName());
     try(ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
-      List<NotificationEvent> events = getNextMetastoreEventsInBatches(catalog,
-          lastEventId, getDbNotificationEventFilter(db));
+      MetaDataFilter metaDataFilter = new MetaDataFilter(
+          getDbNotificationEventFilter(db), MetastoreShim.getDefaultCatalogName(),
+          db.getName());
+      List<NotificationEvent> events = getNextMetastoreEventsWithFilterInBatches(catalog,
+          lastEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC);
 
       if (events.isEmpty()) {
         LOG.debug("db {} already synced till event id: {}, no new hms events from "
@@ -550,7 +580,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   This filter is used when syncing db to the latest HMS event id. The
   filter accepts all events except table related ones
    */
-  private static NotificationFilter getDbNotificationEventFilter(Db db) {
+  @VisibleForTesting
+  public static NotificationFilter getDbNotificationEventFilter(Db db) {
     NotificationFilter filter = new NotificationFilter() {
       @Override
       public boolean accept(NotificationEvent event) {
@@ -976,6 +1007,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEventRequest eventRequest = new NotificationEventRequest();
       eventRequest.setLastEvent(eventId);
       eventRequest.setMaxEvents(batchSize);
+      // Currently filter is always null. No need to set table/db in the request object
       NotificationEventResponse response =
           MetastoreShim.getNextNotification(msClient.getHiveClient(), eventRequest,
               catalog_.getDefaultSkippedHmsEventTypes());
@@ -1434,5 +1466,49 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   public static MessageDeserializer getMessageDeserializer() {
     return MESSAGE_DESERIALIZER;
+  }
+
+  public static class MetaDataFilter {
+    public NotificationFilter filter_;
+    public String catName_;
+    public String dbName_;
+    public String tableName_;
+
+    public MetaDataFilter(NotificationFilter notificationFilter) {
+      this.filter_ = notificationFilter; // if this null then don't build event filter
+    }
+
+    public MetaDataFilter(NotificationFilter notificationFilter, String catName,
+        String dbName) {
+      this(notificationFilter);
+      this.catName_ = Preconditions.checkNotNull(catName);
+      this.dbName_ = Preconditions.checkNotNull(dbName);
+    }
+
+    public MetaDataFilter(NotificationFilter notificationFilter, String catName,
+        String databaseName, String tblName) {
+      this(notificationFilter, catName, databaseName);
+      this.tableName_ = tblName;
+    }
+
+    public void setNotificationFilter(NotificationFilter notificationFilter) {
+      this.filter_ = notificationFilter;
+    }
+
+    public NotificationFilter getNotificationFilter() {
+      return filter_;
+    }
+
+    public String getCatName() {
+      return catName_;
+    }
+
+    public String getDbName() {
+      return dbName_;
+    }
+
+    public String getTableName() {
+      return tableName_;
+    }
   }
 }
