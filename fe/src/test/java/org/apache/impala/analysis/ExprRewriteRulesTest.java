@@ -475,6 +475,18 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("case 0 when null then id else 1 end", rule, "1");
     // All non-constant, don't rewrite.
     RewritesOk("case id when 1 then 1 when 2 then 2 else 3 end", rule, null);
+    // IMPALA-12770: Fix infinite loop for nested Case expressions.
+    // Case NULL, don't rewrite.
+    RewritesOk("case NULL when id then id else 1 end", rule, null);
+    // Nested Case expressions.
+    RewritesOk("case case 1 when 0 then 0 when 1 then id end "
+        + "when 2 then id + 2 else id + 3 end",
+        rule, "CASE id WHEN 2 THEN id + 2 ELSE id + 3 END");
+    // 'when' are all FALSE for inner Case expression, set 'case' expr as NULL for outer
+    // Case expression.
+    RewritesOk("case case 3 when 0 then id when 1 then id + 1 end "
+        + "when 2 then id + 2 end",
+        rule, "CASE NULL WHEN 2 THEN id + 2 END");
   }
 
   @Test

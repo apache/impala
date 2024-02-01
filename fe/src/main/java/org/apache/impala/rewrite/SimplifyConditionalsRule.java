@@ -208,7 +208,10 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   private Expr simplifyCaseExpr(CaseExpr expr, Analyzer analyzer)
       throws AnalysisException {
     Expr caseExpr = expr.hasCaseExpr() ? expr.getChild(0) : null;
-    if (expr.hasCaseExpr() && !Expr.IS_LITERAL.apply(caseExpr)) return expr;
+    if (expr.hasCaseExpr() &&
+        (!Expr.IS_LITERAL.apply(caseExpr) || Expr.IS_NULL_LITERAL.apply(caseExpr))) {
+      return expr;
+    }
 
     int numChildren = expr.getChildren().size();
     int loopStart = expr.hasCaseExpr() ? 1 : 0;
