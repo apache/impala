@@ -304,16 +304,20 @@ class SlotDescriptor {
       llvm::Value* child_index, llvm::Function* fn,
       const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const;
 
+  // 'master_tuple' differs from 'children_tuple' if this is inside a struct -
+  // 'master_tuple' is the first non-struct parent tuple. Applies to the below functions
+  // too.
   void CodegenWriteCollectionIterateOverChildren(LlvmCodeGen* codegen,
-      LlvmBuilder* builder, llvm::Value* children_tuple, llvm::Function* fn,
-      const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const;
-
-  void CodegenWriteCollectionStructChild(LlvmCodeGen* codegen, LlvmBuilder* builder,
-      llvm::Value* tuple, llvm::Function* fn, const NonWritableBasicBlock& insert_before,
+      LlvmBuilder* builder, llvm::Value* master_tuple, llvm::Value* children_tuple,
+      llvm::Function* fn, const NonWritableBasicBlock& insert_before,
       llvm::Value* pool_val) const;
 
+  void CodegenWriteCollectionStructChild(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Value* master_tuple, llvm::Value* tuple, llvm::Function* fn,
+      const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const;
+
   void CodegenWriteCollectionVarlenChild(LlvmCodeGen* codegen, LlvmBuilder* builder,
-      llvm::Value* child_tuple, llvm::Function* fn,
+      llvm::Value* master_tuple, llvm::Value* child_tuple, llvm::Function* fn,
       const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const;
 
   static llvm::Value* CodegenToTimestampValue(

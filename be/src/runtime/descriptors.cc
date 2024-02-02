@@ -1427,13 +1427,14 @@ void SlotDescriptor::CodegenWriteCollectionItemLoopBody(LlvmCodeGen* codegen,
   llvm::Value* children_tuple = builder->CreateInBoundsGEP(children_tuple_array,
       item_index, "children_tuple");
 
-  CodegenWriteCollectionIterateOverChildren(codegen, builder, children_tuple, fn,
-      insert_before, pool_val);
+  CodegenWriteCollectionIterateOverChildren(codegen, builder, children_tuple,
+      children_tuple, fn, insert_before, pool_val);
 }
 
 void SlotDescriptor::CodegenWriteCollectionIterateOverChildren(LlvmCodeGen* codegen,
-    LlvmBuilder* builder, llvm::Value* children_tuple, llvm::Function* fn,
-    const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const {
+    LlvmBuilder* builder, llvm::Value* master_tuple, llvm::Value* children_tuple,
+    llvm::Function* fn, const NonWritableBasicBlock& insert_before,
+    llvm::Value* pool_val) const {
   DCHECK(pool_val != nullptr);
   const TupleDescriptor* children_tuple_desc = children_tuple_descriptor();
   DCHECK(children_tuple_desc != nullptr);
@@ -1443,18 +1444,19 @@ void SlotDescriptor::CodegenWriteCollectionIterateOverChildren(LlvmCodeGen* code
 
     const ColumnType& child_type = child_slot_desc->type();
     if (child_type.IsVarLenStringType() || child_type.IsCollectionType()) {
-      child_slot_desc->CodegenWriteCollectionVarlenChild(codegen, builder, children_tuple,
-          fn, insert_before, pool_val);
+      child_slot_desc->CodegenWriteCollectionVarlenChild(codegen, builder, master_tuple,
+          children_tuple, fn, insert_before, pool_val);
     } else if (child_type.IsStructType()) {
       child_slot_desc->CodegenWriteCollectionStructChild(codegen, builder,
-          children_tuple, fn, insert_before, pool_val);
+          master_tuple, children_tuple, fn, insert_before, pool_val);
     }
   }
 }
 
 void SlotDescriptor::CodegenWriteCollectionStructChild(LlvmCodeGen* codegen,
-    LlvmBuilder* builder, llvm::Value* tuple, llvm::Function* fn,
-    const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const {
+    LlvmBuilder* builder, llvm::Value* master_tuple, llvm::Value* tuple,
+    llvm::Function* fn, const NonWritableBasicBlock& insert_before,
+    llvm::Value* pool_val) const {
   DCHECK(type().IsStructType());
 
   const TupleDescriptor* children_tuple_desc = children_tuple_descriptor();
@@ -1464,13 +1466,14 @@ void SlotDescriptor::CodegenWriteCollectionStructChild(LlvmCodeGen* codegen,
       llvm_field_idx(), "struct_children_tuple");
 
   // TODO IMPALA-12775: Check whether the struct itself is NULL.
-  CodegenWriteCollectionIterateOverChildren(codegen, builder, children_tuple, fn,
-      insert_before, pool_val);
+  CodegenWriteCollectionIterateOverChildren(codegen, builder, master_tuple,
+      children_tuple, fn, insert_before, pool_val);
 }
 
 void SlotDescriptor::CodegenWriteCollectionVarlenChild(LlvmCodeGen* codegen,
-    LlvmBuilder* builder, llvm::Value* children_tuple, llvm::Function* fn,
-    const NonWritableBasicBlock& insert_before, llvm::Value* pool_val) const {
+    LlvmBuilder* builder, llvm::Value* master_tuple, llvm::Value* children_tuple,
+    llvm::Function* fn, const NonWritableBasicBlock& insert_before,
+    llvm::Value* pool_val) const {
   DCHECK(pool_val != nullptr);
   DCHECK(type_.IsVarLenStringType() || type_.IsCollectionType());
 
@@ -1479,7 +1482,7 @@ void SlotDescriptor::CodegenWriteCollectionVarlenChild(LlvmCodeGen* codegen,
   llvm::BasicBlock* child_written_block = insert_before.CreateBasicBlockBefore(
       codegen->context(), "next_block_after_child_is_written", fn);
 
-  llvm::Value* child_is_null = CodegenIsNull(codegen, builder, children_tuple);
+  llvm::Value* child_is_null = CodegenIsNull(codegen, builder, master_tuple);
   builder->CreateCondBr(child_is_null, child_written_block, child_non_null_block);
 
   // Note: Although the input of CodegenWriteStringOrCollectionToSlot() is a '*Val', not a

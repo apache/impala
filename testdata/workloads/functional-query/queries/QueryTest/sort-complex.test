@@ -136,8 +136,8 @@ INT,STRING,STRING
 # Sort collections containing structs, also containing var-len data.
 select id, arr_contains_struct, arr_contains_nested_struct from collection_struct_mix order by id desc;
 ---- RESULTS
-2,'[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]'
-1,'[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]'
+2,'[{"i":100},{"i":8},{"i":35},{"i":45},null,{"i":193},{"i":null}]','[{"inner_struct1":null,"inner_struct2":{"str":"very few distilleries","l":128},"small":104},{"inner_struct1":{"str":"a few soju distilleries","l":28},"inner_struct2":{"str":"lots of soju distilleries","l":228},"small":105},null]'
+1,'[{"i":1},{"i":2},{"i":3},{"i":4},null,{"i":5},{"i":null}]','[{"inner_struct1":{"str":"","l":0},"inner_struct2":{"str":"four spaceship captains","l":2},"small":2},null,{"inner_struct1":{"str":null,"l":5},"inner_struct2":{"str":"more spaceship captains","l":8},"small":20}]'
 ---- TYPES
 INT,STRING,STRING
 ====
@@ -145,8 +145,8 @@ INT,STRING,STRING
 # Sorting a var-len struct nested in a collection.
 select id, arr_contains_nested_struct from collection_struct_mix order by id;
 ---- RESULTS
-1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]'
-2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]'
+1,'[{"inner_struct1":{"str":"","l":0},"inner_struct2":{"str":"four spaceship captains","l":2},"small":2},null,{"inner_struct1":{"str":null,"l":5},"inner_struct2":{"str":"more spaceship captains","l":8},"small":20}]'
+2,'[{"inner_struct1":null,"inner_struct2":{"str":"very few distilleries","l":128},"small":104},{"inner_struct1":{"str":"a few soju distilleries","l":28},"inner_struct2":{"str":"lots of soju distilleries","l":228},"small":105},null]'
 ---- TYPES
 INT,STRING
 ====

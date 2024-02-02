@@ -4126,7 +4126,7 @@ id INT
 struct_contains_arr STRUCT<arr: ARRAY<INT>>
 struct_contains_map STRUCT<m: MAP<INT, STRING>>
 arr_contains_struct ARRAY<STRUCT<i: BIGINT>>
-arr_contains_nested_struct ARRAY<STRUCT<inner_struct: STRUCT<str: STRING, l: INT>, small: SMALLINT>>
+arr_contains_nested_struct ARRAY<STRUCT<inner_struct1: STRUCT<str: STRING, l: INT>, inner_struct2: STRUCT<str: STRING, l: INT>, small: SMALLINT>>
 struct_contains_nested_arr STRUCT<arr: ARRAY<ARRAY<DATE>>, i: INT>
 all_mix MAP<INT, STRUCT<big: STRUCT<arr: ARRAY<STRUCT<inner_arr: ARRAY<ARRAY<INT>>, m: TIMESTAMP>>, n: INT>, small: STRUCT<str: STRING, i: INT>>>
 ---- DEPENDENT_LOAD_HIVE
@@ -4137,8 +4137,10 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
     named_struct("m", map(1, "one spaceship captain", 2, "two", 0, NULL)),
     array(named_struct("i", 1L), named_struct("i", 2L), named_struct("i", 3L),
           named_struct("i", 4L), NULL, named_struct("i", 5L), named_struct("i", NULL)),
-    array(named_struct("inner_struct", named_struct("str", "", "l", 0), "small", 2S), NULL,
-          named_struct("inner_struct", named_struct("str", "some spaceship captain", "l", 5), "small", 20S)),
+    array(named_struct("inner_struct1", named_struct("str", "", "l", 0),
+                       "inner_struct2", named_struct("str", "four spaceship captains", "l", 2), "small", 2S), NULL,
+          named_struct("inner_struct1", named_struct("str", NULL, "l", 5),
+                       "inner_struct2", named_struct("str", "more spaceship captains", "l", 8), "small", 20S)),
     named_struct("arr", array(array(to_date("2022-12-05"), to_date("2022-12-06"), NULL, to_date("2022-12-07")),
                               array(to_date("2022-12-08"), to_date("2022-12-09"), NULL)), "i", 2),
     map(
@@ -4170,8 +4172,10 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
     named_struct("m", if(false, map(1, "one soju distillery"), NULL)),
     array(named_struct("i", 100L), named_struct("i", 8L), named_struct("i", 35L),
           named_struct("i", 45L), NULL, named_struct("i", 193L), named_struct("i", NULL)),
-    array(named_struct("inner_struct", if(false, named_struct("str", "", "l", 0), NULL), "small", 104S),
-          named_struct("inner_struct", named_struct("str", "a few soju distilleries", "l", 28), "small", 105S), NULL),
+    array(named_struct("inner_struct1", if(false, named_struct("str", "", "l", 0), NULL),
+                       "inner_struct2", named_struct("str", "very few distilleries", "l", 128), "small", 104S),
+          named_struct("inner_struct1", named_struct("str", "a few soju distilleries", "l", 28),
+                       "inner_struct2", named_struct("str", "lots of soju distilleries", "l", 228), "small", 105S), NULL),
     named_struct("arr", array(array(to_date("2022-12-10"), to_date("2022-12-11"), NULL, to_date("2022-12-12")),
                               if(false, array(to_date("2022-12-12")), NULL)), "i", 2754),
     map(
