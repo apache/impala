@@ -139,6 +139,15 @@ select id, arr_contains_struct, arr_contains_nested_struct from collection_struc
 INT,STRING,STRING
 ====
 ---- QUERY
+# Sorting a var-len struct nested in a collection. Regression test for IMPALA-12781.
+select id, arr_contains_nested_struct from collection_struct_mix order by id limit 2;
+---- RESULTS
+1,'[{"inner_struct":{"str":"","l":0},"small":2},null,{"inner_struct":{"str":"some spaceship captain","l":5},"small":20}]'
+2,'[{"inner_struct":null,"small":104},{"inner_struct":{"str":"a few soju distilleries","l":28},"small":105},null]'
+---- TYPES
+INT,STRING
+====
+---- QUERY
 # Sorting is not supported yet for collections within structs: IMPALA-12160. Test with a
 # struct that contains an array.
 select id, struct_contains_arr from collection_struct_mix order by id limit 5

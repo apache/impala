@@ -582,11 +582,22 @@ class TupleDescriptor {
   int IR_NO_INLINE num_null_bytes() const { return num_null_bytes_; }
   int IR_NO_INLINE null_bytes_offset() const { return null_bytes_offset_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
-  const std::vector<SlotDescriptor*>& string_slots() const { return string_slots_; }
+
+  const std::vector<SlotDescriptor*>& string_slots() const {
+    DCHECK(!isTupleOfStructSlot());
+    return string_slots_;
+  }
+
   const std::vector<SlotDescriptor*>& collection_slots() const {
+    DCHECK(!isTupleOfStructSlot());
     return collection_slots_;
   }
-  bool HasVarlenSlots() const { return has_varlen_slots_; }
+
+  bool HasVarlenSlots() const {
+    DCHECK(!isTupleOfStructSlot());
+    return has_varlen_slots_;
+  }
+
   const SchemaPath& tuple_path() const { return tuple_path_; }
 
   const TableDescriptor* table_desc() const { return table_desc_; }
@@ -629,14 +640,18 @@ class TupleDescriptor {
   /// them. See Tuple::MaterializeExprs().
   std::vector<SlotDescriptor*> slots_;
 
-  /// Contains only materialized string slots.
+  /// Contains the materialized string slots of this TupleDescriptor and also those of its
+  /// struct children (recursively). Not valid for item tuple descriptors of structs.
   std::vector<SlotDescriptor*> string_slots_;
 
-  /// Contains only materialized map and array slots.
+  /// Contains the materialized map and array slots of this TupleDescriptor and also those
+  /// of its struct children (recursively). Not valid for item tuple descriptors of
+  /// structs.
   std::vector<SlotDescriptor*> collection_slots_;
 
-  /// Provide quick way to check if there are variable length slots.
-  /// True if string_slots_ or collection_slots_ have entries.
+  /// Provides a quick way to check if there are variable length slots in this tuple or
+  /// its struct children (recursively), i.e. true if string_slots_ or collection_slots_
+  /// has entries. Not valid for item tuple descriptors of structs.
   bool has_varlen_slots_;
 
   /// Absolute path into the table schema pointing to the collection whose fields are

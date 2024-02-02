@@ -1035,8 +1035,8 @@ void SlotDescriptor::CodegenStoreNonNullAnyVal(
   switch (type.type) {
     case TYPE_STRING:
     case TYPE_VARCHAR:
-    case TYPE_ARRAY: // CollectionVal has same memory layout as StringVal.
-    case TYPE_MAP: { // CollectionVal has same memory layout as StringVal.
+    case TYPE_ARRAY:
+    case TYPE_MAP: {
       CodegenWriteStringOrCollectionToSlot(read_write_info, raw_val_ptr,
           pool_val, slot_desc, insert_before);
       break;
@@ -1155,29 +1155,29 @@ void SlotDescriptor::CodegenSetToNull(const CodegenAnyValReadWriteInfo& read_wri
 //   br i1 %is_null7, label %null6, label %non_null5
 //
 // non_null5:                            ; preds = %entry4
+//   %src8 = extractvalue { i64, i8* } %src3, 1
 //   %6 = extractvalue { i64, i8* } %src3, 0
 //   %7 = ashr i64 %6, 32
 //   %8 = trunc i64 %7 to i32
-//   %src8 = extractvalue { i64, i8* } %src3, 1
 //   %slot10 = getelementptr inbounds <{ %"struct.impala::CollectionValue", i32, i8 }>,
 //       <{ %"struct.impala::CollectionValue", i32, i8 }>* %tuple, i32 0, i32 0
 //   %9 = insertvalue %"struct.impala::CollectionValue" zeroinitializer, i32 %8, 1
-//   %10 = mul i32 %8, 13
-//   %11 = sext i32 %10 to i64
+//   %coll_tuple_byte_len = mul i32 %8, 13
+//   %10 = sext i32 %coll_tuple_byte_len to i64
 //   %new_coll_val_ptr = call i8* @_ZN6impala7MemPool8AllocateILb0EEEPhli(
-//       %"class.impala::MemPool"* %pool, i64 %11, i32 8)
-//   call void @llvm.memcpy.p0i8.p0i8.i32(i8* %new_coll_val_ptr, i8* %src8, i32 %10,
-//       i32 0, i1 false)
-//   %12 = insertvalue %"struct.impala::CollectionValue" %9, i8* %new_coll_val_ptr, 0
+//       %"class.impala::MemPool"* %pool, i64 %10, i32 8)
+//   call void @llvm.memcpy.p0i8.p0i8.i32(i8* %new_coll_val_ptr, i8* %src8,
+//       i32 %coll_tuple_byte_len, i32 0, i1 false)
+//   %11 = insertvalue %"struct.impala::CollectionValue" %9, i8* %new_coll_val_ptr, 0
 //   store i32 0, i32* %item_index_addr
 //   br label %loop_condition_block
 //
 // null6:                                ; preds = %entry4
-//   %13 = bitcast <{ %"struct.impala::CollectionValue", i32, i8 }>* %tuple to i8*
-//   %null_byte_ptr15 = getelementptr inbounds i8, i8* %13, i32 16
-//   %null_byte16 = load i8, i8* %null_byte_ptr15
-//   %null_bit_set17 = or i8 %null_byte16, 1
-//   store i8 %null_bit_set17, i8* %null_byte_ptr15
+//   %12 = bitcast <{ %"struct.impala::CollectionValue", i32, i8 }>* %tuple to i8*
+//   %null_byte_ptr14 = getelementptr inbounds i8, i8* %12, i32 16
+//   %null_byte15 = load i8, i8* %null_byte_ptr14
+//   %null_bit_set16 = or i8 %null_byte15, 1
+//   store i8 %null_bit_set16, i8* %null_byte_ptr14
 //   br label %end_write9
 //
 // loop_condition_block:                 ; preds = %loop_increment_block, %non_null5
@@ -1187,11 +1187,11 @@ void SlotDescriptor::CodegenSetToNull(const CodegenAnyValReadWriteInfo& read_wri
 //
 // loop_body_block:                      ; preds = %loop_condition_block
 //   %children_tuple_array = bitcast i8* %new_coll_val_ptr
-//       to <{ %"struct.impala::StringValue", i8 }>*
-//   %children_tuple = getelementptr inbounds <{ %"struct.impala::StringValue", i8 }>,
-//       <{ %"struct.impala::StringValue", i8 }>* %children_tuple_array, i32 %item_index
-//   %14 = bitcast <{ %"struct.impala::StringValue", i8 }>* %children_tuple to i8*
-//   %null_byte_ptr11 = getelementptr inbounds i8, i8* %14, i32 12
+//       to <{ %"class.impala::StringValue", i8 }>*
+//   %children_tuple = getelementptr inbounds <{ %"class.impala::StringValue", i8 }>,
+//       <{ %"class.impala::StringValue", i8 }>* %children_tuple_array, i32 %item_index
+//   %13 = bitcast <{ %"class.impala::StringValue", i8 }>* %children_tuple to i8*
+//   %null_byte_ptr11 = getelementptr inbounds i8, i8* %13, i32 12
 //   %null_byte12 = load i8, i8* %null_byte_ptr11
 //   %null_mask = and i8 %null_byte12, 1
 //   %is_null13 = icmp ne i8 %null_mask, 0
@@ -1204,31 +1204,26 @@ void SlotDescriptor::CodegenSetToNull(const CodegenAnyValReadWriteInfo& read_wri
 //   br label %loop_condition_block
 //
 // loop_exit_block:                      ; preds = %loop_condition_block
-//   store %"struct.impala::CollectionValue" %12,
+//   store %"struct.impala::CollectionValue" %11,
 //       %"struct.impala::CollectionValue"* %slot10
 //   br label %end_write9
 //
 // child_non_null_block:                 ; preds = %loop_body_block
 //   %child_str_or_coll_value_addr = getelementptr inbounds
-//       <{ %"struct.impala::StringValue", i8 }>,
-//       <{ %"struct.impala::StringValue", i8 }>* %children_tuple, i32 0, i32 0
-//   %child_str_or_coll_value = load %"struct.impala::StringValue",
-//       %"struct.impala::StringValue"* %child_str_or_coll_value_addr
-//   %child_str_or_coll_value_ptr = extractvalue
-//       %"struct.impala::StringValue" %child_str_or_coll_value, 0
-//   %child_str_or_coll_value_len = extractvalue
-//       %"struct.impala::StringValue" %child_str_or_coll_value, 1
-//   %15 = insertvalue %"struct.impala::StringValue" zeroinitializer,
-//       i32 %child_str_or_coll_value_len, 1
-//   %16 = sext i32 %child_str_or_coll_value_len to i64
-//   %new_coll_val_ptr14 = call i8* @_ZN6impala7MemPool8AllocateILb0EEEPhli(
-//       %"class.impala::MemPool"* %pool, i64 %16, i32 8)
-//   call void @llvm.memcpy.p0i8.p0i8.i32(i8* %new_coll_val_ptr14,
-//       i8* %child_str_or_coll_value_ptr, i32 %child_str_or_coll_value_len, i32 0,
-//       i1 false)
-//   %17 = insertvalue %"struct.impala::StringValue" %15, i8* %new_coll_val_ptr14, 0
-//   store %"struct.impala::StringValue" %17,
-//       %"struct.impala::StringValue"* %child_str_or_coll_value_addr
+//       <{ %"class.impala::StringValue", i8 }>,
+//       <{ %"class.impala::StringValue", i8 }>* %children_tuple, i32 0, i32 0
+//   %child_str_or_coll_value_ptr = call i8* @_ZNK6impala11StringValue5IrPtrEv(
+//       %"class.impala::StringValue"* %child_str_or_coll_value_addr)
+//   %child_str_or_coll_value_len = call i32 @_ZNK6impala11StringValue5IrLenEv(
+//       %"class.impala::StringValue"* %child_str_or_coll_value_addr)
+//   %14 = sext i32 %child_str_or_coll_value_len to i64
+//   %new_ptr = call i8* @_ZN6impala7MemPool8AllocateILb0EEEPhli(
+//       %"class.impala::MemPool"* %pool, i64 %14, i32 8)
+//   call void @llvm.memcpy.p0i8.p0i8.i32(i8* %new_ptr, i8* %child_str_or_coll_value_ptr,
+//       i32 %child_str_or_coll_value_len, i32 0, i1 false)
+//   call void @_ZN6impala11StringValue8IrAssignEPci(
+//       %"class.impala::StringValue"* %child_str_or_coll_value_addr, i8* %new_ptr,
+//       i32 %child_str_or_coll_value_len)
 //   br label %next_block_after_child_is_written
 //
 // next_block_after_child_is_written:    ; preds = %child_non_null_block, %loop_body_block
@@ -1318,19 +1313,21 @@ void SlotDescriptor::CodegenWriteCollectionToSlot(
   coll_value = CodegenCollValueSetLen(codegen, builder, coll_value,
       read_write_info.GetPtrAndLen().len);
   if (pool_val != nullptr) {
-    llvm::Value* len = read_write_info.GetPtrAndLen().len;
+    llvm::Value* num_tuples = read_write_info.GetPtrAndLen().len;
     DCHECK(slot_desc != nullptr) << "SlotDescriptor needed to calculate the size of "
         << "the collection for copying.";
     // For a 'CollectionValue', 'len' is not the byte size of the whole data but the
     // number of items, so we have to multiply it with the byte size of the item tuple
     // to get the data size.
     int item_tuple_byte_size = slot_desc->children_tuple_descriptor()->byte_size();
-    len = builder->CreateMul(len, codegen->GetI32Constant(item_tuple_byte_size));
+    llvm::Value* byte_len = builder->CreateMul(num_tuples,
+        codegen->GetI32Constant(item_tuple_byte_size), "coll_tuple_byte_len");
 
     // Allocate a 'new_ptr' from 'pool_val' and copy the data from 'read_write_info->ptr'.
     llvm::Value* new_ptr = codegen->CodegenMemPoolAllocate(
-        builder, pool_val, len, "new_coll_val_ptr");
-    codegen->CodegenMemcpy(builder, new_ptr, read_write_info.GetPtrAndLen().ptr, len);
+        builder, pool_val, byte_len, "new_coll_val_ptr");
+    codegen->CodegenMemcpy(builder, new_ptr, read_write_info.GetPtrAndLen().ptr,
+        byte_len);
     coll_value = CodegenCollValueSetPtr(codegen, builder, coll_value, new_ptr);
 
     slot_desc->CodegenWriteCollectionItemsToSlot(codegen, builder, new_ptr,
@@ -1449,7 +1446,7 @@ void SlotDescriptor::CodegenWriteCollectionIterateOverChildren(LlvmCodeGen* code
       child_slot_desc->CodegenWriteCollectionVarlenChild(codegen, builder, children_tuple,
           fn, insert_before, pool_val);
     } else if (child_type.IsStructType()) {
-      child_slot_desc-> CodegenWriteCollectionStructChild(codegen, builder,
+      child_slot_desc->CodegenWriteCollectionStructChild(codegen, builder,
           children_tuple, fn, insert_before, pool_val);
     }
   }
@@ -1463,16 +1460,11 @@ void SlotDescriptor::CodegenWriteCollectionStructChild(LlvmCodeGen* codegen,
   const TupleDescriptor* children_tuple_desc = children_tuple_descriptor();
   DCHECK(children_tuple_desc != nullptr);
 
-  // We only need to handle var-len descendant slots.
-  if (children_tuple_desc->string_slots().empty()
-      && children_tuple_desc->collection_slots().empty()) {
-    return;
-  }
-
   llvm::Value* children_tuple = builder->CreateStructGEP(nullptr, tuple,
       llvm_field_idx(), "struct_children_tuple");
 
-  CodegenWriteCollectionIterateOverChildren(codegen, builder, children_tuple ,fn,
+  // TODO IMPALA-12775: Check whether the struct itself is NULL.
+  CodegenWriteCollectionIterateOverChildren(codegen, builder, children_tuple, fn,
       insert_before, pool_val);
 }
 
