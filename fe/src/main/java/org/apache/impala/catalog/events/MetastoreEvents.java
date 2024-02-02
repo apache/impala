@@ -693,6 +693,8 @@ public class MetastoreEvents {
           return;
         }
       }
+      DebugUtils.executeDebugAction(
+          BackendConfig.INSTANCE.debugActions(), DebugUtils.EVENT_PROCESSING_DELAY);
       process();
       injectErrorIfNeeded();
     }

@@ -19,12 +19,71 @@ under the License.
 {{> www/common-header.tmpl }}
 {{^error}}
 
-<h3>Event Processor Summary</h3>
-<pre>{{event_processor_metrics}}</pre>
-
 {{?event_processor_error_msg}}
 <h3>Error Message</h3>
 <pre>{{event_processor_error_msg}}</pre>
 {{/event_processor_error_msg}}
+
+<h3>Lag Info:</h3>
+Lag time: {{progress-info.lag_time}}
+<table class="table table-hover table-bordered">
+  <tr>
+    <th>
+    <th>Event ID</th>
+    <th>Event Timestamp (s)</th>
+    <th>Event Time</th>
+  </tr>
+  <tr>
+    <td>Last Synced Event</td>
+    <td>{{progress-info.last_synced_event_id}}</td>
+    <td>{{progress-info.last_synced_event_time_s}}</td>
+    <td>{{progress-info.last_synced_event_time}}</td>
+  </tr>
+  <tr>
+    <td>Latest Event in Metastore</td>
+    <td>{{progress-info.latest_event_id}}</td>
+    <td>{{progress-info.latest_event_time_s}}</td>
+    <td>{{progress-info.latest_event_time}}</td>
+  </tr>
+</table>
+
+{{?progress-info.num_hms_events}}
+<h3>Current Event Batch</h3>
+<p>
+Metastore Event Batch: {{progress-info.num_hms_events}} events.</br>
+Event ID starts from {{progress-info.min_event_id}} to {{progress-info.max_event_id}}.</br>
+Event time starts from {{progress-info.min_event_time}} to {{progress-info.max_event_time}}.</br>
+After batching and filtering, there are {{progress-info.num_filtered_events}} events to be processed.
+{{progress-info.num_synced_events}} ({{progress-info.synced_percent}}%) have been processed.</br>
+Started processing the current batch at {{progress-info.start_time}} ({{progress-info.elapsed_time}} ago).</br>
+Started processing the current event at {{progress-info.start_time_of_event}} ({{progress-info.elapsed_time_current_event}} ago).
+</p>
+<p>Current Metastore event being processed
+{{?progress-info.current_event_batch_size}}
+(a batch of {{progress-info.current_event_batch_size}} events on the same table)
+{{/progress-info.current_event_batch_size}}
+:</p>
+<table class="table table-hover table-bordered">
+  <tr>
+    <th>Event ID</th>
+    <th>Event Time</th>
+    <th>Event Type</th>
+    <th>Catalog Name</th>
+    <th>Database Name</th>
+    <th>Table Name</th>
+  </tr>
+  <tr>
+    <td>{{progress-info.current_event.event_id}}</td>
+    <td>{{progress-info.current_event.event_time}}</td>
+    <td>{{progress-info.current_event.event_type}}</td>
+    <td>{{progress-info.current_event.cat_name}}</td>
+    <td>{{progress-info.current_event.db_name}}</td>
+    <td>{{progress-info.current_event.tbl_name}}</td>
+  </tr>
+</table>
+{{/progress-info.num_hms_events}}
+
+<h3>Event Processor Summary</h3>
+<pre>{{event_processor_metrics}}</pre>
 
 {{> www/common-footer.tmpl }}

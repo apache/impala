@@ -71,6 +71,9 @@ public class DebugUtils {
   public static final String GET_FILTERED_EVENTS_DELAY =
       "catalogd_get_filtered_events_delay";
 
+  // debug action label to inject a delay in processing each HMS event
+  public static final String EVENT_PROCESSING_DELAY = "catalogd_event_processing_delay";
+
   // debug action label for introducing delay in loading table metadata.
   public static final String LOAD_TABLES_DELAY = "impalad_load_tables_delay";
 

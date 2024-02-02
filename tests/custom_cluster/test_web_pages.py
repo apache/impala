@@ -28,6 +28,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import (
   DEFAULT_CLUSTER_SIZE,
   CustomClusterTestSuite)
+from tests.common.skip import SkipIfFS
 from tests.shell.util import run_impala_shell_cmd
 
 SMALL_QUERY_LOG_SIZE_IN_BYTES = 40 * 1024
@@ -436,3 +437,68 @@ class TestWebPage(CustomClusterTestSuite):
     self.cluster.statestored.service.wait_for_live_subscribers(DEFAULT_CLUSTER_SIZE)
     # Verify the topic metrics again
     self._verify_topic_size_metrics()
+
+  @SkipIfFS.hive
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=1 "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@2000")
+  def test_event_processor_status(self, unique_database):
+    """Verify the /events page by using a long delay in event processing."""
+    self.execute_query("create table {}.part (i int) partitioned by (p int)".format(
+        unique_database))
+    insert_stmt = "insert into {}.part partition(p) select id, month from "\
+        "functional.alltypes".format(unique_database)
+    self.execute_query(insert_stmt)
+    # Run the same INSERT statement in Hive to get non-self events.
+    self.run_stmt_in_hive("set hive.exec.dynamic.partition.mode=nonstrict;" + insert_stmt)
+    page = requests.get("http://localhost:25020/events").text
+    # Wait until the batched events are being processed
+    while "a batch of" not in page:
+      time.sleep(1)
+      page = requests.get("http://localhost:25020/events").text
+    expected_lines = [
+      "Lag Info", "Lag time:", "Current Event Batch", "Metastore Event Batch:",
+      "Event ID starts from", "Event time starts from",
+      "Started processing the current batch at",
+      "Started processing the current event at",
+      "Current Metastore event being processed",
+      "(a batch of ", " events on the same table)",
+    ]
+    for expected in expected_lines:
+      assert expected in page, "Missing '%s' in events page:\n%s" % (expected, page)
+
+  @SkipIfFS.hive
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=1 "
+                  "--invalidate_metadata_on_event_processing_failure=false "
+                  "--inject_process_event_failure_event_types=CREATE_TABLE")
+  def test_event_processor_error_message(self, unique_database):
+    """Verify the /events page show the error of event processing"""
+    self.run_stmt_in_hive("create table {}.tbl(i int)".format(unique_database))
+    # Wait enough time for the event to be processed
+    time.sleep(2)
+    page = requests.get("http://localhost:25020/events").text
+    expected_lines = [
+      "Unexpected exception received while processing event",
+      "Event id:", "Event Type: CREATE_TABLE", "Event message:",
+    ]
+    for expected in expected_lines:
+      assert expected in page, "Missing '%s' in events page:\n%s" % (expected, page)
+
+    # Verify the latest event id still get updated
+    json_res = json.loads(requests.get("http://localhost:25020/events?json").text)
+    old_latest_event_id = json_res["progress-info"]["latest_event_id"]
+    # Generate new events
+    self.run_stmt_in_hive("create table {}.tbl2(i int)".format(unique_database))
+    # Wait enough time for the event to be polled
+    time.sleep(2)
+    json_res = json.loads(requests.get("http://localhost:25020/events?json").text)
+    new_latest_event_id = json_res["progress-info"]["latest_event_id"]
+    assert new_latest_event_id > old_latest_event_id
+    # Current event (the failed one) should not be cleared
+    assert "current_event" in json_res["progress-info"]
+
+    # Verify the error message disappears after a global INVALIDATE METADATA
+    self.execute_query("invalidate metadata")
+    page = requests.get("http://localhost:25020/events").text
+    assert "Unexpected exception" not in page, "Still see error message:\n" + page

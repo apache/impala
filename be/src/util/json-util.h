@@ -74,4 +74,25 @@ void ProtobufToJson(const google::protobuf::Message& pb, rapidjson::Document* do
     rapidjson::Value* obj);
 } // namespace impala
 
+/// A wrapper for creating a rapidjson::Value with new fields.
+struct JsonObjWrapper {
+  JsonObjWrapper(rapidjson::MemoryPoolAllocator<>& alloc):
+    value(rapidjson::kObjectType), allocator(alloc) {}
+
+  template<typename T>
+  void AddMember(const char* name, const T& val) {
+    rapidjson::Value field(val);
+    value.AddMember(rapidjson::StringRef(name), field, allocator);
+  }
+
+  rapidjson::Value value;
+  rapidjson::MemoryPoolAllocator<>& allocator;
+};
+
+template<>
+inline void JsonObjWrapper::AddMember(const char* name, const std::string& val) {
+  rapidjson::Value field(val.c_str(), allocator);
+  value.AddMember(rapidjson::StringRef(name), field, allocator);
+}
+
 #endif

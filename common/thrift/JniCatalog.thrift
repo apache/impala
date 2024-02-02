@@ -1065,10 +1065,35 @@ struct TCopyTestCaseReq {
   1: required string input_path
 }
 
+struct TEventBatchProgressInfo {
+  // Number of original HMS events received in the current batch.
+  1: required i32 num_hms_events
+  // Number of filtered MetastoreEvents generated from the original HMS events.
+  2: required i32 num_filtered_events
+  3: required i32 current_event_index
+  // Number of HMS events represented by this filtered event. For most events this is 1.
+  // In case of BatchPartitionEvent this could be more than 1.
+  4: required i32 current_event_batch_size
+  5: required i64 min_event_id
+  6: required i64 min_event_time_s
+  7: required i64 max_event_id
+  8: required i64 max_event_time_s
+  // Timestamp when we start to process the current event batch
+  9: required i64 current_batch_start_time_ms
+  // Timestamp when we start to process the current event
+  10: required i64 current_event_start_time_ms
+  11: required i64 last_synced_event_id
+  12: required i64 last_synced_event_time_s
+  13: required i64 latest_event_id
+  14: required i64 latest_event_time_s
+  15: optional hive_metastore.NotificationEvent current_event
+}
+
 struct TEventProcessorMetricsSummaryResponse {
   // summary view of the events processor which can include status,
   // metrics and other details
   1: required string summary
   // Error messages if the events processor goes into ERROR/NEEDS_INVALIDATE states
   2: optional string error_msg
+  3: optional TEventBatchProgressInfo progress
 }
