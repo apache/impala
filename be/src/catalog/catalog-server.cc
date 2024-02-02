@@ -1056,14 +1056,14 @@ static void CatalogOpListToJson(const vector<TCatalogOpRecord>& catalog_ops,
     Value target_name(catalog_op.target_name.c_str(), document->GetAllocator());
     obj.AddMember("target_name", target_name, document->GetAllocator());
 
-    Value start_time(ToUtcStringFromUnixMillis(catalog_op.start_time_ms,
+    Value start_time(ToStringFromUnixMillis(catalog_op.start_time_ms,
         TimePrecision::Millisecond).c_str(), document->GetAllocator());
     obj.AddMember("start_time", start_time, document->GetAllocator());
 
     int64_t end_time_ms;
     if (catalog_op.finish_time_ms > 0) {
       end_time_ms = catalog_op.finish_time_ms;
-      Value finish_time(ToUtcStringFromUnixMillis(catalog_op.finish_time_ms,
+      Value finish_time(ToStringFromUnixMillis(catalog_op.finish_time_ms,
           TimePrecision::Millisecond).c_str(), document->GetAllocator());
       obj.AddMember("finish_time", finish_time, document->GetAllocator());
     } else {

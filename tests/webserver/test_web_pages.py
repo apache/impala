@@ -21,6 +21,7 @@ from tests.common.file_utils import grep_dir
 from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.parse_util import parse_duration_string_ms
 from datetime import datetime
 from multiprocessing import Process, Queue
 from time import sleep, time
@@ -901,6 +902,44 @@ class TestWebPage(ImpalaTestSuite):
     assert page.status_code == requests.codes.ok
     page = requests.head("http://localhost:25020/operations")
     assert page.status_code == requests.codes.ok
+
+  def test_catalog_operation_fields(self, unique_database):
+    """Verify the CREATE_DATABASE operation is consistent with the statement shown in the
+       /queries page of impalad."""
+    catalog_operations = json.loads(
+        requests.get("http://localhost:25020/operations?json").text)
+    assert "finished_catalog_operations" in catalog_operations
+
+    queries = json.loads(
+        requests.get("http://localhost:25000/queries?json").text)
+    assert "completed_queries" in queries
+
+    # Find the CREATE_DATABASE operation in catalogd
+    ts_format = "%Y-%m-%d %H:%M:%S.%f"
+    found = False
+    for op in catalog_operations["finished_catalog_operations"]:
+      if op["target_name"] == unique_database \
+          and op["catalog_op_name"] == "CREATE_DATABASE":
+        catalog_op_query_id = op["query_id"]
+        catalog_op_user = op["user"]
+        catalog_op_start_time = datetime.strptime(op["start_time"], ts_format)
+        catalog_op_end_time = datetime.strptime(op["finish_time"], ts_format)
+        catalog_op_duration = parse_duration_string_ms(op["duration"])
+        found = True
+        break
+    assert found
+    # Find the query in impalad
+    matched = False
+    for query in queries["completed_queries"]:
+      if query["query_id"] == catalog_op_query_id:
+        assert "CREATE DATABASE" in query["stmt"]
+        assert unique_database in query["stmt"]
+        assert catalog_op_user == query["effective_user"]
+        assert datetime.strptime(query["start_time"], ts_format) <= catalog_op_start_time
+        assert datetime.strptime(query["end_time"], ts_format) >= catalog_op_end_time
+        assert parse_duration_string_ms(query["duration"]) >= catalog_op_duration
+        matched = True
+    assert matched
 
   def test_catalog_metrics(self):
     """Test /metrics of catalogd"""
