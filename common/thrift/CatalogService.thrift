@@ -99,6 +99,8 @@ struct TCatalogUpdateResult {
 }
 
 // Subset of query options passed to DDL operations
+// When changing default values, CatalogOperationTracker#increment() should also be
+// updated.
 struct TDdlQueryOptions {
   // True if SYNC_DDL is set in query options
   1: required bool sync_ddl
@@ -253,6 +255,8 @@ struct TUpdatedPartition {
 // with details on the result of the operation. Used to add partitions after executing
 // DML operations, and could potentially be used in the future to update column stats
 // after DML operations.
+// When changing default values, CatalogOperationTracker#increment() should also be
+// updated.
 // TODO: Rename this struct to something more descriptive.
 struct TUpdateCatalogRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
@@ -295,6 +299,8 @@ struct TUpdateCatalogResponse {
 }
 
 // Parameters of REFRESH/INVALIDATE METADATA commands
+// When changing default values, CatalogOperationTracker#increment() should also be
+// updated.
 struct TResetMetadataRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 

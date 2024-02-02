@@ -104,7 +104,7 @@ under the License.
       {{#inflight_catalog_operations}}
       <tr>
         <td>{{thread_id}}</td>
-        <td>{{query_id}}</td>
+        <td style="min-width:150px;word-break:break-all;">{{query_id}}</td>
         <td>{{client_ip}}</td>
         <td>{{coordinator}}</td>
         <td>{{catalog_op_name}}</td>
@@ -113,7 +113,7 @@ under the License.
         <td>{{start_time}}</td>
         <td>{{duration}}</td>
         <td>{{status}}</td>
-        <td>{{details}}</td>
+        <td style="min-width:240px;word-break:break-all;">{{details}}</td>
       </tr>
       {{/inflight_catalog_operations}}
     </table>
@@ -149,7 +149,7 @@ under the License.
       {{#finished_catalog_operations}}
       <tr>
         <td>{{thread_id}}</td>
-        <td>{{query_id}}</td>
+        <td style="min-width:150px;word-break:break-all;">{{query_id}}</td>
         <td>{{client_ip}}</td>
         <td>{{coordinator}}</td>
         <td>{{catalog_op_name}}</td>
@@ -159,7 +159,7 @@ under the License.
         <td>{{finish_time}}</td>
         <td>{{duration}}</td>
         <td>{{status}}</td>
-        <td>{{details}}</td>
+        <td style="word-break:break-all;">{{details}}</td>
       </tr>
       {{/finished_catalog_operations}}
     </table>

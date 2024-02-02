@@ -18,13 +18,16 @@
 package org.apache.impala.catalog.monitor;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TDdlExecRequest;
+import org.apache.impala.thrift.TDdlQueryOptions;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TCatalogOpRecord;
 import org.apache.impala.thrift.TGetOperationUsageResponse;
 import org.apache.impala.thrift.TOperationUsageCounter;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
@@ -54,6 +57,7 @@ public final class CatalogOperationTracker {
   private static final Logger LOG =
       LoggerFactory.getLogger(CatalogOperationTracker.class);
   public final static CatalogOperationTracker INSTANCE = new CatalogOperationTracker();
+  private static final TQueryOptions DEFAULT_QUERY_OPTIONS = new TQueryOptions();
 
   // Keeps track of the on-going DDL operations
   CatalogDdlCounter catalogDdlCounter_;
@@ -163,8 +167,23 @@ public final class CatalogOperationTracker {
 
   public void increment(TDdlExecRequest ddlRequest, Optional<TTableName> tTableName) {
     if (ddlRequest.isSetHeader()) {
-      String details = "query_options=" + ddlRequest.query_options.toString();
-      addRecord(ddlRequest.getHeader(), getDdlType(ddlRequest), tTableName, details);
+      // Only show non-default options in the 'details' field.
+      TDdlQueryOptions options = ddlRequest.query_options;
+      List<String> nonDefaultOptions = new ArrayList<>();
+      if (options.sync_ddl) nonDefaultOptions.add("sync_ddl=true");
+      if (StringUtils.isNotEmpty(options.debug_action)) {
+        nonDefaultOptions.add("debug_action=" + options.debug_action);
+      }
+      if (options.lock_max_wait_time_s != DEFAULT_QUERY_OPTIONS.lock_max_wait_time_s) {
+        nonDefaultOptions.add("lock_max_wait_time_s=" + options.lock_max_wait_time_s);
+      }
+      if (options.kudu_table_reserve_seconds
+          != DEFAULT_QUERY_OPTIONS.kudu_table_reserve_seconds) {
+        nonDefaultOptions.add(
+            "kudu_table_reserve_seconds=" + options.kudu_table_reserve_seconds);
+      }
+      addRecord(ddlRequest.getHeader(), getDdlType(ddlRequest), tTableName,
+          StringUtils.join(nonDefaultOptions, ", "));
     }
     catalogDdlCounter_.incrementOperation(ddlRequest.ddl_type, tTableName);
   }
@@ -179,15 +198,20 @@ public final class CatalogOperationTracker {
     Optional<TTableName> tTableName =
         req.table_name != null ? Optional.of(req.table_name) : Optional.empty();
     if (req.isSetHeader()) {
-      String details = "sync_ddl=" + req.sync_ddl +
-          ", want_minimal_response=" + req.getHeader().want_minimal_response +
-          ", refresh_updated_hms_partitions=" + req.refresh_updated_hms_partitions;
-      if (req.isSetDebug_action() && !req.debug_action.isEmpty()) {
-        details += ", debug_action=" + req.debug_action;
+      List<String> details = new ArrayList<>();
+      if (req.sync_ddl) details.add("sync_ddl=true");
+      if (req.header.want_minimal_response) {
+        details.add("want_minimal_response=true");
+      }
+      if (req.refresh_updated_hms_partitions) {
+        details.add("refresh_updated_hms_partitions=true");
+      }
+      if (StringUtils.isNotEmpty(req.debug_action)) {
+        details.add("debug_action=" + req.debug_action);
       }
       addRecord(req.getHeader(),
           CatalogResetMetadataCounter.getResetMetadataType(req, tTableName).name(),
-          tTableName, details);
+          tTableName, StringUtils.join(details, ", "));
     }
     catalogResetMetadataCounter_.incrementOperation(req);
   }
@@ -203,20 +227,23 @@ public final class CatalogOperationTracker {
     Optional<TTableName> tTableName =
         Optional.of(new TTableName(req.db_name, req.target_table));
     if (req.isSetHeader()) {
-      String details = "sync_ddl=" + req.sync_ddl +
-          ", is_overwrite=" + req.is_overwrite +
-          ", transaction_id=" + req.transaction_id +
-          ", write_id=" + req.write_id +
-          ", num_of_updated_partitions=" + req.getUpdated_partitionsSize();
-      if (req.isSetIceberg_operation()) {
-        details += ", iceberg_operation=" + req.iceberg_operation.operation;
+      List<String> details = new ArrayList<>();
+      details.add("#partitions=" + req.getUpdated_partitionsSize());
+      if (req.sync_ddl) details.add("sync_ddl=true");
+      if (req.is_overwrite) details.add("is_overwrite=true");
+      if (req.transaction_id > 0) {
+        details.add("transaction_id=" + req.transaction_id);
       }
-      if (req.isSetDebug_action() && !req.debug_action.isEmpty()) {
-        details += ", debug_action=" + req.debug_action;
+      if (req.write_id > 0) details.add("write_id=" + req.write_id);
+      if (req.isSetIceberg_operation()) {
+        details.add("iceberg_operation=" + req.iceberg_operation.operation);
+      }
+      if (StringUtils.isNotEmpty(req.debug_action)) {
+        details.add("debug_action=" + req.debug_action);
       }
       addRecord(req.getHeader(),
           CatalogFinalizeDmlCounter.getDmlType(req.getHeader().redacted_sql_stmt).name(),
-          tTableName, details);
+          tTableName, StringUtils.join(details, ", "));
     }
     catalogFinalizeDmlCounter_.incrementOperation(req);
   }
