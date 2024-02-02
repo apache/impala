@@ -44,6 +44,10 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 fi
 ${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet,tpch_orc_def \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
-${COMPUTE_STATS_SCRIPT} \
-    --db_names=tpch_nested_parquet,tpcds,tpcds_parquet,tpcds_partitioned_parquet_snap
+${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet,tpcds,tpcds_parquet
 ${COMPUTE_STATS_SCRIPT} --db_names=functional_kudu,tpch_kudu
+
+# Compute tables of tpcds_partitioned_parquet_snap serially
+# due to large number of partitions in some of the fact tables.
+${COMPUTE_STATS_SCRIPT} --db_names=tpcds_partitioned_parquet_snap \
+    --parallelism=1
