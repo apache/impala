@@ -39,7 +39,7 @@ Max Per-Host Resource Reservation: Memory=80.88MB Threads=1
 Per-Host Resource Estimates: Memory=160MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=160.00MB mem-reservation=80.88MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  max-parallelism=1 segment-costs=[8857656658, 17477682390, 0, 10, 8857656658, 17477682390, 0, 10, 400112, 30]
+|  max-parallelism=1 segment-costs=[8857656658, 17477682390, 0, 10, 8857656658, 17477682390, 0, 10, 427428, 30]
 PLAN-ROOT SINK
 |  output exprs: rnk, i_product_name, i_product_name
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=30
@@ -235,7 +235,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=101.54K
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=26 row-size=39B cardinality=10(filtered from 360.00K) cost=200001
+|     tuple-ids=26 row-size=39B cardinality=10(filtered from 360.00K) cost=213659
 |     in pipelines: 18(GETNEXT)
 |
 19:SCAN HDFS [tpcds_partitioned_parquet_snap.item i2]
@@ -246,7 +246,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=101.54K
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-   tuple-ids=27 row-size=39B cardinality=10(filtered from 360.00K) cost=200001
+   tuple-ids=27 row-size=39B cardinality=10(filtered from 360.00K) cost=213659
    in pipelines: 19(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=534.56MB Threads=64

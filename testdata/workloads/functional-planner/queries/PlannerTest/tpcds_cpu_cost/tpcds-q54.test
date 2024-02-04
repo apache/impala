@@ -60,7 +60,7 @@ Max Per-Host Resource Reservation: Memory=114.69MB Threads=1
 Per-Host Resource Estimates: Memory=1.19GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=1.19GB mem-reservation=114.69MB thread-reservation=1 runtime-filters-memory=15.00MB
-|  max-parallelism=1 segment-costs=[6751896734, 197063, 0, 197063, 0, 436986527, 4059700, 200, 300]
+|  max-parallelism=1 segment-costs=[6752128729, 197063, 0, 197063, 0, 537292039, 4059700, 200, 300]
 PLAN-ROOT SINK
 |  output exprs: segment, count(*), CAST(segment AS BIGINT) * CAST(50 AS BIGINT)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=300
@@ -306,7 +306,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=3.10M
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=8B cardinality=304.61K(filtered from 30.00M) cost=502380
+|     tuple-ids=6 row-size=8B cardinality=304.61K(filtered from 30.00M) cost=734375
 |     in pipelines: 05(GETNEXT)
 |
 10:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
@@ -318,7 +318,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=390.22M
    mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=9 row-size=12B cardinality=80.53M(filtered from 8.64G) cost=92143736
+   tuple-ids=9 row-size=12B cardinality=80.53M(filtered from 8.64G) cost=192449248
    in pipelines: 10(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=575.64MB Threads=55
@@ -835,7 +835,7 @@ max-parallelism=120 segment-costs=[8834586785]
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 |  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=1.00MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[505950]
+|  max-parallelism=10 segment-costs=[737945]
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.49MB
 |     runtime filters: RF011[min_max] -> c_customer_sk, RF007[min_max] -> tpcds_partitioned_parquet_snap.customer.c_current_addr_sk, RF010[bloom] -> c_customer_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.customer.c_current_addr_sk
@@ -844,7 +844,7 @@ max-parallelism=120 segment-costs=[8834586785]
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=3.10M
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=8B cardinality=304.61K(filtered from 30.00M) cost=502380
+|     tuple-ids=6 row-size=8B cardinality=304.61K(filtered from 30.00M) cost=734375
 |     in pipelines: 05(GETNEXT)
 |
 10:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
@@ -1373,7 +1373,7 @@ max-parallelism=120 segment-costs=[8834586785]
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 |  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=1.00MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[505950]
+|  max-parallelism=10 segment-costs=[737945]
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.49MB
 |     runtime filters: RF011[min_max] -> c_customer_sk, RF007[min_max] -> tpcds_partitioned_parquet_snap.customer.c_current_addr_sk, RF010[bloom] -> c_customer_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.customer.c_current_addr_sk
@@ -1382,7 +1382,7 @@ max-parallelism=120 segment-costs=[8834586785]
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=3.10M
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=8B cardinality=304.61K(filtered from 30.00M) cost=502380
+|     tuple-ids=6 row-size=8B cardinality=304.61K(filtered from 30.00M) cost=734375
 |     in pipelines: 05(GETNEXT)
 |
 10:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]

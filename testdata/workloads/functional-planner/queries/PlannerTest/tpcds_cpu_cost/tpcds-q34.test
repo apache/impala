@@ -35,7 +35,7 @@ Max Per-Host Resource Reservation: Memory=73.00MB Threads=1
 Per-Host Resource Estimates: Memory=1.17GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=1.17GB mem-reservation=73.00MB thread-reservation=1 runtime-filters-memory=4.00MB
-|  max-parallelism=1 segment-costs=[1198341504, 23998397, 19951626]
+|  max-parallelism=1 segment-costs=[1226221452, 25775223, 19951626]
 PLAN-ROOT SINK
 |  output exprs: c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number, cnt
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=19951626
@@ -134,7 +134,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=354(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=0 row-size=24B cardinality=487.28M(filtered from 8.64G) cost=29120740
+|     tuple-ids=0 row-size=24B cardinality=487.28M(filtered from 8.64G) cost=57000688
 |     in pipelines: 00(GETNEXT)
 |
 08:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
@@ -145,7 +145,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.10M
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=721500
+   tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=2498326
    in pipelines: 08(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=401.33MB Threads=23
@@ -166,7 +166,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=41.44MB mem-reservation=13.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[22449952, 273457] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 10:SORT
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC, ss_ticket_number ASC
 |  mem-estimate=25.44MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
@@ -214,7 +214,7 @@ max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [m
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  Per-Instance Resources: mem-estimate=27.88MB mem-reservation=17.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[1198020332, 779361] cpu-comparison-result=120 [max(120 (self) vs 33 (sum children))]
+|  max-parallelism=120 segment-costs=[1225900280, 779361] cpu-comparison-result=120 [max(120 (self) vs 33 (sum children))]
 |  07:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
@@ -345,7 +345,7 @@ max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [m
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=354(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=0 row-size=24B cardinality=487.28M(filtered from 8.64G) cost=29120740
+|     tuple-ids=0 row-size=24B cardinality=487.28M(filtered from 8.64G) cost=57000688
 |     in pipelines: 00(GETNEXT)
 |
 08:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
@@ -356,7 +356,7 @@ max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [m
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.10M
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=721500
+   tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=2498326
    in pipelines: 08(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=401.33MB Threads=23
@@ -377,7 +377,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=41.44MB mem-reservation=13.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[22449952, 273457] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 10:SORT
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC, ss_ticket_number ASC
 |  mem-estimate=25.44MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
@@ -425,7 +425,7 @@ max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [m
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  Per-Instance Resources: mem-estimate=27.88MB mem-reservation=17.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[1198020332, 779361] cpu-comparison-result=120 [max(120 (self) vs 33 (sum children))]
+|  max-parallelism=120 segment-costs=[1225900280, 779361] cpu-comparison-result=120 [max(120 (self) vs 33 (sum children))]
 |  07:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
@@ -556,7 +556,7 @@ max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [m
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=354(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-|     tuple-ids=0 row-size=24B cardinality=487.28M(filtered from 8.64G) cost=29120740
+|     tuple-ids=0 row-size=24B cardinality=487.28M(filtered from 8.64G) cost=57000688
 |     in pipelines: 00(GETNEXT)
 |
 08:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
@@ -567,6 +567,6 @@ max-parallelism=10 segment-costs=[20673126, 273457] cpu-comparison-result=120 [m
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.10M
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=721500
+   tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=2498326
    in pipelines: 08(GETNEXT)
 ====

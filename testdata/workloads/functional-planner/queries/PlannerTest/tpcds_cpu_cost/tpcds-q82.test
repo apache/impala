@@ -21,7 +21,7 @@ Max Per-Host Resource Reservation: Memory=78.88MB Threads=1
 Per-Host Resource Estimates: Memory=125.61GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=125.61GB mem-reservation=78.88MB thread-reservation=1 runtime-filters-memory=3.00MB
-|  max-parallelism=1 segment-costs=[15423925255, 100, 300]
+|  max-parallelism=1 segment-costs=[15457630399, 100, 300]
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=300
@@ -113,7 +113,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=390.22M
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=3 row-size=4B cardinality=11.42M(filtered from 8.64G) cost=91244600
+   tuple-ids=3 row-size=4B cardinality=11.42M(filtered from 8.64G) cost=124949744
    in pipelines: 03(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=1.26GB Threads=55
@@ -248,7 +248,7 @@ max-parallelism=1320 segment-costs=[13125921748, 475716832] cpu-comparison-resul
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=93.16MB mem-reservation=4.00MB thread-reservation=1
-max-parallelism=20 segment-costs=[104498188]
+max-parallelism=20 segment-costs=[138203332]
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=02
 |  hash predicates: ss_item_sk = i_item_sk
@@ -298,7 +298,7 @@ max-parallelism=20 segment-costs=[104498188]
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=390.22M
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=3 row-size=4B cardinality=11.42M(filtered from 8.64G) cost=91244600
+   tuple-ids=3 row-size=4B cardinality=11.42M(filtered from 8.64G) cost=124949744
    in pipelines: 03(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=1.26GB Threads=55
@@ -433,7 +433,7 @@ max-parallelism=1320 segment-costs=[13125921748, 475716832] cpu-comparison-resul
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=93.16MB mem-reservation=4.00MB thread-reservation=1
-max-parallelism=20 segment-costs=[104498188]
+max-parallelism=20 segment-costs=[138203332]
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=02
 |  hash predicates: ss_item_sk = i_item_sk
@@ -483,6 +483,6 @@ max-parallelism=20 segment-costs=[104498188]
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=390.22M
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=3 row-size=4B cardinality=11.42M(filtered from 8.64G) cost=91244600
+   tuple-ids=3 row-size=4B cardinality=11.42M(filtered from 8.64G) cost=124949744
    in pipelines: 03(GETNEXT)
 ====

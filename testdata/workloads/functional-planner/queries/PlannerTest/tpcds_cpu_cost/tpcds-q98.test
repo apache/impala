@@ -37,7 +37,7 @@ Max Per-Host Resource Reservation: Memory=83.94MB Threads=1
 Per-Host Resource Estimates: Memory=995.48GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=995.48GB mem-reservation=83.94MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  max-parallelism=1 segment-costs=[20847978532, 2590685184, 15544111104, 18134796288]
+|  max-parallelism=1 segment-costs=[20918868188, 2590685184, 15544111104, 18134796288]
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_category, i_class, i_current_price, sum(ss_ext_sales_price), sum(ss_ext_sales_price) * CAST(100 AS DECIMAL(3,0)) / sum(sum(ss_ext_sales_price))
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=18134796288
@@ -119,7 +119,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=390.22M
    mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.59G(filtered from 8.64G) cost=121559592
+   tuple-ids=0 row-size=12B cardinality=2.59G(filtered from 8.64G) cost=192449248
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=1.65GB Threads=41
@@ -182,7 +182,7 @@ max-parallelism=1610 segment-costs=[16055904544, 511793440] cpu-comparison-resul
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=793.78MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[20847041064, 511793440] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=120 segment-costs=[20917930720, 511793440] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
@@ -275,7 +275,7 @@ max-parallelism=120 segment-costs=[20847041064, 511793440] cpu-comparison-result
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=390.22M
    mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.59G(filtered from 8.64G) cost=121559592
+   tuple-ids=0 row-size=12B cardinality=2.59G(filtered from 8.64G) cost=192449248
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=1.65GB Threads=41
@@ -338,7 +338,7 @@ max-parallelism=1610 segment-costs=[16055904544, 511793440] cpu-comparison-resul
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=793.78MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[20847041064, 511793440] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=120 segment-costs=[20917930720, 511793440] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
@@ -431,6 +431,6 @@ max-parallelism=120 segment-costs=[20847041064, 511793440] cpu-comparison-result
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=390.22M
    mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.59G(filtered from 8.64G) cost=121559592
+   tuple-ids=0 row-size=12B cardinality=2.59G(filtered from 8.64G) cost=192449248
    in pipelines: 00(GETNEXT)
 ====

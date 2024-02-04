@@ -35,7 +35,7 @@ Max Per-Host Resource Reservation: Memory=229.94MB Threads=1
 Per-Host Resource Estimates: Memory=6.21GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=6.21GB mem-reservation=229.94MB thread-reservation=1 runtime-filters-memory=21.00MB
-|  max-parallelism=1 segment-costs=[419269089, 419269089, 151373536, 113288174, 1600]
+|  max-parallelism=1 segment-costs=[419269089, 419269089, 151373536, 115788502, 1600]
 PLAN-ROOT SINK
 |  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state, ca_zip, ca_country, ca_gmt_offset, ca_location_type, ctr_total_return
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1600
@@ -156,7 +156,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=3.10M
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=87B cardinality=641.56K(filtered from 30.00M) cost=554639
+|     tuple-ids=6 row-size=87B cardinality=641.56K(filtered from 30.00M) cost=3054967
 |     in pipelines: 07(GETNEXT)
 |
 05:AGGREGATE [FINALIZE]
@@ -431,7 +431,7 @@ max-parallelism=10 segment-costs=[95491215, 30] cpu-comparison-result=142 [max(1
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=27.67MB mem-reservation=1.00MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[1383413]
+|  max-parallelism=10 segment-costs=[3883741]
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash-table-id=04
 |  |  hash predicates: c_current_addr_sk = ca_address_sk
@@ -478,7 +478,7 @@ max-parallelism=10 segment-costs=[95491215, 30] cpu-comparison-result=142 [max(1
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=3.10M
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=87B cardinality=641.56K(filtered from 30.00M) cost=554639
+|     tuple-ids=6 row-size=87B cardinality=641.56K(filtered from 30.00M) cost=3054967
 |     in pipelines: 07(GETNEXT)
 |
 25:EXCHANGE [HASH(cr_returning_customer_sk)]
@@ -820,7 +820,7 @@ max-parallelism=10 segment-costs=[95491215, 30] cpu-comparison-result=142 [max(1
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=27.67MB mem-reservation=1.00MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[1383413]
+|  max-parallelism=10 segment-costs=[3883741]
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash-table-id=04
 |  |  hash predicates: c_current_addr_sk = ca_address_sk
@@ -867,7 +867,7 @@ max-parallelism=10 segment-costs=[95491215, 30] cpu-comparison-result=142 [max(1
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=3.10M
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=87B cardinality=641.56K(filtered from 30.00M) cost=554639
+|     tuple-ids=6 row-size=87B cardinality=641.56K(filtered from 30.00M) cost=3054967
 |     in pipelines: 07(GETNEXT)
 |
 25:EXCHANGE [HASH(cr_returning_customer_sk)]

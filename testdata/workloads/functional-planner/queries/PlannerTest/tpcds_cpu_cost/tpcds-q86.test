@@ -32,7 +32,7 @@ Max Per-Host Resource Reservation: Memory=47.88MB Threads=1
 Per-Host Resource Estimates: Memory=90MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=89.94MB mem-reservation=47.88MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  max-parallelism=1 segment-costs=[23865051032, 6006, 3003, 1301, 500]
+|  max-parallelism=1 segment-costs=[23865063688, 6006, 3003, 1301, 500]
 PLAN-ROOT SINK
 |  output exprs: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END), CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END, CASE valid_tid(3,4,5) WHEN 3 THEN i_class WHEN 4 THEN NULL WHEN 5 THEN NULL END, CAST(aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) AS SMALLINT) + CAST(aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) AS SMALLINT), rank()
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=500
@@ -127,7 +127,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.37M
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.16G(filtered from 2.16G) cost=116499472
+   tuple-ids=0 row-size=12B cardinality=2.16G(filtered from 2.16G) cost=116512128
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=537.50MB Threads=19
@@ -207,7 +207,7 @@ max-parallelism=10 segment-costs=[3152, 6006, 49] cpu-comparison-result=120 [max
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=51.92MB mem-reservation=6.12MB thread-reservation=1
-max-parallelism=120 segment-costs=[23864272400, 149] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=120 segment-costs=[23864285056, 149] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(ws_net_paid)
@@ -304,7 +304,7 @@ max-parallelism=120 segment-costs=[23864272400, 149] cpu-comparison-result=120 [
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.37M
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.16G(filtered from 2.16G) cost=116499472
+   tuple-ids=0 row-size=12B cardinality=2.16G(filtered from 2.16G) cost=116512128
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=537.50MB Threads=19
@@ -384,7 +384,7 @@ max-parallelism=10 segment-costs=[3152, 6006, 49] cpu-comparison-result=120 [max
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=51.92MB mem-reservation=6.12MB thread-reservation=1
-max-parallelism=120 segment-costs=[23864272400, 149] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=120 segment-costs=[23864285056, 149] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(ws_net_paid)
@@ -481,6 +481,6 @@ max-parallelism=120 segment-costs=[23864272400, 149] cpu-comparison-result=120 [
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.37M
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=2.16G(filtered from 2.16G) cost=116499472
+   tuple-ids=0 row-size=12B cardinality=2.16G(filtered from 2.16G) cost=116512128
    in pipelines: 00(GETNEXT)
 ====

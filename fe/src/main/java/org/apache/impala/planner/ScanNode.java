@@ -337,7 +337,7 @@ abstract public class ScanNode extends PlanNode {
     if (!hasScanConjuncts() && !hasStorageLayerConjuncts() && hasLimit()) {
       return getLimit();
     }
-    return filteredCardinality_ > -1 ? filteredCardinality_ : inputCardinality_;
+    return filteredInputCardinality_ > -1 ? filteredInputCardinality_ : inputCardinality_;
   }
 
   @Override
@@ -617,5 +617,12 @@ abstract public class ScanNode extends PlanNode {
       }
     }
     nodeStack.clear();
+
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("reduceCardinalityByRuntimeFilter completed at " + getDisplayLabel()
+          + ". inputCardinality=" + getInputCardinality() + " filteredInputCardinality="
+          + getFilteredInputCardinality() + " cardinality=" + getCardinality()
+          + " filteredCardinality=" + getFilteredCardinality());
+    }
   }
 }

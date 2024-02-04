@@ -22,7 +22,7 @@ Max Per-Host Resource Reservation: Memory=176.12MB Threads=1
 Per-Host Resource Estimates: Memory=227.48GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=227.48GB mem-reservation=176.12MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  max-parallelism=1 segment-costs=[27918130072, 13891241984, 500, 500]
+|  max-parallelism=1 segment-costs=[27918136126, 13891241984, 500, 500]
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(4,6,8,10,12) WHEN 4 THEN i_product_name WHEN 6 THEN i_product_name WHEN 8 THEN i_product_name WHEN 10 THEN i_product_name WHEN 12 THEN NULL END, CASE valid_tid(4,6,8,10,12) WHEN 4 THEN i_brand WHEN 6 THEN i_brand WHEN 8 THEN i_brand WHEN 10 THEN NULL WHEN 12 THEN NULL END, CASE valid_tid(4,6,8,10,12) WHEN 4 THEN i_class WHEN 6 THEN i_class WHEN 8 THEN NULL WHEN 10 THEN NULL WHEN 12 THEN NULL END, CASE valid_tid(4,6,8,10,12) WHEN 4 THEN i_category WHEN 6 THEN NULL WHEN 8 THEN NULL WHEN 10 THEN NULL WHEN 12 THEN NULL END, aggif(valid_tid(4,6,8,10,12) IN (4, 6, 8, 10, 12), CASE valid_tid(4,6,8,10,12) WHEN 4 THEN avg(inv_quantity_on_hand) WHEN 6 THEN avg(inv_quantity_on_hand) WHEN 8 THEN avg(inv_quantity_on_hand) WHEN 10 THEN avg(inv_quantity_on_hand) WHEN 12 THEN avg(inv_quantity_on_hand) END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=500
@@ -108,7 +108,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.98M
    mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=1.03G(filtered from 1.03G) cost=25155976
+   tuple-ids=0 row-size=12B cardinality=1.03G(filtered from 1.03G) cost=25162030
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=3.70GB Threads=29
@@ -171,7 +171,7 @@ max-parallelism=1390 segment-costs=[12619154693, 13891241984, 500, 6] cpu-compar
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=3.84GB mem-reservation=138.25MB thread-reservation=1
-max-parallelism=120 segment-costs=[27917329288, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=120 segment-costs=[27917335342, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
@@ -274,7 +274,7 @@ max-parallelism=120 segment-costs=[27917329288, 1043120064] cpu-comparison-resul
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.98M
    mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=1.03G(filtered from 1.03G) cost=25155976
+   tuple-ids=0 row-size=12B cardinality=1.03G(filtered from 1.03G) cost=25162030
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=3.70GB Threads=29
@@ -337,7 +337,7 @@ max-parallelism=1390 segment-costs=[12619154693, 13891241984, 500, 6] cpu-compar
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=3.84GB mem-reservation=138.25MB thread-reservation=1
-max-parallelism=120 segment-costs=[27917329288, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=120 segment-costs=[27917335342, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
@@ -440,6 +440,6 @@ max-parallelism=120 segment-costs=[27917329288, 1043120064] cpu-comparison-resul
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.98M
    mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=1.03G(filtered from 1.03G) cost=25155976
+   tuple-ids=0 row-size=12B cardinality=1.03G(filtered from 1.03G) cost=25162030
    in pipelines: 00(GETNEXT)
 ====

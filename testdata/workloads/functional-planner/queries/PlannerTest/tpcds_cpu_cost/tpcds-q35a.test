@@ -65,7 +65,7 @@ Max Per-Host Resource Reservation: Memory=250.12MB Threads=1
 Per-Host Resource Estimates: Memory=4.91GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.91GB mem-reservation=250.12MB thread-reservation=1 runtime-filters-memory=44.00MB
-|  max-parallelism=1 segment-costs=[1128400152, 1688091017, 620827457, 600, 1800]
+|  max-parallelism=1 segment-costs=[1128400152, 1688091017, 620831762, 600, 1800]
 PLAN-ROOT SINK
 |  output exprs: ca_state, cd_gender, cd_marital_status, cd_dep_count, count(*), stddev_samp(cd_dep_count), stddev_samp(cd_dep_count), min(cd_dep_count), cd_dep_employed_count, count(*), stddev_samp(cd_dep_employed_count), stddev_samp(cd_dep_employed_count), min(cd_dep_employed_count), cd_dep_college_count, count(*), stddev_samp(cd_dep_college_count), stddev_samp(cd_dep_college_count), min(cd_dep_college_count)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1800
@@ -257,7 +257,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.10M
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=29.63M(filtered from 30.00M) cost=847258
+   tuple-ids=0 row-size=12B cardinality=29.63M(filtered from 30.00M) cost=851563
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=1.96GB Threads=54
@@ -630,7 +630,7 @@ max-parallelism=10 segment-costs=[31889853]
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 Per-Host Shared Resources: mem-estimate=41.00MB mem-reservation=41.00MB thread-reservation=0 runtime-filters-memory=41.00MB
 Per-Instance Resources: mem-estimate=16.62MB mem-reservation=1.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[1310269]
+max-parallelism=10 segment-costs=[1314574]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer c, RANDOM]
    HDFS partitions=1/1 files=1 size=5.49MB
    runtime filters: RF007[min_max] -> c.c_current_cdemo_sk, RF001[min_max] -> c.c_customer_sk, RF003[min_max] -> c.c_customer_sk, RF005[min_max] -> c.c_current_addr_sk, RF006[bloom] -> c.c_current_cdemo_sk, RF000[bloom] -> c.c_customer_sk, RF002[bloom] -> c.c_customer_sk, RF004[bloom] -> c.c_current_addr_sk
@@ -639,7 +639,7 @@ max-parallelism=10 segment-costs=[1310269]
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.10M
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=29.63M(filtered from 30.00M) cost=847258
+   tuple-ids=0 row-size=12B cardinality=29.63M(filtered from 30.00M) cost=851563
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=1.96GB Threads=54
@@ -1012,7 +1012,7 @@ max-parallelism=10 segment-costs=[31889853]
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 Per-Host Shared Resources: mem-estimate=41.00MB mem-reservation=41.00MB thread-reservation=0 runtime-filters-memory=41.00MB
 Per-Instance Resources: mem-estimate=16.62MB mem-reservation=1.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[1310269]
+max-parallelism=10 segment-costs=[1314574]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer c, RANDOM]
    HDFS partitions=1/1 files=1 size=5.49MB
    runtime filters: RF007[min_max] -> c.c_current_cdemo_sk, RF001[min_max] -> c.c_customer_sk, RF003[min_max] -> c.c_customer_sk, RF005[min_max] -> c.c_current_addr_sk, RF006[bloom] -> c.c_current_cdemo_sk, RF000[bloom] -> c.c_customer_sk, RF002[bloom] -> c.c_customer_sk, RF004[bloom] -> c.c_current_addr_sk
@@ -1021,6 +1021,6 @@ max-parallelism=10 segment-costs=[1310269]
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.10M
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=29.63M(filtered from 30.00M) cost=847258
+   tuple-ids=0 row-size=12B cardinality=29.63M(filtered from 30.00M) cost=851563
    in pipelines: 00(GETNEXT)
 ====

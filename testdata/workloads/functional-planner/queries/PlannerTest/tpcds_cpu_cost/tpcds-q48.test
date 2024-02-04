@@ -71,7 +71,7 @@ Max Per-Host Resource Reservation: Memory=68.52MB Threads=1
 Per-Host Resource Estimates: Memory=260MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=259.79MB mem-reservation=68.52MB thread-reservation=1 runtime-filters-memory=4.00MB
-|  max-parallelism=1 segment-costs=[13906680614, 0]
+|  max-parallelism=1 segment-costs=[29282165542, 0]
 PLAN-ROOT SINK
 |  output exprs: sum(ss_quantity)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -174,7 +174,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=374(filtered from 1824)
    parquet dictionary predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
    mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=0 row-size=28B cardinality=807.50M(filtered from 863.99M) cost=12960788480
+   tuple-ids=0 row-size=28B cardinality=807.50M(filtered from 863.99M) cost=28336273408
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=764.14MB Threads=21
@@ -200,7 +200,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[13868172588, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
+max-parallelism=120 segment-costs=[29243657516, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -367,7 +367,7 @@ max-parallelism=120 segment-costs=[13868172588, 1] cpu-comparison-result=120 [ma
    extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=374(filtered from 1824)
    parquet dictionary predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
    mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=0 row-size=28B cardinality=807.50M(filtered from 863.99M) cost=12960788480
+   tuple-ids=0 row-size=28B cardinality=807.50M(filtered from 863.99M) cost=28336273408
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=764.14MB Threads=21
@@ -393,7 +393,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[13868172588, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
+max-parallelism=120 segment-costs=[29243657516, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -560,6 +560,6 @@ max-parallelism=120 segment-costs=[13868172588, 1] cpu-comparison-result=120 [ma
    extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=374(filtered from 1824)
    parquet dictionary predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
    mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
-   tuple-ids=0 row-size=28B cardinality=807.50M(filtered from 863.99M) cost=12960788480
+   tuple-ids=0 row-size=28B cardinality=807.50M(filtered from 863.99M) cost=28336273408
    in pipelines: 00(GETNEXT)
 ====

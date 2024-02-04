@@ -88,7 +88,7 @@ Max Per-Host Resource Reservation: Memory=84.84MB Threads=1
 Per-Host Resource Estimates: Memory=397MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=397.40MB mem-reservation=84.84MB thread-reservation=1 runtime-filters-memory=10.00MB
-|  max-parallelism=1 segment-costs=[709990484, 264, 264]
+|  max-parallelism=1 segment-costs=[35003590426, 264, 264]
 PLAN-ROOT SINK
 |  output exprs: substr(r_reason_desc, 1, 20), avg(ws_quantity), avg(wr_refunded_cash), avg(wr_fee)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=264
@@ -230,7 +230,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=9.41M
 |  |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|  |     tuple-ids=1 row-size=36B cardinality=20.19M(filtered from 216.00M) cost=106409736
+|  |     tuple-ids=1 row-size=36B cardinality=20.19M(filtered from 216.00M) cost=113293848
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
@@ -244,7 +244,7 @@ PLAN-ROOT SINK
 |     extrapolated-rows=disabled max-scan-range-rows=3.37M
 |     parquet dictionary predicates: ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=0 row-size=32B cardinality=23.11M(filtered from 216.00M) cost=461716288
+|     tuple-ids=0 row-size=32B cardinality=23.11M(filtered from 216.00M) cost=34718187520
 |     in pipelines: 00(GETNEXT)
 |
 05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
@@ -258,14 +258,14 @@ PLAN-ROOT SINK
    parquet statistics predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    parquet dictionary predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=5 row-size=43B cardinality=188.68K(filtered from 2.61M) cost=885284
+   tuple-ids=5 row-size=43B cardinality=188.68K(filtered from 2.61M) cost=31129882
    in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=314.40MB Threads=24
-Per-Host Resource Estimates: Memory=691MB
+Max Per-Host Resource Reservation: Memory=519.15MB Threads=30
+Per-Host Resource Estimates: Memory=990MB
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[267] cpu-comparison-result=103 [max(1 (self) vs 103 (sum children))]
+|  max-parallelism=1 segment-costs=[267] cpu-comparison-result=163 [max(1 (self) vs 163 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: substr(r_reason_desc, 1, 20), avg(ws_quantity), avg(wr_refunded_cash), avg(wr_fee)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=264
@@ -279,7 +279,7 @@ PLAN-ROOT SINK
 |
 F09:PLAN FRAGMENT [HASH(r_reason_desc)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=10.03MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[268, 264, 3] cpu-comparison-result=103 [max(10 (self) vs 103 (sum children))]
+max-parallelism=10 segment-costs=[268, 264, 3] cpu-comparison-result=163 [max(10 (self) vs 163 (sum children))]
 16:TOP-N [LIMIT=100]
 |  order by: substr(r_reason_desc, 1, 20) ASC, avg(ws_quantity) ASC, avg(wr_refunded_cash) ASC, avg(wr_fee) ASC
 |  materialized: substr(r_reason_desc, 1, 20)
@@ -301,7 +301,7 @@ max-parallelism=10 segment-costs=[268, 264, 3] cpu-comparison-result=103 [max(10
 |
 F05:PLAN FRAGMENT [HASH(ca_address_sk)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=22.53MB mem-reservation=2.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (self) vs 103 (sum children))]
+max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=163 [max(20 (self) vs 163 (sum children))]
 15:AGGREGATE [STREAMING]
 |  output: avg(CAST(ws_quantity AS BIGINT)), avg(wr_refunded_cash), avg(wr_fee)
 |  group by: r_reason_desc
@@ -427,8 +427,8 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
 |--F14:PLAN FRAGMENT [HASH(ca_address_sk)] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=17.80MB mem-reservation=5.75MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[218372] cpu-comparison-result=70 [max(70 (self) vs 40 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=5.75MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[218372] cpu-comparison-result=130 [max(130 (self) vs 40 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: wr_refunded_addr_sk
@@ -436,14 +436,14 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0 cost=188680
 |  |
 |  21:EXCHANGE [HASH(wr_refunded_addr_sk)]
-|  |  mem-estimate=12.05MB mem-reservation=0B thread-reservation=0
+|  |  mem-estimate=21.50MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=0,1,3,4 row-size=145B cardinality=188.68K cost=29692
 |  |  in pipelines: 00(GETNEXT)
 |  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 |  Per-Instance Resources: mem-estimate=22.29MB mem-reservation=128.00KB thread-reservation=1
-|  max-parallelism=60 segment-costs=[507970236]
+|  max-parallelism=120 segment-costs=[34764441468]
 |  10:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash-table-id=04
 |  |  hash predicates: ws_item_sk = wr_item_sk, ws_order_number = wr_order_number
@@ -454,13 +454,13 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |
 |  |--F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=266.03MB mem-reservation=206.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  |  Per-Instance Resources: mem-estimate=422.44MB mem-reservation=410.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  |  |  max-parallelism=10 segment-costs=[6079434] cpu-comparison-result=40 [max(30 (self) vs 40 (sum children))]
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=02
 |  |  |  build expressions: wr_item_sk, wr_order_number
 |  |  |  runtime filters: RF008[bloom] <- wr_item_sk, RF009[bloom] <- wr_order_number, RF010[min_max] <- wr_item_sk, RF011[min_max] <- wr_order_number
-|  |  |  mem-estimate=251.59MB mem-reservation=204.00MB spill-buffer=2.00MB thread-reservation=0 cost=3773584
+|  |  |  mem-estimate=408.00MB mem-reservation=408.00MB spill-buffer=2.00MB thread-reservation=0 cost=3773584
 |  |  |
 |  |  19:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=12.44MB mem-reservation=0B thread-reservation=0
@@ -470,7 +470,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
 |  |  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  |  Per-Instance Resources: mem-estimate=16.49MB mem-reservation=256.00KB thread-reservation=1
-|  |  max-parallelism=20 segment-costs=[187391985]
+|  |  max-parallelism=20 segment-costs=[194276097]
 |  |  09:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash-table-id=05
 |  |  |  hash predicates: wr_returning_cdemo_sk = cd2.cd_demo_sk, cd1.cd_marital_status = cd2.cd_marital_status, cd1.cd_education_status = cd2.cd_education_status
@@ -554,7 +554,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=9.41M
 |  |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|  |     tuple-ids=1 row-size=36B cardinality=20.19M(filtered from 216.00M) cost=106409736
+|  |     tuple-ids=1 row-size=36B cardinality=20.19M(filtered from 216.00M) cost=113293848
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
@@ -568,7 +568,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |     extrapolated-rows=disabled max-scan-range-rows=3.37M
 |     parquet dictionary predicates: ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=0 row-size=32B cardinality=23.11M(filtered from 216.00M) cost=461716288
+|     tuple-ids=0 row-size=32B cardinality=23.11M(filtered from 216.00M) cost=34718187520
 |     in pipelines: 00(GETNEXT)
 |
 20:EXCHANGE [HASH(ca_address_sk)]
@@ -579,7 +579,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=17.84MB mem-reservation=128.00KB thread-reservation=1
-max-parallelism=10 segment-costs=[893945]
+max-parallelism=10 segment-costs=[31138543]
 05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
    HDFS partitions=1/1 files=1 size=1.16MB
    predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
@@ -591,14 +591,14 @@ max-parallelism=10 segment-costs=[893945]
    parquet statistics predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    parquet dictionary predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=5 row-size=43B cardinality=188.68K(filtered from 2.61M) cost=885284
+   tuple-ids=5 row-size=43B cardinality=188.68K(filtered from 2.61M) cost=31129882
    in pipelines: 05(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=144.27MB Threads=24
-Per-Host Resource Estimates: Memory=445MB
+Max Per-Host Resource Reservation: Memory=145.15MB Threads=31
+Per-Host Resource Estimates: Memory=570MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[267] cpu-comparison-result=103 [max(1 (self) vs 103 (sum children))]
+|  max-parallelism=1 segment-costs=[267] cpu-comparison-result=173 [max(1 (self) vs 173 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: substr(r_reason_desc, 1, 20), avg(ws_quantity), avg(wr_refunded_cash), avg(wr_fee)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=264
@@ -612,7 +612,7 @@ PLAN-ROOT SINK
 |
 F10:PLAN FRAGMENT [HASH(r_reason_desc)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=10.03MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[268, 264, 3] cpu-comparison-result=103 [max(10 (self) vs 103 (sum children))]
+max-parallelism=10 segment-costs=[268, 264, 3] cpu-comparison-result=173 [max(10 (self) vs 173 (sum children))]
 16:TOP-N [LIMIT=100]
 |  order by: substr(r_reason_desc, 1, 20) ASC, avg(ws_quantity) ASC, avg(wr_refunded_cash) ASC, avg(wr_fee) ASC
 |  materialized: substr(r_reason_desc, 1, 20)
@@ -634,7 +634,7 @@ max-parallelism=10 segment-costs=[268, 264, 3] cpu-comparison-result=103 [max(10
 |
 F06:PLAN FRAGMENT [HASH(ca_address_sk)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=22.53MB mem-reservation=2.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (self) vs 103 (sum children))]
+max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=173 [max(20 (self) vs 173 (sum children))]
 15:AGGREGATE [STREAMING]
 |  output: avg(CAST(ws_quantity AS BIGINT)), avg(wr_refunded_cash), avg(wr_fee)
 |  group by: r_reason_desc
@@ -761,7 +761,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |
 |--F15:PLAN FRAGMENT [HASH(ca_address_sk)] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=9.94MB mem-reservation=5.75MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[218372] cpu-comparison-result=70 [max(70 (self) vs 40 (sum children))]
+|  |  max-parallelism=10 segment-costs=[218372] cpu-comparison-result=140 [max(140 (self) vs 40 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: wr_refunded_addr_sk
@@ -774,7 +774,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F05:PLAN FRAGMENT [HASH(ws_item_sk,ws_order_number)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=18.05MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=20.51MB mem-reservation=0B thread-reservation=1
 |  max-parallelism=10 segment-costs=[47066484]
 |  10:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash-table-id=04
@@ -802,7 +802,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
 |  |  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  |  Per-Instance Resources: mem-estimate=20.89MB mem-reservation=256.00KB thread-reservation=1
-|  |  max-parallelism=20 segment-costs=[187391985]
+|  |  max-parallelism=20 segment-costs=[194276097]
 |  |  09:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash-table-id=05
 |  |  |  hash predicates: wr_returning_cdemo_sk = cd2.cd_demo_sk, cd1.cd_marital_status = cd2.cd_marital_status, cd1.cd_education_status = cd2.cd_education_status
@@ -886,18 +886,18 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=9.41M
 |  |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|  |     tuple-ids=1 row-size=36B cardinality=20.19M(filtered from 216.00M) cost=106409736
+|  |     tuple-ids=1 row-size=36B cardinality=20.19M(filtered from 216.00M) cost=113293848
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  19:EXCHANGE [HASH(ws_item_sk,ws_order_number)]
-|  |  mem-estimate=11.76MB mem-reservation=0B thread-reservation=0
+|  |  mem-estimate=14.22MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=0 row-size=32B cardinality=23.11M(filtered from 216.00M) cost=812536
 |  |  in pipelines: 00(GETNEXT)
 |  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=50 (adjusted from 120)
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 |  Per-Instance Resources: mem-estimate=17.41MB mem-reservation=128.00KB thread-reservation=1
-|  max-parallelism=50 segment-costs=[462528824]
+|  max-parallelism=120 segment-costs=[34719000056]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=84.18MB
 |     predicates: ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2))
@@ -909,7 +909,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 |     extrapolated-rows=disabled max-scan-range-rows=3.37M
 |     parquet dictionary predicates: ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=0 row-size=32B cardinality=23.11M(filtered from 216.00M) cost=461716288
+|     tuple-ids=0 row-size=32B cardinality=23.11M(filtered from 216.00M) cost=34718187520
 |     in pipelines: 00(GETNEXT)
 |
 21:EXCHANGE [HASH(ca_address_sk)]
@@ -920,7 +920,7 @@ max-parallelism=10 segment-costs=[267088, 4] cpu-comparison-result=103 [max(20 (
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=17.84MB mem-reservation=128.00KB thread-reservation=1
-max-parallelism=10 segment-costs=[893945]
+max-parallelism=10 segment-costs=[31138543]
 05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
    HDFS partitions=1/1 files=1 size=1.16MB
    predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
@@ -932,6 +932,6 @@ max-parallelism=10 segment-costs=[893945]
    parquet statistics predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    parquet dictionary predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=5 row-size=43B cardinality=188.68K(filtered from 2.61M) cost=885284
+   tuple-ids=5 row-size=43B cardinality=188.68K(filtered from 2.61M) cost=31129882
    in pipelines: 05(GETNEXT)
 ====
