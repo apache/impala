@@ -76,7 +76,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
 
   protected DataSource dbcpDataSource = null;
   // Cache datasource for sharing
-  public static Cache<String, DataSource> dataSourceCache = CacheBuilder
+  protected static final Cache<String, DataSource> dataSourceCache = CacheBuilder
       .newBuilder()
       .removalListener((RemovalListener<String, DataSource>) notification -> {
         DataSource ds = notification.getValue();
@@ -164,9 +164,9 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
   @Override
   public void close(boolean cleanCache) {
     dbcpDataSource = null;
-    if (cleanCache && dataSourceCache != null) {
+    if (cleanCache) {
+      Preconditions.checkNotNull(dataSourceCache);
       dataSourceCache.invalidateAll();
-      dataSourceCache = null;
     }
     if (jdbcDriverLocalPath != null) {
       // Delete the jar file of jdbc driver.
@@ -287,6 +287,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
           String jdbcUrl = props.getProperty("url");
           String username = props.getProperty("username", "-");
           String cacheMapKey = String.format("%s.%s", jdbcUrl, username);
+          Preconditions.checkNotNull(dataSourceCache);
           dbcpDataSource = dataSourceCache.get(cacheMapKey,
               () -> {
                 LOG.info("Datasource for '{}' was not cached. "

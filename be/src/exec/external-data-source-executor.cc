@@ -139,8 +139,10 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
   string local_jar_path;
   // TODO(IMPALA-6727): pass the mtime from the coordinator. for now, skip the mtime
   // check (-1).
-  RETURN_IF_ERROR(LibCache::instance()->GetLocalPath(
-      jar_path, LibCache::TYPE_JAR, -1, &handle, &local_jar_path));
+  if (!jar_path.empty()) {
+    RETURN_IF_ERROR(LibCache::instance()->GetLocalPath(
+        jar_path, LibCache::TYPE_JAR, -1, &handle, &local_jar_path));
+  }
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
 
   // Add a scoped cleanup jni reference object. This cleans up local refs made below.

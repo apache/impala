@@ -2326,11 +2326,11 @@ create_view_stmt ::=
 create_data_src_stmt ::=
   KW_CREATE KW_DATA source_ident:is_source_id
   if_not_exists_val:if_not_exists ident_or_default:data_src_name
-  KW_LOCATION STRING_LITERAL:location
+  location_val:location
   KW_CLASS STRING_LITERAL:class_name
   KW_API_VERSION STRING_LITERAL:api_version
   {:
-    RESULT = new CreateDataSrcStmt(data_src_name, new HdfsUri(location), class_name,
+    RESULT = new CreateDataSrcStmt(data_src_name, location, class_name,
         api_version, if_not_exists);
   :}
   ;

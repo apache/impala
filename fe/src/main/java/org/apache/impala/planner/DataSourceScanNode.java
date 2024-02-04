@@ -65,6 +65,7 @@ import org.apache.impala.thrift.TStatus;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
@@ -169,16 +170,28 @@ public class DataSourceScanNode extends ScanNode {
       }
     }
 
-    String dsLocation = table_.getDataSource().getHdfs_location();
-    String localPath;
-    try {
-      localPath = FileSystemUtil.copyFileFromUriToLocal(dsLocation);
-    } catch (IOException e) {
-      throw new InternalException(String.format(
-          "Unable to fetch data source jar from location '%s'.", dsLocation));
-    }
     String className = table_.getDataSource().getClass_name();
     String apiVersion = table_.getDataSource().getApi_version();
+    String dsLocation = table_.getDataSource().getHdfs_location();
+    // Check if the data source jar file exists in the HDFS location. If yes, then copy
+    // the jar file to the local file system, and get the instance of the data source
+    // class in URLClassLoader which is generated from copied local jar file. Otherwise
+    // assume the jar file is in the classpath and try to get the instance of the data
+    // source class in current ClassLoader.
+    String localPath = null;
+    if (!Strings.isNullOrEmpty(dsLocation)) {
+      LOG.trace("Get the instance from URLClassLoader");
+      try {
+        localPath = FileSystemUtil.copyFileFromUriToLocal(dsLocation);
+      } catch (IOException e) {
+        throw new InternalException(String.format(
+            "Unable to fetch data source jar from location '%s'.", dsLocation));
+      }
+      Preconditions.checkNotNull(localPath);
+    } else {
+      LOG.trace("Get the instance of the data source class in current ClassLoader");
+    }
+
     TPrepareResult prepareResult;
     TStatus prepareStatus;
     try {
@@ -196,9 +209,11 @@ public class DataSourceScanNode extends ScanNode {
           "Error calling prepare() on data source %s",
           DataSource.debugString(table_.getDataSource())), e);
     } finally {
-      // Delete the jar file once its loaded
-      Path localJarPath = new Path("file://" + localPath);
-      FileSystemUtil.deleteIfExists(localJarPath);
+      if (!Strings.isNullOrEmpty(localPath)) {
+        // Delete the jar file once its loaded
+        Path localJarPath = new Path("file://" + localPath);
+        FileSystemUtil.deleteIfExists(localJarPath);
+      }
     }
     if (prepareStatus.getStatus_code() != TErrorCode.OK) {
       throw new InternalException(String.format(

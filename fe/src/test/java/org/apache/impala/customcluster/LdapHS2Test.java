@@ -741,9 +741,8 @@ public class LdapHS2Test {
 
     String dropDSQuery = "DROP DATA SOURCE IF EXISTS impala_jdbc_test_ds";
     String createDSQuery = String.format("CREATE DATA SOURCE impala_jdbc_test_ds " +
-        "LOCATION '%s/test-warehouse/data-sources/jdbc-data-source.jar' " +
         "CLASS 'org.apache.impala.extdatasource.jdbc.JdbcDataSource' " +
-        "API_VERSION 'V1'", fileSystemPrefix);
+        "API_VERSION 'V1'");
     String dropTableQuery = "DROP TABLE IF EXISTS %s";
     // Set JDBC authentication mechanisms as LDAP (3) with username/password as
     // TEST_USER_1/TEST_PASSWORD_1.

@@ -79,6 +79,7 @@ under the License.
     <bouncy-castle.version>${env.IMPALA_BOUNCY_CASTLE_VERSION}</bouncy-castle.version>
     <springframework.version>${env.IMPALA_SPRINGFRAMEWORK_VERSION}</springframework.version>
     <json-smart.version>${env.IMPALA_JSON_SMART_VERSION}</json-smart.version>
+    <commons-dbcp2.version>${env.IMPALA_DBCP2_VERSION}</commons-dbcp2.version>
   </properties>
 
   <repositories>

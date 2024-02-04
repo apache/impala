@@ -290,6 +290,7 @@ export IMPALA_SLF4J_VERSION=2.0.3
 export IMPALA_SPRINGFRAMEWORK_VERSION=5.3.27
 export IMPALA_XMLSEC_VERSION=2.2.3
 export IMPALA_OBS_VERSION=3.1.1-hw-42
+export IMPALA_DBCP2_VERSION=2.9.0
 
 # When Impala is building docker images on Redhat-based distributions,
 # it is useful to be able to customize the base image. Some users will

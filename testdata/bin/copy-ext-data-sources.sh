@@ -40,13 +40,6 @@ hadoop fs -put -f \
 echo "Copied" ${EXT_DATA_SOURCE_SRC_PATH}/test/target/impala-data-source-test-*.jar \
   "into HDFS" ${EXT_DATA_SOURCES_HDFS_PATH}
 
-hadoop fs -put -f \
-  ${EXT_DATA_SOURCE_SRC_PATH}/jdbc/target/impala-data-source-jdbc-*.jar \
-  ${EXT_DATA_SOURCES_HDFS_PATH}/jdbc-data-source.jar
-
-echo "Copied" ${EXT_DATA_SOURCE_SRC_PATH}/jdbc/target/impala-data-source-jdbc-*.jar \
-  "into HDFS" ${EXT_DATA_SOURCES_HDFS_PATH}
-
 # Copy Postgres JDBC driver to HDFS
 hadoop fs -put -f \
   ${IMPALA_HOME}/fe/target/dependency/postgresql-*.jar \

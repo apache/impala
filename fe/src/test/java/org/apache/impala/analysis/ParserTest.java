@@ -3115,6 +3115,7 @@ public class ParserTest extends FrontendTestBase {
         "API_VERSION \"V1\"");
     ParsesOk("CREATE DATA SOURCE foo LOCATION '/x/foo@hi_^!#.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
+    ParsesOk("CREATE DATA SOURCE foo CLASS 'com.bar.Foo' API_VERSION 'V1'");
 
     ParserError("CREATE DATA foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
@@ -3129,8 +3130,6 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE DATA SOURCE foo LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION V1");
     ParserError("CREATE DATA SOURCE LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
-        "API_VERSION 'V1'");
-    ParserError("CREATE DATA SOURCE foo CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
     ParserError("CREATE DATA SOURCE foo LOCATION CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");

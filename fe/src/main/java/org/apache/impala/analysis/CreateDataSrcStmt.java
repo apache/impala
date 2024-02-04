@@ -44,7 +44,6 @@ public class CreateDataSrcStmt extends StatementBase {
     Preconditions.checkNotNull(dataSrcName);
     Preconditions.checkNotNull(className);
     Preconditions.checkNotNull(apiVersionString);
-    Preconditions.checkNotNull(location);
     dataSrcName_ = dataSrcName.toLowerCase();
     location_ = location;
     className_ = className;
@@ -68,7 +67,9 @@ public class CreateDataSrcStmt extends StatementBase {
           "'. Valid API versions: " + Joiner.on(", ").join(ApiVersion.values()));
     }
 
-    location_.analyze(analyzer, Privilege.ALL, FsAction.READ);
+    if (location_ != null) {
+      location_.analyze(analyzer, Privilege.ALL, FsAction.READ);
+    }
     // TODO: Check class exists and implements API version
     // TODO: authorization check
   }
@@ -80,7 +81,7 @@ public class CreateDataSrcStmt extends StatementBase {
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
     sb.append(dataSrcName_);
     sb.append(" LOCATION '");
-    sb.append(location_.getLocation());
+    sb.append(location_ != null ? location_.getLocation() : "");
     sb.append("' CLASS '");
     sb.append(className_);
     sb.append("' API_VERSION '");
@@ -91,7 +92,7 @@ public class CreateDataSrcStmt extends StatementBase {
 
   public TCreateDataSourceParams toThrift() {
     return new TCreateDataSourceParams(
-        new TDataSource(dataSrcName_, location_.toString(), className_,
-            apiVersion_.name())).setIf_not_exists(ifNotExists_);
+        new TDataSource(dataSrcName_, location_ != null ? location_.toString() : "",
+            className_, apiVersion_.name())).setIf_not_exists(ifNotExists_);
   }
 }

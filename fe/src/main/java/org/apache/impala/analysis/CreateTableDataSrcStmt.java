@@ -62,14 +62,16 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
             "not support the column type: " + col.getType());
       }
     }
+
     // Add table properties from the DataSource catalog object now that we have access
     // to the catalog. These are stored in the table metadata so that the table could
     // be scanned without the DataSource catalog object.
     String location = dataSource.getLocation();
-    getTblProperties().put(TBL_PROP_LOCATION, location);
+    getTblProperties().put(TBL_PROP_LOCATION, location != null ? location : "");
     getTblProperties().put(TBL_PROP_CLASS, dataSource.getClassName());
     getTblProperties().put(TBL_PROP_API_VER, dataSource.getApiVersion());
-    new HdfsUri(location).analyze(analyzer, Privilege.ALL, FsAction.READ);
-    // TODO: check class exists and implements API version
+    if (!Strings.isNullOrEmpty(location)) {
+      new HdfsUri(location).analyze(analyzer, Privilege.ALL, FsAction.READ);
+    }
   }
 }

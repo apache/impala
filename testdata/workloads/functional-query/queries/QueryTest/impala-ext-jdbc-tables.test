@@ -3,7 +3,6 @@
 # Create DataSource
 DROP DATA SOURCE IF EXISTS TestJdbcDataSource;
 CREATE DATA SOURCE TestJdbcDataSource
-LOCATION '$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-data-source.jar'
 CLASS 'org.apache.impala.extdatasource.jdbc.JdbcDataSource'
 API_VERSION 'V1';
 ---- RESULTS
@@ -15,7 +14,7 @@ SHOW DATA SOURCES LIKE 'testjdbcdatasource';
 ---- LABELS
 NAME,LOCATION,CLASS NAME,API VERSION
 ---- RESULTS
-'testjdbcdatasource',regex:'.*/test-warehouse/data-sources/jdbc-data-source.jar','org.apache.impala.extdatasource.jdbc.JdbcDataSource','V1'
+'testjdbcdatasource','','org.apache.impala.extdatasource.jdbc.JdbcDataSource','V1'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====

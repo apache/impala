@@ -1041,18 +1041,18 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    * Convert DataConnector object to DataSource object.
    */
   private static DataSource dataConnectorToDataSource(DataConnector connector) {
-    if (!connector.isSetName() || !connector.isSetType() || !connector.isSetUrl()
+    if (!connector.isSetName() || !connector.isSetType()
         || !connector.isSetDescription() || connector.getParametersSize() == 0
         || !connector.getType().equalsIgnoreCase(HMS_DATA_CONNECTOR_TYPE)) {
       return null;
     }
     String name = connector.getName();
-    String location = connector.getUrl();
+    String location = connector.isSetUrl() ? connector.getUrl() : "";
     String className =
         connector.getParameters().get(HMS_DATA_CONNECTOR_PARAM_KEY_CLASS_NAME);
     String apiVersion =
         connector.getParameters().get(HMS_DATA_CONNECTOR_PARAM_KEY_API_VERSION);
-    if (!Strings.isNullOrEmpty(name) && !Strings.isNullOrEmpty(location) &&
+    if (!Strings.isNullOrEmpty(name) && location != null &&
         !Strings.isNullOrEmpty(className) && !Strings.isNullOrEmpty(apiVersion)) {
       return new DataSource(name, location, className, apiVersion);
     }

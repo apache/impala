@@ -47,6 +47,7 @@ import org.apache.impala.extdatasource.v1.ExternalDataSource;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TStatus;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -107,15 +108,14 @@ public class ExternalDataSourceExecutor {
 
   /**
    * @param jarPath The local path to the jar containing the ExternalDataSource.
+   *     It is null or empty if the jar file of data source is already in classpath.
    * @param className The name of the class implementing the ExternalDataSource.
    * @param apiVersionStr The API version the ExternalDataSource implements.
-   *                         Must be a valid value of {@link ApiVersion}.
+   *     Must be a valid value of {@link ApiVersion}.
    * @param initString The init string registered with this data source.
    */
   public ExternalDataSourceExecutor(String jarPath, String className,
       String apiVersionStr, String initString) throws ImpalaException {
-    Preconditions.checkNotNull(jarPath);
-
     apiVersion_ = ApiVersion.valueOf(apiVersionStr);
     if (apiVersion_ == null) {
       throw new ImpalaRuntimeException("Invalid API version: " + apiVersionStr);
@@ -130,8 +130,8 @@ public class ExternalDataSourceExecutor {
       dataSource_ = (ExternalDataSource) ctor.newInstance();
     } catch (Exception ex) {
       throw new ImpalaRuntimeException(String.format("Unable to load external data " +
-          "source library from path=%s className=%s apiVersion=%s", jarPath,
-          className, apiVersionStr), ex);
+          "source library from path=%s className=%s apiVersion=%s",
+          jarPath != null ? jarPath : "Impala classpath", className, apiVersionStr), ex);
     }
   }
 
@@ -141,6 +141,11 @@ public class ExternalDataSourceExecutor {
    */
   private Class<?> getDataSourceClass() throws Exception {
     Class<?> c = null;
+    if (Strings.isNullOrEmpty(jarPath_)) {
+      c = Class.forName(className_);
+      LOG.trace("Get instance of DataSourceClass in current ClassLoader");
+      return c;
+    }
     // Cache map key needs to contain both the class name and init string in case
     // the same class is used for multiple tables where some are cached and others
     // are not.
@@ -248,8 +253,8 @@ public class ExternalDataSourceExecutor {
     }
     String errorMessage = String.format(
         "Error in data source (path=%s, class=%s, version=%s) %s: %s",
-        jarPath_, className_, apiVersion_.name(), opName,
-        exceptionMessage);
+        jarPath_ != null ? jarPath_ : "Impala classpath", className_, apiVersion_.name(),
+        opName, exceptionMessage);
     LOG.error(errorMessage, e); // Logs the stack
     return new TStatus(TErrorCode.RUNTIME_ERROR, Lists.newArrayList(errorMessage));
   }
