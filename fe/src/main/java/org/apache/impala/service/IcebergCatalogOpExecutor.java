@@ -367,7 +367,16 @@ public class IcebergCatalogOpExecutor {
       DeleteFile deleteFile = createDeleteFile(feIcebergTable, buf);
       rowDelta.addDeletes(deleteFile);
     }
-    validateAndCommitRowDelta(rowDelta, icebergOp.getInitial_snapshot_id());
+    try {
+      // Validate that there are no conflicting data files, because if data files are
+      // added in the meantime, they potentially contain records that should have been
+      // affected by this DELETE operation.
+      rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
+      rowDelta.validateNoConflictingDataFiles();
+      rowDelta.commit();
+    } catch (ValidationException e) {
+      throw new ImpalaRuntimeException(e.getMessage(), e);
+    }
   }
 
   private static void updateRows(FeIcebergTable feIcebergTable, Transaction txn,
@@ -384,14 +393,15 @@ public class IcebergCatalogOpExecutor {
       DataFile dataFile = createDataFile(feIcebergTable, buf);
       rowDelta.addRows(dataFile);
     }
-    validateAndCommitRowDelta(rowDelta, icebergOp.getInitial_snapshot_id());
-  }
-
-  private static void validateAndCommitRowDelta(RowDelta rowDelta,
-      long initialSnapshotId) throws ImpalaRuntimeException {
     try {
-      rowDelta.validateFromSnapshot(initialSnapshotId);
+      // Validate that there are no conflicting data files, because if data files are
+      // added in the meantime, they potentially contain records that should have been
+      // affected by this UPDATE operation. Also validate that there are no conflicting
+      // delete files, because we don't want to revive records that have been deleted
+      // in the meantime.
+      rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
       rowDelta.validateNoConflictingDataFiles();
+      rowDelta.validateNoConflictingDeleteFiles();
       rowDelta.commit();
     } catch (ValidationException e) {
       throw new ImpalaRuntimeException(e.getMessage(), e);
