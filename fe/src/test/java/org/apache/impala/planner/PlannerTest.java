@@ -577,7 +577,11 @@ public class PlannerTest extends PlannerTestBase {
   public void testSmallQueryOptimization() {
     TQueryOptions options = new TQueryOptions();
     options.setExec_single_node_rows_threshold(8);
-    runPlannerTestFile("small-query-opt", options);
+    addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
+    addTestTable("CREATE EXTERNAL TABLE kudu_planner_test.no_stats STORED AS KUDU "
+        + "TBLPROPERTIES ('kudu.table_name' = 'impala::functional_kudu.alltypes');");
+    runPlannerTestFile("small-query-opt", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
@@ -679,9 +683,6 @@ public class PlannerTest extends PlannerTestBase {
     options.unsetEnabled_runtime_filter_types();
     options.addToEnabled_runtime_filter_types(TRuntimeFilterType.BLOOM);
     options.addToEnabled_runtime_filter_types(TRuntimeFilterType.MIN_MAX);
-    addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
-    addTestTable("CREATE EXTERNAL TABLE kudu_planner_test.no_stats STORED AS KUDU " +
-        "TBLPROPERTIES ('kudu.table_name' = 'impala::functional_kudu.alltypes');");
     runPlannerTestFile("kudu", options);
   }
 

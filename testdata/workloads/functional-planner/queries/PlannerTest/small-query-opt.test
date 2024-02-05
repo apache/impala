@@ -449,3 +449,202 @@ PLAN-ROOT SINK
    partition key scan
    row-size=4B cardinality=1.82K
 ====
+# testbl is an empty table. It does not have stats computed and query has no limit.
+# Query should run without 'small query' optimization.
+select * from functional.testtbl;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.testtbl]
+   HDFS partitions=1/1 files=0 size=0B
+   row-size=24B cardinality=0
+====
+# testbl is an empty table, but has limit less than 8.
+# 'small query' optimization is enabled.
+select * from functional.testtbl limit 4;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.testtbl]
+   HDFS partitions=1/1 files=0 size=0B
+   limit: 4
+   row-size=24B cardinality=0
+====
+# testbl does not have stats computed.
+# But its input cardinality is estimated to be 0 and query has limit.
+# 'small query' optimization is enabled.
+select * from functional.testtbl limit 1000;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.testtbl]
+   HDFS partitions=1/1 files=0 size=0B
+   limit: 1000
+   row-size=24B cardinality=0
+====
+# functional.tinytable has no stats and not empty.
+# Query should run without 'small query' optimization.
+select * from functional.tinytable;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.tinytable]
+   HDFS partitions=1/1 files=1 size=38B
+   row-size=24B cardinality=2
+====
+# tinytable has no stats, but has limit less than 8.
+# 'small query' optimization is enabled.
+select * from functional.tinytable limit 4;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.tinytable]
+   HDFS partitions=1/1 files=1 size=38B
+   limit: 4
+   row-size=24B cardinality=2
+====
+# tinytable does not have stats computed.
+# But its input cardinality is estimated to be 2 and query has limit.
+# 'small query' optimization is enabled.
+select * from functional.tinytable limit 1000;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.tinytable]
+   HDFS partitions=1/1 files=1 size=38B
+   limit: 1000
+   row-size=24B cardinality=2
+====
+# functional_kudu.tinytable has stats and its input cardinality is 3.
+# Query should run with 'small query' optimization even without limit.
+select * from functional_kudu.tinytable;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.tinytable]
+   row-size=43B cardinality=3
+====
+# If input cardinality < EXEC_SINGLE_NODE_ROWS_THRESHOLD < limit,
+# then the query should run with 'small query' optimization.
+select * from functional_kudu.tinytable limit 1000;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.tinytable]
+   limit: 1000
+   row-size=43B cardinality=3
+====
+# kudu_planner_test.no_stats has no stats computed and query has no limit.
+# Query should run without 'small query' optimization.
+select * from kudu_planner_test.no_stats;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [kudu_planner_test.no_stats]
+   row-size=88B cardinality=unavailable
+====
+# kudu_planner_test.no_stats has no stats computed and
+# query has limit less than 8. 'small query' optimization is enabled.
+select * from kudu_planner_test.no_stats limit 7;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [kudu_planner_test.no_stats]
+   limit: 7
+   row-size=88B cardinality=7
+====
+# kudu_planner_test.no_stats has no stats computed and query has limit more than 8.
+# 'small query' optimization is disabled.
+select * from kudu_planner_test.no_stats limit 1000;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1000
+|
+00:SCAN KUDU [kudu_planner_test.no_stats]
+   limit: 1000
+   row-size=88B cardinality=1.00K
+====
+# IMPALA-5602: If a query contains predicates that are all pushed to kudu and there is a
+# limit, then the query should not incorrectly run with 'small query' optimization.
+select * from functional_kudu.alltypesagg where tinyint_col = 9 limit 7;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 7
+|
+00:SCAN KUDU [functional_kudu.alltypesagg_idx]
+   kudu predicates: functional_kudu.alltypesagg_idx.tinyint_col = 9
+   limit: 7
+   row-size=103B cardinality=7
+====
+# IMPALA-5602: If a query contains predicates that are all pushed to kudu, there is a
+# limit, and no table stats, then the query should not incorrectly run with 'small query'
+# optimization.
+select * from kudu_planner_test.no_stats where tinyint_col = 9 limit 7;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 7
+|
+00:SCAN KUDU [kudu_planner_test.no_stats]
+   kudu predicates: tinyint_col = 9
+   limit: 7
+   row-size=88B cardinality=0
+====
+# alltypes_datasource has estimated input cardinality of 5000.
+# Query should run without 'small query' optimization.
+select * from functional.alltypes_datasource;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+   row-size=116B cardinality=5.00K
+====
+# limit is less than 8. 'small query' optimization is enabled.
+select * from functional.alltypes_datasource limit 7;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+   limit: 7
+   row-size=116B cardinality=7
+====
+# limit is more than 8. 'small query' optimization is disabled.
+select * from functional.alltypes_datasource limit 1000;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1000
+|
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+   limit: 1000
+   row-size=116B cardinality=1.00K
+====
+# IMPALA-5602: If a query contains predicates that are all pushed to the datasource and
+# there is a limit, then the query should not incorrectly run with 'small query'
+# optimization.
+select * from functional.alltypes_datasource where id = 1 limit 7
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 7
+|
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+data source predicates: id = 1
+   limit: 7
+   row-size=116B cardinality=7
+====

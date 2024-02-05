@@ -139,3 +139,64 @@ max-parallelism=21 segment-costs=[194962048, 2276043]
    tuple-ids=0 row-size=24B cardinality=2.88M cost=91267504
    in pipelines: 00(GETNEXT)
 ====
+select * from income_band;
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=4.02MB Threads=2
+Per-Host Resource Estimates: Memory=20MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[61]
+PLAN-ROOT SINK
+|  output exprs: tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk, tpcds_partitioned_parquet_snap.income_band.ib_lower_bound, tpcds_partitioned_parquet_snap.income_band.ib_upper_bound
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=60
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=20 cost=1
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
+max-parallelism=1 segment-costs=[50002]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
+   HDFS partitions=1/1 files=1 size=1.21KB
+   stored statistics:
+     table: rows=20 size=1.21KB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=20
+   mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+   tuple-ids=0 row-size=12B cardinality=20 cost=50001
+   in pipelines: 00(GETNEXT)
+====
+# Scan cost should be exactly the same as select star without limit.
+select * from income_band limit 1000000000;
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=4.02MB Threads=2
+Per-Host Resource Estimates: Memory=20MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[61]
+PLAN-ROOT SINK
+|  output exprs: tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk, tpcds_partitioned_parquet_snap.income_band.ib_lower_bound, tpcds_partitioned_parquet_snap.income_band.ib_upper_bound
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=60
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1000000000
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=20 cost=1
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
+max-parallelism=1 segment-costs=[50002]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
+   HDFS partitions=1/1 files=1 size=1.21KB
+   stored statistics:
+     table: rows=20 size=1.21KB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=20
+   limit: 1000000000
+   mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+   tuple-ids=0 row-size=12B cardinality=20 cost=50001
+   in pipelines: 00(GETNEXT)
+====

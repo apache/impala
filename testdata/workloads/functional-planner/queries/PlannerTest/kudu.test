@@ -511,35 +511,6 @@ INSERT INTO KUDU [default.t]
    partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
-# IMPALA-5602: If a query contains predicates that are all pushed to kudu and there is a
-# limit, then the query should not incorrectly run with 'small query' optimization.
-select * from functional_kudu.alltypesagg where tinyint_col = 9 limit 10;
----- DISTRIBUTEDPLAN
-PLAN-ROOT SINK
-|
-01:EXCHANGE [UNPARTITIONED]
-|  limit: 10
-|
-00:SCAN KUDU [functional_kudu.alltypesagg_idx]
-   kudu predicates: functional_kudu.alltypesagg_idx.tinyint_col = 9
-   limit: 10
-   row-size=103B cardinality=10
-====
-# IMPALA-5602: If a query contains predicates that are all pushed to kudu, there is a
-# limit, and no table stats, then the query should not incorrectly run with 'small query'
-# optimization.
-select * from kudu_planner_test.no_stats where tinyint_col = 9 limit 10;
----- DISTRIBUTEDPLAN
-PLAN-ROOT SINK
-|
-01:EXCHANGE [UNPARTITIONED]
-|  limit: 10
-|
-00:SCAN KUDU [kudu_planner_test.no_stats]
-   kudu predicates: tinyint_col = 9
-   limit: 10
-   row-size=88B cardinality=10
-====
 # Insert into an unpartitioned table, shouldn't partition/sort
 insert into tpch_kudu.nation
 select * from tpch_parquet.nation

@@ -324,20 +324,36 @@ abstract public class ScanNode extends PlanNode {
     return result;
   }
 
+  /**
+   * Return true if this scan node has limit, no scan conjunct,
+   * and no storage layer conjunct. Otherwise, return false.
+   * This is mainly used to determine whether a scan's input cardinality can be bounded by
+   * the LIMIT clause or not.
+   */
+  public boolean hasSimpleLimit() {
+    return hasLimit() && !hasScanConjuncts() && !hasStorageLayerConjuncts();
+  }
+
+  private long capInputCardinalityWithLimit(long inputCardinality) {
+    if (hasSimpleLimit()) {
+      if (inputCardinality < 0) {
+        return getLimit();
+      } else {
+        return Math.min(getLimit(), inputCardinality);
+      }
+    }
+    return inputCardinality;
+  }
+
   @Override
   public long getInputCardinality() {
-    if (!hasScanConjuncts() && !hasStorageLayerConjuncts() && hasLimit()) {
-      return getLimit();
-    }
-    return inputCardinality_;
+    return capInputCardinalityWithLimit(inputCardinality_);
   }
 
   // TODO: merge this with getInputCardinality().
   public long getFilteredInputCardinality() {
-    if (!hasScanConjuncts() && !hasStorageLayerConjuncts() && hasLimit()) {
-      return getLimit();
-    }
-    return filteredInputCardinality_ > -1 ? filteredInputCardinality_ : inputCardinality_;
+    return capInputCardinalityWithLimit(
+        filteredInputCardinality_ > -1 ? filteredInputCardinality_ : inputCardinality_);
   }
 
   @Override

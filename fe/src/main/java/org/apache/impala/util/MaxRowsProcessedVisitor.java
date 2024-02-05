@@ -50,12 +50,11 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
       boolean missingStats = scan.isTableMissingStats() || scan.hasCorruptTableStats();
       // In the absence of collection stats, treat scans on collections as if they
       // have no limit.
-      if (scan.isAccessingCollectionType() ||
-          (missingStats && !(scan.hasLimit() && !scan.hasScanConjuncts() &&
-              !scan.hasStorageLayerConjuncts()))) {
+      if (scan.isAccessingCollectionType() || (missingStats && !scan.hasSimpleLimit())) {
         valid_ = false;
         return;
       }
+      Preconditions.checkState(numRows > -1);
       maxRowsProcessed_ = Math.max(maxRowsProcessed_, numRows);
       maxRowsProcessedPerNode_ = Math.max(maxRowsProcessedPerNode_,
           (long)Math.ceil(numRows / (double)numNodes));
