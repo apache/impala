@@ -971,3 +971,35 @@ describe functional_parquet.iceberg_query_metadata.all_entries;
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
+---- QUERY
+show metadata tables in functional_parquet.iceberg_query_metadata;
+---- RESULTS
+'all_data_files'
+'all_delete_files'
+'all_entries'
+'all_files'
+'all_manifests'
+'data_files'
+'delete_files'
+'entries'
+'files'
+'history'
+'manifests'
+'metadata_log_entries'
+'partitions'
+'position_deletes'
+'refs'
+'snapshots'
+---- TYPES
+STRING
+====
+---- QUERY
+show metadata tables in functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: The SHOW METADATA TABLES statement is only valid for Iceberg tables: 'functional_parquet.alltypestiny' is not an Iceberg table.
+====
+---- QUERY
+show metadata tables in functional_parquet.iceberg_view;
+---- CATCH
+AnalysisException: The SHOW METADATA TABLES statement is only valid for Iceberg tables: 'functional_parquet.iceberg_view' is not an Iceberg table.
+====

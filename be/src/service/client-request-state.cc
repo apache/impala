@@ -366,12 +366,27 @@ Status ClientRequestState::ExecLocalCatalogOp(
       // A NULL pattern means match all tables of the specified table types. However,
       // Thrift string types can't be NULL in C++, so we have to test if it's set rather
       // than just blindly using the value.
-      const string* table_name =
-          params->__isset.show_pattern ? &(params->show_pattern) : NULL;
+      const string* table_name_pattern =
+          params->__isset.show_pattern ? &(params->show_pattern) : nullptr;
       TGetTablesResult table_names;
       const set<TImpalaTableType::type>& table_types = params->table_types;
-      RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
+      RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name_pattern,
           &query_ctx_.session, table_types, &table_names));
+      SetResultSet(table_names.tables);
+      return Status::OK();
+    }
+    case TCatalogOpType::SHOW_METADATA_TABLES: {
+      const TShowTablesParams* params = &catalog_op.show_tables_params;
+      // A NULL pattern means match all tables of the specified table types. However,
+      // Thrift string types can't be NULL in C++, so we have to test if it's set rather
+      // than just blindly using the value.
+      const string* metadata_table_name_pattern =
+          params->__isset.show_pattern ? &(params->show_pattern) : nullptr;
+      DCHECK(params->__isset.tbl);
+      const string& table_name = params->tbl;
+      TGetTablesResult table_names;
+      RETURN_IF_ERROR(frontend_->GetMetadataTableNames(params->db, table_name,
+          metadata_table_name_pattern, &query_ctx_.session, &table_names));
       SetResultSet(table_names.tables);
       return Status::OK();
     }

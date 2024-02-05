@@ -28,8 +28,8 @@ package org.apache.impala.analysis;
  * SHOW TABLES IN database "pattern"
  * SHOW TABLES IN database LIKE "pattern"
  *
- * In Hive, the 'LIKE' is optional. Also SHOW TABLES unquotedpattern is accepted
- * by the parser but returns no results. We don't support that syntax.
+ * As in Hive, the 'LIKE' is optional. In Hive, also SHOW TABLES unquotedpattern is
+ * accepted by the parser but returns no results. We don't support that syntax.
  */
 public class ShowTablesStmt extends ShowTablesOrViewsStmt {
   public ShowTablesStmt() { super(null, null); }
@@ -40,18 +40,18 @@ public class ShowTablesStmt extends ShowTablesOrViewsStmt {
 
   @Override
   public String toSql(ToSqlOptions options) {
-    if (getPattern() == null) {
-      if (getParsedDb() == null) {
-        return "SHOW TABLES";
-      } else {
-        return "SHOW TABLES IN " + getParsedDb();
-      }
-    } else {
-      if (getParsedDb() == null) {
-        return "SHOW TABLES LIKE '" + getPattern() + "'";
-      } else {
-        return "SHOW TABLES IN " + getParsedDb() + " LIKE '" + getPattern() + "'";
-      }
+    StringBuilder sb = new StringBuilder("SHOW TABLES");
+
+    String parsedDb = getParsedDb();
+    if (parsedDb != null) {
+      sb.append(" IN ").append(parsedDb);
     }
+
+    String pattern = getPattern();
+    if (pattern != null) {
+      sb.append(" LIKE '").append(pattern).append("'");
+    }
+
+    return sb.toString();
   }
 }

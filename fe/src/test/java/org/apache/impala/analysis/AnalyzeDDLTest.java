@@ -4106,6 +4106,17 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("show tables");
     AnalyzesOk("show tables like '*pattern'");
 
+    AnalyzesOk("show tables in functional");
+    AnalyzesOk("show tables in functional like '*pattern'");
+
+    AnalyzesOk("show metadata tables in functional_parquet.iceberg_query_metadata");
+    AnalyzesOk(
+        "show metadata tables in functional_parquet.iceberg_query_metadata like 'e*|f*'");
+
+    AnalysisError("show metadata tables in functional_parquet.alltypes",
+        "The SHOW METADATA TABLES statement is only valid for Iceberg tables: " +
+        "'functional_parquet.alltypes' is not an Iceberg table.");
+
     for (String fnType: new String[]{"", "aggregate", "analytic"}) {
       AnalyzesOk(String.format("show %s functions", fnType));
       AnalyzesOk(String.format("show %s functions like '*pattern'", fnType));

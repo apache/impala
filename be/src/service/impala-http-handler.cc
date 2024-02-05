@@ -962,7 +962,7 @@ void ImpalaHttpHandler::CatalogHandler(const Webserver::WebRequest& req,
 
     TGetTablesResult get_table_results;
     status = server_->exec_env_->frontend()->GetTableNames(
-        db.db_name, NULL, NULL, &get_table_results);
+        db.db_name, nullptr, nullptr, &get_table_results);
     if (!status.ok()) {
       Value error(status.GetDetail().c_str(), document->GetAllocator());
       database.AddMember("error", error, document->GetAllocator());

@@ -119,6 +119,9 @@ public class AnalysisContext {
     public boolean isUseStmt() { return stmt_ instanceof UseStmt; }
     public boolean isSetStmt() { return stmt_ instanceof SetStmt; }
     public boolean isShowTablesStmt() { return stmt_ instanceof ShowTablesStmt; }
+    public boolean isShowMetadataTablesStmt() {
+      return stmt_ instanceof ShowMetadataTablesStmt;
+    }
     public boolean isShowViewsStmt() { return stmt_ instanceof ShowViewsStmt; }
     public boolean isDescribeHistoryStmt() {
       return stmt_ instanceof DescribeHistoryStmt;
@@ -177,9 +180,9 @@ public class AnalysisContext {
     }
 
     private boolean isViewMetadataStmt() {
-      return isShowFilesStmt() || isShowTablesStmt() || isShowViewsStmt() ||
-          isShowDbsStmt() || isShowFunctionsStmt() || isShowRolesStmt() ||
-          isShowGrantPrincipalStmt() || isShowCreateTableStmt() ||
+      return isShowFilesStmt() || isShowTablesStmt() || isShowMetadataTablesStmt() ||
+          isShowViewsStmt() || isShowDbsStmt() || isShowFunctionsStmt() ||
+          isShowRolesStmt() || isShowGrantPrincipalStmt() || isShowCreateTableStmt() ||
           isShowDataSrcsStmt() || isShowStatsStmt() || isDescribeTableStmt() ||
           isDescribeDbStmt() || isShowCreateFunctionStmt() || isDescribeHistoryStmt();
     }
@@ -211,8 +214,8 @@ public class AnalysisContext {
      */
     public boolean isSingleColumnPrivStmt() {
       return isDescribeTableStmt() || isResetMetadataStmt() || isUseStmt()
-          || isShowTablesStmt() || isShowViewsStmt() || isAlterTableStmt()
-          || isShowFunctionsStmt();
+          || isShowTablesStmt() || isShowMetadataTablesStmt() || isShowViewsStmt()
+          || isAlterTableStmt() || isShowFunctionsStmt();
     }
 
     public boolean isConvertTableToIcebergStmt() {
@@ -326,6 +329,11 @@ public class AnalysisContext {
     public ShowTablesStmt getShowTablesStmt() {
       Preconditions.checkState(isShowTablesStmt());
       return (ShowTablesStmt) stmt_;
+    }
+
+    public ShowMetadataTablesStmt getShowMetadataTablesStmt() {
+      Preconditions.checkState(isShowMetadataTablesStmt());
+      return (ShowMetadataTablesStmt) stmt_;
     }
 
     public ShowViewsStmt getShowViewsStmt() {

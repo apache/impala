@@ -1897,7 +1897,7 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   /**
-   * Test SHOW TABLES statements are output correctly.
+   * Tests that SHOW TABLES statements are output correctly.
    */
   @Test
   public void testShowTables() {
@@ -1906,6 +1906,21 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("SHOW TABLES LIKE 'alltypes*'", "functional",
         "SHOW TABLES LIKE 'alltypes*'");
     testToSql("SHOW TABLES IN functional LIKE 'alltypes*'");
+  }
+
+  /**
+   * Tests that SHOW METADATA TABLES statements are output correctly.
+   */
+  @Test
+  public void testShowMetadataTables() {
+    String q1 = "SHOW METADATA TABLES IN iceberg_query_metadata";
+    testToSql(q1, "functional_parquet", q1);
+    String q2 = "SHOW METADATA TABLES IN iceberg_query_metadata LIKE '*file*'";
+    testToSql(q2, "functional_parquet", q2);
+
+    testToSql("SHOW METADATA TABLES IN functional_parquet.iceberg_query_metadata");
+    testToSql("SHOW METADATA TABLES IN functional_parquet.iceberg_query_metadata " +
+        "LIKE '*file*'");
   }
 
   /**

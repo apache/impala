@@ -63,6 +63,7 @@ import org.apache.hadoop.hive.metastore.api.LockType;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.iceberg.HistoryEntry;
+import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.impala.analysis.AlterDbStmt;
@@ -586,6 +587,11 @@ public class Frontend {
     } else if (analysis.isShowTablesStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_TABLES;
       ddl.setShow_tables_params(analysis.getShowTablesStmt().toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("name", Type.STRING.toThrift())));
+    } else if (analysis.isShowMetadataTablesStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_METADATA_TABLES;
+      ddl.setShow_tables_params(analysis.getShowMetadataTablesStmt().toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isShowViewsStmt()) {
@@ -1148,17 +1154,34 @@ public class Frontend {
     return getTableNames(dbName, matcher, user, /*tableTypes*/ Collections.emptySet());
   }
 
-  /**
-   * Returns tables of types specified in 'tableTypes' in database 'dbName' that
-   * match the pattern of 'matcher' and are accessible to 'user'.
+  /** Returns the names of the tables of types specified in 'tableTypes' in database
+   * 'dbName' that are accessible to 'user'. Only tables that match the pattern of
+   * 'matcher' are returned.
    */
-  public List<String> getTableNames(String dbName, PatternMatcher matcher,
-      User user, Set<TImpalaTableType> tableTypes) throws ImpalaException {
+  public List<String> getTableNames(String dbName, PatternMatcher matcher, User user,
+      Set<TImpalaTableType> tableTypes) throws ImpalaException {
     RetryTracker retries = new RetryTracker(
         String.format("fetching %s table names", dbName));
     while (true) {
       try {
-        return doGetTableNames(dbName, matcher, user, tableTypes);
+        return doGetCatalogTableNames(dbName, matcher, user, tableTypes);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  /** Returns the metadata tables available for the given table. Currently only Iceberg
+   * metadata tables are supported. Only tables that match the pattern of 'matcher' are
+   * returned.
+   */
+  public List<String> getMetadataTableNames(String dbName, String tblName,
+      PatternMatcher matcher, User user) throws ImpalaException {
+    RetryTracker retries = new RetryTracker(
+        String.format("fetching %s table names to query metadata table list", dbName));
+    while (true) {
+      try {
+        return doGetMetadataTableNames(dbName, tblName, matcher, user);
       } catch(InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
@@ -1193,12 +1216,8 @@ public class Frontend {
           "Check the server log for more details.");
   }
 
-  private List<String> doGetTableNames(String dbName, PatternMatcher matcher,
-      User user, Set<TImpalaTableType> tableTypes)
+  private void filterTablesIfAuthNeeded(String dbName, User user, List<String> tblNames)
       throws ImpalaException {
-    FeCatalog catalog = getCatalog();
-    List<String> tblNames = catalog.getTableNames(dbName, matcher, tableTypes);
-
     boolean needsAuthChecks = authzFactory_.getAuthorizationConfig().isEnabled()
                               && !userHasAccessForWholeDb(user, dbName);
 
@@ -1214,7 +1233,7 @@ public class Frontend {
         // 'owned' tables for a given user just because the metadata is not loaded.
         // TODO(IMPALA-8937): Figure out a way to load Table/Database ownership
         // information when fetching the table lists from HMS.
-        FeTable table = catalog.getTableIfCached(dbName, tblName);
+        FeTable table = getCatalog().getTableIfCached(dbName, tblName);
         String tableOwner = table.getOwnerUser();
         if (tableOwner == null) {
           LOG.info("Table {} not yet loaded, ignoring it in table listing.",
@@ -1226,8 +1245,37 @@ public class Frontend {
 
       filterUnaccessibleElements(pendingCheckTasks, tblNames);
     }
+  }
+
+  private List<String> doGetCatalogTableNames(String dbName, PatternMatcher matcher,
+      User user, Set<TImpalaTableType> tableTypes) throws ImpalaException {
+    FeCatalog catalog = getCatalog();
+    List<String> tblNames = catalog.getTableNames(dbName, matcher, tableTypes);
+
+    filterTablesIfAuthNeeded(dbName, user, tblNames);
 
     return tblNames;
+  }
+
+  private List<String> doGetMetadataTableNames(String dbName, String catalogTblName,
+      PatternMatcher matcher, User user)
+      throws ImpalaException {
+    FeTable catalogTbl = getCatalog().getTable(dbName, catalogTblName);
+    // Analysis ensures that only Iceberg tables are passed to this function.
+    Preconditions.checkState(catalogTbl instanceof FeIcebergTable);
+
+    List<String> listToFilter = new ArrayList<>();
+    listToFilter.add(catalogTblName);
+
+    filterTablesIfAuthNeeded(dbName, user, listToFilter);
+    if (listToFilter.isEmpty()) return Collections.emptyList();
+
+    List<String> metadataTblNames = Arrays.stream(MetadataTableType.values())
+      .map(tblType -> tblType.toString().toLowerCase())
+      .collect(Collectors.toList());
+    List<String> filteredMetadataTblNames = Catalog.filterStringsByPattern(
+        metadataTblNames, matcher);
+    return filteredMetadataTblNames;
   }
 
   /**

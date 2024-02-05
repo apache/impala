@@ -83,6 +83,22 @@ struct TGetTablesParams {
   4: optional set<CatalogService.TImpalaTableType> table_types = []
 }
 
+// Arguments to getMetadataTableNames, which returns the list of metadata tables of the
+// specified table.
+struct TGetMetadataTablesParams {
+  1: required string db
+
+  2: required string tbl
+
+  // If not set, match every table
+  3: optional string pattern
+
+  // Session state for the user who initiated this request. If authorization is
+  // enabled, only the tables this user has access to will be returned. If not
+  // set, access checks will be skipped (used for internal Impala requests)
+  4: optional Query.TSessionState session
+}
+
 // getTableNames returns a list of unqualified table names
 struct TGetTablesResult {
   1: list<string> tables
@@ -253,18 +269,21 @@ struct TShowFunctionsParams {
   3: optional string show_pattern
 }
 
-// Parameters for SHOW TABLES and SHOW VIEWS commands
+// Parameters for SHOW TABLES, SHOW METADATA TABLES and SHOW VIEWS commands
 struct TShowTablesParams {
   // Database to use for SHOW TABLES
   1: optional string db
 
+  // Set for querying the metadata tables of the given table.
+  2: optional string tbl
+
   // Optional pattern to match tables names. If not set, all tables from the given
   // database are returned.
-  2: optional string show_pattern
+  3: optional string show_pattern
 
   // This specifies the types of tables that should be returned. If not set, all types of
   // tables are considered when their names are matched against pattern.
-  3: optional set<CatalogService.TImpalaTableType> table_types = []
+  4: optional set<CatalogService.TImpalaTableType> table_types = []
 }
 
 // Parameters for SHOW FILES commands
@@ -441,6 +460,7 @@ enum TCatalogOpType {
   SHOW_CREATE_FUNCTION = 14
   DESCRIBE_HISTORY = 15
   SHOW_VIEWS = 16
+  SHOW_METADATA_TABLES = 17
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field

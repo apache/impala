@@ -3885,6 +3885,14 @@ DELETE FROM {db_name}{db_suffix}.{table_name} WHERE i = 2;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_view
+---- CREATE
+CREATE VIEW {db_name}{db_suffix}.{table_name} AS
+SELECT * FROM  {db_name}{db_suffix}.iceberg_query_metadata;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 iceberg_lineitem_multiblock
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}

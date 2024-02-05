@@ -101,6 +101,47 @@ class TestAuthorization(CustomClusterTestSuite):
     assert_file_in_dir_contains(self.impala_log_dir, "Ignoring removed flag "
                                                      "authorization_policy_file")
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala --authorization_provider=ranger "
+                 "--min_privilege_set_for_show_stmts=select",
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala --authorization_provider=ranger")
+  def test_ranger_show_iceberg_metadata_tables(self, unique_name):
+    unique_db = unique_name + "_db"
+    tbl_name = "ice"
+    full_tbl_name = "{}.{}".format(unique_db, tbl_name)
+    non_existent_suffix = "_a"
+    non_existent_tbl_name = full_tbl_name + non_existent_suffix
+    priv = "select"
+    user = getuser()
+    query = "show metadata tables in {}".format(full_tbl_name)
+    query_non_existent = "show metadata tables in {}".format(non_existent_tbl_name)
+    admin_client = self.create_impala_client()
+    try:
+      admin_client.execute("create database {}".format(unique_db), user=ADMIN)
+      admin_client.execute(
+          "create table {} (i int) stored as iceberg".format(full_tbl_name), user=ADMIN)
+
+      # Check that when the user has no privileges on the database, the error is the same
+      # if we try an existing or a non-existing table.
+      exc1_str = str(self.execute_query_expect_failure(self.client, query, user=user))
+      exc2_str = str(self.execute_query_expect_failure(self.client, query_non_existent,
+          user=user))
+      assert exc1_str == exc2_str
+      assert "AuthorizationException" in exc1_str
+      assert "does not have privileges to access"
+
+      # Check that there is no error when the user has access to the table.
+      admin_client.execute("grant {priv} on database {db} to user {user}".format(
+          priv=priv, db=unique_db, user=user))
+      self.execute_query_expect_success(self.client, query, user=user)
+    finally:
+      admin_client.execute("revoke {priv} on database {db} from user {user}".format(
+          priv=priv, db=unique_db, user=user), user=ADMIN)
+      admin_client.execute("drop database if exists {} cascade".format(unique_db))
+
   @staticmethod
   def _verify_show_dbs(result, unique_name, visibility_privileges=PRIVILEGES):
     """ Helper function for verifying the results of SHOW DATABASES below.

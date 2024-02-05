@@ -60,16 +60,16 @@ class Frontend {
   /// Get the metrics from the catalog used by this frontend.
   Status GetCatalogMetrics(TGetCatalogMetricsResult* resp);
 
-  /// Get all matching table names, per Hive's "SHOW TABLES <pattern>" regardless of the
-  /// table type.
+  /// Returns all matching table names, per Hive's "SHOW TABLES <pattern>" regardless of
+  /// the table type.
   Status GetTableNames(const std::string& db, const std::string* pattern,
       const TSessionState* session, TGetTablesResult* table_names);
 
   /// Returns all matching table names, per Hive's "SHOW TABLES <pattern>" such that each
   /// corresponds to a table whose type is in table_types for a non-empty table_types.
-  /// Each table name returned is unqualified.
-  /// If table_types is empty, then all types of tables will be considered when their
-  /// table names are matched against the pattern.
+  /// Each table name returned is unqualified. If table_types is empty, then all types of
+  /// tables will be considered when their table names are matched against the pattern.
+  ///
   /// If pattern is NULL, match all tables otherwise match only those tables that
   /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   /// and each pN may contain wildcards denoted by '*' which match all strings.
@@ -81,6 +81,13 @@ class Frontend {
   Status GetTableNames(const std::string& db, const std::string* pattern,
       const TSessionState* session, const std::set<TImpalaTableType::type>& table_types,
       TGetTablesResult* table_names);
+
+  /// Returns the list of metadata tables for the given table that match the pattern.
+  /// 'pattern' and 'session' are used as in GetTableNames(). Currently only Iceberg
+  /// metadata tables are supported.
+  Status GetMetadataTableNames(const string& db, const string& table_name,
+      const string* pattern, const TSessionState* session,
+      TGetTablesResult* metadata_table_names);
 
   /// Return all databases matching the optional argument 'pattern'.
   /// If pattern is NULL, match all databases otherwise match only those databases that
@@ -251,6 +258,7 @@ class Frontend {
   jmethodID update_membership_id_; // JniFrontend.updateExecutorMembership()
   jmethodID get_catalog_metrics_id_; // JniFrontend.getCatalogMetrics()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
+  jmethodID get_metadata_table_names_id_; // JniFrontend.getMetadataTableNames
   jmethodID describe_db_id_; // JniFrontend.describeDb
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID show_create_table_id_; // JniFrontend.showCreateTable

@@ -110,6 +110,7 @@ Frontend::Frontend() {
     {"updateExecutorMembership", "([B)V", &update_membership_id_},
     {"getCatalogMetrics", "()[B", &get_catalog_metrics_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
+    {"getMetadataTableNames", "([B)[B", &get_metadata_table_names_id_},
     {"describeDb", "([B)[B", &describe_db_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"showCreateTable", "([B)Ljava/lang/String;", &show_create_table_id_},
@@ -217,9 +218,21 @@ Status Frontend::GetTableNames(const string& db, const string* pattern,
   TGetTablesParams params;
   params.__set_db(db);
   params.__set_table_types(table_types);
-  if (pattern != NULL) params.__set_pattern(*pattern);
-  if (session != NULL) params.__set_session(*session);
+  if (pattern != nullptr) params.__set_pattern(*pattern);
+  if (session != nullptr) params.__set_session(*session);
   return JniUtil::CallJniMethod(fe_, get_table_names_id_, params, table_names);
+}
+
+Status Frontend::GetMetadataTableNames(const string& db, const string& table_name,
+    const string* pattern, const TSessionState* session,
+    TGetTablesResult* metadata_table_names) {
+  TGetMetadataTablesParams params;
+  params.__set_db(db);
+  params.__set_tbl(table_name);
+  if (pattern != nullptr) params.__set_pattern(*pattern);
+  if (session != nullptr) params.__set_session(*session);
+  return JniUtil::CallJniMethod(fe_, get_metadata_table_names_id_, params,
+      metadata_table_names);
 }
 
 Status Frontend::GetDbs(const string* pattern, const TSessionState* session,

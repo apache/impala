@@ -381,6 +381,7 @@ nonterminal UseStmt use_stmt;
 nonterminal SetStmt set_stmt;
 nonterminal SetStmt unset_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
+nonterminal ShowMetadataTablesStmt show_metadata_tables_stmt;
 nonterminal ShowViewsStmt show_views_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal ShowStatsStmt show_stats_stmt, show_partitions_stmt,
@@ -681,6 +682,8 @@ stmt ::=
   {: RESULT = use; :}
   | show_tables_stmt:show_tables
   {: RESULT = show_tables; :}
+  | show_metadata_tables_stmt:show_metadata_tables
+  {: RESULT = show_metadata_tables; :}
   | show_views_stmt:show_views
   {: RESULT = show_views; :}
   | show_dbs_stmt:show_dbs
@@ -2936,6 +2939,15 @@ show_tables_stmt ::=
   {: RESULT = new ShowTablesStmt(db, null); :}
   | KW_SHOW KW_TABLES KW_IN ident_or_default:db show_pattern:showPattern
   {: RESULT = new ShowTablesStmt(db, showPattern); :}
+  ;
+
+show_metadata_tables_stmt ::=
+  KW_SHOW KW_METADATA KW_TABLES KW_IN table_name:tbl_name
+  {: RESULT = new ShowMetadataTablesStmt(tbl_name.getDb(), tbl_name.getTbl(), null); :}
+  | KW_SHOW KW_METADATA KW_TABLES KW_IN table_name:tbl_name
+      show_pattern:showPattern
+  {: RESULT = new ShowMetadataTablesStmt(
+      tbl_name.getDb(), tbl_name.getTbl(), showPattern); :}
   ;
 
 show_views_stmt ::=

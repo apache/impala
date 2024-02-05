@@ -1253,6 +1253,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     }
     test.error(accessError("functional.*.*"));
 
+    // Show metadata tables in table.
+    test = authorize("show metadata tables in functional_parquet.iceberg_query_metadata");
+    test.error(accessError("functional_parquet"));
+
+    for (TPrivilegeLevel privilege: allExcept(TPrivilegeLevel.RWSTORAGE)) {
+      // Test that even if we have privileges on a different table in the same db, we
+      // still can't access 'iceberg_query_metadata' if we don't have privileges on it.
+      test.error(accessError("functional_parquet.iceberg_query_metadata"),
+          onTable("functional_parquet", "alltypes", privilege));
+      test.ok(onTable("functional_parquet", "iceberg_query_metadata", privilege));
+    }
+
     // Show views.
     test = authorize("show views in functional");
     // We exclude TPrivilegeLevel.RWSTORAGE because of the same reason mentioned above.

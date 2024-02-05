@@ -78,6 +78,7 @@ import org.apache.impala.thrift.TGetHadoopConfigResponse;
 import org.apache.impala.thrift.TGetHadoopGroupsRequest;
 import org.apache.impala.thrift.TGetHadoopGroupsResponse;
 import org.apache.impala.thrift.TGetTableHistoryResult;
+import org.apache.impala.thrift.TGetMetadataTablesParams;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLoadDataReq;
@@ -94,6 +95,7 @@ import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
 import org.apache.impala.thrift.TDescribeHistoryParams;
+import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
@@ -256,10 +258,11 @@ public class JniFrontend {
   }
 
   /**
-   * Implement Hive's pattern-matching semantics for "SHOW TABLE [[LIKE] 'pattern']", and
-   * return a list of table names matching an optional pattern.
-   * The only metacharacters are '*' which matches any string of characters, and '|'
-   * which denotes choice.  Doing the work here saves loading tables or databases from the
+   * Returns a list of table names matching an optional pattern.
+   *
+   * Implements Hive's pattern-matching semantics for "SHOW TABLE [[LIKE] 'pattern']". The
+   * only metacharacters are '*' which matches any string of characters, and '|' which
+   * denotes choice. Doing the work here saves loading tables or databases from the
    * metastore (which Hive would do if we passed the call through to the metastore
    * client). If the pattern is null, all strings are considered to match. If it is an
    * empty string, no strings match.
@@ -272,15 +275,48 @@ public class JniFrontend {
     Preconditions.checkNotNull(frontend_);
     TGetTablesParams params = new TGetTablesParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
-    // If the session was not set it indicates this is an internal Impala call.
-    User user = params.isSetSession() ?
-        new User(TSessionStateUtil.getEffectiveUser(params.getSession())) :
-        ImpalaInternalAdminUser.getInstance();
+
+    TSessionState session = params.isSetSession() ? params.getSession() : null;
+    User user = getUser(session);
 
     Preconditions.checkState(!params.isSetSession() || user != null );
     List<String> tables = frontend_.getTableNames(params.db,
         PatternMatcher.createHivePatternMatcher(params.pattern), user,
         params.getTable_types());
+
+    TGetTablesResult result = new TGetTablesResult();
+    result.setTables(tables);
+
+    try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Returns the metadata tables available for the given table. Currently only Iceberg
+   * metadata tables are supported.
+   *
+   * Pattern matching is done as in getTableNames().
+   *
+   * The argument is a serialized TGetMetadataTablesParams object.
+   * The return type is a serialised TGetTablesResult object.
+   * @see Frontend#getTableNames
+   */
+  public byte[] getMetadataTableNames(byte[] thriftGetMetadataTablesParams)
+      throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TGetMetadataTablesParams params = new TGetMetadataTablesParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftGetMetadataTablesParams);
+
+    TSessionState session = params.isSetSession() ? params.getSession() : null;
+    User user = getUser(session);
+
+    Preconditions.checkState(!params.isSetSession() || user != null );
+    List<String> tables = frontend_.getMetadataTableNames(params.db, params.tbl,
+        PatternMatcher.createHivePatternMatcher(params.pattern), user);
 
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
@@ -326,10 +362,10 @@ public class JniFrontend {
     Preconditions.checkNotNull(frontend_);
     TGetDbsParams params = new TGetDbsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
-    // If the session was not set it indicates this is an internal Impala call.
-    User user = params.isSetSession() ?
-        new User(TSessionStateUtil.getEffectiveUser(params.getSession())) :
-        ImpalaInternalAdminUser.getInstance();
+
+    TSessionState session = params.isSetSession() ? params.getSession() : null;
+    User user = getUser(session);
+
     List<? extends FeDb> dbs = frontend_.getDbs(
         PatternMatcher.createHivePatternMatcher(params.pattern), user);
     TGetDbsResult result = new TGetDbsResult();
@@ -921,6 +957,14 @@ public class JniFrontend {
     }
 
     return output.toString();
+  }
+
+  private User getUser(TSessionState session) {
+    // If the session was not set it indicates this is an internal Impala call.
+    User user = session == null ?
+        ImpalaInternalAdminUser.getInstance() :
+        new User(TSessionStateUtil.getEffectiveUser(session));
+    return user;
   }
 
   /**

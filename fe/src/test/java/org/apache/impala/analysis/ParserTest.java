@@ -1994,6 +1994,13 @@ public class ParserTest extends FrontendTestBase {
     // Empty pattern ok
     ParsesOk("SHOW TABLES ''");
     ParsesOk("SHOW VIEWS ''");
+    // Querying metadata tables: SHOW METADATA TABLES IN db.tbl
+    ParsesOk("SHOW METADATA TABLES IN tbl");
+    ParsesOk("SHOW METADATA TABLES IN tbl 'e*'");
+    ParsesOk("SHOW METADATA TABLES IN tbl LIKE 'e*'");
+    ParsesOk("SHOW METADATA TABLES IN db.tbl");
+    ParsesOk("SHOW METADATA TABLES IN db.tbl 'e*'");
+    ParsesOk("SHOW METADATA TABLES IN db.tbl LIKE 'e*'");
     // Databases
     ParsesOk("SHOW DATABASES");
     ParsesOk("SHOW SCHEMAS");
@@ -2044,6 +2051,10 @@ public class ParserTest extends FrontendTestBase {
     // Malformed pattern (no quotes)
     ParserError("SHOW TABLES tablename");
     ParserError("SHOW VIEWS tablename");
+    // Missing keyword METADATA when listing metadata tables
+    ParserError("SHOW TABLES IN db.tbl");
+    // Trying to list the metadata tables of a metadata table
+    ParserError("SHOW METADATA TABLES IN db.tbl.files");
     // Invalid SHOW DATA SOURCE statements
     ParserError("SHOW DATA");
     ParserError("SHOW SOURCE");
