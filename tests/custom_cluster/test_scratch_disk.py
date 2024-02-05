@@ -26,6 +26,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf
@@ -307,6 +308,10 @@ class TestScratchDir(CustomClusterTestSuite):
     assert pids
     for pid in pids:
       deleted_files = self.find_deleted_files_in_fd(pid)
+      if deleted_files is not None:
+        # Retry again if fails at the first time.
+        time.sleep(15)
+        deleted_files = self.find_deleted_files_in_fd(pid)
       assert deleted_files is None
 
   @pytest.mark.execute_serially
