@@ -109,9 +109,9 @@ public class HBaseTable extends Table implements FeHBaseTable {
       List<Column> cols;
       try {
         hbaseTableName_ = Util.getHBaseTableName(getMetaStoreTable());
-        // Warm up the connection and verify the table exists.
-        Util.getHBaseTable(hbaseTableName_).close();
         columnFamilies_ = null;
+        // Warm up the connection and verify the table exists.
+        getColumnFamilies();
         cols = Util.loadColumns(msTable_);
       } finally {
         storageMetadataLoadTime_ = storageLoadTimer.stop();
@@ -138,9 +138,9 @@ public class HBaseTable extends Table implements FeHBaseTable {
     super.loadFromThrift(table);
     try {
       hbaseTableName_ = Util.getHBaseTableName(getMetaStoreTable());
-      // Warm up the connection and verify the table exists.
-      Util.getHBaseTable(hbaseTableName_).close();
       columnFamilies_ = null;
+      // Warm up the connection and verify the table exists.
+      getColumnFamilies();
     } catch (Exception e) {
       throw new TableLoadingException(
           "Failed to load metadata for HBase table from thrift table: " + name_, e);

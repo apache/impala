@@ -146,6 +146,11 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
     new_vector.get_value('exec_option')['TIMEZONE'] = '"Europe/Budapest"'
     self.run_test_case('QueryTest/struct-in-select-list', new_vector)
 
+  @SkipIfFS.hbase
+  def test_struct_in_select_list_hbase(self, vector):
+    """Verify error cases that are not supported on HBase tables"""
+    self.run_test_case('QueryTest/struct-in-select-list-hbase', vector)
+
   def test_nested_struct_in_select_list(self, vector):
     """Queries where a nested struct column is in the select list"""
     new_vector = deepcopy(vector)

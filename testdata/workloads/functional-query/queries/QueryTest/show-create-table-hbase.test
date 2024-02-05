@@ -1,0 +1,25 @@
+====
+---- QUERY
+SHOW CREATE TABLE functional_hbase.alltypes
+---- RESULTS-HIVE
+CREATE EXTERNAL TABLE functional_hbase.alltypes (
+  id INT COMMENT 'Add a comment',
+  bigint_col BIGINT,
+  bool_col BOOLEAN,
+  date_string_col STRING,
+  double_col DOUBLE,
+  float_col FLOAT,
+  int_col INT,
+  month INT,
+  smallint_col SMALLINT,
+  string_col STRING,
+  timestamp_col TIMESTAMP,
+  tinyint_col TINYINT,
+  year INT
+)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col,d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col,d:date_string_col,d:string_col,d:timestamp_col,d:year,d:month',
+                      'serialization.format'='1')
+TBLPROPERTIES ('hbase.table.name'='functional_hbase.alltypes',
+               'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler')
+====

@@ -472,6 +472,12 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/alter-table-set-column-stats', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
+  @SkipIfFS.hbase
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_alter_hbase_set_column_stats(self, vector, unique_database):
+    self.run_test_case('QueryTest/alter-hbase-table-set-column-stats', vector,
+        use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
+
   @SkipIfLocal.hdfs_client
   def test_drop_partition_with_purge(self, vector, unique_database):
     """Verfies whether alter <tbl> drop partition purge actually skips trash"""

@@ -1,0 +1,59 @@
+====
+---- QUERY
+create external table alltypes_hbase_clone like functional_hbase.alltypes
+====
+---- QUERY
+alter table alltypes_hbase_clone set column stats double_col ('numDVs'='2');
+alter table alltypes_hbase_clone set column stats timestamp_col ('numNulls'='9');
+alter table alltypes_hbase_clone set column stats int_col ('numDVs'='100','numNulls'='20');
+alter table alltypes_hbase_clone set column stats string_col ('maxSize'='555','avgSize'='60');
+====
+---- QUERY
+show column stats alltypes_hbase_clone
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',100,20,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',2,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,555,60,-1,-1
+'timestamp_col','TIMESTAMP',-1,9,16,16,-1,-1
+'year','INT',-1,-1,4,4,-1,-1
+'month','INT',-1,-1,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# Reset the column stats to an unknown state by setting the values to -1
+alter table alltypes_hbase_clone set column stats double_col ('numDVs'='-1');
+alter table alltypes_hbase_clone set column stats timestamp_col ('numNulls'='-1');
+alter table alltypes_hbase_clone set column stats int_col ('numDVs'='-1','numNulls'='-1');
+alter table alltypes_hbase_clone set column stats string_col ('maxSize'='-1','avgSize'='-1');
+====
+---- QUERY
+show column stats alltypes_hbase_clone
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',-1,-1,4,4,-1,-1
+'month','INT',-1,-1,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====

@@ -1,0 +1,8 @@
+====
+---- QUERY
+# It's not supported to create a view with structs from a table type that doesn't
+# support selecting structs.
+create view tmp_view as select id, int_struct_col from functional_hbase.allcomplextypes;
+---- CATCH
+is not supported when querying STRUCT type STRUCT<f1:INT,f2:INT>
+====
