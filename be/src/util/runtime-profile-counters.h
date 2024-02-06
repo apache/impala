@@ -816,6 +816,7 @@ class RuntimeProfile::SamplingTimeSeriesCounter
     : public RuntimeProfile::TimeSeriesCounter {
  private:
   friend class RuntimeProfile;
+  friend class ToJson_TimeSeriesCounterToJsonTest_Test;
 
   SamplingTimeSeriesCounter(
       const std::string& name, TUnit::type unit, SampleFunction fn, int initial_period)
@@ -823,6 +824,9 @@ class RuntimeProfile::SamplingTimeSeriesCounter
 
   virtual void AddSampleLocked(int64_t sample, int ms_elapsed) override;
   virtual const int64_t* GetSamplesLocked( int* num_samples, int* period) const override;
+
+  /// Reset the underlying StreamingCounterSampler to the initial state. Used in tests.
+  void Reset();
 
   StreamingCounterSampler samples_;
 };

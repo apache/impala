@@ -1839,11 +1839,14 @@ TEST(ToJson, TimeSeriesCounterToJsonTest) {
   FLAGS_status_report_interval_ms = 50000;
   RuntimeProfile::TimeSeriesCounter* counter =
       profile->AddChunkedTimeSeriesCounter("TimeSeriesCounter", TUnit::UNIT, sample_fn);
-  RuntimeProfile::TimeSeriesCounter* counter2 =
-      profile->AddSamplingTimeSeriesCounter("SamplingCounter", TUnit::UNIT, sample_fn);
+  auto counter2 = static_cast<RuntimeProfile::SamplingTimeSeriesCounter*>(
+      profile->AddSamplingTimeSeriesCounter("SamplingCounter", TUnit::UNIT, sample_fn));
 
   // Stop counter updates from interfering with the rest of the test.
   StopAndClearCounter(profile, counter);
+  // ChunkedTimeSeriesCounters are stopped and cleared above.
+  // But SamplingTimeSeriesCounter needs explicitly Reset() to back to the initial state.
+  counter2->Reset();
 
   // Reset value after previous values have been retrieved.
   value = 0;
@@ -1853,15 +1856,17 @@ TEST(ToJson, TimeSeriesCounterToJsonTest) {
   for (int i = 0; i < 80; ++i) counter2->AddSample(test_period);
 
   profile->ToJson(&doc);
+  EXPECT_EQ(doc["contents"]["time_series_counters"][1]["counter_name"],
+      "TimeSeriesCounter");
   EXPECT_STR_CONTAINS(
       doc["contents"]["time_series_counters"][1]["data"].GetString(), "0,1,2,3,4");
-
   EXPECT_STR_CONTAINS(
       doc["contents"]["time_series_counters"][1]["data"].GetString(), "60,61,62,63");
 
+  EXPECT_EQ(doc["contents"]["time_series_counters"][0]["counter_name"],
+      "SamplingCounter");
   EXPECT_STR_CONTAINS(
       doc["contents"]["time_series_counters"][0]["data"].GetString(), "0,2,4,6");
-
   EXPECT_STR_CONTAINS(
       doc["contents"]["time_series_counters"][0]["data"].GetString(), "72,74,76,78");
 }

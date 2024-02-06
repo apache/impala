@@ -2071,6 +2071,10 @@ const int64_t* RuntimeProfile::SamplingTimeSeriesCounter::GetSamplesLocked(
   return samples_.GetSamples(num_samples, period);
 }
 
+void RuntimeProfile::SamplingTimeSeriesCounter::Reset() {
+    samples_.Reset();
+}
+
 RuntimeProfile::ChunkedTimeSeriesCounter::ChunkedTimeSeriesCounter(
     const string& name, TUnit::type unit, SampleFunction fn)
   : TimeSeriesCounter(name, unit, fn)
