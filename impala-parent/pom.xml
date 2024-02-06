@@ -146,7 +146,7 @@ under the License.
       <url>https://repository.cloudera.com/artifactory/cdh-releases-rcs</url>
       <name>CDH Releases Repository</name>
       <snapshots>
-        <enabled>true</enabled>
+        <enabled>false</enabled>
       </snapshots>
     </repository>
     <repository>
