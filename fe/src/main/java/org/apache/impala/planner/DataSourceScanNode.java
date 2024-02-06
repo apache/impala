@@ -35,6 +35,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.analysis.TimestampLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
@@ -140,10 +141,16 @@ public class DataSourceScanNode extends ScanNode {
       case DATE:
         return new TColumnValue().setDate_val(
             (int) ((DateLiteral) expr).getValue());
+      case TIMESTAMP:
+        /**
+         * timestamp is of the ISO 8601 format(SQL standard): 'yyyy-mm-dd hh:mm:ss.ms'
+         * We are using string representation and not binary representation here as all
+         * Literals will finally be converted to string for pushdown.
+         */
+        return new TColumnValue().setString_val(
+            ((TimestampLiteral) expr).getStringValue());
       case DECIMAL:
       case DATETIME:
-      case TIMESTAMP:
-        // TODO: we support DECIMAL, TIMESTAMP and DATE but no way to specify it in SQL.
         return null;
       default:
         Preconditions.checkState(false);

@@ -281,6 +281,147 @@ where date_col between DATE '2009-03-01' and DATE '2009-04-01' order by id limit
 INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 ====
 ---- QUERY
+# Gets specified columns based on timestamp predicate with operator '='.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col = '2009-01-02 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+12,true,2,2.200000047683716,20.2,2009-01-02,2009-01-02 00:12:00.460000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '='
+# with empty result.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col = '1990-01-02 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '>'.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col > '2009-01-02 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+13,false,3,3.299999952316284,30.3,2009-01-02,2009-01-02 00:13:00.480000000
+14,true,4,4.400000095367432,40.4,2009-01-02,2009-01-02 00:14:00.510000000
+15,false,5,5.5,50.5,2009-01-02,2009-01-02 00:15:00.550000000
+16,true,6,6.599999904632568,60.59999999999999,2009-01-02,2009-01-02 00:16:00.600000000
+17,false,7,7.699999809265137,70.7,2009-01-02,2009-01-02 00:17:00.660000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '>'
+# with empty result.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col > '2990-01-01 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '<'.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col < '2009-01-02 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+0,true,0,0,0,2009-01-01,2009-01-01 00:00:00
+1,false,1,1.100000023841858,10.1,2009-01-01,2009-01-01 00:01:00
+2,true,2,2.200000047683716,20.2,2009-01-01,2009-01-01 00:02:00.100000000
+3,false,3,3.299999952316284,30.3,2009-01-01,2009-01-01 00:03:00.300000000
+4,true,4,4.400000095367432,40.4,2009-01-01,2009-01-01 00:04:00.600000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '<'
+# with empty result.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col <  '1990-01-01 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '>='.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col >= '2009-01-02 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+12,true,2,2.200000047683716,20.2,2009-01-02,2009-01-02 00:12:00.460000000
+13,false,3,3.299999952316284,30.3,2009-01-02,2009-01-02 00:13:00.480000000
+14,true,4,4.400000095367432,40.4,2009-01-02,2009-01-02 00:14:00.510000000
+15,false,5,5.5,50.5,2009-01-02,2009-01-02 00:15:00.550000000
+16,true,6,6.599999904632568,60.59999999999999,2009-01-02,2009-01-02 00:16:00.600000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '<='.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col <= '2009-01-02 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+0,true,0,0,0,2009-01-01,2009-01-01 00:00:00
+1,false,1,1.100000023841858,10.1,2009-01-01,2009-01-01 00:01:00
+2,true,2,2.200000047683716,20.2,2009-01-01,2009-01-01 00:02:00.100000000
+3,false,3,3.299999952316284,30.3,2009-01-01,2009-01-01 00:03:00.300000000
+4,true,4,4.400000095367432,40.4,2009-01-01,2009-01-01 00:04:00.600000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator '!='.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col != '2009-01-02 00:12:00.460000000' order by id limit 5;
+---- RESULTS
+0,true,0,0,0,2009-01-01,2009-01-01 00:00:00
+1,false,1,1.100000023841858,10.1,2009-01-01,2009-01-01 00:01:00
+2,true,2,2.200000047683716,20.2,2009-01-01,2009-01-01 00:02:00.100000000
+3,false,3,3.299999952316284,30.3,2009-01-01,2009-01-01 00:03:00.300000000
+4,true,4,4.400000095367432,40.4,2009-01-01,2009-01-01 00:04:00.600000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate with operator 'between'.
+select count(*) from alltypes_jdbc_datasource where timestamp_col between
+'2009-01-03 00:12:00' and '2009-01-05 00:12:00'
+---- RESULTS
+20
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate without time in timestamp.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col > '2009-01-03' order by id limit 5;
+---- RESULTS
+20,true,0,0,0,2009-01-03,2009-01-03 00:20:00.900000000
+21,false,1,1.100000023841858,10.1,2009-01-03,2009-01-03 00:21:00.900000000
+22,true,2,2.200000047683716,20.2,2009-01-03,2009-01-03 00:22:00.910000000
+23,false,3,3.299999952316284,30.3,2009-01-03,2009-01-03 00:23:00.930000000
+24,true,4,4.400000095367432,40.4,2009-01-03,2009-01-03 00:24:00.960000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns based on timestamp predicate without milisecond in timestamp.
+select id, bool_col, smallint_col, float_col, double_col, date_col, timestamp_col
+from alltypes_jdbc_datasource
+where timestamp_col > '2009-01-03 00:22:00' order by id limit 5;
+---- RESULTS
+22,true,2,2.200000047683716,20.2,2009-01-03,2009-01-03 00:22:00.910000000
+23,false,3,3.299999952316284,30.3,2009-01-03,2009-01-03 00:23:00.930000000
+24,true,4,4.400000095367432,40.4,2009-01-03,2009-01-03 00:24:00.960000000
+25,false,5,5.5,50.5,2009-01-03,2009-01-03 00:25:01
+26,true,6,6.599999904632568,60.59999999999999,2009-01-03,2009-01-03 00:26:01.500000000
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE, TIMESTAMP
+====
+---- QUERY
 # Drop table
 DROP TABLE alltypes_jdbc_datasource;
 ---- RESULTS

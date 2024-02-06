@@ -103,3 +103,25 @@ PLAN-ROOT SINK
 |
 00:EMPTYSET
 ====
+# IMPALA-12815: Support timestamp as external datasource scan predicates
+select * from functional.alltypes_jdbc_datasource where date_col > DATE '2009-01-02'
+and timestamp_col > '2009-01-02 00:12:00' limit 15
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN DATA SOURCE [functional.alltypes_jdbc_datasource]
+data source predicates: date_col > DATE '2009-01-02', timestamp_col > TIMESTAMP '2009-01-02 00:12:00'
+   limit: 15
+   row-size=64B cardinality=1
+====
+# IMPALA-12815: use timestamp with cast() and to_timestamp()
+select * from functional.alltypes_jdbc_datasource where timestamp_col between
+date_add(cast('2009-01-01' as timestamp), interval 1 day) and to_timestamp('Jan 04, 2009', 'MMM dd, yyyy') limit 15;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN DATA SOURCE [functional.alltypes_jdbc_datasource]
+data source predicates: timestamp_col >= TIMESTAMP '2009-01-02 00:00:00', timestamp_col <= TIMESTAMP '2009-01-04 00:00:00'
+   limit: 15
+   row-size=64B cardinality=1
+====
