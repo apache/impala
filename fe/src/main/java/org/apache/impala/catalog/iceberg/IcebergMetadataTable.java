@@ -31,6 +31,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.VirtualTable;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumnDescriptor;
@@ -73,7 +74,8 @@ public class IcebergMetadataTable extends VirtualTable {
         metadataTableSchema)) {
       LOG.trace("Adding column: \"{}\" with type: \"{}\" to metadata table.",
           col.getName(), col.getType());
-      addColumn(col);
+      addColumn(IcebergColumn.cloneWithNullability(
+          (IcebergColumn)col, true /*isNullable*/));
     }
   }
 

@@ -98,9 +98,12 @@ class TestLineage(CustomClusterTestSuite):
   def run_test_create_table_timestamp(self, unique_database, table_format):
     """Test that 'createTableTime' in the lineage graph are populated with valid value
        from HMS."""
-    query = "create table {0}.lineage_test_tbl_{1} primary key (int_col) stored as {1} " \
-            "as select int_col, bigint_col from functional.alltypes".format(
-                unique_database, table_format)
+    not_enforced = ""
+    if table_format == "iceberg":
+      not_enforced = " NOT ENFORCED"
+    query = "create table {0}.lineage_test_tbl_{1} primary key (int_col) {2} " \
+        "stored as {1} as select int_col, bigint_col from functional.alltypes".format(
+            unique_database, table_format, not_enforced)
     result = self.execute_query_expect_success(self.client, query)
     profile_query_id = re.search("Query \(id=(.*)\):", result.runtime_profile).group(1)
 

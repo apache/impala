@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeDb;
@@ -39,6 +40,7 @@ import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.THdfsFileFormat;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 
 /**
  * Represents a CREATE TABLE AS SELECT (CTAS) statement
@@ -186,6 +188,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // Add the columns from the select statement to the create statement.
     int colCnt = tmpQueryStmt.getColLabels().size();
+    Set<String> hashedPrimaryKeyColNames =
+        Sets.newHashSet(createStmt_.getTblPrimaryKeyColumnNames());
     for (int i = 0; i < colCnt; ++i) {
       ColumnDef colDef = new ColumnDef(tmpQueryStmt.getColLabels().get(i), null,
           Collections.<ColumnDef.Option, Object>emptyMap());
@@ -194,6 +198,11 @@ public class CreateTableAsSelectStmt extends StatementBase {
         throw new AnalysisException(String.format("Unable to infer the column type " +
             "for column '%s'. Use cast() to explicitly specify the column type for " +
             "column '%s'.", colDef.getColName(), colDef.getColName()));
+      }
+      if (createStmt_.getFileFormat() == THdfsFileFormat.ICEBERG &&
+          hashedPrimaryKeyColNames.contains(colDef.getColName())) {
+        // Iceberg tables require NOT NULL column config for primary key columns.
+        colDef.setNullable(false);
       }
       createStmt_.getColumnDefs().add(colDef);
     }
@@ -239,7 +248,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
           partSpec = createStmt_.getIcebergPartitionSpecs().get(0);
         }
         tmpTable = new IcebergCtasTarget(db, msTbl, createStmt_.getColumnDefs(),
-            partSpec);
+            createStmt_.getTblPrimaryKeyColumnNames(), partSpec);
       } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
         tmpTable = db.createFsCtasTarget(msTbl);
       }

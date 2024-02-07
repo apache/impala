@@ -854,3 +854,90 @@ alter table functional_parquet.iceberg_v2_delete_equality_partitioned drop colum
 ---- CATCH
 Failed to ALTER table 'iceberg_v2_delete_equality_partitioned': Cannot delete identifier field 2: s: required string.
 ====
+---- QUERY
+create table ice_pk_column_def (i int not null primary key) stored as iceberg;
+---- CATCH
+AnalysisException: Unsupported column options for file format 'ICEBERG': 'i INT PRIMARY KEY NOT NULL'
+====
+---- QUERY
+create table ice_pk_column_def (i int primary key) stored as iceberg;
+---- CATCH
+AnalysisException: Unsupported column options for file format 'ICEBERG': 'i INT PRIMARY KEY'
+====
+---- QUERY
+create table ice_tbl_with_pk (i int not null, primary key(i)) stored as iceberg;
+---- CATCH
+AnalysisException: Iceberg tables only support NOT ENFORCED primary keys.
+====
+---- QUERY
+create table ice_tbl_with_pk (i int, j int, primary key(i) not enforced) stored as iceberg;
+---- CATCH
+Cannot add field i as an identifier field: not a required field
+====
+---- QUERY
+create table ice_tbl_with_pk (i int not null, j int, primary key(i, j) not enforced)
+    partitioned by spec (j)
+    stored as iceberg;
+---- CATCH
+Cannot add field j as an identifier field: not a required field
+====
+---- QUERY
+create table ice_tbl_float_pk (f float not null, s string not null, d date not null, primary key(f) not enforced) stored as iceberg;
+---- CATCH
+IllegalArgumentException: Cannot add field f as an identifier field: must not be float or double field
+====
+---- QUERY
+create table ice_tbl_double_pk (db double not null, s string not null, d date not null, primary key(db) not enforced) stored as iceberg;
+---- CATCH
+IllegalArgumentException: Cannot add field db as an identifier field: must not be float or double field
+====
+---- QUERY
+create table ice_tbl_with_pk (i int, j int, primary key(i) not enforced)
+  partitioned by spec (j)
+  stored as iceberg;
+---- CATCH
+AnalysisException: Partition columns have to be part of the primary key for Iceberg tables.
+====
+---- QUERY
+create table ice_tbl_with_pk (i int not null, j int not null, k int,  primary key(i, j) not enforced)
+  partitioned by spec (j, k)
+  stored as iceberg;
+---- CATCH
+AnalysisException: Partition columns have to be part of the primary key for Iceberg tables.
+====
+---- QUERY
+create table ice_tbl_with_pk_partition_transform
+    (i int not null, s string not null, d date not null, primary key(s) not enforced)
+    partitioned by spec (day(d), truncate(3,s), bucket(10, s))
+    stored as iceberg;
+---- CATCH
+AnalysisException: Partition columns have to be part of the primary key for Iceberg tables.
+====
+---- QUERY
+create table ice_tbl_with_pk (i int not null, j int not null, primary key(i) not enforced) stored as iceberg;
+alter table ice_tbl_with_pk drop column i;
+---- CATCH
+Cannot delete identifier field 1: i: required int
+====
+---- QUERY
+create table ctas_pk
+  primary key(int_col)
+  stored as iceberg
+  as select * from functional_parquet.alltypes;
+---- CATCH
+AnalysisException: Iceberg tables only support NOT ENFORCED primary keys.
+====
+---- QUERY
+create table ctas_pk
+  primary key(int_col) not enforced
+  partitioned by spec (string_col)
+  stored as iceberg
+  as select * from functional_parquet.alltypes;
+---- CATCH
+AnalysisException: Partition columns have to be part of the primary key for Iceberg tables.
+====
+---- QUERY
+alter table ice_tbl_with_pk set partition spec (j)
+---- CATCH
+Not allowed to do partition evolution on Iceberg tables with primary keys.
+====

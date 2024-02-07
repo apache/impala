@@ -89,11 +89,11 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   private HdfsStorageDescriptor hdfsSd_;
 
   public IcebergCtasTarget(FeDb db, org.apache.hadoop.hive.metastore.api.Table msTbl,
-      List<ColumnDef> columnDefs, IcebergPartitionSpec partSpec)
-      throws CatalogException, ImpalaRuntimeException {
+        List<ColumnDef> columnDefs, List<String> primaryKeyNames,
+        IcebergPartitionSpec partSpec) throws CatalogException, ImpalaRuntimeException {
     super(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     createFsTable(db, msTbl);
-    createIcebergSchema(columnDefs);
+    createIcebergSchema(columnDefs, primaryKeyNames);
     createPartitionSpec(partSpec);
     icebergCatalog_ = IcebergUtil.getTIcebergCatalog(msTbl);
     setLocations();
@@ -105,13 +105,14 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
     hdfsSd_ = HdfsStorageDescriptor.fromStorageDescriptor(name_, msTable_.getSd());
   }
 
-  private void createIcebergSchema(List<ColumnDef> columnDefs) throws CatalogException {
+  private void createIcebergSchema(List<ColumnDef> columnDefs,
+      List<String> primaryKeyNames) throws CatalogException {
     List<TColumn> tcols = new ArrayList<>();
     for (ColumnDef col : columnDefs) {
       tcols.add(col.toThrift());
     }
     try {
-      iceSchema_ = IcebergSchemaConverter.genIcebergSchema(tcols);
+      iceSchema_ = IcebergSchemaConverter.genIcebergSchema(tcols, primaryKeyNames);
       // In genIcebergSchema() we did our best to assign correct field ids to columns,
       // but to be sure, let's use Iceberg's API function to assign field ids.
       iceSchema_ = TypeUtil.assignIncreasingFreshIds(iceSchema_);

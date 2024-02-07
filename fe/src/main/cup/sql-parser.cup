@@ -308,7 +308,7 @@ terminal
   KW_COMPUTE, KW_CONSTRAINT, KW_CONVERT, KW_COPY, KW_CREATE, KW_CROSS, KW_CUBE, KW_CURRENT, KW_DATA,
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DEFAULT, KW_DELETE,
   KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISABLE, KW_DISTINCT, KW_DIV, KW_DOUBLE,
-  KW_DROP, KW_ELSE, KW_ENABLE, KW_ENCODING, KW_END, KW_ESCAPED, KW_EXCEPT, KW_EXECUTE,
+  KW_DROP, KW_ELSE, KW_ENABLE, KW_ENCODING, KW_END, KW_ENFORCED, KW_ESCAPED, KW_EXCEPT, KW_EXECUTE,
   KW_EXISTS, KW_EXPLAIN, KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT,
   KW_FILES, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FOREIGN,
   KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GRANT,
@@ -1676,6 +1676,8 @@ primary_keys ::=
   KW_PRIMARY key_ident LPAREN ident_list:col_names RPAREN
   {: RESULT = new Pair<List<String>, Boolean>(col_names, true); :}
   | KW_NON KW_UNIQUE KW_PRIMARY key_ident LPAREN ident_list:col_names RPAREN
+  {: RESULT = new Pair<List<String>, Boolean>(col_names, false); :}
+  | KW_PRIMARY key_ident LPAREN ident_list:col_names RPAREN KW_NOT KW_ENFORCED
   {: RESULT = new Pair<List<String>, Boolean>(col_names, false); :}
   ;
 
@@ -4306,6 +4308,8 @@ word ::=
   | KW_ENCODING:r
   {: RESULT = r.toString(); :}
   | KW_END:r
+  {: RESULT = r.toString(); :}
+  | KW_ENFORCED:r
   {: RESULT = r.toString(); :}
   | KW_ESCAPED:r
   {: RESULT = r.toString(); :}

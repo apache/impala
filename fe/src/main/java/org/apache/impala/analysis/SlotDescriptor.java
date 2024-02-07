@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TSlotDescriptor;
@@ -170,10 +171,13 @@ public class SlotDescriptor {
     type_ = path_.destType();
     label_ = Joiner.on(".").join(path.getRawPath());
 
-    // Set nullability, if this refers to a KuduColumn.
+    // Set nullability based on column type.
     if (path_.destColumn() instanceof KuduColumn) {
       KuduColumn kuduColumn = (KuduColumn)path_.destColumn();
       isNullable_ = kuduColumn.isNullable();
+    } else if (path_.destColumn() instanceof IcebergColumn) {
+      IcebergColumn icebergColumn = (IcebergColumn)path_.destColumn();
+      isNullable_ = icebergColumn.isNullable();
     }
   }
 

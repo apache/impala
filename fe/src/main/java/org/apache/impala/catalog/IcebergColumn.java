@@ -48,6 +48,13 @@ public class IcebergColumn extends Column {
     isNullable_ = isNullable;
   }
 
+  public static IcebergColumn cloneWithNullability(IcebergColumn source,
+      boolean isNullable) {
+    return new IcebergColumn(source.name_, source.type_, source.comment_,
+        source.position_, source.fieldId_, source.fieldMapKeyId_, source.fieldMapKeyId_,
+        isNullable);
+  }
+
   public int getFieldId() {
     return fieldId_;
   }

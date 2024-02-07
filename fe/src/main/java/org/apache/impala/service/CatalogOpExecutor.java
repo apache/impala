@@ -3560,7 +3560,8 @@ public class CatalogOpExecutor {
     } else if (IcebergTable.isIcebergTable(tbl)) {
       return createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,
           params.if_not_exists, params.getColumns(), params.getPartition_spec(),
-          params.getTable_properties(), params.getComment());
+          params.getPrimary_key_column_names(), params.getTable_properties(),
+          params.getComment());
     }
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
@@ -3934,7 +3935,8 @@ public class CatalogOpExecutor {
   private boolean createIcebergTable(org.apache.hadoop.hive.metastore.api.Table newTable,
       boolean wantMinimalResult, TDdlExecResponse response, EventSequence catalogTimeline,
       boolean ifNotExists, List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
-      Map<String, String> tableProperties, String tblComment) throws ImpalaException {
+      List<String> primaryKeyColumnNames, Map<String, String> tableProperties,
+      String tblComment) throws ImpalaException {
     Preconditions.checkState(IcebergTable.isIcebergTable(newTable));
 
     acquireMetastoreDdlLock(catalogTimeline);
@@ -3969,7 +3971,8 @@ public class CatalogOpExecutor {
             }
             String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
                 IcebergUtil.getIcebergTableIdentifier(newTable), location, columns,
-                partitionSpec, newTable.getOwner(), tableProperties).location();
+                partitionSpec, primaryKeyColumnNames, newTable.getOwner(),
+                tableProperties).location();
             newTable.getSd().setLocation(tableLoc);
             catalogTimeline.markEvent(CREATED_ICEBERG_TABLE + catalog.name());
           } else {
@@ -4196,8 +4199,9 @@ public class CatalogOpExecutor {
       TIcebergPartitionSpec partitionSpec = srcIceTable.getDefaultPartitionSpec()
           .toThrift();
       createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,
-          params.if_not_exists, columns, partitionSpec, tableProperties,
-          params.getComment());
+          params.if_not_exists, columns, partitionSpec,
+          Lists.newArrayList(srcIceTable.getIcebergSchema().identifierFieldNames()),
+          tableProperties, params.getComment());
     } else if (srcTable instanceof KuduTable && KuduTable.isKuduTable(tbl)) {
       TCreateTableParams createTableParams =
           extractKuduCreateTableParams(params, tblName, (KuduTable) srcTable, tbl);

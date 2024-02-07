@@ -18,10 +18,10 @@
 package org.apache.impala.service;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Collections;
 
 import org.apache.iceberg.AppendFiles;
@@ -71,6 +71,7 @@ import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TRollbackType;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
+import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
@@ -90,9 +91,10 @@ public class IcebergCatalogOpExecutor {
    */
   public static Table createTable(TIcebergCatalog catalog, TableIdentifier identifier,
       String location, List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
-      String owner, Map<String, String> tableProperties) throws ImpalaRuntimeException {
+      List<String> primaryKeyColumnNames, String owner,
+      Map<String, String> tableProperties) throws ImpalaRuntimeException {
     // Each table id increase from zero
-    Schema schema = createIcebergSchema(columns);
+    Schema schema = createIcebergSchema(columns, primaryKeyColumnNames);
     PartitionSpec spec = IcebergUtil.createIcebergPartition(schema, partitionSpec);
     IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
     if (icebergCatalog instanceof IcebergHiveCatalog) {
@@ -185,6 +187,15 @@ public class IcebergCatalogOpExecutor {
   public static void alterTableSetPartitionSpec(FeIcebergTable feTable,
       TIcebergPartitionSpec partSpec, Transaction transaction)
       throws ImpalaRuntimeException {
+    try {
+      if (!feTable.getPrimaryKeyColumnNames().isEmpty()) {
+        throw new ImpalaRuntimeException("Not allowed to do partition evolution on " +
+            "Iceberg tables with primary keys.");
+      }
+    } catch (TException tEx) {
+      throw new ImpalaRuntimeException(tEx.getMessage());
+    }
+
     BaseTable iceTable = (BaseTable)feTable.getIcebergApiTable();
     UpdatePartitionSpec updatePartitionSpec = transaction.updateSpec();
     iceTable.spec().fields().forEach(partitionField -> updatePartitionSpec.removeField(
@@ -297,9 +308,9 @@ public class IcebergCatalogOpExecutor {
   /**
    * Build iceberg schema by parameters.
    */
-  private static Schema createIcebergSchema(List<TColumn> columns)
-      throws ImpalaRuntimeException {
-    return IcebergSchemaConverter.genIcebergSchema(columns);
+  private static Schema createIcebergSchema(List<TColumn> columns,
+      List<String> primaryKeyColumnNames) throws ImpalaRuntimeException {
+    return IcebergSchemaConverter.genIcebergSchema(columns, primaryKeyColumnNames);
   }
 
   /**

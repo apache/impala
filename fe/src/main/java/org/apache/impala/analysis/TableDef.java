@@ -57,6 +57,7 @@ import org.apache.thrift.TException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Represents the table parameters in a CREATE TABLE statement. These parameters
@@ -85,9 +86,12 @@ class TableDef {
   // mean no primary keys were specified as the columnDefs_ could contain primary keys.
   private final List<String> primaryKeyColNames_ = new ArrayList<>();
 
-  // If true, the primary key is unique. If not, an auto-incrementing column will be
-  // added automatically by Kudu engine. This extra key column helps produce a unique
-  // composite primary key (primary keys + auto-incrementing construct).
+  // If true, the primary key is unique. If not, and the table is a Kudu table then an
+  // auto-incrementing column will be added automatically by Kudu engine. This extra key
+  // column helps produce a unique composite primary key (primary keys +
+  // auto-incrementing construct).
+  // This is also used for Iceberg table and set to false if "NOT ENFORCED" is provided
+  // for the primary key.
   private boolean isPrimaryKeyUnique_;
 
   // If true, the table's data will be preserved if dropped.
@@ -478,28 +482,20 @@ class TableDef {
   }
 
   /**
-   * Kudu and Iceberg table has their own column option, this function will return false
-   * if we use column option incorrectly, such as use primary key for Parquet format.
+   * Kudu and Iceberg tables have their own column options, this function will return
+   * false if we use column options incorrectly, e.g. primary key column option for an
+   * Iceberg table.
    */
   private boolean analyzeColumnOption(ColumnDef columnDef) {
-    boolean flag = true;
-    // Kudu option and Iceberg option have overlap
-    if (columnDef.hasKuduOptions() && columnDef.hasIcebergOptions()) {
-      if (!isKuduTable() && !isIcebergTable()) {
-        flag = false;
-      }
-    } else if (columnDef.hasKuduOptions()) {
-      if (!isKuduTable()) {
-        flag = false;
-      }
-    } else if (columnDef.hasIcebergOptions()) {
-      // Currently Iceberg option only contains 'nullable', so we won't run into this
-      // situation.
-      if (!isIcebergTable()) {
-        flag = false;
-      }
+    if (isKuduTable()) {
+      if (columnDef.hasIncompatibleKuduOptions()) return false;
+    } else if (isIcebergTable()) {
+      if (columnDef.hasIncompatibleIcebergOptions()) return false;
+    } else if (columnDef.hasKuduOptions() || columnDef.hasIcebergOptions()) {
+      // If the table is neither Kudu or Iceberg but has some incompatible column options.
+      return false;
     }
-    return flag;
+    return true;
   }
 
   /**
@@ -574,9 +570,29 @@ class TableDef {
           "(col1, col2, ...) syntax at the end of the column definition.",
           primaryKeyString, primaryKeyString, primaryKeyString));
     } else if (!primaryKeyColNames_.isEmpty() && !isPrimaryKeyUnique()
-        && !isKuduTable()) {
-      throw new AnalysisException(primaryKeyString + " is only supported for Kudu.");
+        && !isKuduTable() && !isIcebergTable()) {
+      throw new AnalysisException(primaryKeyString +
+          " is only supported for Kudu and Iceberg.");
     }
+
+    if (isIcebergTable() && isPrimaryKeyUnique_) {
+      throw new AnalysisException(
+          "Iceberg tables only support NOT ENFORCED primary keys.");
+    }
+
+    Set<String> hashedPKColNames = Sets.newHashSet(primaryKeyColNames_);
+    List<IcebergPartitionSpec> icebergPartitionSpecs = getIcebergPartitionSpecs();
+    if (!icebergPartitionSpecs.isEmpty()) {
+      Preconditions.checkState(icebergPartitionSpecs.size() == 1);
+      IcebergPartitionSpec partSpec = icebergPartitionSpecs.get(0);
+      for (IcebergPartitionField partField : partSpec.getIcebergPartitionFields()) {
+        if (!hashedPKColNames.contains(partField.getFieldName())) {
+          throw new AnalysisException("Partition columns have to be part of the " +
+              "primary key for Iceberg tables.");
+        }
+      }
+    }
+
     Map<String, ColumnDef> colDefsByColName = ColumnDef.mapByColumnNames(columnDefs_);
     int keySeq = 1;
     String constraintName = null;

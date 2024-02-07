@@ -92,6 +92,7 @@ import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TResultRowBuilder;
+import org.apache.thrift.TException;
 
 import org.json.simple.JSONValue;
 import org.slf4j.Logger;
@@ -197,6 +198,11 @@ public interface FeIcebergTable extends FeFsTable {
    */
   default Schema getIcebergSchema() {
     return getIcebergApiTable().schema();
+  }
+
+  @Override
+  default List<String> getPrimaryKeyColumnNames() throws TException {
+    return Lists.newArrayList(getIcebergSchema().identifierFieldNames());
   }
 
   @Override

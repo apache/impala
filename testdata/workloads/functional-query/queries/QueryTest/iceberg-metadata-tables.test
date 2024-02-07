@@ -718,8 +718,8 @@ STRING
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.snapshots;
 ---- RESULTS
-'committed_at','timestamp','','false'
-'snapshot_id','bigint','','false'
+'committed_at','timestamp','','true'
+'snapshot_id','bigint','','true'
 'parent_id','bigint','','true'
 'operation','string','','true'
 'manifest_list','string','','true'
@@ -731,11 +731,11 @@ STRING,STRING,STRING,STRING
 describe functional_parquet.iceberg_query_metadata.`files`;
 ---- RESULTS
 'content','int','Contents of the file: 0=data, 1=position deletes, 2=equality deletes','true'
-'file_path','string','Location URI with FS scheme','false'
-'file_format','string','File format name: avro, orc, or parquet','false'
+'file_path','string','Location URI with FS scheme','true'
+'file_format','string','File format name: avro, orc, or parquet','true'
 'spec_id','int','Partition spec ID','true'
-'record_count','bigint','Number of records in the file','false'
-'file_size_in_bytes','bigint','Total file size in bytes','false'
+'record_count','bigint','Number of records in the file','true'
+'file_size_in_bytes','bigint','Total file size in bytes','true'
 'column_sizes','map<int,bigint>','Map of column id to total size on disk','true'
 'value_counts','map<int,bigint>','Map of column id to total count, including null and NaN','true'
 'null_value_counts','map<int,bigint>','Map of column id to null value count','true'
@@ -754,11 +754,11 @@ STRING,STRING,STRING,STRING
 describe functional_parquet.iceberg_query_metadata.data_files;
 ---- RESULTS
 'content','int','Contents of the file: 0=data, 1=position deletes, 2=equality deletes','true'
-'file_path','string','Location URI with FS scheme','false'
-'file_format','string','File format name: avro, orc, or parquet','false'
+'file_path','string','Location URI with FS scheme','true'
+'file_format','string','File format name: avro, orc, or parquet','true'
 'spec_id','int','Partition spec ID','true'
-'record_count','bigint','Number of records in the file','false'
-'file_size_in_bytes','bigint','Total file size in bytes','false'
+'record_count','bigint','Number of records in the file','true'
+'file_size_in_bytes','bigint','Total file size in bytes','true'
 'column_sizes','map<int,bigint>','Map of column id to total size on disk','true'
 'value_counts','map<int,bigint>','Map of column id to total count, including null and NaN','true'
 'null_value_counts','map<int,bigint>','Map of column id to null value count','true'
@@ -777,11 +777,11 @@ STRING,STRING,STRING,STRING
 describe functional_parquet.iceberg_query_metadata.delete_files;
 ---- RESULTS
 'content','int','Contents of the file: 0=data, 1=position deletes, 2=equality deletes','true'
-'file_path','string','Location URI with FS scheme','false'
-'file_format','string','File format name: avro, orc, or parquet','false'
+'file_path','string','Location URI with FS scheme','true'
+'file_format','string','File format name: avro, orc, or parquet','true'
 'spec_id','int','Partition spec ID','true'
-'record_count','bigint','Number of records in the file','false'
-'file_size_in_bytes','bigint','Total file size in bytes','false'
+'record_count','bigint','Number of records in the file','true'
+'file_size_in_bytes','bigint','Total file size in bytes','true'
 'column_sizes','map<int,bigint>','Map of column id to total size on disk','true'
 'value_counts','map<int,bigint>','Map of column id to total count, including null and NaN','true'
 'null_value_counts','map<int,bigint>','Map of column id to null value count','true'
@@ -799,18 +799,18 @@ STRING,STRING,STRING,STRING
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.history;
 ---- RESULTS
-'made_current_at','timestamp','','false'
-'snapshot_id','bigint','','false'
+'made_current_at','timestamp','','true'
+'snapshot_id','bigint','','true'
 'parent_id','bigint','','true'
-'is_current_ancestor','boolean','','false'
+'is_current_ancestor','boolean','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.metadata_log_entries;
 ---- RESULTS
-'timestamp','timestamp','','false'
-'file','string','','false'
+'timestamp','timestamp','','true'
+'file','string','','true'
 'latest_snapshot_id','bigint','','true'
 'latest_schema_id','int','','true'
 'latest_sequence_number','bigint','','true'
@@ -820,8 +820,8 @@ STRING,STRING,STRING,STRING
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.snapshots;
 ---- RESULTS
-'committed_at','timestamp','','false'
-'snapshot_id','bigint','','false'
+'committed_at','timestamp','','true'
+'snapshot_id','bigint','','true'
 'parent_id','bigint','','true'
 'operation','string','','true'
 'manifest_list','string','','true'
@@ -832,9 +832,9 @@ STRING,STRING,STRING,STRING
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.refs;
 ---- RESULTS
-'name','string','','false'
-'type','string','','false'
-'snapshot_id','bigint','','false'
+'name','string','','true'
+'type','string','','true'
+'snapshot_id','bigint','','true'
 'max_reference_age_in_ms','bigint','','true'
 'min_snapshots_to_keep','int','','true'
 'max_snapshot_age_in_ms','bigint','','true'
@@ -844,30 +844,30 @@ STRING,STRING,STRING,STRING
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.manifests;
 ---- RESULTS
-'content','int','','false'
-'path','string','','false'
-'length','bigint','','false'
-'partition_spec_id','int','','false'
-'added_snapshot_id','bigint','','false'
-'added_data_files_count','int','','false'
-'existing_data_files_count','int','','false'
-'deleted_data_files_count','int','','false'
-'added_delete_files_count','int','','false'
-'existing_delete_files_count','int','','false'
-'deleted_delete_files_count','int','','false'
-'partition_summaries','array<struct<\n  contains_null:boolean,\n  contains_nan:boolean,\n  lower_bound:string,\n  upper_bound:string\n>>','','false'
+'content','int','','true'
+'path','string','','true'
+'length','bigint','','true'
+'partition_spec_id','int','','true'
+'added_snapshot_id','bigint','','true'
+'added_data_files_count','int','','true'
+'existing_data_files_count','int','','true'
+'deleted_data_files_count','int','','true'
+'added_delete_files_count','int','','true'
+'existing_delete_files_count','int','','true'
+'deleted_delete_files_count','int','','true'
+'partition_summaries','array<struct<\n  contains_null:boolean,\n  contains_nan:boolean,\n  lower_bound:string,\n  upper_bound:string\n>>','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.`partitions`;
 ---- RESULTS
-'record_count','bigint','Count of records in data files','false'
-'file_count','int','Count of data files','false'
-'position_delete_record_count','bigint','Count of records in position delete files','false'
-'position_delete_file_count','int','Count of position delete files','false'
-'equality_delete_record_count','bigint','Count of records in equality delete files','false'
-'equality_delete_file_count','int','Count of equality delete files','false'
+'record_count','bigint','Count of records in data files','true'
+'file_count','int','Count of data files','true'
+'position_delete_record_count','bigint','Count of records in position delete files','true'
+'position_delete_file_count','int','Count of position delete files','true'
+'equality_delete_record_count','bigint','Count of records in equality delete files','true'
+'equality_delete_file_count','int','Count of equality delete files','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
@@ -875,11 +875,11 @@ STRING,STRING,STRING,STRING
 describe functional_parquet.iceberg_query_metadata.all_data_files;
 ---- RESULTS
 'content','int','Contents of the file: 0=data, 1=position deletes, 2=equality deletes','true'
-'file_path','string','Location URI with FS scheme','false'
-'file_format','string','File format name: avro, orc, or parquet','false'
+'file_path','string','Location URI with FS scheme','true'
+'file_format','string','File format name: avro, orc, or parquet','true'
 'spec_id','int','Partition spec ID','true'
-'record_count','bigint','Number of records in the file','false'
-'file_size_in_bytes','bigint','Total file size in bytes','false'
+'record_count','bigint','Number of records in the file','true'
+'file_size_in_bytes','bigint','Total file size in bytes','true'
 'column_sizes','map<int,bigint>','Map of column id to total size on disk','true'
 'value_counts','map<int,bigint>','Map of column id to total count, including null and NaN','true'
 'null_value_counts','map<int,bigint>','Map of column id to null value count','true'
@@ -898,11 +898,11 @@ STRING,STRING,STRING,STRING
 describe functional_parquet.iceberg_query_metadata.all_delete_files;
 ---- RESULTS
 'content','int','Contents of the file: 0=data, 1=position deletes, 2=equality deletes','true'
-'file_path','string','Location URI with FS scheme','false'
-'file_format','string','File format name: avro, orc, or parquet','false'
+'file_path','string','Location URI with FS scheme','true'
+'file_format','string','File format name: avro, orc, or parquet','true'
 'spec_id','int','Partition spec ID','true'
-'record_count','bigint','Number of records in the file','false'
-'file_size_in_bytes','bigint','Total file size in bytes','false'
+'record_count','bigint','Number of records in the file','true'
+'file_size_in_bytes','bigint','Total file size in bytes','true'
 'column_sizes','map<int,bigint>','Map of column id to total size on disk','true'
 'value_counts','map<int,bigint>','Map of column id to total count, including null and NaN','true'
 'null_value_counts','map<int,bigint>','Map of column id to null value count','true'
@@ -921,11 +921,11 @@ STRING,STRING,STRING,STRING
 describe functional_parquet.iceberg_query_metadata.all_files;
 ---- RESULTS
 'content','int','Contents of the file: 0=data, 1=position deletes, 2=equality deletes','true'
-'file_path','string','Location URI with FS scheme','false'
-'file_format','string','File format name: avro, orc, or parquet','false'
+'file_path','string','Location URI with FS scheme','true'
+'file_format','string','File format name: avro, orc, or parquet','true'
 'spec_id','int','Partition spec ID','true'
-'record_count','bigint','Number of records in the file','false'
-'file_size_in_bytes','bigint','Total file size in bytes','false'
+'record_count','bigint','Number of records in the file','true'
+'file_size_in_bytes','bigint','Total file size in bytes','true'
 'column_sizes','map<int,bigint>','Map of column id to total size on disk','true'
 'value_counts','map<int,bigint>','Map of column id to total count, including null and NaN','true'
 'null_value_counts','map<int,bigint>','Map of column id to null value count','true'
@@ -943,30 +943,30 @@ STRING,STRING,STRING,STRING
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.all_manifests;
 ---- RESULTS
-'content','int','','false'
-'path','string','','false'
-'length','bigint','','false'
+'content','int','','true'
+'path','string','','true'
+'length','bigint','','true'
 'partition_spec_id','int','','true'
 'added_snapshot_id','bigint','','true'
 'added_data_files_count','int','','true'
 'existing_data_files_count','int','','true'
 'deleted_data_files_count','int','','true'
-'added_delete_files_count','int','','false'
-'existing_delete_files_count','int','','false'
-'deleted_delete_files_count','int','','false'
+'added_delete_files_count','int','','true'
+'existing_delete_files_count','int','','true'
+'deleted_delete_files_count','int','','true'
 'partition_summaries','array<struct<\n  contains_null:boolean,\n  contains_nan:boolean,\n  lower_bound:string,\n  upper_bound:string\n>>','','true'
-'reference_snapshot_id','bigint','','false'
+'reference_snapshot_id','bigint','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 describe functional_parquet.iceberg_query_metadata.all_entries;
 ---- RESULTS
-'status','int','','false'
+'status','int','','true'
 'snapshot_id','bigint','','true'
 'sequence_number','bigint','','true'
 'file_sequence_number','bigint','','true'
-'data_file','struct<\n  content:int comment ''contents of the file: 0=data, 1=position deletes, 2=equality deletes'',\n  file_path:string comment ''location uri with fs scheme'',\n  file_format:string comment ''file format name: avro, orc, or parquet'',\n  spec_id:int comment ''partition spec id'',\n  record_count:bigint comment ''number of records in the file'',\n  file_size_in_bytes:bigint comment ''total file size in bytes'',\n  column_sizes:map<int,bigint> comment ''map of column id to total size on disk'',\n  value_counts:map<int,bigint> comment ''map of column id to total count, including null and nan'',\n  null_value_counts:map<int,bigint> comment ''map of column id to null value count'',\n  nan_value_counts:map<int,bigint> comment ''map of column id to number of nan values in the column'',\n  lower_bounds:map<int,binary> comment ''map of column id to lower bound'',\n  upper_bounds:map<int,binary> comment ''map of column id to upper bound'',\n  key_metadata:binary comment ''encryption key metadata blob'',\n  split_offsets:array<bigint> comment ''splittable offsets'',\n  equality_ids:array<int> comment ''equality comparison field ids'',\n  sort_order_id:int comment ''sort order id''\n>','','false'
+'data_file','struct<\n  content:int comment ''contents of the file: 0=data, 1=position deletes, 2=equality deletes'',\n  file_path:string comment ''location uri with fs scheme'',\n  file_format:string comment ''file format name: avro, orc, or parquet'',\n  spec_id:int comment ''partition spec id'',\n  record_count:bigint comment ''number of records in the file'',\n  file_size_in_bytes:bigint comment ''total file size in bytes'',\n  column_sizes:map<int,bigint> comment ''map of column id to total size on disk'',\n  value_counts:map<int,bigint> comment ''map of column id to total count, including null and nan'',\n  null_value_counts:map<int,bigint> comment ''map of column id to null value count'',\n  nan_value_counts:map<int,bigint> comment ''map of column id to number of nan values in the column'',\n  lower_bounds:map<int,binary> comment ''map of column id to lower bound'',\n  upper_bounds:map<int,binary> comment ''map of column id to upper bound'',\n  key_metadata:binary comment ''encryption key metadata blob'',\n  split_offsets:array<bigint> comment ''splittable offsets'',\n  equality_ids:array<int> comment ''equality comparison field ids'',\n  sort_order_id:int comment ''sort order id''\n>','','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING

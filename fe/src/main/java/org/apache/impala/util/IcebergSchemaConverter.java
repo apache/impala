@@ -18,7 +18,11 @@
 package org.apache.impala.util;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -168,16 +172,32 @@ public class IcebergSchemaConverter {
 
   /**
    * Generates Iceberg schema from given columns. It also assigns a unique 'field id' for
-   * each schema element, although Iceberg will reassign the ids.
+   * each schema element, although Iceberg will reassign the ids. 'primaryKeyColumnNames'
+   * are used for populating 'identifier-field-ids' in the Schema.
    */
-  public static Schema genIcebergSchema(List<TColumn> columns)
-      throws ImpalaRuntimeException {
+  public static Schema genIcebergSchema(List<TColumn> columns,
+      List<String> primaryKeyColumnNames) throws ImpalaRuntimeException {
     iThreadLocal.set(1);
     List<Types.NestedField> fields = new ArrayList<Types.NestedField>();
+    Map<String, Integer> colNameToFieldId = new HashMap<>();
     for (TColumn column : columns) {
-      fields.add(createIcebergField(column));
+      Types.NestedField icebergField = createIcebergField(column);
+      fields.add(icebergField);
+      colNameToFieldId.put(icebergField.name(), icebergField.fieldId());
     }
-    return new Schema(fields);
+
+    if (primaryKeyColumnNames == null || primaryKeyColumnNames.isEmpty()) {
+      return new Schema(fields);
+    }
+
+    Set<Integer> identifierFieldIds = new HashSet<>();
+    for (String pkColName : primaryKeyColumnNames) {
+      if (!colNameToFieldId.containsKey(pkColName)) {
+        throw new ImpalaRuntimeException("Invalid primary key column name: " + pkColName);
+      }
+      identifierFieldIds.add(colNameToFieldId.get(pkColName));
+    }
+    return new Schema(fields, identifierFieldIds);
   }
 
   /**

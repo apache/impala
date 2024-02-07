@@ -616,3 +616,86 @@ describe formatted ice_hadoop_tbl;
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+# Create an Iceberg table with PKs and check if 'identifier-field-ids' are populated.
+create table ice_tbl_with_pk
+    (i int not null, s string not null, d date not null, primary key(i, d) not enforced)
+    stored as iceberg;
+describe formatted ice_tbl_with_pk;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','current-schema.*','.*identifier-field-ids\\\\":\[1,3\].*'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Similar as above, but the table is also partitioned.
+create table ice_tbl_with_pk_partitioned
+    (i int not null, s string not null, d date, primary key(i, s) not enforced)
+    partitioned by spec (s)
+    stored as iceberg;
+describe formatted ice_tbl_with_pk_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','current-schema.*','.*identifier-field-ids\\\\":\[1,2\].*'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Primary key on partition columns with partition transform.
+create table ice_tbl_with_pk_partition_transform
+    (i int not null, s string not null, d date not null, primary key(s, d) not enforced)
+    partitioned by spec (day(d), truncate(3,s), bucket(10, s))
+    stored as iceberg;
+describe formatted ice_tbl_with_pk_partition_transform;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','current-schema.*','.*identifier-field-ids\\\\":\[2,3\].*'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# When source table has primary keys the CTAS by default won't use it for the target
+# table.
+create table ctas_pk_in_source_not_used
+  stored as iceberg
+  as select * from ice_tbl_with_pk;
+describe formatted ctas_pk_in_source_not_used;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'.*','current-schema.*','.*'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'.*','current-schema.*','.*identifier-field-ids.*'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Primary key provided to a CTAS statement.
+create table ctas_pk_unpartitioned
+  primary key(d) not enforced
+  stored as iceberg
+  as select * from ice_tbl_with_pk;
+describe formatted ctas_pk_unpartitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'.*','current-schema.*','.*identifier-field-ids\\\\":\[3\].*'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Similar as above but the table is partitioned.
+create table ctas_pk_partitioned
+  primary key(s, d) not enforced
+  partitioned by spec (d)
+  stored as iceberg
+  as select * from ice_tbl_with_pk;
+describe formatted ctas_pk_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'.*','current-schema.*','.*identifier-field-ids\\\\":\[2,3\].*'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Create table like inherits the 'identifier-field-ids' from the source table.
+create table ice_like_pk like ice_tbl_with_pk_partitioned;
+describe formatted ice_like_pk;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'.*','current-schema.*','.*identifier-field-ids\\\\":\[1,2\].*'
+---- TYPES
+STRING,STRING,STRING
+====

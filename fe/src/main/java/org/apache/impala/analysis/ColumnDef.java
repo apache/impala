@@ -181,6 +181,17 @@ public class ColumnDef {
   public boolean hasIcebergOptions() {
     return isNullabilitySet();
   }
+  // Returns true if the column has options that are not supported for Iceberg tables.
+  public boolean hasIncompatibleIcebergOptions() {
+    return isPrimaryKey() || hasEncoding() || hasCompression() || hasDefaultValue()
+        || hasBlockSize();
+  }
+  // Returns true if the column has options that are not supported for Kudu tables.
+  public boolean hasIncompatibleKuduOptions() {
+    // This always returns false as currently only 'isNullable' is a valid Iceberg
+    // option that is also valid for Kudu.
+    return false;
+  }
   public boolean hasEncoding() { return encodingVal_ != null; }
   public boolean hasCompression() { return compressionVal_ != null; }
   public boolean hasBlockSize() { return blockSize_ != null; }

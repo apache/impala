@@ -125,6 +125,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("enable", SqlParserSymbols.KW_ENABLE);
     keywordMap.put("encoding", SqlParserSymbols.KW_ENCODING);
     keywordMap.put("end", SqlParserSymbols.KW_END);
+    keywordMap.put("enforced", SqlParserSymbols.KW_ENFORCED);
     keywordMap.put("escaped", SqlParserSymbols.KW_ESCAPED);
     keywordMap.put("except", SqlParserSymbols.KW_EXCEPT);
     keywordMap.put("exists", SqlParserSymbols.KW_EXISTS);
