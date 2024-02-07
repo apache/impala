@@ -181,6 +181,8 @@ public class CreateTableLikeStmt extends StatementBase {
         srcTable.getMetaStoreTable())) {
       throw new AnalysisException(srcTable.getFullName() + " cannot be cloned into an "
           + "Iceberg table because it is not an Iceberg table.");
+    } else if (fileFormat_ == THdfsFileFormat.JDBC) {
+      throw new AnalysisException("CREATE TABLE LIKE is not supported for JDBC tables.");
     }
 
     srcDbName_ = srcTable.getDb().getName();

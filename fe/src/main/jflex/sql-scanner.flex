@@ -173,6 +173,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("invalidate", SqlParserSymbols.KW_INVALIDATE);
     keywordMap.put("iregexp", SqlParserSymbols.KW_IREGEXP);
     keywordMap.put("is", SqlParserSymbols.KW_IS);
+    keywordMap.put("jdbc", SqlParserSymbols.KW_JDBC);
     keywordMap.put("join", SqlParserSymbols.KW_JOIN);
     keywordMap.put("jsonfile", SqlParserSymbols.KW_JSONFILE);
     keywordMap.put("kudu", SqlParserSymbols.KW_KUDU);

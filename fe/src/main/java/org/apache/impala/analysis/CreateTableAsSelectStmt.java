@@ -136,6 +136,9 @@ public class CreateTableAsSelectStmt extends StatementBase {
       // TODO: Add support for CTAS on external Kudu tables (see IMPALA-4318)
       throw new AnalysisException(String.format("CREATE TABLE AS SELECT is not " +
           "supported for external Kudu tables."));
+    } else if (createStmt_.getFileFormat() == THdfsFileFormat.JDBC) {
+      throw new AnalysisException("CREATE TABLE AS SELECT is not supported for " +
+          "JDBC tables.");
     }
 
     // The analysis for CTAS happens in two phases - the first phase happens before

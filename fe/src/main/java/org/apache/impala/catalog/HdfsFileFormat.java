@@ -82,7 +82,11 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", true, true, true),
   ICEBERG("org.apache.iceberg.mr.hive.HiveIcebergInputFormat",
       "org.apache.iceberg.mr.hive.HiveIcebergOutputFormat",
-      "org.apache.iceberg.mr.hive.HiveIcebergSerDe", false, false, false);
+      "org.apache.iceberg.mr.hive.HiveIcebergSerDe", false, false, false),
+  JDBC("org.apache.hadoop.hive.jdbc.JdbcInputFormat",
+      "org.apache.hadoop.hive.jdbc.JdbcOutputFormat",
+      "org.apache.hadoop.hive.jdbc.JdbcSerDe", false, false, true);
+
 
   private final String inputFormat_;
   private final String outputFormat_;
@@ -192,6 +196,7 @@ public enum HdfsFileFormat {
       case KUDU: return HdfsFileFormat.KUDU;
       case ICEBERG: return HdfsFileFormat.ICEBERG;
       case JSON: return HdfsFileFormat.JSON;
+      case JDBC: return HdfsFileFormat.JDBC;
       default:
         throw new RuntimeException("Unknown THdfsFileFormat: "
             + thriftFormat + " - should never happen!");
@@ -210,6 +215,7 @@ public enum HdfsFileFormat {
       case KUDU: return THdfsFileFormat.KUDU;
       case ICEBERG: return THdfsFileFormat.ICEBERG;
       case JSON: return THdfsFileFormat.JSON;
+      case JDBC: return THdfsFileFormat.JDBC;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -236,6 +242,7 @@ public enum HdfsFileFormat {
       case HUDI_PARQUET: return "HUDIPARQUET";
       case ICEBERG: return "ICEBERG";
       case JSON: return "JSONFILE";
+      case JDBC: return "JDBC";
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -259,6 +266,8 @@ public enum HdfsFileFormat {
       case ICEBERG:
         return true;
       case KUDU:
+        return false;
+      case JDBC:
         return false;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "

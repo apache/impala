@@ -417,7 +417,8 @@ class TableDef {
   boolean isBucketableFormat() {
     return options_.fileFormat != THdfsFileFormat.KUDU
         && options_.fileFormat != THdfsFileFormat.ICEBERG
-        && options_.fileFormat != THdfsFileFormat.HUDI_PARQUET;
+        && options_.fileFormat != THdfsFileFormat.HUDI_PARQUET
+        && options_.fileFormat != THdfsFileFormat.JDBC;
   }
 
   /**

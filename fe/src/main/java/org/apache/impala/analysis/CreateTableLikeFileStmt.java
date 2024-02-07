@@ -69,6 +69,9 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
     if (getFileFormat() == THdfsFileFormat.KUDU) {
       throw new AnalysisException("CREATE TABLE LIKE FILE statement is not supported " +
           "for Kudu tables.");
+    } else if (getFileFormat() == THdfsFileFormat.JDBC) {
+      throw new AnalysisException("CREATE TABLE LIKE FILE statement is not supported " +
+          "for JDBC tables.");
     }
     schemaLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ);
     switch (schemaFileFormat_) {

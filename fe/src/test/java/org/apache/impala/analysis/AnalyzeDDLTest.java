@@ -2194,6 +2194,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table newtbl_kudu like parquet " +
         "'/test-warehouse/schemas/alltypestiny.parquet' stored as kudu",
         "CREATE TABLE LIKE FILE statement is not supported for Kudu tables.");
+    AnalysisError("create table newtbl_jdbc like parquet " +
+        "'/test-warehouse/schemas/alltypestiny.parquet' stored as JDBC",
+        "CREATE TABLE LIKE FILE statement is not supported for JDBC tables.");
   }
 
   @Test
@@ -2421,6 +2424,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "BIGINT_COL, DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, YEAR, " +
         "MONTH FROM functional.alltypes");
 
+    // CTAS is not supported for JDBC tables.
+    AnalysisError("create table t stored as JDBC as select id, bool_col, tinyint_col " +
+        "from functional.alltypestiny",
+        "CREATE TABLE AS SELECT does not support the (JDBC) file format. " +
+        "Supported formats are: (PARQUET, TEXTFILE, KUDU, ICEBERG)");
+
     // IMPALA-7679: Inserting a null column type without an explicit type should
     // throw an error.
     AnalyzesOk("create table t as select cast(null as int) as new_col");
@@ -2569,6 +2578,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Kudu tables with range partitions cannot be cloned
     AnalysisError("create table kudu_jointbl_clone like functional_kudu.jointbl",
         "CREATE TABLE LIKE is not supported for Kudu tables having range partitions.");
+
+    // CREATE TABLE LIKE is not supported for JDBC tables.
+    AnalysisError("create table jdbc_tbl like functional.alltypestiny stored as JDBC",
+        "CREATE TABLE LIKE is not supported for JDBC tables.");
 
     // Test sort columns.
     AnalyzesOk("create table tbl sort by (int_col,id) like functional.alltypes");
@@ -2859,6 +2872,21 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'  '", "URI path cannot be empty.");
 
+    // Create JDBC tables
+    AnalyzesOk("CREATE TABLE Foo (i int) STORED BY JDBC " +
+        "TBLPROPERTIES ('database.type'='a', 'jdbc.url'='b', " +
+        "'jdbc.driver'='c', 'driver.url'='d', 'dbcp.username'='e', " +
+        "'dbcp.password'='f', 'table'='g')");
+    AnalysisError("CREATE TABLE Foo (i int) STORED BY JDBC TBLPROPERTIES ('a'='b')",
+        "Cannot create table 'Foo': Required JDBC config 'database.type' is not " +
+        "present in table properties.");
+    AnalysisError("CREATE TABLE Foo (i int) STORED BY JDBC CACHED IN 'testPool'",
+        "A JDBC table cannot be cached in HDFS.");
+    AnalysisError("CREATE TABLE Foo (i int) STORED BY JDBC LOCATION " +
+        "'/test-warehouse/new_table'", "LOCATION cannot be specified for a JDBC table.");
+    AnalysisError("CREATE TABLE Foo (i int) PARTITIONED BY (d decimal) STORED BY JDBC ",
+        "PARTITIONED BY cannot be used in a JDBC table.");
+
     // Create table PRODUCED BY DATA SOURCE
     final String DATA_SOURCE_NAME = "TestDataSource1";
     catalog_.addDataSource(new DataSource(DATA_SOURCE_NAME, "/foo.jar",
@@ -2939,13 +2967,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "CLUSTERED BY(i) SORT BY (s) INTO 24 BUCKETS");
 
-    // Bucketed table not supported for Kudu and ICEBERG table
+    // Bucketed table not supported for Kudu, ICEBERG and JDBC table
     AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY KUDU", "CLUSTERED BY not " +
         "support fileformat: 'KUDU'");
     AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY ICEBERG",
         "CLUSTERED BY not support fileformat: 'ICEBERG'");
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+        "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY JDBC",
+        "CLUSTERED BY not support fileformat: 'JDBC'");
     // Bucketed columns must not contain partition column and don't duplicate
     AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "PARTITIONED BY(dt string) CLUSTERED BY (dt) INTO 24 BUCKETS",

@@ -78,6 +78,7 @@ enum THdfsFileFormat {
   HUDI_PARQUET = 7
   ICEBERG = 8
   JSON = 9
+  JDBC = 10
 }
 
 enum TVirtualColumnType {

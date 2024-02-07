@@ -17,14 +17,20 @@
 
 package org.apache.impala.catalog;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.extdatasource.ApiVersion;
+import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfig;
 import org.apache.impala.extdatasource.v1.ExternalDataSource;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
@@ -35,6 +41,7 @@ import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.JsonUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
 
@@ -71,6 +78,17 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
    * Table property key for the API version implemented by the data source.
    */
   public static final String TBL_PROP_API_VER = "__IMPALA_DATA_SOURCE_API_VERSION";
+
+  /**
+   * Name of Impala built-in JDBC data source .
+   */
+  public static final String IMPALA_BUILTIN_JDBC_DATASOURCE = "impalajdbcdatasource";
+
+  /**
+   * Classname of Impala external JDBC data source.
+   */
+  public static final String IMPALA_JDBC_DATA_SRC_CLASSNAME =
+      "org.apache.impala.extdatasource.jdbc.JdbcDataSource";
 
   private String initString_;
   private TDataSource dataSource_;
@@ -145,6 +163,28 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
   }
 
   /**
+   * Set table property with builtin JDBC DataSource name and check if the keys of input
+   * table properties are valid.
+   */
+  public static void setJdbcDataSourceProperties(Map<String, String> tblProperties)
+      throws ImpalaRuntimeException {
+    // Check if required JDBC/DBCP parameters are set in the table properties.
+    Set<String> tblPropertyKeys = tblProperties.keySet().stream()
+        .map(String::toLowerCase).collect(Collectors.toSet());
+    for (JdbcStorageConfig config : JdbcStorageConfig.values()) {
+      if (config.isRequired() && !tblPropertyKeys.contains(config.getPropertyName())) {
+        throw new ImpalaRuntimeException(String.format("Required JDBC config '%s' is " +
+            "not present in table properties.", config.getPropertyName()));
+      }
+    }
+    // DataSourceTable is still represented as HDFS tables in the metastore but has a
+    // special table property __IMPALA_DATA_SOURCE_NAME to indicate that Impala should
+    // use an external data source so we need to add the table property with the name
+    // of builtin JDBC DataSource.
+    tblProperties.put(TBL_PROP_DATA_SRC_NAME, IMPALA_BUILTIN_JDBC_DATASOURCE);
+  }
+
+  /**
    * Create columns corresponding to fieldSchemas.
    * Throws a TableLoadingException if the metadata is incompatible with what we
    * support.
@@ -179,13 +219,36 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
     if (LOG.isTraceEnabled()) {
       LOG.trace("load table: " + db_.getName() + "." + name_);
     }
-    String dataSourceName = getRequiredTableProperty(msTbl, TBL_PROP_DATA_SRC_NAME, null);
-    String location = getRequiredTableProperty(msTbl, TBL_PROP_LOCATION, dataSourceName);
-    String className = getRequiredTableProperty(msTbl, TBL_PROP_CLASS, dataSourceName);
-    String apiVersionString = getRequiredTableProperty(msTbl, TBL_PROP_API_VER,
-        dataSourceName);
-    dataSource_ = new TDataSource(dataSourceName, location, className, apiVersionString);
-    initString_ = getRequiredTableProperty(msTbl, TBL_PROP_INIT_STRING, dataSourceName);
+    String dataSourceName = getTableProperty(msTbl, TBL_PROP_DATA_SRC_NAME, null, true);
+    if (dataSourceName.equals(IMPALA_BUILTIN_JDBC_DATASOURCE)) {
+      // The table is created with "STORED BY JDBC".
+      dataSource_ = new TDataSource(dataSourceName, /* location */ "",
+          /* className */ IMPALA_JDBC_DATA_SRC_CLASSNAME,
+          /* apiVersionString */ ApiVersion.V1.name());
+      // Serialize table properties to JSON string as initString for data source.
+      Map<String, String> tblProperties = new HashMap<String, String>();
+      for (JdbcStorageConfig config : JdbcStorageConfig.values()) {
+        String propertyValue = getTableProperty(msTbl, config.getPropertyName(),
+            IMPALA_BUILTIN_JDBC_DATASOURCE, false);
+        if (propertyValue != null) {
+          tblProperties.put(config.getPropertyName(), propertyValue);
+        }
+      }
+      try {
+        initString_ = JsonUtil.convertPropertyMapToJSON(tblProperties);
+      } catch (ImpalaRuntimeException e) {
+        throw new TableLoadingException(e.getMessage());
+      }
+    } else {
+      // The table is created with "PRODUCED BY DATA SOURCE".
+      String location = getTableProperty(msTbl, TBL_PROP_LOCATION, dataSourceName, true);
+      String className = getTableProperty(msTbl, TBL_PROP_CLASS, dataSourceName, true);
+      String apiVersionString = getTableProperty(msTbl, TBL_PROP_API_VER,
+          dataSourceName, true);
+      dataSource_ =
+          new TDataSource(dataSourceName, location, className, apiVersionString);
+      initString_ = getTableProperty(msTbl, TBL_PROP_INIT_STRING, dataSourceName, true);
+    }
 
     if (msTbl.getPartitionKeysSize() > 0) {
       Table.LOADING_TABLES.decrementAndGet();
@@ -210,14 +273,21 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
     }
   }
 
-  private String getRequiredTableProperty(
-      org.apache.hadoop.hive.metastore.api.Table msTbl, String key, String dataSourceName)
-      throws TableLoadingException {
+  private String getTableProperty(org.apache.hadoop.hive.metastore.api.Table msTbl,
+      String key, String dataSourceName, boolean required) throws TableLoadingException {
     String val = msTbl.getParameters().get(key);
-    if (val == null) {
-      throw new TableLoadingException(String.format("Failed to load table %s produced " +
-          "by external data source %s. Missing required metadata: %s", name_,
-          dataSourceName == null ? "<unknown>" : dataSourceName, key));
+    if (val == null && required) {
+      if (key.equals(TBL_PROP_DATA_SRC_NAME)) {
+        throw new TableLoadingException(String.format("Failed to load table %s. " +
+            "Missing required metadata: %s", name_, key));
+      } else if (dataSourceName.equals(IMPALA_BUILTIN_JDBC_DATASOURCE)) {
+        throw new TableLoadingException(String.format("Failed to load table %s " +
+            "stored by JDBC. Missing required metadata: %s", name_, key));
+      } else {
+        throw new TableLoadingException(String.format("Failed to load table %s " +
+            "produced by external data source %s. Missing required metadata: %s",
+            name_, dataSourceName, key));
+      }
     }
     return val;
   }

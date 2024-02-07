@@ -1,24 +1,5 @@
 ====
 ---- QUERY
-# Create DataSource
-DROP DATA SOURCE IF EXISTS TestJdbcDataSource;
-CREATE DATA SOURCE TestJdbcDataSource
-CLASS 'org.apache.impala.extdatasource.jdbc.JdbcDataSource'
-API_VERSION 'V1';
----- RESULTS
-'Data source has been created.'
-====
----- QUERY
-# Show created DataSource
-SHOW DATA SOURCES LIKE 'testjdbcdatasource';
----- LABELS
-NAME,LOCATION,CLASS NAME,API VERSION
----- RESULTS
-'testjdbcdatasource','','org.apache.impala.extdatasource.jdbc.JdbcDataSource','V1'
----- TYPES
-STRING,STRING,STRING,STRING
-====
----- QUERY
 # Create external JDBC DataSource table
 DROP TABLE IF EXISTS alltypes_jdbc_datasource;
 CREATE TABLE alltypes_jdbc_datasource (
@@ -33,15 +14,16 @@ CREATE TABLE alltypes_jdbc_datasource (
  date_col DATE,
  string_col STRING,
  timestamp_col TIMESTAMP)
-PRODUCED BY DATA SOURCE TestJdbcDataSource(
-'{"database.type":"IMPALA",
-"jdbc.url":"jdbc:impala://$INTERNAL_LISTEN_HOST:21050/functional",
-"jdbc.auth":"AuthMech=0",
-"jdbc.driver":"com.cloudera.impala.jdbc.Driver",
-"driver.url":"$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
-"dbcp.username":"impala",
-"dbcp.password":"cloudera",
-"table":"alltypes_with_date"}');
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="IMPALA",
+"jdbc.url"="jdbc:impala://$INTERNAL_LISTEN_HOST:21050/functional",
+"jdbc.auth"="AuthMech=0",
+"jdbc.driver"="com.cloudera.impala.jdbc.Driver",
+"driver.url"="$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
+"dbcp.username"="impala",
+"dbcp.password"="cloudera",
+"table"="alltypes_with_date");
 ---- RESULTS
 'Table has been created.'
 ====
@@ -172,10 +154,4 @@ INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
 DROP TABLE alltypes_jdbc_datasource;
 ---- RESULTS
 'Table has been dropped.'
-====
----- QUERY
-# Drop DataSource
-DROP DATA SOURCE TestJdbcDataSource;
----- RESULTS
-'Data source has been dropped.'
 ====

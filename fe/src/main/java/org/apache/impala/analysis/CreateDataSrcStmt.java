@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.extdatasource.ApiVersion;
@@ -53,7 +54,9 @@ public class CreateDataSrcStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!MetastoreShim.validateName(dataSrcName_)) {
+    if (dataSrcName_.equalsIgnoreCase(DataSourceTable.IMPALA_BUILTIN_JDBC_DATASOURCE)) {
+      throw new AnalysisException("Built-in data source name: " + dataSrcName_);
+    } else if (!MetastoreShim.validateName(dataSrcName_)) {
       throw new AnalysisException("Invalid data source name: " + dataSrcName_);
     }
     if (!ifNotExists_ && analyzer.getCatalog().getDataSource(dataSrcName_) != null) {

@@ -46,12 +46,6 @@ CREATE TABLE alltypes_datasource (
   date_col DATE)
 PRODUCED BY DATA SOURCE AllTypesDataSource("TestInitString");
 
-DROP DATA SOURCE IF EXISTS JdbcDataSource;
-CREATE DATA SOURCE JdbcDataSource
-LOCATION '/test-warehouse/data-sources/jdbc-data-source.jar'
-CLASS 'org.apache.impala.extdatasource.jdbc.JdbcDataSource'
-API_VERSION 'V1';
-
 DROP TABLE IF EXISTS alltypes_jdbc_datasource;
 CREATE TABLE alltypes_jdbc_datasource (
  id INT,
@@ -65,14 +59,15 @@ CREATE TABLE alltypes_jdbc_datasource (
  date_col DATE,
  string_col STRING,
  timestamp_col TIMESTAMP)
-PRODUCED BY DATA SOURCE JdbcDataSource(
-'{"database.type":"POSTGRES",
-"jdbc.url":"jdbc:postgresql://localhost:5432/functional",
-"jdbc.driver":"org.postgresql.Driver",
-"driver.url":"/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
-"dbcp.username":"hiveuser",
-"dbcp.password":"password",
-"table":"alltypes"}');
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="POSTGRES",
+"jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+"jdbc.driver"="org.postgresql.Driver",
+"driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"dbcp.username"="hiveuser",
+"dbcp.password"="password",
+"table"="alltypes");
 
 DROP TABLE IF EXISTS alltypes_jdbc_datasource_2;
 CREATE TABLE alltypes_jdbc_datasource_2 (
@@ -87,12 +82,13 @@ CREATE TABLE alltypes_jdbc_datasource_2 (
  date_col DATE,
  string_col STRING,
  timestamp_col TIMESTAMP)
-PRODUCED BY DATA SOURCE JdbcDataSource(
-'{"database.type":"POSTGRES",
-"jdbc.url":"jdbc:postgresql://localhost:5432/functional",
-"jdbc.driver":"org.postgresql.Driver",
-"driver.url":"hdfs://localhost:20500/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
-"dbcp.username":"hiveuser",
-"dbcp.password":"password",
-"table":"AllTypesWithQuote",
-"column.mapping":"id=id, bool_col=Bool_col, tinyint_col=Tinyint_col, smallint_col=Smallint_col, int_col=Int_col, bigint_col=Bigint_col, float_col=Float_col, double_col=Double_col, date_string_col=Date_string_col, string_col=String_col, timestamp=Timestamp"}');
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="POSTGRES",
+"jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+"jdbc.driver"="org.postgresql.Driver",
+"driver.url"="hdfs://localhost:20500/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"dbcp.username"="hiveuser",
+"dbcp.password"="password",
+"table"="AllTypesWithQuote",
+"column.mapping"="id=id, bool_col=Bool_col, tinyint_col=Tinyint_col, smallint_col=Smallint_col, int_col=Int_col, bigint_col=Bigint_col, float_col=Float_col, double_col=Double_col, date_string_col=Date_string_col, string_col=String_col, timestamp=Timestamp");

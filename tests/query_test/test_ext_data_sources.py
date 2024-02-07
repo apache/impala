@@ -64,16 +64,7 @@ class TestExtDataSources(ImpalaTestSuite):
     jdbc_tbl_name = "functional.alltypes_jdbc_datasource"
     properties = self._get_tbl_properties(jdbc_tbl_name)
     # Verify data source related table properties
-    assert properties['__IMPALA_DATA_SOURCE_NAME'] == 'jdbcdatasource'
-    expected_location = "/test-warehouse/data-sources/jdbc-data-source.jar"
-    assert re.search(expected_location, properties['__IMPALA_DATA_SOURCE_LOCATION'])
-    assert properties['__IMPALA_DATA_SOURCE_CLASS'] == \
-        'org.apache.impala.extdatasource.jdbc.JdbcDataSource'
-    assert properties['__IMPALA_DATA_SOURCE_API_VERSION'] == 'V1'
-    assert 'database.type\\":\\"POSTGRES' \
-        in properties['__IMPALA_DATA_SOURCE_INIT_STRING']
-    assert 'table\\":\\"alltypes' \
-        in properties['__IMPALA_DATA_SOURCE_INIT_STRING']
+    assert properties['__IMPALA_DATA_SOURCE_NAME'] == 'impalajdbcdatasource'
 
   def test_data_source_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)

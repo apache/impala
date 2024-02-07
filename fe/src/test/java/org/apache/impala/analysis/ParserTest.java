@@ -2816,9 +2816,16 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE foo (i INT, NON UNIQUE PRIMARY KEY) STORED AS KUDU");
     ParserError("CREATE TABLE foo (NON UNIQUE PRIMARY KEY(a), a INT) STORED AS KUDU");
 
+    // Create external JDBC tables.
+    ParsesOk("CREATE TABLE foo (i INT, j STRING) STORED AS JDBC");
+    ParsesOk("CREATE TABLE IF NOT EXISTS foo (i INT) COMMENT 'comment' " +
+        "STORED AS JDBC TBLPROPERTIES ('key1'='value1', 'key2'='value2')");
+    ParserError("CREATE TABLE foo (i INT) PRIMARY KEY (i) STORED AS JDBC");
+
     // Supported storage engines
     ParsesOk("CREATE TABLE foo (i INT) STORED BY KUDU");
     ParsesOk("CREATE TABLE foo (i INT) STORED BY ICEBERG");
+    ParsesOk("CREATE TABLE foo (i INT) STORED BY JDBC");
     ParserError("CREATE TABLE foo (i INT) STORED BY PARQUET");
     ParserError("CREATE TABLE foo (i INT) STORED BY FOOBAR");
     ParserError("CREATE TABLE foo (i INT) STORED BY");
@@ -2864,6 +2871,8 @@ public class ParserTest extends FrontendTestBase {
       ParserError(String.format("CREATE TABLE Foo (i int) %s (a='c')", propType));
     }
     ParsesOk("CREATE TABLE Foo (i int) WITH SERDEPROPERTIES ('a'='b') " +
+        "TBLPROPERTIES ('c'='d', 'e'='f')");
+    ParsesOk("CREATE TABLE Foo (i int) STORED BY JDBC " +
         "TBLPROPERTIES ('c'='d', 'e'='f')");
     // TBLPROPERTIES must go after SERDEPROPERTIES
     ParserError("CREATE TABLE Foo (i int) TBLPROPERTIES ('c'='d', 'e'='f') " +

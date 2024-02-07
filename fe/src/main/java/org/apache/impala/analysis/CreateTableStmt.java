@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.RowFormat;
@@ -268,7 +269,7 @@ public class CreateTableStmt extends StatementBase {
     // schema. Likewise for external Kudu tables, the schema can be read from Kudu.
     if (getColumnDefs().isEmpty() && getFileFormat() != THdfsFileFormat.AVRO
         && getFileFormat() != THdfsFileFormat.KUDU && getFileFormat() !=
-        THdfsFileFormat.ICEBERG) {
+        THdfsFileFormat.ICEBERG && getFileFormat() != THdfsFileFormat.JDBC) {
       throw new AnalysisException("Table requires at least 1 column");
     }
     if (getRowFormat() != null) {
@@ -309,6 +310,10 @@ public class CreateTableStmt extends StatementBase {
         throw new AnalysisException(
             "PARTITIONED BY SPEC is only valid for Iceberg tables.");
       }
+    }
+
+    if (getFileFormat() == THdfsFileFormat.JDBC) {
+      analyzeJdbcSchema(analyzer);
     }
 
     // If lineage logging is enabled, compute minimal lineage graph.
@@ -883,6 +888,36 @@ public class CreateTableStmt extends StatementBase {
     getIcebergPartitionSpecs().add(new IcebergPartitionSpec(partFields));
     getColumnDefs().addAll(getPartitionColumnDefs());
     getPartitionColumnDefs().clear();
+  }
+
+  /**
+   * Analyzes the parameters of a CREATE TABLE ... STORED BY JDBC statement. Adds the
+   * table properties of DataSource so that JDBC table is stored as DataSourceTable in
+   * HMS.
+   */
+  private void analyzeJdbcSchema(Analyzer analyzer) throws AnalysisException {
+    for (ColumnDef col: getColumnDefs()) {
+      if (!DataSourceTable.isSupportedColumnType(col.getType())) {
+        throw new AnalysisException("Tables stored by JDBC do not support the column " +
+            "type: " + col.getType());
+      }
+    }
+
+    AnalysisUtils.throwIfNotNull(getCachingOp(),
+        "A JDBC table cannot be cached in HDFS.");
+    AnalysisUtils.throwIfNotNull(getLocation(), "LOCATION cannot be specified for a " +
+        "JDBC table.");
+    AnalysisUtils.throwIfNotEmpty(tableDef_.getPartitionColumnDefs(),
+        "PARTITIONED BY cannot be used in a JDBC table.");
+
+    // Set table properties of the DataSource to make the table saved as DataSourceTable
+    // in HMS.
+    try {
+      DataSourceTable.setJdbcDataSourceProperties(getTblProperties());
+    } catch (ImpalaRuntimeException e) {
+      throw new AnalysisException(String.format(
+          "Cannot create table '%s': %s", getTbl(), e.getMessage()));
+    }
   }
 
   /**
