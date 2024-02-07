@@ -578,7 +578,8 @@ under the License.
           </ul>
           The queries are listed in reverse chronological order, with the most recent at the
           top. You can control the amount of memory devoted to completed queries by specifying
-          the <codeph>-&#8209;-&#8209;query_log_size</codeph> startup option for
+          the <codeph>-&#8209;-&#8209;query_log_size</codeph>
+          and <codeph>-&#8209;-&#8209;query_log_size_in_bytes</codeph> startup options for
           <codeph>impalad</codeph>.
         </p>
 

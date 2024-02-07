@@ -80,7 +80,7 @@ class TestWebPage(CustomClusterTestSuite):
   def test_webserver_interface(self):
     addrs = psutil.net_if_addrs()
     print("net_if_addrs returned: %s" % addrs)
-    ip_matcher = re.compile("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+    ip_matcher = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
     ip_addrs = []
     for addr in addrs:
       for snic in addrs[addr]:
@@ -146,6 +146,26 @@ class TestWebPage(CustomClusterTestSuite):
     response_json = response.text
     assert expected in response_json, "No matching statement found in the queries site."
     assert '"resource_pool": "default-pool"' in response_json
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--query_log_size_in_bytes=" + str(2 * 1024 * 1024)
+  )
+  def test_query_log_size_in_bytes(self):
+    """Check if query list is limited by query_log_size_in_bytes flag."""
+    # The input query will produce ~627228 bytes of QueryStateRecord in MT_DOP=8.
+    query = ("with l1 as (select id id1 from functional.alltypes), "
+        "l2 as (select a1.id1 id2 from l1 as a1 join l1 as b1 on a1.id1=-b1.id1), "
+        "l3 as (select a2.id2 id3 from l2 as a2 join l2 as b2 on a2.id2=-b2.id2), "
+        "l4 as (select a3.id3 id4 from l3 as a3 join l3 as b3 on a3.id3=-b3.id3), "
+        "l5 as (select a4.id4 id5 from l4 as a4 join l4 as b4 on a4.id4=-b4.id4) "
+        "select * from l5 limit 100;")
+    self.execute_query("SET MT_DOP=8;")
+    for i in range(0, 5):
+      self.execute_query(query)
+    response = requests.get("http://localhost:25000/queries?json")
+    queries_json = json.loads(response.text)
+    assert len(queries_json["completed_queries"]) == 3
 
   # Checks if 'messages' exists/does not exist in 'result_stderr' based on the value of
   # 'should_exist'

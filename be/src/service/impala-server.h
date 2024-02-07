@@ -942,7 +942,7 @@ class ImpalaServer : public ImpalaServiceIf,
   std::string ColumnTypeToBeeswaxTypeString(const TColumnType& type);
 
   /// Snapshot of a query's state, archived in the query log. Not mutated after
-  /// construction.
+  /// construction. Please update EstimateSize() if field member changed.
   struct QueryStateRecord {
     /// Compressed representation of profile returned by RuntimeProfile::Compress().
     /// Must be initialised to a valid value if this is a completed query.
@@ -1077,6 +1077,11 @@ class ImpalaServer : public ImpalaServiceIf,
     /// Comparator that sorts by start time.
     bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
   };
+
+  /// Return the estimated size of given record in bytes.
+  /// It does not meant to return exact byte size of given QueryStateRecord in memory,
+  /// but should account for compressed_profile vector of record.
+  static int64_t EstimateSize(const QueryStateRecord* record);
 
   /// Returns the active QueryHandle for this query id. The QueryHandle contains the
   /// active ClientRequestState. Returns an error Status if the query id cannot be found.
@@ -1269,7 +1274,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Random number generator for use in this class, thread safe.
   static ThreadSafeRandom rng_;
 
-  /// Guards query_log_ and query_log_index_
+  /// Guards query_log_, query_log_index_, query_log_est_sizes_,
+  /// and query_log_est_total_size_.
   std::mutex query_log_lock_;
 
   /// FIFO list of query records, which are written after the query finishes executing.
@@ -1287,6 +1293,10 @@ class ImpalaServer : public ImpalaServiceIf,
   typedef boost::unordered_map<TUniqueId, std::shared_ptr<QueryStateRecord>*>
       QueryLogIndex;
   QueryLogIndex query_log_index_;
+
+  /// Estimated individual and total size of records in query_log_ in bytes.
+  std::list<int64_t> query_log_est_sizes_;
+  int64_t query_log_est_total_size_;
 
   /// Sets the given query_record (and retried_query_record too if given) for the given
   /// query_id. Returns an error Status if the given query_id cannot be found in the

@@ -173,8 +173,14 @@ DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
 DEFINE_string(default_query_options, "", "key=value pair of default query options for"
     " impalad, separated by ','");
-DEFINE_int32(query_log_size, 100, "Number of queries to retain in the query log. If -1, "
-    "the query log has unbounded size.");
+DEFINE_int32(query_log_size, 200,
+    "Number of queries to retain in the query log. If -1, "
+    "the query log has unbounded size. Used in combination with query_log_size_in_bytes, "
+    "whichever is less.");
+DEFINE_int64(query_log_size_in_bytes, 2L * 1024 * 1024 * 1024,
+    "Total maximum bytes of queries to retain in the query log. If -1, "
+    "the query log has unbounded size. Used in combination with query_log_size, "
+    "whichever is less");
 DEFINE_int32(query_stmt_size, 250, "length of the statements in the query log. If <=0, "
     "the full statement is displayed in the query log without trimming.");
 DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to file.");
@@ -1139,7 +1145,7 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
     }
   }
 
-  if (FLAGS_query_log_size == 0) return;
+  if (FLAGS_query_log_size == 0 || FLAGS_query_log_size_in_bytes == 0) return;
   // 'fetch_rows_lock()' protects several fields in ClientReqestState that are read
   // during QueryStateRecord creation. There should be no contention on this lock because
   // the query has already been closed (e.g. no more results can be fetched).
@@ -1151,18 +1157,77 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
   if (query_handle->GetCoordinator() != nullptr) {
     query_handle->GetCoordinator()->GetTExecSummary(&record->exec_summary);
   }
+  int64_t record_size = EstimateSize(record.get());
+  VLOG(3) << "QueryStateRecord of " << PrintId(query_handle->query_id()) << " is "
+          << record_size << " bytes";
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
+    query_log_est_total_size_ += record_size;
+    query_log_est_sizes_.push_front(record_size);
     query_log_.push_front(move(record));
     query_log_index_[query_handle->query_id()] = &query_log_.front();
 
-    if (FLAGS_query_log_size > -1 && FLAGS_query_log_size < query_log_.size()) {
-      DCHECK_EQ(query_log_.size() - FLAGS_query_log_size, 1);
+    while (!query_log_.empty()
+        && ((FLAGS_query_log_size > -1 && FLAGS_query_log_size < query_log_.size())
+            || (FLAGS_query_log_size_in_bytes > -1
+                && FLAGS_query_log_size_in_bytes < query_log_est_total_size_))) {
       query_log_index_.erase(query_log_.back()->id);
+      query_log_est_total_size_ -= query_log_est_sizes_.back();
+      query_log_est_sizes_.pop_back();
       query_log_.pop_back();
+      DCHECK_GE(query_log_est_total_size_, 0);
+      DCHECK_EQ(query_log_.size(), query_log_est_sizes_.size());
     }
   }
+}
+
+int64_t ImpalaServer::EstimateSize(const QueryStateRecord* record) {
+  int64_t size = sizeof(QueryStateRecord); // 800
+  size += sizeof(uint8_t) * record->compressed_profile.capacity();
+  size += record->effective_user.capacity();
+  size += record->default_db.capacity();
+  size += record->stmt.capacity();
+  size += record->plan.capacity();
+  size += record->query_state.capacity();
+  size += record->timeline.capacity();
+  size += record->resource_pool.capacity();
+
+  // The following dynamic memory of field members are estimated rather than
+  // exactly sized. Some of thrift members might be nested, but the estimation
+  // does not traverse deeper than the first level.
+
+  // TExecSummary exec_summary
+  if (record->exec_summary.__isset.nodes) {
+    size += sizeof(TPlanNodeExecSummary) * record->exec_summary.nodes.capacity();
+  }
+  if (record->exec_summary.__isset.exch_to_sender_map) {
+    size += sizeof(int32_t) * 2 * record->exec_summary.exch_to_sender_map.size();
+  }
+  if (record->exec_summary.__isset.error_logs) {
+    for (const auto& log : record->exec_summary.error_logs) size += log.capacity();
+  }
+  if (record->exec_summary.__isset.queued_reason) {
+    size += record->exec_summary.queued_reason.capacity();
+  }
+
+  // Status query_status
+  if (!record->query_status.ok()) {
+    size += record->query_status.msg().msg().capacity();
+    for (const auto& detail : record->query_status.msg().details()) {
+      size += detail.capacity();
+    }
+  }
+
+  // TEventSequence event_sequence
+  size += record->event_sequence.name.capacity();
+  size += sizeof(int64_t) * record->event_sequence.timestamps.capacity();
+  for (const auto& label : record->event_sequence.labels) size += label.capacity();
+
+  // vector<TPlanFragment> fragments
+  size += sizeof(TPlanFragment) * record->fragments.capacity();
+
+  return size;
 }
 
 ImpalaServer::~ImpalaServer() {}
