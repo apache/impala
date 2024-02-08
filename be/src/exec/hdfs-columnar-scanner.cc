@@ -81,6 +81,11 @@ HdfsColumnarScanner::~HdfsColumnarScanner() {}
 
 Status HdfsColumnarScanner::Open(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Open(context));
+  // Memorize 'is_footer_scanner_' here since 'stream_' can be released early.
+  const io::ScanRange* range = stream_->scan_range();
+  is_footer_scanner_ =
+      range->offset() + range->bytes_to_read() >= stream_->file_desc()->file_length;
+
   RuntimeProfile* profile = scan_node_->runtime_profile();
   num_cols_counter_ = PROFILE_NumColumns.Instantiate(profile);
   num_scanners_with_no_reads_counter_ =

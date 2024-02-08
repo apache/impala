@@ -271,6 +271,10 @@ struct TFileSplitGeneratorSpec {
 
   // Hash of the partition path
   5: required i32 partition_path_hash
+
+  // True if only footer range (the last block in file) is needed.
+  // If True, is_splittable must also be True as well.
+  6: required bool is_footer_only
 }
 
 // Specification of an individual data range which is held in its entirety

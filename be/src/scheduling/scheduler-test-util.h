@@ -202,8 +202,12 @@ struct Block {
 
 struct FileSplitGeneratorSpec {
   FileSplitGeneratorSpec() {}
-  FileSplitGeneratorSpec(int64_t length, int64_t block, bool splittable)
-    : length(length), block_size(block), is_splittable(splittable) {}
+  FileSplitGeneratorSpec(
+      int64_t length, int64_t block, bool splittable, bool is_footer_only = false)
+    : length(length),
+      block_size(block),
+      is_splittable(splittable),
+      is_footer_only(is_footer_only) {}
 
   /// Length of file for which to generate file splits.
   int64_t length = DEFAULT_FILE_SIZE;
@@ -212,6 +216,8 @@ struct FileSplitGeneratorSpec {
   int64_t block_size = DEFAULT_BLOCK_SIZE;
 
   bool is_splittable = true;
+
+  bool is_footer_only = false;
 
   static const int64_t DEFAULT_FILE_SIZE;
   static const int64_t DEFAULT_BLOCK_SIZE;

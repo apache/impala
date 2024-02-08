@@ -1253,23 +1253,24 @@ public class HdfsScanNode extends ScanNode {
           totalBytesPerFsEC_.merge(fsType, fileDesc.getFileLength(), Long::sum);
         }
 
+        // If parquet count star optimization is enabled, we only need the
+        // 'RowGroup.num_rows' in file metadata, thus only the scan range that contains
+        // a file footer is required.
+        // IMPALA-8834 introduced the optimization for partition key scan by generating
+        // one scan range for each HDFS file. With Parquet and ORC, we only need to get
+        // the scan range that contains a file footer for short-circuiting.
+        boolean isFooterOnly = countStarSlot_ != null
+            || (isPartitionKeyScan_
+                && (partition.getFileFormat().isParquetBased()
+                    || partition.getFileFormat() == HdfsFileFormat.ORC));
+
         if (!fsHasBlocks) {
           Preconditions.checkState(fileDesc.getNumFileBlocks() == 0);
           generateScanRangeSpecs(
-              partition, partitionLocation, fileDesc, scanRangeBytesLimit);
+              partition, partitionLocation, fileDesc, scanRangeBytesLimit, isFooterOnly);
         } else {
           // Skips files that have no associated blocks.
           if (fileDesc.getNumFileBlocks() == 0) continue;
-          // If parquet count star optimization is enabled, we only need the
-          // 'RowGroup.num_rows' in file metadata, thus only the scan range that contains
-          // a file footer is required.
-          // IMPALA-8834 introduced the optimization for partition key scan by generating
-          // one scan range for each HDFS file. With Parquet and ORC, we only need to get
-          // the scan range that contains a file footer for short-circuiting.
-          boolean isFooterOnly = countStarSlot_ != null
-              || (isPartitionKeyScan_
-                  && (partition.getFileFormat().isParquetBased()
-                      || partition.getFileFormat() == HdfsFileFormat.ORC));
           Pair<Boolean, Long> result =
               transformBlocksToScanRanges(partition, partitionLocation, fsType, fileDesc,
                   fsHasBlocks, scanRangeBytesLimit, analyzer, isFooterOnly);
@@ -1371,17 +1372,17 @@ public class HdfsScanNode extends ScanNode {
    * FeFsPartition can be expensive.
    */
   private void generateScanRangeSpecs(FeFsPartition partition, String partitionLocation,
-      FileDescriptor fileDesc, long maxBlockSize) {
+      FileDescriptor fileDesc, long maxBlockSize, boolean isFooterOnly) {
     Preconditions.checkArgument(fileDesc.getNumFileBlocks() == 0);
     Preconditions.checkArgument(maxBlockSize > 0);
     if (fileDesc.getFileLength() <= 0) return;
     boolean splittable = partition.getFileFormat().isSplittable(
         HdfsCompression.fromFileName(fileDesc.getPath()));
+    isFooterOnly &= splittable;
     // Hashing must use String.hashCode() for consistency.
     int partitionHash = partitionLocation.hashCode();
-    TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(
-        fileDesc.toThrift(), maxBlockSize, splittable, partition.getId(),
-        partitionHash);
+    TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(fileDesc.toThrift(),
+        maxBlockSize, splittable, partition.getId(), partitionHash, isFooterOnly);
     scanRangeSpecs_.addToSplit_specs(splitSpec);
     long scanRangeBytes = Math.min(maxBlockSize, fileDesc.getFileLength());
     if (splittable && !isPartitionKeyScan_) {

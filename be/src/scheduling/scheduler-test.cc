@@ -642,6 +642,27 @@ TEST_F(SchedulerTest, TestGeneratedVariableSizeSplit) {
   EXPECT_EQ(300, result.NumTotalAssignedBytes());
 }
 
+TEST_F(SchedulerTest, TestGeneratedVariableSizeSplitFooterOnly) {
+  Cluster cluster;
+
+  cluster.AddHosts(3, true, true);
+
+  Schema schema(cluster);
+  schema.AddFileSplitGeneratorSpecs(
+      "T", {{100, 100, false, false}, {100, 1, true, true}, {100, 10, true, true}});
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+  plan.SetRandomReplica(true);
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  ASSERT_OK(scheduler.Compute(&result));
+
+  EXPECT_EQ(3, result.NumTotalAssignments());
+  EXPECT_EQ(111, result.NumTotalAssignedBytes());
+}
+
 TEST_F(SchedulerTest, TestBlockAndGenerateSplit) {
   Cluster cluster;
 

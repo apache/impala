@@ -60,6 +60,10 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// top-level tuples. See AssembleRows() in the derived classes.
   boost::scoped_ptr<ScratchTupleBatch> scratch_batch_;
 
+  /// Indicate whether this is a footer scanner or not.
+  /// Assigned in HdfsColumnarScanner::Open().
+  bool is_footer_scanner_ = false;
+
   /// Scan range for the metadata.
   const io::ScanRange* metadata_range_ = nullptr;
 

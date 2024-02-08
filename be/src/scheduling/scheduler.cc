@@ -121,8 +121,17 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
 
     long scan_range_offset = 0;
     long remaining = fb_desc->length();
-    long scan_range_length = std::min(spec.max_block_size, fb_desc->length());
-    if (!spec.is_splittable) scan_range_length = fb_desc->length();
+    long scan_range_length = fb_desc->length();
+
+    if (spec.is_splittable) {
+      scan_range_length = std::min(spec.max_block_size, fb_desc->length());
+      if (spec.is_footer_only) {
+        scan_range_offset = fb_desc->length() - scan_range_length;
+        remaining = scan_range_length;
+      }
+    } else {
+      DCHECK(!spec.is_footer_only);
+    }
 
     while (remaining > 0) {
       THdfsFileSplit hdfs_scan_range;

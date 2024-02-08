@@ -411,6 +411,7 @@ void Plan::BuildScanRangeSpec(const TableName& table_name,
   thrift_spec->__set_file_desc(thrift_file);
   thrift_spec->__set_max_block_size(spec.block_size);
   thrift_spec->__set_is_splittable(spec.is_splittable);
+  thrift_spec->__set_is_footer_only(spec.is_footer_only);
   int32_t partition_path_hash = static_cast<int32_t>(HashUtil::Hash(partition_path.data(),
       partition_path.length(), 0));
   thrift_spec->__set_partition_path_hash(partition_path_hash);
