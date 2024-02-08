@@ -176,6 +176,8 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
 
@@ -197,6 +199,8 @@ public class MetastoreEventsProcessorTest {
   private static CatalogServiceTestCatalog catalog_;
   private static CatalogOpExecutor catalogOpExecutor_;
   private static MetastoreEventsProcessor eventsProcessor_;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MetastoreEventsProcessorTest.class);
 
   @BeforeClass
   public static void setUpTestEnvironment() throws TException, ImpalaException {
@@ -3082,6 +3086,110 @@ public class MetastoreEventsProcessorTest {
     fileMetadataLoadAfter =
         tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
     assertNotEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
+  }
+
+  /**
+   * Some of the the alter table events on Storage Descriptor doesn't require to reload
+   * file metadata, this test asserts that file metadata is not reloaded for such alter
+   * table events
+   */
+  @Test
+  public void testAlterTableSdVerifyMetadataReload() throws Exception {
+    createDatabase(TEST_DB_NAME, null);
+    final String testTblName = "testSdFileMetadataReload";
+    createTable(testTblName, true);
+    List<List<String>> partVals = new ArrayList<>();
+    partVals.add(Arrays.asList("1"));
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
+    eventsProcessor_.processEvents();
+    // load the table first
+    loadTable(testTblName);
+    HdfsTable tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    // get file metadata load counter before altering the partition
+    long fileMetadataLoadBefore =
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+
+    // Test 1: Set file format
+    LOG.info("Test changes in file format for an Alter table statement");
+    org.apache.hadoop.hive.metastore.api.Table hmsTbl = catalog_.getTable(TEST_DB_NAME,
+        testTblName).getMetaStoreTable();
+    hmsTbl.getSd().setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
+    hmsTbl.getSd().setOutputFormat(
+        "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+    long fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+
+    // Test 2: set rowformat
+    LOG.info("Test changes in row format for Alter table statement");
+    hmsTbl = catalog_.getTable(TEST_DB_NAME, testTblName).getMetaStoreTable();
+    hmsTbl.getSd().getSerdeInfo().setSerializerClass(
+        "org.apache.hadoop.hive.contrib.serde2.RegexSerDe");
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+
+    // Test 3: set location
+    LOG.info("Test changes in table location for Alter table statement");
+    hmsTbl = catalog_.getTable(TEST_DB_NAME, testTblName).getMetaStoreTable();
+    assertNotNull("Location is expected to be set to proceed forward in the test",
+        hmsTbl.getSd().getLocation());
+    String tblLocation = hmsTbl.getSd().getLocation() + "_changed";
+    hmsTbl.getSd().setLocation(tblLocation);
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+
+    // Test 4: set storedAsSubDirectories from false to unset
+    LOG.info("Test changes in storedAsSubDirectories from false to unset");
+    hmsTbl = tbl.getMetaStoreTable().deepCopy();
+    hmsTbl.getSd().unsetStoredAsSubDirectories();
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore, fileMetadataLoadAfter);
+
+    // Test 5: set storedAsSubDirectories to true
+    LOG.info("Test changes in storedAsSubDirectories from unset to true");
+    hmsTbl.getSd().setStoredAsSubDirectories(true);
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+
+    // Test 6: set storedAsSubDirectories from true to false
+    LOG.info("Test changes in storedAsSubDirectories from true to false");
+    hmsTbl.getSd().setStoredAsSubDirectories(false);
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+
+    // Test 7: set storedAsSubDirectories from unset to false
+    LOG.info("Test changes in storedAsSubDirectories from unset to false");
+    // first set the value to unset from false
+    hmsTbl.getSd().unsetStoredAsSubDirectories();
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+    hmsTbl.getSd().setStoredAsSubDirectories(false);
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore, fileMetadataLoadAfter);
+
+    // Test 8: keep SD unchanged by setting the same value and also change non-trivial
+    // TblProperties to verify file metadata is reloaded
+    LOG.info("Test changes in non-trivial tbl props and same SD");
+    hmsTbl = tbl.getMetaStoreTable().deepCopy();
+    hmsTbl.getSd().setStoredAsSubDirectories(false);
+    hmsTbl.getParameters().put("EXTERNAL", "false");
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+  }
+
+  private long processAlterTableAndReturnMetric(String testTblName,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      msClient.getHiveClient().alter_table_with_environmentContext(
+          TEST_DB_NAME, testTblName, msTbl, null);
+    }
+    eventsProcessor_.processEvents();
+    HdfsTable tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+    return
+        tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
   }
 
   /**

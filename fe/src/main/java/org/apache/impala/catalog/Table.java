@@ -1103,6 +1103,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public long getLastRefreshEventId() { return lastRefreshEventId_; }
 
   public void setLastRefreshEventId(long eventId) {
+    setLastRefreshEventId(eventId, true);
+  }
+
+  public void setLastRefreshEventId(long eventId, boolean isSetLastSyncEventId) {
     if (eventId > lastRefreshEventId_) {
       lastRefreshEventId_ = eventId;
     }
@@ -1111,7 +1115,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     // TODO: Should we reset lastSyncedEvent Id if it is less than event Id?
     // If we don't reset it - we may start syncing table from an event id which
     // is less than refresh event id
-    if (lastSyncedEventId_ < eventId) {
+    if (lastSyncedEventId_ < eventId && isSetLastSyncEventId) {
       setLastSyncedEventId(eventId);
     }
   }

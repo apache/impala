@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TxnToWriteId;
 import org.apache.hadoop.hive.metastore.messaging.AbortTxnMessage;
@@ -1892,12 +1893,19 @@ public class MetastoreEvents {
 
       // There are lot of other alter statements which doesn't require file metadata
       // reload but these are the most common types for alter statements.
+      boolean skipFileMetadata = false;
       if (isFieldSchemaChanged(beforeTable, afterTable) ||
-          isTableOwnerChanged(beforeTable.getOwner(), afterTable.getOwner()) ||
-          !isCustomTblPropsChanged(whitelistedTblProperties, beforeTable, afterTable)) {
-        return true;
+          isTableOwnerChanged(beforeTable.getOwner(), afterTable.getOwner())) {
+        skipFileMetadata = true;
+      } else if (!Objects.equals(beforeTable.getSd(), afterTable.getSd())) {
+        if (isTrivialSdPropsChanged(beforeTable.getSd(), afterTable.getSd())) {
+          skipFileMetadata = true;
+        }
+      } else if (!isCustomTblPropsChanged(whitelistedTblProperties, beforeTable,
+          afterTable)) {
+        skipFileMetadata = true;
       }
-      return false;
+      return skipFileMetadata;
     }
 
     private boolean isFieldSchemaChanged(
@@ -1907,8 +1915,9 @@ public class MetastoreEvents {
       List<FieldSchema> afterCols = afterTable.getSd().getCols();
       // check if columns are added or removed
       if (beforeCols.size() != afterCols.size()) {
-        infoLog("Change in number of columns detected for table {}.{} from {} to {}",
-            dbName_, tblName_, beforeCols.size(), afterCols.size());
+        infoLog("Change in number of columns detected for table {}.{} from {} to {}. " +
+            "So file metadata reload can be skipped.", dbName_, tblName_,
+            beforeCols.size(), afterCols.size());
         return true;
       }
       // check if columns are replaced or column definition is changed
@@ -1916,10 +1925,10 @@ public class MetastoreEvents {
       for (int i = 0; i < beforeCols.size(); i++) {
         if (!beforeCols.get(i).getName().equals(afterCols.get(i).getName()) ||
             !beforeCols.get(i).getType().equals(afterCols.get(i).getType())) {
-          infoLog("Change in table schema detected for table {}.{} from {} to {} ",
-              tblName_, dbName_, beforeCols.get(i).getName() + " (" +
-                  beforeCols.get(i).getType() +")", afterCols.get(i).getName() + " (" +
-                  afterCols.get(i).getType() + ")");
+          infoLog("Change in table schema detected for table {}.{} from {} ({}) " +
+              "to {} ({}). So file metadata reload can be skipped.", dbName_, tblName_,
+              beforeCols.get(i).getName(), beforeCols.get(i).getType(),
+              afterCols.get(i).getName(), afterCols.get(i).getType());
           return true;
         }
       }
@@ -1929,7 +1938,8 @@ public class MetastoreEvents {
     private boolean isTableOwnerChanged(String ownerBefore, String ownerAfter) {
       if (!Objects.equals(ownerBefore, ownerAfter)) {
         infoLog("Change in Ownership detected for table {}.{}, oldOwner: {}, " +
-            "newOwner: {}", dbName_, tblName_, ownerBefore, ownerAfter);
+            "newOwner: {}. So file metadata reload can be skipped.",
+            dbName_, tblName_, ownerBefore, ownerAfter);
         return true;
       }
       return false;
@@ -1944,12 +1954,52 @@ public class MetastoreEvents {
         String configAfter = afterTable.getParameters().get(whitelistConfig);
         if (!Objects.equals(configBefore, configAfter)) {
           infoLog("Change in whitelisted table properties detected for table {}.{} " +
-              "whitelisted config: {}, value before: {}, value after: {}", dbName_,
-              tblName_, whitelistConfig, configBefore, configAfter);
+              "whitelisted config: {}, value before: {}, value after: {}. So file " +
+              "metadata should be reloaded.", dbName_, tblName_, whitelistConfig,
+              configBefore, configAfter);
           return true;
         }
       }
       return false;
+    }
+
+    // Check if the trivial SD properties are changed during the alter statement.
+    // Also, the caller should make sure that 'beforeSd' and 'afterSd' are not equal.
+    private boolean isTrivialSdPropsChanged(StorageDescriptor beforeSd,
+        StorageDescriptor afterSd) {
+      Preconditions.checkNotNull(beforeSd, "beforeSd is null");
+      Preconditions.checkNotNull(afterSd, "afterSd is null");
+      StorageDescriptor previousSD = normalizeStorageDescriptor(beforeSd.deepCopy());
+      StorageDescriptor currentSD = normalizeStorageDescriptor(afterSd.deepCopy());
+      if (!Objects.equals(previousSD, currentSD)) {
+        infoLog("Non-trivial change in table storage descriptor (SD) detected for " +
+            "table {}.{}. So file metadata should be reloaded. SD before: {}, SD " +
+            "after: {}", dbName_, tblName_, beforeSd.toString(), afterSd.toString());
+        return false;
+      }
+      infoLog("Trivial changes in table storage descriptor (SD) detected for table " +
+          "{}.{}. So file metadata reload can be skipped.", dbName_, tblName_);
+      return true;
+    }
+
+    /**
+     * Normalize the storage descriptor by unsetting the trivial fields in SD like
+     * columns, compressed, numBuckets, bucketCols,SkewedInfo, and
+     * setStoredAsSubDirectories.
+     */
+    private StorageDescriptor normalizeStorageDescriptor(StorageDescriptor sd) {
+      sd.unsetCols();
+      sd.unsetCompressed();
+      sd.unsetNumBuckets();
+      sd.unsetBucketCols();
+      sd.unsetSortCols();
+      sd.unsetSkewedInfo();
+      // setStoredAsSubDirectories = null or 'false' are trivial changes, so we normalize
+      // this value to false if it is null.
+      if (!sd.isSetStoredAsSubDirectories()) {
+        sd.setStoredAsSubDirectories(false);
+      }
+      return sd;
     }
 
     /**

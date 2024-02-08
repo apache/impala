@@ -2761,6 +2761,7 @@ public class CatalogServiceCatalog extends Catalog {
         }
         catalogTimeline.markEvent("Loaded table");
       }
+      boolean isFullReloadOnTable = !isSkipFileMetadataReload;
       if (currentHmsEventId != -1 && syncToLatestEventId) {
         // fetch latest event id from HMS before starting table load and set that event
         // id as table's last synced id. It may happen that while the table was being
@@ -2770,16 +2771,20 @@ public class CatalogServiceCatalog extends Catalog {
         // We are not replaying new events for the table in the end because certain
         // events like ALTER_TABLE in MetastoreEventProcessor call this method which
         // might trigger an endless loop cycle
-        tbl.setLastSyncedEventId(currentHmsEventId);
+        if (isFullReloadOnTable) {
+          tbl.setLastSyncedEventId(currentHmsEventId);
+        } else {
+          tbl.setLastSyncedEventId(eventId);
+        }
       }
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
       // Set the last refresh event id as current HMS event id since all the metadata
       // until the current HMS event id is refreshed at this point.
-      if (currentHmsEventId > eventId) {
-        tbl.setLastRefreshEventId(currentHmsEventId);
+      if (currentHmsEventId > eventId && isFullReloadOnTable) {
+        tbl.setLastRefreshEventId(currentHmsEventId, isFullReloadOnTable);
       } else {
-        tbl.setLastRefreshEventId(eventId);
+        tbl.setLastRefreshEventId(eventId, isFullReloadOnTable);
       }
       return tbl.toTCatalogObject(resultType);
     } finally {
