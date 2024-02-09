@@ -27,10 +27,13 @@ from multiprocessing import Process, Queue
 from time import sleep, time
 import itertools
 import json
+import logging
 import os
 import pytest
 import re
 import requests
+
+LOG = logging.getLogger(__name__)
 
 
 class TestWebPage(ImpalaTestSuite):
@@ -906,12 +909,12 @@ class TestWebPage(ImpalaTestSuite):
   def test_catalog_operation_fields(self, unique_database):
     """Verify the CREATE_DATABASE operation is consistent with the statement shown in the
        /queries page of impalad."""
-    catalog_operations = json.loads(
-        requests.get("http://localhost:25020/operations?json").text)
+    catalog_operations_page = requests.get("http://localhost:25020/operations?json").text
+    catalog_operations = json.loads(catalog_operations_page)
     assert "finished_catalog_operations" in catalog_operations
 
-    queries = json.loads(
-        requests.get("http://localhost:25000/queries?json").text)
+    queries_page = requests.get("http://localhost:25000/queries?json").text
+    queries = json.loads(queries_page)
     assert "completed_queries" in queries
 
     # Find the CREATE_DATABASE operation in catalogd
@@ -926,19 +929,39 @@ class TestWebPage(ImpalaTestSuite):
         catalog_op_end_time = datetime.strptime(op["finish_time"], ts_format)
         catalog_op_duration = parse_duration_string_ms(op["duration"])
         found = True
+        LOG.info("Found query id in catalog operations: " + catalog_op_query_id)
         break
     assert found
+
+    def verify_query_record(query):
+      assert "CREATE DATABASE" in query["stmt"]
+      assert unique_database in query["stmt"]
+      assert catalog_op_user == query["effective_user"]
+      assert datetime.strptime(query["start_time"], ts_format) <= catalog_op_start_time
+      assert datetime.strptime(query["end_time"], ts_format) >= catalog_op_end_time
+      assert parse_duration_string_ms(query["duration"]) >= catalog_op_duration
+
     # Find the query in impalad
     matched = False
     for query in queries["completed_queries"]:
       if query["query_id"] == catalog_op_query_id:
-        assert "CREATE DATABASE" in query["stmt"]
-        assert unique_database in query["stmt"]
-        assert catalog_op_user == query["effective_user"]
-        assert datetime.strptime(query["start_time"], ts_format) <= catalog_op_start_time
-        assert datetime.strptime(query["end_time"], ts_format) >= catalog_op_end_time
-        assert parse_duration_string_ms(query["duration"]) >= catalog_op_duration
+        verify_query_record(query)
         matched = True
+    if not matched:
+      LOG.info("Query id {0} not found in the completed queries list".format(
+          catalog_op_query_id))
+      # Try to find the query in the in-flight queries list. It could be waiting to
+      # be closed.
+      for query in queries["in_flight_queries"]:
+        if query["query_id"] == catalog_op_query_id:
+          verify_query_record(query)
+          matched = True
+
+    # Dump web pages for debug
+    if not matched:
+      LOG.info("Query id {0} not found in queries page!".format(catalog_op_query_id))
+      LOG.info("Catalog operations: " + catalog_operations_page)
+      LOG.info("Queries: " + queries_page)
     assert matched
 
   def test_catalog_metrics(self):
