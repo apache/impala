@@ -215,6 +215,11 @@ async function renderFragmentDiagram() {
           // Plan node timing row
           DrawBars(fragment_svg_group, rownum_l, row_height, node.events, name_width,
               px_per_ns);
+
+          fragment_svg_group.id = fragment.name;
+          fragment_svg_group.addEventListener('click', updateFragmentMetricsChartOnClick);
+          fragment_diagram.appendChild(fragment_svg_group);
+
           if (node.type == "HASH_JOIN_NODE") {
             fragment_diagram.appendChild(getSvgText("X", stroke_fill_colors.black,
                 name_width + Math.min.apply(null, node.events[2].tslist) * px_per_ns,
@@ -223,6 +228,10 @@ async function renderFragmentDiagram() {
                 name_width + Math.min.apply(null, node.events[2].tslist) * px_per_ns,
                 text_y, row_height, false));
           }
+        } else {
+          fragment_svg_group.id = fragment.name;
+          fragment_svg_group.addEventListener('click', updateFragmentMetricsChartOnClick);
+          fragment_diagram.appendChild(fragment_svg_group);
         }
 
         if (node.is_receiver) {
@@ -287,11 +296,7 @@ async function renderFragmentDiagram() {
             pending_fragments.push(fragments[node.sender_frag_index]);
           }
         }
-
       }
-      fragment_svg_group.id = fragment.name;
-      fragment_svg_group.addEventListener('click', updateFragmentMetricsChartOnClick);
-      fragment_diagram.appendChild(fragment_svg_group);
 
       // Visit sender fragments in reverse order to avoid dag edges crossing
       pending_fragments.reverse().forEach(printFragment);
