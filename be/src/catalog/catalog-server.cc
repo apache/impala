@@ -188,10 +188,11 @@ DEFINE_validator(topic_update_log_gc_frequency, &ValidatePositiveInt);
 DEFINE_validator(catalog_delete_log_ttl, &ValidatePositiveInt);
 
 DEFINE_bool(invalidate_metadata_on_event_processing_failure, true,
-    "This configuration is used to invalidate metadata for table(s) upon event process "
-    "failure other than HMS connection issues. The default value is true. When enabled, "
-    "invalidate metadata is performed automatically upon event process failure. "
-    "Otherwise, failure can put metastore event processor in non-active state.");
+    "This configuration is used to invalidate metadata for specific table(s) upon event "
+    "process failure other than HMS connection issues. The default value is true. When "
+    "enabled, invalidate metadata is performed automatically upon event process failure "
+    "of that specific table(s). Otherwise, failure can put metastore event processor in "
+    "non-active state.");
 
 DEFINE_bool(invalidate_global_metadata_on_event_processing_failure, false,
     "This configuration is used to global invalidate metadata when "
@@ -236,6 +237,39 @@ DEFINE_string(common_hms_event_types, "ADD_PARTITION,ALTER_PARTITION,DROP_PARTIT
     "CREATE_ISCHEMA, ALTER_ISCHEMA, DROP_ISCHEMA, ADD_SCHEMA_VERSION,"
     "ALTER_SCHEMA_VERSION, DROP_SCHEMA_VERSION, CREATE_CATALOG, ALTER_CATALOG,"
     "DROP_CATALOG, CREATE_DATACONNECTOR, ALTER_DATACONNECTOR, DROP_DATACONNECTOR.");
+
+DEFINE_bool(enable_hierarchical_event_processing, false,
+    "This configuration is used to enable hierarchical event processing. The default "
+    "value is false. When enabled, events are fetched, dispatched and processed in "
+    "different threads.");
+
+DEFINE_int32(num_db_event_executors, 5,
+    "This configuration is used to set the number of database level event executors. "
+    "Each database event executor is responsible a set of databases. A db processor "
+    "is maintained for each database within the database event executor. Functions of "
+    "db event executor is to dispatch table events to the respective table event "
+    "executors within it and to process database events. This configuration is "
+    "applicable when enable_hierarchical_event_processing is enabled.");
+
+DEFINE_int32(num_table_event_executors_per_db_event_executor, 5,
+    "This configuration is used to set the number of table level event executors within "
+    "a database event executor. Each table event executor is responsible a set of "
+    "tables. A table processor is maintained for each table within the table event "
+    "executor. Table event executor is used to process table events. This configuration "
+    "is applicable when enable_hierarchical_event_processing is enabled.");
+
+DEFINE_int32(min_event_processor_idle_ms, 60000,
+    "This configuration is used to set the minimum time to retain idle db processors and "
+    "table processors on the database event executors and table event executors "
+    "respectively, when they do not have events to process. Idle db processors and "
+    "table processors that have elapsed this time are purged later periodically. This "
+    "configuration is applicable when enable_hierarchical_event_processing is enabled.");
+
+DEFINE_int32(max_outstanding_events_on_executors, 1000,
+    "This configuration is used to limit the maximum outstanding events to process on "
+    "event executors. It is a backpressure mechanism to throttle event fetching when "
+    "the outstanding events exceeds the threshold. This configuration is applicable when "
+    "enable_hierarchical_event_processing is enabled.");
 
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);

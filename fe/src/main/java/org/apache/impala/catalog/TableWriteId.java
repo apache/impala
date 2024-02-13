@@ -28,16 +28,13 @@ public class TableWriteId {
   private String dbName_;
   // Table name
   private String tblName_;
-  // Create event id, which help us determine if a table is recreated
-  private long createEventId_;
   // Write id of this table in the transaction
   private long writeId_;
 
-  public TableWriteId(String dbName, String tblName, long createEventId, long writeId) {
+  public TableWriteId(String dbName, String tblName, long writeId) {
     Preconditions.checkArgument(dbName != null && tblName != null);
     this.dbName_ = dbName;
     this.tblName_ = tblName;
-    this.createEventId_ = createEventId;
     this.writeId_ = writeId;
   }
 
@@ -49,10 +46,6 @@ public class TableWriteId {
     return tblName_;
   }
 
-  public long getCreateEventId() {
-    return createEventId_;
-  }
-
   public long getWriteId() {
     return writeId_;
   }
@@ -62,10 +55,10 @@ public class TableWriteId {
     if (object == null || getClass() != object.getClass()) return false;
     TableWriteId that = (TableWriteId) object;
     return dbName_.equals(that.dbName_) && tblName_.equals(that.tblName_) &&
-        createEventId_ == that.createEventId_ && writeId_ == that.writeId_;
+        writeId_ == that.writeId_;
   }
 
   public int hashCode() {
-    return java.util.Objects.hash(dbName_, tblName_, createEventId_, writeId_);
+    return java.util.Objects.hash(dbName_, tblName_, writeId_);
   }
 }

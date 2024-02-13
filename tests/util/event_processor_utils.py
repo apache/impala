@@ -57,10 +57,10 @@ class EventProcessorUtils(object):
     while True:
       t = time.time()
       current_synced_id = EventProcessorUtils.get_last_synced_event_id()
-      if current_synced_id >= target_event_id:
-        LOG.debug(
-            "Metric last-synced-event-id has reached the desired value: %d",
-            target_event_id)
+      outstanding_events = EventProcessorUtils.get_outstanding_event_count()
+      if current_synced_id >= target_event_id and outstanding_events == 0:
+        LOG.debug("Metric last-synced-event-id has reached the desired value: %d, "
+                  + "outstanding events: %d", target_event_id, outstanding_events)
         break
       status = EventProcessorUtils.get_event_processor_status()
       if status not in status_list:
@@ -78,8 +78,9 @@ class EventProcessorUtils(object):
             within {1} seconds".format(last_synced_id, timeout))
       if made_progress:
         LOG.debug(
-            "Metric last-synced-event-id has been increased to %d but has not yet \
-            reached the desired value: %d", current_synced_id, target_event_id)
+          "Metric last-synced-event-id has been increased to %d but has not yet "
+          + "reached the desired value: %d, outstanding events: %d", current_synced_id,
+          target_event_id, outstanding_events)
         last_synced_id = current_synced_id
         last_synced_time = t
       time.sleep(0.1)
@@ -172,6 +173,13 @@ class EventProcessorUtils(object):
     metrics = EventProcessorUtils.get_event_processor_metrics()
     assert 'status' in metrics.keys()
     return metrics['status']
+
+  @staticmethod
+  def get_outstanding_event_count():
+    """Returns the outstanding event count"""
+    metrics = EventProcessorUtils.get_event_processor_metrics()
+    assert 'outstanding-event-count' in metrics.keys()
+    return int(metrics['outstanding-event-count'])
 
   @staticmethod
   def get_current_notification_id(hive_client):

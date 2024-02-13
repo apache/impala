@@ -3646,6 +3646,16 @@
     "key" : "events-processor.lag-time"
   },
   {
+    "description": "Total number of outstanding events to be processed on db event executors and table event executors when hierarchical event processing is enabled",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Outstanding Event Count",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.outstanding-event-count"
+  },
+  {
     "description": "Total number of executor groups that have at least one executor",
     "contexts": [
       "IMPALAD"

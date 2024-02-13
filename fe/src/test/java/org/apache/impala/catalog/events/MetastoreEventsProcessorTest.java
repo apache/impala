@@ -44,7 +44,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -166,7 +165,6 @@ import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdatedPartition;
 import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
-import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.thrift.TException;
 import org.junit.After;
@@ -210,7 +208,7 @@ public class MetastoreEventsProcessorTest {
       CurrentNotificationEventId currentNotificationId =
           metaStoreClient.getHiveClient().getCurrentNotificationEventId();
       eventsProcessor_ = new SynchronousHMSEventProcessorForTests(
-          catalogOpExecutor_, currentNotificationId.getEventId(), 10L);
+          catalogOpExecutor_, currentNotificationId.getEventId(), 10000L);
       eventsProcessor_.start();
     }
     catalog_.setMetastoreEventProcessor(eventsProcessor_);
@@ -1082,24 +1080,6 @@ public class MetastoreEventsProcessorTest {
   }
 
   /**
-   * Util method to create empty files in a given path
-   */
-  private List<String> addFilesToDirectory(Path parentPath, String fileNamePrefix,
-      int totalNumberOfFilesToAdd, boolean isOverwrite) throws IOException {
-    List<String> newFiles = new ArrayList<>();
-    final FileSystem fs = parentPath.getFileSystem(FileSystemUtil.getConfiguration());
-    if (isOverwrite && fs.exists(parentPath)) fs.delete(parentPath, true);
-    for (int i = 0; i < totalNumberOfFilesToAdd; i++) {
-      Path filename = new Path(parentPath,
-          fileNamePrefix + RandomStringUtils.random(5, true, true).toUpperCase());
-      try (FSDataOutputStream out = fs.create(filename)) {
-        newFiles.add(filename.getName());
-      }
-    }
-    return newFiles;
-  }
-
-  /**
    * Helper to test insert events. Creates a fake InsertEvent notification in the
    * catalog and processes it. To simulate an insert, we load a file using FS APIs and
    * verify the new file shows up after table/partition refresh.
@@ -1176,8 +1156,8 @@ public class MetastoreEventsProcessorTest {
       boolean isOverwrite) throws IOException, TException {
     Path parentPath = partition == null ? new Path(msTbl.getSd().getLocation())
         : new Path(partition.getSd().getLocation());
-    List <String> newFiles = addFilesToDirectory(parentPath, "testFile.",
-        totalNumberOfFilesToAdd, isOverwrite);
+    List<String> newFiles = MetastoreApiTestUtils.addFilesToDirectory(parentPath,
+        "testFile.", totalNumberOfFilesToAdd, isOverwrite);
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       List<InsertEventRequestData> partitionInsertEventInfos = new ArrayList<>();
       List<List<String>> partitionInsertEventVals = new ArrayList<>();
@@ -1198,26 +1178,9 @@ public class MetastoreEventsProcessorTest {
   private void simulateInsertIntoTransactionalTableFromFS(
       org.apache.hadoop.hive.metastore.api.Table msTbl, Partition partition,
       int totalNumberOfFilesToAdd, long txnId, long writeId) throws IOException {
-    Path parentPath = partition == null ?
-        new Path(msTbl.getSd().getLocation()) : new Path(partition.getSd().getLocation());
-    Path deltaPath = new Path(parentPath, String.format("delta_%d_%d", writeId, writeId));
-    List<String> newFiles = addFilesToDirectory(deltaPath, "testFile.",
-        totalNumberOfFilesToAdd, false);
-    List<InsertEventRequestData> insertEventReqDatas = new ArrayList<>();
-    List<List<String>> insertEventVals = new ArrayList<>();
-    InsertEventRequestData insertEventRequestData = new InsertEventRequestData();
-    if (partition != null) {
-      MetastoreShim.setPartitionVal(insertEventRequestData, partition.getValues());
-    }
-    insertEventRequestData.setFilesAdded(newFiles);
-    insertEventRequestData.setReplace(false);
-    insertEventReqDatas.add(insertEventRequestData);
-    insertEventVals.add(partition != null ? partition.getValues() : null);
-    MetaStoreUtil.TableInsertEventInfo insertEventInfo =
-        new MetaStoreUtil.TableInsertEventInfo(insertEventReqDatas, insertEventVals,
-            true, txnId, writeId);
-    MetastoreShim.fireInsertEvents(catalog_.getMetaStoreClient(), insertEventInfo,
-        msTbl.getDbName(), msTbl.getTableName());
+    MetastoreApiTestUtils.simulateInsertIntoTransactionalTableFromFS(
+        catalog_.getMetaStoreClient(), msTbl, partition, totalNumberOfFilesToAdd, txnId,
+        writeId);
   }
 
   /**
@@ -1434,10 +1397,9 @@ public class MetastoreEventsProcessorTest {
    */
   private static class HMSFetchNotificationsEventProcessor
       extends MetastoreEventsProcessor {
-    HMSFetchNotificationsEventProcessor(
-        CatalogOpExecutor catalogOp, long startSyncFromId, long pollingFrequencyInSec)
-        throws CatalogException {
-      super(catalogOp, startSyncFromId, pollingFrequencyInSec);
+    HMSFetchNotificationsEventProcessor(CatalogOpExecutor catalogOp, long startSyncFromId,
+        long pollingFrequencyInMilliSec) throws CatalogException {
+      super(catalogOp, startSyncFromId, pollingFrequencyInMilliSec);
     }
 
     @Override
@@ -1459,9 +1421,8 @@ public class MetastoreEventsProcessorTest {
   public void testEventProcessorFetchAfterHMSRestart() throws ImpalaException {
     CatalogServiceTestCatalog catalog = CatalogServiceTestCatalog.create();
     CatalogOpExecutor catalogOpExecutor = catalog.getCatalogOpExecutor();
-    MetastoreEventsProcessor fetchProcessor =
-        new HMSFetchNotificationsEventProcessor(catalogOpExecutor,
-            eventsProcessor_.getCurrentEventId(), 2L);
+    MetastoreEventsProcessor fetchProcessor = new HMSFetchNotificationsEventProcessor(
+        catalogOpExecutor, eventsProcessor_.getCurrentEventId(), 2000L);
     fetchProcessor.start();
     try {
       assertEquals(EventProcessorStatus.ACTIVE, fetchProcessor.getStatus());
@@ -4140,8 +4101,7 @@ public class MetastoreEventsProcessorTest {
     // Check whether txnId to write id mapping is present
     Set<TableWriteId> writeIds = catalog_.getWriteIds(txnId);
     assertEquals(1, writeIds.size());
-    assertTrue(writeIds.contains(
-        new TableWriteId(TEST_DB_NAME, tblName, table.getCreateEventId(), writeId)));
+    assertTrue(writeIds.contains(new TableWriteId(TEST_DB_NAME, tblName, writeId)));
     if (isLoadTable) {
       assertTrue(table instanceof HdfsTable);
       // For loaded partitioned table, write id is added on alloc write id event process

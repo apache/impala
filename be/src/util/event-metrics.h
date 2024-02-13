@@ -91,6 +91,9 @@ class MetastoreEventMetrics {
   /// Lag time of the event processing
   static IntCounter* LAG_TIME;
 
+  /// Outstanding event count
+  static IntCounter* OUTSTANDING_EVENT_COUNT;
+
  private:
   /// Following metric names must match with the key in metrics.json
 
@@ -147,6 +150,9 @@ class MetastoreEventMetrics {
 
   /// Metric name for the lag time of the event processing
   static std::string LAG_TIME_METRIC_NAME;
+
+  /// Metric name for the outstanding event count
+  static std::string OUTSTANDING_EVENT_COUNT_METRIC_NAME;
 };
 
 } // namespace impala

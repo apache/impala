@@ -17,6 +17,9 @@
 
 package org.apache.impala.catalog.events;
 
+import java.util.List;
+
+import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -27,11 +30,9 @@ import org.junit.Assert;
  * functionality of MetastoreEventsProcessor
  */
 public class SynchronousHMSEventProcessorForTests extends MetastoreEventsProcessor {
-
-  public SynchronousHMSEventProcessorForTests(
-      CatalogOpExecutor catalogOpExecutor, long startSyncFromId,
-      long pollingFrequencyInSec) throws CatalogException {
-    super(catalogOpExecutor, startSyncFromId, pollingFrequencyInSec);
+  public SynchronousHMSEventProcessorForTests(CatalogOpExecutor catalogOpExecutor,
+      long startSyncFromId, long pollingFrequencyInMilliSec) throws CatalogException {
+    super(catalogOpExecutor, startSyncFromId, pollingFrequencyInMilliSec);
   }
 
   @Override
@@ -47,8 +48,16 @@ public class SynchronousHMSEventProcessorForTests extends MetastoreEventsProcess
   @Override
   public void processEvents() {
     super.processEvents();
+    Assert.assertTrue(ensureEventsProcessedInHierarchicalMode(100000));
     super.updateLatestEventId();
     verifyEventSyncedMetrics();
+  }
+
+  @Override
+  protected void processEvents(long currentEventId, List<NotificationEvent> events)
+      throws MetastoreNotificationException {
+    super.processEvents(currentEventId, events);
+    Assert.assertTrue(ensureEventsProcessedInHierarchicalMode(100000));
   }
 
   private void verifyEventSyncedMetrics() {

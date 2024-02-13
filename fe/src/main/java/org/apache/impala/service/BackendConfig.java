@@ -143,7 +143,7 @@ public class BackendConfig {
     return backendCfg_.catalog_partial_fetch_max_files;
   }
 
-  public long getHMSPollingIntervalInSeconds() {
+  public double getHMSPollingIntervalInSeconds() {
     return backendCfg_.hms_event_polling_interval_s;
   }
 
@@ -552,5 +552,25 @@ public class BackendConfig {
 
   public String getInjectedGroupMembersDebugOnly() {
     return backendCfg_.injected_group_members_debug_only;
+  }
+
+  public boolean isHierarchicalEventProcessingEnabled() {
+    return backendCfg_.enable_hierarchical_event_processing;
+  }
+
+  public int getNumDbEventExecutors() {
+    return backendCfg_.num_db_event_executors;
+  }
+
+  public int getNumTableEventExecutorsPerDbEventExecutor() {
+    return backendCfg_.num_table_event_executors_per_db_event_executor;
+  }
+
+  public int getMinEventProcessorIdleMs() {
+    return backendCfg_.min_event_processor_idle_ms;
+  }
+
+  public int getMaxOutstandingEventsOnExecutors() {
+    return backendCfg_.max_outstanding_events_on_executors;
   }
 }

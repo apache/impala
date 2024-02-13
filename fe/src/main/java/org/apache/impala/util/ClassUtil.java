@@ -17,6 +17,9 @@
 
 package org.apache.impala.util;
 
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
 public class ClassUtil {
   /**
    * Returns the current method name.
@@ -28,11 +31,21 @@ public class ClassUtil {
     return stackTrace.getClassName() + "." + stackTrace.getMethodName() + "()";
   }
 
+  /**
+   * Retrieves the current thread's stack trace and converts it into a string
+   * representation.
+   * <p> The first two elements of the stack trace are skipped:
+   * <ul>
+   * <li> {@code java.lang.Thread.getStackTrace()}</li>
+   * <li> This method itself (i.e., {@link ClassUtil#getStackTraceForThread()})</li>
+   * </ul>
+   *
+   * @return The caller's stack trace as a formatted string, excluding internal frames
+   */
   public static String getStackTraceForThread() {
-    StringBuilder stringBuilder = new StringBuilder();
-    for (StackTraceElement frame: Thread.currentThread().getStackTrace()) {
-      stringBuilder.append(frame.toString() + "\n");
-    }
-    return stringBuilder.toString();
+    return Arrays.stream(Thread.currentThread().getStackTrace())
+        .skip(2)
+        .map(StackTraceElement::toString)
+        .collect(Collectors.joining("\n\tat "));
   }
 }

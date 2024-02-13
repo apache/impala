@@ -70,7 +70,7 @@ DECLARE_int32(catalog_partial_fetch_max_files);
 DECLARE_int64(exchg_node_buffer_size_bytes);
 DECLARE_int32(kudu_mutation_buffer_size);
 DECLARE_int32(kudu_error_buffer_size);
-DECLARE_int32(hms_event_polling_interval_s);
+DECLARE_double(hms_event_polling_interval_s);
 DECLARE_bool(enable_insert_events);
 DECLARE_string(authorization_factory_class);
 DECLARE_string(ranger_service_type);
@@ -137,6 +137,11 @@ DECLARE_bool(enable_catalogd_ha);
 DECLARE_string(injected_group_members_debug_only);
 DECLARE_int32(hms_event_sync_sleep_interval_ms);
 DECLARE_int32(catalog_delete_log_ttl);
+DECLARE_bool(enable_hierarchical_event_processing);
+DECLARE_int32(num_db_event_executors);
+DECLARE_int32(num_table_event_executors_per_db_event_executor);
+DECLARE_int32(min_event_processor_idle_ms);
+DECLARE_int32(max_outstanding_events_on_executors);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -519,6 +524,14 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_enable_catalogd_ha(FLAGS_enable_catalogd_ha);
   cfg.__set_hms_event_sync_sleep_interval_ms(FLAGS_hms_event_sync_sleep_interval_ms);
   cfg.__set_catalog_delete_log_ttl(FLAGS_catalog_delete_log_ttl);
+  cfg.__set_enable_hierarchical_event_processing(
+      FLAGS_enable_hierarchical_event_processing);
+  cfg.__set_num_db_event_executors(FLAGS_num_db_event_executors);
+  cfg.__set_num_table_event_executors_per_db_event_executor(
+      FLAGS_num_table_event_executors_per_db_event_executor);
+  cfg.__set_min_event_processor_idle_ms(FLAGS_min_event_processor_idle_ms);
+  cfg.__set_max_outstanding_events_on_executors(
+      FLAGS_max_outstanding_events_on_executors);
   return Status::OK();
 }
 

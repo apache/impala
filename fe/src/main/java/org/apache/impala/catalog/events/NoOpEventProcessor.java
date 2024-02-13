@@ -78,6 +78,11 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
   }
 
   @Override
+  public void clear() {
+    // no-op
+  }
+
+  @Override
   public void shutdown() {
     // no-op
   }

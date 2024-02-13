@@ -120,7 +120,7 @@ struct TBackendGflags {
 
   44: required i32 kudu_error_buffer_size
 
-  45: required i32 hms_event_polling_interval_s
+  45: required double hms_event_polling_interval_s
 
   46: required string impala_build_version
 
@@ -327,4 +327,14 @@ struct TBackendGflags {
   147: required i32 catalog_partial_fetch_max_files
 
   148: required i32 catalog_delete_log_ttl
+
+  149: required bool enable_hierarchical_event_processing
+
+  150: required i32 num_db_event_executors
+
+  151: required i32 num_table_event_executors_per_db_event_executor
+
+  152: required i32 min_event_processor_idle_ms
+
+  153: required i32 max_outstanding_events_on_executors
 }

@@ -43,13 +43,13 @@ public class CatalogTableWriteIdTest {
 
   @Test
   public void test() {
-    TableWriteId tableWriteId1 = new TableWriteId("default", "table1", -1L, 1L);
+    TableWriteId tableWriteId1 = new TableWriteId("default", "table1", 1L);
     catalog_.addWriteId(1L, tableWriteId1);
 
-    TableWriteId tableWriteId2 = new TableWriteId("default", "table2", -1L, 2L);
+    TableWriteId tableWriteId2 = new TableWriteId("default", "table2", 2L);
     catalog_.addWriteId(1L, tableWriteId2);
 
-    TableWriteId tableWriteId3 = new TableWriteId("default", "table3", -1L, 3L);
+    TableWriteId tableWriteId3 = new TableWriteId("default", "table3", 3L);
     catalog_.addWriteId(2L, tableWriteId3);
 
     Set<TableWriteId> set = catalog_.getWriteIds(1L);

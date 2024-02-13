@@ -210,7 +210,8 @@ public class JniCatalog {
   private ExternalEventsProcessor getEventsProcessor(
       MetaStoreClientPool metaStoreClientPool, CatalogOpExecutor catalogOpExecutor)
       throws ImpalaException {
-    long eventPollingInterval = BackendConfig.INSTANCE.getHMSPollingIntervalInSeconds();
+    long eventPollingInterval =
+        (long)(BackendConfig.INSTANCE.getHMSPollingIntervalInSeconds() * 1000);
     if (eventPollingInterval <= 0) {
       LOG.info("Metastore event processing is disabled. Event polling interval is {}",
           eventPollingInterval);

@@ -114,7 +114,7 @@ public class EventsProcessorStressTest {
       CurrentNotificationEventId currentNotificationId =
           metaStoreClient.getHiveClient().getCurrentNotificationEventId();
       eventsProcessor_ = new SynchronousHMSEventProcessorForTests(
-          catalogOpExecutor, currentNotificationId.getEventId(), 10L);
+          catalogOpExecutor, currentNotificationId.getEventId(), 10000L);
       eventsProcessor_.start();
     }
     catalog_.setMetastoreEventProcessor(eventsProcessor_);

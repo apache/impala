@@ -606,10 +606,10 @@ public class MetastoreEvents {
     protected final String catalogName_;
 
     // dbName from the event
-    protected final String dbName_;
+    protected String dbName_;
 
     // tblName from the event
-    protected final String tblName_;
+    protected String tblName_;
 
     // eventId of the event. Used instead of calling getter on event_ everytime
     private long eventId_;
@@ -670,11 +670,29 @@ public class MetastoreEvents {
       return eventType_ + " event " + eventId_;
     }
 
+    public CatalogOpExecutor getCatalogOpExecutor() {
+      return catalogOpExecutor_;
+    }
+
+    public NotificationEvent getEvent() {
+      return event_;
+    }
+
+    public Metrics getMetrics() {
+      return metrics_;
+    }
+
+    public boolean isDatabaseEvent() {
+      return eventType_ == MetastoreEventType.CREATE_DATABASE ||
+          eventType_ == MetastoreEventType.DROP_DATABASE ||
+          eventType_ == MetastoreEventType.ALTER_DATABASE;
+    }
+
     /**
      * Method to inject error randomly for certain events during the processing.
      * It is used for testing purpose.
      */
-    private void injectErrorIfNeeded() {
+    void injectErrorIfNeeded() {
       if (catalog_.getFailureEventsForTesting().contains(eventType_.toString())) {
         double random = Math.random();
         if (random < BackendConfig.INSTANCE.getProcessEventFailureRatio()) {
@@ -973,12 +991,15 @@ public class MetastoreEvents {
   }
 
   /**
+   * Marker interface for derived metastore event
+   */
+  public interface DerivedMetastoreEvent {
+  }
+
+  /**
    * Base class for all the table events
    */
   public static abstract class MetastoreTableEvent extends MetastoreEvent {
-    // tblName from the event
-    protected final String tblName_;
-
     // tbl object from the Notification event, corresponds to the before tableObj in
     // case of alter events
     protected org.apache.hadoop.hive.metastore.api.Table msTbl_;
@@ -991,13 +1012,17 @@ public class MetastoreEvents {
     // the partition object from the events which are batched together.
     protected Partition getPartitionForBatching() { return null; }
 
-    private MetastoreTableEvent(CatalogOpExecutor catalogOpExecutor,
-        Metrics metrics, NotificationEvent event) {
+    protected MetastoreTableEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
+        NotificationEvent event) {
       super(catalogOpExecutor, metrics, event);
-      Preconditions.checkNotNull(dbName_, "Database name cannot be null");
-      tblName_ = Preconditions.checkNotNull(event.getTableName());
+      if (!(this instanceof DerivedMetastoreEvent)) {
+        Preconditions.checkNotNull(dbName_, "Database name cannot be null");
+      }
     }
 
+    public Table getTable() {
+      return msTbl_;
+    }
 
     /**
      * Util method to return the fully qualified table name which is of the format
@@ -1473,6 +1498,13 @@ public class MetastoreEvents {
       }
     }
 
+    protected CreateTableEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
+        NotificationEvent event, org.apache.hadoop.hive.metastore.api.Table table) {
+      super(catalogOpExecutor, metrics, event);
+      Preconditions.checkArgument(getEventType() == MetastoreEventType.CREATE_TABLE);
+      msTbl_ = table;
+    }
+
     @Override
     public SelfEventContext getSelfEventContext() {
       throw new UnsupportedOperationException("Self-event evaluation is unnecessary for"
@@ -1552,10 +1584,6 @@ public class MetastoreEvents {
         }
       }
       return false;
-    }
-
-    public Table getTable() {
-      return msTbl_;
     }
 
     protected boolean shouldSkipWhenSyncingToLatestEventId() {
@@ -2156,6 +2184,13 @@ public class MetastoreEvents {
                 + "Check if %s is set to true in metastore configuration",
             MetastoreEventsProcessor.HMS_ADD_THRIFT_OBJECTS_IN_EVENTS_CONFIG_KEY), e);
       }
+    }
+
+    protected DropTableEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
+        NotificationEvent event, org.apache.hadoop.hive.metastore.api.Table table) {
+      super(catalogOpExecutor, metrics, event);
+      Preconditions.checkArgument(getEventType() == MetastoreEventType.DROP_TABLE);
+      msTbl_ = table;
     }
 
     @Override
@@ -3048,6 +3083,11 @@ public class MetastoreEvents {
           MetastoreEventsProcessor.getMessageDeserializer().getAllocWriteIdMessage(
               event.getMessage());
       txnToWriteIdList_ = allocWriteIdMessage.getTxnToWriteIdList();
+      for (TxnToWriteId txnToWriteId : txnToWriteIdList_) {
+        TableWriteId tableWriteId =
+            new TableWriteId(dbName_, tblName_, txnToWriteId.getWriteId());
+        catalog_.addWriteId(txnToWriteId.getTxnId(), tableWriteId);
+      }
     }
 
     @Override
@@ -3064,13 +3104,6 @@ public class MetastoreEvents {
             .collect(Collectors.toList());
         catalog_.addWriteIdsToTable(dbName_, tblName_, getEventId(), writeIds,
             MutableValidWriteIdList.WriteIdStatus.OPEN);
-        for (TxnToWriteId txnToWriteId : txnToWriteIdList_) {
-          TableWriteId tableWriteId = new TableWriteId(
-              dbName_, tblName_, tbl.getCreateEventId(), txnToWriteId.getWriteId());
-          catalog_.addWriteId(txnToWriteId.getTxnId(), tableWriteId);
-          infoLog("Added write id {} on table {}.{} for txn {}",
-              txnToWriteId.getWriteId(), dbName_, tblName_, txnToWriteId.getTxnId());
-        }
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException("Failed to mark open "
             + "write ids to table. Event processing cannot continue. Issue an "
@@ -3260,7 +3293,7 @@ public class MetastoreEvents {
   public static class AbortTxnEvent extends MetastoreEvent {
     public static final String EVENT_TYPE = "ABORT_TXN";
     private final long txnId_;
-    private Set<TableWriteId> tableWriteIds_ = Collections.emptySet();
+    private Set<TableWriteId> tableWriteIds_;
 
     AbortTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
@@ -3271,22 +3304,25 @@ public class MetastoreEvents {
           MetastoreEventsProcessor.getMessageDeserializer().getAbortTxnMessage(
               event.getMessage());
       txnId_ = abortTxnMessage.getTxnId();
+      tableWriteIds_ = catalog_.removeWriteIds(txnId_);
       infoLog("Received AbortTxnEvent for transaction " + txnId_);
+    }
+
+    public Set<TableWriteId> getTableWriteIds() {
+      return tableWriteIds_;
     }
 
     @Override
     protected void process() throws MetastoreNotificationException {
       try {
-        tableWriteIds_ = catalog_.getWriteIds(txnId_);
-        infoLog("Adding {} aborted write ids", tableWriteIds_.size());
+        infoLog("Adding {} aborted write ids for txn id {}", tableWriteIds_.size(),
+            txnId_);
         addAbortedWriteIdsToTables(tableWriteIds_);
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
             + "mark aborted write ids to table for txn {}. Event processing cannot "
             + "continue. Issue an invalidate metadata command to reset event processor.",
             txnId_), e);
-      } finally {
-        catalog_.removeWriteIds(txnId_);
       }
     }
 
@@ -3337,6 +3373,59 @@ public class MetastoreEvents {
     @Override
     protected boolean shouldSkipWhenSyncingToLatestEventId() {
       return false;
+    }
+  }
+
+  /**
+   * Pseudo abort transaction event handles abort processing for a table
+   */
+  public static class PseudoAbortTxnEvent extends MetastoreTableEvent
+      implements DerivedMetastoreEvent {
+    final private long txnId_;
+    final private List<Long> writeIds_;
+
+    PseudoAbortTxnEvent(AbortTxnEvent actualEvent, String dbName, String tableName,
+        List<Long> writeIds) {
+      super(actualEvent.catalogOpExecutor_, actualEvent.metrics_, actualEvent.event_);
+      txnId_ = actualEvent.txnId_;
+      writeIds_ = writeIds;
+      dbName_ = dbName;
+      tblName_ = tableName;
+    }
+
+    @Override
+    protected void processTableEvent() throws MetastoreNotificationException {
+      try {
+        catalog_.addWriteIdsToTable(getDbName(), getTableName(), getEventId(), writeIds_,
+            MutableValidWriteIdList.WriteIdStatus.ABORTED);
+      } catch (CatalogException e) {
+        throw new MetastoreNotificationNeedsInvalidateException(debugString(
+            "Failed to mark aborted write ids to table for txn {}. Event processing " +
+                "cannot continue. Issue an invalidate metadata command to reset event " +
+                "processor.",
+            txnId_), e);
+      }
+    }
+
+    @Override
+    protected boolean shouldSkipWhenSyncingToLatestEventId() {
+      return false;
+    }
+
+    @Override
+    protected boolean isEventProcessingDisabled() {
+      return false;
+    }
+
+    @Override
+    protected SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException(
+          "Self-event evaluation is not needed for this event type");
+    }
+
+    @Override
+    public String getEventDesc() {
+      return super.getEventDesc() + " pseudo-event";
     }
   }
 

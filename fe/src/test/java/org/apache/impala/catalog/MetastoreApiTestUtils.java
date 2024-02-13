@@ -21,10 +21,16 @@ import static org.junit.Assert.assertFalse;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.Catalog;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -38,6 +44,9 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
 import org.apache.thrift.TException;
 
 /**
@@ -165,5 +174,50 @@ public class MetastoreApiTestUtils {
       partitions.add(partition);
     }
     msClient.getHiveClient().add_partitions(partitions);
+  }
+
+  /**
+   * Util method to create empty files in a given path
+   */
+  public static List<String> addFilesToDirectory(Path parentPath, String fileNamePrefix,
+      int totalNumberOfFilesToAdd, boolean isOverwrite) throws IOException {
+    List<String> newFiles = new ArrayList<>();
+    final FileSystem fs = parentPath.getFileSystem(FileSystemUtil.getConfiguration());
+    if (isOverwrite && fs.exists(parentPath)) fs.delete(parentPath, true);
+    for (int i = 0; i < totalNumberOfFilesToAdd; i++) {
+      Path filename = new Path(parentPath,
+          fileNamePrefix + RandomStringUtils.random(5, true, true).toUpperCase());
+      try (FSDataOutputStream out = fs.create(filename)) {
+        newFiles.add(filename.getName());
+      }
+    }
+    return newFiles;
+  }
+
+  /**
+   * Method to generate insert event for the transactional table to hms notification log
+   */
+  public static void simulateInsertIntoTransactionalTableFromFS(MetaStoreClient msClient,
+      org.apache.hadoop.hive.metastore.api.Table msTbl, Partition partition,
+      int totalNumberOfFilesToAdd, long txnId, long writeId) throws IOException {
+    Path parentPath = partition == null ?
+        new Path(msTbl.getSd().getLocation()) : new Path(partition.getSd().getLocation());
+    Path deltaPath = new Path(parentPath, String.format("delta_%d_%d", writeId, writeId));
+    List<String> newFiles = addFilesToDirectory(deltaPath, "testFile.",
+        totalNumberOfFilesToAdd, false);
+    List<InsertEventRequestData> insertEventReqDatas = new ArrayList<>();
+    List<List<String>> insertEventVals = new ArrayList<>();
+    InsertEventRequestData insertEventRequestData = new InsertEventRequestData();
+    if (partition != null) {
+      MetastoreShim.setPartitionVal(insertEventRequestData, partition.getValues());
+    }
+    insertEventRequestData.setFilesAdded(newFiles);
+    insertEventRequestData.setReplace(false);
+    insertEventReqDatas.add(insertEventRequestData);
+    insertEventVals.add(partition != null ? partition.getValues() : null);
+    TableInsertEventInfo insertEventInfo = new TableInsertEventInfo(insertEventReqDatas,
+        insertEventVals, true, txnId, writeId);
+    MetastoreShim.fireInsertEvents(msClient, insertEventInfo, msTbl.getDbName(),
+        msTbl.getTableName());
   }
 }

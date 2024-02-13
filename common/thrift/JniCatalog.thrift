@@ -980,6 +980,9 @@ struct TEventProcessorMetrics {
 
   // Event time of the latest metastore event
   21: optional i64 latest_event_time
+
+  // Outstanding event count to process on executors
+  22: optional i64 outstanding_event_count
 }
 
 struct TCatalogHmsCacheApiMetrics {

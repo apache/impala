@@ -150,6 +150,7 @@ import org.apache.impala.thrift.TWaitForHmsEventRequest;
 import org.apache.impala.thrift.TWaitForHmsEventResponse;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.CatalogBlacklistUtils;
+import org.apache.impala.util.ClassUtil;
 import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.FunctionUtils;
@@ -637,15 +638,10 @@ public class CatalogServiceCatalog extends Catalog {
           if (lock.tryLock(0, TimeUnit.SECONDS)) {
             long duration = System.currentTimeMillis() - begin;
             if (duration > LOCK_ACQUIRING_DURATION_WARN_MS) {
-              // Get the caller stacktrace and convert it into string.
-              StackTraceElement[] stack = Thread.currentThread().getStackTrace();
-              // Skip the first method which is always java.lang.Thread.getStackTrace().
-              String st = Arrays.stream(stack).skip(1)
-                  .map(StackTraceElement::toString)
-                  .collect(Collectors.joining("\n\tat "));
               LOG.warn("{} lock for table {} was acquired in {} msec. " +
                       "Caller stacktrace: {}",
-                  useWriteLock ? "Write" : "Read", tbl.getFullName(), duration, st);
+                  useWriteLock ? "Write" : "Read", tbl.getFullName(), duration,
+                  ClassUtil.getStackTraceForThread());
             }
             return true;
           }
@@ -2282,6 +2278,9 @@ public class CatalogServiceCatalog extends Catalog {
     }
     // pause the event processing since the cache is anyways being cleared
     metastoreEventProcessor_.pause();
+    metastoreEventProcessor_.clear();
+    // Clear delete event log
+    metastoreEventProcessor_.getDeleteEventLog().garbageCollect(currentEventId);
     // Update the HDFS cache pools
     try {
       // We want only 'true' HDFS filesystems to poll the HDFS cache (i.e not S3,
@@ -4433,6 +4432,8 @@ public class CatalogServiceCatalog extends Catalog {
   public void addWriteIdsToTable(String dbName, String tblName, long eventId,
       List<Long> writeIds, MutableValidWriteIdList.WriteIdStatus status)
     throws CatalogException {
+    LOG.debug("Trying to add {} write ids {} to table {}.{} for event {}", status,
+        writeIds, dbName, tblName, eventId);
     Table tbl;
     try {
       tbl = getTable(dbName, tblName);

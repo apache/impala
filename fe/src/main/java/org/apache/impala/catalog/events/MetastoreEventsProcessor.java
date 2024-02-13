@@ -281,6 +281,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String LATEST_EVENT_TIME = "latest-event-time";
   // delay(secs) in events processing
   public static final String EVENT_PROCESSING_DELAY = "event-processing-delay";
+
+  // Number of events pending to process on DbEventExecutors and TableEventExecutors, when
+  // hierarchical mode is enabled. It is 0, when hierarchical mode is disabled.
+  public static final String OUTSTANDING_EVENT_COUNT = "outstanding-event-count";
+
   // metric name for number of tables which are refreshed by event processor so far
   public static final String NUMBER_OF_TABLE_REFRESHES = "tables-refreshed";
   // number of times events processor refreshed a partition
@@ -674,8 +679,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   // The duration in nanoseconds of the processing of the last event batch.
   private final AtomicLong lastEventProcessDurationNs_ = new AtomicLong(0);
 
-  // polling interval in seconds. Note this is a time we wait AFTER each fetch call
-  private final long pollingFrequencyInSec_;
+  // polling interval in milliseconds. Note this is a time we wait AFTER each fetch call
+  private final long pollingFrequencyInMilliSec_;
+
+  // Event executor service is used when hierarchical event processing is enabled
+  private EventExecutorService eventExecutorService_ = null;
 
   // catalog service instance to be used while processing events
   protected final CatalogServiceCatalog catalog_;
@@ -711,19 +719,31 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   @VisibleForTesting
   MetastoreEventsProcessor(CatalogOpExecutor catalogOpExecutor, long startSyncFromId,
-      long pollingFrequencyInSec) throws CatalogException {
-    Preconditions.checkState(pollingFrequencyInSec > 0);
+      long pollingFrequencyInMilliSec) throws CatalogException {
+    Preconditions.checkState(pollingFrequencyInMilliSec > 0);
     this.catalog_ = Preconditions.checkNotNull(catalogOpExecutor.getCatalog());
     validateConfigs();
     lastSyncedEventId_.set(startSyncFromId);
     lastSyncedEventTimeSecs_.set(getEventTimeFromHMS(startSyncFromId));
     initMetrics();
     metastoreEventFactory_ = new MetastoreEventFactory(catalogOpExecutor);
-    pollingFrequencyInSec_ = pollingFrequencyInSec;
+    pollingFrequencyInMilliSec_ = pollingFrequencyInMilliSec;
     hmsEventSyncSleepIntervalMs_ = BackendConfig.INSTANCE
         .getBackendCfg().hms_event_sync_sleep_interval_ms;
     Preconditions.checkState(hmsEventSyncSleepIntervalMs_ > 0,
         "hms_event_sync_sleep_interval_ms must be positive");
+    if (BackendConfig.INSTANCE.isHierarchicalEventProcessingEnabled()) {
+      int numDbEventExecutor = BackendConfig.INSTANCE.getNumDbEventExecutors();
+      int numTableEventExecutor =
+          BackendConfig.INSTANCE.getNumTableEventExecutorsPerDbEventExecutor();
+      Preconditions.checkArgument(numDbEventExecutor > 0,
+          "num_db_event_executors should be positive: %s", numDbEventExecutor);
+      Preconditions.checkArgument(numTableEventExecutor > 0,
+          "num_table_event_executors_per_db_event_executor should be positive: %s",
+          numTableEventExecutor);
+      eventExecutorService_ = new EventExecutorService(this, numDbEventExecutor,
+          numTableEventExecutor);
+    }
   }
 
   /**
@@ -797,6 +817,27 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         .addGauge(DELETE_EVENT_LOG_SIZE, (Gauge<Integer>) deleteEventLog_::size);
     metrics_.addCounter(NUMBER_OF_BATCH_EVENTS);
     metrics_.addTimer(AVG_DELAY_IN_CONSUMING_EVENTS);
+    metrics_.addGauge(OUTSTANDING_EVENT_COUNT,
+        (Gauge<Long>) this::getOutstandingEventCount);
+  }
+
+  /**
+   * Gets the count of events pending to process when hierarchical mode is enabled. Always
+   * return 0 if hierarchical mode is disabled.
+   * @return Outstanding event count
+   */
+  public long getOutstandingEventCount() {
+    if (!isHierarchicalEventProcessingEnabled()) return 0;
+    return eventExecutorService_.getOutstandingEventCount();
+  }
+
+  /**
+   * Determines whether hierarchical event processing is enabled. EventExecutorService
+   * exists when hierarchical event processing is enabled.
+   * @return True, if hierarchical event processing is enabled. False, otherwise.
+   */
+  public boolean isHierarchicalEventProcessingEnabled() {
+    return eventExecutorService_ != null;
   }
 
   /**
@@ -811,10 +852,13 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public synchronized void start() {
     Preconditions.checkState(eventProcessorStatus_ != EventProcessorStatus.ACTIVE);
     resetProgressInfo();
+    if (isHierarchicalEventProcessingEnabled()) {
+      eventExecutorService_.start();
+    }
     startScheduler();
     updateStatus(EventProcessorStatus.ACTIVE);
     LOG.info(String.format("Successfully started metastore event processing."
-        + " Polling interval: %d seconds.", pollingFrequencyInSec_));
+        + " Polling interval: %d milliseconds.", pollingFrequencyInMilliSec_));
   }
 
   /**
@@ -822,6 +866,49 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   public EventProcessorStatus getStatus() {
     return eventProcessorStatus_;
+  }
+
+  /**
+   * This method is only for testing.
+   * @return EventExecutorService
+   */
+  @VisibleForTesting
+  public @Nullable EventExecutorService getEventExecutorService() {
+    return eventExecutorService_;
+  }
+
+  /**
+   * This method is only for testing and must not be used anywhere else.
+   * @param eventExecutorService
+   */
+  @VisibleForTesting
+  public void setEventExecutorService(EventExecutorService eventExecutorService) {
+    Preconditions.checkArgument(eventExecutorService != null);
+    eventExecutorService_ = eventExecutorService;
+  }
+
+  /**
+   * This method ensure all the outstanding events are processed on DbEventExecutor and
+   * TableEventExecutor threads within the time limit.
+   * @param timeLimit Time bound in milliseconds
+   * @return True, if the all events are processed. False, Otherwise
+   */
+  boolean ensureEventsProcessedInHierarchicalMode(int timeLimit) {
+    // Time limit is to avoid infinite loop if the exception occur in any event processing
+    // and that event’s onFailure() return false and auto global invalidation also cannot
+    // happen.
+    int sleepTime = 5;
+    int maxLoopTimes = timeLimit / sleepTime;
+    // Ensure all the outstanding events are processed
+    while (maxLoopTimes-- > 0 && getOutstandingEventCount() > 0) {
+      Uninterruptibles.sleepUninterruptibly(sleepTime, TimeUnit.MILLISECONDS);
+    }
+    if (maxLoopTimes == 0) {
+      LOG.warn("Failed to process all the outstanding events within {}",
+          PrintUtils.printTimeMs(timeLimit));
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -856,15 +943,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   @VisibleForTesting
   void startScheduler() {
-    Preconditions.checkState(pollingFrequencyInSec_ > 0);
-    LOG.info(String.format("Starting metastore event polling with interval %d seconds.",
-        pollingFrequencyInSec_));
-    processEventsScheduler_.scheduleAtFixedRate(this ::processEvents,
-        pollingFrequencyInSec_, pollingFrequencyInSec_, TimeUnit.SECONDS);
+    Preconditions.checkState(pollingFrequencyInMilliSec_ > 0);
+    long interval = pollingFrequencyInMilliSec_;
+    LOG.info(
+        String.format("Starting metastore event polling with interval %d ms.", interval));
+    processEventsScheduler_.scheduleAtFixedRate(this::processEvents, interval, interval,
+        TimeUnit.MILLISECONDS);
     // Update latestEventId in another thread in case that the processEvents() thread is
     // blocked by slow metadata reloading or waiting for table locks.
-    updateEventIdScheduler_.scheduleAtFixedRate(this ::updateLatestEventId,
-        pollingFrequencyInSec_, pollingFrequencyInSec_, TimeUnit.SECONDS);
+    updateEventIdScheduler_.scheduleAtFixedRate(this::updateLatestEventId, interval,
+        interval, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -976,6 +1064,17 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   /**
+   * Clear the event processor if it has any pending events available on event executor
+   * service when hierarchical mode is enabled.
+   */
+  @Override
+  public void clear() {
+    if (isHierarchicalEventProcessingEnabled()) {
+      eventExecutorService_.clear();
+    }
+  }
+
+  /**
    * Stops the event processing and shuts down the scheduler. In case there is a batch of
    * events which is being processed currently, the
    * <code>processEvents</code> method releases lock after every event is processed.
@@ -988,6 +1087,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         "Event processing is already stopped");
     shutdownAndAwaitTermination(processEventsScheduler_);
     shutdownAndAwaitTermination(updateEventIdScheduler_);
+    if (isHierarchicalEventProcessingEnabled()) {
+      eventExecutorService_.shutdown(true);
+    }
     updateStatus(EventProcessorStatus.STOPPED);
     LOG.info("Metastore event processing stopped.");
   }
@@ -996,7 +1098,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * Attempts to cleanly shutdown the scheduler pool. If the pool does not shutdown
    * within timeout, does a force shutdown which might interrupt currently running tasks.
    */
-  private synchronized void shutdownAndAwaitTermination(ScheduledExecutorService ses) {
+  public static void shutdownAndAwaitTermination(ScheduledExecutorService ses) {
     Preconditions.checkNotNull(ses);
     ses.shutdown(); // disable new tasks from being submitted
     try {
@@ -1112,6 +1214,12 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         tryAutoGlobalInvalidateOnFailure();
         return;
       }
+      long eventCount = getOutstandingEventCount();
+      if (eventCount >= BackendConfig.INSTANCE.getMaxOutstandingEventsOnExecutors()) {
+        LOG.warn("Outstanding events to process exceeds threshold. Event count: {}",
+            eventCount);
+        return;
+      }
       // fetch the current notification event id. We assume that the polling interval
       // is small enough that most of these polling operations result in zero new
       // events. In such a case, fetching current notification event id is much faster
@@ -1119,19 +1227,39 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       long currentEventId = getCurrentEventId();
       List<NotificationEvent> events = getNextMetastoreEvents(currentEventId);
       processEvents(currentEventId, events);
-    } catch (MetastoreNotificationFetchException ex) {
+    } catch (Exception ex) {
+      handleEventProcessException(ex);
+    } finally {
+      if (isHierarchicalEventProcessingEnabled()) {
+        eventExecutorService_.cleanup();
+      }
+    }
+  }
+
+  /**
+   * Updates event processor status and invalidates global metadata iff
+   * invalidate_global_metadata_on_event_processing_failure flag is true. If the flag
+   * is false, user need to issue invalidate metadata command to clear event processor
+   * (which in turn clears event executor service) and start event processor.
+   * Note: Event processor status is not changed if exception occurred is
+   * MetastoreNotificationFetchException, since event processor and event executor
+   * service will continue to process events once the HMS is UP again.
+   * @param ex Exception in event processing
+   */
+  public void handleEventProcessException(Exception ex) {
+    if (ex instanceof MetastoreNotificationFetchException) {
       // No need to change the EventProcessor state to error since we want the
       // EventProcessor to continue getting new events after HMS is back up.
       LOG.error("Unable to fetch the next batch of metastore events. Hive Metastore " +
         "may be unavailable. Will retry.", ex);
-    } catch (MetastoreNotificationNeedsInvalidateException ex) {
+    } else if (ex instanceof MetastoreNotificationNeedsInvalidateException) {
       updateStatus(EventProcessorStatus.NEEDS_INVALIDATE);
-      String msg = "Event processing needs a invalidate command to resolve the state";
+      String msg = "Event processing needs an invalidate command to resolve the state";
       LOG.error(msg, ex);
       eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
           ExceptionUtils.getStackTrace(ex);
       tryAutoGlobalInvalidateOnFailure();
-    } catch (Exception ex) {
+    } else {
       // There are lot of Preconditions which can throw RuntimeExceptions when we
       // process events this catch all exception block is needed so that the scheduler
       // thread does not die silently
@@ -1195,9 +1323,17 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       LOG.info("Latest event in HMS: id={}, time={}. Last synced event: id={}, time={}.",
           currentEventId, currentEventTime, lastSyncedEventId, lastSyncedEventTime);
       if (currentEventTime > lastSyncedEventTime) {
-        LOG.warn("Lag: {}. {} events pending to be processed.",
+        // TODO: Need to redefine the lag in the hierarchical processing mode.
+        // Hierarchical mode currently have a mechanism to check the total number of
+        // outstanding events at the moment so that memory usage pressure on catalogd
+        // can be controlled when event processing becomes slow i.e., iff outstanding
+        // event count exceeds max_outstanding_events_on_executors configured value. And
+        // lastSyncedEventTimeSecs_ accounts only for event dispatch time in hierarchical
+        // mode.
+        LOG.warn("Lag: {}. {} events pending to be {}.",
             PrintUtils.printTimeMs((currentEventTime - lastSyncedEventTime) * 1000),
-            currentEventId - lastSyncedEventId);
+            currentEventId - lastSyncedEventId,
+            isHierarchicalEventProcessingEnabled() ? "dispatched" : "processed");
       }
     } catch (Exception e) {
       LOG.error("Unable to update current notification event id. Last value: {}",
@@ -1225,6 +1361,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     long eventsSkipped = metrics_.getCounter(EVENTS_SKIPPED_METRIC).getCount();
     eventProcessorMetrics.setEvents_received(eventsReceived);
     eventProcessorMetrics.setEvents_skipped(eventsSkipped);
+    eventProcessorMetrics.setOutstanding_event_count(getOutstandingEventCount());
 
     Snapshot fetchDuration =
         metrics_.getTimer(EVENTS_FETCH_DURATION_METRIC).getSnapshot();
@@ -1360,6 +1497,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         resetProgressInfo();
         return;
       }
+      boolean isHierarchical = isHierarchicalEventProcessingEnabled();
       for (MetastoreEvent event : currentFilteredEvents_) {
         // synchronizing each event processing reduces the scope of the lock so the a
         // potential reset() during event processing is not blocked for longer than
@@ -1371,11 +1509,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           currentEvent_ = event.metastoreNotificationEvent_;
           currentFilteredEvent_ = event;
           String targetName = event.getTargetName();
-          String desc = String.format("Processing %s on %s, eventId=%d",
-              event.getEventType(), targetName, event.getEventId());
+          String desc = String.format("%s %s on %s, eventId=%d",
+              isHierarchical ? "Dispatching" : "Processing", event.getEventType(),
+              targetName, event.getEventId());
           try (ThreadNameAnnotator tna = new ThreadNameAnnotator(desc)) {
             currentEventStartTimeMs_ = System.currentTimeMillis();
-            event.processIfEnabled();
+            if (isHierarchical) {
+              eventExecutorService_.dispatch(event);
+            } else {
+              event.processIfEnabled();
+            }
             long elapsedTimeMs = System.currentTimeMillis() - currentEventStartTimeMs_;
             eventProcessingTime.put(event, elapsedTimeMs);
           } catch (Exception processingEx) {
@@ -1390,7 +1533,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
             }
           }
           currentEventIndex_++;
-          deleteEventLog_.garbageCollect(event.getEventId());
+          if (!isHierarchical) {
+            deleteEventLog_.garbageCollect(event.getEventId());
+          }
           lastSyncedEventId_.set(event.getEventId());
           lastSyncedEventTimeSecs_.set(event.getEventTime());
           metrics_.getTimer(AVG_DELAY_IN_CONSUMING_EVENTS).update(
@@ -1412,7 +1557,13 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   private void logEventMetrics(Map<MetastoreEvent, Long> eventProcessingTime,
       long elapsedNs) {
-    LOG.info("Time elapsed in processing event batch: {}",
+    // TODO: eventProcessingTime here is more relevant in sequential processing mode. But,
+    //  in case of hierarchical processing mode, these are the times taken at dispatcher
+    //  thread alone for each event. Need to have another mechanism to capture the actual
+    //  event processing time in hierarchical processing mode.
+    boolean isHierarchical = isHierarchicalEventProcessingEnabled();
+    LOG.info("Time elapsed in {} event batch: {}",
+        isHierarchical ? "dispatching" : "processing",
         PrintUtils.printTimeNs(elapsedNs));
     // Only log the metrics when the processing on this batch is slow.
     if (elapsedNs < HdfsTable.LOADING_WARNING_TIME_NS) return;
@@ -1440,7 +1591,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         new ArrayList<>(durationPerTable.entrySet());
     targetList.sort(Map.Entry.<String, Long>comparingByValue().reversed());
     num = Math.min(10, targetList.size());
-    report.append("\nTop ").append(num).append(" targets in event processing: ");
+    report.append("\nTop ").append(num).append(String.format(" targets in event %s: ",
+        isHierarchical ? "dispatching" : "processing"));
     for (Map.Entry<String, Long> entry : targetList.subList(0, num)) {
       String targetName = entry.getKey();
       long durationMs = entry.getValue();
@@ -1488,7 +1640,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    *     processor belongs.
    * @param startSyncFromId Start event id. Events will be polled starting from this
    *     event id
-   * @param eventPollingInterval HMS polling interval in seconds
+   * @param eventPollingInterval HMS polling interval in milliseconds
    * @return this object is already created, or create a new one if it is not yet
    *     instantiated
    */

@@ -100,7 +100,7 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
             CurrentNotificationEventId currentNotificationId =
                     metaStoreClient.getHiveClient().getCurrentNotificationEventId();
             eventsProcessor_ = new SynchronousHMSEventProcessorForTests(
-                    catalogOpExecutor_, currentNotificationId.getEventId(), 10L);
+                catalogOpExecutor_, currentNotificationId.getEventId(), 10000L);
             eventsProcessor_.start();
         }
         // Don't set event processor in catalog because

@@ -303,8 +303,8 @@ under the License.
         This feature is controlled by the
         <codeph>&#8209;&#8209;hms_event_polling_interval_s</codeph> flag. Start the
         <codeph>catalogd</codeph> with the <codeph>‑‑hms_event_polling_interval_s</codeph>
-        flag set to a positive integer to enable the feature and set the polling frequency in
-        seconds. We recommend the value to be less than 5 seconds.
+        flag set to a positive double value to enable the feature and set the polling frequency in
+        seconds. We recommend the value between 1.0 to 5.0 seconds.
       </p>
 
       <p>
@@ -615,6 +615,17 @@ under the License.
                 </row>
                 <row>
                   <entry>
+                    events-processor.outstanding-event-count
+                  </entry>
+                  <entry>
+                    Total number of outstanding events to be processed on db event executors
+                    and table event executors when
+                    <codeph>--enable_hierarchical_event_processing</codeph> flag is
+                    <codeph>true</codeph>.
+                  </entry>
+                </row>
+                <row>
+                  <entry>
                     events-processor.status
                   </entry>
                   <entry>
@@ -643,6 +654,7 @@ under the License.
 
                       <li>
                         The event processor is in error state and event processing has stopped.
+                        Needs a manual <codeph>INVALIDATE</codeph> command to reset the state.
                       </li>
 
                       <li>

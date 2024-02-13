@@ -59,6 +59,11 @@ public interface ExternalEventsProcessor {
   void start(long fromEventId);
 
   /**
+   * Clears the event processor if it has any pending events to process in its pipeline
+   */
+  void clear();
+
+  /**
    * Shutdown the events processor. Cannot be restarted again.
    */
   void shutdown();

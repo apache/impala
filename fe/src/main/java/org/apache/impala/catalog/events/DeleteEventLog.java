@@ -96,6 +96,14 @@ public class DeleteEventLog {
   }
 
   /**
+   * Removes event log entry for the given eventId.
+   * @param eventId The eventId from hive metastore that maps to event.
+   */
+  public synchronized void removeEvent(long eventId) {
+    eventLog_.remove(eventId);
+  }
+
+  /**
    * Returns the current size of the delete event log.
    */
   public synchronized int size() {

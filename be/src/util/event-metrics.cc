@@ -26,7 +26,7 @@
 #include "gen-cpp/JniCatalog_types.h"
 #include "util/metrics.h"
 
-DECLARE_int32(hms_event_polling_interval_s);
+DECLARE_double(hms_event_polling_interval_s);
 
 namespace impala {
 string MetastoreEventMetrics::NUMBER_EVENTS_RECEIVED_METRIC_NAME =
@@ -73,6 +73,8 @@ string MetastoreEventMetrics::LATEST_EVENT_TIME_METRIC_NAME =
 string MetastoreEventMetrics::PENDING_EVENTS_METRIC_NAME =
     "events-processor.pending-events";
 string MetastoreEventMetrics::LAG_TIME_METRIC_NAME = "events-processor.lag-time";
+string MetastoreEventMetrics::OUTSTANDING_EVENT_COUNT_METRIC_NAME =
+    "events-processor.outstanding-event-count";
 
 IntCounter* MetastoreEventMetrics::NUM_EVENTS_RECEIVED_COUNTER = nullptr;
 IntCounter* MetastoreEventMetrics::NUM_EVENTS_SKIPPED_COUNTER = nullptr;
@@ -100,6 +102,7 @@ IntCounter* MetastoreEventMetrics::LATEST_EVENT_ID = nullptr;
 IntCounter* MetastoreEventMetrics::LATEST_EVENT_TIME = nullptr;
 IntCounter* MetastoreEventMetrics::PENDING_EVENTS = nullptr;
 IntCounter* MetastoreEventMetrics::LAG_TIME = nullptr;
+IntCounter* MetastoreEventMetrics::OUTSTANDING_EVENT_COUNT = nullptr;
 
 // Initialize all the metrics for the events metric group
 void MetastoreEventMetrics::InitMetastoreEventMetrics(MetricGroup* metric_group) {
@@ -153,6 +156,8 @@ void MetastoreEventMetrics::InitMetastoreEventMetrics(MetricGroup* metric_group)
       event_metrics->AddCounter(LATEST_EVENT_TIME_METRIC_NAME, 0);
   PENDING_EVENTS = event_metrics->AddCounter(PENDING_EVENTS_METRIC_NAME, 0);
   LAG_TIME = event_metrics->AddCounter(LAG_TIME_METRIC_NAME, 0);
+  OUTSTANDING_EVENT_COUNT =
+      event_metrics->AddCounter(OUTSTANDING_EVENT_COUNT_METRIC_NAME, 0);
 }
 
 void MetastoreEventMetrics::refresh(TEventProcessorMetrics* response) {
@@ -241,6 +246,9 @@ void MetastoreEventMetrics::refresh(TEventProcessorMetrics* response) {
       PENDING_EVENTS->SetValue(
           response->latest_event_id - response->last_synced_event_id);
     }
+  }
+  if (response->__isset.outstanding_event_count) {
+    OUTSTANDING_EVENT_COUNT->SetValue(response->outstanding_event_count);
   }
 }
 } // namespace impala

@@ -28,6 +28,7 @@ from impala_thrift_gen.hive_metastore.ttypes import InsertEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_connection import ERROR, FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.util.acid_txn import AcidTxn
@@ -555,6 +556,11 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_self_events_with_hive(self, unique_database):
     """Runs multiple queries which generate events using hive as client"""
+    self._run_self_events_test(unique_database, {}, use_impala=False)
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0.2"
+                                    " --enable_hierarchical_event_processing=true")
+  def test_self_events_with_hive_hierarchical(self, unique_database):
     self._run_self_events_test(unique_database, {}, use_impala=False)
 
   @CustomClusterTestSuite.with_args(
@@ -1497,6 +1503,127 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
         .format(test_tbl))
     self.assert_catalogd_log_contains('INFO', log_regex, expected_count=3, timeout_s=20)
 
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=0.2"
+                  " --enable_hierarchical_event_processing=true"
+                  " --num_db_event_executors=2"
+                  " --num_table_event_executors_per_db_event_executor=2")
+  def test_create_table_after_rename(self, unique_database):
+    # Test creating table with the name after rename it to another
+    t1 = "t1"
+    t2 = "t2"
+    # Create tables t1 and t2 and load them on catalogd
+    self.run_stmt_in_hive("create table {}.{} (i int)".format(unique_database, t1))
+    self.run_stmt_in_hive("create table {}.{} (i int)".format(unique_database, t2))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute("describe formatted {}.{}".format(unique_database, t1))
+    self.client.execute("describe formatted {}.{}".format(unique_database, t2))
+    # Drop table t2, rename t1 to t2, load some data to t2 and create t1 from hive again
+    self.client.execute(":event_processor('pause')")
+    self.run_stmt_in_hive("drop table {}.{}".format(unique_database, t2))
+    self.run_stmt_in_hive("alter table {}.{} rename to {}.{}".format(unique_database, t1,
+                                                                     unique_database, t2))
+    self.run_stmt_in_hive("insert into {}.{} values (1),(2)".format(unique_database, t2))
+    self.run_stmt_in_hive("create table {}.{} as select * from {}.{}"
+                          .format(unique_database, t1, unique_database, t2))
+    self.client.execute(":event_processor('start')")
+    EventProcessorUtils.wait_for_event_processing(self)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    res = self.execute_query_expect_success(self.client,
+                                            "select count(*) from {}.{}"
+                                            .format(unique_database, t1))
+    assert int(res.get_data()) == 2
+    res = self.execute_query_expect_success(self.client,
+                                            "select count(*) from {}.{}"
+                                            .format(unique_database, t2))
+    assert int(res.get_data()) == 2
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=0.2"
+                  " --enable_hierarchical_event_processing=true"
+                  " --num_db_event_executors=2"
+                  " --num_table_event_executors_per_db_event_executor=1")
+  @UniqueDatabase.parametrize(num_dbs=2, sync_ddl=True)
+  def test_rename_table_hierarchical_two_db_and_table_threads(self, unique_database):
+    # Test rename table across DBs on different db executor(implicitly different table
+    # executors)
+    # Test for events generated through impala
+    src_db = unique_database
+    target_db = unique_database + '2'
+    self.rename_table_with_hierarchical_event_process(src_db, target_db, "t1", "t2", True)
+    # Test for events generated through hive
+    self.rename_table_with_hierarchical_event_process(src_db, target_db, "t3", "t4",
+                                                      False)
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=0.2"
+                  " --enable_hierarchical_event_processing=true"
+                  " --num_db_event_executors=1"
+                  " --num_table_event_executors_per_db_event_executor=2")
+  @UniqueDatabase.parametrize(num_dbs=2, sync_ddl=True)
+  def test_rename_table_hierarchical_one_db_and_two_table_threads(self, unique_database):
+    # Test for events generated through impala
+    # Test rename table across DBs on same db executor and 2 different table executors
+    src_db = unique_database
+    target_db = unique_database + '2'
+    self.rename_table_with_hierarchical_event_process(src_db, target_db, "t1", "t2", True)
+    # Test rename table within DB(same db executor) and 2 different table executors
+    self.rename_table_with_hierarchical_event_process(src_db, src_db, "t3", "t4", True)
+    # Test for events generated through hive
+    # Test rename table across DBs on same db executor and 2 different table executors
+    self.rename_table_with_hierarchical_event_process(src_db, target_db, "t5", "t6",
+                                                      False)
+    # Test rename table within DB(same db executor) and 2 different table executors
+    self.rename_table_with_hierarchical_event_process(src_db, src_db, "t7", "t8", False)
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=0.2"
+                  " --enable_hierarchical_event_processing=true"
+                  " --num_db_event_executors=1"
+                  " --num_table_event_executors_per_db_event_executor=1")
+  def test_rename_table_hierarchical_one_db_and_one_table_threads(self, unique_database):
+    # Test for events generated through impala
+    # Test rename table within DB(same db executor) and same table executor
+    self.rename_table_with_hierarchical_event_process(unique_database, unique_database,
+                                                      "t1", "t2", True)
+    # Test for events generated through hive
+    # Test rename table within DB(same db executor) and same table executor
+    self.rename_table_with_hierarchical_event_process(unique_database, unique_database,
+                                                      "t3", "t4", False)
+
+  def rename_table_with_hierarchical_event_process(self, src_db_name, target_db_name,
+                                                   src_table_name, target_table_name,
+                                                   is_exec_from_impala):
+    EventProcessorUtils.wait_for_event_processing(self)
+    if is_exec_from_impala:
+      execute = self.client.execute
+      prev_events_skipped = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    else:
+      execute = self.run_stmt_in_hive
+      prev_create_table_metric = EventProcessorUtils.get_int_metric('tables-added', 0)
+    execute("create table {}.{} (i int)".format(src_db_name, src_table_name))
+    EventProcessorUtils.wait_for_event_processing(self)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    if is_exec_from_impala:
+      curr_events_skipped = EventProcessorUtils.get_int_metric('events-skipped', 0)
+      assert curr_events_skipped == prev_events_skipped + 1
+      prev_events_skipped = curr_events_skipped
+    else:
+      curr_create_table_metric = EventProcessorUtils.get_int_metric('tables-added', 0)
+      assert curr_create_table_metric == prev_create_table_metric + 1
+      prev_create_table_metric = curr_create_table_metric
+      prev_drop_table_metric = EventProcessorUtils.get_int_metric('tables-removed', 0)
+    execute("alter table {}.{} rename to {}.{}".format(src_db_name, src_table_name,
+                                                       target_db_name, target_table_name))
+    EventProcessorUtils.wait_for_event_processing(self)
+    if is_exec_from_impala:
+      curr_events_skipped = EventProcessorUtils.get_int_metric('events-skipped', 0)
+      assert curr_events_skipped == prev_events_skipped + 1
+    else:
+      curr_create_table_metric = EventProcessorUtils.get_int_metric('tables-added', 0)
+      curr_drop_table_metric = EventProcessorUtils.get_int_metric('tables-removed', 0)
+      assert curr_drop_table_metric == prev_drop_table_metric + 1
+      assert curr_create_table_metric == prev_create_table_metric + 1
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
@@ -1524,6 +1651,12 @@ class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
     self._run_self_events_test(unique_database, vector.get_value('exec_option'),
         use_impala=True)
 
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=0.2"
+                  " --enable_hierarchical_event_processing=true")
+  def test_self_events_with_impala_hierarchical(self, vector, unique_database):
+    self._run_self_events_test(unique_database, vector.get_value('exec_option'),
+                               use_impala=True)
 
 @SkipIfFS.hive
 class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):
