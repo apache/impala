@@ -70,10 +70,6 @@ under the License.
       <version>${hadoop.version}</version>
       <exclusions>
         <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
           <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
           <groupId>org.fusesource.leveldbjni</groupId>
           <artifactId>*</artifactId>
@@ -489,11 +485,6 @@ under the License.
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
-          <groupId>io.netty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-server</artifactId>
         </exclusion>
@@ -874,8 +865,6 @@ under the License.
                     <!-- IMPALA-9649 (Avoid pulling in shiro* due to CVE's) -->
                     <exclude>org.apache.shiro:shiro-core:*</exclude>
                     <exclude>org.apache.shiro:shiro-crypto-cipher:*</exclude>
-                    <!-- IMPALA-9648: Ensure that netty-all is not present. -->
-                    <exclude>io.netty:*</exclude>
                     <!-- Avoid runtime dependency on rocksdb. -->
                     <exclude>org.rocksdb:*</exclude>
                     <!-- Avoid runtime dependency on Jersey server components. -->
