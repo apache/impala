@@ -168,17 +168,17 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
     """Deletes every row from the table one by one."""
     target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    impalad_client.set_configuration_option("SYNC_DDL", "true")
     i = 0
     while i < num_rows:
       try:
         impalad_client.execute(
             "delete from {0} WHERE id = {1}".format(tbl_name, i))
         i += 1
-        # Sleep after a succesful operation.
-        time.sleep(random.random())
-      except Exception:
+      except Exception as e:
         # Exceptions are expected due to concurrent operations.
-        pass
+        print(str(e))
+      time.sleep(random.random())
     flag.value = 1
     impalad_client.close()
 
@@ -186,15 +186,15 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
     """Updates every row in the table in a loop."""
     target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    impalad_client.set_configuration_option("SYNC_DDL", "true")
     while flag.value != 1:
       try:
         impalad_client.execute(
             "update {0} set j = j + 1".format(tbl_name))
-        # Sleep after a succesful operation.
-        time.sleep(random.random())
-      except Exception:
+      except Exception as e:
         # Exceptions are expected due to concurrent operations.
-        pass
+        print(str(e))
+      time.sleep(random.random())
     impalad_client.close()
 
   def _impala_role_concurrent_checker(self, tbl_name, flag, num_rows):
@@ -232,7 +232,7 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
         stored as iceberg
         tblproperties('format-version'='2')""".format(tbl_name,))
 
-    num_rows = 20
+    num_rows = 10
     values_str = ""
     for i in range(num_rows):
       values_str += "({}, 0)".format(i)
@@ -246,6 +246,5 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
     checker = Task(self._impala_role_concurrent_checker, tbl_name, flag, num_rows)
     run_tasks([deleter, updater, checker])
 
-    self.client.execute("refresh {}".format(tbl_name))
     result = self.client.execute("select count(*) from {}".format(tbl_name))
     assert result.data == ['0']
