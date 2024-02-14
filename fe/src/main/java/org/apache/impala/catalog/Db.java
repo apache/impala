@@ -612,7 +612,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * given version and does not add it
    * @param versionNumber version number to add
    */
-  public void addToVersionsForInflightEvents(long versionNumber) {
+  public boolean addToVersionsForInflightEvents(long versionNumber) {
     // The lock is not needed for thread safety, just verifying existing behavior.
     Preconditions.checkState(dbLock_.isHeldByCurrentThread(),
         "addToVersionsForInFlightEvents called without getting the db lock for "
@@ -626,6 +626,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
           + "events. This could cause unnecessary database %s invalidation when the "
           + "event is processed", versionNumber, getName()));
     }
+    return added;
   }
 
   @Override // FeDb

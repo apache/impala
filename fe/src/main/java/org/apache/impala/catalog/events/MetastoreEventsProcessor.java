@@ -138,7 +138,7 @@ import org.slf4j.LoggerFactory;
  * Following table shows the actions to be taken when the given event type is received.
  *
  * <pre>
- *               +------------------------------------------------+ --------------------+
+ *               +------------------------------------------------+---------------------+
  *               |    Catalog object state                                              |
  * +--------------------------------------+-----------------------+---------------------+
  * | Event type  | Loaded                 | Incomplete            | Not present         |
@@ -979,8 +979,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEventResponse response =
           MetastoreShim.getNextNotification(msClient.getHiveClient(), eventRequest,
               catalog_.getDefaultSkippedHmsEventTypes());
-      LOG.info(String.format("Received %d events. Start event id : %d",
-          response.getEvents().size(), eventId));
+      LOG.info("Received {} events. First event id: {}.", response.getEvents().size(),
+          (response.getEvents().size() > 0 ? response.getEvents().get(0).getEventId() :
+                                             "none"));
       if (filter == null) return response.getEvents();
       List<NotificationEvent> filteredEvents = new ArrayList<>();
       for (NotificationEvent event : response.getEvents()) {
