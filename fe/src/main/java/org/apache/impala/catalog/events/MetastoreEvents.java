@@ -301,10 +301,13 @@ public class MetastoreEvents {
       }
       LOG.info(String.format("Total number of events received: %d Total number of events "
           + "filtered out: %d", sizeBefore, numFilteredEvents));
-      metrics.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
-              .inc(numFilteredEvents);
-      LOG.debug("Incremented skipped metric to " + metrics
-          .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount());
+      if (numFilteredEvents > 0) {
+        metrics.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+            .inc(numFilteredEvents);
+        LOG.debug("Incremented skipped metric to "
+            + metrics.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                  .getCount());
+      }
       return createBatchEvents(metastoreEvents, metrics);
     }
 
@@ -1064,7 +1067,7 @@ public class MetastoreEvents {
      * Helper function to initiate a table reload on Catalog. Re-throws the exception if
      * the catalog operation throws.
      */
-    protected boolean reloadTableFromCatalog(String operation, boolean isTransactional)
+    protected void reloadTableFromCatalog(String operation, boolean isTransactional)
         throws CatalogException {
       try {
         if (!catalog_.reloadTableIfExists(dbName_, tblName_,
@@ -1073,7 +1076,11 @@ public class MetastoreEvents {
           debugLog("Automatic refresh on table {} failed as the table "
                   + "either does not exist anymore or is not in loaded state.",
               getFullyQualifiedTblName());
-          return false;
+          metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
+          debugLog("Incremented skipped metric to "
+              + metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                    .getCount());
+          return;
         }
       } catch (TableLoadingException | DatabaseNotFoundException e) {
         // there could be many reasons for receiving a tableLoading exception,
@@ -1082,12 +1089,11 @@ public class MetastoreEvents {
         // we can do here other than log it appropriately.
         debugLog("Table {} was not refreshed due to error {}",
             getFullyQualifiedTblName(), e.getMessage());
-        return false;
+        return;
       }
       String tblStr = isTransactional ? "transactional table" : "table";
       infoLog("Refreshed {} {}", tblStr, getFullyQualifiedTblName());
       metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).inc();
-      return true;
     }
 
     /**

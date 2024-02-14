@@ -1055,7 +1055,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * @return True if version number was added, false if the collection is at its max
    * capacity
    */
-  public void addToVersionsForInflightEvents(boolean isInsertEvent, long versionNumber) {
+  public boolean addToVersionsForInflightEvents(
+      boolean isInsertEvent, long versionNumber) {
     // We generally don't take locks on Incomplete tables since they are atomically
     // replaced during load.
     // The lock is not needed for thread safety, just verifying existing behavior.
@@ -1073,6 +1074,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         metrics_.getCounter(NUMBER_OF_INFLIGHT_EVENTS).inc();
       }
     }
+    return added;
   }
 
   @Override

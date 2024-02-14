@@ -1240,11 +1240,11 @@ public class HdfsTable extends Table implements FeFsTable {
    * metadata cache of the table and trigger a fresh load.
    */
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl,
-      boolean loadPartitionFileMetadata, boolean loadTableSchema,
-      boolean refreshUpdatedPartitions, Set<String> partitionsToUpdate,
-      @Nullable String debugAction, @Nullable Map<String, Long> partitionToEventId,
-      String reason, EventSequence catalogTimeline) throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, boolean loadPartitionFileMetadata,
+      boolean loadTableSchema, boolean refreshUpdatedPartitions,
+      @Nullable Set<String> partitionsToUpdate, @Nullable String debugAction,
+      @Nullable Map<String, Long> partitionToEventId, String reason,
+      EventSequence catalogTimeline) throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     String annotation = String.format("%s metadata for %s%s partition(s) of %s.%s (%s)",

@@ -1260,13 +1260,18 @@ public class CatalogServiceCatalog extends Catalog {
    * @param tbl Catalog table
    * @param versionNumber when isInsertEventContext is true, it is eventId to add
    * when isInsertEventContext is false, it is version number to add
+   * @return true if versionNumber is added to in-flight list. Otherwise, return false.
    */
-  public void addVersionsForInflightEvents(
+  public boolean addVersionsForInflightEvents(
       boolean isInsertEvent, Table tbl, long versionNumber) {
-    if (!isEventProcessingActive()) return;
-    tbl.addToVersionsForInflightEvents(isInsertEvent, versionNumber);
-    LOG.info("Added {} {} in table's {} in-flight events",
-        isInsertEvent ? "eventId" : "catalog version", versionNumber, tbl.getFullName());
+    if (!isEventProcessingActive()) return false;
+    boolean added = tbl.addToVersionsForInflightEvents(isInsertEvent, versionNumber);
+    if (added) {
+      LOG.info("Added {} {} in table's {} in-flight events",
+          isInsertEvent ? "eventId" : "catalog version", versionNumber,
+          tbl.getFullName());
+    }
+    return added;
   }
 
   /**
@@ -1275,12 +1280,16 @@ public class CatalogServiceCatalog extends Catalog {
    *
    * @param db Catalog database
    * @param versionNumber version number to be added
+   * @return true if versionNumber is added to in-flight list. Otherwise, return false.
    */
-  public void addVersionsForInflightEvents(Db db, long versionNumber) {
-    if (!isEventProcessingActive()) return;
-    LOG.info("Added catalog version {} in database's {} in-flight events",
-        versionNumber, db.getName());
-    db.addToVersionsForInflightEvents(versionNumber);
+  public boolean addVersionsForInflightEvents(Db db, long versionNumber) {
+    if (!isEventProcessingActive()) return false;
+    boolean added = db.addToVersionsForInflightEvents(versionNumber);
+    if (added) {
+      LOG.info("Added catalog version {} in database's {} in-flight events",
+          versionNumber, db.getName());
+    }
+    return added;
   }
 
   /**
