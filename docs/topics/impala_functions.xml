@@ -1038,6 +1038,20 @@ under the License.
           </row>
           <row>
             <entry>
+              <xref href=
+                "impala_string_functions.xml#string_functions/prettyprint_duration">
+                PRETTYPRINT_DURATION</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href=
+                "impala_string_functions.xml#string_functions/prettyprint_bytes">
+                PRETTYPRINT_BYTES</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
               <xref
                 href="impala_datetime_functions.xml#datetime_functions/quarter"
                 >QUARTER</xref>

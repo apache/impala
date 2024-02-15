@@ -530,62 +530,66 @@ Benchmark* BenchmarkConditionalFunctions(bool codegen) {
 // StringFn:                  Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                              length                209      210      212         1X         1X         1X
-//                          substring1                153      153      154      0.73X     0.729X     0.727X
-//                          substring2                173      174      176     0.827X     0.826X      0.83X
-//                                left                159      160      161     0.763X     0.762X     0.758X
-//                               right                160      160      161     0.764X     0.763X     0.758X
-//                               lower               74.9     75.6     76.3     0.358X      0.36X      0.36X
-//                               upper               76.5     77.4       78     0.366X     0.369X     0.368X
-//                             reverse                108      109      110     0.515X     0.519X      0.52X
-//                                trim                194      195      197      0.93X      0.93X     0.929X
-//                               ltrim                217      218      221      1.04X      1.04X      1.04X
-//                               rtrim                217      220      221      1.04X      1.05X      1.04X
-//                               space                147      148      149     0.702X     0.704X     0.703X
-//                               ascii                294      296      298      1.41X      1.41X      1.41X
-//                               instr               95.1     95.5     96.5     0.455X     0.455X     0.455X
-//                              locate               93.7     94.1     94.6     0.448X     0.448X     0.446X
-//                             locate2               98.8       99     99.5     0.473X     0.471X     0.469X
-//                              concat                129      130      131     0.616X     0.618X     0.618X
-//                             concat2               99.4      100      102     0.475X     0.478X     0.479X
-//                            concatws                262      264      267      1.25X      1.26X      1.26X
-//                           concatws2               97.5     98.4     99.2     0.467X     0.468X     0.468X
-//                              repeat               83.8     84.9     85.6     0.401X     0.404X     0.403X
-//                                lpad                 81     81.7     82.2     0.387X     0.389X     0.388X
-//                                rpad               81.5     82.4     82.7      0.39X     0.392X      0.39X
-//                         find_in_set                140      142      143      0.67X     0.674X     0.673X
-//                      regexp_extract               19.9     20.1     20.1    0.0953X    0.0957X    0.0949X
-//                      regexp_replace               1.43     1.44     1.44   0.00686X   0.00687X    0.0068X
-//
+//                              length                420      425      427         1X         1X         1X
+//                          substring1                372      376      380     0.886X     0.886X     0.889X
+//                          substring2                406      410      415     0.969X     0.966X      0.97X
+//                                left                370      372      377     0.882X     0.875X     0.883X
+//                               right                369      373      378      0.88X     0.879X     0.884X
+//                               lower                159      161      162     0.379X     0.379X     0.379X
+//                               upper                157      157      159     0.373X      0.37X     0.373X
+//                             reverse                266      271      273     0.635X     0.637X     0.638X
+//                                trim                446      452      455      1.06X      1.06X      1.06X
+//                               ltrim                546      556      559       1.3X      1.31X      1.31X
+//                               rtrim                545      553      556       1.3X       1.3X       1.3X
+//                               space                372      376      380     0.888X     0.886X     0.889X
+//                               ascii                809      817      826      1.93X      1.92X      1.93X
+//                               instr                220      223      225     0.524X     0.526X     0.526X
+//                              locate                217      218      219     0.517X     0.512X     0.511X
+//                             locate2                229      230      232     0.545X     0.542X     0.543X
+//                              concat                316      318      322     0.753X      0.75X     0.753X
+//                             concat2                257      260      263     0.613X     0.611X     0.615X
+//                            concatws                593      597      599      1.41X      1.41X       1.4X
+//                           concatws2                228      229      232     0.543X     0.539X     0.543X
+//                              repeat                208      209      212     0.495X     0.493X     0.497X
+//                                lpad                169      170      170     0.403X       0.4X     0.399X
+//                                rpad                167      169      170     0.397X     0.397X     0.397X
+//                         find_in_set                321      323      325     0.765X     0.761X      0.76X
+//                      regexp_extract                 42     42.8       43       0.1X     0.101X     0.101X
+//                      regexp_replace               2.94     2.96        3   0.00701X   0.00698X   0.00702X
+//                prettyprint_duration               18.3     18.6     18.7    0.0437X    0.0439X    0.0438X
+//                  prettyprint_bytes                9.54     9.72     9.75    0.0227X    0.0229X    0.0228X
+// 
 // StringFnCodegen:           Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                              length                826      834      836         1X         1X         1X
-//                          substring1                297      300      302      0.36X      0.36X     0.362X
-//                          substring2                777      785      790     0.941X     0.942X     0.945X
-//                                left                296      299      301     0.359X     0.359X      0.36X
-//                               right                297      300      303      0.36X     0.359X     0.362X
-//                               lower                102      103      104     0.123X     0.123X     0.125X
-//                               upper                105      106      107     0.127X     0.127X     0.128X
-//                             reverse                161      165      168     0.194X     0.198X       0.2X
-//                                trim                425      427      432     0.514X     0.513X     0.517X
-//                               ltrim                561      564      569     0.679X     0.677X     0.681X
-//                               rtrim                584      587      594     0.707X     0.705X     0.711X
-//                               space                213      215      217     0.258X     0.258X      0.26X
-//                               ascii                822      829      836     0.996X     0.994X         1X
-//                               instr                215      217      219     0.261X      0.26X     0.262X
-//                              locate                214      217      218     0.259X      0.26X     0.261X
-//                             locate2                226      228      230     0.274X     0.274X     0.275X
-//                              concat                210      214      216     0.254X     0.257X     0.258X
-//                             concat2                189      191      193     0.229X      0.23X     0.231X
-//                            concatws                777      784      790     0.941X     0.941X     0.945X
-//                           concatws2                160      162      163     0.194X     0.194X     0.196X
-//                              repeat                159      161      164     0.193X     0.194X     0.196X
-//                                lpad                212      214      216     0.257X     0.257X     0.258X
-//                                rpad                212      214      216     0.257X     0.257X     0.259X
-//                         find_in_set                276      278      280     0.334X     0.333X     0.335X
-//                      regexp_extract               20.4     20.5     20.8    0.0247X    0.0246X    0.0248X
-//                      regexp_replace               1.43     1.47     1.47   0.00174X   0.00176X   0.00176X
+//                              length                461      466      471         1X         1X         1X
+//                          substring1                372      377      380     0.806X     0.809X     0.808X
+//                          substring2                369      376      378     0.802X     0.806X     0.802X
+//                                left                367      369      375     0.797X     0.792X     0.797X
+//                               right                351      356      359     0.761X     0.764X     0.763X
+//                               lower                160      161      162     0.347X     0.345X     0.344X
+//                               upper                156      157      157     0.339X     0.336X     0.334X
+//                             reverse                272      275      277     0.591X     0.591X     0.588X
+//                                trim                445      450      453     0.966X     0.966X     0.963X
+//                               ltrim                551      558      563       1.2X       1.2X       1.2X
+//                               rtrim                544      552      557      1.18X      1.18X      1.18X
+//                               space                374      377      380     0.811X     0.808X     0.807X
+//                               ascii                805      813      823      1.75X      1.74X      1.75X
+//                               instr                220      223      224     0.478X     0.479X     0.476X
+//                              locate                219      220      220     0.475X     0.471X     0.468X
+//                             locate2                225      227      231     0.489X     0.487X      0.49X
+//                              concat                316      319      322     0.686X     0.683X     0.684X
+//                             concat2                258      260      264      0.56X     0.557X      0.56X
+//                            concatws                593      598      602      1.29X      1.28X      1.28X
+//                           concatws2                227      229      232     0.493X      0.49X     0.493X
+//                              repeat                203      205      208     0.441X     0.439X     0.441X
+//                                lpad                169      170      170     0.367X     0.364X     0.362X
+//                                rpad                169      169      170     0.366X     0.363X     0.361X
+//                         find_in_set                320      323      325     0.694X     0.693X     0.691X
+//                      regexp_extract               42.2       43     43.2    0.0915X    0.0922X    0.0918X
+//                      regexp_replace               2.89     2.94        3   0.00626X   0.00631X   0.00637X
+//                prettyprint_duration               18.3     18.6     18.7    0.0398X      0.04X    0.0397X
+//                  prettyprint_bytes                9.55     9.72     9.74    0.0207X    0.0208X    0.0207X
 Benchmark* BenchmarkStringFunctions(bool codegen) {
   Benchmark* suite = new Benchmark(BenchmarkName("StringFn", codegen));
   BENCHMARK("length", "length('Hello World!')");
@@ -614,6 +618,8 @@ Benchmark* BenchmarkStringFunctions(bool codegen) {
   BENCHMARK("find_in_set", "find_in_set('ab', 'abc,ad,ab,ade,cde')");
   BENCHMARK("regexp_extract", "regexp_extract('abxcy1234a', 'a.x.y.*a', 0)");
   BENCHMARK("regexp_replace", "regexp_replace('axcaycazc', '', 'r')");
+  BENCHMARK("prettyprint_duration", "prettyprint_duration(123456789)");
+  BENCHMARK("prettyprint_bytes", "prettyprint_bytes(987654321)");
   return suite;
 }
 

@@ -27,6 +27,7 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"
+#include "gen-cpp/Metrics_types.h"
 #include "gutil/strings/charset.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
@@ -1888,4 +1889,62 @@ IntVal StringFunctions::DamerauLevenshtein(
   ctx->Free(reinterpret_cast<uint8_t*>(rows));
   return IntVal(result);
 }
+
+template <typename T>
+static StringVal prettyPrint(FunctionContext* context, const T& int_val,
+    const TUnit::type& unit) {
+  if (int_val.is_null) {
+    return StringVal::null();
+  }
+
+  const string& fmt_str = PrettyPrinter::Print(int_val.val, unit);
+
+  StringVal result(context, fmt_str.size());
+  if (UNLIKELY(result.is_null)) return StringVal::null();
+  uint8_t* ptr = result.ptr;
+  memcpy(ptr, fmt_str.c_str(), fmt_str.size());
+
+  return result;
+}
+
+StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
+    const BigIntVal& duration_us) {
+  return prettyPrint(context, duration_us, TUnit::TIME_NS);
+}
+
+StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
+    const IntVal& duration_us) {
+  return prettyPrint(context, duration_us, TUnit::TIME_NS);
+}
+
+StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
+    const SmallIntVal& duration_us) {
+  return prettyPrint(context, duration_us, TUnit::TIME_NS);
+}
+
+StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
+    const TinyIntVal& duration_us) {
+  return prettyPrint(context, duration_us, TUnit::TIME_NS);
+}
+
+StringVal StringFunctions::PrettyPrintMemory(FunctionContext* context,
+    const BigIntVal& bytes) {
+  return prettyPrint(context, bytes, TUnit::BYTES);
+}
+
+StringVal StringFunctions::PrettyPrintMemory(FunctionContext* context,
+    const IntVal& bytes) {
+  return prettyPrint(context, bytes, TUnit::BYTES);
+}
+
+StringVal StringFunctions::PrettyPrintMemory(FunctionContext* context,
+    const SmallIntVal& bytes) {
+  return prettyPrint(context, bytes, TUnit::BYTES);
+}
+
+StringVal StringFunctions::PrettyPrintMemory(FunctionContext* context,
+    const TinyIntVal& bytes) {
+  return prettyPrint(context, bytes, TUnit::BYTES);
+}
+
 }

@@ -236,6 +236,20 @@ class StringFunctions {
       const StringVal& s2, const DoubleVal& scaling_factor,
       const DoubleVal& boost_threshold);
 
+  /// Converts nanoseconds stored as an integer value into human readable time durations.
+  /// For example, 2147483647 nanoseconds is converted to "2s147ms".
+  static StringVal PrettyPrintDuration(FunctionContext*, const BigIntVal& duration_us);
+  static StringVal PrettyPrintDuration(FunctionContext*, const IntVal& duration_us);
+  static StringVal PrettyPrintDuration(FunctionContext*, const SmallIntVal& duration_us);
+  static StringVal PrettyPrintDuration(FunctionContext*, const TinyIntVal& duration_us);
+
+  /// Converts bytes stored as an integer value into human readable memory measurements.
+  /// For example, 123456789012 bytes is converted to "114.98 GB".
+  static StringVal PrettyPrintMemory(FunctionContext*, const BigIntVal& bytes);
+  static StringVal PrettyPrintMemory(FunctionContext*, const IntVal& bytes);
+  static StringVal PrettyPrintMemory(FunctionContext*, const SmallIntVal& bytes);
+  static StringVal PrettyPrintMemory(FunctionContext*, const TinyIntVal& bytes);
+
  private:
   static uint64_t re2_mem_limit_;
 
