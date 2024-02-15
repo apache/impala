@@ -646,10 +646,9 @@ public class AnalysisContext {
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
       analysisResult_.analyzer_.setEnablePrivChecks(true); // Always restore
     } catch (AnalysisException e) {
-      LOG.error(String.format("Error analyzing the rewritten query.\n" +
-          "Original SQL: %s\nRewritten SQL: %s", analysisResult_.stmt_.toSql(),
-          analysisResult_.stmt_.toSql(REWRITTEN)), e);
-      throw e;
+      logRewriteErrorNoThrow(analysisResult_.stmt_, e);
+      throw new AnalysisException("An error occurred after query rewrite: " +
+          e.getMessage(), e);
     }
     // Restore the original result types and column labels.
     analysisResult_.stmt_.castResultExprs(origResultTypes);
@@ -658,6 +657,18 @@ public class AnalysisContext {
       LOG.trace("Rewritten SQL: " + analysisResult_.stmt_.toSql(REWRITTEN));
     }
     if (isExplain) analysisResult_.stmt_.setIsExplain();
+  }
+
+  private void logRewriteErrorNoThrow(StatementBase stmt,
+      AnalysisException analysisException) {
+    try {
+      LOG.error(String.format("Error analyzing the rewritten query.\n" +
+          "Original SQL: %s\nRewritten SQL: %s", stmt.toSql(),
+          stmt.toSql(REWRITTEN)), analysisException);
+    } catch (Exception e) {
+      LOG.error("An exception occurred during printing out " +
+          "the rewritten SQL statement.", e);
+    }
   }
 
   public Analyzer getAnalyzer() { return analysisResult_.getAnalyzer(); }

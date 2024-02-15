@@ -951,3 +951,15 @@ regex:'.*/xxxx-xxxxxxxxx/xxxxxxxxxxxx/xxxx=xxxx/xxxxx=x/090401.txt',700,NULL,1,1
 ---- TYPES
 STRING, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT, INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT, STRING
 ====
+---- QUERY
+# Query table with invalid masking function
+SELECT * FROM functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: An error occurred after query rewrite: Could not resolve column/field reference: 'invalid_col'
+====
+---- QUERY
+# CTAS statement with invalid masking function
+CREATE TABLE $UNIQUE_DB.invalid_masked_tbl AS SELECT * FROM functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: An error occurred after query rewrite: Could not resolve column/field reference: 'invalid_col'
+====

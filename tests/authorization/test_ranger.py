@@ -1827,6 +1827,11 @@ class TestRanger(CustomClusterTestSuite):
         unique_name + str(policy_cnt), user, "functional_parquet",
         "iceberg_v2_delete_positional", "data", "MASK_NULL")
       policy_cnt += 1
+      # Add invalid column masking policy to trigger an error during re-analyze.
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional_parquet",
+        "alltypessmall", "string_col", "CUSTOM", "concat(string_col, invalid_col)")
+      policy_cnt += 1
       self.execute_query_expect_success(admin_client, "refresh authorization",
                                         user=ADMIN)
       self.run_test_case("QueryTest/ranger_column_masking", vector,
