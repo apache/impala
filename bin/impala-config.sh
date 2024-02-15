@@ -207,6 +207,8 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
   export IMPALA_HADOOP_CLIENT_VERSION=3.3.6
   unset IMPALA_HADOOP_CLIENT_URL
 fi
+export IMPALA_MOLD_VERSION=2.4.1
+unset IMPALA_MOLD_URL
 
 # Impala JDBC driver for testing.
 export IMPALA_SIMBA_JDBC_DRIVER_VERSION=42-2.6.32.1041
@@ -531,8 +533,11 @@ chmod 755 "${PYTHON_EGG_CACHE}"
 # If it's 0, Impala will be built with the compiler in the toolchain directory.
 export USE_SYSTEM_GCC=${USE_SYSTEM_GCC-0}
 
-# Use ld.gold instead of ld by default to speed up builds.
-export USE_GOLD_LINKER=${USE_GOLD_LINKER-true}
+# Allow the linker to be set to gold, mold, or regular ld. Gold is the default
+# as it has been for a long time. Mold is a new linker that is faster than gold.
+# Note: This is validated in the CMake code.
+# TODO: Add support for lld as well
+export IMPALA_LINKER=${IMPALA_LINKER-gold}
 
 # Override the default compiler by setting a path to the new compiler. The default
 # compiler depends on USE_SYSTEM_GCC and IMPALA_GCC_VERSION. The intended use case

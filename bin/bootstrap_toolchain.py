@@ -474,9 +474,9 @@ def get_toolchain_downloads():
   toolchain_packages += [ToolchainPackage(p) for p in
       ["avro", "binutils", "boost", "breakpad", "bzip2", "calloncehack", "cctz",
        "cloudflarezlib", "cmake", "crcutil", "curl", "flatbuffers", "gdb", "gflags",
-       "glog", "gperftools", "gtest", "jwt-cpp", "libev", "libunwind", "lz4", "openldap",
-       "orc", "protobuf", "python", "rapidjson", "re2", "snappy", "tpc-h", "tpc-ds",
-       "zlib", "zstd"]]
+       "glog", "gperftools", "gtest", "jwt-cpp", "libev", "libunwind", "lz4", "mold",
+       "openldap", "orc", "protobuf", "python", "rapidjson", "re2", "snappy", "tpc-h",
+       "tpc-ds", "zlib", "zstd"]]
   python3_package = ToolchainPackage(
       "python", explicit_version=os.environ.get("IMPALA_PYTHON3_VERSION"))
   toolchain_packages += [python3_package]

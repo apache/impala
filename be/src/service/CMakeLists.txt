@@ -58,11 +58,13 @@ add_library(fesupport SHARED
 # Hide all symbols from compression libraries so that users of this libfesupport.so
 # don't have conflicts with libhadoop or other libraries.
 # TODO: This should also hide most other symbols as a precaution.
-set(LINK_FLAGS "-Wl,--exclude-libs=libbz2")
-set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=liblz4")
-set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libsnappy")
-set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libz")
-set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libzstd")
+# Note: Using the full library name with ".a" is needed for lld/mold linkers.
+# It has no impact on gold, which supports with or without the .a.
+set(LINK_FLAGS "-Wl,--exclude-libs=libbz2.a")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=liblz4.a")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libsnappy.a")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libz.a")
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--exclude-libs=libzstd.a")
 set_target_properties(fesupport
   PROPERTIES
   LINK_FLAGS "${LINK_FLAGS}")

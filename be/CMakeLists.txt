@@ -27,6 +27,13 @@ PROJECT(ASSEMBLER)
 
 option(BUILD_WITH_NO_TESTS "Do not generate test and benchmark targets" OFF)
 
+# Validate the IMPALA_LINKER environment variable
+if (NOT "$ENV{IMPALA_LINKER}" STREQUAL "ld" AND
+    NOT "$ENV{IMPALA_LINKER}" STREQUAL "gold" AND
+    NOT "$ENV{IMPALA_LINKER}" STREQUAL "mold")
+  message(FATAL_ERROR "Invalid IMPALA_LINKER: $ENV{IMPALA_LINKER} (expected: ld, gold, or mold)")
+endif()
+
 # compiler flags that are common across debug/release builds
 #  -Wall: Enable all warnings.
 #  -Wno-sign-compare: suppress warnings for comparison between signed and unsigned
@@ -58,6 +65,14 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_ALLOW_DEPRECATED_HEADERS")
 #      built at OS where getrandom(2) is available at OSes where getrandom(2)
 #      isn't supported (e.g., that might happen in containerized deployments).
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX")
+IF($ENV{IMPALA_LINKER} STREQUAL "mold")
+  # Only very recent GCC 12+ has support for -fuse-ld=mold, so we override "ld" by
+  # putting Mold's libexec/mold directory (which has a "ld" symlink) on the path.
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/mold-$ENV{IMPALA_MOLD_VERSION}/libexec/mold")
+ENDIF()
+# Note: apart from gold linker, binutils provides an up-to-date "as" utility. Older
+# distributions will have an "as" utility too old to process the output from
+# modern GCC.
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/binutils-$ENV{IMPALA_BINUTILS_VERSION}/bin/")
 #  -Wno-deprecated-declarations: OpenSSL3 deprecated various APIs currently used by
 #      Impala, so this disables those warnings when using OpenSSL3 until they can be
@@ -65,7 +80,7 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME
 if (OPENSSL_VERSION VERSION_GREATER_EQUAL 3)
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated-declarations")
 endif()
-IF($ENV{USE_GOLD_LINKER} STREQUAL "true")
+IF($ENV{IMPALA_LINKER} STREQUAL "gold")
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fuse-ld=gold")
 ENDIF()
 
@@ -245,11 +260,14 @@ endif()
 # debug info in the executable. This can reduce the size of binaries by >50%
 # without changing the amount of debug information. gdb is known to work
 # with compressed debug info, but other tools may not know how to use it.
-# TODO: The current version of Clang does not handles this flag correctly and
-# simply produces binaries with uncompressed debug info. This needs further
-# debugging.
 if ($ENV{IMPALA_COMPRESSED_DEBUG_INFO} STREQUAL "true")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gz")
+  # Clang doesn't handle -gz properly until version 12, so there is no reason to keep it.
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"
+      AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12.0)
+    message(STATUS "Detected Clang < 12: -gz is ineffective on this version, skipping.")
+  else()
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gz")
+  endif()
 endif()
 
 # Use ccache when found and not explicitly disabled by setting the DISABLE_CCACHE envvar.
