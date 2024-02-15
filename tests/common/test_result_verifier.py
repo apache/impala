@@ -295,11 +295,27 @@ def verify_query_result_is_equal(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
   assert expected_results == actual_results
 
-def verify_query_result_is_not_in(expected_results, actual_results):
-  assert_args_not_none(expected_results, actual_results)
-  expected_set = set(map(unicode, expected_results.rows))
+
+def verify_query_result_is_not_in(banned_results, actual_results):
+  assert_args_not_none(banned_results, actual_results)
+  banned_literals, banned_non_literals = banned_results.separate_rows()
+
+  # Part 1: No intersection with the banned literals
+  banned_literals_set = set([unicode(row) for row in banned_literals])
   actual_set = set(map(unicode, actual_results.rows))
-  assert expected_set.isdisjoint(actual_set)
+  assert banned_literals_set.isdisjoint(actual_set)
+
+  # Part 2: Walk through each banned non-literal / regex and make sure that no row
+  # in the actual output matches.
+  for banned_row in banned_non_literals:
+    matched = False
+    for actual_row in actual_results.rows:
+      # Equals is overloaded, so this is doing a regex check
+      if actual_row == banned_row:
+        matched = True
+        break
+    assert not matched, u"Found banned row {0} in actual rows:\n{1}".format(
+      unicode(banned_row), unicode(actual_results))
 
 # Global dictionary that maps the verification type to appropriate verifier.
 # The RESULTS section of a .test file is tagged with the verifier type. We may
