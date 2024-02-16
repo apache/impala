@@ -65,14 +65,14 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
-|  row-size=36B cardinality=247.17K(filtered from 6.00M)
+|  row-size=36B cardinality=240.05K(filtered from 6.00M)
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
 |     row-size=8B cardinality=1.50M
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF000 -> l_suppkey, RF001 -> l_suppkey
-   row-size=28B cardinality=247.17K(filtered from 6.00M)
+   row-size=28B cardinality=240.05K(filtered from 6.00M)
 ====
 # With cardinality reduction applied half, 00:SCAN estimate cardinality is 3.12M.
 select l_partkey, l_suppkey, sum(o_orderkey) o_qty, sum(l_linenumber) l_qty

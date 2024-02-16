@@ -175,7 +175,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  runtime filters: RF032[bloom] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=880059957
+|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M cost=880059957
 |  |  in pipelines: 23(GETNEXT), 24(OPEN)
 |  |
 |  |--24:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
@@ -393,7 +393,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  runtime filters: RF020[bloom] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=880059957
+|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M cost=880059957
 |  |  in pipelines: 16(GETNEXT), 17(OPEN)
 |  |
 |  |--17:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
@@ -673,7 +673,7 @@ max-parallelism=55910 segment-costs=[559077106064, 9] cpu-comparison-result=1260
 |  |
 |  78:EXCHANGE [HASH(cs_bill_customer_sk)]
 |  |  mem-estimate=13.91MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=34377328
+|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M cost=34377328
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F30:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
@@ -685,7 +685,7 @@ max-parallelism=55910 segment-costs=[559077106064, 9] cpu-comparison-result=1260
 |  |  hash predicates: cs_sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=880059584
+|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M cost=880059584
 |  |  in pipelines: 23(GETNEXT), 24(OPEN)
 |  |
 |  |--F40:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
@@ -1124,7 +1124,7 @@ max-parallelism=120 segment-costs=[14871350016, 183541153664] cpu-comparison-res
 |  |
 |  60:EXCHANGE [HASH(cs_bill_customer_sk)]
 |  |  mem-estimate=13.91MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=34377328
+|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M cost=34377328
 |  |  in pipelines: 16(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
@@ -1136,7 +1136,7 @@ max-parallelism=120 segment-costs=[14871350016, 183541153664] cpu-comparison-res
 |  |  hash predicates: cs_sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=880059584
+|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M cost=880059584
 |  |  in pipelines: 16(GETNEXT), 17(OPEN)
 |  |
 |  |--F49:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
@@ -1566,7 +1566,7 @@ max-parallelism=55910 segment-costs=[559077106064, 9] cpu-comparison-result=1260
 |  |
 |  78:EXCHANGE [HASH(cs_bill_customer_sk)]
 |  |  mem-estimate=13.91MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=34377328
+|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M cost=34377328
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F30:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
@@ -1578,7 +1578,7 @@ max-parallelism=55910 segment-costs=[559077106064, 9] cpu-comparison-result=1260
 |  |  hash predicates: cs_sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=880059584
+|  |  tuple-ids=47,48 row-size=32B cardinality=880.06M cost=880059584
 |  |  in pipelines: 23(GETNEXT), 24(OPEN)
 |  |
 |  |--F40:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
@@ -2017,7 +2017,7 @@ max-parallelism=120 segment-costs=[14871350016, 183541153664] cpu-comparison-res
 |  |
 |  60:EXCHANGE [HASH(cs_bill_customer_sk)]
 |  |  mem-estimate=13.91MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=34377328
+|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M cost=34377328
 |  |  in pipelines: 16(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
@@ -2029,7 +2029,7 @@ max-parallelism=120 segment-costs=[14871350016, 183541153664] cpu-comparison-res
 |  |  hash predicates: cs_sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M(filtered from 880.06M) cost=880059584
+|  |  tuple-ids=33,34 row-size=32B cardinality=880.06M cost=880059584
 |  |  in pipelines: 16(GETNEXT), 17(OPEN)
 |  |
 |  |--F49:PLAN FRAGMENT [RANDOM] hosts=10 instances=10

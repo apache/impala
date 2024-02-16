@@ -118,7 +118,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  runtime filters: RF004[bloom] <- i_item_sk, RF005[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1,0 row-size=98B cardinality=481
+|  tuple-ids=1,0 row-size=98B cardinality=96(filtered from 481)
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 |--00:SCAN HDFS [tpcds_parquet.item]
@@ -141,7 +141,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=362(filtered from 1824)
    mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=1 row-size=20B cardinality=481(filtered from 2.88M)
+   tuple-ids=1 row-size=20B cardinality=96(filtered from 2.88M)
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=28.52MB Threads=10
@@ -265,7 +265,7 @@ Per-Host Resources: mem-estimate=67.14MB mem-reservation=11.81MB thread-reservat
 |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  runtime filters: RF004[bloom] <- i_item_sk, RF005[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1,0 row-size=98B cardinality=481
+|  tuple-ids=1,0 row-size=98B cardinality=96(filtered from 481)
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 |--12:EXCHANGE [BROADCAST]
@@ -295,7 +295,7 @@ Per-Host Resources: mem-estimate=67.14MB mem-reservation=11.81MB thread-reservat
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=362(filtered from 1824)
    mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=1 row-size=20B cardinality=481(filtered from 2.88M)
+   tuple-ids=1 row-size=20B cardinality=96(filtered from 2.88M)
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=52.27MB Threads=11
@@ -436,7 +436,7 @@ Per-Instance Resources: mem-estimate=26.66MB mem-reservation=3.00MB thread-reser
 |  hash predicates: ss_item_sk = i_item_sk
 |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1,0 row-size=98B cardinality=481
+|  tuple-ids=1,0 row-size=98B cardinality=96(filtered from 481)
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 |--F08:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -474,6 +474,6 @@ Per-Instance Resources: mem-estimate=26.66MB mem-reservation=3.00MB thread-reser
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=362(filtered from 1824)
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=1 row-size=20B cardinality=481(filtered from 2.88M)
+   tuple-ids=1 row-size=20B cardinality=96(filtered from 2.88M)
    in pipelines: 01(GETNEXT)
 ====

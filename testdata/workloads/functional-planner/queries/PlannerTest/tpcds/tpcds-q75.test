@@ -819,7 +819,7 @@ Per-Host Resources: mem-estimate=2.10MB mem-reservation=1.94MB thread-reservatio
 |  |  |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  |  |  runtime filters: RF026[bloom] <- i_item_sk, RF027[min_max] <- i_item_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=20,21 row-size=70B cardinality=287.40K
+|  |  |  tuple-ids=20,21 row-size=70B cardinality=58.85K(filtered from 287.40K)
 |  |  |  in pipelines: 32(GETNEXT), 33(OPEN)
 |  |  |
 |  |  |--70:EXCHANGE [BROADCAST]
@@ -851,7 +851,7 @@ Per-Host Resources: mem-estimate=2.10MB mem-reservation=1.94MB thread-reservatio
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
 |  |     mem-estimate=64.00MB mem-reservation=2.00MB thread-reservation=1
-|  |     tuple-ids=20 row-size=28B cardinality=287.80K(filtered from 2.88M)
+|  |     tuple-ids=20 row-size=28B cardinality=58.85K(filtered from 2.88M)
 |  |     in pipelines: 32(GETNEXT)
 |  |
 |  31:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
@@ -1168,7 +1168,7 @@ Per-Host Resources: mem-estimate=27.25MB mem-reservation=11.50MB thread-reservat
 |  |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  |  runtime filters: RF014[bloom] <- i_item_sk, RF015[min_max] <- i_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=4,5 row-size=70B cardinality=287.40K
+|  |  tuple-ids=4,5 row-size=70B cardinality=58.85K(filtered from 287.40K)
 |  |  in pipelines: 08(GETNEXT), 09(OPEN)
 |  |
 |  |--54:EXCHANGE [BROADCAST]
@@ -1201,7 +1201,7 @@ Per-Host Resources: mem-estimate=27.25MB mem-reservation=11.50MB thread-reservat
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
 |     mem-estimate=64.00MB mem-reservation=2.00MB thread-reservation=1
-|     tuple-ids=4 row-size=28B cardinality=287.80K(filtered from 2.88M)
+|     tuple-ids=4 row-size=28B cardinality=58.85K(filtered from 2.88M)
 |     in pipelines: 08(GETNEXT)
 |
 07:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
@@ -1600,7 +1600,7 @@ Per-Instance Resources: mem-estimate=311.03KB mem-reservation=0B thread-reservat
 |  |  |  hash predicates: ss_item_sk = i_item_sk
 |  |  |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=20,21 row-size=70B cardinality=287.40K
+|  |  |  tuple-ids=20,21 row-size=70B cardinality=58.85K(filtered from 287.40K)
 |  |  |  in pipelines: 32(GETNEXT), 33(OPEN)
 |  |  |
 |  |  |--F45:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1640,7 +1640,7 @@ Per-Instance Resources: mem-estimate=311.03KB mem-reservation=0B thread-reservat
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
 |  |     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-|  |     tuple-ids=20 row-size=28B cardinality=287.80K(filtered from 2.88M)
+|  |     tuple-ids=20 row-size=28B cardinality=58.85K(filtered from 2.88M)
 |  |     in pipelines: 32(GETNEXT)
 |  |
 |  31:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
@@ -2024,7 +2024,7 @@ Per-Instance Resources: mem-estimate=12.83MB mem-reservation=2.00MB thread-reser
 |  |  hash predicates: ss_item_sk = i_item_sk
 |  |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=4,5 row-size=70B cardinality=287.40K
+|  |  tuple-ids=4,5 row-size=70B cardinality=58.85K(filtered from 287.40K)
 |  |  in pipelines: 08(GETNEXT), 09(OPEN)
 |  |
 |  |--F54:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2065,7 +2065,7 @@ Per-Instance Resources: mem-estimate=12.83MB mem-reservation=2.00MB thread-reser
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
 |     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-|     tuple-ids=4 row-size=28B cardinality=287.80K(filtered from 2.88M)
+|     tuple-ids=4 row-size=28B cardinality=58.85K(filtered from 2.88M)
 |     in pipelines: 08(GETNEXT)
 |
 07:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]

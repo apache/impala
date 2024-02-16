@@ -551,7 +551,7 @@ PLAN-ROOT SINK
 01:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate <= '1996-12-31', l_shipdate >= '1995-01-01'
    runtime filters: RF006 -> l_suppkey, RF007 -> l_suppkey, RF008 -> l_orderkey, RF009 -> l_orderkey
-   row-size=58B cardinality=600.12K
+   row-size=58B cardinality=575.77K(filtered from 600.12K)
 ====
 # Q8 - National Market Share Query
 select
@@ -1088,7 +1088,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
    runtime filters: RF000 -> l_partkey, RF001 -> l_partkey
-   row-size=24B cardinality=600.12K
+   row-size=24B cardinality=598.58K(filtered from 600.12K)
 ====
 # Q15 - Top Supplier Query
 with revenue_view as (
@@ -1630,7 +1630,7 @@ PLAN-ROOT SINK
 |  |  01:SCAN KUDU [tpch_kudu.lineitem l1]
 |  |     predicates: l1.l_receiptdate > l1.l_commitdate
 |  |     runtime filters: RF004 -> l1.l_suppkey, RF005 -> l1.l_suppkey, RF006 -> l1.l_orderkey, RF007 -> l1.l_orderkey
-|  |     row-size=68B cardinality=600.12K
+|  |     row-size=68B cardinality=191.92K(filtered from 600.12K)
 |  |
 |  04:SCAN KUDU [tpch_kudu.lineitem l2]
 |     runtime filters: RF000 -> l2.l_orderkey, RF001 -> l2.l_orderkey

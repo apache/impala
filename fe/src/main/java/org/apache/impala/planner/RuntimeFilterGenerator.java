@@ -59,6 +59,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.planner.JoinNode.EqJoinConjunctScanSlots;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
@@ -798,28 +799,30 @@ public final class RuntimeFilterGenerator {
      */
     public long reducedCardinalityForScanNode(ScanNode scanNode, long scanCardinality,
         Map<String, Double> partitionSelectivities) {
+      Preconditions.checkState(isHighlySelective());
+      SlotRef buildSlot = srcExpr_.unwrapSlotRef(true);
       PlanNodeId scanNodeId = scanNode.getId();
-      long scanColumnNdv = getTargetExpr(scanNodeId).getNumDistinctValues();
+      Expr targetExpr = getTargetExpr(scanNodeId);
+      SlotRef targetSlot = targetExpr.unwrapSlotRef(true);
+      long scanColumnNdv = targetExpr.getNumDistinctValues();
       if (scanColumnNdv < 0) {
         // For cardinality reduction, it is OK to skip this filter if 'scanColumnNdv'
         // is unknown rather than trying to estimate it.
         return -1;
       }
+
       long buildKeyNdv = ndvEstimate_;
       long buildKeyCard = src_.getChild(1).getCardinality();
       long buildKeyNumRows = getBuildKeyNumRowStats();
       // The raw input cardinality without applying scan conjuct and limits.
       long scanNumRows = scanNode.inputCardinality_;
 
-      long estCardAfterFilter = JoinNode.computeGenericJoinCardinality(scanColumnNdv,
-          buildKeyNdv, scanNumRows, buildKeyNumRows, scanCardinality, buildKeyCard);
-
-      if (isPartitionFilterAt(scanNodeId)) {
+      boolean isPartitionFilter = isPartitionFilterAt(scanNodeId);
+      if (isPartitionFilter) {
         // Partition filter can apply at file-level filtering.
         // Keep the most selective partition filter per column to reduce
         // inputCardinality_. Ignore a column if its name is unknown.
         double thisPartSel = (double) buildKeyNdv / scanColumnNdv;
-        SlotRef targetSlot = getTargetExpr(scanNodeId).unwrapSlotRef(true);
         if (targetSlot != null && targetSlot.hasDesc()
             && targetSlot.getDesc().getColumn() != null) {
           String colName = targetSlot.getDesc().getColumn().getName();
@@ -827,7 +830,31 @@ public final class RuntimeFilterGenerator {
           if (thisPartSel < currentSel) partitionSelectivities.put(colName, thisPartSel);
         }
       }
-      return estCardAfterFilter;
+
+      List<EqJoinConjunctScanSlots> eligibleFkPkJoinConjuncts = new ArrayList<>();
+      boolean isEvalAtStorageLayer =
+          isPartitionFilter || (scanNode instanceof KuduScanNode);
+      if (isEvalAtStorageLayer && src_.fkPkEqJoinConjuncts_ != null && targetSlot != null
+          && targetSlot.hasDesc() && buildSlot != null && buildSlot.hasDesc()) {
+        for (EqJoinConjunctScanSlots fkPk : src_.fkPkEqJoinConjuncts_) {
+          if (targetSlot.getSlotId().equals(fkPk.lhs_.getId())
+              && buildSlot.getSlotId().equals(fkPk.rhs_.getId())) {
+            eligibleFkPkJoinConjuncts.add(fkPk);
+          }
+        }
+      }
+
+      if (eligibleFkPkJoinConjuncts.isEmpty()) {
+        return JoinNode.computeGenericJoinCardinality(scanColumnNdv, buildKeyNdv,
+            scanNumRows, buildKeyNumRows, scanCardinality, buildKeyCard);
+      } else {
+        // JoinNode.getFkPkJoinCardinality() can return lower number than
+        // JoinNode.computeGenericJoinCardinality(). But be conservative to only use it
+        // for filters that evaluate in storage layer (such as partition filter and
+        // pushed-down Kudu filter) to avoid severe underestimation.
+        return JoinNode.getFkPkJoinCardinality(
+            eligibleFkPkJoinConjuncts, scanCardinality, buildKeyCard);
+      }
     }
 
     public String debugString() {

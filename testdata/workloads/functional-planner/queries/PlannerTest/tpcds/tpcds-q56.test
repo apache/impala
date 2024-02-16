@@ -370,7 +370,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  runtime filters: RF006[bloom] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1 row-size=32B cardinality=170.55K(filtered from 170.55K)
+|  tuple-ids=0,1 row-size=32B cardinality=170.55K
 |  in pipelines: 01(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds_parquet.date_dim]
@@ -857,7 +857,7 @@ Per-Host Resources: mem-estimate=55.48MB mem-reservation=8.88MB thread-reservati
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  runtime filters: RF006[bloom] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1 row-size=32B cardinality=170.55K(filtered from 170.55K)
+|  tuple-ids=0,1 row-size=32B cardinality=170.55K
 |  in pipelines: 01(GETNEXT), 02(OPEN)
 |
 |--33:EXCHANGE [BROADCAST]
@@ -1445,7 +1445,7 @@ Per-Instance Resources: mem-estimate=17.22MB mem-reservation=2.00MB thread-reser
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1 row-size=32B cardinality=170.55K(filtered from 170.55K)
+|  tuple-ids=0,1 row-size=32B cardinality=170.55K
 |  in pipelines: 01(GETNEXT), 02(OPEN)
 |
 |--F27:PLAN FRAGMENT [RANDOM] hosts=3 instances=3

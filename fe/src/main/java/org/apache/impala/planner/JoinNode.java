@@ -387,8 +387,8 @@ public abstract class JoinNode extends PlanNode {
    * The returned result is >= 0.
    * The list of join conjuncts must be non-empty and the cardinalities must be >= 0.
    */
-  private long getFkPkJoinCardinality(List<EqJoinConjunctScanSlots> eqJoinConjunctSlots,
-      long lhsCard, long rhsCard) {
+  protected static long getFkPkJoinCardinality(
+      List<EqJoinConjunctScanSlots> eqJoinConjunctSlots, long lhsCard, long rhsCard) {
     Preconditions.checkState(!eqJoinConjunctSlots.isEmpty());
     Preconditions.checkState(lhsCard >= 0 && rhsCard >= 0);
 
@@ -523,8 +523,8 @@ public abstract class JoinNode extends PlanNode {
    */
   public static final class EqJoinConjunctScanSlots {
     private final Expr eqJoinConjunct_;
-    private final SlotDescriptor lhs_;
-    private final SlotDescriptor rhs_;
+    protected final SlotDescriptor lhs_;
+    protected final SlotDescriptor rhs_;
 
     private EqJoinConjunctScanSlots(Expr eqJoinConjunct, SlotDescriptor lhs,
         SlotDescriptor rhs) {

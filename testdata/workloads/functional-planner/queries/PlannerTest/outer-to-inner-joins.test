@@ -755,7 +755,7 @@ PLAN-ROOT SINK
 |     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     predicates: sts.ss_net_paid > 0, sts.ss_net_profit > 1, sts.ss_quantity > 0
 |     runtime filters: RF012 -> sts.ss_item_sk, RF013 -> sts.ss_ticket_number, RF016 -> ss_sold_date_sk
-|     row-size=32B cardinality=170.55K(filtered from 288.04K)
+|     row-size=32B cardinality=17.05K(filtered from 288.04K)
 |
 |--22:SELECT
 |  |  predicates: (rank() <= 10 OR rank() <= 10)

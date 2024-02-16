@@ -224,7 +224,7 @@ Max Per-Host Resource Reservation: Memory=84.75MB Threads=1
 Per-Host Resource Estimates: Memory=1.15GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=1.15GB mem-reservation=84.75MB thread-reservation=1 runtime-filters-memory=8.00MB
-|  max-parallelism=1 segment-costs=[624422110, 1228557625, 1423304000, 100, 4400]
+|  max-parallelism=1 segment-costs=[281780574, 542578569, 1423304000, 100, 4400]
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`, sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / w_warehouse_sq_ft), sum(feb_sales / w_warehouse_sq_ft), sum(mar_sales / w_warehouse_sq_ft), sum(apr_sales / w_warehouse_sq_ft), sum(may_sales / w_warehouse_sq_ft), sum(jun_sales / w_warehouse_sq_ft), sum(jul_sales / w_warehouse_sq_ft), sum(aug_sales / w_warehouse_sq_ft), sum(sep_sales / w_warehouse_sq_ft), sum(oct_sales / w_warehouse_sq_ft), sum(nov_sales / w_warehouse_sq_ft), sum(dec_sales / w_warehouse_sq_ft), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=4400
@@ -298,7 +298,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs_ship_mode_sk = sm_ship_mode_sk
 |  |  runtime filters: RF012[bloom] <- sm_ship_mode_sk, RF013[min_max] <- sm_ship_mode_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6,9,10 row-size=59B cardinality=43.07M cost=430736514
+|  |  tuple-ids=6,9,10 row-size=59B cardinality=43.07M cost=87746986
 |  |  in pipelines: 11(GETNEXT), 15(OPEN)
 |  |
 |  |--15:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode]
@@ -319,7 +319,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs_sold_time_sk = t_time_sk
 |  |  runtime filters: RF014[bloom] <- t_time_sk, RF015[min_max] <- t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6,9 row-size=36B cardinality=430.74M cost=430745152
+|  |  tuple-ids=6,9 row-size=36B cardinality=87.75M(filtered from 430.74M) cost=87755624
 |  |  in pipelines: 11(GETNEXT), 14(OPEN)
 |  |
 |  |--14:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
@@ -344,7 +344,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=21.52M est-scan-range=374(filtered from 1831)
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=28B cardinality=430.74M(filtered from 4.32G) cost=42764128
+|     tuple-ids=6 row-size=28B cardinality=87.75M(filtered from 4.32G) cost=42764128
 |     in pipelines: 11(GETNEXT)
 |
 10:AGGREGATE [FINALIZE]
@@ -398,7 +398,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ws_ship_mode_sk = sm_ship_mode_sk
 |  runtime filters: RF004[bloom] <- sm_ship_mode_sk, RF005[min_max] <- sm_ship_mode_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3,4 row-size=59B cardinality=21.54M cost=215361186
+|  tuple-ids=0,3,4 row-size=59B cardinality=21.54M cost=44040418
 |  in pipelines: 01(GETNEXT), 05(OPEN)
 |
 |--05:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode]
@@ -419,7 +419,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ws_sold_time_sk = t_time_sk
 |  runtime filters: RF006[bloom] <- t_time_sk, RF007[min_max] <- t_time_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=36B cardinality=215.36M(filtered from 215.36M) cost=215369824
+|  tuple-ids=0,3 row-size=36B cardinality=44.04M(filtered from 215.36M) cost=44049056
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
@@ -444,14 +444,14 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.37M est-scan-range=374(filtered from 1824)
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=0 row-size=28B cardinality=215.36M(filtered from 2.16G) cost=30777842
+   tuple-ids=0 row-size=28B cardinality=44.04M(filtered from 2.16G) cost=30777842
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.81GB Threads=54
-Per-Host Resource Estimates: Memory=10.98GB
+Max Per-Host Resource Reservation: Memory=1017.27MB Threads=38
+Per-Host Resource Estimates: Memory=5.39GB
 F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=8.10MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[4470] cpu-comparison-result=190 [max(1 (self) vs 190 (sum children))]
+|  max-parallelism=1 segment-costs=[4470] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`, sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / w_warehouse_sq_ft), sum(feb_sales / w_warehouse_sq_ft), sum(mar_sales / w_warehouse_sq_ft), sum(apr_sales / w_warehouse_sq_ft), sum(may_sales / w_warehouse_sq_ft), sum(jun_sales / w_warehouse_sq_ft), sum(jul_sales / w_warehouse_sq_ft), sum(aug_sales / w_warehouse_sq_ft), sum(sep_sales / w_warehouse_sq_ft), sum(oct_sales / w_warehouse_sq_ft), sum(nov_sales / w_warehouse_sq_ft), sum(dec_sales / w_warehouse_sq_ft), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=4400
@@ -464,8 +464,8 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F13:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)] hosts=10 instances=60 (adjusted from 120)
-Per-Instance Resources: mem-estimate=245.31MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=60 segment-costs=[589069482, 100, 70] cpu-comparison-result=190 [max(60 (self) vs 190 (sum children))]
+Per-Instance Resources: mem-estimate=203.40MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=60 segment-costs=[589069482, 100, 70] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC
 |  mem-estimate=69.46KB mem-reservation=0B thread-reservation=0
@@ -480,17 +480,17 @@ max-parallelism=60 segment-costs=[589069482, 100, 70] cpu-comparison-result=190 
 |  in pipelines: 36(GETNEXT), 28(OPEN), 34(OPEN)
 |
 35:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)]
-|  mem-estimate=93.82MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=51.91MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=14 row-size=711B cardinality=13.18M cost=9204906
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
-F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=330.56MB mem-reservation=68.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cpu-comparison-result=190 [max(120 (self) vs 190 (sum children))]
+F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
+Per-Instance Resources: mem-estimate=393.62MB mem-reservation=68.00MB thread-reservation=1
+max-parallelism=60 segment-costs=[138724003, 276396427, 1423304000, 9204906] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(feb_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(mar_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(apr_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(may_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jun_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jul_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(aug_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(sep_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(oct_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(nov_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(dec_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, year
-|  mem-estimate=56.81MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=113.62MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=14 row-size=711B cardinality=13.18M cost=579864576
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
@@ -502,23 +502,23 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |--34:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN d_moy = 1 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_net_paid * cs_quantity ELSE 0 END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  |  mem-estimate=36.21MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=72.42MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=11 row-size=507B cardinality=8.77M cost=272015680
 |  |  in pipelines: 34(GETNEXT), 11(OPEN)
 |  |
 |  33:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  |  mem-estimate=69.91MB mem-reservation=0B thread-reservation=0
+|  |  mem-estimate=39.95MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=11 row-size=507B cardinality=8.77M cost=4380747
 |  |  in pipelines: 11(GETNEXT)
 |  |
-|  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
 |  Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
-|  Per-Instance Resources: mem-estimate=289.64MB mem-reservation=35.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[1228101183, 4380747] cpu-comparison-result=120 [max(120 (self) vs 44 (sum children))]
+|  Per-Instance Resources: mem-estimate=190.13MB mem-reservation=35.00MB thread-reservation=1
+|  max-parallelism=60 segment-costs=[542122127, 4380747] cpu-comparison-result=60 [max(60 (self) vs 44 (sum children))]
 |  20:AGGREGATE [STREAMING]
 |  |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=54.31MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=11 row-size=507B cardinality=8.77M cost=272015680
 |  |  in pipelines: 11(GETNEXT)
 |  |
@@ -531,13 +531,13 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  in pipelines: 11(GETNEXT), 12(OPEN)
 |  |
 |  |--F19:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.64MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[52]
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=02
 |  |  |  build expressions: w_warehouse_sk
 |  |  |  runtime filters: RF008[bloom] <- w_warehouse_sk, RF009[min_max] <- w_warehouse_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=22
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=22
 |  |  |
 |  |  32:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -566,13 +566,13 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  in pipelines: 11(GETNEXT), 13(OPEN)
 |  |
 |  |--F20:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.64MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[433]
 |  |  JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=02
 |  |  |  build expressions: d_date_sk
 |  |  |  runtime filters: RF010[bloom] <- d_date_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=373
 |  |  |
 |  |  31:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -600,17 +600,17 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  hash predicates: cs_ship_mode_sk = sm_ship_mode_sk
 |  |  fk/pk conjuncts: cs_ship_mode_sk = sm_ship_mode_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6,9,10 row-size=59B cardinality=43.07M cost=430736512
+|  |  tuple-ids=6,9,10 row-size=59B cardinality=43.07M cost=87746984
 |  |  in pipelines: 11(GETNEXT), 15(OPEN)
 |  |
 |  |--F21:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.64MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[12]
 |  |  JOIN BUILD
 |  |  |  join-table-id=06 plan-id=07 cohort-id=02
 |  |  |  build expressions: sm_ship_mode_sk
 |  |  |  runtime filters: RF012[bloom] <- sm_ship_mode_sk, RF013[min_max] <- sm_ship_mode_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=2
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=2
 |  |  |
 |  |  30:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -638,17 +638,17 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  hash predicates: cs_sold_time_sk = t_time_sk
 |  |  fk/pk conjuncts: cs_sold_time_sk = t_time_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6,9 row-size=36B cardinality=430.74M cost=430736512
+|  |  tuple-ids=6,9 row-size=36B cardinality=87.75M(filtered from 430.74M) cost=87746984
 |  |  in pipelines: 11(GETNEXT), 14(OPEN)
 |  |
 |  |--F22:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.33MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.70MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[9660]
 |  |  JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=02
 |  |  |  build expressions: t_time_sk
 |  |  |  runtime filters: RF014[bloom] <- t_time_sk, RF015[min_max] <- t_time_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=8640
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=8640
 |  |  |
 |  |  29:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=79.50KB mem-reservation=0B thread-reservation=0
@@ -680,29 +680,29 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=21.52M est-scan-range=374(filtered from 1831)
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=28B cardinality=430.74M(filtered from 4.32G) cost=42764128
+|     tuple-ids=6 row-size=28B cardinality=87.75M(filtered from 4.32G) cost=42764128
 |     in pipelines: 11(GETNEXT)
 |
 28:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN d_moy = 1 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=36.35MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=507B cardinality=4.40M cost=136525296
 |  in pipelines: 28(GETNEXT), 01(OPEN)
 |
 27:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  mem-estimate=44.95MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=24.98MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=5 row-size=507B cardinality=4.40M cost=2198707
 |  in pipelines: 01(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=70 (adjusted from 120)
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
-Per-Instance Resources: mem-estimate=289.64MB mem-reservation=34.12MB thread-reservation=1
-max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [max(70 (self) vs 44 (sum children))]
+Per-Instance Resources: mem-estimate=190.34MB mem-reservation=34.12MB thread-reservation=1
+max-parallelism=30 segment-costs=[281324132, 2198707] cpu-comparison-result=44 [max(30 (self) vs 44 (sum children))]
 10:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=54.52MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=507B cardinality=4.40M cost=136525296
 |  in pipelines: 01(GETNEXT)
 |
@@ -715,13 +715,13 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  in pipelines: 01(GETNEXT), 02(OPEN)
 |
 |--F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.58MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[52]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: w_warehouse_sk
 |  |  runtime filters: RF000[bloom] <- w_warehouse_sk, RF001[min_max] <- w_warehouse_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=22
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=22
 |  |
 |  26:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -750,13 +750,13 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--F16:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.58MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[433]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
 |  |  runtime filters: RF002[bloom] <- d_date_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=373
 |  |
 |  25:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -784,17 +784,17 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  hash predicates: ws_ship_mode_sk = sm_ship_mode_sk
 |  fk/pk conjuncts: ws_ship_mode_sk = sm_ship_mode_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3,4 row-size=59B cardinality=21.54M cost=215361184
+|  tuple-ids=0,3,4 row-size=59B cardinality=21.54M cost=44040416
 |  in pipelines: 01(GETNEXT), 05(OPEN)
 |
 |--F17:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.58MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[12]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: sm_ship_mode_sk
 |  |  runtime filters: RF004[bloom] <- sm_ship_mode_sk, RF005[min_max] <- sm_ship_mode_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=2
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=2
 |  |
 |  24:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -822,17 +822,17 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  hash predicates: ws_sold_time_sk = t_time_sk
 |  fk/pk conjuncts: ws_sold_time_sk = t_time_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=36B cardinality=215.36M(filtered from 215.36M) cost=215361184
+|  tuple-ids=0,3 row-size=36B cardinality=44.04M(filtered from 215.36M) cost=44040416
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.64MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.89MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[9660]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: t_time_sk
 |  |  runtime filters: RF006[bloom] <- t_time_sk, RF007[min_max] <- t_time_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=8640
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=8640
 |  |
 |  23:EXCHANGE [BROADCAST]
 |  |  mem-estimate=79.50KB mem-reservation=0B thread-reservation=0
@@ -864,14 +864,14 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.37M est-scan-range=374(filtered from 1824)
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=0 row-size=28B cardinality=215.36M(filtered from 2.16G) cost=30777842
+   tuple-ids=0 row-size=28B cardinality=44.04M(filtered from 2.16G) cost=30777842
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.81GB Threads=54
-Per-Host Resource Estimates: Memory=10.98GB
+Max Per-Host Resource Reservation: Memory=1017.27MB Threads=38
+Per-Host Resource Estimates: Memory=5.39GB
 F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=8.10MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[4470] cpu-comparison-result=190 [max(1 (self) vs 190 (sum children))]
+|  max-parallelism=1 segment-costs=[4470] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`, sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / w_warehouse_sq_ft), sum(feb_sales / w_warehouse_sq_ft), sum(mar_sales / w_warehouse_sq_ft), sum(apr_sales / w_warehouse_sq_ft), sum(may_sales / w_warehouse_sq_ft), sum(jun_sales / w_warehouse_sq_ft), sum(jul_sales / w_warehouse_sq_ft), sum(aug_sales / w_warehouse_sq_ft), sum(sep_sales / w_warehouse_sq_ft), sum(oct_sales / w_warehouse_sq_ft), sum(nov_sales / w_warehouse_sq_ft), sum(dec_sales / w_warehouse_sq_ft), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=4400
@@ -884,8 +884,8 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F13:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)] hosts=10 instances=60 (adjusted from 120)
-Per-Instance Resources: mem-estimate=245.31MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=60 segment-costs=[589069482, 100, 70] cpu-comparison-result=190 [max(60 (self) vs 190 (sum children))]
+Per-Instance Resources: mem-estimate=203.40MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=60 segment-costs=[589069482, 100, 70] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC
 |  mem-estimate=69.46KB mem-reservation=0B thread-reservation=0
@@ -900,17 +900,17 @@ max-parallelism=60 segment-costs=[589069482, 100, 70] cpu-comparison-result=190 
 |  in pipelines: 36(GETNEXT), 28(OPEN), 34(OPEN)
 |
 35:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)]
-|  mem-estimate=93.82MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=51.91MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=14 row-size=711B cardinality=13.18M cost=9204906
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
-F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=330.56MB mem-reservation=68.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cpu-comparison-result=190 [max(120 (self) vs 190 (sum children))]
+F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
+Per-Instance Resources: mem-estimate=393.62MB mem-reservation=68.00MB thread-reservation=1
+max-parallelism=60 segment-costs=[138724003, 276396427, 1423304000, 9204906] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(feb_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(mar_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(apr_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(may_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jun_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jul_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(aug_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(sep_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(oct_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(nov_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(dec_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, year
-|  mem-estimate=56.81MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=113.62MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=14 row-size=711B cardinality=13.18M cost=579864576
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
@@ -922,23 +922,23 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |--34:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN d_moy = 1 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_net_paid * cs_quantity ELSE 0 END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  |  mem-estimate=36.21MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=72.42MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=11 row-size=507B cardinality=8.77M cost=272015680
 |  |  in pipelines: 34(GETNEXT), 11(OPEN)
 |  |
 |  33:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  |  mem-estimate=69.91MB mem-reservation=0B thread-reservation=0
+|  |  mem-estimate=39.95MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=11 row-size=507B cardinality=8.77M cost=4380747
 |  |  in pipelines: 11(GETNEXT)
 |  |
-|  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
 |  Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
-|  Per-Instance Resources: mem-estimate=289.64MB mem-reservation=35.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[1228101183, 4380747] cpu-comparison-result=120 [max(120 (self) vs 44 (sum children))]
+|  Per-Instance Resources: mem-estimate=190.13MB mem-reservation=35.00MB thread-reservation=1
+|  max-parallelism=60 segment-costs=[542122127, 4380747] cpu-comparison-result=60 [max(60 (self) vs 44 (sum children))]
 |  20:AGGREGATE [STREAMING]
 |  |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=54.31MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=11 row-size=507B cardinality=8.77M cost=272015680
 |  |  in pipelines: 11(GETNEXT)
 |  |
@@ -951,13 +951,13 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  in pipelines: 11(GETNEXT), 12(OPEN)
 |  |
 |  |--F19:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.64MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[52]
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=02
 |  |  |  build expressions: w_warehouse_sk
 |  |  |  runtime filters: RF008[bloom] <- w_warehouse_sk, RF009[min_max] <- w_warehouse_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=22
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=22
 |  |  |
 |  |  32:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -986,13 +986,13 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  in pipelines: 11(GETNEXT), 13(OPEN)
 |  |
 |  |--F20:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.64MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[433]
 |  |  JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=02
 |  |  |  build expressions: d_date_sk
 |  |  |  runtime filters: RF010[bloom] <- d_date_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=373
 |  |  |
 |  |  31:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -1020,17 +1020,17 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  hash predicates: cs_ship_mode_sk = sm_ship_mode_sk
 |  |  fk/pk conjuncts: cs_ship_mode_sk = sm_ship_mode_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6,9,10 row-size=59B cardinality=43.07M cost=430736512
+|  |  tuple-ids=6,9,10 row-size=59B cardinality=43.07M cost=87746984
 |  |  in pipelines: 11(GETNEXT), 15(OPEN)
 |  |
 |  |--F21:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.64MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[12]
 |  |  JOIN BUILD
 |  |  |  join-table-id=06 plan-id=07 cohort-id=02
 |  |  |  build expressions: sm_ship_mode_sk
 |  |  |  runtime filters: RF012[bloom] <- sm_ship_mode_sk, RF013[min_max] <- sm_ship_mode_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=2
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=2
 |  |  |
 |  |  30:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -1058,17 +1058,17 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |  |  hash predicates: cs_sold_time_sk = t_time_sk
 |  |  fk/pk conjuncts: cs_sold_time_sk = t_time_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6,9 row-size=36B cardinality=430.74M cost=430736512
+|  |  tuple-ids=6,9 row-size=36B cardinality=87.75M(filtered from 430.74M) cost=87746984
 |  |  in pipelines: 11(GETNEXT), 14(OPEN)
 |  |
 |  |--F22:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=24.33MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=12.70MB mem-reservation=12.62MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=10 segment-costs=[9660]
 |  |  JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=02
 |  |  |  build expressions: t_time_sk
 |  |  |  runtime filters: RF014[bloom] <- t_time_sk, RF015[min_max] <- t_time_sk
-|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=8640
+|  |  |  mem-estimate=11.62MB mem-reservation=11.62MB spill-buffer=64.00KB thread-reservation=0 cost=8640
 |  |  |
 |  |  29:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=79.50KB mem-reservation=0B thread-reservation=0
@@ -1100,29 +1100,29 @@ max-parallelism=120 segment-costs=[138724003, 276396427, 1423304000, 9204906] cp
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=21.52M est-scan-range=374(filtered from 1831)
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=6 row-size=28B cardinality=430.74M(filtered from 4.32G) cost=42764128
+|     tuple-ids=6 row-size=28B cardinality=87.75M(filtered from 4.32G) cost=42764128
 |     in pipelines: 11(GETNEXT)
 |
 28:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN d_moy = 1 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=36.35MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=507B cardinality=4.40M cost=136525296
 |  in pipelines: 28(GETNEXT), 01(OPEN)
 |
 27:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  mem-estimate=44.95MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=24.98MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=5 row-size=507B cardinality=4.40M cost=2198707
 |  in pipelines: 01(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=70 (adjusted from 120)
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
-Per-Instance Resources: mem-estimate=289.64MB mem-reservation=34.12MB thread-reservation=1
-max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [max(70 (self) vs 44 (sum children))]
+Per-Instance Resources: mem-estimate=190.34MB mem-reservation=34.12MB thread-reservation=1
+max-parallelism=30 segment-costs=[281324132, 2198707] cpu-comparison-result=44 [max(30 (self) vs 44 (sum children))]
 10:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=54.52MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=507B cardinality=4.40M cost=136525296
 |  in pipelines: 01(GETNEXT)
 |
@@ -1135,13 +1135,13 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  in pipelines: 01(GETNEXT), 02(OPEN)
 |
 |--F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.58MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[52]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: w_warehouse_sk
 |  |  runtime filters: RF000[bloom] <- w_warehouse_sk, RF001[min_max] <- w_warehouse_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=22
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=22
 |  |
 |  26:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -1170,13 +1170,13 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--F16:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.58MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[433]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
 |  |  runtime filters: RF002[bloom] <- d_date_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=373
 |  |
 |  25:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -1204,17 +1204,17 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  hash predicates: ws_ship_mode_sk = sm_ship_mode_sk
 |  fk/pk conjuncts: ws_ship_mode_sk = sm_ship_mode_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3,4 row-size=59B cardinality=21.54M cost=215361184
+|  tuple-ids=0,3,4 row-size=59B cardinality=21.54M cost=44040416
 |  in pipelines: 01(GETNEXT), 05(OPEN)
 |
 |--F17:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.58MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[12]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: sm_ship_mode_sk
 |  |  runtime filters: RF004[bloom] <- sm_ship_mode_sk, RF005[min_max] <- sm_ship_mode_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=2
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=2
 |  |
 |  24:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -1242,17 +1242,17 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
 |  hash predicates: ws_sold_time_sk = t_time_sk
 |  fk/pk conjuncts: ws_sold_time_sk = t_time_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=36B cardinality=215.36M(filtered from 215.36M) cost=215361184
+|  tuple-ids=0,3 row-size=36B cardinality=44.04M(filtered from 215.36M) cost=44040416
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=14.64MB mem-reservation=14.56MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.89MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[9660]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: t_time_sk
 |  |  runtime filters: RF006[bloom] <- t_time_sk, RF007[min_max] <- t_time_sk
-|  |  mem-estimate=13.56MB mem-reservation=13.56MB spill-buffer=64.00KB thread-reservation=0 cost=8640
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=8640
 |  |
 |  23:EXCHANGE [BROADCAST]
 |  |  mem-estimate=79.50KB mem-reservation=0B thread-reservation=0
@@ -1284,6 +1284,6 @@ max-parallelism=70 segment-costs=[623965668, 2198707] cpu-comparison-result=70 [
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=3.37M est-scan-range=374(filtered from 1824)
    mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-   tuple-ids=0 row-size=28B cardinality=215.36M(filtered from 2.16G) cost=30777842
+   tuple-ids=0 row-size=28B cardinality=44.04M(filtered from 2.16G) cost=30777842
    in pipelines: 01(GETNEXT)
 ====

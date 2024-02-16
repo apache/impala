@@ -129,7 +129,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
 |  runtime filters: RF006[bloom] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=28B cardinality=220.26M(filtered from 220.26M) cost=220260074
+|  tuple-ids=0,3 row-size=28B cardinality=220.26M cost=220260074
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
@@ -375,7 +375,7 @@ max-parallelism=120 segment-costs=[1668962985, 1141303] cpu-comparison-result=12
 |  hash predicates: ws_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=28B cardinality=220.26M(filtered from 220.26M) cost=220259888
+|  tuple-ids=0,3 row-size=28B cardinality=220.26M cost=220259888
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
@@ -642,7 +642,7 @@ max-parallelism=50 segment-costs=[447315277]
 |
 15:EXCHANGE [HASH(ws_bill_customer_sk)]
 |  mem-estimate=11.05MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,3 row-size=28B cardinality=220.26M(filtered from 220.26M) cost=7743512
+|  tuple-ids=0,3 row-size=28B cardinality=220.26M cost=7743512
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
@@ -654,7 +654,7 @@ max-parallelism=30 segment-costs=[240794961]
 |  hash predicates: ws_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,3 row-size=28B cardinality=220.26M(filtered from 220.26M) cost=220259888
+|  tuple-ids=0,3 row-size=28B cardinality=220.26M cost=220259888
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=10

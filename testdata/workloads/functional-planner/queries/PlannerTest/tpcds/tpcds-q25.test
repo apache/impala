@@ -412,7 +412,7 @@ Per-Host Resources: mem-estimate=205.07MB mem-reservation=18.81MB thread-reserva
 |  |
 |  18:EXCHANGE [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)]
 |  |  mem-estimate=2.54MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K(filtered from 170.55K)
+|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -422,7 +422,7 @@ Per-Host Resources: mem-estimate=205.07MB mem-reservation=18.81MB thread-reserva
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  runtime filters: RF018[bloom] <- d1.d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K(filtered from 170.55K)
+|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--17:EXCHANGE [BROADCAST]
@@ -718,7 +718,7 @@ Per-Instance Resources: mem-estimate=50.25MB mem-reservation=8.00MB thread-reser
 |  |
 |  18:EXCHANGE [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)]
 |  |  mem-estimate=2.69MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K(filtered from 170.55K)
+|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -729,7 +729,7 @@ Per-Instance Resources: mem-estimate=50.25MB mem-reservation=8.00MB thread-reser
 |  |  hash predicates: ss_sold_date_sk = d1.d_date_sk
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K(filtered from 170.55K)
+|  |  tuple-ids=0,3 row-size=44B cardinality=170.55K
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--F18:PLAN FRAGMENT [RANDOM] hosts=3 instances=3

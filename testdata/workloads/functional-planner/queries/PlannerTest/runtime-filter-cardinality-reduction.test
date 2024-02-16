@@ -459,7 +459,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_sold_time_sk = t_time_sk
 |  runtime filters: RF002[bloom] <- t_time_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,3 row-size=64B cardinality=61(filtered from 62)
+|  tuple-ids=0,1N,3 row-size=64B cardinality=13(filtered from 62)
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_parquet.time_dim]
@@ -480,7 +480,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  other predicates: sr_ticket_number IS NULL
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
-|  tuple-ids=0,1N row-size=56B cardinality=61(filtered from 2.88M)
+|  tuple-ids=0,1N row-size=56B cardinality=13(filtered from 2.88M)
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_parquet.store_returns]
@@ -502,7 +502,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K est-scan-range=374(filtered from 1824)
    mem-estimate=112.00MB mem-reservation=4.00MB thread-reservation=1
-   tuple-ids=0 row-size=40B cardinality=61(filtered from 2.88M)
+   tuple-ids=0 row-size=40B cardinality=13(filtered from 2.88M)
    in pipelines: 00(GETNEXT)
 ====
 # Case 07: Same as Case 06, but make the RHS of join predicate an expression.

@@ -178,7 +178,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  runtime filters: RF018[bloom] <- d1.d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M(filtered from 431.05M) cost=431049499
+|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M cost=431049499
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim d1]
@@ -476,7 +476,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |  |
 |  18:EXCHANGE [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)]
 |  |  mem-estimate=12.83MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M(filtered from 431.05M) cost=24414908
+|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M cost=24414908
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=50 (adjusted from 120)
@@ -488,7 +488,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |  |  hash predicates: ss_sold_date_sk = d1.d_date_sk
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M(filtered from 431.05M) cost=431049408
+|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M cost=431049408
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
@@ -812,7 +812,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |  |
 |  18:EXCHANGE [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)]
 |  |  mem-estimate=12.83MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M(filtered from 431.05M) cost=24414908
+|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M cost=24414908
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=50 (adjusted from 120)
@@ -824,7 +824,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |  |  hash predicates: ss_sold_date_sk = d1.d_date_sk
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M(filtered from 431.05M) cost=431049408
+|  |  tuple-ids=0,3 row-size=50B cardinality=431.05M cost=431049408
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=10

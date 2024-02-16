@@ -197,7 +197,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: sts.ss_item_sk = sr.sr_item_sk, sts.ss_ticket_number = sr.sr_ticket_number
 |  |  other predicates: sr.sr_return_amt > CAST(10000 AS DECIMAL(5,0))
 |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=16,17N row-size=56B cardinality=170.55K(filtered from 288.04K)
+|  |  tuple-ids=16,17N row-size=56B cardinality=17.05K(filtered from 288.04K)
 |  |  in pipelines: 23(GETNEXT), 24(OPEN)
 |  |
 |  |--24:SCAN HDFS [tpcds_parquet.store_returns sr]
@@ -225,7 +225,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: sts.ss_net_paid > CAST(0 AS DECIMAL(3,0)), sts.ss_net_profit > CAST(1 AS DECIMAL(3,0)), sts.ss_quantity > CAST(0 AS INT)
 |     parquet dictionary predicates: sts.ss_net_paid > CAST(0 AS DECIMAL(3,0)), sts.ss_net_profit > CAST(1 AS DECIMAL(3,0)), sts.ss_quantity > CAST(0 AS INT)
 |     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=16 row-size=32B cardinality=170.55K(filtered from 288.04K)
+|     tuple-ids=16 row-size=32B cardinality=17.05K(filtered from 288.04K)
 |     in pipelines: 23(GETNEXT)
 |
 |--22:SELECT
@@ -549,7 +549,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: sts.ss_item_sk = sr.sr_item_sk, sts.ss_ticket_number = sr.sr_ticket_number
 |  |  other predicates: sr.sr_return_amt > CAST(10000 AS DECIMAL(5,0))
 |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=16,17N row-size=56B cardinality=170.55K(filtered from 288.04K)
+|  |  tuple-ids=16,17N row-size=56B cardinality=17.05K(filtered from 288.04K)
 |  |  in pipelines: 23(GETNEXT), 24(OPEN)
 |  |
 |  |--46:EXCHANGE [BROADCAST]
@@ -584,7 +584,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: sts.ss_net_paid > CAST(0 AS DECIMAL(3,0)), sts.ss_net_profit > CAST(1 AS DECIMAL(3,0)), sts.ss_quantity > CAST(0 AS INT)
 |     parquet dictionary predicates: sts.ss_net_paid > CAST(0 AS DECIMAL(3,0)), sts.ss_net_profit > CAST(1 AS DECIMAL(3,0)), sts.ss_quantity > CAST(0 AS INT)
 |     mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
-|     tuple-ids=16 row-size=32B cardinality=170.55K(filtered from 288.04K)
+|     tuple-ids=16 row-size=32B cardinality=17.05K(filtered from 288.04K)
 |     in pipelines: 23(GETNEXT)
 |
 |--22:SELECT
@@ -990,7 +990,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: sts.ss_item_sk = sr.sr_item_sk, sts.ss_ticket_number = sr.sr_ticket_number
 |  |  other predicates: sr.sr_return_amt > CAST(10000 AS DECIMAL(5,0))
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=16,17N row-size=56B cardinality=170.55K(filtered from 288.04K)
+|  |  tuple-ids=16,17N row-size=56B cardinality=17.05K(filtered from 288.04K)
 |  |  in pipelines: 23(GETNEXT), 24(OPEN)
 |  |
 |  |--F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1032,7 +1032,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: sts.ss_net_paid > CAST(0 AS DECIMAL(3,0)), sts.ss_net_profit > CAST(1 AS DECIMAL(3,0)), sts.ss_quantity > CAST(0 AS INT)
 |     parquet dictionary predicates: sts.ss_net_paid > CAST(0 AS DECIMAL(3,0)), sts.ss_net_profit > CAST(1 AS DECIMAL(3,0)), sts.ss_quantity > CAST(0 AS INT)
 |     mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-|     tuple-ids=16 row-size=32B cardinality=170.55K(filtered from 288.04K)
+|     tuple-ids=16 row-size=32B cardinality=17.05K(filtered from 288.04K)
 |     in pipelines: 23(GETNEXT)
 |
 |--22:SELECT
