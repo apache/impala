@@ -28,7 +28,8 @@ from tests.common.skip import (
 from tests.common.test_dimensions import (
     create_uncompressed_text_dimension, create_uncompressed_json_dimension,
     create_exec_option_dimension_from_dict, create_client_protocol_dimension,
-    hs2_parquet_constraint, extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP)
+    hs2_parquet_constraint, extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP,
+    add_exec_option_dimension)
 from tests.util.filesystem_utils import get_fs_path
 from subprocess import check_call
 
@@ -262,6 +263,7 @@ class TestQueriesJsonTables(ImpalaTestSuite):
     super(TestQueriesJsonTables, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_json_dimension(cls.get_workload()))
+    add_exec_option_dimension(cls, 'disable_optimized_json_count_star', [0, 1])
 
   @classmethod
   def get_workload(cls):

@@ -12,3 +12,10 @@ int, string, string, string
 13,'Liam','NULL','NULL'
 15,'Nora','NULL','NULL'
 ====
+---- QUERY
+select count(*) from complex_json
+---- TYPES
+bigint
+---- RESULTS
+5
+====

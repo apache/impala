@@ -119,7 +119,6 @@ Status HdfsJsonScanner::InitNewRange() {
   }
   RETURN_IF_ERROR(UpdateDecompressor(compression_type));
 
-  // TODO: Optmize for zero slots scan (e.g. count(*)).
   vector<string> schema;
   schema.reserve(scan_node_->materialized_slots().size());
   for (const SlotDescriptor* slot : scan_node_->materialized_slots()) {
@@ -203,8 +202,17 @@ Status HdfsJsonScanner::FindFirstTuple() {
 Status HdfsJsonScanner::ParseWrapper(int max_tuples, int* num_tuples) {
   DCHECK(json_parser_->IsTidy());
   SCOPED_TIMER(parse_json_timer_);
-  Status status = json_parser_->Parse(max_tuples, num_tuples);
-  RETURN_IF_ERROR(buffer_status_);
+  Status status;
+  if (!state_->query_options().disable_optimized_json_count_star &&
+      scan_node_->materialized_slots().size() == 0) {
+    status = json_parser_->CountJsonObjects(max_tuples, num_tuples);
+    RETURN_IF_ERROR(buffer_status_);
+    DCHECK(num_tuples_materialized_ == 0);
+    num_tuples_materialized_ = WriteTemplateTuples(tuple_row_, *num_tuples);
+  } else {
+    Status status = json_parser_->Parse(max_tuples, num_tuples);
+    RETURN_IF_ERROR(buffer_status_);
+  }
   return status;
 }
 

@@ -28,6 +28,11 @@ using std::string;
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
+#define ERROR_IF_FALSE(x, err) \
+  do { \
+    if (UNLIKELY(!(x))) { code_ = err; return false; } \
+  } while (false)
+
 template <class Scanner>
 JsonParser<Scanner>::JsonParser(const vector<string>& schema, Scanner* scanner)
   : num_fields_(schema.size()), scanner_(scanner), stream_(this) {
@@ -82,6 +87,7 @@ bool JsonParser<Scanner>::MoveToNextJson() {
 template <class Scanner>
 Status JsonParser<Scanner>::Parse(int max_rows, int* num_rows) {
   while (*num_rows < max_rows) {
+    // TODO: Support Inf and NaN.
     constexpr auto parse_flags = kParseNumbersAsStringsFlag | kParseStopWhenDoneFlag;
     // Reads characters from the stream, parses them and publishes events to this
     // handler (JsonParser).
@@ -120,6 +126,37 @@ Status JsonParser<Scanner>::Parse(int max_rows, int* num_rows) {
         MoveToNextJson();
       }
       ResetParser();
+    }
+
+    ++(*num_rows);
+    if (UNLIKELY(scanner_->BreakParse())) break;
+  }
+
+  return Status::OK();
+}
+
+template <class Scanner>
+Status JsonParser<Scanner>::CountJsonObjects(int max_rows, int* num_rows) {
+  JsonSkipper<CharStream> skipper(stream_);
+  while (*num_rows < max_rows) {
+    skipper.SkipNextObject();
+
+    if (UNLIKELY(skipper.HasError())) {
+      if (skipper.GetErrorCode() == kParseErrorDocumentEmpty) {
+        // See the comments at the corresponding location of the Parse().
+        if (UNLIKELY(!stream_.Eos())) {
+          DCHECK_EQ(stream_.Peek(), '\0');
+          stream_.Take();
+          continue;
+        }
+        return Status::OK();
+      }
+      RETURN_IF_ERROR(scanner_->HandleError(skipper.GetErrorCode(), stream_.Tell()));
+
+      // See the comments at the corresponding location of the Parse().
+      if (reader_.GetParseErrorCode() != kParseErrorObjectMissCommaOrCurlyBracket) {
+        MoveToNextJson();
+      }
     }
 
     ++(*num_rows);
@@ -230,5 +267,154 @@ bool JsonParser<Scanner>::String(const char* str, uint32_t len, bool copy) {
   return true;
 }
 
+template<class Stream>
+bool JsonSkipper<Stream>::SkipNextObject() {
+  code_ = kParseErrorNone;
+  while (true) {
+    SkipWhitespace();
+    ERROR_IF_FALSE(s_.Peek() != '\0', kParseErrorDocumentEmpty);
+    bool is_object = (s_.Peek() == '{');
+    RETURN_IF_FALSE(SkipValue());
+    if (LIKELY(is_object)) return true;
+  }
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipNull() {
+  DCHECK(s_.Peek() == 'n');
+  s_.Take();
+  ERROR_IF_FALSE(Consume('u'), kParseErrorValueInvalid);
+  ERROR_IF_FALSE(Consume('l'), kParseErrorValueInvalid);
+  ERROR_IF_FALSE(Consume('l'), kParseErrorValueInvalid);
+  return true;
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipTrue() {
+  DCHECK(s_.Peek() == 't');
+  s_.Take();
+  ERROR_IF_FALSE(Consume('r'), kParseErrorValueInvalid);
+  ERROR_IF_FALSE(Consume('u'), kParseErrorValueInvalid);
+  ERROR_IF_FALSE(Consume('e'), kParseErrorValueInvalid);
+  return true;
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipFalse() {
+  DCHECK(s_.Peek() == 'f');
+  s_.Take();
+  ERROR_IF_FALSE(Consume('a'), kParseErrorValueInvalid);
+  ERROR_IF_FALSE(Consume('l'), kParseErrorValueInvalid);
+  ERROR_IF_FALSE(Consume('s'), kParseErrorValueInvalid);
+  ERROR_IF_FALSE(Consume('e'), kParseErrorValueInvalid);
+  return true;
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipString() {
+  DCHECK(s_.Peek() == '"');
+  s_.Take();
+  char c;
+  bool escape = false;
+  while ((c = s_.Peek()) != '\0') {
+    if (escape) {
+      escape = false;
+    } else if (c == '\\') {
+      escape = true;
+    } else if (c == '"') {
+      s_.Take();
+      return true;
+    }
+    s_.Take();
+  }
+  ERROR_IF_FALSE(false, kParseErrorStringMissQuotationMark);
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipNumber() {
+  // Please note that in standard JSON, number literals must start with a digit or a
+  // minus sign (in the case of negative numbers). Positive numbers should be written
+  // directly without a '+', and '0.123' should not be abbreviated as '.123'.
+  // Numbers starting with '.' or '+' in JSON are considered invalid values, which is
+  // consistent with the behavior of rapidjson.
+  // Despite the fact that special values such as Inf and NaN are not supported in
+  // standard JSON (they are considered invalid values), rapidjson does support them.
+  // However, it requires the parsing flag kParseNanAndInfFlag to be enabled. Since this
+  // flag is not enabled in the current JsonParser::Parse(), this function also remains
+  // consistent by not supporting Inf and NaN.
+  // TODO: Support Inf and NaN.
+  Consume('-');
+  if (UNLIKELY(s_.Peek() == '0')) {
+    s_.Take();
+  } else if (LIKELY(s_.Peek() >= '1' && s_.Peek() <= '9')) {
+    while (LIKELY(s_.Peek() >= '0' && s_.Peek() <= '9')) s_.Take();
+  } else ERROR_IF_FALSE(false, kParseErrorValueInvalid);
+
+  if (Consume('.')) {
+    ERROR_IF_FALSE(s_.Peek() >= '0' && s_.Peek() <= '9', kParseErrorNumberMissFraction);
+    while (LIKELY(s_.Peek() >= '0' && s_.Peek() <= '9')) s_.Take();
+  }
+
+  if (Consume('e') || Consume('E')) {
+    if (!Consume('+')) Consume('-');
+    ERROR_IF_FALSE(s_.Peek() >= '0' && s_.Peek() <= '9', kParseErrorNumberMissExponent);
+    while (LIKELY(s_.Peek() >= '0' && s_.Peek() <= '9')) s_.Take();
+  }
+  return true;
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipObject() {
+  DCHECK(s_.Peek() == '{');
+  s_.Take();
+  SkipWhitespace();
+  if (Consume('}')) return true;
+  while (true) {
+    ERROR_IF_FALSE(s_.Peek() == '"', kParseErrorObjectMissName);
+    RETURN_IF_FALSE(SkipString());
+    SkipWhitespace();
+    ERROR_IF_FALSE(Consume(':'), kParseErrorObjectMissColon);
+    SkipWhitespace();
+    RETURN_IF_FALSE(SkipValue());
+    SkipWhitespace();
+    if (Consume(',')) SkipWhitespace();
+    else if (Consume('}')) return true;
+    else ERROR_IF_FALSE(false, kParseErrorObjectMissCommaOrCurlyBracket);
+  }
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipArray() {
+  DCHECK(s_.Peek() == '[');
+  s_.Take();
+  SkipWhitespace();
+  if (Consume(']')) return true;
+  while (true) {
+    RETURN_IF_FALSE(SkipValue());
+    SkipWhitespace();
+    if (Consume(',')) SkipWhitespace();
+    else if (Consume(']')) return true;
+    else ERROR_IF_FALSE(false, kParseErrorArrayMissCommaOrSquareBracket);
+  }
+}
+
+template<class Stream>
+bool JsonSkipper<Stream>::SkipValue() {
+  // Please note that in standard JSON, the special values null, true, and false must all
+  // be in lowercase form. Any other cases will be considered invalid values, which is
+  // consistent with the behavior of rapidjson.
+  switch (s_.Peek()) {
+    case 'n': RETURN_IF_FALSE(SkipNull()); break;
+    case 't': RETURN_IF_FALSE(SkipTrue()); break;
+    case 'f': RETURN_IF_FALSE(SkipFalse()); break;
+    case '"': RETURN_IF_FALSE(SkipString()); break;
+    case '{': RETURN_IF_FALSE(SkipObject()); break;
+    case '[': RETURN_IF_FALSE(SkipArray()); break;
+    default: RETURN_IF_FALSE(SkipNumber()); break;
+  }
+  return true;
+}
+
 template class impala::JsonParser<SimpleJsonScanner>;
 template class impala::JsonParser<HdfsJsonScanner>;
+template class impala::JsonSkipper<SimpleStream>;

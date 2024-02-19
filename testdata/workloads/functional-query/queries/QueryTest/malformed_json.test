@@ -23,3 +23,10 @@ true,10,1.0,'abc123'
 NULL,NULL,NULL,'NULL'
 NULL,NULL,NULL,'abc123'
 ====
+---- QUERY
+select count(*) from malformed_json
+---- TYPES
+bigint
+---- RESULTS
+13
+====

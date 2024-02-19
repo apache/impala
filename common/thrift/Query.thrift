@@ -728,6 +728,7 @@ struct TQueryOptions {
   178: optional TSlotCountStrategy slot_count_strategy =
     TSlotCountStrategy.LARGEST_FRAGMENT
 
+  // See comment in ImpalaService.thrift
   179: optional bool clean_dbcp_ds_cache = true;
 
   // See comment in ImpalaService.thrift
@@ -735,6 +736,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   181: optional bool write_kudu_utc_timestamps = false;
+
+  // See comment in ImpalaService.thrift
+  182: optional bool disable_optimized_json_count_star = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -52,7 +52,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::WRITE_KUDU_UTC_TIMESTAMPS + 1);                               \
+      TImpalaQueryOptions::DISABLE_OPTIMIZED_JSON_COUNT_STAR + 1);                       \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -335,6 +335,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(use_null_slots_cache, USE_NULL_SLOTS_CACHE, TQueryOptionLevel::ADVANCED)  \
   QUERY_OPT_FN(write_kudu_utc_timestamps,                                                \
       WRITE_KUDU_UTC_TIMESTAMPS, TQueryOptionLevel::ADVANCED)                            \
+  QUERY_OPT_FN(disable_optimized_json_count_star, DISABLE_OPTIMIZED_JSON_COUNT_STAR,     \
+      TQueryOptionLevel::ADVANCED)                                                       \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.

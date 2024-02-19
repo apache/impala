@@ -143,9 +143,18 @@ public:
   ///    invalid JSON format, etc.), and Scanner returns an error status after handling
   ///    the error.
   /// 4. Scanner's BreakParse() indicates the need to end parsing.
+  /// Please note that 'max_rows' and 'num_rows' actually represent the number of
+  /// top-level JSON values processed by the parser, meaning that if there are top-level
+  /// arrays, strings, or other JSON values in the JSON data, they will also be included
+  /// in the count.
   Status Parse(int max_rows, int* num_rows);
 
-  CharStream& stream() { return stream_; }
+  /// Parse the JSON data and directly count how many top-level JSON objects (excluding
+  /// nested ones) there are without performing specific data copying and conversion. It
+  /// behaves similarly to Parse() but is faster, suitable for zero slots scans such as
+  /// count(*). Different from Parse(), here 'max_rows' and 'num_rows' only count the
+  /// top-level JSON objects and do not include other top-level JSON values.
+  Status CountJsonObjects(int max_rows, int* num_rows);
 
 private:
   friend class rapidjson::GenericReader<rapidjson::UTF8<>, rapidjson::UTF8<>>;
@@ -231,13 +240,85 @@ private:
   std::vector<char> field_found_;
 };
 
+/// A util class used to assist in parsing JSON. When conducting zero slots scans, no
+/// actual data from the JSON is needed, only the number of JSON objects. This class is
+/// essentially a simplified version of a rapidjson parser (rapidjson::GenericReader),
+/// removing specific data parsing and copying operations, allowing for faster parsing of
+/// the number of JSON objects.
+/// The class retains the ability to recognize malformed JSON and provide specific error
+/// codes like rapidjson's parser. However, as it skips specific data parsing, it cannot
+/// identify string encoding errors or numeric overflow errors. Nonetheless, these data
+/// errors do not affect the counting of JSON objects, and ignoring them is acceptable.
+/// Please refer to the following link for code about rapidjson::GenericReader:
+///   https://github.com/Tencent/rapidjson/blob/5ec44fb/include/rapidjson/reader.h#L539
+template<class Stream>
+class JsonSkipper {
+ public:
+  JsonSkipper(Stream& stream) : s_(stream) { }
+
+  /// Consume the stream until skipping a complete outermost JSON object, return false and
+  /// log the corresponding error code if an error occurs.
+  bool SkipNextObject();
+
+  bool HasError() { return code_ != rapidjson::kParseErrorNone; }
+  rapidjson::ParseErrorCode GetErrorCode() { return code_; }
+
+ private:
+  friend class JsonParserTest;
+
+  /// This function attempts to consume a character from the stream, if the next character
+  /// matches the 'expect', take out it and return true, otherwise return false.
+  inline bool Consume(char expect) {
+    if (LIKELY(s_.Peek() == expect)) {
+      s_.Take();
+      return true;
+    }
+    return false;
+  }
+
+  inline void SkipWhitespace() {
+    char c;
+    while ((c = s_.Peek()) == ' ' || c == '\n' || c == '\r' || c == '\t') s_.Take();
+  }
+
+  /// The following function is used to skip a specific JSON value. It maintains logic
+  /// consistent with rapidjson, consuming the stream and returning true upon successfully
+  /// skipping the specified value, or returning false and setting the respective error
+  /// code if an error is encountered.
+  /// See more details about valid JSON values in: https://rapidjson.org/md_doc_sax.html
+  bool SkipNull();
+  bool SkipTrue();
+  bool SkipFalse();
+  bool SkipString();
+  bool SkipNumber();
+  bool SkipObject();
+  bool SkipArray();
+  bool SkipValue();
+
+  Stream& s_;
+  rapidjson::ParseErrorCode code_ = rapidjson::kParseErrorNone;
+};
+
+/// A simple c_str wrapper for testing JsonSkipper.
+class SimpleStream {
+public:
+  SimpleStream(const char* str) : current_(str) { }
+
+  char Peek() { return *current_; }
+
+  char Take() { return *current_ == '\0' ? '\0' : *current_++; }
+
+private:
+  const char* current_ = nullptr;
+};
+
 /// A simple class for testing JsonParser.
 class SimpleJsonScanner {
 public:
   using GetBufferFunc = std::function<void(const char**, const char**)>;
 
   SimpleJsonScanner(const std::vector<std::string>& schema, GetBufferFunc get_buffer)
-     : parser_(schema, this), get_buffer_(get_buffer) {
+     : row_count_(0), parser_(schema, this), get_buffer_(get_buffer) {
     parser_.ResetParser();
     current_row_.resize(schema.size());
   }
@@ -246,10 +327,18 @@ public:
     *num_rows = 0;
     if (!parser_.IsTidy()) return Status("Parser is not tidy");
     RETURN_IF_ERROR(parser_.Parse(max_row, num_rows));
-    return Status::OK();;
+    return Status::OK();
   }
 
-  std::string Result() { return result_.str(); }
+  Status Count(int max_row, int* num_rows) {
+    *num_rows = 0;
+    RETURN_IF_ERROR(parser_.CountJsonObjects(max_row, num_rows));
+    return Status::OK();
+  }
+
+  std::string result() const { return result_.str(); }
+
+  size_t row_count() const { return row_count_; }
 
 private:
   friend class JsonParser<SimpleJsonScanner>;
@@ -271,6 +360,7 @@ private:
   void SubmitRow() {
     for (const auto& s : current_row_) result_ << s << ", ";
     result_ << '\n';
+    ++row_count_;
   }
 
   void AddNull(int index) {
@@ -294,6 +384,7 @@ private:
 
   std::vector<std::string> current_row_;
   std::stringstream result_;
+  size_t row_count_;
   JsonParser<SimpleJsonScanner> parser_;
   GetBufferFunc get_buffer_;
 };

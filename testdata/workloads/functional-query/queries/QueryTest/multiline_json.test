@@ -25,3 +25,10 @@ int, string, string
 8,'one line multiple objects','obj1'
 9,'one line multiple objects','obj2'
 ====
+---- QUERY
+select count(*) from multiline_json
+---- TYPES
+bigint
+---- RESULTS
+9
+====

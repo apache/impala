@@ -1259,6 +1259,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_enable_tuple_cache(enable_tuple_cache);
         break;
       }
+      case TImpalaQueryOptions::DISABLE_OPTIMIZED_JSON_COUNT_STAR: {
+        query_options->__set_disable_optimized_json_count_star(IsTrue(value));
+        break;
+      }
       case TImpalaQueryOptions::ICEBERG_DISABLE_COUNT_STAR_OPTIMIZATION: {
         query_options->__set_iceberg_disable_count_star_optimization(IsTrue(value));
         break;

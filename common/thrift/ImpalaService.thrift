@@ -953,6 +953,9 @@ enum TImpalaQueryOptions {
   // written to Kudu as UNIXTIME_MICRO.
   // Reads are unaffected (see CONVERT_KUDU_UTC_TIMESTAMPS).
   WRITE_KUDU_UTC_TIMESTAMPS = 180
+
+  // Turns off optimized JSON count star (zero slots) scan, falls back to rapidjson parse.
+  DISABLE_OPTIMIZED_JSON_COUNT_STAR = 181
 }
 
 // The summary of a DML statement.
