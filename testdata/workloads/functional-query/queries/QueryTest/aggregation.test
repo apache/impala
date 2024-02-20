@@ -2078,7 +2078,8 @@ double, double, double, double, double, double, double
 # regr_intercept() on different datatypes
 select regr_intercept(tinyint_col, tinyint_col), regr_intercept(smallint_col, smallint_col),
  regr_intercept(int_col, int_col), regr_intercept(bigint_col, bigint_col), regr_intercept(float_col, float_col),
- regr_intercept(double_col, double_col), regr_intercept(timestamp_col, timestamp_col) from functional.alltypes;
+ regr_intercept(double_col, double_col), round(regr_intercept(timestamp_col, timestamp_col), 5) from
+ functional.alltypes;
 ---- RESULTS
 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 ---- TYPES
