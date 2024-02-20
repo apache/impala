@@ -475,14 +475,15 @@ class TestObservability(ImpalaTestSuite):
           "' in profile: \n" + runtime_profile
 
   def test_create_table_profile_events(self, unique_database):
+    """Test that specific DDL timeline event labels exist in the profile. Note that
+       labels of HMS events are not used so this test is expected to pass with or without
+       event processor enabled"""
     # Create normal table
     stmt = "create table %s.t1(id int)" % unique_database
     self.__verify_event_labels_in_profile(stmt, [
         "Got metastoreDdlLock",
         "Got Metastore client",
-        "Got current Metastore event id",
         "Created table in Metastore",
-        "Fetched event batch from Metastore",
         "Created table in catalog cache",
         "DDL finished"
     ])
@@ -491,7 +492,6 @@ class TestObservability(ImpalaTestSuite):
            " partition by hash(id) partitions 3 stored as kudu" % unique_database
     self.__verify_event_labels_in_profile(stmt, [
         "Got Metastore client",
-        "Got current Metastore event id",
         "Got Kudu client",
         "Got kuduDdlLock",
         "Checked table existence in Kudu",
@@ -500,7 +500,6 @@ class TestObservability(ImpalaTestSuite):
         "Got Metastore client",
         "Checked table existence in Metastore",
         "Created table in Metastore",
-        "Fetched event batch from Metastore",
         "Created table in catalog cache",
         "DDL finished",
     ])
@@ -509,9 +508,7 @@ class TestObservability(ImpalaTestSuite):
     self.__verify_event_labels_in_profile(stmt, [
         "Got Metastore client",
         "Checked table existence in Metastore",
-        "Got current Metastore event id",
         "Created table using Iceberg Catalog HIVE_CATALOG",
-        "Fetched event batch from Metastore",
         "Created table in catalog cache",
         "DDL finished",
     ])
@@ -519,7 +516,7 @@ class TestObservability(ImpalaTestSuite):
   def __verify_event_labels_in_profile(self, stmt, event_labels):
     profile = self.execute_query(stmt).runtime_profile
     for label in event_labels:
-      assert label in profile
+      assert label in profile, "Missing '%s' in runtime profile:\n%s" % (label, profile)
 
   def test_compute_stats_profile(self, unique_database):
     """Test that the profile for a 'compute stats' query contains three unique query ids:
