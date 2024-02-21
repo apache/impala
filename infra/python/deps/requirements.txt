@@ -64,6 +64,7 @@ sqlparse == 0.3.1
 texttable == 0.8.3
 virtualenv == 16.7.10
 avro==1.10.2
+thrift==0.16.0
 
 # Required for Kudu:
   Cython == 0.29.14
