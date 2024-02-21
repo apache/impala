@@ -253,13 +253,6 @@ void PrintTColumnValue(std::ostream& out, const TColumnValue& colval) {
   }
 }
 
-bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b) {
-  int cmp = a.hostname.compare(b.hostname);
-  if (cmp < 0) return true;
-  if (cmp == 0) return a.port < b.port;
-  return false;
-}
-
 bool IsReadTimeoutTException(const TTransportException& e) {
   // String taken from TSocket::read() Thrift's TSocket.cpp and TSSLSocket.cpp.
   // Specifically, "THRIFT_EAGAIN (timed out)" from TSocket.cpp,

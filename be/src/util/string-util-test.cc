@@ -269,5 +269,78 @@ TEST(RandomFindUtf8PosTest, Basic) {
   }
 }
 
+// StringStreamPopTest: These tests assert the functionality of the StringStreamPop class.
+
+// Assert the most common use case where the last character is popped and a new character
+// is written to the stream.
+TEST(StringStreamPopTest, NotEmptyPopOnce) {
+  StringStreamPop fixture;
+  fixture << "this is a tes,";
+  fixture.move_back();
+  fixture << "t";
+  EXPECT_EQ("this is a test", fixture.str());
+}
+
+// Asssert where the stream only contains a single character that is popped before another
+// character is written to the stream.
+TEST(StringStreamPopTest, OneCharPop) {
+  StringStreamPop fixture;
+  fixture << "t";
+  fixture.move_back();
+  fixture << "v";
+  EXPECT_EQ("v", fixture.str());
+}
+
+// Assert where the last two characters of a non-empty stream are popped.
+TEST(StringStreamPopTest, NotEmptyPopTwice) {
+  StringStreamPop fixture;
+  fixture << "this is a second te,,";
+  fixture.move_back();
+  fixture.move_back();
+  fixture << "st";
+  EXPECT_EQ("this is a second test", fixture.str());
+}
+
+// Assert where an empty stream has it's last (nonexistant) character popped.
+TEST(StringStreamPopTest, EmptyPopOnce) {
+  StringStreamPop fixture;
+  fixture.move_back();
+  EXPECT_TRUE(fixture.str().empty());
+}
+
+// Assert where an empty stream has it's last (nonexistant) character popped twice.
+TEST(StringStreamPopTest, EmptyPopTwice) {
+  StringStreamPop fixture;
+  fixture.move_back();
+  fixture.move_back();
+  EXPECT_TRUE(fixture.str().empty());
+}
+
+// Assert the move_back functionality does not actually remove the character.
+TEST(StringStreamPopTest, PopOnceBeforeAppend) {
+  StringStreamPop fixture;
+  fixture.move_back();
+  fixture << "a";
+  fixture.move_back();
+
+  // This assertion is correct because the move_back() function only moves the write
+  // pointer, it does not modify the internal buffer.
+  EXPECT_EQ("a", fixture.str());
+}
+
+// Assert the StringStreamPop class behavior matches the behavior of the stringstream
+// class.
+TEST(StringStreamPopTest, CompareWithStringstream) {
+  StringStreamPop fixture;
+  stringstream expected;
+
+  expected << "C++ is" << " an " << "invisible found" << "ation of " << "everything!";
+  fixture  << "C++ is" << " an " << "invisible found" << "ation of " << "everything?";
+  fixture.move_back();
+  fixture << '!';
+
+  EXPECT_EQ(expected.str(), fixture.str());
+}
+
 }
 

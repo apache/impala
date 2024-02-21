@@ -129,4 +129,9 @@ inline TUniqueId GenerateUUID() {
   memcpy(&uid.lo, u.data() + sizeof(int64_t), sizeof(int64_t));
   return uid;
 }
+
+/// Determines if a query id is empty.
+inline bool UUIDEmpty(const TUniqueId& id) {
+  return id.hi == 0 && id.lo == 0;
+}
 } // namespace impala

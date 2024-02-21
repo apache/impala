@@ -29,8 +29,8 @@
 
 set -euo pipefail
 
-echo "Compiling"
 TMP_BUILDALL_LOG=$(mktemp)
+echo "Compiling, for build logs see ${TMP_BUILDALL_LOG}"
 if ! ./buildall.sh -skiptests -tidy -so -noclean &> "${TMP_BUILDALL_LOG}"
 then
   echo "buildall.sh failed, dumping output" >&2
@@ -59,6 +59,7 @@ export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/share
 :${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin/\
 :$PATH"
 TMP_STDERR=$(mktemp)
+echo; echo "Running clang tidy, for error logs see ${TMP_STDERR}"
 STRCAT_MESSAGE="Impala-specific note: This can also be fixed using the StrCat() function \
 from be/src/gutil/strings strcat.h)"
 CLANG_STRING_CONCAT="performance-inefficient-string-concatenation"

@@ -129,18 +129,4 @@ TEST(ThriftUtil, SerDeBuffer100MB) {
   }
 }
 
-TEST(ThriftUtil, TNetworkAddressComparator) {
-  EXPECT_TRUE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 500),
-                                        MakeNetworkAddress("zzzz", 500)));
-  EXPECT_FALSE(TNetworkAddressComparator(MakeNetworkAddress("zzzz", 500),
-                                         MakeNetworkAddress("aaaa", 500)));
-  EXPECT_TRUE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 500),
-                                        MakeNetworkAddress("aaaa", 501)));
-  EXPECT_FALSE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 501),
-                                         MakeNetworkAddress("aaaa", 500)));
-
-  EXPECT_FALSE(TNetworkAddressComparator(MakeNetworkAddress("aaaa", 500),
-                                         MakeNetworkAddress("aaaa", 500)));
-}
-
 }

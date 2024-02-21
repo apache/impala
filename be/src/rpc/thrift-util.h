@@ -175,10 +175,6 @@ Status WaitForServer(const std::string& host, int port, int num_retries,
 /// Print a TColumnValue. If null, print "NULL".
 void PrintTColumnValue(std::ostream& out, const TColumnValue& colval);
 
-/// Compares two TNetworkAddresses alphanumerically by their host:port
-/// string representation
-bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b);
-
 /// Returns true if the TTransportException corresponds to a TCP socket read timeout.
 bool IsReadTimeoutTException(const apache::thrift::transport::TTransportException& e);
 

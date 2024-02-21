@@ -252,6 +252,27 @@ NetworkAddressPB FromTNetworkAddress(const TNetworkAddress& address) {
   return address_pb;
 }
 
+bool TNetworkAddressComparator::operator()(const TNetworkAddress& a,
+    const TNetworkAddress& b) const {
+    const int host_compare = a.hostname.compare(b.hostname);
+
+    if (host_compare < 0) {
+      return true;
+    } else if(host_compare > 0) {
+      return false;
+    }
+
+    // Hostnames were the same, compare on port
+    if (a.port < b.port) {
+      return true;
+    } else if (a.port > b.port) {
+      return false;
+    }
+
+    // Hostnames and ports were the same, compare on uds address.
+    return a.uds_address.compare(b.uds_address) < 0;
+}
+
 /// Pick a random port in the range of ephemeral ports
 /// https://tools.ietf.org/html/rfc6335
 int FindUnusedEphemeralPort() {

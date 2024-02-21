@@ -143,4 +143,11 @@ int FindUtf8PosBackward(const uint8_t* ptr, const int len, int index) {
   DCHECK_EQ(pos, -1);
   return -1;
 }
+
+void StringStreamPop::move_back() {
+  if (tellp() > 0) {
+    seekp(-1, std::ios_base::cur);
+  }
+}
+
 }

@@ -93,6 +93,19 @@ int FindUtf8PosBackward(const uint8_t* str_ptr, const int str_len, const int ind
 inline int FindUtf8PosBackward(const char* str_ptr, const int str_len, const int index) {
   return FindUtf8PosBackward(reinterpret_cast<const uint8_t*>(str_ptr), str_len, index);
 }
-}
 
+/// Subclass of std::stringstream that adds functionality to allow overwriting the very
+/// last character of the stream. The purpose of this additional functionality is to
+/// enable comma delimited string building where the last instance of the comma needs to
+/// be removed (for example when building a list of columns in a sql statement).
+class StringStreamPop : public std::basic_stringstream<char> {
+public:
+  /// Directly modifies the underlying stream buffer seeking it backwards 1 position.
+  /// Then, when additional characters are written, the character at the end of the stream
+  /// is overwritten. Thus, to truly remove the character at the end of the stream
+  /// requires writing at least one character to the stream after this function is called.
+  void move_back();
+};
+
+}
 #endif
