@@ -37,28 +37,27 @@ Status ImpalaServer::OpenSession(const string& user_name, TUniqueId& new_session
     const TQueryOptions& query_opts) {
   shared_ptr<ThriftServer::ConnectionContext> conn_ctx =
       make_shared<ThriftServer::ConnectionContext>();
-  conn_ctx->connection_id = this->RandomUniqueID();
+  conn_ctx->connection_id = RandomUniqueID();
   conn_ctx->server_name = ImpalaServer::INTERNAL_SERVER_NAME;
   conn_ctx->username = user_name;
   conn_ctx->network_address.hostname = "in-memory.localhost";
 
-  this->ConnectionStart(*conn_ctx.get());
+  ConnectionStart(*conn_ctx.get());
 
   {
-    lock_guard<mutex> l(this->connection_to_sessions_map_lock_);
-    new_session_id = *this->
-        connection_to_sessions_map_[conn_ctx->connection_id].cbegin();
+    lock_guard<mutex> l(connection_to_sessions_map_lock_);
+    new_session_id = *connection_to_sessions_map_[conn_ctx->connection_id].cbegin();
   }
 
   {
-    lock_guard<mutex> l(this->internal_server_connections_lock_);
-    this->internal_server_connections_.insert(make_pair(new_session_id, conn_ctx));
+    lock_guard<mutex> l(internal_server_connections_lock_);
+    internal_server_connections_.insert(make_pair(new_session_id, conn_ctx));
   }
 
   shared_ptr<ImpalaServer::SessionState> session_state;
   {
-    lock_guard<mutex> l(this->session_state_map_lock_);
-    session_state = this->session_state_map_[new_session_id];
+    lock_guard<mutex> l(session_state_map_lock_);
+    session_state = session_state_map_[new_session_id];
     std::map<string, string> query_opts_map;
     TQueryOptionsToMap(query_opts, &query_opts_map);
     for (auto iter=query_opts_map.cbegin(); iter!=query_opts_map.cend(); iter++) {
@@ -69,33 +68,33 @@ Status ImpalaServer::OpenSession(const string& user_name, TUniqueId& new_session
     }
   }
 
-  this->MarkSessionActive(session_state);
+  MarkSessionActive(session_state);
 
   return Status::OK();
 } // ImpalaServer::OpenSession
 
 bool ImpalaServer::CloseSession(const TUniqueId& session_id) {
   {
-    lock_guard<mutex> l(this->session_state_map_lock_);
+    lock_guard<mutex> l(session_state_map_lock_);
 
-    auto iter = this->session_state_map_.find(session_id);
-    if (iter == this->session_state_map_.end()) {
+    auto iter = session_state_map_.find(session_id);
+    if (iter == session_state_map_.end()) {
       return false;
     }
 
-    this->MarkSessionInactive(iter->second);
+    MarkSessionInactive(iter->second);
   }
 
   {
-    lock_guard<mutex> l(this->internal_server_connections_lock_, adopt_lock);
-    this->internal_server_connections_lock_.lock();
+    lock_guard<mutex> l(internal_server_connections_lock_, adopt_lock);
+    internal_server_connections_lock_.lock();
 
-    const auto iter = this->internal_server_connections_.find(session_id);
-    if (iter != this->internal_server_connections_.end()) {
-      this->internal_server_connections_lock_.unlock();
-      this->ConnectionEnd(*iter->second.get());
-      this->internal_server_connections_lock_.lock();
-      this->internal_server_connections_.erase(iter);
+    const auto iter = internal_server_connections_.find(session_id);
+    if (iter != internal_server_connections_.end()) {
+      internal_server_connections_lock_.unlock();
+      ConnectionEnd(*iter->second.get());
+      internal_server_connections_lock_.lock();
+      internal_server_connections_.erase(iter);
     }
   }
 
@@ -107,15 +106,15 @@ Status ImpalaServer::ExecuteIgnoreResults(const string& user_name, const string&
   TUniqueId session_id;
   TUniqueId internal_query_id;
 
-  RETURN_IF_ERROR(this->SubmitAndWait(user_name, sql, session_id, internal_query_id));
+  RETURN_IF_ERROR(SubmitAndWait(user_name, sql, session_id, internal_query_id));
 
   if (query_id != nullptr) {
     *query_id = internal_query_id;
   }
 
-  this->CloseQuery(internal_query_id);
+  CloseQuery(internal_query_id);
 
-  this->CloseSession(session_id);
+  CloseSession(session_id);
 
   return Status::OK();
 } //ImpalaServer::ExecuteIgnoreResults
@@ -126,16 +125,16 @@ Status ImpalaServer::ExecuteAndFetchAllText(const std::string& user_name,
   TUniqueId session_id;
   TUniqueId internal_query_id;
 
-  RETURN_IF_ERROR(this->SubmitAndWait(user_name, sql, session_id, internal_query_id));
+  RETURN_IF_ERROR(SubmitAndWait(user_name, sql, session_id, internal_query_id));
 
   if (query_id != nullptr) {
     *query_id = internal_query_id;
   }
 
-  RETURN_IF_ERROR(this->FetchAllRows(internal_query_id, results, columns));
+  RETURN_IF_ERROR(FetchAllRows(internal_query_id, results, columns));
 
-  this->CloseQuery(internal_query_id);
-  this->CloseSession(session_id);
+  CloseQuery(internal_query_id);
+  CloseSession(session_id);
 
   return Status::OK();
 } // ImpalaServer::ExecuteAndFetchAllText
@@ -143,10 +142,10 @@ Status ImpalaServer::ExecuteAndFetchAllText(const std::string& user_name,
 Status ImpalaServer::SubmitAndWait(const string& user_name, const string& sql,
     TUniqueId& new_session_id, TUniqueId& new_query_id) {
 
-  RETURN_IF_ERROR(this->OpenSession(user_name, new_session_id));
-  RETURN_IF_ERROR(this->SubmitQuery(sql, new_session_id, new_query_id));
+  RETURN_IF_ERROR(OpenSession(user_name, new_session_id));
+  RETURN_IF_ERROR(SubmitQuery(sql, new_session_id, new_query_id));
 
-  return this->WaitForResults(new_query_id);
+  return WaitForResults(new_query_id);
 } // ImpalaServer::SubmitAndWait
 
 Status ImpalaServer::WaitForResults(TUniqueId& query_id) {
@@ -157,7 +156,7 @@ Status ImpalaServer::WaitForResults(TUniqueId& query_id) {
 
   int64_t block_wait_time;
   bool timed_out;
-  RETURN_IF_ERROR(this->WaitForResults(query_handle->query_id(), &query_handle,
+  RETURN_IF_ERROR(WaitForResults(query_handle->query_id(), &query_handle,
       &block_wait_time, &timed_out));
   query_id = query_handle->query_id();
 
@@ -178,10 +177,10 @@ Status ImpalaServer::SubmitQuery(const string& sql, const TUniqueId& session_id,
   // locate the previously opened session
   shared_ptr<SessionState> session_state;
   {
-    lock_guard<mutex> l(this->session_state_map_lock_);
+    lock_guard<mutex> l(session_state_map_lock_);
 
-    const auto iter = this->session_state_map_.find(session_id);
-    if (iter == this->session_state_map_.end()) {
+    const auto iter = session_state_map_.find(session_id);
+    if (iter == session_state_map_.end()) {
       return Status::Expected(TErrorCode::GENERAL, PrintId(session_id));
     }
 
@@ -194,13 +193,13 @@ Status ImpalaServer::SubmitQuery(const string& sql, const TUniqueId& session_id,
   query_context.client_request.query_options = session_state->QueryOptions();
   set_query_options_mask = session_state->set_query_options_mask;
 
-  this->AddPoolConfiguration(&query_context, ~set_query_options_mask);
+  AddPoolConfiguration(&query_context, ~set_query_options_mask);
 
   QueryHandle query_handle;
-  RETURN_IF_ERROR(this->Execute(&query_context, session_state, &query_handle, nullptr));
+  RETURN_IF_ERROR(Execute(&query_context, session_state, &query_handle, nullptr));
   new_query_id = query_handle->query_id();
 
-  RETURN_IF_ERROR(this->SetQueryInflight(session_state, query_handle));
+  RETURN_IF_ERROR(SetQueryInflight(session_state, query_handle));
 
   return Status::OK();
 } // ImpalaServer::SubmitQuery
@@ -256,15 +255,15 @@ Status ImpalaServer::FetchAllRows(const TUniqueId& query_id, query_results& resu
 } // ImpalaServer::FetchAllRows
 
 void ImpalaServer::CloseQuery(const TUniqueId& query_id) {
-  this->UnregisterQueryDiscardResult(query_id, false);
+  UnregisterQueryDiscardResult(query_id, false);
 } // ImpalaServer::CloseQuery
 
 void ImpalaServer::GetConnectionContextList(
     ThriftServer::ConnectionContextList* connection_contexts) {
-  lock_guard<mutex> l(this->internal_server_connections_lock_);
+  lock_guard<mutex> l(internal_server_connections_lock_);
 
-  for(auto iter = this->internal_server_connections_.cbegin();
-      iter != this->internal_server_connections_.cend(); iter++) {
+  for(auto iter = internal_server_connections_.cbegin();
+      iter != internal_server_connections_.cend(); iter++) {
     connection_contexts->push_back(iter->second);
   }
 } // ImpalaServer::GetConnectionContextList

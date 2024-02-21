@@ -125,17 +125,17 @@ class DatabaseTest {
       // See the warning on the category_count_ class member definition.
       EXPECT_LE(category_count_, 11);
 
-      this->impala_server_ = impala_server;
-      this->database_name_ = StrCat(name_prefix, "_", GetCurrentTimeMicros());
+      impala_server_ = impala_server;
+      database_name_ = StrCat(name_prefix, "_", GetCurrentTimeMicros());
       TUniqueId query_id;
-      EXPECT_OK(this->impala_server_->ExecuteIgnoreResults("impala", StrCat("create "
-          "database ", this->database_name_), &query_id));
+      EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", StrCat("create database ",
+          database_name_), &query_id));
       assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
       if (create_table) {
         table_name_ = StrCat(database_name_, ".", "products");
-        EXPECT_OK(this->impala_server_->ExecuteIgnoreResults("impala", StrCat("create "
-            "table ", table_name_, "(id INT, name STRING, first_sold TIMESTAMP, "
+        EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", StrCat("create table ",
+            table_name_, "(id INT, name STRING, first_sold TIMESTAMP, "
             "last_sold TIMESTAMP, price DECIMAL(30, 2)) partitioned by (category INT)"),
             &query_id));
         assertQueryState(query_id, QUERY_STATE_SUCCESS);
@@ -161,7 +161,7 @@ class DatabaseTest {
           }
         }
 
-        EXPECT_OK(this->impala_server_->ExecuteIgnoreResults("impala", sql1, &query_id));
+        EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", sql1, &query_id));
         assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
         // Insert some products that do not have a last_sold time.
@@ -181,27 +181,26 @@ class DatabaseTest {
           }
         }
 
-        EXPECT_OK(this->impala_server_->ExecuteIgnoreResults("impala", sql2,
-            &query_id));
+        EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", sql2, &query_id));
         assertQueryState(query_id, QUERY_STATE_SUCCESS);
       }
     }
 
     ~DatabaseTest() {
-      RETURN_VOID_IF_ERROR(this->impala_server_->ExecuteIgnoreResults("impala",
-          "drop database if exists " + this->database_name_ + " cascade"));
+      RETURN_VOID_IF_ERROR(impala_server_->ExecuteIgnoreResults("impala",
+          "drop database if exists " + database_name_ + " cascade"));
     }
 
     const string GetDbName() const {
-        return this->database_name_;
+        return database_name_;
     }
 
     const string GetTableName() const {
-        return this->table_name_;
+        return table_name_;
     }
 
     int GetCategoryCount() const {
-      return this->category_count_;
+      return category_count_;
     }
 
   private:

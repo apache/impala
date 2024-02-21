@@ -548,7 +548,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if ((!TestInfo::is_test() || TestInfo::is_be_cluster_test()) && FLAGS_is_coordinator) {
     auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
         vector<TTopicDelta>* topic_updates) {
-      this->CatalogUpdateCallback(state, topic_updates);
+      CatalogUpdateCallback(state, topic_updates);
     };
     // The 'local-catalog' implementation only needs minimal metadata to
     // trigger cache invalidations.
@@ -2574,7 +2574,7 @@ void ImpalaServer::ConnectionStart(
     const TUniqueId& session_id = connection_context.connection_id;
     // Generate a secret per Beeswax session so that the HS2 secret validation mechanism
     // prevent accessing of Beeswax sessions from HS2.
-    TUniqueId secret = this->RandomUniqueID();
+    TUniqueId secret = RandomUniqueID();
     shared_ptr<SessionState> session_state =
         std::make_shared<SessionState>(this, session_id, secret);
     session_state->closed = false;
@@ -3453,8 +3453,8 @@ void ImpalaServer::GetAllConnectionContexts(
 TUniqueId ImpalaServer::RandomUniqueID() {
   uuid conn_uuid;
   {
-    lock_guard<mutex> l(this->uuid_lock_);
-    conn_uuid = this->crypto_uuid_generator_();
+    lock_guard<mutex> l(uuid_lock_);
+    conn_uuid = crypto_uuid_generator_();
   }
   TUniqueId conn_id;
   UUIDToTUniqueId(conn_uuid, &conn_id);
