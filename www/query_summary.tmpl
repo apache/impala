@@ -47,6 +47,11 @@ function refresh() {
     }
     var blob = xhr.response;
     json = JSON.parse(blob);
+    if (json.error) {
+      clearInterval(intervalId);
+      document.getElementById("toggle").checked = false;
+      return;
+    }
     refresh_record(json.record_json);
     document.getElementById("timeline").textContent = json["timeline"].trim();
     document.getElementById("summary").textContent = json["summary"].trim();

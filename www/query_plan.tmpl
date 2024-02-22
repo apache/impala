@@ -183,6 +183,10 @@ var is_first = true;
 function renderGraph(ignored_arg) {
   if (req.status != 200) return;
   var json = JSON.parse(req.responseText);
+  if (json.error) {
+    clearInterval(intervalId);
+    return;
+  }
   refresh_record(json.record_json);
   var plan = json["plan_json"];
   var inflight = json["inflight"];
