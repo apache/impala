@@ -185,6 +185,8 @@ const string AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON =
 const string AdmissionController::PROFILE_INFO_KEY_ADMITTED_MEM =
     "Cluster Memory Admitted";
 const string AdmissionController::PROFILE_INFO_KEY_EXECUTOR_GROUP = "Executor Group";
+const string AdmissionController::PROFILE_INFO_KEY_EXECUTOR_GROUP_QUERY_LOAD =
+    "Number of running queries in designated executor group when admitted";
 const string AdmissionController::PROFILE_INFO_KEY_STALENESS_WARNING =
     "Admission control state staleness";
 const string AdmissionController::PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME =
@@ -2268,6 +2270,8 @@ void AdmissionController::AdmitQuery(QueueNode* node, bool was_queued, bool is_t
       PROFILE_INFO_KEY_ADMITTED_MEM, PrintBytes(state->GetClusterMemoryToAdmit()));
   state->summary_profile()->AddInfoString(
       PROFILE_INFO_KEY_EXECUTOR_GROUP, state->executor_group());
+  state->summary_profile()->AddInfoString(PROFILE_INFO_KEY_EXECUTOR_GROUP_QUERY_LOAD,
+      std::to_string(GetExecGroupQueryLoad(state->executor_group())));
   // We may have admitted based on stale information. Include a warning in the profile
   // if this this may be the case.
   int64_t time_since_update_ms;
@@ -2719,6 +2723,14 @@ void AdmissionController::UpdateExecGroupMetric(
     DCHECK_GE(entry->second->GetValue() + delta, 0);
     entry->second->Increment(delta);
   }
+}
+
+int64_t AdmissionController::GetExecGroupQueryLoad(const string& grp_name) {
+  auto entry = exec_group_query_load_map_.find(grp_name);
+  if (entry != exec_group_query_load_map_.end()) {
+    return entry->second->GetValue();
+  }
+  return 0;
 }
 
 } // namespace impala

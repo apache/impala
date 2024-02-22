@@ -339,6 +339,7 @@ class AdmissionController {
   static const std::string PROFILE_INFO_KEY_LAST_QUEUED_REASON;
   static const std::string PROFILE_INFO_KEY_ADMITTED_MEM;
   static const std::string PROFILE_INFO_KEY_EXECUTOR_GROUP;
+  static const std::string PROFILE_INFO_KEY_EXECUTOR_GROUP_QUERY_LOAD;
   static const std::string PROFILE_INFO_KEY_STALENESS_WARNING;
   static const std::string PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME;
 
@@ -1166,6 +1167,10 @@ class AdmissionController {
   /// Caller must hold 'admission_ctrl_lock_'. Must be called whenever a query is
   /// admitted or released.
   void UpdateExecGroupMetric(const string& grp_name, int64_t delta);
+
+  /// Returns the query load for the given executor group.
+  /// If no query load information is available, returns 0.
+  int64_t GetExecGroupQueryLoad(const string& grp_name);
 
   /// A helper type to glue information together to compute the topN queries out of <n>
   /// topM queries through a priority queue. Each object of the type represents a query.

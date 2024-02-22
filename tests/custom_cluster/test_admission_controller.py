@@ -907,6 +907,32 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=2, max_queued=1,
+          pool_max_mem=1024 * 1024 * 1024), statestored_args=_STATESTORED_ARGS)
+  def test_concurrent_queries(self):
+    """Test that the number of running queries appears in the profile when the query is
+    successfully admitted."""
+    # A trivial coordinator only query is scheduled on the empty group which does not
+    # exist in the cluster.
+    result = self.execute_query_expect_success(self.client, "select 1")
+    assert "Executor Group: empty group (using coordinator only)" \
+        in result.runtime_profile
+    assert "Number of running queries in designated executor group when admitted: 0" \
+        in result.runtime_profile
+    # Two queries run concurrently in the default pool.
+    sleep_query = "select * from functional.alltypesagg where id < sleep(1000)"
+    query = "select * from functional.alltypesagg"
+    sleep_query_handle = self.client.execute_async(sleep_query)
+    self.client.wait_for_admission_control(sleep_query_handle)
+    self._wait_for_change_to_profile(sleep_query_handle,
+        "Admission result: Admitted immediately")
+    result = self.execute_query_expect_success(self.client, query)
+    assert "Executor Group: default" in result.runtime_profile
+    assert "Number of running queries in designated executor group when admitted: 2" \
+        in result.runtime_profile
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=10,
           pool_max_mem=1024 * 1024 * 1024),
       statestored_args=_STATESTORED_ARGS)
