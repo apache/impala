@@ -184,6 +184,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
     start_args="--enable_catalogd_ha")
   def test_catalogd_auto_failover(self):
     """Tests for Catalog Service auto fail over without failed RPCs."""
@@ -201,6 +202,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000 "
                      "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
     start_args="--enable_catalogd_ha")
   def test_catalogd_auto_failover_with_failed_rpc(self):
     """Tests for Catalog Service auto fail over with failed RPCs."""
@@ -283,6 +285,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
     start_args="--enable_catalogd_ha")
   def test_catalogd_manual_failover(self):
     """Tests for Catalog Service manual fail over without failed RPCs."""
@@ -300,6 +303,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000 "
                      "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
     start_args="--enable_catalogd_ha")
   def test_catalogd_manual_failover_with_failed_rpc(self):
     """Tests for Catalog Service manual fail over with failed RPCs."""

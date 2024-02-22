@@ -152,8 +152,12 @@ DEFINE_bool(enable_skipping_older_events, false, "This configuration is used to 
 DEFINE_int32(catalog_operation_log_size, 100, "Number of catalog operation log records "
     "to retain in catalogd. If -1, the operation log has unbounded size.");
 
-DEFINE_bool(catalogd_ha_reset_metadata_on_failover, false, "If true, reset all metadata "
-    "when the catalogd becomes active.");
+// The standby catalogd may have stale metadata for some reason, like event processor
+// could have hung or could be just behind in processing events. Also the standby
+// catalogd doesn't get invalidate requests from coordinators so we should probably
+// reset its metadata when it becomes active to avoid stale metadata.
+DEFINE_bool_hidden(catalogd_ha_reset_metadata_on_failover, true, "If true, reset all "
+    "metadata when the catalogd becomes active.");
 
 DEFINE_int32(topic_update_log_gc_frequency, 1000, "Frequency at which the entries "
     "of the catalog topic update log are garbage collected. An entry may survive "
