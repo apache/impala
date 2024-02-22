@@ -44,7 +44,7 @@ from random import shuffle
 from sys import exit
 
 from tests.common.test_dimensions import TableFormatInfo
-from tests.performance.query import Query, HiveQueryResult, ImpalaQueryResult
+from tests.performance.query import Query, HiveQueryResult
 from tests.performance.query_executor import QueryExecConfig
 from tests.performance.workload_runner import WorkloadRunner
 from tests.performance.workload import Workload
@@ -65,7 +65,8 @@ parser.add_option("--impalads", dest="impalads", default="localhost",
                   help=("A comma-separated list of impalad instances to run the "
                   "workload against."))
 parser.add_option("--exec_options", dest="exec_options", default=str(),
-                  help="Runquery exec option string.")
+                  help=("Run query exec option string "
+                    "(formatted as 'opt1:val1;opt2:val2')."))
 parser.add_option("--results_json_file", dest="results_json_file",
                   default=os.environ['IMPALA_HOME'] + "/benchmark_results.json",
                   help="The output file where benchmark results are saved")
@@ -150,6 +151,7 @@ class CustomJSONEncoder(json.JSONEncoder):
     else:
       super(CustomJSONEncoder, self).default(obj)
 
+
 def prettytable_print(results, failed=False):
   """Print a list of query results in prettytable"""
   column_names = ['Query', 'Start Time', 'Time Taken (s)', 'Client ID']
@@ -170,12 +172,14 @@ def prettytable_print(results, failed=False):
     table.clear_rows()
     print(str())
 
+
 def print_result_summary(results):
   """Print failed and successfull queries for a given result list"""
   failed_results = [x for x in results if not x.success]
   successful_results = [x for x in results if x.success]
   prettytable_print(successful_results)
   if failed_results: prettytable_print(failed_results, failed=True)
+
 
 def get_workload_scale_factor():
   """Extract the workload -> scale factor mapping from the command line
@@ -188,14 +192,16 @@ def get_workload_scale_factor():
   for workload_tuple in workload_tuples:
     # Each member should conform to workload[:scale_factor]
     workload_tuple = split_and_strip(workload_tuple, delim=":")
-    assert len(workload_tuple) in [1,2], "Error parsing workload:scale_factor"
+    assert len(workload_tuple) in [1, 2], "Error parsing workload:scale_factor"
     if len(workload_tuple) == 1: workload_tuple.append(str())
     yield workload_tuple
+
 
 def split_and_strip(input_string, delim=","):
   """Convert a string into a list using the given delimiter"""
   if not input_string: return list()
   return list(map(str.strip, input_string.split(delim)))
+
 
 def create_workload_config():
   """Parse command line inputs.
@@ -218,6 +224,7 @@ def create_workload_config():
   config['impalads'] = deque(impalads)
   return WorkloadConfig(**config)
 
+
 def _validate_options():
   """Basic validation for some commandline options"""
   # the sasl module must be importable on a secure setup.
@@ -235,8 +242,9 @@ def _validate_options():
   # The list of Impalads must be provided as a comma separated list of either host:port
   # combination or just host.
   for impalad in split_and_strip(options.impalads):
-    if len(impalad.split(":")) not in [1,2]:
+    if len(impalad.split(":")) not in [1, 2]:
       raise RuntimeError("Impalads must be of the form host:port or host.")
+
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')

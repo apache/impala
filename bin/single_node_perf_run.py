@@ -68,6 +68,8 @@
 #   --load                load databases for the chosen workloads
 #   --start_minicluster   start a new Hadoop minicluster
 #   --ninja               use ninja, rather than Make, as the build tool
+#   --exec_options        query exec option string to run workload
+#                         (formatted as 'opt1:val1;opt2:val2')
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
@@ -128,8 +130,8 @@ def start_minicluster():
 
 def start_impala(num_impalads, options):
   configured_call(["{0}/bin/start-impala-cluster.py".format(IMPALA_HOME), "-s",
-                   str(num_impalads), "-c", str(num_impalads)] +
-                  ["--impalad_args={0}".format(arg) for arg in options.impalad_args])
+                   str(num_impalads), "-c", str(num_impalads)]
+                  + ["--impalad_args={0}".format(arg) for arg in options.impalad_args])
 
 
 def run_workload(base_dir, workloads, options):
@@ -150,6 +152,9 @@ def run_workload(base_dir, workloads, options):
                    "--query_iterations={0}".format(options.iterations),
                    "--table_formats={0}".format(options.table_formats),
                    "--plan_first"]
+
+  if options.exec_options:
+    run_workload += ["--exec_options={0}".format(options.exec_options)]
 
   if options.query_names:
     run_workload += ["--query_names={0}".format(options.query_names)]
@@ -335,6 +340,9 @@ def parse_options():
   parser.add_option("--no_split_profiles", action="store_false", dest="split_profiles",
                     help=("If specified, query profiles will be generated as a "
                       "single-combined file"))
+  parser.add_option("--exec_options", dest="exec_options",
+                    help=("Query exec option string to run workload (formatted as "
+                      "'opt1:val1;opt2:val2')"))
 
   parser.set_usage(textwrap.dedent("""
     single_node_perf_run.py [options] git_hash_A [git_hash_B]
