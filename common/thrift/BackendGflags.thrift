@@ -280,4 +280,12 @@ struct TBackendGflags {
   124: required i32 topic_update_log_gc_frequency
 
   125: required string debug_actions
+
+  126: required bool invalidate_metadata_on_event_processing_failure
+
+  127: required bool invalidate_global_metadata_on_event_processing_failure
+
+  128: required string inject_process_event_failure_event_types
+
+  129: required double inject_process_event_failure_ratio
 }

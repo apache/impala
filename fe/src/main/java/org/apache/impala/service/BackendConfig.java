@@ -459,4 +459,24 @@ public class BackendConfig {
   }
 
   public String debugActions() { return backendCfg_.debug_actions; }
+
+  public boolean isInvalidateMetadataOnEventProcessFailureEnabled() {
+    return backendCfg_.invalidate_metadata_on_event_processing_failure;
+  }
+
+  public boolean isInvalidateGlobalMetadataOnEventProcessFailureEnabled() {
+    return backendCfg_.invalidate_global_metadata_on_event_processing_failure;
+  }
+
+  public void setInvalidateGlobalMetadataOnEventProcessFailure(boolean isEnabled) {
+    backendCfg_.invalidate_global_metadata_on_event_processing_failure = isEnabled;
+  }
+
+  public String getProcessEventFailureEventTypes() {
+    return backendCfg_.inject_process_event_failure_event_types;
+  }
+
+  public double getProcessEventFailureRatio() {
+    return backendCfg_.inject_process_event_failure_ratio;
+  }
 }

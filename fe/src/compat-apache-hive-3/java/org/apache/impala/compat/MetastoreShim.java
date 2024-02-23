@@ -634,6 +634,11 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     }
 
     @Override
+    protected boolean onFailure(Exception e) {
+      return false;
+    }
+
+    @Override
     protected boolean isEventProcessingDisabled() {
       return false;
     }

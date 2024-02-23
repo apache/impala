@@ -63,6 +63,7 @@ import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IncompleteTable;
+import org.apache.impala.catalog.MetastoreClientInstantiationException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.TableNotLoadedException;
@@ -656,6 +657,19 @@ public class MetastoreEvents {
     }
 
     /**
+     * Method to inject error randomly for certain events during the processing.
+     * It is used for testing purpose.
+     */
+    private void injectErrorIfNeeded() {
+      if (catalog_.getFailureEventsForTesting().contains(eventType_.toString())) {
+        double random = Math.random();
+        if (random < BackendConfig.INSTANCE.getProcessEventFailureRatio()) {
+          throw new RuntimeException("Event processing failed due to error injection");
+        }
+      }
+    }
+
+    /**
      * Process this event if it is enabled based on the flags on this object
      *
      * @throws CatalogException If  Catalog operations fail
@@ -677,6 +691,7 @@ public class MetastoreEvents {
         }
       }
       process();
+      injectErrorIfNeeded();
     }
 
     /**
@@ -739,6 +754,25 @@ public class MetastoreEvents {
      */
     protected abstract void process()
         throws MetastoreNotificationException, CatalogException;
+
+    /**
+     * Process event failure handles the exception occurred during processing.
+     * @param e Exception occurred during process
+     * @return Returns true when failure is handled. Otherwise, false
+     */
+    protected abstract boolean onFailure(Exception e);
+
+    protected boolean canInvalidateTable(Exception e) {
+      if (e instanceof MetastoreClientInstantiationException) {
+        // All runtime exceptions except this exception are considered for invalidation.
+        return false;
+      }
+      // This RuntimeException covers all the exceptions from
+      // com.google.common.base.Preconditions methods. IllegalStateException is one such
+      // exception seen in IMPALA-12827.
+      return (e instanceof RuntimeException) || (e instanceof CatalogException)
+          || (e instanceof MetastoreNotificationNeedsInvalidateException);
+    }
 
     /**
      * Helper method to get debug string with helpful event information prepended to the
@@ -816,6 +850,17 @@ public class MetastoreEvents {
           new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr).toString();
       Object[] formatArgs = getLogFormatArgs(args);
       LOG.warn(formatString, formatArgs);
+    }
+
+    /**
+     * Method to log error for an event
+     */
+    protected void errorLog(String logFormattedStr, Object... args) {
+      if (!LOG.isErrorEnabled()) return;
+      String formatString =
+          new StringBuilder(LOG_FORMAT_EVENT_ID_TYPE).append(logFormattedStr).toString();
+      Object[] formatArgs = getLogFormatArgs(args);
+      LOG.error(formatString, formatArgs);
     }
 
     /**
@@ -1261,6 +1306,20 @@ public class MetastoreEvents {
       }
     }
 
+    @Override
+    protected boolean onFailure(Exception e) {
+      if (!BackendConfig.INSTANCE.isInvalidateMetadataOnEventProcessFailureEnabled()) {
+        return false;
+      }
+      boolean isInvalidate = canInvalidateTable(e);
+      if (isInvalidate) {
+        errorLog("Invalidate table {}.{} due to exception during event processing",
+            dbName_, tblName_, e);
+        catalog_.invalidateTableIfExists(dbName_, tblName_);
+      }
+      return isInvalidate;
+    }
+
     protected abstract void processTableEvent() throws MetastoreNotificationException,
         CatalogException;
   }
@@ -1328,6 +1387,12 @@ public class MetastoreEvents {
       }
       return true;
     }
+
+    @Override
+    protected boolean onFailure(Exception e) {
+      // TODO: Need to check db event failure in future
+      return false;
+    }
   }
 
   /**
@@ -1391,6 +1456,11 @@ public class MetastoreEvents {
         throw new MetastoreNotificationException(
             debugString("Unable to process event"), e);
       }
+    }
+
+    @Override
+    protected boolean onFailure(Exception e) {
+      return false;
     }
 
     @Override
@@ -1734,6 +1804,27 @@ public class MetastoreEvents {
       }
     }
 
+    @Override
+    protected boolean onFailure(Exception e) {
+      if (!BackendConfig.INSTANCE.isInvalidateMetadataOnEventProcessFailureEnabled()
+          || !canInvalidateTable(e)) {
+        return false;
+      }
+      if (isRename()) {
+        /* In case of rename table, not invalidating tables due of following reasons:
+        1. When failure happened before old table is removed from catalog,
+        invalidateTableIfExists may trigger table load for a non-existing table later.
+        2. When failure happened before adding new table to catalog,
+        invalidateTableIfExists does not invalidate table
+        */
+        errorLog(
+            "Rename table {}.{} to {}.{} failed due to exception during event processing",
+            tableBefore_.getDbName(), tableBefore_.getTableName(), dbName_, tblName_, e);
+        return false;
+      }
+      return super.onFailure(e);
+    }
+
     private void handleEventSyncTurnedOn() throws DatabaseNotFoundException,
         MetastoreNotificationNeedsInvalidateException {
       // check if the table exists or not. 1) if the table doesn't exist create an
@@ -1974,6 +2065,11 @@ public class MetastoreEvents {
         debugLog("Incremented skipped metric to " + metrics_
             .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount());
       }
+    }
+
+    @Override
+    protected boolean onFailure(Exception e) {
+      return false;
     }
   }
 
@@ -2988,6 +3084,7 @@ public class MetastoreEvents {
    */
   public static class AbortTxnEvent extends MetastoreEvent {
     private final long txnId_;
+    private Set<TableWriteId> tableWriteIds_ = Collections.emptySet();
 
     AbortTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
@@ -3004,9 +3101,9 @@ public class MetastoreEvents {
     @Override
     protected void process() throws MetastoreNotificationException {
       try {
-        Set<TableWriteId> tableWriteIds = catalog_.getWriteIds(txnId_);
-        infoLog("Adding {} aborted write ids", tableWriteIds.size());
-        addAbortedWriteIdsToTables(tableWriteIds);
+        tableWriteIds_ = catalog_.getWriteIds(txnId_);
+        infoLog("Adding {} aborted write ids", tableWriteIds_.size());
+        addAbortedWriteIdsToTables(tableWriteIds_);
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
             + "mark aborted write ids to table for txn {}. Event processing cannot "
@@ -3015,6 +3112,26 @@ public class MetastoreEvents {
       } finally {
         catalog_.removeWriteIds(txnId_);
       }
+    }
+
+    @Override
+    protected boolean onFailure(Exception e) {
+      if (!BackendConfig.INSTANCE.isInvalidateMetadataOnEventProcessFailureEnabled()
+          || !canInvalidateTable(e)) {
+        return false;
+      }
+      errorLog(
+          "Invalidating tables in transaction due to exception during event processing",
+          e);
+      Set<TableName> tableNames =
+          tableWriteIds_.stream()
+              .map(writeId -> new TableName(writeId.getDbName(), writeId.getTblName()))
+              .collect(Collectors.toSet());
+      for (TableName tableName : tableNames) {
+        errorLog("Invalidate table {}.{}", tableName.getDb(), tableName.getTbl());
+        catalog_.invalidateTableIfExists(tableName.getDb(), tableName.getTbl());
+      }
+      return true;
     }
 
     private void addAbortedWriteIdsToTables(Set<TableWriteId> tableWriteIds)
@@ -3137,6 +3254,11 @@ public class MetastoreEvents {
     protected SelfEventContext getSelfEventContext() {
       throw new UnsupportedOperationException("Self-event evaluation is not needed for "
           + "this event type");
+    }
+
+    @Override
+    protected boolean onFailure(Exception e) {
+      return false;
     }
   }
 }

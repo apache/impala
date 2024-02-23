@@ -82,19 +82,24 @@ class EventProcessorUtils(object):
 
   @staticmethod
   def wait_for_event_processing(test_suite, timeout=10):
+    if isinstance(test_suite, CustomClusterTestSuite):
+      impala_cluster = test_suite.cluster
+    else:
+      impala_cluster = ImpalaCluster.get_e2e_test_cluster()
+    EventProcessorUtils.wait_for_event_processing_impl(test_suite.hive_client,
+      impala_cluster, timeout)
+
+  @staticmethod
+  def wait_for_event_processing_impl(hive_client, impala_cluster, timeout=10):
     """Waits till the event processor has synced to the latest event id from metastore
     or the timeout value in seconds whichever is earlier"""
     if EventProcessorUtils.get_event_processor_status() == "DISABLED":
       return
     assert timeout > 0
-    assert test_suite.hive_client is not None
+    assert hive_client is not None
     current_event_id = EventProcessorUtils.get_current_notification_id(
-      test_suite.hive_client)
+      hive_client)
     EventProcessorUtils.wait_for_synced_event_id(timeout, current_event_id)
-    if isinstance(test_suite, CustomClusterTestSuite):
-      impala_cluster = test_suite.cluster
-    else:
-      impala_cluster = ImpalaCluster.get_e2e_test_cluster()
     # Wait until the impalad catalog versions agree with the catalogd's version.
     catalogd_version = impala_cluster.catalogd.service.get_catalog_version()
     for impalad in impala_cluster.impalads:

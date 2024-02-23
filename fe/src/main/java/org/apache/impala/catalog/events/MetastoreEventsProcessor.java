@@ -59,6 +59,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
@@ -960,6 +961,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         LOG.warn(String.format(
             "Event processing is skipped since status is %s. Last synced event id is %d",
             currentStatus, lastSyncedEventId_.get()));
+        tryAutoGlobalInvalidateOnFailure();
         return;
       }
       // fetch the current notification event id. We assume that the polling interval
@@ -980,6 +982,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       LOG.error(msg, ex);
       eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
           ExceptionUtils.getFullStackTrace(ex);
+      tryAutoGlobalInvalidateOnFailure();
     } catch (Exception ex) {
       // There are lot of Preconditions which can throw RuntimeExceptions when we
       // process events this catch all exception block is needed so that the scheduler
@@ -990,6 +993,28 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
           ExceptionUtils.getFullStackTrace(ex);
       dumpEventInfoToLog(currentEvent_);
+      tryAutoGlobalInvalidateOnFailure();
+    }
+  }
+
+  /**
+   * This method does global invalidation when
+   * invalidate_global_metadata_on_event_processing_failure flag is enabled and the
+   * event processor is in error state or need invalidate state
+   */
+  private void tryAutoGlobalInvalidateOnFailure() {
+    EventProcessorStatus currentStatus = eventProcessorStatus_;
+    if (BackendConfig.INSTANCE.isInvalidateGlobalMetadataOnEventProcessFailureEnabled()
+        && ((currentStatus == EventProcessorStatus.ERROR)
+               || (currentStatus == EventProcessorStatus.NEEDS_INVALIDATE))) {
+      try {
+        LOG.error("Triggering auto global invalidation");
+        catalog_.reset();
+        eventProcessorErrorMsg_ = null;
+      } catch (Exception e) {
+        // Catching generic exception so that scheduler thread does not die silently
+        LOG.error("Automatic global invalidate metadata failed", e);
+      }
     }
   }
 
@@ -1163,6 +1188,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
             event.processIfEnabled();
             long elapsedTimeMs = System.currentTimeMillis() - startMs;
             eventProcessingTime.put(event, elapsedTimeMs);
+          } catch (Exception processingEx) {
+            try {
+              if (!event.onFailure(processingEx)) {
+                event.errorLog("Unable to handle event processing failure");
+                throw processingEx;
+              }
+            } catch (Exception onFailureEx) {
+              event.errorLog("Failed to handle event processing failure", onFailureEx);
+              throw processingEx;
+            }
           }
           deleteEventLog_.garbageCollect(event.getEventId());
           lastSyncedEventId_.set(event.getEventId());
@@ -1226,7 +1261,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   /**
    * Updates the current states to the given status.
    */
-  private synchronized void updateStatus(EventProcessorStatus toStatus) {
+  @VisibleForTesting
+  public synchronized void updateStatus(EventProcessorStatus toStatus) {
     eventProcessorStatus_ = toStatus;
   }
 

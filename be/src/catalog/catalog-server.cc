@@ -163,6 +163,32 @@ DEFINE_int32(topic_update_log_gc_frequency, 1000, "Frequency at which the entrie
     "of the catalog topic update log are garbage collected. An entry may survive "
     "for (2 * TOPIC_UPDATE_LOG_GC_FREQUENCY) - 1 topic updates.");
 
+DEFINE_bool(invalidate_metadata_on_event_processing_failure, true,
+    "This configuration is used to invalidate metadata for table(s) upon event process "
+    "failure other than HMS connection issues. The default value is true. When enabled, "
+    "invalidate metadata is performed automatically upon event process failure. "
+    "Otherwise, failure can put metastore event processor in non-active state.");
+
+DEFINE_bool(invalidate_global_metadata_on_event_processing_failure, false,
+    "This configuration is used to global invalidate metadata when "
+    "invalidate_metadata_on_event_processing_failure cannot invalidate metadata for "
+    "table(s). The default value is false. When enabled, global invalidate metadata is "
+    "performed automatically. Otherwise, failure can put metastore event processor in "
+    "non-active state.");
+
+DEFINE_string_hidden(inject_process_event_failure_event_types, "",
+    "This configuration is used to inject event processing failure for an event type "
+    "randomly. It is used for debugging purpose. Empty string indicates no failure "
+    "injection and it is default behavior. Valid values are comma separated event types "
+    "as specified in MetastoreEventType enum. This config is only for testing purpose "
+    "and it should not be set in production environments.");
+
+DEFINE_double_hidden(inject_process_event_failure_ratio, 1.0,
+    "This configuration is used in conjunction with the config "
+    "'inject_process_event_failure_event_types', to define what is the ratio of an"
+    "event failure. If the generated random number is lesser than this value, then we"
+    "fail the event processor(EP).");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);

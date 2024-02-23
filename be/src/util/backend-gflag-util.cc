@@ -117,6 +117,10 @@ DECLARE_string(hostname);
 DECLARE_bool(allow_catalog_cache_op_from_masked_users);
 DECLARE_int32(topic_update_log_gc_frequency);
 DECLARE_string(debug_actions);
+DECLARE_bool(invalidate_metadata_on_event_processing_failure);
+DECLARE_bool(invalidate_global_metadata_on_event_processing_failure);
+DECLARE_string(inject_process_event_failure_event_types);
+DECLARE_double(inject_process_event_failure_ratio);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -455,6 +459,13 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_allow_catalog_cache_op_from_masked_users);
   cfg.__set_topic_update_log_gc_frequency(FLAGS_topic_update_log_gc_frequency);
   cfg.__set_debug_actions(FLAGS_debug_actions);
+  cfg.__set_invalidate_metadata_on_event_processing_failure(
+      FLAGS_invalidate_metadata_on_event_processing_failure);
+  cfg.__set_invalidate_global_metadata_on_event_processing_failure(
+      FLAGS_invalidate_global_metadata_on_event_processing_failure);
+  cfg.__set_inject_process_event_failure_event_types(
+      FLAGS_inject_process_event_failure_event_types);
+  cfg.__set_inject_process_event_failure_ratio(FLAGS_inject_process_event_failure_ratio);
   return Status::OK();
 }
 

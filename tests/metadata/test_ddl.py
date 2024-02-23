@@ -25,7 +25,7 @@ import time
 
 from beeswaxd.BeeswaxService import QueryState
 from copy import deepcopy
-from test_ddl_base import TestDdlBase
+from tests.metadata.test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import (HIVE_MAJOR_VERSION)
 from tests.common.file_utils import create_table_from_orc

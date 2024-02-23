@@ -3718,6 +3718,28 @@ public class MetastoreEventsProcessorTest {
             .getCount());
   }
 
+  @Test
+  public void testEventProcessorErrorState() throws Exception {
+    boolean prevFlagVal =
+        BackendConfig.INSTANCE.isInvalidateGlobalMetadataOnEventProcessFailureEnabled();
+    try {
+      BackendConfig.INSTANCE.setInvalidateGlobalMetadataOnEventProcessFailure(true);
+      createDatabase(TEST_DB_NAME, null);
+      eventsProcessor_.updateStatus(EventProcessorStatus.NEEDS_INVALIDATE);
+      eventsProcessor_.processEvents();
+      // wait and check EP status
+      assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+      dropDatabaseCascadeFromHMS();
+      eventsProcessor_.updateStatus(EventProcessorStatus.ERROR);
+      eventsProcessor_.processEvents();
+      // wait and check EP status
+      assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+    } finally {
+      BackendConfig.INSTANCE.setInvalidateGlobalMetadataOnEventProcessFailure(
+          prevFlagVal);
+    }
+  }
+
   private void insertIntoTable(String dbName, String tableName) throws Exception {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTable =

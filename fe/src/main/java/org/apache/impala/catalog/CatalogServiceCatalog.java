@@ -332,6 +332,9 @@ public class CatalogServiceCatalog extends Catalog {
   // Table properties that require file metadata reload
   private final Set<String> whitelistedTblProperties_;
 
+  // A variable to test expected failed events
+  private final Set<String> failureEventsForTesting_;
+
   // Total number of dbs, tables and functions in the catalog cache.
   // Updated in each catalog topic update (getCatalogDelta()).
   private int numDbs_ = 0;
@@ -386,6 +389,13 @@ public class CatalogServiceCatalog extends Catalog {
     for (String tblProps: Splitter.on(',').trimResults().omitEmptyStrings().split(
         whitelist)) {
       whitelistedTblProperties_.add(tblProps);
+    }
+    failureEventsForTesting_ = Sets.newHashSet();
+    String failureEvents =
+        BackendConfig.INSTANCE.getProcessEventFailureEventTypes().toUpperCase();
+    for (String tblProps :
+        Splitter.on(',').trimResults().omitEmptyStrings().split(failureEvents)) {
+      failureEventsForTesting_.add(tblProps);
     }
   }
 
@@ -4046,4 +4056,6 @@ public class CatalogServiceCatalog extends Catalog {
   public Set<String> getWhitelistedTblProperties() {
     return whitelistedTblProperties_;
   }
+
+  public Set<String> getFailureEventsForTesting() { return failureEventsForTesting_; }
 }

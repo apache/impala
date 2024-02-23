@@ -830,6 +830,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   public static class CommitTxnEvent extends MetastoreEvent {
     private final CommitTxnMessage commitTxnMessage_;
     private final long txnId_;
+    private Set<TableWriteId> tableWriteIds_ = Collections.emptySet();
 
     public CommitTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
@@ -848,6 +849,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       // To ensure no memory leaking in case an exception is thrown, we remove entries
       // at first.
       Set<TableWriteId> committedWriteIds = catalog_.removeWriteIds(txnId_);
+      tableWriteIds_ = committedWriteIds;
       // Via getAllWriteEventInfo, we can get data insertion info for transactional tables
       // even though there are no insert events generated for transactional tables. Note
       // that we cannot get DDL info from this API.
@@ -874,6 +876,26 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
             + "processing cannot continue. Issue an invalidate metadata command to reset "
             + "event processor.", txnId_), e);
       }
+    }
+
+    @Override
+    protected boolean onFailure(Exception e) {
+      if (!BackendConfig.INSTANCE.isInvalidateMetadataOnEventProcessFailureEnabled()
+          || !canInvalidateTable(e)) {
+        return false;
+      }
+      errorLog(
+          "Invalidating tables in transaction due to exception during event processing",
+          e);
+      Set<TableName> tableNames =
+          tableWriteIds_.stream()
+              .map(writeId -> new TableName(writeId.getDbName(), writeId.getTblName()))
+              .collect(Collectors.toSet());
+      for (TableName tableName : tableNames) {
+        errorLog("Invalidate table {}.{}", tableName.getDb(), tableName.getTbl());
+        catalog_.invalidateTableIfExists(tableName.getDb(), tableName.getTbl());
+      }
+      return true;
     }
 
     private void addCommittedWriteIdsToTables(Set<TableWriteId> tableWriteIds)
