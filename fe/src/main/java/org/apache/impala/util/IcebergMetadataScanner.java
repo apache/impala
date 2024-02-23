@@ -17,7 +17,11 @@
 
 package org.apache.impala.util;
 
+import com.cloudera.cloud.storage.relocated.protobuf.Struct;
 import com.google.common.base.Preconditions;
+
+import java.util.Iterator;
+import java.util.List;
 
 import org.apache.iceberg.Accessor;
 import org.apache.iceberg.DataTask;
@@ -26,6 +30,8 @@ import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.MetadataTableUtils;
 import org.apache.iceberg.StructLike;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.io.CloseableIterator;
@@ -39,14 +45,16 @@ import org.apache.iceberg.io.CloseableIterator;
  * caller of {@code IcebergMetadataScanner}.
  */
 public class IcebergMetadataScanner {
-  // FeTable object is extracted by the backend and passed when this object is created
-  private FeIcebergTable iceTbl_ = null;
+  private final static Logger LOG = LoggerFactory.getLogger(IcebergMetadataScanner.class);
 
-  // Metadata table
-  private Table metadataTable_ = null;
+  // Metadata table instance.
+  final private Table metadataTable_;
+
+  // FeTable object is extracted by the backend and passed when this object is created
+  final private FeIcebergTable iceTbl_;
 
   // Name of the metadata table
-  private String metadataTableName_;
+  final private String metadataTableName_;
 
   // Persist the file scan task iterator so we can continue after a RowBatch is full
   private CloseableIterator<FileScanTask> fileScanTaskIterator_;
@@ -58,18 +66,8 @@ public class IcebergMetadataScanner {
     Preconditions.checkNotNull(iceTbl);
     this.iceTbl_ = (FeIcebergTable) iceTbl;
     this.metadataTableName_ = metadataTableName;
-  }
-
-  /**
-   * Iterates over the {{fileScanTaskIterator_}} to find a {FileScanTask} that has rows.
-   */
-  public boolean FindFileScanTaskWithRows() {
-    while (fileScanTaskIterator_.hasNext()) {
-      DataTask dataTask = (DataTask)fileScanTaskIterator_.next();
-      dataRowsIterator_ = dataTask.rows().iterator();
-      if (dataRowsIterator_.hasNext()) return true;
-    }
-    return false;
+    this.metadataTable_ = MetadataTableUtils.createMetadataTableInstance(
+      iceTbl_.getIcebergApiTable(), MetadataTableType.valueOf(metadataTableName_));
   }
 
   /**
@@ -80,8 +78,7 @@ public class IcebergMetadataScanner {
    */
   public void ScanMetadataTable() {
     // Create and scan the metadata table
-    metadataTable_ = MetadataTableUtils.createMetadataTableInstance(
-        iceTbl_.getIcebergApiTable(), MetadataTableType.valueOf(metadataTableName_));
+    LOG.trace("Metadata table schema: " + metadataTable_.schema().toString());
     TableScan scan = metadataTable_.newScan();
     // Init the FileScanTask iterator and DataRowsIterator
     fileScanTaskIterator_ = scan.planFiles().iterator();
@@ -89,11 +86,15 @@ public class IcebergMetadataScanner {
   }
 
   /**
-   * Returns the field {Accessor} for the specified field id. This {Accessor} then is
-   * used to access a field in the {StructLike} object.
+   * Iterates over the {{fileScanTaskIterator_}} to find a {FileScanTask} that has rows.
    */
-  public Accessor GetAccessor(int fieldId) {
-    return metadataTable_.schema().accessorForField(fieldId);
+  private boolean FindFileScanTaskWithRows() {
+    while (fileScanTaskIterator_.hasNext()) {
+      DataTask dataTask = (DataTask)fileScanTaskIterator_.next();
+      dataRowsIterator_ = dataTask.rows().iterator();
+      if (dataRowsIterator_.hasNext()) return true;
+    }
+    return false;
   }
 
   /**
@@ -112,4 +113,39 @@ public class IcebergMetadataScanner {
     return null;
   }
 
+  /**
+   * Uses the Accessor to access the value in the StructLike object. This only works for
+   * non collection types.
+   */
+  public Object GetValueByFieldId(StructLike structLike, int fieldId) {
+    Accessor accessor = metadataTable_.schema().accessorForField(fieldId);
+    return accessor.get(structLike);
+  }
+
+  /**
+   * Accesses the value inside the StructLike by its position.
+   */
+  public <T> T GetValueByPosition(StructLike structLike, int pos, Class<T> javaClass)
+  {
+    return structLike.get(pos, javaClass);
+  }
+
+  /**
+   * Wrapper around an array that is the result of a metadata table scan.
+   * It is used to avoid iterating over a list through JNI.
+   */
+  public class ArrayScanner<T> {
+    private Iterator<T> iterator;
+
+    public ArrayScanner(List<T> array) {
+      this.iterator = array.iterator();
+      Preconditions.checkNotNull(iterator);
+      LOG.trace("Created metadata table array scanner, array size: " + array.size());
+    }
+
+    public T GetNextArrayItem() {
+      if (iterator.hasNext()) return iterator.next();
+      return null;
+    }
+  }
 }

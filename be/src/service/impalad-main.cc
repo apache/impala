@@ -29,7 +29,7 @@
 #include "common/status.h"
 #include "exec/hbase/hbase-table-scanner.h"
 #include "exec/hbase/hbase-table-writer.h"
-#include "exec/iceberg-metadata/iceberg-metadata-scan-node.h"
+#include "exec/iceberg-metadata/iceberg-metadata-scanner.h"
 #include "exec/iceberg-metadata/iceberg-row-reader.h"
 #include "exprs/hive-udf-call.h"
 #include "exprs/timezone_db.h"
@@ -66,7 +66,7 @@ int ImpaladMain(int argc, char** argv) {
   ABORT_IF_ERROR(HBaseTableScanner::Init());
   ABORT_IF_ERROR(HBaseTable::InitJNI());
   ABORT_IF_ERROR(HBaseTableWriter::InitJNI());
-  ABORT_IF_ERROR(IcebergMetadataScanNode::InitJNI());
+  ABORT_IF_ERROR(IcebergMetadataScanner::InitJNI());
   ABORT_IF_ERROR(IcebergRowReader::InitJNI());
   ABORT_IF_ERROR(HiveUdfCall::InitEnv());
   ABORT_IF_ERROR(JniCatalogCacheUpdateIterator::InitJNI());

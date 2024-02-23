@@ -18,6 +18,7 @@
 #pragma once
 
 #include "exec/iceberg-metadata/iceberg-row-reader.h"
+#include "exec/iceberg-metadata/iceberg-metadata-scanner.h"
 #include "exec/scan-node.h"
 
 #include <jni.h>
@@ -56,17 +57,13 @@ class Status;
 class IcebergMetadataScanPlanNode : public ScanPlanNode {
  public:
   Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
-  ~IcebergMetadataScanPlanNode(){}
+  ~IcebergMetadataScanPlanNode() {}
 };
 
 class IcebergMetadataScanNode : public ScanNode {
  public:
   IcebergMetadataScanNode(ObjectPool* pool, const IcebergMetadataScanPlanNode& pnode,
       const DescriptorTbl& descs);
-
-  /// JNI setup. Creates global references for Java classes and find method ids.
-  /// Initializes static members, should be called once per process lifecycle.
-  static Status InitJNI() WARN_UNUSED_RESULT;
 
   /// Initializes counters, executes Iceberg table scan and initializes accessors.
   Status Prepare(RuntimeState* state) override;
@@ -81,26 +78,12 @@ class IcebergMetadataScanNode : public ScanNode {
   void Close(RuntimeState* state) override;
 
  private:
-  /// Global class references created with JniUtil.
-  inline static jclass impala_iceberg_metadata_scanner_cl_ = nullptr;
-
-  /// Method references created with JniUtil.
-  inline static jmethodID iceberg_metadata_scanner_ctor_ = nullptr;
-  inline static jmethodID scan_metadata_table_ = nullptr;
-  inline static jmethodID get_accessor_ = nullptr;
-  inline static jmethodID get_next_ = nullptr;
-
-  /// Iceberg metadata scanner Java object, it helps preparing the metadata table and
-  /// executes an Iceberg table scan. Allows the ScanNode to fetch the metadata from
-  /// the Java Heap.
-  jobject jmetadata_scanner_;
+  /// Adapter that helps preparing the metadata table and executes an Iceberg table scan
+  /// on Java side. Allows the ScanNode to fetch the metadata from the Java Heap.
+  std::unique_ptr<IcebergMetadataScanner> metadata_scanner_;
 
   /// Helper class to transform Iceberg rows to Impala tuples.
   std::unique_ptr<IcebergRowReader> iceberg_row_reader_;
-
-  /// Accessor map for the scan result, pairs the slot ids with the java Accessor
-  /// objects.
-  std::unordered_map<SlotId, jobject> jaccessors_;
 
   // The TupleId and TupleDescriptor of the tuple that this scan node will populate.
   const TupleId tuple_id_;
@@ -114,29 +97,8 @@ class IcebergMetadataScanNode : public ScanNode {
   RuntimeProfile::Counter* scan_prepare_timer_;
   RuntimeProfile::Counter* iceberg_api_scan_timer_;
 
-  /// Initializes the metadata table and executes an Iceberg scan through JNI.
-  Status ScanMetadataTable();
-
   /// Gets the FeIceberg table from the Frontend.
   Status GetCatalogTable(jobject* jtable);
-
-  /// Populates the jaccessors_ map by creating the accessors for the columns in the JVM.
-  /// To create a field accessor for a column the Iceberg field id is needed. For columns
-  /// that are not a field of a struct, this can be found in the ColumnDescriptor.
-  /// However, ColumnDescriptors are not available for struct fields, in this case the
-  /// ColumnType of the SlotDescriptor can be used.
-  Status CreateFieldAccessors();
-
-  /// Recursive part of the Accessor collection, when there is a struct in the tuple.
-  /// Collects the field ids of the struct members. The type_ field inside the struct slot
-  /// stores an ordered list of Iceberg Struct member field ids. This list can be indexed
-  /// with the last element of SchemaPath col_path to obtain the correct field id of the
-  /// struct member.
-  Status CreateFieldAccessors(JNIEnv* env, const SlotDescriptor* struct_slot_desc);
-
-  /// Helper method to simplify adding new accessors to the jaccessors_ map. It obtains
-  /// the Accessor through JNI and persists it into the jaccessors_ map.
-  Status AddAccessorForFieldId(JNIEnv* env, int field_id, SlotId slot_id);
 };
 
 }

@@ -3,7 +3,7 @@
 # from the manifests files that Iceberg adds. Therefore, the query results are checked
 # with regexp.
 ####
-# Test 0 : Query all the metadata tables once
+# Query all the metadata tables once
 ####
 ====
 ---- QUERY
@@ -176,7 +176,7 @@ row_regex:1,[1-9]\d*|0,[1-9]\d*|0,[1-9]\d*|0
 INT,BIGINT,BIGINT,BIGINT
 
 ####
-# Test 1 : Test query empty table's metadata
+# Test query empty table's metadata
 ####
 ====
 ---- QUERY
@@ -229,7 +229,7 @@ select record_count + file_count from functional_parquet.iceberg_query_metadata.
 BIGINT
 
 ####
-# Test 3 : Test filtering
+# Test filtering
 ####
 ====
 ---- QUERY
@@ -317,7 +317,7 @@ BIGINT
 ====
 
 ####
-# Test 4 : Test joins
+# Test joins
 ####
 ====
 ---- QUERY
@@ -360,7 +360,7 @@ $OVERWRITE_SNAPSHOT_ID
 BIGINT
 
 ####
-# Test 5 : Inline query
+# Inline query
 ####
 ====
 ---- QUERY
@@ -375,7 +375,7 @@ row_regex:[1-9]\d*|0
 BIGINT
 
 ####
-# Test 6 : Complex types
+# Complex types
 # Currently not supported, complex type slots are set to NULL (IMPALA-12205)
 ####
 ====
@@ -390,7 +390,7 @@ row_regex:[1-9]\d*|0,'NULL'
 BIGINT,STRING
 
 ####
-# Test 7 : Multiple RowBatch results
+# Multiple RowBatch results
 ####
 ====
 ---- QUERY
@@ -405,7 +405,6 @@ row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,t
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 
 ####
-# Test 8 : Timetravel
 # Timetravel is not supported currently, related Jira IMPALA-11991.
 ####
 ====
@@ -446,7 +445,7 @@ row_regex:[1-9]\d*|0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/i
 INT,STRING,BIGINT
 
 ####
-# Test 10 : Invalid operations
+# Invalid operations
 # In most cases the parser catches the table reference.
 ####
 ====
@@ -485,9 +484,39 @@ alter table functional_parquet.iceberg_query_metadata.snapshots add columns (col
 ---- CATCH
 ParseException: Syntax error in line 1
 ====
+---- QUERY
+select i from functional_parquet.iceberg_query_metadata.entries.readable_metrics;
+---- CATCH
+AnalysisException: Illegal table reference to non-collection type: 'functional_parquet.iceberg_query_metadata.entries.readable_metrics'
+====
+---- QUERY
+select delete_ids.item
+from functional_parquet.iceberg_query_metadata.all_files, functional_parquet.iceberg_query_metadata.all_files.equality_ids delete_ids;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) in FROM clause is not supported for Iceberg Metadata tables.
+====
+---- QUERY
+select null_value_counts.key, null_value_counts.value
+from functional_parquet.iceberg_query_metadata.all_files, functional_parquet.iceberg_query_metadata.all_files.null_value_counts null_value_counts;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) in FROM clause is not supported for Iceberg Metadata tables.
+====
+---- QUERY
+select item
+from functional_parquet.iceberg_query_metadata.all_files a, a.equality_ids e, e.delete_ids;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) in FROM clause is not supported for Iceberg Metadata tables.
+====
+---- QUERY
+create view iceberg_query_metadata_all_files
+as select equality_ids from functional_parquet.iceberg_query_metadata.all_files;
+select item from iceberg_query_metadata_all_files a, a.equality_ids e, e.delete_ids;
+---- CATCH
+AnalysisException: Querying collection types (ARRAY/MAP) in FROM clause is not supported for Iceberg Metadata tables.
+====
 
 ####
-# Test 11 : Query nested type columns
+# Query nested type columns
 ####
 ====
 ---- QUERY
@@ -562,39 +591,128 @@ row_regex:'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_quer
 ---- TYPES
 STRING,INT
 ====
+
+####
+# Query ARRAY type columns
+####
 ---- QUERY
-select i from functional_parquet.iceberg_query_metadata.entries.readable_metrics;
----- CATCH
-AnalysisException: Illegal table reference to non-collection type: 'functional_parquet.iceberg_query_metadata.entries.readable_metrics'
+select equality_ids from functional_parquet.iceberg_v2_delete_both_eq_and_pos.all_files;
+---- RESULTS
+'NULL'
+'[1,3]'
+'NULL'
+'NULL'
+'[1,3]'
+---- TYPES
+STRING
 ====
 ---- QUERY
-select delete_ids.item
-from functional_parquet.iceberg_query_metadata.all_files, functional_parquet.iceberg_query_metadata.all_files.equality_ids delete_ids;
----- CATCH
-AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+select partition_summaries from functional_parquet.iceberg_partitioned.all_manifests;
+---- RESULTS
+'[{"contains_null":false,"contains_nan":null,"lower_bound":"2020-01-01-08","upper_bound":"2020-01-01-10"},{"contains_null":false,"contains_nan":null,"lower_bound":"click","upper_bound":"view"}]'
+---- TYPES
+STRING
 ====
 ---- QUERY
-select null_value_counts.key, null_value_counts.value
-from functional_parquet.iceberg_query_metadata.all_files, functional_parquet.iceberg_query_metadata.all_files.null_value_counts null_value_counts;
----- CATCH
-AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+select file_path, content, equality_ids from functional_parquet.iceberg_v2_delete_both_eq_and_pos.all_files
+order by file_path;
+---- RESULTS
+'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-38a471ff-46f4-4350-85cc-2e7ba946b34c-00001.parquet',0,'NULL'
+'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-38a471ff-46f4-4350-85cc-2e7ba946b34c-00002.parquet',2,'[1,3]'
+'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-72709aba-fb15-4bd6-9758-5f39eb9bdcb7-00001.parquet',0,'NULL'
+'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-72709aba-fb15-4bd6-9758-5f39eb9bdcb7-00002.parquet',2,'[1,3]'
+'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/delete-074a9e19e61b766e-652a169e00000001_800513971_data.0.parq',1,'NULL'
+---- TYPES
+STRING,INT,STRING
 ====
 ---- QUERY
-select item
-from functional_parquet.iceberg_query_metadata.all_files a, a.equality_ids e, e.delete_ids;
----- CATCH
-AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+select equality_ids, equality_ids from functional_parquet.iceberg_v2_delete_both_eq_and_pos.all_files;
+---- RESULTS
+'NULL','NULL'
+'[1,3]','[1,3]'
+'NULL','NULL'
+'NULL','NULL'
+'[1,3]','[1,3]'
+---- TYPES
+STRING,STRING
 ====
 ---- QUERY
-create view iceberg_query_metadata_all_files
-as select equality_ids from functional_parquet.iceberg_query_metadata.all_files;
-select item from iceberg_query_metadata_all_files a, a.equality_ids e, e.delete_ids;
----- CATCH
-AnalysisException: Querying collection types (ARRAY/MAP) is not supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)
+select equality_ids from (select equality_ids from functional_parquet.iceberg_v2_delete_both_eq_and_pos.all_files) s;
+---- RESULTS
+'NULL'
+'[1,3]'
+'NULL'
+'NULL'
+'[1,3]'
+---- TYPES
+STRING
+====
+---- QUERY
+with s as (select equality_ids from functional_parquet.iceberg_v2_delete_both_eq_and_pos.all_files)
+select equality_ids from s;
+---- RESULTS
+'NULL'
+'[1,3]'
+'NULL'
+'NULL'
+'[1,3]'
+---- TYPES
+STRING
+====
+---- QUERY
+# The following three queries are for specific use-cases:
+# Source: https://www.apachecon.com/acna2022/slides/02_Ho_Icebergs_Best_Secret.pdf
+# How many files per partition:
+SELECT `partition`, file_count FROM functional_parquet.iceberg_partitioned.`partitions`;
+---- RESULTS
+'{"event_time_hour":438296,"action":"view"}',8
+'{"event_time_hour":438297,"action":"click"}',6
+'{"event_time_hour":438298,"action":"download"}',6
+---- TYPES
+STRING,INT
+====
+---- QUERY
+# Total size of each partition:
+SELECT `partition`.event_time_hour as event_time_hour, `partition`.action as action, sum(file_size_in_bytes)
+FROM functional_parquet.iceberg_partitioned.`files`
+GROUP BY event_time_hour, action;
+---- RESULTS
+438296,'view',9296
+438298,'download',7139
+438297,'click',7013
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Last update time per partition
+SELECT e.data_file.`partition`.event_time_hour as event_time_hour, e.data_file.`partition`.action as action, MAX(s.committed_at) AS last_modified_time
+FROM functional_parquet.iceberg_partitioned.snapshots s
+JOIN functional_parquet.iceberg_partitioned.entries e
+WHERE s.snapshot_id = e.snapshot_id
+GROUP BY event_time_hour, action;
+---- RESULTS
+438298,'download',2020-08-31 05:58:08.440000000
+438297,'click',2020-08-31 05:58:08.440000000
+438296,'view',2020-08-31 05:58:08.440000000
+---- TYPES
+INT,STRING,TIMESTAMP
 ====
 
 ####
-# Test 12 : Describe all the metadata tables once
+# Query MAP type columns
+####
+---- QUERY
+select null_value_counts from functional_parquet.iceberg_query_metadata.all_files;
+---- RESULTS
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+---- TYPES
+STRING
+
+####
+# Describe all the metadata tables once
 ####
 ====
 ---- QUERY

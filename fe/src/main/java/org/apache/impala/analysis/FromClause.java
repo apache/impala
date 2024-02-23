@@ -165,9 +165,10 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     Preconditions.checkNotNull(tblRef.getDesc());
     Preconditions.checkNotNull(tblRef.getDesc().getPath());
     Preconditions.checkNotNull(tblRef.getDesc().getPath().getRootTable());
+    // IMPALA-12853: Collection types in FROM clause for Iceberg Metadata Tables
     if (tblRef.getDesc().getPath().getRootTable() instanceof IcebergMetadataTable) {
-      throw new AnalysisException("Querying collection types (ARRAY/MAP) is not " +
-          "supported for Iceberg Metadata tables. (IMPALA-12610, IMPALA-12611)");
+      throw new AnalysisException("Querying collection types (ARRAY/MAP) in FROM " +
+          "clause is not supported for Iceberg Metadata tables.");
     }
   }
 

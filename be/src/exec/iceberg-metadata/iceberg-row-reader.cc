@@ -16,7 +16,10 @@
 // under the License.
 
 #include "exec/exec-node.inline.h"
+#include "exec/iceberg-metadata/iceberg-metadata-scanner.h"
 #include "exec/iceberg-metadata/iceberg-row-reader.h"
+#include "exec/scan-node.h"
+#include "runtime/collection-value-builder.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"
@@ -24,59 +27,52 @@
 
 namespace impala {
 
-IcebergRowReader::IcebergRowReader(const std::unordered_map<SlotId, jobject>& jaccessors)
-  : jaccessors_(jaccessors) {}
+IcebergRowReader::IcebergRowReader(ScanNode* scan_node,
+    IcebergMetadataScanner* metadata_scanner)
+  : scan_node_(scan_node),
+    metadata_scanner_(metadata_scanner) {}
 
 Status IcebergRowReader::InitJNI() {
-  DCHECK(iceberg_accessor_cl_ == nullptr) << "InitJNI() already called!";
+  DCHECK(list_cl_ == nullptr) << "InitJNI() already called!";
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
+
   // Global class references:
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "org/apache/iceberg/Accessor", &iceberg_accessor_cl_));
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "java/util/List", &list_cl_));
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "org/apache/iceberg/types/Types$NestedField", &iceberg_nested_field_cl_));
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "java/lang/Boolean", &java_boolean_cl_));
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "java/lang/Integer", &java_int_cl_));
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "java/lang/Long", &java_long_cl_));
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "java/lang/CharSequence", &java_char_sequence_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/List", &list_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Boolean", &boolean_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Integer", &integer_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Long", &long_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/CharSequence",
+      &char_sequence_cl_));
 
   // Method ids:
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, list_cl_, "get",
-      "(I)Ljava/lang/Object;", &list_get_));
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_accessor_cl_, "get",
-      "(Ljava/lang/Object;)Ljava/lang/Object;", &iceberg_accessor_get_));
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, java_boolean_cl_, "booleanValue", "()Z",
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, list_cl_, "get", "(I)Ljava/lang/Object;",
+      &list_get_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, list_cl_, "size", "()I", &list_size_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, boolean_cl_, "booleanValue", "()Z",
       &boolean_value_));
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, java_int_cl_, "intValue", "()I",
-      &int_value_));
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, java_long_cl_, "longValue", "()J",
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, integer_cl_, "intValue", "()I",
+      &integer_value_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, long_cl_, "longValue", "()J",
       &long_value_));
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, java_char_sequence_cl_, "toString",
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, char_sequence_cl_, "toString",
       "()Ljava/lang/String;", &char_sequence_to_string_));
   return Status::OK();
 }
 
 Status IcebergRowReader::MaterializeTuple(JNIEnv* env,
     jobject struct_like_row, const TupleDescriptor* tuple_desc, Tuple* tuple,
-    MemPool* tuple_data_pool) {
+    MemPool* tuple_data_pool, RuntimeState* state) {
   DCHECK(env != nullptr);
   DCHECK(struct_like_row != nullptr);
   DCHECK(tuple != nullptr);
   DCHECK(tuple_data_pool != nullptr);
   DCHECK(tuple_desc != nullptr);
 
-  for (SlotDescriptor* slot_desc: tuple_desc->slots()) {
-    jobject accessor = jaccessors_.at(slot_desc->id());
-    jobject accessed_value = env->CallObjectMethod(accessor, iceberg_accessor_get_,
-        struct_like_row);
-    RETURN_ERROR_IF_EXC(env);
+  for (const SlotDescriptor* slot_desc: tuple_desc->slots()) {
+    jobject accessed_value;
+    RETURN_IF_ERROR(metadata_scanner_->GetValue(env, slot_desc, struct_like_row,
+        JavaClassFromImpalaType(slot_desc->type()), &accessed_value));
     if (accessed_value == nullptr) {
       tuple->SetNull(slot_desc->null_indicator_offset());
       continue;
@@ -98,9 +94,13 @@ Status IcebergRowReader::MaterializeTuple(JNIEnv* env,
       } case TYPE_STRING: { // java.lang.String
         RETURN_IF_ERROR(WriteStringSlot(env, accessed_value, slot, tuple_data_pool));
         break;
-      } case TYPE_STRUCT: {
+      } case TYPE_STRUCT: { // Struct type is not used by Impala to access values.
         RETURN_IF_ERROR(WriteStructSlot(env, struct_like_row, slot_desc, tuple,
-            tuple_data_pool));
+            tuple_data_pool, state));
+        break;
+      } case TYPE_ARRAY: { // java.lang.ArrayList
+        RETURN_IF_ERROR(WriteArraySlot(env, accessed_value, (CollectionValue*)slot,
+            slot_desc, tuple, tuple_data_pool, state));
         break;
       }
       default:
@@ -108,42 +108,46 @@ Status IcebergRowReader::MaterializeTuple(JNIEnv* env,
         tuple->SetNull(slot_desc->null_indicator_offset());
         VLOG(3) << "Skipping unsupported column type: " << slot_desc->type().type;
     }
+    env->DeleteLocalRef(accessed_value);
+    RETURN_ERROR_IF_EXC(env);
   }
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteBooleanSlot(JNIEnv* env, jobject accessed_value,
+Status IcebergRowReader::WriteBooleanSlot(JNIEnv* env, const jobject &accessed_value,
     void* slot) {
   DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, java_boolean_cl_) == JNI_TRUE);
+  DCHECK(env->IsInstanceOf(accessed_value, boolean_cl_) == JNI_TRUE);
   jboolean result = env->CallBooleanMethod(accessed_value, boolean_value_);
   RETURN_ERROR_IF_EXC(env);
   *reinterpret_cast<bool*>(slot) = (bool)(result == JNI_TRUE);
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteIntSlot(JNIEnv* env, jobject accessed_value, void* slot) {
+Status IcebergRowReader::WriteIntSlot(JNIEnv* env, const jobject &accessed_value,
+    void* slot) {
   DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, java_int_cl_) == JNI_TRUE);
-  jint result = env->CallIntMethod(accessed_value, int_value_);
+  DCHECK(env->IsInstanceOf(accessed_value, integer_cl_) == JNI_TRUE);
+  jint result = env->CallIntMethod(accessed_value, integer_value_);
   RETURN_ERROR_IF_EXC(env);
   *reinterpret_cast<int32_t*>(slot) = reinterpret_cast<int32_t>(result);
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteLongSlot(JNIEnv* env, jobject accessed_value, void* slot) {
+Status IcebergRowReader::WriteLongSlot(JNIEnv* env, const jobject &accessed_value,
+    void* slot) {
   DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, java_long_cl_) == JNI_TRUE);
+  DCHECK(env->IsInstanceOf(accessed_value, long_cl_) == JNI_TRUE);
   jlong result = env->CallLongMethod(accessed_value, long_value_);
   RETURN_ERROR_IF_EXC(env);
   *reinterpret_cast<int64_t*>(slot) = reinterpret_cast<int64_t>(result);
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteTimeStampSlot(JNIEnv* env, jobject accessed_value,
+Status IcebergRowReader::WriteTimeStampSlot(JNIEnv* env, const jobject &accessed_value,
     void* slot) {
   DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, java_long_cl_) == JNI_TRUE);
+  DCHECK(env->IsInstanceOf(accessed_value, long_cl_) == JNI_TRUE);
   jlong result = env->CallLongMethod(accessed_value, long_value_);
   RETURN_ERROR_IF_EXC(env);
   *reinterpret_cast<TimestampValue*>(slot) = TimestampValue::FromUnixTimeMicros(result,
@@ -151,10 +155,10 @@ Status IcebergRowReader::WriteTimeStampSlot(JNIEnv* env, jobject accessed_value,
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteStringSlot(JNIEnv* env, jobject accessed_value, void* slot,
-      MemPool* tuple_data_pool) {
+Status IcebergRowReader::WriteStringSlot(JNIEnv* env, const jobject &accessed_value,
+    void* slot, MemPool* tuple_data_pool) {
   DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, java_char_sequence_cl_) == JNI_TRUE);
+  DCHECK(env->IsInstanceOf(accessed_value, char_sequence_cl_) == JNI_TRUE);
   jstring result = static_cast<jstring>(env->CallObjectMethod(accessed_value,
       char_sequence_to_string_));
   RETURN_ERROR_IF_EXC(env);
@@ -173,12 +177,79 @@ Status IcebergRowReader::WriteStringSlot(JNIEnv* env, jobject accessed_value, vo
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteStructSlot(JNIEnv* env, jobject struct_like_row,
-    SlotDescriptor* slot_desc, Tuple* tuple, MemPool* tuple_data_pool) {
+Status IcebergRowReader::WriteStructSlot(JNIEnv* env, const jobject &struct_like_row,
+    const SlotDescriptor* slot_desc, Tuple* tuple, MemPool* tuple_data_pool,
+    RuntimeState* state) {
   DCHECK(slot_desc != nullptr);
+  DCHECK(struct_like_row != nullptr);
+  DCHECK(slot_desc->type().IsStructType());
   RETURN_IF_ERROR(MaterializeTuple(env, struct_like_row,
-      slot_desc->children_tuple_descriptor(), tuple, tuple_data_pool));
+      slot_desc->children_tuple_descriptor(), tuple, tuple_data_pool, state));
   return Status::OK();
+}
+
+Status IcebergRowReader::WriteArraySlot(JNIEnv* env, const jobject &struct_like_row,
+    CollectionValue* slot, const SlotDescriptor* slot_desc, Tuple* tuple,
+    MemPool* tuple_data_pool, RuntimeState* state) {
+  DCHECK(slot_desc != nullptr);
+  DCHECK(slot_desc->type().IsCollectionType());
+  DCHECK(env->IsInstanceOf(struct_like_row, list_cl_) == JNI_TRUE);
+  const TupleDescriptor* item_tuple_desc = slot_desc->children_tuple_descriptor();
+  *slot = CollectionValue();
+  CollectionValueBuilder coll_value_builder(slot, *item_tuple_desc, tuple_data_pool,
+      state);
+  jobject array_scanner;
+  RETURN_IF_ERROR(metadata_scanner_->CreateArrayScanner(env, struct_like_row,
+      array_scanner));
+  int remaining_array_size = env->CallIntMethod(struct_like_row, list_size_);
+  RETURN_ERROR_IF_EXC(env);
+  while (!scan_node_->ReachedLimit() && remaining_array_size > 0) {
+    RETURN_IF_CANCELLED(state);
+    int num_tuples;
+    MemPool* tuple_data_pool_collection = coll_value_builder.pool();
+    Tuple* tuple;
+    RETURN_IF_ERROR(coll_value_builder.GetFreeMemory(&tuple, &num_tuples));
+    // 'num_tuples' can be very high if we're writing to a large CollectionValue. Limit
+    // the number of tuples we read at one time so we don't spend too long in the
+    // 'num_tuples' loop below before checking for cancellation or limit reached.
+    num_tuples = std::min(num_tuples, scan_node_->runtime_state()->batch_size());
+    int num_to_commit = 0;
+    while (num_to_commit < num_tuples && remaining_array_size > 0) {
+      tuple->Init(item_tuple_desc->byte_size());
+      jobject item;
+      RETURN_IF_ERROR(metadata_scanner_->GetNextArrayItem(env, array_scanner, &item));
+      RETURN_IF_ERROR(MaterializeTuple(env, item, item_tuple_desc, tuple,
+          tuple_data_pool_collection, state));
+      // For filtering please see IMPALA-12853.
+      tuple += item_tuple_desc->byte_size();
+      ++num_to_commit;
+      --remaining_array_size;
+    }
+    coll_value_builder.CommitTuples(num_to_commit);
+  }
+  env->DeleteLocalRef(array_scanner);
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
+jclass IcebergRowReader::JavaClassFromImpalaType(const ColumnType type) {
+  switch (type.type) {
+    case TYPE_BOOLEAN: {     // java.lang.Boolean
+      return boolean_cl_;
+    } case TYPE_INT: {       // java.lang.Integer
+      return integer_cl_;
+    } case TYPE_BIGINT:      // java.lang.Long
+      case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
+      return long_cl_;
+    } case TYPE_STRING: {    // java.lang.String
+      return char_sequence_cl_;
+    } case TYPE_ARRAY: {     // java.lang.util.List
+      return list_cl_;
+    }
+    default:
+      VLOG(3) << "Skipping unsupported column type: " << type.type;
+  }
+  return nullptr;
 }
 
 }
