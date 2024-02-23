@@ -537,6 +537,23 @@ public abstract class Catalog implements AutoCloseable {
    */
   public TCatalogObject getTCatalogObject(TCatalogObject objectDesc)
       throws CatalogException {
+    return getTCatalogObject(objectDesc, false);
+  }
+
+  /**
+   * Gets the thrift representation of a catalog object, given the "object
+   * description". The object description is just a TCatalogObject with only the
+   * catalog object type and object name set.
+   * If the object is not found, a CatalogException is thrown.
+   * @param objectDesc the object description.
+   * @param isHumanReadable whether the request is for human readable purpose or not.
+   *                        If False, return full object. Otherwise, return smaller
+   *                        catalog object that omit some field.
+   * @return the requested catalog object.
+   * @throws CatalogException
+   */
+  public TCatalogObject getTCatalogObject(
+      TCatalogObject objectDesc, boolean isHumanReadable) throws CatalogException {
     TCatalogObject result = new TCatalogObject();
     switch (objectDesc.getType()) {
       case DATABASE: {
@@ -562,7 +579,8 @@ public abstract class Catalog implements AutoCloseable {
         try {
           result.setType(table.getCatalogObjectType());
           result.setCatalog_version(table.getCatalogVersion());
-          result.setTable(table.toThrift());
+          result.setTable(
+              isHumanReadable ? table.toHumanReadableThrift() : table.toThrift());
         } finally {
           table.releaseReadLock();
         }

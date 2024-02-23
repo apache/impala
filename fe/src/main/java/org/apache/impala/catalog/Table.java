@@ -705,6 +705,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     return table;
   }
 
+  /**
+   * Variant of toThrift() with lower detail. Intended to get a human readable output
+   * that omit any binary fields.
+   */
+  public TTable toHumanReadableThrift() { return toThrift(); }
+
   private boolean isLockedByCurrentThread() {
     return isReadLockedByCurrentThread() || tableLock_.isWriteLockedByCurrentThread();
   }

@@ -2092,6 +2092,16 @@ public class HdfsTable extends Table implements FeFsTable {
     return table;
   }
 
+  @Override
+  public TTable toHumanReadableThrift() {
+    // Same as toThrift, but call getTHdfsTable with lower
+    // ThriftObjectType.DESCRIPTOR_ONLY.
+    TTable table = super.toThrift();
+    table.setTable_type(TTableType.HDFS_TABLE);
+    table.setHdfs_table(getTHdfsTable(ThriftObjectType.DESCRIPTOR_ONLY, null));
+    return table;
+  }
+
   /**
    * Just like toThrift but unset the full partition metadata in the partition map.
    * So only the partition ids are contained. Used in catalogd to send partition updates

@@ -400,7 +400,9 @@ public class JniCatalog {
 
   /**
    * Gets the json string of a catalog object. It can only be used in showing debug
-   * messages and can't be deserialized to a thrift object.
+   * messages and can't be deserialized to a thrift object. The returned object is also
+   * slimmer than the one obtained from getCatalogObject() because binary data fields
+   * are excluded.
    */
   public String getJsonCatalogObject(byte[] thriftParams)
       throws ImpalaException, TException {
@@ -411,7 +413,7 @@ public class JniCatalog {
         "Getting JSON catalog object of " + Catalog.toCatalogObjectKey(objectDesc);
 
     return execOp("getJsonCatalogObject", shortDesc, () -> {
-      String res = jsonSerializer.toString(catalog_.getTCatalogObject(objectDesc));
+      String res = jsonSerializer.toString(catalog_.getTCatalogObject(objectDesc, true));
       return Pair.create(res, (long) res.length());
     }, objectDesc);
   }

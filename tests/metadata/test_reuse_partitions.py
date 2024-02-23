@@ -44,11 +44,13 @@ class TestReusePartitions(ImpalaTestSuite):
     obj_url = self.JSON_TABLE_OBJECT_URL.format(db_name, tbl_name)
     response = requests.get(obj_url)
     assert response.status_code == requests.codes.ok
-    catalog_obj = json.loads(json.loads(response.text)["json_string"])
-    assert "table" in catalog_obj
-    assert "hdfs_table" in catalog_obj["table"]
+    json_response = json.loads(response.text)
+    assert "json_string" in json_response, json_response
+    catalog_obj = json.loads(json_response["json_string"])
+    assert "table" in catalog_obj, catalog_obj
+    assert "hdfs_table" in catalog_obj["table"], catalog_obj["table"]
     tbl_obj = catalog_obj["table"]["hdfs_table"]
-    assert "partitions" in tbl_obj
+    assert "partitions" in tbl_obj, tbl_obj
     return set(tbl_obj["partitions"].keys())
 
   def test_reuse_partitions_nontransactional(self, unique_database):
