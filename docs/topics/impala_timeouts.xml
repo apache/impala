@@ -126,8 +126,10 @@ Trying to re-register with state-store</codeblock>
               <codeph>--idle_query_timeout</codeph> disables query timeouts.
           </p>
           <p>
-            Cancelled queries remain in the open state but use only the
-            minimal resources.
+            Cancelled queries are closed, but the client can still fetch their exception
+            details. If the query was in a good state when cancelled, it will present an
+            error like "Query 6f49e509bfa5b347:207d8ef900000000 expired due to client
+            inactivity", otherwise it will show the relevant error.
           </p>
         </li>
 

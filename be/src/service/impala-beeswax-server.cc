@@ -292,7 +292,14 @@ beeswax::QueryState::type ImpalaServer::get_state(
   VLOG_ROW << "get_state(): query_id=" << PrintId(query_id);
 
   QueryHandle query_handle;
-  RAISE_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
+  Status status = GetActiveQueryHandle(query_id, &query_handle);
+  // GetActiveQueryHandle may return the query's status from being cancelled. If not an
+  // invalid query handle, we can assume that error statuses reflect a query in the
+  // EXCEPTION state.
+  if (!status.ok() && status.code() != TErrorCode::INVALID_QUERY_HANDLE) {
+    return beeswax::QueryState::EXCEPTION;
+  }
+  RAISE_IF_ERROR(status, SQLSTATE_GENERAL_ERROR);
 
   // Validate that query can be accessed by user.
   RAISE_IF_ERROR(CheckClientRequestSession(session.get(), query_handle->effective_user(),

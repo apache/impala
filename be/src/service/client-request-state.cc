@@ -1155,6 +1155,10 @@ bool ClientRequestState::BlockOnWait(int64_t timeout_us, int64_t* block_on_wait_
 void ClientRequestState::Wait() {
   // block until results are ready
   Status status = WaitInternal();
+  // Rows are available now (for SELECT statement), so start the 'wait' timer that tracks
+  // how long Impala waits for the client to fetch rows. For other statements, track the
+  // time until a Close() is received.
+  MarkInactive();
   {
     lock_guard<mutex> l(lock_);
     if (returns_result_set()) {
@@ -1191,7 +1195,6 @@ void ClientRequestState::Wait() {
 Status ClientRequestState::WaitInternal() {
   // Explain requests have already populated the result set. Nothing to do here.
   if (exec_request().stmt_type == TStmtType::EXPLAIN) {
-    MarkInactive();
     return Status::OK();
   }
 
@@ -1240,10 +1243,6 @@ Status ClientRequestState::WaitInternal() {
   } else if (isCTAS) {
     SetCreateTableAsSelectResultSet();
   }
-  // Rows are available now (for SELECT statement), so start the 'wait' timer that tracks
-  // how long Impala waits for the client to fetch rows. For other statements, track the
-  // time until a Close() is received.
-  MarkInactive();
   return Status::OK();
 }
 

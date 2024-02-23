@@ -185,10 +185,11 @@ class TQueryExecRequest;
 /// 1. session_state_map_lock_
 /// 2. SessionState::lock
 /// 3. query_expiration_lock_
-/// 4. ClientRequestState::fetch_rows_lock
-/// 5. ClientRequestState::lock
-/// 6. ClientRequestState::expiration_data_lock_
-/// 7. Coordinator::exec_summary_lock
+/// 4. idle_query_statuses_lock_
+/// 5. ClientRequestState::fetch_rows_lock
+/// 6. ClientRequestState::lock
+/// 7. ClientRequestState::expiration_data_lock_
+/// 8. Coordinator::exec_summary_lock
 ///
 /// The following locks are not held in conjunction with other locks:
 /// * query_log_lock_
@@ -656,6 +657,9 @@ class ImpalaServer : public ImpalaServiceIf,
     /// SetQueryInflight is called, the original may be cleaned up before it is added to
     /// inflight_queries. In that case we add it to prestopped_queries instead.
     std::set<TUniqueId> prestopped_queries;
+
+    /// Unregistered queries we need to clear from idle_query_statuses_ on closure.
+    std::vector<TUniqueId> idled_queries;
 
     /// Total number of queries run as part of this session.
     int64_t total_queries;
@@ -1153,8 +1157,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// check should be rescheduled for a later time.
   Status CheckResourceLimits(ClientRequestState* crs);
 
-  /// Expire 'crs' and cancel it with status 'status'.
-  void ExpireQuery(ClientRequestState* crs, const Status& status);
+  /// Expire 'crs' and cancel it with status 'status'. Optionally unregisters the query.
+  void ExpireQuery(ClientRequestState* crs, const Status& status,
+      bool unregister = false);
 
   typedef boost::unordered_map<std::string, boost::unordered_set<std::string>>
       AuthorizedProxyMap;
@@ -1422,6 +1427,13 @@ class ImpalaServer : public ImpalaServiceIf,
   /// A map from session identifier to a structure containing per-session information
   typedef boost::unordered_map<TUniqueId, std::shared_ptr<SessionState>> SessionStateMap;
   SessionStateMap session_state_map_;
+
+  /// Protects idle_query_statuses_;
+  std::mutex idle_query_statuses_lock_;
+
+  /// A map of queries that were stopped due to idle timeout and the status they had when
+  /// unregistered. Used to return a more useful error when looking up unregistered IDs.
+  std::map<TUniqueId, Status> idle_query_statuses_;
 
   /// Protects connection_to_sessions_map_. See "Locking" in the class comment for lock
   /// acquisition order.

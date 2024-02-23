@@ -1428,6 +1428,16 @@ Status ImpalaServer::RegisterQuery(const TUniqueId& query_id,
   return Status::OK();
 }
 
+static inline int32_t GetIdleTimeout(const TQueryOptions& query_options) {
+  int32_t idle_timeout_s = query_options.query_timeout_s;
+  if (FLAGS_idle_query_timeout > 0 && idle_timeout_s > 0) {
+    return min(FLAGS_idle_query_timeout, idle_timeout_s);
+  } else {
+    // Use a non-zero timeout, if one exists
+    return max(FLAGS_idle_query_timeout, idle_timeout_s);
+  }
+}
+
 Status ImpalaServer::SetQueryInflight(
     shared_ptr<SessionState> session_state, const QueryHandle& query_handle) {
   DebugActionNoFail(query_handle->query_options(), "SET_QUERY_INFLIGHT");
@@ -1459,13 +1469,7 @@ Status ImpalaServer::SetQueryInflight(
   }
 
   // If the query has a timeout or time limit, schedule checks.
-  int32_t idle_timeout_s = query_handle->query_options().query_timeout_s;
-  if (FLAGS_idle_query_timeout > 0 && idle_timeout_s > 0) {
-    idle_timeout_s = min(FLAGS_idle_query_timeout, idle_timeout_s);
-  } else {
-    // Use a non-zero timeout, if one exists
-    idle_timeout_s = max(FLAGS_idle_query_timeout, idle_timeout_s);
-  }
+  int32_t idle_timeout_s = GetIdleTimeout(query_handle->query_options());
   int32_t exec_time_limit_s = query_handle->query_options().exec_time_limit_s;
   int64_t cpu_limit_s = query_handle->query_options().cpu_limit_s;
   int64_t scan_bytes_limit = query_handle->query_options().scan_bytes_limit;
@@ -1701,6 +1705,14 @@ Status ImpalaServer::GetActiveQueryHandle(
   DCHECK(query_handle != nullptr);
   shared_ptr<QueryDriver> query_driver = GetQueryDriver(query_id);
   if (UNLIKELY(query_driver == nullptr)) {
+    {
+      lock_guard<mutex> l(idle_query_statuses_lock_);
+      auto it = idle_query_statuses_.find(query_id);
+      if (it != idle_query_statuses_.end()) {
+        return it->second;
+      }
+    }
+
     Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
     VLOG(1) << err.GetDetail();
     return err;
@@ -1797,6 +1809,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     DecrementSessionCount(session_state->connected_user);
   }
   unordered_set<TUniqueId> inflight_queries;
+  vector<TUniqueId> idled_queries;
   {
     lock_guard<mutex> l(session_state->lock);
     DCHECK(!session_state->closed);
@@ -1804,12 +1817,19 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     // Since closed is true, no more queries will be added to the inflight list.
     inflight_queries.insert(session_state->inflight_queries.begin(),
         session_state->inflight_queries.end());
+    idled_queries.swap(session_state->idled_queries);
   }
   // Unregister all open queries from this session.
   Status status = Status::Expected("Session closed");
   for (const TUniqueId& query_id: inflight_queries) {
     // TODO: deal with an error status
     UnregisterQueryDiscardResult(query_id, false, &status);
+  }
+  {
+    lock_guard<mutex> l(idle_query_statuses_lock_);
+    for (const TUniqueId& query_id: idled_queries) {
+      idle_query_statuses_.erase(query_id);
+    }
   }
   // Reconfigure the poll period of session_maintenance_thread_ if necessary.
   UnregisterSessionTimeout(session_state->session_timeout);
@@ -2774,8 +2794,9 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
           continue;
         }
         ClientRequestState* crs = query_driver->GetActiveClientRequestState();
-        if (crs->is_expired()) {
-          // Query was expired already from a previous expiration event.
+        if (crs->is_expired() && expiration_event->kind != ExpirationKind::IDLE_TIMEOUT) {
+          // Query was expired already from a previous expiration event. Keep idle
+          // timeouts as they will additionally unregister the query.
           expiration_event = queries_by_timestamp_.erase(expiration_event);
           continue;
         }
@@ -2812,13 +2833,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
         // Now check to see if the idle timeout has expired. We must check the actual
         // expiration time in case the query has updated 'last_active_ms' since the last
         // time we looked.
-        int32_t idle_timeout_s = crs->query_options().query_timeout_s;
-        if (FLAGS_idle_query_timeout > 0 && idle_timeout_s > 0) {
-          idle_timeout_s = min(FLAGS_idle_query_timeout, idle_timeout_s);
-        } else {
-          // Use a non-zero timeout, if one exists
-          idle_timeout_s = max(FLAGS_idle_query_timeout, idle_timeout_s);
-        }
+        int32_t idle_timeout_s = GetIdleTimeout(crs->query_options());
         int64_t expiration = crs->last_active_ms() + (idle_timeout_s * 1000L);
         if (now < expiration) {
           // If the real expiration date is in the future we may need to re-insert the
@@ -2840,10 +2855,29 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
           VLOG_QUERY << "Expiring query due to client inactivity: "
                      << PrintId(expiration_event->query_id) << ", last activity was at: "
                      << ToStringFromUnixMillis(crs->last_active_ms());
-          ExpireQuery(crs,
-              Status::Expected(TErrorCode::INACTIVE_QUERY_EXPIRED,
-                  PrintId(expiration_event->query_id),
-                  PrettyPrinter::Print(idle_timeout_s, TUnit::TIME_S)));
+          const Status status = Status::Expected(TErrorCode::INACTIVE_QUERY_EXPIRED,
+              PrintId(expiration_event->query_id),
+              PrettyPrinter::Print(idle_timeout_s, TUnit::TIME_S));
+
+          // Save status so we can report it for unregistered queries.
+          Status preserved_status;
+          {
+            lock_guard<mutex> l(*crs->lock());
+            preserved_status = crs->query_status();
+          }
+          preserved_status.MergeStatus(status);
+          {
+            shared_ptr<SessionState> session = crs->session();
+            lock_guard<mutex> l(session->lock);
+            if (!session->closed) {
+              lock_guard<mutex> l(idle_query_statuses_lock_);
+              idle_query_statuses_.emplace(
+                  expiration_event->query_id, move(preserved_status));
+              session->idled_queries.emplace_back(expiration_event->query_id);
+            }
+          }
+
+          ExpireQuery(crs, status, true);
           expiration_event = queries_by_timestamp_.erase(expiration_event);
         } else {
           // Iterator is moved on in every other branch.
@@ -2972,12 +3006,18 @@ Status ImpalaServer::CheckResourceLimits(ClientRequestState* crs) {
   return Status::OK();
 }
 
-void ImpalaServer::ExpireQuery(ClientRequestState* crs, const Status& status) {
+void ImpalaServer::ExpireQuery(ClientRequestState* crs, const Status& status,
+    bool unregister) {
   DCHECK(!status.ok());
   cancellation_thread_pool_->Offer(
-      CancellationWork::TerminatedByServer(crs->query_id(), status, false));
-  ImpaladMetrics::NUM_QUERIES_EXPIRED->Increment(1L);
-  crs->set_expired();
+      CancellationWork::TerminatedByServer(crs->query_id(), status, unregister));
+  if (crs->is_expired()) {
+    // Should only be re-entrant if we're now unregistering the query.
+    DCHECK(unregister);
+  } else {
+    ImpaladMetrics::NUM_QUERIES_EXPIRED->Increment(1L);
+    crs->set_expired();
+  }
 }
 
 Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,

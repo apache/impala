@@ -886,7 +886,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.cluster.impalads[1].kill()
     query = self._count_query
     handle = self.execute_query_async(query,
-        query_options={'retry_failed_queries': 'true', 'query_timeout_s': '1'})
+        query_options={'retry_failed_queries': 'true', 'exec_time_limit_s': '1'})
     self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 60)
 
     # Validate the live exec summary.
@@ -908,7 +908,7 @@ class TestQueryRetries(CustomClusterTestSuite):
       self.client.fetch(query, handle)
       assert False
     except Exception as e:
-        assert "expired due to client inactivity" in str(e)
+        assert "expired due to execution time limit of 1s000ms" in str(e)
 
     # Assert that the impalad metrics show one expired query.
     assert impalad_service.get_metric_value('impala-server.num-queries-expired') == 1
