@@ -24,7 +24,21 @@ setup_report_build_error
 : ${IMPALA_JS_TEST_LOGS_DIR:="${IMPALA_LOGS_DIR}/js_tests"}
 
 NODEJS_VERSION=v16.20.2
-NODEJS_DISTRO=linux-x64
+# ARCH_NAME is set in bin/impala-config.sh
+if [[ $ARCH_NAME == aarch64 ]]; then
+  NODEJS_DISTRO=linux-arm64
+elif [[ $ARCH_NAME == x86_64 ]]; then
+  NODEJS_DISTRO=linux-x64
+else
+  echo "This script supports Intel x86_64 or ARM aarch64 CPU architectures only." >&2
+  echo "Current CPU type is reported as $ARCH_NAME" >&2
+  # report the installation failure as a JUnit symptom
+  "${IMPALA_HOME}"/bin/generate_junitxml.py --phase JS_TEST \
+      -- step "node.js installation" \
+      --error "Unknown CPU architecture $ARCH_NAME encountered."
+  exit 1
+fi
+
 NODEJS_LIB_PATH="${IMPALA_TOOLCHAIN}/node-${NODEJS_VERSION}"
 export IMPALA_NODEJS="${NODEJS_LIB_PATH}/bin/node"
 NPM="${NODEJS_LIB_PATH}/bin/npm"
