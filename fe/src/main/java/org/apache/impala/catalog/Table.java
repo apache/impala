@@ -86,10 +86,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   protected final String full_name_;
   protected final String owner_;
   protected TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
-  // Lock protecting this table. A read lock must be table when we are serializing
+  // Lock protecting this table. A read lock must be held when we are serializing
   // the table contents over thrift (e.g when returning the table to clients over thrift
   // or when topic-update thread serializes the table in the topic update)
-  // A write lock must be table when the table is being modified (e.g. DDLs or refresh)
+  // A write lock must be held when the table is being modified (e.g. DDLs or refresh)
   private final ReentrantReadWriteLock tableLock_ = new ReentrantReadWriteLock(
       true /*fair ordering*/);
   private final ReadLock readLock_ = tableLock_.readLock();

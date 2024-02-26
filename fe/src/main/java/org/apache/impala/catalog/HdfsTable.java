@@ -207,6 +207,8 @@ public class HdfsTable extends Table implements FeFsTable {
   public static final String LOAD_DURATION_FILE_METADATA_ALL_PARTITIONS =
       "load-duration.all-partitions.file-metadata";
 
+  private static final THdfsPartition FAKE_THDFS_PARTITION = new THdfsPartition();
+
   // string to indicate NULL. set in load() from table properties
   private String nullColumnValue_;
 
@@ -2129,7 +2131,7 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Just likes super.toMinimalTCatalogObject() but also contains the minimal catalog
+   * Just likes super.toMinimalTCatalogObject() but try to add the minimal catalog
    * objects of partitions in the returned result.
    */
   @Override
@@ -2138,19 +2140,49 @@ public class HdfsTable extends Table implements FeFsTable {
     if (!BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()) {
       return catalogObject;
     }
-    catalogObject.getTable().setTable_type(TTableType.HDFS_TABLE);
-    THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
-        nullPartitionKeyValue_, nullColumnValue_,
-        /*idToPartition=*/ new HashMap<>(),
-        /*prototypePartition=*/ new THdfsPartition());
-    for (HdfsPartition part : partitionMap_.values()) {
-      hdfsTable.partitions.put(part.getId(), part.toMinimalTHdfsPartition());
+    // Try adding the partition ids and names if we can acquire the read lock.
+    // Use tryReadLock() to avoid being blocked by concurrent DDLs. It won't result in
+    // correctness issues if we return the result without the partition ids and names.
+    // The results are mainly used in two scenarios:
+    // 1. The result is added to catalog deleteLog for sending delete updates for
+    //    partitions. The delete update for the table is always sent so coordinators are
+    //    able to invalidate the HdfsTable object. This enforces the correctness.
+    //    However, not sending the deletes causes a leak of the topic values in
+    //    statestore if the topic keys (tableName+partName) are not reused anymore.
+    //    Note that topic keys are never deleted in the TopicEntryMap of statestore even
+    //    if we send the delete updates. So we already have a leak on catalog topic keys.
+    //    We can revisit this if we found statestore has memory issues.
+    // 2. The result is used in DDL/DML response for a removed/invalidated table.
+    //    Coordinators can still invalidate its cache since the table is sent (in the
+    //    parent implementation).
+    //    However, LocalCatalog coordinators can't immediately invalidate partitions of
+    //    a removed table. They will be cleared by the cache eviction policy since the
+    //    partitions of deleted tables won't be used anymore.
+    // TODO: synchronize the access on the partition map by using a finer-grained lock
+    if (!tryReadLock()) {
+      LOG.warn("Not returning the partition ids and names of table {} since not " +
+          "holding the table read lock", getFullName());
+      return catalogObject;
     }
-    hdfsTable.setHas_full_partitions(false);
-    // The minimal catalog object of partitions contain the partition names.
-    hdfsTable.setHas_partition_names(true);
-    catalogObject.getTable().setHdfs_table(hdfsTable);
-    return catalogObject;
+    try {
+      catalogObject.getTable().setTable_type(TTableType.HDFS_TABLE);
+      // Column names are unused by the consumers so use an empty list here.
+      THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_,
+          /*colNames=*/ Collections.emptyList(),
+          nullPartitionKeyValue_, nullColumnValue_,
+          /*idToPartition=*/ new HashMap<>(),
+          /*prototypePartition=*/ FAKE_THDFS_PARTITION);
+      for (HdfsPartition part : partitionMap_.values()) {
+        hdfsTable.partitions.put(part.getId(), part.toMinimalTHdfsPartition());
+      }
+      hdfsTable.setHas_full_partitions(false);
+      // The minimal catalog object of partitions contain the partition names.
+      hdfsTable.setHas_partition_names(true);
+      catalogObject.getTable().setHdfs_table(hdfsTable);
+      return catalogObject;
+    } finally {
+      releaseReadLock();
+    }
   }
 
   /**
