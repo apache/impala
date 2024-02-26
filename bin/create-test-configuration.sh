@@ -151,6 +151,13 @@ mkdir -p hive-site-events-cleanup
 rm -f hive-site-events-cleanup/hive-site.xml
 ln -s "${CONFIG_DIR}/hive-site_events_cleanup.xml" hive-site-events-cleanup/hive-site.xml
 
+export HIVE_VARIANT=housekeeping_on
+$IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_housekeeping_on.xml
+mkdir -p hive-site-housekeeping-on
+rm -f hive-site-housekeeping-on/hive-site.xml
+ln -s "${CONFIG_DIR}/hive-site_housekeeping_on.xml" \
+    hive-site-housekeeping-on/hive-site.xml
+
 export HIVE_VARIANT=ranger_auth
 HIVE_RANGER_CONF_DIR=hive-site-ranger-auth
 $IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_ranger_auth.xml

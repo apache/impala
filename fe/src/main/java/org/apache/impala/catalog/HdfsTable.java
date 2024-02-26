@@ -3033,16 +3033,15 @@ public class HdfsTable extends Table implements FeFsTable {
       throws TableLoadingException {
     String tblFullName = getFullName();
     if (LOG.isTraceEnabled()) LOG.trace("Get valid writeIds for table: " + tblFullName);
-    ValidWriteIdList validWriteIds = null;
+    ValidWriteIdList validWriteIds;
     try {
       validWriteIds = MetastoreShim.fetchValidWriteIds(client, tblFullName);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Valid writeIds: " + validWriteIds.writeToString());
-      }
+      LOG.info("Valid writeIds of table {}: {}", tblFullName,
+          validWriteIds.writeToString());
       return validWriteIds;
     } catch (Exception e) {
       throw new TableLoadingException(String.format("Error loading ValidWriteIds for " +
-          "table '%s'", getName()), e);
+          "table '%s'", tblFullName), e);
     }
   }
 

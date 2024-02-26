@@ -2802,7 +2802,7 @@ public class MetastoreEvents {
     @Override
     protected void processTableEvent() throws MetastoreNotificationException {
       if (msTbl_ == null) {
-        debugLog("Ignoring the event since table {} is not found",
+        debugLog("Ignoring the event since table {} does not exist or is unloaded",
             getFullyQualifiedTblName());
         return;
       }
@@ -2823,6 +2823,8 @@ public class MetastoreEvents {
           TableWriteId tableWriteId = new TableWriteId(dbName_, tblName_,
               tbl_.getCreateEventId(), txnToWriteId.getWriteId());
           catalog_.addWriteId(txnToWriteId.getTxnId(), tableWriteId);
+          infoLog("Added write id {} on table {}.{} for txn {}",
+              txnToWriteId.getWriteId(), dbName_, tblName_, txnToWriteId.getTxnId());
         }
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException("Failed to mark open "
@@ -3007,12 +3009,15 @@ public class MetastoreEvents {
           MetastoreEventsProcessor.getMessageDeserializer().getAbortTxnMessage(
               event.getMessage());
       txnId_ = abortTxnMessage.getTxnId();
+      infoLog("Received AbortTxnEvent for transaction " + txnId_);
     }
 
     @Override
     protected void process() throws MetastoreNotificationException {
       try {
-        addAbortedWriteIdsToTables(catalog_.getWriteIds(txnId_));
+        Set<TableWriteId> tableWriteIds = catalog_.getWriteIds(txnId_);
+        infoLog("Adding {} aborted write ids", tableWriteIds.size());
+        addAbortedWriteIdsToTables(tableWriteIds);
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
             + "mark aborted write ids to table for txn {}. Event processing cannot "

@@ -88,6 +88,11 @@ elif variant == 'events_cleanup':
     'hive.metastore.event.db.listener.timetolive': '60s',
     'hive.metastore.event.db.listener.clean.interval': '10s'
   })
+elif variant == 'housekeeping_on':
+  # HMS configs needed for regression test for IMPALA-12827
+  CONFIG.update({
+    'hive.metastore.housekeeping.threads.on': 'true',
+  })
 
 # HBase-related configs.
 # Impala processes need to connect to zookeeper on INTERNAL_LISTEN_HOST for HBase.

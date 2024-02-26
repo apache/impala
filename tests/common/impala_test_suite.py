@@ -1035,6 +1035,7 @@ class ImpalaTestSuite(BaseTestSuite):
   # out to beeline for better performance
   def run_stmt_in_hive(self, stmt, username=None):
     """Run a statement in Hive by Beeline."""
+    LOG.info("-- executing in HiveServer2\n\n" + stmt + "\n")
     url = 'jdbc:hive2://' + pytest.config.option.hive_server2
     return self.run_stmt_in_beeline(url, username, stmt)
 

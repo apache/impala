@@ -839,6 +839,8 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       commitTxnMessage_ = MetastoreEventsProcessor.getMessageDeserializer()
           .getCommitTxnMessage(event.getMessage());
       txnId_ = commitTxnMessage_.getTxnId();
+      LOG.info("EventId: {} EventType: COMMIT_TXN transaction id: {}", getEventId(),
+          txnId_);
     }
 
     @Override

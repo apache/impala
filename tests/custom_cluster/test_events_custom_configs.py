@@ -17,6 +17,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import logging
+from os import getenv
 import pytest
 
 
@@ -25,11 +26,15 @@ from hive_metastore.ttypes import FireEventRequestData
 from hive_metastore.ttypes import InsertEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS
+from tests.common.skip import SkipIf, SkipIfFS
+from tests.util.acid_txn import AcidTxn
 from tests.util.hive_utils import HiveDbWrapper
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.iceberg_util import IcebergCatalogs
+
+HIVE_SITE_HOUSEKEEPING_ON =\
+    getenv('IMPALA_HOME') + '/fe/src/test/resources/hive-site-housekeeping-on'
 
 
 @SkipIfFS.hive
@@ -1144,3 +1149,44 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     data = int(self.execute_scalar("select count(*) from {0}.{1}".format(
       unique_database, hive_tbl)))
     assert data == 0
+
+  @SkipIf.is_test_jdk
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--hms_event_polling_interval_s=100",
+      hive_conf_dir=HIVE_SITE_HOUSEKEEPING_ON)
+  def test_commit_compaction_with_abort_txn(self, unique_database):
+    """Use a long enough polling interval to allow Hive statements to finish before
+       the ABORT_TXN event is processed. In local tests, the Hive statements usually
+       finish in 60s.
+       TODO: improve this by adding commands to pause and resume the event-processor."""
+    tbl = "part_table"
+    fq_tbl = unique_database + '.' + tbl
+    acid = AcidTxn(self.hive_client)
+    self.run_stmt_in_hive(
+        "create transactional table {} (i int) partitioned by (p int)".format(fq_tbl))
+
+    # Allocate a write id on this table and abort the txn
+    txn_id = acid.open_txns()
+    acid.allocate_table_write_ids(txn_id, unique_database, tbl)
+    acid.abort_txn(txn_id)
+
+    # Insert some rows and trigger compaction
+    for i in range(2):
+      self.run_stmt_in_hive(
+          "insert into {} partition(p=0) values (1),(2),(3)".format(fq_tbl))
+    self.run_stmt_in_hive(
+        "alter table {} partition(p=0) compact 'major' and wait".format(fq_tbl))
+
+    # The CREATE_TABLE event hasn't been processed yet so we have to explictily invalidate
+    # the table first.
+    self.client.execute("invalidate metadata " + fq_tbl)
+    # Reload the table so the latest valid writeIdList is loaded
+    self.client.execute("refresh " + fq_tbl)
+    # Process the ABORT_TXN event
+    EventProcessorUtils.wait_for_event_processing(self, timeout=100)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    # Uncomment this once we can stop and resume the event-processor using commands.
+    # Currently the test is flaky with it since the Hive statements could take longer to
+    # finish than 100s (e.g. I saw a run of 5mins).
+    # self.assert_catalogd_log_contains("INFO", "Not added ABORTED write id 1 since it's "
+    #    + "not opened and might already be cleaned up")

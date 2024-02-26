@@ -251,6 +251,8 @@ public class MutableValidReaderWriteIdList implements MutableValidWriteIdList {
     for (long currentId = highWatermark + 1; currentId <= writeId; currentId++) {
       exceptions.add(currentId);
     }
+    LOG.debug("Added OPEN write id: {}. Old high water mark: {}.",
+        writeId, highWatermark);
     highWatermark = writeId;
     return true;
   }
@@ -263,19 +265,25 @@ public class MutableValidReaderWriteIdList implements MutableValidWriteIdList {
     boolean added = false;
     long maxWriteId = Collections.max(writeIds);
     if (maxWriteId > highWatermark) {
-      LOG.trace("Current high water mark: {} and max aborted write id: {}, so mark them "
+      LOG.info("Current high water mark: {} and max aborted write id: {}, so mark them "
           + "as open first", highWatermark, maxWriteId);
       addOpenWriteId(maxWriteId);
       added = true;
     }
     for (long writeId : writeIds) {
       int index = Collections.binarySearch(exceptions, writeId);
-      // make sure the write id is not committed
-      Preconditions.checkState(index >= 0);
+      if (index < 0) {
+        LOG.info("Not added ABORTED write id {} since it's not opened and might " +
+            "already be cleaned up. minOpenWriteId: {}.", writeId, minOpenWriteId);
+        continue;
+      }
       added = added || !abortedBits.get(index);
       abortedBits.set(index);
     }
     updateMinOpenWriteId();
+    if (!added) {
+      LOG.info("Not added any ABORTED write ids of the given {}", writeIds.size());
+    }
     return added;
   }
 
