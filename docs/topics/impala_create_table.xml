@@ -450,11 +450,18 @@ AS
 
     <p rev="2.9.0 IMPALA-4166">
       The optional <codeph>SORT BY</codeph> clause lets you specify zero or more columns that
-      are sorted in the data files created by each Impala <codeph>INSERT</codeph> or
-      <codeph>CREATE TABLE AS SELECT</codeph> operation. Creating data files that are sorted is
-      most useful for Parquet tables, where the metadata stored inside each file includes the
-      minimum and maximum values for each column in the file. (The statistics apply to each row
-      group within the file; for simplicity, Impala writes a single row group in each file.)
+      are sorted in ascending order in the data files created by each Impala <codeph>INSERT</codeph>
+      or <codeph>CREATE TABLE AS SELECT</codeph> operation. There are two orderings to chose
+      from: <codeph>LEXICAL</codeph> and <codeph>ZORDER</codeph>. The default ordering is
+      <codeph>LEXICAL</codeph>, which can be used for any number of sort columns.
+      <codeph>ZORDER</codeph> can only be used to sort more than one column.
+    </p>
+
+    <p rev="2.9.0 IMPALA-4166">
+      Creating data files that are sorted is most useful for Parquet tables, where the
+      metadata stored inside each file includes the minimum and maximum values for each
+      column in the file. (The statistics apply to each row group within the file;
+      for simplicity, Impala writes a single row group in each file.)
       Grouping data values together in relatively narrow ranges within each data file makes it
       possible for Impala to quickly skip over data files that do not contain value ranges
       indicated in the <codeph>WHERE</codeph> clause of a query, and can improve the
@@ -496,7 +503,7 @@ AS
     </p>
 
 <codeblock rev="2.9.0 IMPALA-4166">CREATE TABLE census_data (last_name STRING, first_name STRING, state STRING, address STRING)
-  SORT BY (last_name, state)
+  SORT BY LEXICAL (last_name, state)
   STORED AS PARQUET;
 </codeblock>
 
