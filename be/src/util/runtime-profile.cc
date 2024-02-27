@@ -992,7 +992,7 @@ RuntimeProfile* RuntimeProfile::CreateChild(
   return child;
 }
 
-void RuntimeProfileBase::GetChildren(vector<RuntimeProfileBase*>* children) {
+void RuntimeProfileBase::GetChildren(vector<RuntimeProfileBase*>* children) const {
   children->clear();
   lock_guard<SpinLock> l(children_lock_);
   for (const auto& entry : children_) children->push_back(entry.first);
@@ -1216,10 +1216,10 @@ void RuntimeProfile::AddLocalTimeCounter(const SampleFunction& counter_fn) {
   counter_map_[LOCAL_TIME_COUNTER_NAME] = local_time_counter;
 }
 
-RuntimeProfileBase::Counter* RuntimeProfileBase::GetCounter(const string& name) {
+RuntimeProfileBase::Counter* RuntimeProfileBase::GetCounter(const string& name) const {
   lock_guard<SpinLock> l(counter_map_lock_);
-  if (counter_map_.find(name) != counter_map_.end()) {
-    return counter_map_[name];
+  if (auto iter = counter_map_.find(name); iter != counter_map_.cend()) {
+    return iter->second;
   }
   return NULL;
 }

@@ -43,6 +43,7 @@ add_library(Service
   internal-server.cc
   query-options.cc
   query-result-set.cc
+  query-state-record.cc
 )
 add_dependencies(Service gen-deps)
 
@@ -132,6 +133,7 @@ add_library(ServiceTests STATIC
   hs2-util-test.cc
   impala-server-test.cc
   query-options-test.cc
+  query-state-record-test.cc
 )
 add_dependencies(ServiceTests gen-deps)
 
@@ -140,4 +142,5 @@ ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrif
 ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(query-options-test QueryOptions.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-server-test ImpalaServerTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(query-state-record-test QueryStateRecordTest.*:PerHostStateTest.*)
 ADD_BE_LSAN_TEST(internal-server-test)

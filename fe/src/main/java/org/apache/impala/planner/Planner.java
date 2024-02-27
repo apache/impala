@@ -605,6 +605,8 @@ public class Planner {
     maxPerHostPeakResources = MIN_PER_HOST_RESOURCES.max(maxPerHostPeakResources);
 
     request.setPer_host_mem_estimate(maxPerHostPeakResources.getMemEstimateBytes());
+    request.setPlanner_per_host_mem_estimate(
+        maxPerHostPeakResources.getMemEstimateBytes());
     request.setIs_trivial_query(trivial);
     request.setMax_per_host_min_mem_reservation(
         maxPerHostPeakResources.getMinMemReservationBytes());

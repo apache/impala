@@ -207,7 +207,7 @@ class ImpalaHttpHandler {
 
   /// Helper method to render a single QueryStateRecord as a Json object Used by
   /// QueryStateHandler().
-  void QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
+  void QueryStateToJson(const QueryStateRecord& record,
       rapidjson::Value* value, rapidjson::Document* document, bool inflight);
 
   /// Json callback for /backends, which prints a table of known backends.

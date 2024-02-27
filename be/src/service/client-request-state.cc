@@ -2367,4 +2367,28 @@ void ClientRequestState::AddTableResetHints(const TConvertTableRequest& params,
   status->MergeStatus(Status(table_reset_hint));
 }
 
+int64_t ClientRequestState::num_rows_fetched_counter() const {
+  if (LIKELY(num_rows_fetched_counter_ != nullptr)) {
+    return num_rows_fetched_counter_->value();
+  }
+
+  return 0;
+}
+
+int64_t ClientRequestState::row_materialization_rate() const {
+  if (LIKELY(row_materialization_rate_ != nullptr)) {
+    return row_materialization_rate_->value();
+  }
+
+  return 0;
+}
+
+int64_t ClientRequestState::row_materialization_timer() const {
+  if (LIKELY(row_materialization_timer_ != nullptr)) {
+    return row_materialization_timer_->value();
+  }
+
+  return 0;
+}
+
 }

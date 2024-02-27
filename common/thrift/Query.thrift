@@ -989,5 +989,9 @@ struct TQueryExecRequest {
   // executor group to run the query. Non-positive value means no specific CPU core count
   // is required.
   14: optional i32 cores_required;
+
+  // Estimated per-host memory. The planner generates this value which may or may not be
+  // overridden to come up with a final per-host memory estimate.
+  15: optional i64 planner_per_host_mem_estimate;
 }
 

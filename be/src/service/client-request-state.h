@@ -244,6 +244,11 @@ class ClientRequestState {
   TSessionType::type session_type() const { return query_ctx_.session.session_type; }
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
   const std::string& default_db() const { return query_ctx_.session.database; }
+  const std::string& redacted_sql() const {
+    return
+      query_ctx_.client_request.__isset.redacted_stmt ?
+      query_ctx_.client_request.redacted_stmt : query_ctx_.client_request.stmt;
+  }
   bool eos() const { return eos_.Load(); }
   const QuerySchedulePB* schedule() const { return schedule_.get(); }
 
@@ -275,6 +280,14 @@ class ClientRequestState {
   bool returns_result_set() { return !result_metadata_.columns.empty(); }
   const TResultSetMetadata* result_metadata() const { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_ctx_.query_id; }
+
+  /// Return values from counters. See explanation on declaration of
+  /// num_rows_fetched_counter_, row_materialization_rate_, and row_materialization_timer_
+  /// for details.
+  int64_t num_rows_fetched_counter() const;
+  int64_t row_materialization_rate() const;
+  int64_t row_materialization_timer() const;
+
   /// Returns the TExecRequest for the query associated with this ClientRequestState.
   /// Contents are a place-holder until GetExecRequest(TQueryCtx) initializes the
   /// TExecRequest.
@@ -312,6 +325,7 @@ class ClientRequestState {
   }
   const RuntimeProfile* profile() const { return profile_; }
   const RuntimeProfile* summary_profile() const { return summary_profile_; }
+  const RuntimeProfile* frontend_profile() const { return frontend_profile_; }
   int64_t start_time_us() const { return start_time_us_; }
   int64_t end_time_us() const { return end_time_us_.Load(); }
   const std::string& sql_stmt() const { return query_ctx_.client_request.stmt; }

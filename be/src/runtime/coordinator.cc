@@ -19,8 +19,10 @@
 
 #include <cerrno>
 #include <iomanip>
+#include <list>
 #include <sstream>
 #include <unordered_set>
+#include <utility>
 
 #include <thrift/protocol/TDebugProtocol.h>
 #include <boost/algorithm/string/join.hpp>
@@ -1502,6 +1504,20 @@ vector<NetworkAddressPB> Coordinator::GetActiveBackends(
       result.push_back(backend_state->impalad_address());
     }
   }
+  return result;
+}
+
+list<pair<NetworkAddressPB, Coordinator::ResourceUtilization>>
+    Coordinator::BackendResourceUtilization() {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first.";
+  list<pair<NetworkAddressPB, Coordinator::ResourceUtilization>> result;
+
+  lock_guard<SpinLock> l(backend_states_init_lock_);
+  for (BackendState* backend_state : backend_states_) {
+    result.push_back(make_pair(backend_state->impalad_address(),
+        backend_state->GetResourceUtilization()));
+  }
+
   return result;
 }
 

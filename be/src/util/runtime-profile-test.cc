@@ -92,7 +92,8 @@ TEST(CountersTest, Basic) {
   RuntimeProfile* from_thrift = RuntimeProfile::CreateFromThrift(&pool, thrift_profile);
   counter_merged = from_thrift->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
-  EXPECT_TRUE(from_thrift->GetCounter("Not there") ==  NULL);
+  EXPECT_TRUE(from_thrift->GetCounter("Not there") == NULL);
+  EXPECT_TRUE(from_thrift->GetCounter("Not there") == nullptr);
   TExecSummary exec_summary_result;
   from_thrift->GetExecSummary(&exec_summary_result);
   EXPECT_EQ(exec_summary_result.status, status);
@@ -107,6 +108,7 @@ TEST(CountersTest, Basic) {
       RuntimeProfile::CreateFromThrift(&pool, deserialized_thrift_profile);
   counter_merged = deserialized_profile->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
+  EXPECT_TRUE(deserialized_profile->GetCounter("Not there") == NULL);
   EXPECT_TRUE(deserialized_profile->GetCounter("Not there") == nullptr);
   deserialized_profile->GetExecSummary(&exec_summary_result);
   EXPECT_EQ(exec_summary_result.status, status);
@@ -119,6 +121,7 @@ TEST(CountersTest, Basic) {
       RuntimeProfile::DecompressToProfile(compressed, &pool, &deserialized_profile2));
   counter_merged = deserialized_profile2->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
+  EXPECT_TRUE(deserialized_profile2->GetCounter("Not there") == NULL);
   EXPECT_TRUE(deserialized_profile2->GetCounter("Not there") == nullptr);
   deserialized_profile2->GetExecSummary(&exec_summary_result);
   EXPECT_EQ(exec_summary_result.status, status);

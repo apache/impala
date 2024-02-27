@@ -43,6 +43,7 @@
 #include "service/client-request-state.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
+#include "service/query-state-record.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/coding-util.h"
 #include "util/debug-util.h"
@@ -510,7 +511,7 @@ std::string ImpalaHttpHandler::ProgressToString(int64_t num_completed, int64_t t
   return ss.str();
 }
 
-void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
+void ImpalaHttpHandler::QueryStateToJson(const QueryStateRecord& record,
     Value* value, Document* document, bool inflight) {
   Value user(record.effective_user.c_str(), document->GetAllocator());
   value->AddMember("effective_user", user, document->GetAllocator());
@@ -623,19 +624,19 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
     Document* document) {
   AddQueryRecordTips(document);
 
-  set<ImpalaServer::QueryStateRecord, ImpalaServer::QueryStateRecordLessThan>
+  set<QueryStateRecord, QueryStateRecord::StartTimeComparator>
       sorted_query_records;
 
   server_->query_driver_map_.DoFuncForAllEntries(
       [&](const std::shared_ptr<QueryDriver>& query_driver) {
         sorted_query_records.insert(
-            ImpalaServer::QueryStateRecord(*query_driver->GetActiveClientRequestState()));
+            QueryStateRecord(*query_driver->GetActiveClientRequestState()));
       });
 
   unordered_set<TUniqueId> in_flight_query_ids;
   Value in_flight_queries(kArrayType);
   int64_t num_waiting_queries = 0;
-  for (const ImpalaServer::QueryStateRecord& record: sorted_query_records) {
+  for (const QueryStateRecord& record: sorted_query_records) {
     Value record_json(kObjectType);
     QueryStateToJson(record, &record_json, document, true);
 
@@ -662,7 +663,7 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
   Value completed_queries(kArrayType);
   {
     lock_guard<mutex> l(server_->query_log_lock_);
-    for (const shared_ptr<ImpalaServer::QueryStateRecord>& log_entry :
+    for (const shared_ptr<QueryStateRecord>& log_entry :
         server_->query_log_) {
       // Don't show duplicated entries between in-flight and completed queries.
       if (in_flight_query_ids.find(log_entry->id) != in_flight_query_ids.end()) continue;
@@ -1185,7 +1186,7 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
     return;
   }
 
-  shared_ptr<ImpalaServer::QueryStateRecord> query_record = nullptr;
+  shared_ptr<QueryStateRecord> query_record = nullptr;
   TExecSummary summary;
   string stmt;
   string plan;
@@ -1199,7 +1200,7 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
     status = server_->GetQueryHandle(query_id, &query_handle);
     if (status.ok()) {
       inflight = true;
-      query_record = make_shared<ImpalaServer::QueryStateRecord>(*query_handle);
+      query_record = make_shared<QueryStateRecord>(*query_handle);
       // If the query plan isn't generated, avoid waiting for the request
       // state lock to be acquired, since it could potentially be an expensive
       // call, if the table Catalog metadata loading is in progress. Instead

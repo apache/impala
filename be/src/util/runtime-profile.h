@@ -165,7 +165,7 @@ class RuntimeProfileBase {
 
   /// Gets the counter object with 'name'.  Returns NULL if there is no counter with
   /// that name.
-  Counter* GetCounter(const std::string& name);
+  Counter* GetCounter(const std::string& name) const;
 
   /// Adds all counters with 'name' that are registered either in this or
   /// in any of the child profiles to 'counters'.
@@ -183,7 +183,7 @@ class RuntimeProfileBase {
   void PrettyPrint(
       Verbosity verbosity, std::ostream* s, const std::string& prefix = "") const;
 
-  void GetChildren(std::vector<RuntimeProfileBase*>* children);
+  void GetChildren(std::vector<RuntimeProfileBase*>* children) const;
 
   /// Gets all profiles in tree, including this one.
   void GetAllChildren(std::vector<RuntimeProfileBase*>* children);
