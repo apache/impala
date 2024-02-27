@@ -54,6 +54,9 @@ public class AlterTableExecuteRollbackStmt extends AlterTableExecuteStmt {
   }
 
   @Override
+  public String getOperation() { return "EXECUTE ROLLBACK"; }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     FeTable table = getTargetTable();

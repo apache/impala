@@ -433,3 +433,123 @@ DROP TABLE alltypes_jdbc_datasource_2;
 ---- RESULTS
 'Table has been dropped.'
 ====
+---- QUERY
+# Create JDBC table with unknown database type.
+DROP TABLE IF EXISTS jdbc_test;
+CREATE TABLE jdbc_test (
+ id INT,
+ bool_col BOOLEAN,
+ int_col INT)
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="UNKNOWN",
+"jdbc.url"="jdbc:postgresql://$INTERNAL_LISTEN_HOST:5432/functional",
+"jdbc.driver"="org.postgresql.Driver",
+"driver.url"="$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"dbcp.username"="hiveuser",
+"dbcp.password"="password",
+"table"="alltypes");
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+select count(*) from jdbc_test;
+---- CATCH
+row_regex:.*InternalException:.*Unknown database type.
+====
+---- QUERY
+# Alter JDBC table to change database type as POSTGRES.
+ALTER TABLE jdbc_test
+SET TBLPROPERTIES ("database.type"="POSTGRES");
+---- RESULTS
+'Updated table.'
+====
+---- QUERY
+select count(*) from jdbc_test;
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Alter JDBC table to set wrong username and password.
+ALTER TABLE jdbc_test
+SET TBLPROPERTIES ("dbcp.username"="UNKNOWN", "dbcp.password"="NONE");
+---- RESULTS
+'Updated table.'
+====
+---- QUERY
+select * from jdbc_test order by id limit 5;
+---- CATCH
+row_regex:.*Caught exception.*(FATAL: password authentication failed for user "UNKNOWN")
+====
+---- QUERY
+# Alter JDBC table to set correct username and password.
+ALTER TABLE jdbc_test
+SET TBLPROPERTIES ("dbcp.username"="hiveuser", "dbcp.password"="password");
+---- RESULTS
+'Updated table.'
+====
+---- QUERY
+select * from jdbc_test order by id limit 5;
+---- RESULTS
+0,true,0
+1,false,1
+2,true,2
+3,false,3
+4,true,4
+---- TYPES
+INT, BOOLEAN, INT
+====
+---- QUERY
+# Alter JDBC table to unset the required JDBC configuration "table".
+ALTER TABLE jdbc_test UNSET TBLPROPERTIES ("table");
+---- CATCH
+row_regex:.*AnalysisException: Unsetting the 'table' table property is not supported for JDBC DataSource table
+====
+---- QUERY
+# Alter table to drop a column.
+ALTER TABLE jdbc_test DROP COLUMN int_col;
+---- RESULTS
+'Column has been dropped.'
+====
+---- QUERY
+# Alter table to add a new column.
+ALTER TABLE jdbc_test ADD COLUMN IF NOT EXISTS date_col DATE;
+---- RESULTS
+'New column(s) have been added to the table.'
+====
+---- QUERY
+select * from jdbc_test order by id limit 5;
+---- RESULTS
+0,true,2009-01-01
+1,false,2009-01-01
+2,true,2009-01-01
+3,false,2009-01-01
+4,true,2009-01-01
+---- TYPES
+INT, BOOLEAN, DATE
+====
+---- QUERY
+# Alter table to change a column.
+ALTER TABLE jdbc_test CHANGE COLUMN date_col timestamp_col TIMESTAMP;
+---- RESULTS
+'Column has been altered.'
+====
+---- QUERY
+select * from jdbc_test order by id limit 5;
+---- RESULTS
+0,true,2009-01-01 00:00:00
+1,false,2009-01-01 00:01:00
+2,true,2009-01-01 00:02:00.100000000
+3,false,2009-01-01 00:03:00.300000000
+4,true,2009-01-01 00:04:00.600000000
+---- TYPES
+INT, BOOLEAN, TIMESTAMP
+====
+---- QUERY
+# Drop table.
+DROP TABLE jdbc_test;
+---- RESULTS
+'Table has been dropped.'
+====

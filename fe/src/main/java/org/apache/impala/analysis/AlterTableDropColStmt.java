@@ -52,6 +52,9 @@ public class AlterTableDropColStmt extends AlterTableStmt {
   }
 
   @Override
+  public String getOperation() { return "DROP COLUMN"; }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     FeTable t = getTargetTable();

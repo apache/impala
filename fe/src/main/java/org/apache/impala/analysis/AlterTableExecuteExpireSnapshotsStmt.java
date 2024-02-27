@@ -46,6 +46,9 @@ public class AlterTableExecuteExpireSnapshotsStmt extends AlterTableExecuteStmt 
   }
 
   @Override
+  public String getOperation() { return "EXECUTE EXPIRE_SNAPSHOTS"; }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     Preconditions.checkState(getTargetTable() instanceof FeIcebergTable);

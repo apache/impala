@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
@@ -86,6 +88,9 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
 
   public String getColName() { return colName_; }
   public ColumnDef getNewColDef() { return newColDef_; }
+
+  @Override
+  public String getOperation() { return "CHANGE COLUMN"; }
 
   @Override
   public TAlterTableParams toThrift() {
@@ -185,6 +190,13 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
           newColDef_.getType().isComplexType()) {
         throw new AnalysisException(String.format("ALTER TABLE CHANGE COLUMN " +
             "is not supported for complex types in Iceberg tables."));
+      }
+    }
+
+    if (t instanceof FeDataSourceTable) {
+      if (!DataSourceTable.isSupportedColumnType(newColDef_.getType())) {
+        throw new AnalysisException("Tables stored by JDBC do not support the " +
+            "column type: " + newColDef_.getType());
       }
     }
   }

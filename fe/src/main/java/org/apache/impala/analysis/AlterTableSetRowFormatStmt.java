@@ -43,6 +43,9 @@ public class AlterTableSetRowFormatStmt extends AlterTableSetStmt {
   public RowFormat getRowFormat() { return rowFormat_; }
 
   @Override
+  public String getOperation() { return "SET ROW FORMAT"; }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_ROW_FORMAT);

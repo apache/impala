@@ -28,6 +28,8 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -76,6 +78,12 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   public Map<String, String> getTblProperties() { return tblProperties_; }
 
   @Override
+  public String getOperation() {
+    return (targetProperty_ == TTablePropertyType.TBL_PROPERTY)
+        ? "SET TBLPROPERTIES" : "SET SERDEPROPERTIES";
+  }
+
+  @Override
   public TAlterTableParams toThrift() {
    TAlterTableParams params = super.toThrift();
    params.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);
@@ -106,6 +114,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       analyzeKuduTable(analyzer);
     } else if (getTargetTable() instanceof FeIcebergTable) {
       analyzeIcebergTable(analyzer);
+    } else if (getTargetTable() instanceof FeDataSourceTable) {
+      analyzeDataSourceTable(analyzer);
     }
 
     // Check avro schema when it is set in avro.schema.url or avro.schema.literal to
@@ -208,6 +218,28 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     }
   }
 
+  private void analyzeDataSourceTable(Analyzer analyzer) throws AnalysisException {
+    if (partitionSet_ != null) {
+      throw new AnalysisException("Partition is not supported for DataSource table.");
+    } else if (targetProperty_ == TTablePropertyType.SERDE_PROPERTY) {
+      throw new AnalysisException("ALTER TABLE SET SERDEPROPERTIES is not supported " +
+          "for DataSource table.");
+    }
+    // Cannot change internal properties of DataSource.
+    dataSourcePropertyCheck(DataSourceTable.TBL_PROP_DATA_SRC_NAME);
+    dataSourcePropertyCheck(DataSourceTable.TBL_PROP_INIT_STRING);
+    dataSourcePropertyCheck(DataSourceTable.TBL_PROP_LOCATION);
+    dataSourcePropertyCheck(DataSourceTable.TBL_PROP_CLASS);
+    dataSourcePropertyCheck(DataSourceTable.TBL_PROP_API_VER);
+  }
+
+  private void dataSourcePropertyCheck(String property) throws AnalysisException {
+    if (tblProperties_.containsKey(property)) {
+      throw new AnalysisException(String.format("Changing the '%s' table property is " +
+          "not supported for DataSource table.", property));
+    }
+  }
+
   /**
    * Check that Avro schema provided in avro.schema.url or avro.schema.literal is valid
    * Json and contains only supported Impala types. If both properties are set, then
@@ -279,10 +311,14 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     boolean containsSortingColumnProperties = tblProperties
         .containsKey(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS);
 
-    if ((containsOrderingProperties || containsSortingColumnProperties) &&
-        table instanceof FeKuduTable) {
-      throw new AnalysisException("'sort.*' table properties are not "
-          + "supported for Kudu tables.");
+    if (containsOrderingProperties || containsSortingColumnProperties) {
+      if (table instanceof FeKuduTable) {
+        throw new AnalysisException("'sort.*' table properties are not "
+            + "supported for Kudu tables.");
+      } else if (table instanceof FeDataSourceTable) {
+        throw new AnalysisException("'sort.*' table properties are not "
+            + "supported for DataSource tables.");
+      }
     }
 
     TSortingOrder sortingOrder = TSortingOrder.LEXICAL;

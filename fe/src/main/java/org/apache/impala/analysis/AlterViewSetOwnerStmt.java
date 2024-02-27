@@ -28,6 +28,9 @@ public class AlterViewSetOwnerStmt extends AlterTableOrViewSetOwnerStmt {
   }
 
   @Override
+  public String getOperation() { return "SET OWNER"; }
+
+  @Override
   protected void validateType(TableRef tableRef) throws AnalysisException {
     if (!(tableRef instanceof InlineViewRef)) {
       throw new AnalysisException(String.format(

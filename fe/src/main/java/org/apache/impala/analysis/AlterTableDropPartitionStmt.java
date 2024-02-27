@@ -80,6 +80,14 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   public boolean getIfNotExists() { return ifExists_; }
 
   @Override
+  public String getOperation() {
+    StringBuilder sb = new StringBuilder("DROP ");
+    if (ifExists_) sb.append("IF EXISTS ");
+    sb.append("PARTITION");
+    return sb.toString();
+  }
+
+  @Override
   public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" DROP ");

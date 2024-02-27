@@ -54,6 +54,9 @@ public class AlterTableSortByStmt extends AlterTableStmt {
   }
 
   @Override
+  public String getOperation() { return "SORT BY"; }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);

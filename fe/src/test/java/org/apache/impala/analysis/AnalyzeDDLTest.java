@@ -119,10 +119,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       AnalysisError("alter table functional.alltypes_view " + kw +
           " partition(year=2050, month=10)",
           "ALTER TABLE not allowed on a view: functional.alltypes_view");
+      // Cannot ALTER TABLE to add or drop partition for data source tables.
       AnalysisError("alter table functional.alltypes_datasource " + kw +
           " partition(year=2050, month=10)",
-          "ALTER TABLE not allowed on a table produced by a data source: " +
-          "functional.alltypes_datasource");
+          "ALTER TABLE " + kw.toUpperCase() + " PARTITION not allowed on a table " +
+          "PRODUCED BY DATA SOURCE: functional.alltypes_datasource");
+      AnalysisError("alter table functional.alltypes_jdbc_datasource " + kw +
+          " partition(year=2050, month=10)",
+          "ALTER TABLE " + kw.toUpperCase() + " PARTITION not allowed on a table " +
+          "STORED BY JDBC: functional.alltypes_jdbc_datasource");
 
       // NULL partition keys
       AnalyzesOk("alter table functional.alltypes " + kw +
@@ -450,6 +455,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Valid unicode column name.
     AnalyzesOk("alter table functional.alltypes add column `???` int");
 
+    // ALTER TABLE to add column for data source tables.
+    AnalyzesOk("alter table functional.alltypes_datasource add column c1 string");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource add column c1 string");
+
     // Column name must be unique for add.
     AnalysisError("alter table functional.alltypes add column int_col int",
         "Column already exists: int_col");
@@ -478,10 +487,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table allcomplextypes.int_array_col add column c1 string",
         createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
-    // Cannot ALTER TABLE produced by a data source.
-    AnalysisError("alter table functional.alltypes_datasource add column c1 string",
-        "ALTER TABLE not allowed on a table produced by a data source: " +
-        "functional.alltypes_datasource");
+    // Cannot ALTER TABLE to add column with unsupported data type for data source
+    // table.
+    AnalysisError("alter table functional.alltypes_jdbc_datasource add column i binary",
+        "Tables stored by JDBC do not support the column type: BINARY");
 
     // Cannot ALTER TABLE ADD COLUMNS on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes add column i int",
@@ -523,6 +532,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes add columns" +
         "(`시스???पताED` int)");
 
+    // ALTER TABLE to add columns for data source tables.
+    AnalyzesOk("alter table functional.alltypes_datasource add columns " +
+        "(c1 string comment 'hi')");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource add columns " +
+        "(c1 string comment 'hi')");
+
     // Column name must be unique for add.
     AnalysisError("alter table functional.alltypes add columns (int_col int)",
         "Column already exists: int_col");
@@ -557,11 +572,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "add columns (c1 string comment 'hi')",
         createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
-    // Cannot ALTER TABLE produced by a data source.
-    AnalysisError("alter table functional.alltypes_datasource " +
-        "add columns (c1 string comment 'hi')",
-        "ALTER TABLE not allowed on a table produced by a data source: " +
-        "functional.alltypes_datasource");
+    // Cannot ALTER TABLE to add columns with unsupported data type for data source
+    // table.
+    AnalysisError("alter table functional.alltypes_jdbc_datasource add columns " +
+        "(c1 binary comment 'hi')",
+        "Tables stored by JDBC do not support the column type: BINARY");
 
     // Cannot ALTER TABLE ADD COLUMNS on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes add columns (i int)",
@@ -632,11 +647,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
             "replace columns (c1 string comment 'hi')",
         createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
-    // Cannot ALTER TABLE produced by a data source.
+    // Cannot ALTER TABLE to replace columns for data source tables.
     AnalysisError("alter table functional.alltypes_datasource " +
             "replace columns (c1 string comment 'hi')",
-        "ALTER TABLE not allowed on a table produced by a data source: " +
+        "ALTER TABLE REPLACE COLUMNS not allowed on a table PRODUCED BY DATA SOURCE: " +
             "functional.alltypes_datasource");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource " +
+            "replace columns (c1 string comment 'hi')",
+        "ALTER TABLE REPLACE COLUMNS not allowed on a table STORED BY JDBC: " +
+            "functional.alltypes_jdbc_datasource");
 
     // Cannot ALTER TABLE REPLACE COLUMNS on a HBase table.
     AnalysisError("alter table functional_hbase.alltypes replace columns (i int)",
@@ -650,6 +669,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   @Test
   public void TestAlterTableDropColumn() throws AnalysisException {
     AnalyzesOk("alter table functional.alltypes drop column int_col");
+
+    // ALTER TABLE to drop column for data source tables.
+    AnalyzesOk("alter table functional.alltypes_datasource drop column int_col");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource drop column int_col");
 
     AnalysisError("alter table functional.alltypes drop column no_col",
         "Column 'no_col' does not exist in table: functional.alltypes");
@@ -675,10 +698,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table allcomplextypes.int_array_col drop column int_col",
         createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
-    // Cannot ALTER TABLE produced by a data source.
-    AnalysisError("alter table functional.alltypes_datasource drop column int_col",
-        "ALTER TABLE not allowed on a table produced by a data source: " +
-        "functional.alltypes_datasource");
 
     // Cannot ALTER TABLE DROP COLUMN on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes drop column int_col",
@@ -699,6 +718,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes change int_col int_col int comment 'c'");
     AnalyzesOk("alter table functional.alltypes change column int_col `汉字` int");
 
+    // ALTER TABLE to change column for data source tables.
+    AnalyzesOk("alter table functional.alltypes_datasource " +
+        "change column int_col int_col2 int");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource " +
+        "change column int_col int_col2 int");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource " +
+        "change column int_col bin_col binary",
+        "Tables stored by JDBC do not support the column type: BINARY");
+
     AnalysisError("alter table functional.alltypes change column no_col c1 int",
         "Column 'no_col' does not exist in table: functional.alltypes");
 
@@ -708,7 +736,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(
         "alter table functional.alltypes change column int_col Tinyint_col int",
         "Column already exists: tinyint_col");
-
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
@@ -725,11 +752,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "change column int_col int_col2 int",
         createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
-    // Cannot ALTER TABLE produced by a data source.
-    AnalysisError("alter table functional.alltypes_datasource " +
-        "change column int_col int_col2 int",
-        "ALTER TABLE not allowed on a table produced by a data source: " +
-        "functional.alltypes_datasource");
 
     // Cannot ALTER TABLE CHANGE COLUMN on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes CHANGE COLUMN int_col i int",
@@ -762,6 +784,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE SET ROW FORMAT is only supported on TEXT or SEQUENCE file formats");
     AnalyzesOk("alter table functional.alltypesmixedformat partition(year=2009,month=1) " +
         "set row format delimited fields terminated by ' '");
+    // Cannot ALTER TABLE to set row format for data source tables.
+    AnalysisError("alter table functional.alltypes_jdbc_datasource set row format " +
+        "delimited fields terminated by ' '",
+        "ALTER TABLE SET ROW FORMAT not allowed on a table STORED BY JDBC: " +
+        "functional.alltypes_jdbc_datasource");
   }
 
   @Test
@@ -795,6 +822,39 @@ public class AnalyzeDDLTest extends FrontendTestBase {
                "set serdeproperties ('a'='2')");
     AnalyzesOk("alter table functional.alltypes PARTITION (year<=2010, month=11) " +
                "set serdeproperties ('a'='2')");
+
+    // ALTER TABLE to set or unset tblproperties for data source tables.
+    AnalyzesOk("alter table functional.alltypes_datasource set tblproperties ('a'='2')");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource set tblproperties " +
+        "('a'='2')");
+    AnalyzesOk("alter table functional.alltypes_datasource unset tblproperties " +
+        "if exists ('a')");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource unset tblproperties " +
+        "if exists ('a')");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource set " +
+        "serdeproperties ('a'='2')",
+        "ALTER TABLE SET SERDEPROPERTIES is not supported for DataSource table");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource PARTITION " +
+        "(year=2010) set tblproperties ('a'='2')",
+        "Table is not partitioned: functional.alltypes_jdbc_datasource");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource set tblproperties " +
+        "('__IMPALA_DATA_SOURCE_NAME'='test')",
+        "Changing the '__IMPALA_DATA_SOURCE_NAME' table property is not supported for " +
+        "DataSource table.");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource unset " +
+        "serdeproperties ('a')",
+        "ALTER TABLE UNSET SERDEPROPERTIES is not supported for DataSource table");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource PARTITION " +
+        "(year=2010) unset tblproperties ('a')",
+        "Partition is not supported for DataSource table.");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource unset " +
+        "tblproperties ('__IMPALA_DATA_SOURCE_NAME')",
+        "Unsetting the '__IMPALA_DATA_SOURCE_NAME' table property is not supported " +
+        "for DataSource table.");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource unset " +
+        "tblproperties ('driver.url')",
+        "Unsetting the 'driver.url' table property is not supported for JDBC " +
+        "DataSource table.");
 
     AnalyzesOk("alter table functional.alltypes set tblproperties('sort.columns'='id')");
     AnalyzesOk("alter table functional.alltypes set tblproperties(" +
@@ -966,6 +1026,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes set location " +
         "'file:///test-warehouse/a/b'");
 
+    // Cannot ALTER TABLE to set location for data source tables.
+    AnalysisError("alter table functional.alltypes_datasource set location " +
+        "'file:///test-warehouse/a/b'",
+        "ALTER TABLE SET LOCATION not allowed on a table PRODUCED BY DATA SOURCE: " +
+        "functional.alltypes_datasource");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource set location " +
+        "'file:///test-warehouse/a/b'",
+        "ALTER TABLE SET LOCATION not allowed on a table STORED BY JDBC: " +
+        "functional.alltypes_jdbc_datasource");
+
     // Invalid location
     AnalysisError("alter table functional.alltypes set location 'test/warehouse'",
         "URI path must be absolute: test/warehouse");
@@ -983,10 +1053,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table allcomplextypes.int_array_col set fileformat sequencefile",
         createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
-    // Cannot ALTER TABLE produced by a data source.
+    // Cannot ALTER TABLE to set fileformat for data source tables.
     AnalysisError("alter table functional.alltypes_datasource set fileformat parquet",
-        "ALTER TABLE not allowed on a table produced by a data source: " +
+        "ALTER TABLE SET FILEFORMAT not allowed on a table PRODUCED BY DATA SOURCE: " +
         "functional.alltypes_datasource");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource set fileformat " +
+        "parquet",
+        "ALTER TABLE SET FILEFORMAT not allowed on a table STORED BY JDBC: " +
+        "functional.alltypes_jdbc_datasource");
 
     // Cannot ALTER TABLE SET on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes set tblproperties('a'='b')",
@@ -1057,6 +1131,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional.alltypestiny partition(year=9999, month=1) " +
         "set cached in 'testPool'",
         "No matching partition(s) found.");
+    // Cannot ALTER TABLE to set cached for data source tables.
+    AnalysisError("alter table functional.alltypes_jdbc_datasource set cached in " +
+        "'testPool'",
+        "ALTER TABLE SET CACHED not allowed on a table STORED BY JDBC: " +
+        "functional.alltypes_jdbc_datasource");
   }
 
   @Test
@@ -1343,8 +1422,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // It should be okay to rename an HBase table.
     AnalyzesOk("alter table functional_hbase.alltypes rename to new_alltypes");
 
-    // It should be okay to rename a table produced by a data source.
+    // It should be okay to rename data source tables.
     AnalyzesOk("alter table functional.alltypes_datasource rename to new_datasrc_tbl");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource rename to " +
+        "new_jdbc_datasrc_tbl");
   }
 
   @Test
@@ -1378,6 +1459,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "SORT BY column 'foo' in table.");
     AnalysisError("alter table functional_hbase.alltypes sort by (id, foo)",
         "ALTER TABLE SORT BY not supported on HBase tables.");
+    // Cannot ALTER TABLE to sort by for data source tables.
+    AnalysisError("alter table functional.alltypes_jdbc_datasource sort by (id)",
+        "ALTER TABLE SORT BY not allowed on a table STORED BY JDBC: " +
+        "functional.alltypes_jdbc_datasource");
   }
 
   @Test
@@ -1396,6 +1481,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "not find SORT BY column 'foo' in table.");
     AnalysisError("alter table functional_hbase.alltypes sort by zorder (id, foo)",
         "ALTER TABLE SORT BY not supported on HBase tables.");
+    // Cannot ALTER TABLE to sort by zorder for data source tables.
+    AnalysisError("alter table functional.alltypes_jdbc_datasource sort by zorder (id)",
+        "ALTER TABLE SORT BY not allowed on a table STORED BY JDBC: " +
+        "functional.alltypes_jdbc_datasource");
   }
 
   @Test
@@ -1648,6 +1737,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Unsupported column options for non-Kudu table: 'int_col INT COMPRESSION LZ4'");
     AnalysisError("alter table functional.alltypes alter int_col drop default",
         "Unsupported column option for non-Kudu table: DROP DEFAULT");
+    AnalysisError("alter table functional.alltypes_datasource alter int_col drop " +
+        "default", "Unsupported column option for non-Kudu table: DROP DEFAULT");
+    AnalysisError("alter table functional.alltypes_jdbc_datasource alter int_col drop " +
+        "default", "Unsupported column option for non-Kudu table: DROP DEFAULT");
   }
 
   ComputeStatsStmt checkComputeStatsStmt(String stmt) throws AnalysisException {

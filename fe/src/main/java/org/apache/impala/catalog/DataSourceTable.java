@@ -114,6 +114,12 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
   @Override // FeDataSourceTable
   public int getNumNodes() { return 1; }
 
+  @Override // FeDataSourceTable
+  public boolean isJdbcDataSourceTable() {
+    return (dataSource_ != null && dataSource_.name != null &&
+        dataSource_.name.equals(IMPALA_BUILTIN_JDBC_DATASOURCE));
+  }
+
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
 
@@ -188,6 +194,18 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
     if (!tblPropertyKeys.contains(AcidUtils.TABLE_IS_TRANSACTIONAL)) {
       tblProperties.put(AcidUtils.TABLE_IS_TRANSACTIONAL, "false");
     }
+  }
+
+  /**
+   * Check if the given property name is one of required JDBC/DBCP parameters.
+   */
+  public static boolean isRequiredJdbcParameter(String propertyName) {
+    for (JdbcStorageConfig config : JdbcStorageConfig.values()) {
+      if (config.getPropertyName().equalsIgnoreCase(propertyName)) {
+        return config.isRequired();
+      }
+    }
+    return false;
   }
 
   /**

@@ -41,6 +41,9 @@ public class AlterTableExecuteStmt extends AlterTableStmt {
     fnCallExpr_ = (FunctionCallExpr) fnCallExpr;
   }
 
+  @Override
+  public String getOperation() { return "EXECUTE"; }
+
   /**
    * Return an instance of a subclass of AlterTableExecuteStmt that can analyze the
    * execute statement for the function call expression in 'expr'.

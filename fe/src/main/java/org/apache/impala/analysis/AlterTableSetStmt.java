@@ -25,10 +25,10 @@ import org.apache.impala.common.AnalysisException;
 /**
  * Base class for all ALTER TABLE ... SET statements
  */
-public class AlterTableSetStmt extends AlterTableStmt {
+public abstract class AlterTableSetStmt extends AlterTableStmt {
   protected final PartitionSet partitionSet_;
 
-  public AlterTableSetStmt(TableName tableName, PartitionSet partitionSet) {
+  protected AlterTableSetStmt(TableName tableName, PartitionSet partitionSet) {
     super(tableName);
     partitionSet_ = partitionSet;
     if (partitionSet_ != null) partitionSet_.setTableName(tableName);

@@ -146,6 +146,12 @@ public class LocalDataSourceTable extends LocalTable implements FeDataSourceTabl
   @Override // FeDataSourceTable
   public int getNumNodes() { return 1; }
 
+  @Override // FeDataSourceTable
+  public boolean isJdbcDataSourceTable() {
+    return (dataSource_ != null && dataSource_.name != null &&
+        dataSource_.name.equals(DataSourceTable.IMPALA_BUILTIN_JDBC_DATASOURCE));
+  }
+
   /**
    * Returns statistics on this table as a tabular result set. Used for the
    * SHOW TABLE STATS statement. The schema of the returned TResultSet is set

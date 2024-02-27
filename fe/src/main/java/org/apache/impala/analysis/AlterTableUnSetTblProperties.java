@@ -19,6 +19,8 @@ package org.apache.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.IcebergTable;
@@ -59,6 +61,12 @@ public class AlterTableUnSetTblProperties extends AlterTableStmt {
   public List<String> getTblPropertyKeys() { return tblPropertyKeys_; }
 
   @Override
+  public String getOperation() {
+    return (targetProperty_ == TTablePropertyType.TBL_PROPERTY)
+        ? "UNSET TBLPROPERTIES" : "UNSET SERDEPROPERTIES";
+  }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.UNSET_TBL_PROPERTIES);
@@ -93,6 +101,8 @@ public class AlterTableUnSetTblProperties extends AlterTableStmt {
       analyzeKuduTable(analyzer);
     } else if (getTargetTable() instanceof FeIcebergTable) {
       analyzeIcebergTable(analyzer);
+    } else if (getTargetTable() instanceof FeDataSourceTable) {
+      analyzeDataSourceTable(analyzer);
     }
 
     // Unsetting avro.schema.url or avro.schema.literal are not allowed to
@@ -126,6 +136,28 @@ public class AlterTableUnSetTblProperties extends AlterTableStmt {
     propertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION, "Iceberg");
     propertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER, "Iceberg");
     propertyCheck(IcebergTable.METADATA_LOCATION, "Iceberg");
+  }
+
+  private void analyzeDataSourceTable(Analyzer analyzer) throws AnalysisException {
+    if (partitionSet_ != null) {
+      throw new AnalysisException("Partition is not supported for DataSource table.");
+    } else if (targetProperty_ == TTablePropertyType.SERDE_PROPERTY) {
+      throw new AnalysisException("ALTER TABLE UNSET SERDEPROPERTIES is not supported " +
+          "for DataSource table.");
+    }
+    // Cannot unset internal properties of DataSource.
+    propertyCheck(DataSourceTable.TBL_PROP_DATA_SRC_NAME, "DataSource");
+    propertyCheck(DataSourceTable.TBL_PROP_INIT_STRING, "DataSource");
+    propertyCheck(DataSourceTable.TBL_PROP_LOCATION, "DataSource");
+    propertyCheck(DataSourceTable.TBL_PROP_CLASS, "DataSource");
+    propertyCheck(DataSourceTable.TBL_PROP_API_VER, "DataSource");
+    // Cannot unset properties which are required JDBC parameters.
+    for (String property : tblPropertyKeys_) {
+      if (DataSourceTable.isRequiredJdbcParameter(property)) {
+        throw new AnalysisException(String.format("Unsetting the '%s' table property " +
+            "is not supported for JDBC DataSource table.", property));
+      }
+    }
   }
 
   private void propertyCheck(String property, String tableType) throws AnalysisException {

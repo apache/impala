@@ -44,6 +44,9 @@ public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
   }
 
   @Override
+  public String getOperation() { return "SET OWNER"; }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     String ownerName = owner_.getOwnerName();
     if (ownerName.length() > MetaStoreUtil.MAX_OWNER_LENGTH) {

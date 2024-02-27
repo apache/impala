@@ -43,6 +43,11 @@ public abstract class AlterTableStmt extends StatementBase {
     table_ = null;
   }
 
+  /*
+   * Returns the operation name of the ALTER TABLE statement.
+   */
+  public abstract String getOperation();
+
   public String getTbl() { return tableName_.getTbl(); }
 
   /**
@@ -101,10 +106,16 @@ public abstract class AlterTableStmt extends StatementBase {
     // column statistics.
     checkTransactionalTable();
     if (table_ instanceof FeDataSourceTable
-        && !(this instanceof AlterTableSetColumnStats)) {
+        && !(this instanceof AlterTableSetColumnStats
+            || this instanceof AlterTableAddColsStmt
+            || this instanceof AlterTableAlterColStmt
+            || this instanceof AlterTableDropColStmt
+            || this instanceof AlterTableSetTblProperties
+            || this instanceof AlterTableUnSetTblProperties)) {
+      boolean storedByJdbc = ((FeDataSourceTable)table_).isJdbcDataSourceTable();
       throw new AnalysisException(String.format(
-          "ALTER TABLE not allowed on a table produced by a data source: %s",
-          tableName_));
+          "ALTER TABLE %s not allowed on a table %s: %s", getOperation(),
+          (storedByJdbc ? "STORED BY JDBC": "PRODUCED BY DATA SOURCE"), tableName_));
     }
   }
 

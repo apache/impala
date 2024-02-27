@@ -48,6 +48,9 @@ public class AlterViewSetTblProperties extends AlterTableSetStmt {
   }
 
   @Override
+  public String getOperation() { return "SET TBLPROPERTIES"; }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = new TAlterTableParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));

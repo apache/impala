@@ -49,6 +49,9 @@ public class AlterViewUnSetTblProperties extends AlterTableStmt {
   }
 
   @Override
+  public String getOperation() { return "UNSET TBLPROPERTIES"; }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = new TAlterTableParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));

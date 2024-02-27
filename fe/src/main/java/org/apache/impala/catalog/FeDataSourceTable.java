@@ -36,4 +36,5 @@ public interface FeDataSourceTable extends FeTable {
   // in Frontend.getTableStats?
   TResultSet getTableStats();
 
+  boolean isJdbcDataSourceTable();
 }

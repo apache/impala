@@ -64,6 +64,9 @@ public class AlterTableAddDropRangePartitionStmt extends AlterTableStmt {
   }
 
   @Override
+  public String getOperation() { return operation_.name().toUpperCase(); }
+
+  @Override
   public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" " + operation_.name());

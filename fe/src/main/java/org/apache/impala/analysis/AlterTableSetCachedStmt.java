@@ -42,6 +42,11 @@ public class AlterTableSetCachedStmt extends AlterTableSetStmt {
   }
 
   @Override
+  public String getOperation() {
+    return cacheOp_.shouldCache() ? "SET CACHED" : "SET UNCACHED";
+  }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_CACHED);

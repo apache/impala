@@ -41,6 +41,9 @@ public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
   public THdfsFileFormat getFileFormat() { return fileFormat_; }
 
   @Override
+  public String getOperation() { return "SET FILEFORMAT"; }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_FILE_FORMAT);

@@ -44,6 +44,9 @@ public class AlterTableSetPartitionSpecStmt extends AlterTableStmt {
   }
 
   @Override
+  public String getOperation() { return "SET PARTITION SPEC"; }
+
+  @Override
   public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("ALTER TABLE ");
     if (getDb() != null) sb.append(getDb() + ".");

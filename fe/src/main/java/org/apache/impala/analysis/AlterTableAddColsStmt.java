@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
@@ -53,6 +55,9 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
     Preconditions.checkState(columnDefs != null && columnDefs.size() > 0);
     columnDefs_ = Lists.newArrayList(columnDefs);
   }
+
+  @Override
+  public String getOperation() { return "ADD COLUMNS"; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -115,6 +120,11 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
       } else if (c.hasKuduOptions()) {
         throw new AnalysisException("The specified column options are only supported " +
             "in Kudu tables: " + c.toString());
+      } else if (t instanceof FeDataSourceTable) {
+        if (!DataSourceTable.isSupportedColumnType(c.getType())) {
+          throw new AnalysisException("Tables stored by JDBC do not support the " +
+              "column type: " + c.getType());
+        }
       }
     }
   }

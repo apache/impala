@@ -56,6 +56,9 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
   public HdfsUri getLocation() { return location_; }
 
   @Override
+  public String getOperation() { return "SET LOCATION"; }
+
+  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.SET_LOCATION);
