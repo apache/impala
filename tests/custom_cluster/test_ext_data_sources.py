@@ -24,6 +24,7 @@ import subprocess
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfApacheHive
+from time import sleep
 
 
 class TestExtDataSources(CustomClusterTestSuite):
@@ -104,6 +105,7 @@ class TestExtDataSources(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
     start_args="--enable_catalogd_ha")
   def test_catalogd_ha_failover(self):
     """The test case for cluster started with catalogd HA enabled."""
@@ -135,6 +137,23 @@ class TestExtDataSources(CustomClusterTestSuite):
     catalogd_service_2.wait_for_metric_value(
         "catalog-server.active-status", expected_value=True, timeout=30)
     assert(catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    # Wait until coordinator receive failover notification.
+    coordinator_service = self.cluster.impalads[0].service
+    expected_catalog_service_port = catalogd_service_2.get_catalog_service_port()
+    received_failover_notification = False
+    retry_count = 30
+    while (retry_count > 0):
+      active_catalogd_address = \
+          coordinator_service.get_metric_value("catalog.active-catalogd-address")
+      _, catalog_service_port = active_catalogd_address.split(":")
+      if (int(catalog_service_port) == expected_catalog_service_port):
+        received_failover_notification = True
+        break
+      retry_count -= 1
+      sleep(1)
+    assert received_failover_notification, \
+        "Coordinator did not receive notification of Catalog service failover."
 
     # Verify that the data source object is available in the catalogd of HA pair.
     result = self.execute_query(SHOW_DATA_SOURCE_QUERY)
