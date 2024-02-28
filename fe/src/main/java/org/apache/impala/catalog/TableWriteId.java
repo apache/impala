@@ -66,6 +66,6 @@ public class TableWriteId {
   }
 
   public int hashCode() {
-    return java.util.Objects.hash(super.hashCode(), createEventId_, writeId_);
+    return java.util.Objects.hash(dbName_, tblName_, createEventId_, writeId_);
   }
 }

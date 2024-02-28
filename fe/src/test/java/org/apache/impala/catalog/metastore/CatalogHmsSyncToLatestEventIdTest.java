@@ -129,9 +129,8 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
     public static void cleanUp() throws Exception {
         // in cleanup, set flag's values to previous value
         BackendConfig.INSTANCE.setEnableCatalogdHMSCache(flagEnableCatalogCache);
-        BackendConfig.INSTANCE.setEnableSyncToLatestEventOnDdls(flagInvalidateCache);
-        BackendConfig.INSTANCE.setInvalidateCatalogdHMSCacheOnDDLs(
-            flagSyncToLatestEventId);
+        BackendConfig.INSTANCE.setEnableSyncToLatestEventOnDdls(flagSyncToLatestEventId);
+        BackendConfig.INSTANCE.setInvalidateCatalogdHMSCacheOnDDLs(flagInvalidateCache);
         if (eventsProcessor_ != null) {
             eventsProcessor_.shutdown();
         }

@@ -2770,7 +2770,6 @@ public class MetastoreEvents {
    */
   public static class AllocWriteIdEvent extends MetastoreTableEvent {
     private final List<TxnToWriteId> txnToWriteIdList_;
-    private org.apache.impala.catalog.Table tbl_;
 
     private AllocWriteIdEvent(CatalogOpExecutor catalogOpExecutor,
         Metrics metrics, NotificationEvent event) throws MetastoreNotificationException {
@@ -2782,34 +2781,13 @@ public class MetastoreEvents {
           MetastoreEventsProcessor.getMessageDeserializer().getAllocWriteIdMessage(
               event.getMessage());
       txnToWriteIdList_ = allocWriteIdMessage.getTxnToWriteIdList();
-      try {
-        // We need to retrieve msTbl_ from catalog because the AllocWriteIdEvent
-        // doesn't bring the table object. However, we need msTbl_ for
-        // MetastoreTableEvent.isEventProcessingDisabled() to determine if event
-        // processing is disabled for the table.
-        tbl_ = catalog_.getTable(dbName_, tblName_);
-        if (tbl_ != null && tbl_.getCreateEventId() < getEventId()) {
-          msTbl_ = tbl_.getMetaStoreTable();
-        }
-      } catch (DatabaseNotFoundException e) {
-        // do nothing
-      } catch (Exception e) {
-        throw new MetastoreNotificationException(debugString("Unable to retrieve table "
-            + "object for AllocWriteIdEvent: {}", getEventId()), e);
-      }
     }
 
     @Override
     protected void processTableEvent() throws MetastoreNotificationException {
-      if (msTbl_ == null) {
-        debugLog("Ignoring the event since table {} does not exist or is unloaded",
-            getFullyQualifiedTblName());
-        return;
-      }
-      // For non-partitioned tables, we can just reload the whole table without
-      // keeping track of write ids.
-      if (msTbl_.getPartitionKeysSize() == 0) {
-        debugLog("Ignoring the event since table {} is non-partitioned",
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl == null) {
+        debugLog("Ignoring the event since table {} does not exist",
             getFullyQualifiedTblName());
         return;
       }
@@ -2820,8 +2798,8 @@ public class MetastoreEvents {
         catalog_.addWriteIdsToTable(dbName_, tblName_, getEventId(), writeIds,
             MutableValidWriteIdList.WriteIdStatus.OPEN);
         for (TxnToWriteId txnToWriteId : txnToWriteIdList_) {
-          TableWriteId tableWriteId = new TableWriteId(dbName_, tblName_,
-              tbl_.getCreateEventId(), txnToWriteId.getWriteId());
+          TableWriteId tableWriteId = new TableWriteId(
+              dbName_, tblName_, tbl.getCreateEventId(), txnToWriteId.getWriteId());
           catalog_.addWriteId(txnToWriteId.getTxnId(), tableWriteId);
           infoLog("Added write id {} on table {}.{} for txn {}",
               txnToWriteId.getWriteId(), dbName_, tblName_, txnToWriteId.getTxnId());
@@ -2841,6 +2819,13 @@ public class MetastoreEvents {
 
     @Override
     protected boolean isEventProcessingDisabled() {
+      // TODO:  Have an init method to set fields that cannot be initialized in the
+      // event constructors and invoke it as a first step before processing event. It
+      // can be useful for other such events.
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl != null && tbl.getCreateEventId() < getEventId()) {
+        msTbl_ = tbl.getMetaStoreTable();
+      }
       if (msTbl_ == null) {
         return false;
       }
@@ -2861,8 +2846,6 @@ public class MetastoreEvents {
     // if isRefresh_ is set to true then it is refresh query, else it is invalidate query
     private boolean isRefresh_;
 
-    private org.apache.impala.catalog.Table tbl_;
-
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
@@ -2878,7 +2861,6 @@ public class MetastoreEvents {
             updatedFields.get("table"));
         reloadPartition_ = (Partition)updatedFields.get("partition");
         isRefresh_ = (boolean)updatedFields.get("isRefresh");
-        tbl_ = catalog_.getTable(dbName_, tblName_);
       } catch (Exception e) {
         throw new MetastoreNotificationException(debugString("Unable to "
                 + "parse reload message"), e);
@@ -2913,11 +2895,10 @@ public class MetastoreEvents {
     }
 
     private boolean isOlderEvent() {
-      if (tbl_ == null || tbl_ instanceof IncompleteTable) {
-        return false;
-      }
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl == null || tbl instanceof IncompleteTable) { return false; }
       // Always check the lastRefreshEventId on the table first for table level refresh
-      if (tbl_.getLastRefreshEventId() >= getEventId()
+      if (tbl.getLastRefreshEventId() >= getEventId()
           || (reloadPartition_ != null
                  && catalog_.isPartitionLoadedAfterEvent(
                         dbName_, tblName_, reloadPartition_, getEventId()))) {
@@ -3074,10 +3055,6 @@ public class MetastoreEvents {
       try {
         partitionName_ =
             MetastoreShim.getPartitionNameFromCommitCompactionEvent(event);
-        org.apache.impala.catalog.Table tbl = catalog_.getTable(dbName_, tblName_);
-        if (tbl != null && tbl.getCreateEventId() < getEventId()) {
-          msTbl_ = tbl.getMetaStoreTable();
-        }
       } catch (Exception ex) {
         warnLog("Unable to parse commit compaction message: {}", ex.getMessage());
       }
@@ -3108,6 +3085,10 @@ public class MetastoreEvents {
 
     @Override
     protected boolean isEventProcessingDisabled() {
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl != null && tbl.getCreateEventId() < getEventId()) {
+        msTbl_ = tbl.getMetaStoreTable();
+      }
       if (msTbl_ == null) {
         return false;
       }

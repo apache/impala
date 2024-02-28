@@ -86,6 +86,7 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.MetastoreApiTestUtils;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableWriteId;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterDatabaseEvent;
@@ -112,6 +113,7 @@ import org.apache.impala.hive.executor.TestHiveJavaFunctionFactory;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.testutil.HiveJdbcClientPool;
 import org.apache.impala.testutil.IncompetentMetastoreClientPool;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TAlterDbParams;
@@ -3602,6 +3604,172 @@ public class MetastoreEventsProcessorTest {
       assertEquals(0, eventsProcessor_.getEventTimeFromHMS(0));
     } finally {
       catalog_.setMetaStoreClientPool(origPool);
+    }
+  }
+
+  @Test
+  public void testAllocWriteIdEventForPartTableWithoutLoad() throws Exception {
+    String tblName = "test_alloc_writeid_part_table";
+    testAllocWriteIdEvent(tblName, true, false);
+  }
+
+  @Test
+  public void testAllocWriteIdEventForNonPartTableWithoutLoad() throws Exception {
+    String tblName = "test_alloc_writeid_table";
+    testAllocWriteIdEvent(tblName, false, false);
+  }
+
+  @Test
+  public void testAllocWriteIdEventForPartTable() throws Exception {
+    String tblName = "test_alloc_writeid_part_table_load";
+    testAllocWriteIdEvent(tblName, true, true);
+  }
+
+  @Test
+  public void testAllocWriteIdEventForNonPartTable() throws Exception {
+    String tblName = "test_alloc_writeid_table_load";
+    testAllocWriteIdEvent(tblName, false, true);
+  }
+
+  @Test
+  public void testReloadEventOnLoadedTable() throws Exception {
+    String tblName = "test_reload";
+    createDatabase(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    createTable(tblName, false);
+    // Fire a reload event
+    MetastoreShim.fireReloadEventHelper(catalog_.getMetaStoreClient(), true, null,
+        TEST_DB_NAME, tblName, Collections.emptyMap());
+    // Fetch all the events
+    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    List<MetastoreEvent> filteredEvents =
+        eventsProcessor_.getEventsFactory().getFilteredEvents(
+            events, eventsProcessor_.getMetrics());
+    assertTrue(filteredEvents.size() == 2);
+    // Process create table event and load table
+    MetastoreEvent event = filteredEvents.get(0);
+    assertEquals(MetastoreEventType.CREATE_TABLE, event.getEventType());
+    event.processIfEnabled();
+    loadTable(tblName);
+    // Process reload event twice and check if table is refreshed on first reload event
+    // and skipped for second event.
+    event = filteredEvents.get(1);
+    assertEquals(MetastoreEventType.RELOAD, event.getEventType());
+    // First reload should refresh table
+    long refreshCount =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES)
+            .getCount();
+    event.processIfEnabled();
+    assertEquals(refreshCount + 1,
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES)
+            .getCount());
+    // Second reload should be skipped
+    long skipCount = eventsProcessor_.getMetrics()
+                         .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                         .getCount();
+    event.processIfEnabled();
+    assertEquals(skipCount + 1,
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+            .getCount());
+  }
+
+  @Test
+  public void testCommitCompactionEventOnLoadedTable() throws Exception {
+    String tblName = "test_commit_compaction";
+    createDatabase(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    createTransactionalTable(TEST_DB_NAME, tblName, false);
+    insertIntoTable(TEST_DB_NAME, tblName);
+    insertIntoTable(TEST_DB_NAME, tblName);
+    alterTableAddParameter(
+        tblName, MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), "true");
+
+    // Run hive query to trigger compaction
+    try (HiveJdbcClientPool jdbcClientPool = HiveJdbcClientPool.create(1);
+         HiveJdbcClientPool.HiveJdbcClient hiveClient = jdbcClientPool.getClient()) {
+      hiveClient.executeSql(
+          "alter table " + TEST_DB_NAME + '.' + tblName + " compact 'minor' and wait");
+    }
+    // Fetch all the events
+    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    List<MetastoreEvent> filteredEvents =
+        eventsProcessor_.getEventsFactory().getFilteredEvents(
+            events, eventsProcessor_.getMetrics());
+    assertTrue(filteredEvents.size() > 1);
+    // Process create table event and load table
+    MetastoreEvent event = filteredEvents.get(0);
+    assertEquals(MetastoreEventType.CREATE_TABLE, event.getEventType());
+    event.processIfEnabled();
+    loadTable(tblName);
+    // Process commit compaction event should skip the event because
+    // DISABLE_EVENT_HMS_SYNC is set to true
+    event = filteredEvents.get(filteredEvents.size() - 1);
+    assertEquals(MetastoreEventType.COMMIT_COMPACTION, event.getEventType());
+    long skipCount = eventsProcessor_.getMetrics()
+                         .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                         .getCount();
+    event.processIfEnabled();
+    assertEquals(skipCount + 1,
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+            .getCount());
+  }
+
+  private void insertIntoTable(String dbName, String tableName) throws Exception {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      org.apache.hadoop.hive.metastore.api.Table msTable =
+          client.getHiveClient().getTable(dbName, tableName);
+      long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      long writeId = MetastoreShim.allocateTableWriteId(
+          client.getHiveClient(), txnId, dbName, tableName);
+      simulateInsertIntoTransactionalTableFromFS(msTable, null, 1, txnId, writeId);
+      MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+    }
+  }
+
+  public void testAllocWriteIdEvent(String tblName, boolean isPartitioned,
+      boolean isLoadTable) throws TException, TransactionException, CatalogException {
+    createDatabase(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    createTransactionalTable(TEST_DB_NAME, tblName, isPartitioned);
+    if (isLoadTable) {
+      eventsProcessor_.processEvents();
+      // Load table
+      loadTable(tblName);
+    }
+    long txnId;
+    long writeId;
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      writeId = MetastoreShim.allocateTableWriteId(
+          client.getHiveClient(), txnId, TEST_DB_NAME, tblName);
+      eventsProcessor_.processEvents();
+      // Abort transaction and do not process event
+      MetastoreShim.abortTransaction(client.getHiveClient(), txnId);
+    }
+    Table table = catalog_.getTableNoThrow(TEST_DB_NAME, tblName);
+    assertNotNull("Table is not present in catalog", table);
+    // Check whether txnId to write id mapping is present
+    Set<TableWriteId> writeIds = catalog_.getWriteIds(txnId);
+    assertEquals(1, writeIds.size());
+    assertTrue(writeIds.contains(
+        new TableWriteId(TEST_DB_NAME, tblName, table.getCreateEventId(), writeId)));
+    if (isLoadTable) {
+      assertTrue(table instanceof HdfsTable);
+      // For loaded partitioned table, write id is added on alloc write id event process
+      // Whereas, for non-partitioned table, write id is not added on alloc write id
+      // event process
+      if (isPartitioned) {
+        assertEquals(writeId, table.getValidWriteIds().getHighWatermark());
+      } else {
+        assertNotEquals(writeId, table.getValidWriteIds().getHighWatermark());
+      }
+    } else {
+      assertTrue(table instanceof IncompleteTable);
+      assertNull(table.getValidWriteIds());
     }
   }
 

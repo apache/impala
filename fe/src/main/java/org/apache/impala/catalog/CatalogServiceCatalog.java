@@ -3934,6 +3934,14 @@ public class CatalogServiceCatalog extends Catalog {
           dbName, tblName, eventId);
       return;
     }
+    if (tbl.getNumClusteringCols() == 0) {
+      // For non-partitioned tables, we just reload the whole table without keeping
+      // track of write ids.
+      LOG.debug("Not adding write ids to table {}.{} for event {} since it is "
+              + "a non-partitioned table",
+          dbName, tblName, eventId);
+      return;
+    }
     if (!tryWriteLock(tbl)) {
       throw new CatalogException(String.format(
           "Error locking table %s for event %d", tbl.getFullName(), eventId));
