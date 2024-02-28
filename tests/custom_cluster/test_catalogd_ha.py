@@ -318,6 +318,38 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert(failed_update_catalogd_rpc_num == successful_update_catalogd_rpc_num)
 
   @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
+                     "--statestore_heartbeat_frequency_ms=1000",
+    impalad_args="--debug_actions=IGNORE_NEW_ACTIVE_CATALOGD_ADDR:FAIL@1.0",
+    start_args="--enable_catalogd_ha")
+  def test_manual_failover_with_coord_ignore_notification(self):
+    """Tests for Catalog Service manual failover with coordinators to ignore failover
+    notification."""
+    # Verify two catalogd instances are created with one as active.
+    catalogds = self.cluster.catalogds()
+    assert(len(catalogds) == 2)
+    catalogd_service_1 = catalogds[0].service
+    catalogd_service_2 = catalogds[1].service
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    # Restart standby catalogd with force_catalogd_active as true.
+    catalogds[1].kill()
+    catalogds[1].start(wait_until_ready=True,
+                       additional_args="--force_catalogd_active=true")
+    # Wait until original active catalogd becomes in-active.
+    catalogd_service_1 = catalogds[0].service
+    catalogd_service_1.wait_for_metric_value(
+        "catalog-server.active-status", expected_value=False, timeout=15)
+    assert(not catalogd_service_1.get_metric_value("catalog-server.active-status"))
+
+    # Run query to create a table. Coordinator still send request to catalogd_service_1
+    # so that the request will be rejected.
+    ddl_query = "CREATE TABLE coordinator_ignore_notification (c int)"
+    ex = self.execute_query_expect_failure(self.client, ddl_query)
+    assert "Request for Catalog service is rejected" in str(ex)
+
+  @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
     start_args="--enable_catalogd_ha")
   def test_restart_statestore(self):

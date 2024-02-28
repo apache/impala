@@ -148,6 +148,7 @@ DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);
 DECLARE_int32(state_store_2_port);
 
+DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
 
 DEFINE_int32(backend_client_connection_num_retries, 3, "Retry backend connections.");
@@ -712,6 +713,8 @@ void ExecEnv::UpdateActiveCatalogd(bool is_registration_reply,
   bool is_matching = (catalogd_registration.address.port == catalogd_address_->port
       && catalogd_registration.address.hostname == catalogd_address_->hostname);
   if (!is_matching) {
+    RETURN_VOID_IF_ERROR(
+        DebugAction(FLAGS_debug_actions, "IGNORE_NEW_ACTIVE_CATALOGD_ADDR"));
     LOG(INFO) << "The address of Catalog service is changed from "
               << TNetworkAddressToString(*catalogd_address_.get())
               << " to " << TNetworkAddressToString(catalogd_registration.address);

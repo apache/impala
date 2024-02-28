@@ -40,6 +40,7 @@ namespace impala {
 
 class ActiveCatalogdVersionChecker;
 class Catalog;
+class CatalogServiceThriftIf;
 class StatestoreSubscriber;
 
 /// The Impala CatalogServer manages the caching and persistence of cluster-wide metadata.
@@ -129,6 +130,8 @@ class CatalogServer {
   }
 
  private:
+  friend class CatalogServiceThriftIf;
+
   /// Protocol version of the Catalog Service.
   CatalogServiceVersion::type protocol_version_;
 

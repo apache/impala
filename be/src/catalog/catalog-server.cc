@@ -227,12 +227,14 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
  public:
   CatalogServiceThriftIf(CatalogServer* catalog_server)
       : catalog_server_(catalog_server) {
+    server_address_ = TNetworkAddressToString(
+        MakeNetworkAddress(FLAGS_hostname, FLAGS_catalog_service_port));
   }
 
   // Executes a TDdlExecRequest and returns details on the result of the operation.
   void ExecDdl(TDdlExecResponse& resp, const TDdlExecRequest& req) override {
     VLOG_RPC << "ExecDdl(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->ExecDdl(req, &resp);
     }
@@ -248,7 +250,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
       override {
     VLOG_RPC << "ResetMetadata(): request=" << ThriftDebugString(req);
     DebugActionNoFail(FLAGS_debug_actions, "RESET_METADATA_DELAY");
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->ResetMetadata(req, &resp);
     }
@@ -264,7 +266,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void UpdateCatalog(TUpdateCatalogResponse& resp, const TUpdateCatalogRequest& req)
       override {
     VLOG_RPC << "UpdateCatalog(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->UpdateCatalog(req, &resp);
     }
@@ -280,7 +282,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetFunctions(TGetFunctionsResponse& resp, const TGetFunctionsRequest& req)
       override {
     VLOG_RPC << "GetFunctions(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->GetFunctions(req, &resp);
     }
@@ -295,7 +297,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetCatalogObject(TGetCatalogObjectResponse& resp,
       const TGetCatalogObjectRequest& req) override {
     VLOG_RPC << "GetCatalogObject(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->GetCatalogObject(
           req.object_desc, &resp.catalog_object);
@@ -317,7 +319,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     // so a heavy query workload against a table undergoing a slow refresh doesn't
     // end up taking down the catalog by creating thousands of threads.
     VLOG_RPC << "GetPartialCatalogObject(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->GetPartialCatalogObject(req, &resp);
     }
@@ -331,7 +333,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetPartitionStats(TGetPartitionStatsResponse& resp,
       const TGetPartitionStatsRequest& req) override {
     VLOG_RPC << "GetPartitionStats(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->GetPartitionStats(req, &resp);
     }
@@ -348,7 +350,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void PrioritizeLoad(TPrioritizeLoadResponse& resp, const TPrioritizeLoadRequest& req)
       override {
     VLOG_RPC << "PrioritizeLoad(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->PrioritizeLoad(req);
     }
@@ -362,7 +364,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void UpdateTableUsage(TUpdateTableUsageResponse& resp,
       const TUpdateTableUsageRequest& req) override {
     VLOG_RPC << "UpdateTableUsage(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->UpdateTableUsage(req);
     }
@@ -376,7 +378,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetNullPartitionName(TGetNullPartitionNameResponse& resp,
       const TGetNullPartitionNameRequest& req) override {
     VLOG_RPC << "GetNullPartitionName(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->GetNullPartitionName(&resp);
     }
@@ -390,7 +392,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void GetLatestCompactions(TGetLatestCompactionsResponse& resp,
       const TGetLatestCompactionsRequest& req) override {
     VLOG_RPC << "GetLatestCompactions(): request=" << ThriftDebugString(req);
-    Status status = CheckProtocolVersion(req.protocol_version);
+    Status status = AcceptRequest(req.protocol_version);
     if (status.ok()) {
       status = catalog_server_->catalog()->GetLatestCompactions(req, &resp);
     }
@@ -403,12 +405,18 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
 
  private:
   CatalogServer* catalog_server_;
+  string server_address_;
 
-  Status CheckProtocolVersion(CatalogServiceVersion::type client_version) {
+  // Check if catalog protocols are compatible between client and catalog server.
+  // Return Status::OK() if the protocols are compatible and catalog server is active.
+  Status AcceptRequest(CatalogServiceVersion::type client_version) {
     Status status = Status::OK();
     if (client_version < catalog_server_->GetProtocolVersion()) {
       status = Status(TErrorCode::CATALOG_INCOMPATIBLE_PROTOCOL, client_version + 1,
           catalog_server_->GetProtocolVersion() + 1);
+    } else if (FLAGS_enable_catalogd_ha && !catalog_server_->IsActive()) {
+      status = Status(Substitute("Request for Catalog service is rejected since "
+          "catalogd $0 is in standby mode", server_address_));
     }
     return status;
   }
