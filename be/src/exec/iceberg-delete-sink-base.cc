@@ -45,8 +45,8 @@ Status IcebergDeleteSinkBase::Prepare(RuntimeState* state,
   table_desc_ = static_cast<const HdfsTableDescriptor*>(
       state->desc_tbl().GetTableDescriptor(table_id_));
   if (table_desc_ == nullptr) {
-    stringstream error_msg("Failed to get table descriptor for table id: ");
-    error_msg << table_id_;
+    stringstream error_msg;
+    error_msg << "Failed to get table descriptor for table id: " << table_id_;
     return Status(error_msg.str());
   }
 
