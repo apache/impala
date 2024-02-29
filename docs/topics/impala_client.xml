@@ -250,7 +250,7 @@ under the License.
         <dlentry>
 
           <dt>
-            --idle_client_poll_time_s
+            --idle_client_poll_period_s
           </dt>
 
           <dd>
@@ -258,11 +258,11 @@ under the License.
             connection is idle and closes it if the connection is idle. A client connection is
             idle if all sessions associated with the client connection are idle.
             <p>
-              By default, <codeph>--idle_client_poll_time_s</codeph> is set to 30 seconds.
+              By default, <codeph>--idle_client_poll_period_s</codeph> is set to 30 seconds.
             </p>
 
             <p>
-              If <codeph>--idle_client_poll_time_s</codeph> is set to 0, idle client connections
+              If <codeph>--idle_client_poll_period_s</codeph> is set to 0, idle client connections
               stay open until explicitly closed by the clients.
             </p>
 
