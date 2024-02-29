@@ -1271,7 +1271,11 @@ public class HdfsTable extends Table implements FeFsTable {
           loadConstraintsInfo(msClient, msTbl);
           catalogTimeline.markEvent("Loaded table schema");
         }
-        loadValidWriteIdList(msClient);
+        boolean prevWriteIdChanged = loadValidWriteIdList(msClient);
+        if (prevWriteIdChanged && !loadParams.isLoadPartitionFileMetadata()) {
+          LOG.info("Not skipping file metadata reload since writeId is changed in the " +
+              "metastore for the table: " + getFullName());
+        }
         // Set table-level stats first so partition stats can inherit it.
         setTableStats(msTbl);
         // Load partition and file metadata
@@ -1284,7 +1288,7 @@ public class HdfsTable extends Table implements FeFsTable {
           }
           storageMetadataLoadTime_ += updateMdFromHmsTable(msTbl);
           if (msTbl.getPartitionKeysSize() == 0) {
-            if (loadParams.isLoadPartitionFileMetadata()) {
+            if (loadParams.isLoadPartitionFileMetadata() || prevWriteIdChanged) {
               storageMetadataLoadTime_ += updateUnpartitionedTableFileMd(
                   msClient, loadParams.getDebugAction(),
                   catalogTimeline);
@@ -2984,7 +2988,14 @@ public class HdfsTable extends Table implements FeFsTable {
     if (MetastoreShim.getMajorVersion() > 2 &&
         AcidUtils.isTransactionalTable(msTable_.getParameters())) {
       ValidWriteIdList writeIdList = fetchValidWriteIds(client);
-      prevWriteIdChanged = writeIdList.toString().equals(validWriteIds_);
+      if (validWriteIds_ != null && writeIdList != null) {
+        prevWriteIdChanged = !writeIdList.toString().equals(
+            validWriteIds_.writeToString());
+        if (prevWriteIdChanged) {
+          LOG.info("Valid writeId changed from {} to {}",
+              validWriteIds_.writeToString(), writeIdList.toString());
+        }
+      }
       validWriteIds_ = new MutableValidReaderWriteIdList(writeIdList);
     } else {
       validWriteIds_ = null;

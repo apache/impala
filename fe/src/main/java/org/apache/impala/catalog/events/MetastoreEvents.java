@@ -1113,7 +1113,7 @@ public class MetastoreEvents {
         throws CatalogException {
       try {
         if (!catalog_.reloadTableIfExists(dbName_, tblName_, getEventDesc(), getEventId(),
-            skipFileMetadataReload_)) {
+            skipFileMetadataReload_, null)) {
           debugLog("Automatic refresh on table {} failed as the table "
                   + "either does not exist anymore or is not in loaded state.",
               getFullyQualifiedTblName());

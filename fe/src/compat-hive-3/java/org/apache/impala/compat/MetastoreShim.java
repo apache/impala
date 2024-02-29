@@ -109,6 +109,7 @@ import org.apache.impala.catalog.TableNotLoadedException;
 import org.apache.impala.catalog.TableWriteId;
 import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
@@ -961,6 +962,13 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       for (int i = 0; i < writeIds.size(); i++) {
         Table tbl = (Table) MessageBuilder.getTObj(
             writeEventInfoList.get(i).getTableObj(), Table.class);
+        if (catalog_.isHmsEventSyncDisabled(tbl)) {
+          LOG.debug("Not adding write ids to table {}.{} for event {} " +
+              "since table/db level flag {} is set to true", tbl.getDbName(),
+              tbl.getTableName(), getEventId(),
+              MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
+          continue;
+        }
         TableName tableName = new TableName(tbl.getDbName(), tbl.getTableName());
         Partition partition = null;
         if (writeEventInfoList.get(i).getPartitionObj() != null) {
@@ -983,7 +991,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
         addCommittedWriteIdsAndReload(getCatalogOpExecutor(), tbl.getDbName(),
             tbl.getTableName(), tbl.getPartitionKeysSize() > 0,
             MetaStoreUtils.isMaterializedViewTable(tbl), writeIdsForTable, partsForTable,
-            getEventId());
+            getEventId(), getMetrics());
       }
     }
 
@@ -1010,12 +1018,17 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
 
   public static void addCommittedWriteIdsAndReload(CatalogOpExecutor catalogOpExecutor,
       String dbName, String tableName, boolean isPartitioned, boolean isMaterializedView,
-      List<Long> writeIds, List<Partition> partitions, long eventId)
+      List<Long> writeIds, List<Partition> partitions, long eventId, Metrics metrics)
       throws CatalogException {
     if (isPartitioned && !isMaterializedView) {
       try {
-        catalogOpExecutor.addCommittedWriteIdsAndReloadPartitionsIfExist(eventId, dbName,
-            tableName, writeIds, partitions, "COMMIT_TXN event " + eventId);
+        int numPartsRefreshed =
+            catalogOpExecutor.addCommittedWriteIdsAndReloadPartitionsIfExist(eventId,
+                dbName, tableName, writeIds, partitions, "COMMIT_TXN event " + eventId);
+        if (numPartsRefreshed > 0) {
+          metrics.getCounter(MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES)
+              .inc(numPartsRefreshed);
+        }
       } catch (TableNotLoadedException e) {
         LOG.debug("Ignoring reloading since table {}.{} is not loaded", dbName,
             tableName);
@@ -1023,9 +1036,13 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
         LOG.debug("Ignoring reloading since table {}.{} is not found", dbName, tableName);
       }
     } else {
-      catalogOpExecutor.getCatalog()
+      boolean tableRefresh = catalogOpExecutor.getCatalog()
           .reloadTableIfExists(dbName, tableName, "COMMIT_TXN event " + eventId,
-              eventId, /*isSkipFileMetadataReload*/ false);
+              eventId, /*isSkipFileMetadataReload*/ false, writeIds);
+      if (tableRefresh) {
+        LOG.info("Refreshed table {}.{}", dbName, tableName);
+        metrics.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).inc();
+      }
     }
   }
 
@@ -1077,7 +1094,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       try {
         addCommittedWriteIdsAndReload(getCatalogOpExecutor(), dbName_, tblName_,
             isPartitioned_, isMaterializedView_, writeIdsInEvent_, partitions_,
-            getEventId());
+            getEventId(), getMetrics());
         catalog_.addWriteIdsToTable(getDbName(), getTableName(), getEventId(),
             writeIdsInCatalog_, MutableValidWriteIdList.WriteIdStatus.COMMITTED);
       } catch (CatalogException e) {

@@ -80,6 +80,8 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.catalog.events.MetastoreNotificationFetchException;
@@ -3401,14 +3403,44 @@ public class CatalogServiceCatalog extends Catalog {
    * otherwise.
    */
   public boolean reloadTableIfExists(String dbName, String tblName, String reason,
-      long eventId, boolean isSkipFileMetadataReload) throws CatalogException {
+      long eventId, boolean isSkipFileMetadataReload, List<Long> committedWriteIds)
+      throws CatalogException {
     try {
       Table table = getTable(dbName, tblName);
       if (table == null || table instanceof IncompleteTable) return false;
-      if (eventId > 0 && eventId <= table.getCreateEventId()) {
-        LOG.debug("Not reloading the table {}.{} for event {} since it is recreated at "
-            + "event {}.", dbName, tblName, eventId, table.getCreateEventId());
+      if (eventId > 0 && eventId <= table.getCreateEventId() ||
+          (eventId != -1 && table.getLastSyncedEventId() != -1 &&
+              table.getLastSyncedEventId() >= eventId)) {
+        String message = (eventId > 0 && eventId <= table.getCreateEventId()) ?
+            "recreated at event " + table.getCreateEventId() :
+            "already synced till event id: " + table.getLastSyncedEventId();
+        LOG.debug("Not reloading the table {}.{} for event {} since it is {}.", dbName,
+            tblName, eventId, message);
         return false;
+      }
+      // Transactional table events using this method should reload the table only if the
+      // incoming committedWriteIds are different from the committedWriteIds cached in
+      // CatalogD. The if block execution is skipped for non-transactional table events.
+      HdfsTable hdfsTable = (HdfsTable) table;
+      ValidWriteIdList previousWriteIdList = hdfsTable.getValidWriteIds();
+      if (previousWriteIdList != null && committedWriteIds != null
+          && !committedWriteIds.isEmpty()) {
+        // get a copy of previous write id list
+        boolean tableNeedsRefresh = false;
+        previousWriteIdList = MetastoreShim.getValidWriteIdListFromString(
+            previousWriteIdList.toString());
+        for (Long writeId : committedWriteIds) {
+          if (!previousWriteIdList.isWriteIdValid(writeId)) {
+            tableNeedsRefresh = true;
+            break;
+          }
+        }
+        if (!tableNeedsRefresh) {
+          LOG.info("Not reloading table {} for event {} since the cache is "
+              + "already up-to-date", table.getFullName(), eventId);
+          hdfsTable.setLastSyncedEventId(eventId);
+          return false;
+        }
       }
       reloadTable(table, reason, eventId, isSkipFileMetadataReload,
           NoOpEventSequence.INSTANCE);
@@ -4748,6 +4780,12 @@ public class CatalogServiceCatalog extends Catalog {
           "since it is not HdfsTable", dbName, tblName, eventId);
       return;
     }
+    if (isHmsEventSyncDisabled(tbl.getMetaStoreTable())) {
+      LOG.debug("Not adding write ids to table {}.{} for event {} " +
+          "since table/db level flag {} is set to true", dbName, tblName, eventId,
+          MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
+      return;
+    }
     if (eventId > 0 && eventId <= tbl.getCreateEventId()) {
       LOG.debug("Not adding write ids to table {}.{} for event {} since it is recreated.",
           dbName, tblName, eventId);
@@ -4802,6 +4840,19 @@ public class CatalogServiceCatalog extends Catalog {
       UnlockWriteLockIfErroneouslyLocked();
       tbl.releaseWriteLock();
     }
+  }
+
+  public boolean isHmsEventSyncDisabled(org.apache.hadoop.hive.metastore.api.Table tbl) {
+    if (tbl == null) {
+      return false;
+    }
+    Boolean tblFlagVal = MetastoreTableEvent.getHmsSyncProperty(tbl);
+    if (tblFlagVal != null) {
+      return tblFlagVal;
+    }
+    String dbFlagVal = getDbProperty(tbl.getDbName(),
+        MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
+    return Boolean.parseBoolean(dbFlagVal);
   }
 
   /**

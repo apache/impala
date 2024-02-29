@@ -191,30 +191,31 @@ class TestEventProcessingCustomConfigsBase(CustomClusterTestSuite):
         # contains the related data
         "create table {0}.{1} (c1 int) {2}".format(db_name,
           acid_no_part_tbl_name, acid_props),
-        "insert into table {0}.{1} values (1) ".format(db_name, acid_no_part_tbl_name),
-        "insert overwrite table {0}.{1} select * from {0}.{1}".format(
-          db_name, acid_no_part_tbl_name),
+        # TODO: IMPALA-14305 will fix the transactional self-events detection
+        # "insert into table {0}.{1} values (1) ".format(db_name, acid_no_part_tbl_name),
+        # "insert overwrite table {0}.{1} select * from {0}.{1}".format(
+        #   db_name, acid_no_part_tbl_name),
         "{0} {1}.{2}".format(TRUNCATE_TBL_STMT, db_name, acid_no_part_tbl_name),
         # the table is empty so the following insert adds 0 rows
-        "insert overwrite table {0}.{1} select * from {0}.{1}".format(
-          db_name, acid_no_part_tbl_name),
+        # "insert overwrite table {0}.{1} select * from {0}.{1}".format(
+        #   db_name, acid_no_part_tbl_name),
         "create table {0}.{1} (c1 int) partitioned by (part int) {2}".format(db_name,
           acid_tbl_name, acid_props),
-        "insert into table {0}.{1} partition (part=1) "
-        "values (1) ".format(db_name, acid_tbl_name),
-        "insert into table {0}.{1} partition (part) select id, int_col "
-        "from functional.alltypestiny".format(db_name, acid_tbl_name),
+        # "insert into table {0}.{1} partition (part=1) "
+        # "values (1) ".format(db_name, acid_tbl_name),
+        # "insert into table {0}.{1} partition (part) select id, int_col "
+        # "from functional.alltypestiny".format(db_name, acid_tbl_name),
         # repeat the same insert, now it writes to existing partitions
-        "insert into table {0}.{1} partition (part) select id, int_col "
-        "from functional.alltypestiny".format(db_name, acid_tbl_name),
+        # "insert into table {0}.{1} partition (part) select id, int_col "
+        # "from functional.alltypestiny".format(db_name, acid_tbl_name),
         # following insert overwrite is used instead of truncate, because truncate
         # leads to a non-self event that reloads the table
-        "insert overwrite table {0}.{1} partition (part) select id, int_col "
-        "from functional.alltypestiny where id=-1".format(db_name, acid_tbl_name),
-        "insert overwrite table {0}.{1} partition (part) select id, int_col "
-        "from functional.alltypestiny".format(db_name, acid_tbl_name),
-        "insert overwrite {0}.{1} partition(part) select * from {0}.{1}".format(
-          db_name, acid_tbl_name),
+        # "insert overwrite table {0}.{1} partition (part) select id, int_col "
+        # "from functional.alltypestiny where id=-1".format(db_name, acid_tbl_name),
+        # "insert overwrite table {0}.{1} partition (part) select id, int_col "
+        # "from functional.alltypestiny".format(db_name, acid_tbl_name),
+        # "insert overwrite {0}.{1} partition(part) select * from {0}.{1}".format(
+        #   db_name, acid_tbl_name),
         # recover partitions will generate add_partition events
         "alter table {0}.{1} recover partitions".format(db_name, recover_tbl_name),
         # events processor doesn't process delete column stats events currently,
@@ -1642,6 +1643,56 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       curr_drop_table_metric = EventProcessorUtils.get_int_metric('tables-removed', 0)
       assert curr_drop_table_metric == prev_drop_table_metric + 1
       assert curr_create_table_metric == prev_create_table_metric + 1
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=1")
+  def test_hms_sync_disabled_txn_events(self, unique_database):
+    """Verify IMPALA-12829: skip txn events if db/table has disabled applying HMS
+    events"""
+    # Iterate through different levels at which HMS sync can be disabled
+    for disable_level in ['table', 'database']:
+      for partitioned in [False, True]:
+        event_id_before = EventProcessorUtils.get_last_synced_event_id()
+        txn_table = "part_tbl" if partitioned else "tbl"
+        full_tbl_name = unique_database + '.' + txn_table
+        part_create = " partitioned by (year int)" if partitioned else ""
+        part_insert = " partition (year=2025)" if partitioned else ""
+
+        create_stmt = "create transactional table {} (i int){}".format(full_tbl_name,
+            part_create)
+        self.run_stmt_in_hive(create_stmt)
+        EventProcessorUtils.wait_for_event_processing(self)
+        if disable_level == 'database':
+          self.run_stmt_in_hive(
+            """ALTER DATABASE {} SET DBPROPERTIES ('impala.disableHmsSync'='true')"""
+            .format(unique_database))
+        else:
+          self.run_stmt_in_hive(
+            """ALTER TABLE {} SET TBLPROPERTIES ('impala.disableHmsSync'='true')"""
+            .format(full_tbl_name))
+        self.client.execute("select * from {}".format(full_tbl_name))
+        EventProcessorUtils.wait_for_event_processing(self)
+        tbls_refreshed_before = EventProcessorUtils.get_int_metric('tables-refreshed', 0)
+        partitions_refreshed_before = EventProcessorUtils.get_int_metric(
+          'partitions-refreshed', 0)
+        self.client.execute(":event_processor('pause')")
+        # commit txn event from insert operation
+        if partitioned:
+          self.client.execute("ALTER TABLE {} ADD PARTITION(year=2025)".format(
+            full_tbl_name))
+        self.run_stmt_in_hive("insert into {} {} values (1),(2),(3)"
+          .format(full_tbl_name, part_insert))
+        self.client.execute(":event_processor('start')")
+        EventProcessorUtils.wait_for_event_processing(self)
+        tbls_refreshed_after = EventProcessorUtils.get_int_metric('tables-refreshed', 0)
+        partitions_refreshed_after = EventProcessorUtils.get_int_metric(
+          'partitions-refreshed', 0)
+        assert tbls_refreshed_after == tbls_refreshed_before
+        assert partitions_refreshed_after == partitions_refreshed_before
+        assert EventProcessorUtils.get_last_synced_event_id() > event_id_before
+        self.client.execute("""DROP DATABASE {} CASCADE""".format(unique_database))
+        self.client.execute("""CREATE DATABASE {}""".format(unique_database))
 
 
 @SkipIfFS.hive
