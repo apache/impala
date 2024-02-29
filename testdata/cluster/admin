@@ -64,7 +64,6 @@ else
   # the other services could work after the proper configuration changes.
   SUPPORTED_SERVICES=()
 fi
-SUPPORTED_SERVICES+=(kudu)
 
 # All DataNodes and NodeManagers need a unique but fixed address. The IP is fixed at
 # 127.0.0.1, so the only difference is the port. The address must be fixed because it is
@@ -182,6 +181,13 @@ function is_kerberized {
 function cluster_exists {
   # Just use the first node as an indicator...
   if [[ ! -e "$IMPALA_CLUSTER_NODES_DIR/${NODE_PREFIX}1" ]]; then
+    return 1
+  fi
+}
+
+function kudu_cluster_exists {
+  # Just use the first master as an indicator.
+  if [[ ! -e "$IMPALA_CLUSTER_NODES_DIR/${NODE_PREFIX}1/var/lib/kudu/master" ]]; then
     return 1
   fi
 }
@@ -366,6 +372,16 @@ function start_cluster {
   return $?
 }
 
+function start_kudu_cluster {
+  if ! kudu_cluster_exists; then
+    echo "The Kudu cluster must be created first"
+    return 1
+  fi
+  start "kudu"
+  sleep 10
+  check_kudu_cluster_status
+}
+
 function start {
   if [[ $# -ne 1 ]]; then
     echo start must be called with a single argument -- the service to start. 1>&2
@@ -444,23 +460,42 @@ function check_cluster_status {
     return 1
   fi
 
+  for SERVICE in ${SUPPORTED_SERVICES[@]-}; do
+    check_status $SERVICE
+  done
+}
+
+function check_kudu_cluster_status {
+  if ! kudu_cluster_exists; then
+    echo "The Kudu cluster does not exist"
+    return 1
+  fi
+
+  check_status "kudu"
+}
+
+function check_status {
+  if [[ $# -ne 1 ]]; then
+    echo stop must be called with a single argument -- the service to check. 1>&2
+    exit 1
+  fi
+  local SERVICE=$1
+
   ROLE_COUNT=0
   NOT_RUNNING=()
   for NODE_DIR in "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*; do
-    for SERVICE in ${SUPPORTED_SERVICES[@]-}; do
-      for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/$SERVICE*" $FIND_EXECUTABLE_FILTER \
-          -type f); do
-        ROLE_COUNT=$((ROLE_COUNT + 1))
-        if ! "$SCRIPT" status &>/dev/null; then
-          NOT_RUNNING+=("\n$(basename $SCRIPT) is not running on $(basename $NODE_DIR)")
-        fi
-      done
+    for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/$SERVICE*" $FIND_EXECUTABLE_FILTER \
+        -type f); do
+      ROLE_COUNT=$((ROLE_COUNT + 1))
+      if ! "$SCRIPT" status &>/dev/null; then
+        NOT_RUNNING+=("\n$(basename $SCRIPT) is not running on $(basename $NODE_DIR)")
+      fi
     done
   done
 
   case ${#NOT_RUNNING[@]} in
-    0) echo "The cluster is running"; return;;
-    $ROLE_COUNT) echo "The cluster is not running"; return 1;;
+    0) echo "The ${SERVICE} cluster is running"; return;;
+    $ROLE_COUNT) echo "The ${SERVICE} cluster is not running"; return 1;;
     *) echo -e "${NOT_RUNNING[@]}"; return 1;;
   esac
 }
@@ -474,6 +509,12 @@ function stop_cluster {
   fi
   # Kill everything anyways just in case a git clean -xdf was done
   pkill -u $USER -f $KILL_CLUSTER_MARKER || true
+}
+
+function stop_kudu_cluster {
+  if kudu_cluster_exists; then
+    stop "kudu"
+  fi
 }
 
 function stop {
@@ -502,7 +543,6 @@ function delete_data {
   rm -rf "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/dfs/{nn,dn}/*
   rm -f "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/kms.keystore
   rm -rf "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/ozone
-  delete_kudu_data
 }
 
 function delete_kudu_data {
@@ -510,6 +550,7 @@ function delete_kudu_data {
 }
 
 function delete_cluster {
+  # Delete all cluster data and directory structure.
   pkill -u $USER -f $KILL_CLUSTER_MARKER || true
   rm -rf "$IMPALA_CLUSTER_NODES_DIR"
 }
@@ -529,7 +570,8 @@ function get_hadoop_client_conf_dir {
 COMMAND=$1
 shift
 case $COMMAND in
-  check_cluster_status | cluster_exists | is_kerberized)
+  check_cluster_status | check_kudu_cluster_status | cluster_exists | \
+        kudu_cluster_exists | is_kerberized)
     # Use an "if" to avoid triggering the ERR trap.
     if ! $COMMAND "$@"; then
       exit 1

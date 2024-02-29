@@ -23,11 +23,11 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
-# If -format is passed, format the mini-dfs cluster.
+# If -format is passed, format the mini-dfs cluster and kudu cluster.
 
 if [[ $# -eq 1 && "$1" == "-format" ]]; then
   echo "Formatting cluster"
-  HDFS_FORMAT_CLUSTER="-format"
+  FORMAT_CLUSTER="-format"
 elif [[ $# -ne 0 ]]; then
   echo "Usage: run-all.sh [-format]"
   echo "[-format] : Format the mini-dfs cluster before starting"
@@ -52,8 +52,10 @@ fi
 popd
 
 echo "Starting cluster services..."
-$IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-} 2>&1 | \
+$IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${FORMAT_CLUSTER-} 2>&1 | \
     tee ${IMPALA_CLUSTER_LOGS_DIR}/run-mini-dfs.log
+$IMPALA_HOME/testdata/bin/run-kudu.sh ${FORMAT_CLUSTER-} 2>&1 | \
+    tee ${IMPALA_CLUSTER_LOGS_DIR}/run-kudu.log
 
 # Starts up a mini-cluster which includes:
 # - HDFS with 3 DNs
