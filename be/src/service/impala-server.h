@@ -1155,7 +1155,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Estimated individual and total size of records in query_log_ in bytes.
   std::list<int64_t> query_log_est_sizes_;
-  int64_t query_log_est_total_size_;
+  int64_t query_log_est_total_size_ = 0;
 
   /// Sets the given query_record (and retried_query_record too if given) for the given
   /// query_id. Returns an error Status if the given query_id cannot be found in the
