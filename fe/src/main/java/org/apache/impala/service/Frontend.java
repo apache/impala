@@ -657,19 +657,20 @@ public class Frontend {
           new TColumn("name", Type.STRING.toThrift()),
           new TColumn("type", Type.STRING.toThrift()),
           new TColumn("comment", Type.STRING.toThrift()));
-      if (descStmt.getTable() instanceof FeKuduTable
+      if (descStmt.targetsTable()
           && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
-        columns.add(new TColumn("primary_key", Type.STRING.toThrift()));
-        columns.add(new TColumn("key_unique", Type.STRING.toThrift()));
-        columns.add(new TColumn("nullable", Type.STRING.toThrift()));
-        columns.add(new TColumn("default_value", Type.STRING.toThrift()));
-        columns.add(new TColumn("encoding", Type.STRING.toThrift()));
-        columns.add(new TColumn("compression", Type.STRING.toThrift()));
-        columns.add(new TColumn("block_size", Type.STRING.toThrift()));
-      } else if ((descStmt.getTable() instanceof FeIcebergTable
-          || descStmt.getTable() instanceof IcebergMetadataTable)
-          && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
-        columns.add(new TColumn("nullable", Type.STRING.toThrift()));
+        if (descStmt.getTable() instanceof FeKuduTable) {
+          columns.add(new TColumn("primary_key", Type.STRING.toThrift()));
+          columns.add(new TColumn("key_unique", Type.STRING.toThrift()));
+          columns.add(new TColumn("nullable", Type.STRING.toThrift()));
+          columns.add(new TColumn("default_value", Type.STRING.toThrift()));
+          columns.add(new TColumn("encoding", Type.STRING.toThrift()));
+          columns.add(new TColumn("compression", Type.STRING.toThrift()));
+          columns.add(new TColumn("block_size", Type.STRING.toThrift()));
+        } else if ((descStmt.getTable() instanceof FeIcebergTable
+            || descStmt.getTable() instanceof IcebergMetadataTable)) {
+          columns.add(new TColumn("nullable", Type.STRING.toThrift()));
+        }
       }
       metadata.setColumns(columns);
     } else if (analysis.isAlterTableStmt()) {

@@ -187,3 +187,60 @@ describe functional_orc_def.complextypestbl
 ---- TYPES
 string, string, string
 ====
+
+---- QUERY
+# Describe array from Iceberg table (regression test for IMPALA-12845).
+describe functional_parquet.iceberg_resolution_test_external.phone
+---- RESULTS
+'item','string',''
+'pos','bigint',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Describe map from Iceberg table (regression test for IMPALA-12845).
+describe functional_parquet.iceberg_resolution_test_external.favorites
+---- RESULTS
+'key','string',''
+'value','string',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Describe struct from Iceberg table (regression test for IMPALA-12845).
+describe functional_parquet.iceberg_resolution_test_external.current_address
+---- RESULTS
+'street_address','struct<\n  street_number:int,\n  street_name:string,\n  street_type:string\n>',''
+'country','string',''
+'postal_code','string',''
+---- TYPES
+string,string,string
+====
+
+---- QUERY
+# Describe array from Iceberg metadata table (regression test for IMPALA-12845).
+describe functional_parquet.iceberg_resolution_test_external.all_files.equality_ids
+---- RESULTS
+'item','int',''
+'pos','bigint',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Describe map from Iceberg metadata table (regression test for IMPALA-12845).
+describe functional_parquet.iceberg_resolution_test_external.all_files.column_sizes
+---- RESULTS
+'key','int',''
+'value','bigint',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Describe struct from Iceberg metadata table (regression test for IMPALA-12845).
+describe functional_parquet.iceberg_resolution_test_external.all_files.`partition`
+---- RESULTS
+'event_time_hour','int',''
+'action','string',''
+---- TYPES
+string,string,string
+====
