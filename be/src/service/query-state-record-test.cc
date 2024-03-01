@@ -125,7 +125,7 @@ TEST(QueryStateRecordTest, EventsTimelineIterator) {
   }
 }
 
-TEST(PerHostStateTest, PeakMemoryComparatorLessThan) {
+TEST(QueryStateRecordTest, PerHostStatePeakMemoryComparatorLessThan) {
   TNetworkAddress addr_a;
   PerHostState a;
   a.peak_memory_usage = std::numeric_limits<int64_t>::min();
@@ -140,15 +140,13 @@ TEST(PerHostStateTest, PeakMemoryComparatorLessThan) {
   EXPECT_FALSE(PerHostPeakMemoryComparator(pair_b, pair_a));
 }
 
-TEST(PerHostStateTest, PeakMemoryComparatorEqual) {
+TEST(QueryStateRecordTest, PerHostStatePeakMemoryComparatorEqual) {
   TNetworkAddress addr_a;
   PerHostState a;
-  a.peak_memory_usage = 0;
   std::pair<TNetworkAddress, PerHostState> pair_a = std::make_pair(addr_a, a);
 
   TNetworkAddress addr_b;
   PerHostState b;
-  b.peak_memory_usage = 0;
   std::pair<TNetworkAddress, PerHostState> pair_b = std::make_pair(addr_b, b);
 
   EXPECT_FALSE(PerHostPeakMemoryComparator(pair_a, pair_b));

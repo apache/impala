@@ -142,5 +142,5 @@ ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrif
 ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(query-options-test QueryOptions.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-server-test ImpalaServerTest.*)
-ADD_UNIFIED_BE_LSAN_TEST(query-state-record-test QueryStateRecordTest.*:PerHostStateTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(query-state-record-test QueryStateRecordTest.*)
 ADD_BE_LSAN_TEST(internal-server-test)

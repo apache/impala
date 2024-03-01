@@ -30,6 +30,8 @@ from tests.common.custom_cluster_test_suite import (
   CustomClusterTestSuite)
 from tests.shell.util import run_impala_shell_cmd
 
+SMALL_QUERY_LOG_SIZE_IN_BYTES = 40 * 1024
+
 
 class TestWebPage(CustomClusterTestSuite):
   @classmethod
@@ -149,23 +151,28 @@ class TestWebPage(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--query_log_size_in_bytes=" + str(2 * 1024 * 1024)
+      cluster_size=1,
+      impalad_args="--query_log_size_in_bytes=" + str(SMALL_QUERY_LOG_SIZE_IN_BYTES)
   )
   def test_query_log_size_in_bytes(self):
     """Check if query list is limited by query_log_size_in_bytes flag."""
-    # The input query will produce ~627228 bytes of QueryStateRecord in MT_DOP=8.
-    query = ("with l1 as (select id id1 from functional.alltypes), "
-        "l2 as (select a1.id1 id2 from l1 as a1 join l1 as b1 on a1.id1=-b1.id1), "
-        "l3 as (select a2.id2 id3 from l2 as a2 join l2 as b2 on a2.id2=-b2.id2), "
-        "l4 as (select a3.id3 id4 from l3 as a3 join l3 as b3 on a3.id3=-b3.id3), "
-        "l5 as (select a4.id4 id5 from l4 as a4 join l4 as b4 on a4.id4=-b4.id4) "
-        "select * from l5 limit 100;")
-    self.execute_query("SET MT_DOP=8;")
-    for i in range(0, 5):
-      self.execute_query(query)
-    response = requests.get("http://localhost:25000/queries?json")
-    queries_json = json.loads(response.text)
-    assert len(queries_json["completed_queries"]) == 3
+    # This simple test query will produce ~8520 bytes of QueryStateRecord.
+    query = "select version()"
+    num_queries = 10
+    for i in range(0, num_queries):
+      self.execute_query_expect_success(self.client, query)
+
+    # Retrieve and verify the total size metrics.
+    metric_key = "impala-server.query-log-est-total-bytes"
+    metric_value = self.cluster.impalads[0].service.get_metric_value(metric_key)
+    assert metric_value > 0
+    assert metric_value <= SMALL_QUERY_LOG_SIZE_IN_BYTES
+
+    # Verify that the query page only contains a subset of the test queries.
+    queries_response = requests.get("http://localhost:25000/queries?json")
+    queries_json = json.loads(queries_response.text)
+    assert len(queries_json["completed_queries"]) > 0
+    assert len(queries_json["completed_queries"]) < num_queries
 
   # Checks if 'messages' exists/does not exist in 'result_stderr' based on the value of
   # 'should_exist'

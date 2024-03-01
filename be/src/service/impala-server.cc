@@ -1164,7 +1164,7 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
-    query_log_est_total_size_ += record_size;
+    ImpaladMetrics::QUERY_LOG_EST_TOTAL_BYTES->Increment(record_size);
     query_log_est_sizes_.push_front(record_size);
     query_log_.push_front(move(record));
     query_log_index_[query_handle->query_id()] = &query_log_.front();
@@ -1172,12 +1172,13 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
     while (!query_log_.empty()
         && ((FLAGS_query_log_size > -1 && FLAGS_query_log_size < query_log_.size())
             || (FLAGS_query_log_size_in_bytes > -1
-                && FLAGS_query_log_size_in_bytes < query_log_est_total_size_))) {
+                && FLAGS_query_log_size_in_bytes
+                    < ImpaladMetrics::QUERY_LOG_EST_TOTAL_BYTES->GetValue()))) {
       query_log_index_.erase(query_log_.back()->id);
-      query_log_est_total_size_ -= query_log_est_sizes_.back();
+      ImpaladMetrics::QUERY_LOG_EST_TOTAL_BYTES->Increment(-query_log_est_sizes_.back());
       query_log_est_sizes_.pop_back();
       query_log_.pop_back();
-      DCHECK_GE(query_log_est_total_size_, 0);
+      DCHECK_GE(ImpaladMetrics::QUERY_LOG_EST_TOTAL_BYTES->GetValue(), 0);
       DCHECK_EQ(query_log_.size(), query_log_est_sizes_.size());
     }
   }

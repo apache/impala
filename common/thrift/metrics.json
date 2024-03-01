@@ -2854,6 +2854,16 @@
     "key": "impala-server.query-durations-ms"
   },
   {
+    "description": "Estimated total size of query logs that are currently retained in memory.",
+    "contexts": [
+        "IMPALAD"
+    ],
+    "label": "Query log size in memory.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.query-log-est-total-bytes"
+  },
+  {
     "description": "Distribution of DDL operation latencies",
     "contexts": [
         "IMPALAD"

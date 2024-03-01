@@ -1133,8 +1133,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Random number generator for use in this class, thread safe.
   static ThreadSafeRandom rng_;
 
-  /// Guards query_log_, query_log_index_, query_log_est_sizes_,
-  /// and query_log_est_total_size_.
+  /// Guards query_log_, query_log_index_, and query_log_est_sizes_.
   std::mutex query_log_lock_;
 
   /// FIFO list of query records, which are written after the query finishes executing.
@@ -1153,9 +1152,8 @@ class ImpalaServer : public ImpalaServiceIf,
       QueryLogIndex;
   QueryLogIndex query_log_index_;
 
-  /// Estimated individual and total size of records in query_log_ in bytes.
+  /// Estimated individual size of records in query_log_ in bytes.
   std::list<int64_t> query_log_est_sizes_;
-  int64_t query_log_est_total_size_ = 0;
 
   /// Sets the given query_record (and retried_query_record too if given) for the given
   /// query_id. Returns an error Status if the given query_id cannot be found in the

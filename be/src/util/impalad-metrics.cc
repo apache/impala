@@ -167,6 +167,8 @@ const char* ImpaladMetricKeys::HEDGED_READ_OPS =
 const char* ImpaladMetricKeys::HEDGED_READ_OPS_WIN =
     "impala-server.hedged-read-ops-win";
 const char* ImpaladMetricKeys::DEBUG_ACTION_NUM_FAIL = "impala.debug_action.fail";
+const char* ImpaladMetricKeys::QUERY_LOG_EST_TOTAL_BYTES =
+    "impala-server.query-log-est-total-bytes";
 
 // These are created by impala-server during startup.
 // =======
@@ -237,6 +239,7 @@ IntGauge* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = nullptr;
 IntGauge* ImpaladMetrics::NUM_QUERIES_REGISTERED = nullptr;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = nullptr;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = nullptr;
+IntGauge* ImpaladMetrics::QUERY_LOG_EST_TOTAL_BYTES = nullptr;
 DoubleGauge* ImpaladMetrics::CATALOG_CACHE_AVG_LOAD_TIME = nullptr;
 DoubleGauge* ImpaladMetrics::CATALOG_CACHE_HIT_RATE = nullptr;
 DoubleGauge* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_RATE = nullptr;
@@ -342,6 +345,8 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS, 0);
   RESULTSET_CACHE_TOTAL_BYTES = m->AddGauge(
       ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES, 0);
+  QUERY_LOG_EST_TOTAL_BYTES =
+      m->AddGauge(ImpaladMetricKeys::QUERY_LOG_EST_TOTAL_BYTES, 0);
 
   // Initialize scan node metrics
   NUM_RANGES_PROCESSED = m->AddCounter(

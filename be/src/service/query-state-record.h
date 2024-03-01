@@ -178,7 +178,7 @@ struct PerHostState {
   int32_t fragment_instance_count = 0;
 
   // Peak Memory Usage
-  int64_t peak_memory_usage;
+  int64_t peak_memory_usage = 0;
 }; // struct PerHostState
 
 /// Comparator function that compares two PerHostState structs based on the

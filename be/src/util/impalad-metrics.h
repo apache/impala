@@ -261,6 +261,10 @@ class ImpaladMetricKeys {
   /// --debug_actions is set.
   static const char* DEBUG_ACTION_NUM_FAIL;
 
+  // Estimated total size of query logs that are currently retained in memory.
+  // Associated metric is modified in ImpalaServer::ArchiveQuery and must hold
+  // ImpalaServer::query_log_lock_ on modification.
+  static const char* QUERY_LOG_EST_TOTAL_BYTES;
 };
 
 /// Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -344,6 +348,7 @@ class ImpaladMetrics {
   static IntGauge* NUM_QUERIES_REGISTERED;
   static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;
   static IntGauge* RESULTSET_CACHE_TOTAL_BYTES;
+  static IntGauge* QUERY_LOG_EST_TOTAL_BYTES;
 
   // Properties
   static BooleanProperty* CATALOG_READY;
