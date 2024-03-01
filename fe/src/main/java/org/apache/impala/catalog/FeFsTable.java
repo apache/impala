@@ -595,7 +595,7 @@ public interface FeFsTable extends FeTable {
       Set<String> keys = new HashSet<>();
       for (FieldSchema fs: table.getMetaStoreTable().getPartitionKeys()) {
         for (TPartitionKeyValue kv: partitionSpec) {
-          if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
+          if (fs.getName().equalsIgnoreCase(kv.getName())) {
             targetValues.add(kv.getValue());
             // Same key was specified twice
             if (!keys.add(kv.getName().toLowerCase())) {
@@ -615,7 +615,9 @@ public interface FeFsTable extends FeTable {
       // match the values being searched for.
       for (PrunablePartition partition: table.getPartitions()) {
         List<LiteralExpr> partitionValues = partition.getPartitionValues();
-        Preconditions.checkState(partitionValues.size() == targetValues.size());
+        Preconditions.checkState(partitionValues.size() == targetValues.size(),
+            "Partition values not match in table %s: %s != %s",
+            table.getFullName(), partitionValues.size(), targetValues.size());
         boolean matchFound = true;
         for (int i = 0; i < targetValues.size(); ++i) {
           String value;
@@ -623,7 +625,9 @@ public interface FeFsTable extends FeTable {
             value = table.getNullPartitionKeyValue();
           } else {
             value = partitionValues.get(i).getStringValue();
-            Preconditions.checkNotNull(value);
+            Preconditions.checkNotNull(value,
+                "Got null string from non-null partition value of table %s: i=%s",
+                table.getFullName(), i);
             // See IMPALA-252: we deliberately map empty strings on to
             // NULL when they're in partition columns. This is for
             // backwards compatibility with Hive, and is clearly broken.

@@ -545,7 +545,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       LOG.error("FireEventResponse does not have event ids set for table {}.{}. This "
               + "may cause the table to unnecessarily be refreshed when the " +
               "refresh/invalidate event is received.", dbName, tableName);
-      return Collections.EMPTY_LIST;
+      return Collections.emptyList();
     }
     return response.getEventIds();
   }

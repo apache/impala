@@ -83,6 +83,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   protected org.apache.hadoop.hive.metastore.api.Table msTable_;
   protected final Db db_;
   protected final String name_;
+  protected final String full_name_;
   protected final String owner_;
   protected TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
   // Lock protecting this table. A read lock must be table when we are serializing
@@ -224,6 +225,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     msTable_ = msTable;
     db_ = db;
     name_ = name.toLowerCase();
+    full_name_ = (db_ != null ? db_.getName() + "." : "") + name_;
     owner_ = owner;
     tableStats_ = new TTableStats(-1);
     tableStats_.setTotal_file_bytes(-1);
@@ -850,7 +852,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public String getName() { return name_; }
 
   @Override // FeTable
-  public String getFullName() { return (db_ != null ? db_.getName() + "." : "") + name_; }
+  public String getFullName() { return full_name_; }
 
   @Override // FeTable
   public TableName getTableName() {

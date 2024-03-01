@@ -21,6 +21,7 @@ from os import getenv
 import pytest
 
 
+from beeswaxd.BeeswaxService import QueryState
 from hive_metastore.ttypes import FireEventRequest
 from hive_metastore.ttypes import FireEventRequestData
 from hive_metastore.ttypes import InsertEventRequestData
@@ -326,6 +327,32 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     self.hive_client.fire_listener_event(req)
     EventProcessorUtils.wait_for_event_processing(self)
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--enable_reload_events=true")
+  def test_reload_events_with_transient_partitions(self, unique_database):
+    tbl = unique_database + ".tbl"
+    create_stmt = "create table {} (i int) partitioned by(p int)".format(tbl)
+    add_part_stmt = "alter table {} add if not exists partition(p=0)".format(tbl)
+    drop_part_stmt = "alter table {} drop if exists partition(p=0)".format(tbl)
+    refresh_stmt = "refresh {} partition(p=0)".format(tbl)
+    end_states = [self.client.QUERY_STATES['FINISHED'],
+                  self.client.QUERY_STATES['EXCEPTION']]
+
+    self.execute_query(create_stmt)
+    self.execute_query(add_part_stmt)
+    # Run REFRESH partition in the background so we can drop the partition concurrently.
+    refresh_handle = self.client.execute_async(refresh_stmt)
+    # Before IMPALA-12855, REFRESH usually fails in 2-3 rounds.
+    for i in range(100):
+      self.execute_query(drop_part_stmt)
+      refresh_state = self.wait_for_any_state(refresh_handle, end_states, 10)
+      assert refresh_state == self.client.QUERY_STATES['FINISHED'],\
+          "REFRESH state: {}. Error log: {}".format(
+              QueryState._VALUES_TO_NAMES[refresh_state],
+              self.client.get_log(refresh_handle))
+      self.execute_query(add_part_stmt)
+      refresh_handle = self.client.execute_async(refresh_stmt)
 
   @CustomClusterTestSuite.with_args(
     catalogd_args="--hms_event_polling_interval_s=10"

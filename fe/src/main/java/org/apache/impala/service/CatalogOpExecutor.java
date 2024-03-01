@@ -4717,7 +4717,8 @@ public class CatalogOpExecutor {
    * Reloads the given partitions if they exist and have not been removed since the event
    * was generated.
    *
-   * @param eventId EventId being processed.
+   * @param eventId EventId of the event being processed.
+   * @param eventType EventType of the event being processed.
    * @param dbName Database name for the partition
    * @param tblName Table name for the partition
    * @param partsFromEvent List of {@link Partition} objects from the events to be
@@ -4727,8 +4728,8 @@ public class CatalogOpExecutor {
    * @return the number of partitions which were reloaded. If the table does not exist,
    * returns 0. Some partitions could be skipped if they don't exist anymore.
    */
-  public int reloadPartitionsIfExist(long eventId, String dbName, String tblName,
-      List<Partition> partsFromEvent, String reason,
+  public int reloadPartitionsIfExist(long eventId, String eventType, String dbName,
+      String tblName, List<Partition> partsFromEvent, String reason,
       FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
     List<String> partNames = new ArrayList<>();
     Table table = catalog_.getTable(dbName, tblName);
@@ -4739,8 +4740,8 @@ public class CatalogOpExecutor {
             part.getValues(), null));
       }
     }
-    return reloadPartitionsFromNamesIfExists(eventId, dbName, tblName, partNames,
-        reason, fileMetadataLoadOpts);
+    return reloadPartitionsFromNamesIfExists(eventId, eventType, dbName, tblName,
+        partNames, reason, fileMetadataLoadOpts);
   }
 
   /**
@@ -4756,8 +4757,8 @@ public class CatalogOpExecutor {
    * @return the number of partitions which were reloaded. If the table does not exist,
    * returns 0. Some partitions could be skipped if they don't exist anymore.
    */
-  public int reloadPartitionsFromNamesIfExists (long eventId, String dbName,
-      String tblName, List<String> partNames, String reason,
+  public int reloadPartitionsFromNamesIfExists(long eventId, String eventType,
+      String dbName, String tblName, List<String> partNames, String reason,
       FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
     Table table = catalog_.getTable(dbName, tblName);
     if (table == null) {
@@ -4765,9 +4766,8 @@ public class CatalogOpExecutor {
           .getDeleteEventLog();
       if (deleteEventLog
           .wasRemovedAfter(eventId, DeleteEventLog.getTblKey(dbName, tblName))) {
-        LOG.info(
-            "Not reloading the partition of table {} since it was removed "
-                + "later in catalog", new TableName(dbName, tblName));
+        LOG.info("EventId: {} EventType: {} Not reloading the partition of table {}.{} " +
+            "since it was removed later in catalog", eventId, eventType, dbName, tblName);
         return 0;
       } else {
         throw new TableNotFoundException(
@@ -4775,8 +4775,8 @@ public class CatalogOpExecutor {
       }
     }
     if (table instanceof IncompleteTable) {
-      LOG.info("Table {} is not loaded. Skipping drop partition event {}",
-          table.getFullName(), eventId);
+      LOG.info("Table {} is not loaded. Skipping {} event {}",
+          table.getFullName(), eventType, eventId);
       return 0;
     }
     if (!(table instanceof HdfsTable)) {
@@ -4791,9 +4791,9 @@ public class CatalogOpExecutor {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
       if (syncToLatestEventId && table.getLastSyncedEventId() >= eventId) {
-        LOG.info("Not reloading partition from event id: {} since table {} is already "
-                + "synced till event id {}", eventId, table.getFullName(),
-            table.getLastSyncedEventId());
+        LOG.info("EventId: {} EventType: {} Not reloading partition since table {} is " +
+                "already synced till event id {}",
+            eventId, eventType, table.getFullName(), table.getLastSyncedEventId());
         return 0;
       }
       HdfsTable hdfsTable = (HdfsTable) table;
@@ -4808,8 +4808,8 @@ public class CatalogOpExecutor {
       hdfsTable.setCatalogVersion(newCatalogVersion);
       return numOfPartsReloaded;
     } catch (TableLoadingException e) {
-      LOG.info("Could not reload {} partitions of table {}", partNames.size(),
-          table.getFullName(), e);
+      LOG.info("EventId: {} EventType: {} Could not reload {} partitions of table {}",
+          eventId, eventType, partNames.size(), table.getFullName(), e);
     } catch (InternalException e) {
       errorOccured = true;
       throw new CatalogException(
@@ -6668,8 +6668,9 @@ public class CatalogOpExecutor {
       Reference<Boolean> dbWasAdded = new Reference<Boolean>(false);
       // Thrift representation of the result of the invalidate/refresh operation.
       TCatalogObject updatedThriftTable = null;
-      TableName tblName = TableName.fromThrift(req.getTable_name());
+      // Result table of the invalidate/refresh operation.
       Table tbl = null;
+      TableName tblName = TableName.fromThrift(req.getTable_name());
       if (!req.isIs_refresh()) {
         // For INVALIDATE METADATA <db>.<table>, the db might be unloaded.
         // So we can't update 'tbl' here.
@@ -6786,39 +6787,44 @@ public class CatalogOpExecutor {
    * Helper class for refresh event.
    * This class invokes metastore shim's fireReloadEvent to fire event to HMS
    * and update the last refresh event id in the cache
-   * @param req - request object for TResetMetadataRequest.
-   * @param tblName
-   * @param tbl
    */
   private void fireReloadEventAndUpdateRefreshEventId(
       TResetMetadataRequest req, TableName tblName, Table tbl) {
     List<String> partVals = null;
     if (req.isSetPartition_spec()) {
       partVals = req.getPartition_spec().stream().
-          map(partSpec -> partSpec.getValue()).collect(Collectors.toList());
+          map(TPartitionKeyValue::getValue).collect(Collectors.toList());
     }
     try {
       List<Long> eventIds = MetastoreShim.fireReloadEventHelper(
           catalog_.getMetaStoreClient(), req.isIs_refresh(), partVals, tblName.getDb(),
           tblName.getTbl(), Collections.emptyMap());
-      if (req.isIs_refresh()) {
-        if (catalog_.tryLock(tbl, true, 600000)) {
-          if (!eventIds.isEmpty()) {
-            if (req.isSetPartition_spec()) {
-              HdfsPartition partition = ((HdfsTable) tbl)
-                  .getPartitionFromThriftPartitionSpec(req.getPartition_spec());
-              HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
-              partBuilder.setLastRefreshEventId(eventIds.get(0));
-              ((HdfsTable) tbl).updatePartition(partBuilder);
-            } else {
-              tbl.setLastRefreshEventId(eventIds.get(0));
-            }
-          }
+      LOG.info("Fired {} RELOAD events for table {}: {}", eventIds.size(),
+          tbl.getFullName(), StringUtils.join(",", eventIds));
+      // Update the lastRefreshEventId accordingly
+      if (!req.isIs_refresh() || eventIds.isEmpty()) return;
+      if (!catalog_.tryLock(tbl, true, 600000)) {
+        LOG.warn("Couldn't obtain a version lock for the table: {}. " +
+                "Self events may go undetected in that case",
+            tbl.getFullName());
+        return;
+      }
+      if (req.isSetPartition_spec()) {
+        HdfsTable hdfsTbl = (HdfsTable) tbl;
+        HdfsPartition partition = hdfsTbl
+            .getPartitionFromThriftPartitionSpec(req.getPartition_spec());
+        if (partition != null) {
+          HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+          partBuilder.setLastRefreshEventId(eventIds.get(0));
+          hdfsTbl.updatePartition(partBuilder);
         } else {
-          LOG.warn(String.format("Couldn't obtain a version lock for the table: %s. " +
-              "Self events may go undetected in that case",
-              tbl.getName()));
+          LOG.warn("Partition {} no longer exists in table {}. It might be " +
+              "dropped by a concurrent operation.",
+              FeCatalogUtils.getPartitionName(hdfsTbl, partVals),
+              hdfsTbl.getFullName());
         }
+      } else {
+        tbl.setLastRefreshEventId(eventIds.get(0));
       }
     } catch (TException | CatalogException e) {
       LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR,

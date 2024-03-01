@@ -1055,7 +1055,8 @@ public class MetastoreEvents {
         throws CatalogException {
       try {
         int numPartsRefreshed = catalogOpExecutor_.reloadPartitionsIfExist(getEventId(),
-            dbName_, tblName_, partitions, reason, fileMetadataLoadOpts);
+            getEventType().toString(), dbName_, tblName_, partitions, reason,
+            fileMetadataLoadOpts);
         if (numPartsRefreshed > 0) {
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES)
               .inc(numPartsRefreshed);
@@ -1098,8 +1099,8 @@ public class MetastoreEvents {
         FileMetadataLoadOpts fileMetadataLoadOpts) throws CatalogException {
       try {
         int numPartsRefreshed = catalogOpExecutor_.reloadPartitionsFromNamesIfExists(
-            getEventId(), dbName_, tblName_, partitionNames, reason,
-            fileMetadataLoadOpts);
+            getEventId(), getEventType().toString(), dbName_, tblName_, partitionNames,
+            reason, fileMetadataLoadOpts);
         if (numPartsRefreshed > 0) {
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES)
                   .inc(numPartsRefreshed);
