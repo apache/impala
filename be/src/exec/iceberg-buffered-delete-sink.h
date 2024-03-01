@@ -90,6 +90,9 @@ class IcebergBufferedDeleteSink : public IcebergDeleteSinkBase {
   /// Writes all buffered delete records to position delete files.
   Status FlushBufferedRecords(RuntimeState* state);
 
+  /// Registers the referenced data files in dml_exec_state_
+  void RegisterDataFilesInDmlExecState();
+
   /// Initializes an empty output batch.
   Status InitializeOutputRowBatch(RowBatch* batch);
 

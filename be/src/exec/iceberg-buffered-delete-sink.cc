@@ -385,7 +385,25 @@ Status IcebergBufferedDeleteSink::FlushFinal(RuntimeState* state) {
   VLogBufferedRecords();
   RETURN_IF_ERROR(VerifyBufferedRecords());
   RETURN_IF_ERROR(FlushBufferedRecords(state));
+  RegisterDataFilesInDmlExecState();
   return Status::OK();
+}
+
+void IcebergBufferedDeleteSink::RegisterDataFilesInDmlExecState() {
+  int capacity = 0;
+  for (const auto& entry : partitions_to_file_positions_) {
+    const FilePositions& file_positions = entry.second;
+    capacity += file_positions.size();
+  }
+  dml_exec_state_.reserveReferencedDataFiles(capacity);
+  for (const auto& entry : partitions_to_file_positions_) {
+    const FilePositions& file_positions = entry.second;
+    for (const auto& file_pos_entry : file_positions) {
+      const StringValue& sv = file_pos_entry.first;
+      string filepath(sv.Ptr(), sv.Len());
+      dml_exec_state_.addReferencedDataFile(std::move(filepath));
+    }
+  }
 }
 
 void IcebergBufferedDeleteSink::Close(RuntimeState* state) {

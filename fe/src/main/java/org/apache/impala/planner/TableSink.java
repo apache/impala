@@ -133,11 +133,8 @@ public abstract class TableSink extends DataSink {
       if (sinkAction == Op.INSERT) {
         return new HdfsTableSink(table, partitionKeyExprs,outputExprs, overwrite,
             inputIsClustered, sortProperties, writeId, maxTableSinks, isResultSink);
-      } else if (sinkAction == Op.DELETE) {
-        return new IcebergDeleteSink((FeIcebergTable)table, partitionKeyExprs,
-            outputExprs, maxTableSinks);
       } else {
-        // We don't support any other sink actions yet.
+        // Other SINK actions are either not supported or created directly.
         Preconditions.checkState(false);
       }
     }

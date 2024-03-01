@@ -1,10 +1,6 @@
 DELETE FROM iceberg_v2_no_deletes where i = 3
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
-|
-01:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=1
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes]
    HDFS partitions=1/1 files=1 size=625B
@@ -12,11 +8,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
    Iceberg snapshot id: 728158873687794725
    row-size=24B cardinality=1
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
-|
-01:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=1
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes]
    HDFS partitions=1/1 files=1 size=625B
@@ -26,11 +18,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
 ====
 DELETE FROM iceberg_v2_delete_positional where id = 15
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
-|
-03:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=1
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=28B cardinality=1
@@ -46,11 +34,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
    Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=1
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
-|
-04:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=1
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=28B cardinality=1
@@ -71,11 +55,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 DELETE FROM iceberg_v2_delete_positional
 where id = (select min(id) from iceberg_v2_delete_positional)
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
-|
-08:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=2
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = min(id)
@@ -113,11 +93,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
    Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=3
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
-|
-13:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=2
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 07:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: id = min(id)
@@ -169,11 +145,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 ====
 DELETE FROM iceberg_v2_delete_positional WHERE FILE__POSITION = id
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
-|
-03:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=1
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=28B cardinality=1
@@ -189,11 +161,7 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
    Iceberg snapshot id: 5725822353600261755
    row-size=28B cardinality=1
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
-|
-04:SORT
-|  order by: input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
-|  row-size=20B cardinality=1
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=28B cardinality=1
@@ -213,10 +181,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DE
 ====
 delete from iceberg_v2_partitioned_position_deletes where id = 20;
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
@@ -233,10 +201,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
    Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=2
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 05:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=1
 |
 04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
@@ -259,10 +227,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 ====
 delete from iceberg_v2_partitioned_position_deletes where action = 'click';
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
@@ -279,10 +247,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
    skipped Iceberg predicates: action = 'click'
    row-size=36B cardinality=6
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 04:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
@@ -303,10 +271,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 ====
 delete from iceberg_v2_partitioned_position_deletes where user like 'A%';
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
@@ -323,10 +291,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
    Iceberg snapshot id: 8885697082976537578
    row-size=48B cardinality=2
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 05:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=1
 |
 04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
@@ -350,10 +318,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 delete from iceberg_v2_partitioned_position_deletes
 where id = (select max(id) from iceberg_v2_delete_positional);
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 08:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=10
 |
 07:HASH JOIN [LEFT SEMI JOIN]
@@ -392,10 +360,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
    Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=20
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 14:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=10
 |
 13:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
@@ -450,10 +418,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
 ====
 DELETE FROM iceberg_v2_partitioned_position_deletes WHERE FILE__POSITION = id
 ---- PLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
@@ -470,10 +438,10 @@ DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-
    Iceberg snapshot id: 8885697082976537578
    row-size=40B cardinality=2
 ---- DISTRIBUTEDPLAN
-DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
 05:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST, input__file__name ASC NULLS LAST, file__position ASC NULLS LAST
+|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
 |  row-size=36B cardinality=1
 |
 04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]

@@ -1630,12 +1630,16 @@ bool ClientRequestState::CreateIcebergCatalogOps(
   } else if (ice_finalize_params.operation == TIcebergOperation::DELETE) {
     cat_ice_op->__set_iceberg_delete_files_fb(
         dml_exec_state->CreateIcebergDeleteFilesVector());
+    cat_ice_op->__set_data_files_referenced_by_position_deletes(
+        dml_exec_state->DataFilesReferencedByPositionDeletes());
     if (cat_ice_op->iceberg_delete_files_fb.empty()) update_catalog = false;
   } else if (ice_finalize_params.operation == TIcebergOperation::UPDATE) {
     cat_ice_op->__set_iceberg_data_files_fb(
         dml_exec_state->CreateIcebergDataFilesVector());
     cat_ice_op->__set_iceberg_delete_files_fb(
         dml_exec_state->CreateIcebergDeleteFilesVector());
+    cat_ice_op->__set_data_files_referenced_by_position_deletes(
+        dml_exec_state->DataFilesReferencedByPositionDeletes());
     if (cat_ice_op->iceberg_delete_files_fb.empty()) {
       DCHECK(cat_ice_op->iceberg_data_files_fb.empty());
       update_catalog = false;

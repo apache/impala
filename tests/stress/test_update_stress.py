@@ -149,7 +149,7 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
     run_tasks([updater_a, updater_b, updater_c] + checkers)
 
 
-class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
+class TestIcebergConcurrentOperations(ImpalaTestSuite):
   """This test checks that concurrent DELETE and UPDATE operations leave the table
   in a consistent state."""
 
@@ -159,12 +159,12 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestIcebergConcurrentDeletesAndUpdates, cls).add_test_dimensions()
+    super(TestIcebergConcurrentOperations, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: (v.get_value('table_format').file_format == 'parquet'
             and v.get_value('table_format').compression_codec == 'snappy'))
 
-  def _impala_role_concurrent_deleter(self, tbl_name, flag, num_rows):
+  def _impala_role_concurrent_deleter(self, tbl_name, all_rows_deleted, num_rows):
     """Deletes every row from the table one by one."""
     target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
@@ -179,15 +179,15 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
         # Exceptions are expected due to concurrent operations.
         print(str(e))
       time.sleep(random.random())
-    flag.value = 1
+    all_rows_deleted.value = 1
     impalad_client.close()
 
-  def _impala_role_concurrent_writer(self, tbl_name, flag):
+  def _impala_role_concurrent_writer(self, tbl_name, all_rows_deleted):
     """Updates every row in the table in a loop."""
     target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
     impalad_client.set_configuration_option("SYNC_DDL", "true")
-    while flag.value != 1:
+    while all_rows_deleted.value != 1:
       try:
         impalad_client.execute(
             "update {0} set j = j + 1".format(tbl_name))
@@ -197,7 +197,21 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
       time.sleep(random.random())
     impalad_client.close()
 
-  def _impala_role_concurrent_checker(self, tbl_name, flag, num_rows):
+  def _impala_role_concurrent_optimizer(self, tbl_name, all_rows_deleted):
+    """Optimizes the table in a loop."""
+    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
+    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    impalad_client.set_configuration_option("SYNC_DDL", "true")
+    while all_rows_deleted.value != 1:
+      try:
+        impalad_client.execute("optimize table {0}".format(tbl_name))
+      except Exception as e:
+        # Exceptions are expected due to concurrent operations.
+        print(str(e))
+      time.sleep(random.random())
+    impalad_client.close()
+
+  def _impala_role_concurrent_checker(self, tbl_name, all_rows_deleted, num_rows):
     """Checks if the table's invariant is true. The invariant is that we have a
     consecutive range of 'id's starting from N to num_rows - 1. And 'j's are equal."""
     def verify_result_set(result):
@@ -214,7 +228,7 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
 
     target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
-    while flag.value != 1:
+    while all_rows_deleted.value != 1:
       result = impalad_client.execute("select * from %s order by id" % tbl_name)
       verify_result_set(result)
       time.sleep(random.random())
@@ -233,18 +247,51 @@ class TestIcebergConcurrentDeletesAndUpdates(ImpalaTestSuite):
         tblproperties('format-version'='2')""".format(tbl_name,))
 
     num_rows = 10
+    for i in range(num_rows):
+      self.client.execute("insert into {} values ({}, 0)".format(tbl_name, i))
+
+    all_rows_deleted = Value('i', 0)
+    deleter = Task(self._impala_role_concurrent_deleter, tbl_name, all_rows_deleted,
+        num_rows)
+    updater = Task(self._impala_role_concurrent_writer, tbl_name, all_rows_deleted)
+    checker = Task(self._impala_role_concurrent_checker, tbl_name, all_rows_deleted,
+        num_rows)
+    run_tasks([deleter, updater, checker])
+
+    result = self.client.execute("select count(*) from {}".format(tbl_name))
+    assert result.data == ['0']
+
+  @pytest.mark.stress
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_deletes_and_updates_and_optimize(self, unique_database):
+    """Issues DELETE and UPDATE statements in parallel in a way that some
+    invariants must be true when a spectator process inspects the table.
+    An optimizer thread also invokes OPTMIZE regularly on the table."""
+
+    tbl_name = "%s.test_concurrent_write_and_optimize" % unique_database
+    self.client.set_configuration_option("SYNC_DDL", "true")
+    self.client.execute("""create table {0} (id int, j bigint)
+        stored as iceberg
+        tblproperties('format-version'='2')""".format(tbl_name,))
+
+    num_rows = 10
     values_str = ""
+    # Prepare INSERT statement of 'num_rows' records.
     for i in range(num_rows):
       values_str += "({}, 0)".format(i)
       if i != num_rows - 1:
         values_str += ", "
     self.client.execute("insert into {} values {}".format(tbl_name, values_str))
 
-    flag = Value('i', 0)
-    deleter = Task(self._impala_role_concurrent_deleter, tbl_name, flag, num_rows)
-    updater = Task(self._impala_role_concurrent_writer, tbl_name, flag)
-    checker = Task(self._impala_role_concurrent_checker, tbl_name, flag, num_rows)
-    run_tasks([deleter, updater, checker])
+    all_rows_deleted = Value('i', 0)
+    deleter = Task(self._impala_role_concurrent_deleter, tbl_name, all_rows_deleted,
+        num_rows)
+    updater = Task(self._impala_role_concurrent_writer, tbl_name, all_rows_deleted)
+    optimizer = Task(self._impala_role_concurrent_optimizer, tbl_name,
+        all_rows_deleted)
+    checker = Task(self._impala_role_concurrent_checker, tbl_name, all_rows_deleted,
+        num_rows)
+    run_tasks([deleter, updater, optimizer, checker])
 
     result = self.client.execute("select count(*) from {}".format(tbl_name))
     assert result.data == ['0']

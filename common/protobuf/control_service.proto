@@ -109,6 +109,10 @@ message DmlExecStatusPB {
   // root's key in an unpartitioned table being ROOT_PARTITION_KEY.
   // The target table name is recorded in the corresponding TQueryExecRequest
   map<string, DmlPartitionStatusPB> per_partition_status = 1;
+
+  // In case of Iceberg modify statements it contains the data files referenced
+  // by position delete records.
+  repeated string data_files_referenced_by_position_deletes = 2;
 }
 
 // Error message exchange format

@@ -113,7 +113,6 @@ public class IcebergBufferedDeleteSink extends TableSink {
   protected void toThriftImpl(TDataSink tsink) {
     TIcebergDeleteSink icebergDeleteSink = new TIcebergDeleteSink();
     icebergDeleteSink.setPartition_key_exprs(Expr.treesToThrift(partitionKeyExprs_));
-    icebergDeleteSink.setIs_buffered(true);
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.iceberg_delete_sink = icebergDeleteSink;

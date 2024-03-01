@@ -20,6 +20,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <vector>
 #include <boost/unordered_map.hpp>
 
 #include "common/hdfs.h"
@@ -131,6 +132,22 @@ class DmlExecState {
   // Encodes delete file list info in flatbuffer format expected by Iceberg API.
   std::vector<std::string> CreateIcebergDeleteFilesVector();
 
+  // Returns vector of Iceberg data files referenced by position delete records by
+  // this DML statement.
+  const std::vector<std::string>& DataFilesReferencedByPositionDeletes() const {
+    return data_files_referenced_by_position_deletes_;
+  }
+
+  // Reserves capacity for 'data_files_referenced_by_position_deletes_'.
+  void reserveReferencedDataFiles(int capacity) {
+    data_files_referenced_by_position_deletes_.reserve(capacity);
+  }
+
+  // Adds file_path to the list of data files referenced by position delete records.
+  void addReferencedDataFile(std::string&& file_path) {
+    data_files_referenced_by_position_deletes_.emplace_back(std::move(file_path));
+  }
+
  private:
   /// Auxiliary function used by 'AddCreatedFile' and 'AddCreatedDeleteFile'.
   void AddFileAux(const OutputPartition& partition, bool is_iceberg,
@@ -151,6 +168,10 @@ class DmlExecState {
   /// deleted.  Uses ordered map so that iteration order is deterministic.
   typedef std::map<std::string, std::string> FileMoveMap;
   FileMoveMap files_to_move_;
+
+  /// In case of Iceberg modify statements it contains the data files referenced
+  /// by position delete records.
+  std::vector<std::string> data_files_referenced_by_position_deletes_;
 
   /// Determines what the permissions of directories created by INSERT statements should
   /// be if permission inheritance is enabled. Populates a map from all prefixes of

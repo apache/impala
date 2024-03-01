@@ -375,6 +375,9 @@ public class IcebergCatalogOpExecutor {
       // affected by this DELETE operation.
       rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
       rowDelta.validateNoConflictingDataFiles();
+      rowDelta.validateDataFilesExist(
+          icebergOp.getData_files_referenced_by_position_deletes());
+      rowDelta.validateDeletedFiles();
       rowDelta.commit();
     } catch (ValidationException e) {
       throw new ImpalaRuntimeException(e.getMessage(), e);
@@ -403,6 +406,9 @@ public class IcebergCatalogOpExecutor {
       rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
       rowDelta.validateNoConflictingDataFiles();
       rowDelta.validateNoConflictingDeleteFiles();
+      rowDelta.validateDataFilesExist(
+          icebergOp.getData_files_referenced_by_position_deletes());
+      rowDelta.validateDeletedFiles();
       rowDelta.commit();
     } catch (ValidationException e) {
       throw new ImpalaRuntimeException(e.getMessage(), e);

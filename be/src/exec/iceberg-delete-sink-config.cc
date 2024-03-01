@@ -20,7 +20,6 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/iceberg-buffered-delete-sink.h"
-#include "exec/iceberg-delete-sink.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/mem-pool.h"
 
@@ -28,13 +27,8 @@ namespace impala {
 
 DataSink* IcebergDeleteSinkConfig::CreateSink(RuntimeState* state) const {
   TDataSinkId sink_id = state->fragment().idx;
-  if (this->tsink_->table_sink.iceberg_delete_sink.is_buffered) {
-    return state->obj_pool()->Add(
-      new IcebergBufferedDeleteSink(sink_id, *this, state));
-  } else {
-    return state->obj_pool()->Add(
-      new IcebergDeleteSink(sink_id, *this, state));
-  }
+  return state->obj_pool()->Add(
+    new IcebergBufferedDeleteSink(sink_id, *this, state));
 }
 
 Status IcebergDeleteSinkConfig::Init(

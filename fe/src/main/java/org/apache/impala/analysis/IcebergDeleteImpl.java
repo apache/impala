@@ -23,7 +23,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
-import org.apache.impala.planner.IcebergDeleteSink;
+import org.apache.impala.planner.IcebergBufferedDeleteSink;
 import org.apache.impala.planner.TableSink;
 import org.apache.impala.thrift.TSortingOrder;
 
@@ -65,7 +65,6 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
     deleteResultExprs_ = getDeleteResultExprs(analyzer);
     selectList.addAll(ExprUtil.exprsAsSelectList(deletePartitionKeyExprs_));
     selectList.addAll(ExprUtil.exprsAsSelectList(deleteResultExprs_));
-    sortExprs_.addAll(deleteResultExprs_);
   }
 
   @Override
@@ -80,7 +79,7 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
   @Override
   public DataSink createDataSink() {
     Preconditions.checkState(modifyStmt_.table_ instanceof FeIcebergTable);
-    return new IcebergDeleteSink(icePosDelTable_, deletePartitionKeyExprs_,
+    return new IcebergBufferedDeleteSink(icePosDelTable_, deletePartitionKeyExprs_,
         deleteResultExprs_);
   }
 }

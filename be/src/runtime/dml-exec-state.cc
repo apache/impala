@@ -133,6 +133,10 @@ void DmlExecState::Update(const DmlExecStatusPB& dml_exec_status) {
       files_to_move_[file.staging_path()] = file.final_path();
     }
   }
+  data_files_referenced_by_position_deletes_.insert(
+      data_files_referenced_by_position_deletes_.end(),
+      dml_exec_status.data_files_referenced_by_position_deletes().begin(),
+      dml_exec_status.data_files_referenced_by_position_deletes().end());
 }
 
 uint64_t DmlExecState::GetKuduLatestObservedTimestamp() {
@@ -436,6 +440,9 @@ void DmlExecState::ToProto(DmlExecStatusPB* dml_status) {
   for (const PartitionStatusMap::value_type& part : per_partition_status_) {
     (*dml_status->mutable_per_partition_status())[part.first] = part.second;
   }
+  *dml_status->mutable_data_files_referenced_by_position_deletes() =
+      {data_files_referenced_by_position_deletes_.begin(),
+      data_files_referenced_by_position_deletes_.end()};
 }
 
 void DmlExecState::ToTDmlResult(TDmlResult* dml_result) {

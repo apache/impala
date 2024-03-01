@@ -244,6 +244,9 @@ struct TIcebergOperationParam {
 
   // The snapshot id when the operation was started
   4: optional i64 initial_snapshot_id;
+
+  // The data files referenced by the position delete files.
+  7: optional list<string> data_files_referenced_by_position_deletes
 }
 
 // Per-partion info needed by Catalog to handle an INSERT.

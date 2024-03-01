@@ -17,7 +17,6 @@
 
 #include "common/object-pool.h"
 #include "exec/hdfs-table-sink.h"
-#include "exec/iceberg-delete-sink.h"
 #include "exec/multi-table-sink.h"
 #include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
