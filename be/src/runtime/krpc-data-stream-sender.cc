@@ -1107,7 +1107,8 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
       if (filename_value_ss.ptr == prev_filename_ptr) {
         // If the filename pointer is the same as the previous one then we can instantly
         // send the row to the same channels as the previous row.
-        DCHECK(skipped_prev_row || !prev_channels.empty());
+        DCHECK(skipped_prev_row || !prev_channels.empty() ||
+            (filename_value_ss.len == 0 && prev_channels.empty()));
         for (Channel* ch : prev_channels) RETURN_IF_ERROR(ch->AddRow(tuple_row));
         continue;
       }
@@ -1121,8 +1122,14 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
         // files that remains in the new snapshot.
         // Another use-case is table sampling where we read only a subset of the data
         // files.
-        VLOG(3) << "Row from delete file refers to a non-existing data file: " <<
-            filename;
+        // A third case is when the delete record is invalid.
+        if (UNLIKELY(filename_value_ss.len == 0)) {
+          state->LogError(
+            ErrorMsg(TErrorCode::GENERAL, "NULL found as file_path in delete file"));
+        } else {
+          VLOG(3) << "Row from delete file refers to a non-existing data file: " <<
+              filename;
+        }
         skipped_prev_row = true;
         continue;
       }

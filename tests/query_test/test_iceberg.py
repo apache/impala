@@ -1451,6 +1451,31 @@ class TestIcebergV2Table(IcebergTestSuite):
 
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
+  def test_read_null_delete_records(self, vector):
+    expected_error = 'NULL found as file_path in delete file'
+    query_options = vector.get_value('exec_option')
+    v2_op_disabled = query_options['disable_optimized_iceberg_v2_read'] == 1
+    result = self.execute_query(
+        'select * from functional_parquet.iceberg_v2_null_delete_record', query_options)
+    assert len(result.data) == 6
+    errors = result.log
+    print(errors)
+    assert expected_error in errors or v2_op_disabled
+    result = self.execute_query(
+        'select count(*) from functional_parquet.iceberg_v2_null_delete_record',
+        query_options)
+    assert result.data == ['6']
+    errors = result.log
+    assert expected_error in errors or v2_op_disabled
+    result = self.execute_query(
+        """select * from functional_parquet.iceberg_v2_null_delete_record
+           where j < 3""", query_options)
+    assert sorted(result.data) == ['1\t1', '2\t2']
+    errors = result.log
+    assert expected_error in errors or v2_op_disabled
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
   def test_read_equality_deletes(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-equality-deletes', vector)
 

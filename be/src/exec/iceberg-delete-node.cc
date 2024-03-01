@@ -187,17 +187,10 @@ Status IcebergDeleteNode::ProcessProbeBatch(RowBatch* out_batch) {
   DCHECK_ENUM_EQ(probe_state_, ProbeState::PROBING_IN_BATCH);
   DCHECK_NE(probe_batch_pos_, -1);
   int rows_added = 0;
-  Status status;
   TPrefetchMode::type prefetch_mode = runtime_state_->query_options().prefetch_mode;
   SCOPED_TIMER(probe_timer_);
 
-  rows_added = ProcessProbeBatch(prefetch_mode, out_batch, &status);
-
-  if (UNLIKELY(rows_added < 0)) {
-    DCHECK(!status.ok());
-    return status;
-  }
-  DCHECK(status.ok());
+  rows_added = ProcessProbeBatch(prefetch_mode, out_batch);
   out_batch->CommitRows(rows_added);
   return Status::OK();
 }
@@ -326,34 +319,14 @@ void IcebergDeleteNode::IcebergDeleteState::UpdateImpl() {
 void IcebergDeleteNode::IcebergDeleteState::Update(
     impala::StringValue* file_path, int64_t* next_probe_pos) {
   DCHECK(builder_ != nullptr);
-  // Making sure the row ids are in ascending order inside a row batch in broadcast mode
-  DCHECK(builder_->IsDistributedMode() || current_probe_pos_ == INVALID_ROW_ID
-      || current_probe_pos_ < *next_probe_pos);
-  bool is_consecutive_pos = false;
-  if(current_probe_pos_ != INVALID_ROW_ID) {
-    const int64_t step = *next_probe_pos - current_probe_pos_;
-    is_consecutive_pos = step == 1;
-  }
+  // Making sure the row ids are in ascending order inside a row batch in DIRECTED mode
+  DCHECK(current_probe_pos_ == INVALID_ROW_ID || current_probe_pos_ < *next_probe_pos);
   current_probe_pos_ = *next_probe_pos;
 
-  if (previous_file_path_ != nullptr
-      && (!builder_->IsDistributedMode() || *file_path == *previous_file_path_)) {
-    // Fast path if the file did not change, no need to hash again
+  if (previous_file_path_ != nullptr) {
+    // We already have a file path, no need to hash again
     if (current_deleted_pos_row_id_ != INVALID_ROW_ID
         && current_probe_pos_ > (*current_delete_row_)[current_deleted_pos_row_id_]) {
-      UpdateImpl();
-    } else if (builder_->IsDistributedMode() && !is_consecutive_pos) {
-      // In distributed mode (which means PARTITIONED JOIN distribution mode) we cannot
-      // rely on ascending row order, not even inside row batches, not even when the
-      // previous file path is the same as the current one.
-      // This is because files with multiple blocks can be processed by multiple hosts
-      // in parallel, then the rows are getting hash-exchanged based on their file paths.
-      // Then the exchange-receiver at the LHS coalesces the row batches from multiple
-      // senders, hence the row IDs getting unordered. So we are always doing a binary
-      // search here to find the proper delete row id.
-      // This won't be a problem with the DIRECTED distribution mode (see IMPALA-12308)
-      // which will behave similarly to the BROADCAST mode in this regard.
-      DCHECK_EQ(*file_path, *previous_file_path_);
       UpdateImpl();
     }
   } else {
@@ -389,7 +362,7 @@ void IcebergDeleteNode::IcebergDeleteState::Delete() {
 }
 
 bool IcebergDeleteNode::IcebergDeleteState::NeedCheck() const {
-  return builder_->IsDistributedMode() || current_deleted_pos_row_id_ != INVALID_ROW_ID
+  return current_deleted_pos_row_id_ != INVALID_ROW_ID
       || current_probe_pos_ == INVALID_ROW_ID;
 }
 
@@ -407,7 +380,7 @@ void IcebergDeleteNode::IcebergDeleteState::Reset() {
 }
 
 bool IR_ALWAYS_INLINE IcebergDeleteNode::ProcessProbeRow(
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status) {
+    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
   DCHECK(current_probe_row_ != nullptr);
   TupleRow* out_row = out_batch_iterator->Get();
   if (!iceberg_delete_state_.IsDeleted()) {
@@ -423,7 +396,7 @@ bool IR_ALWAYS_INLINE IcebergDeleteNode::ProcessProbeRow(
 }
 
 bool IR_ALWAYS_INLINE IcebergDeleteNode::ProcessProbeRowNoCheck(
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status) {
+    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
   DCHECK(current_probe_row_ != nullptr);
   TupleRow* out_row = out_batch_iterator->Get();
   out_batch_iterator->parent()->CopyRow(current_probe_row_, out_row);
@@ -435,7 +408,7 @@ bool IR_ALWAYS_INLINE IcebergDeleteNode::ProcessProbeRowNoCheck(
 }
 
 int IcebergDeleteNode::ProcessProbeBatch(
-    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, Status* __restrict__ status) {
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch) {
   DCHECK(!out_batch->AtCapacity());
   DCHECK_GE(probe_batch_pos_, 0);
   RowBatch::Iterator out_batch_iterator(out_batch, out_batch->AddRow());
@@ -444,7 +417,7 @@ int IcebergDeleteNode::ProcessProbeBatch(
   RowBatch::Iterator probe_batch_iterator(probe_batch_.get(), probe_batch_pos_);
   int remaining_capacity = max_rows;
 
-  while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0 && status->ok()) {
+  while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0) {
     current_probe_row_ = probe_batch_iterator.Get();
     if (iceberg_delete_state_.NeedCheck()) {
       impala::StringValue* file_path =
@@ -453,12 +426,12 @@ int IcebergDeleteNode::ProcessProbeBatch(
           current_probe_row_->GetTuple(0)->GetBigIntSlot(pos_offset_);
 
       iceberg_delete_state_.Update(file_path, current_probe_pos);
-      if (!ProcessProbeRow(&out_batch_iterator, &remaining_capacity, status)) {
-        if (status->ok()) DCHECK_EQ(remaining_capacity, 0);
+      if (!ProcessProbeRow(&out_batch_iterator, &remaining_capacity)) {
+        DCHECK_EQ(remaining_capacity, 0);
       }
     } else {
-      if (!ProcessProbeRowNoCheck(&out_batch_iterator, &remaining_capacity, status)) {
-        if (status->ok()) DCHECK_EQ(remaining_capacity, 0);
+      if (!ProcessProbeRowNoCheck(&out_batch_iterator, &remaining_capacity)) {
+        DCHECK_EQ(remaining_capacity, 0);
       }
     }
 
@@ -468,12 +441,7 @@ int IcebergDeleteNode::ProcessProbeBatch(
     probe_batch_pos_ = (probe_batch_iterator.Get() - probe_batch_->GetRow(0));
   }
 
-  int num_rows_added;
-  if (LIKELY(status->ok())) {
-    num_rows_added = max_rows - remaining_capacity;
-  } else {
-    num_rows_added = -1;
-  }
+  int num_rows_added = max_rows - remaining_capacity;
 
   // Clear state as ascending order of row ids are not guaranteed between probe row
   // batches

@@ -1130,6 +1130,50 @@ iceberg_v2_equality_delete_schema_evolution:
 4: Update a row with Nifi where i=4 to the following:
   (44, 2024-03-21, "str4", 4444)
 
+iceberg_v2_null_delete_record:
+1) Created the table via Impala and added some records to it.
+  CREATE TABLE iceberg_v2_null_delete_record(i INT, j INT)
+  STORED BY ICEBERG;
+  INSERT INTO iceberg_v2_null_delete_record VALUES (1,1), (2,2), (3,3), (4,4);
+  INSERT INTO iceberg_v2_null_delete_record VALUES (1,1), (2,2), (3,3), (4,4);
+
+  (We need at least 2 data files to use DIRECTED mode in KrpcDataStreamSender)
+
+2) Created the following temporary table:
+  CREATE TABLE iceberg_v2_null_delete_record_pos_delete (file_path STRING, pos BIGINT)
+  STORED BY ICEBERG;
+
+  Manually rewrote the metadata JSON file of this table, so the schema elements have the
+  following field ids (there are two places where I had to modify the schemas):
+
+    file_path : 2147483546
+    pos       : 2147483545
+
+3) Inserted data files into iceberg_v2_null_delete_record_pos_delete:
+
+  INSERT INTO iceberg_v2_null_delete_record_pos_delete VALUES
+  (NULL, 0);
+
+  INSERT INTO iceberg_v2_null_delete_record_pos_delete VALUES
+  ('<data file path of iceberg_v2_null_delete_record>', 0), (NULL, 3);
+
+  INSERT INTO iceberg_v2_null_delete_record_pos_delete VALUES
+  (NULL, 2), ('<data file path of iceberg_v2_null_delete_record>', 0);
+
+  INSERT INTO iceberg_v2_null_delete_record_pos_delete VALUES
+  (NULL, 0), (NULL, 1), (NULL, 2);
+
+  The written Parquet files have the schema of position delete files (with the
+  correct Iceberg field ids)
+
+4) Copied iceberg_v2_null_delete_record to the local filesystem and applied
+  the following modifications:
+
+  * added the Parquet files from iceberg_v2_null_delete_record_pos_delete to
+    the /data directory
+  * manually edited the metadata JSON, and the manifest and manifest list files to
+    register the delete files in the table
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

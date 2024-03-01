@@ -116,18 +116,18 @@ class IcebergDeleteNode : public BlockingJoinNode {
   /// Probes 'current_probe_row_' against the hash tables and append outputs
   /// to output batch.
   bool inline ProcessProbeRow(RowBatch::Iterator* out_batch_iterator,
-      int* remaining_capacity, Status* status) WARN_UNUSED_RESULT;
+      int* remaining_capacity) WARN_UNUSED_RESULT;
 
   /// Append outputs to output batch.
   bool inline ProcessProbeRowNoCheck(RowBatch::Iterator* out_batch_iterator,
-      int* remaining_capacity, Status* status) WARN_UNUSED_RESULT;
+      int* remaining_capacity) WARN_UNUSED_RESULT;
 
   /// Process probe rows from probe_batch_. Returns either if out_batch is full or
   /// probe_batch_ is entirely consumed.
   /// Returns the number of rows added to out_batch; -1 on error (and *status will
   /// be set). This function doesn't commit rows to the output batch so it's the caller's
   /// responsibility to do so.
-  int ProcessProbeBatch(TPrefetchMode::type, RowBatch* out_batch, Status* status);
+  int ProcessProbeBatch(TPrefetchMode::type, RowBatch* out_batch);
 
   /// Wrapper that ProcessProbeBatch() and commits the rows to 'out_batch' on success.
   Status ProcessProbeBatch(RowBatch* out_batch);

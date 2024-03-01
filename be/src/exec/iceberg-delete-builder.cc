@@ -141,7 +141,6 @@ Status IcebergDeleteBuilder::CalculateDataFiles() {
   const vector<const PlanFragmentInstanceCtxPB*>& instance_ctx_pbs =
       fragment_it->second->instance_ctx_pbs();
   for (auto ctx : instance_ctx_pbs) {
-    ctx->per_node_scan_ranges().size();
     auto ranges = ctx->per_node_scan_ranges().find(delete_scan_node->tnode_->node_id);
     if (ranges == ctx->per_node_scan_ranges().end()) continue;
 
@@ -184,8 +183,6 @@ Status IcebergDeleteBuilder::CalculateDataFiles() {
     }
   }
 
-  is_distributed_mode_ = deleted_rows_.empty();
-
   return Status::OK();
 }
 
@@ -218,13 +215,13 @@ Status IcebergDeleteBuilder::Open(RuntimeState* state) {
 
 Status IcebergDeleteBuilder::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
-  RETURN_IF_ERROR(AddBatch(batch));
+  RETURN_IF_ERROR(AddBatch(state, batch));
   COUNTER_ADD(num_build_rows_, batch->num_rows());
   return Status::OK();
 }
 
-Status IcebergDeleteBuilder::AddBatch(RowBatch* batch) {
-  RETURN_IF_ERROR(ProcessBuildBatch(batch));
+Status IcebergDeleteBuilder::AddBatch(RuntimeState* state, RowBatch* batch) {
+  RETURN_IF_ERROR(ProcessBuildBatch(state, batch));
   return Status::OK();
 }
 
@@ -272,7 +269,8 @@ string IcebergDeleteBuilder::DebugString() const {
   return ss.str();
 }
 
-Status IcebergDeleteBuilder::ProcessBuildBatch(RowBatch* build_batch) {
+Status IcebergDeleteBuilder::ProcessBuildBatch(RuntimeState* state,
+    RowBatch* build_batch) {
   FOREACH_ROW(build_batch, 0, build_batch_iter) {
     TupleRow* build_row = build_batch_iter.Get();
 
@@ -281,39 +279,15 @@ Status IcebergDeleteBuilder::ProcessBuildBatch(RowBatch* build_batch) {
 
     const int length = file_path->Len();
     if (UNLIKELY(length == 0)) {
-      return Status(Substitute("NULL found as file_path in delete file"));
+      state->LogError(
+          ErrorMsg(TErrorCode::GENERAL, "NULL found as file_path in delete file"));
+      continue;
     }
     int64_t* id = build_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
-    if (is_distributed_mode_) {
-      // Distributed mode, deleted_rows_ is empty after init, only the relevant delete
-      // files are sent to this fragment, processing everything
-      auto it = deleted_rows_.find(*file_path);
-      if (it == deleted_rows_.end()) {
-        char* ptr_copy = reinterpret_cast<char*>(expr_results_pool_->Allocate(length));
-        if (ptr_copy == nullptr) {
-          return Status("Failed to allocate memory.");
-        }
-
-        memcpy(ptr_copy, file_path->Ptr(), length);
-
-        std::pair<DeleteRowHashTable::iterator, bool> retval =
-            deleted_rows_.emplace(std::piecewise_construct,
-                std::forward_as_tuple(ptr_copy, length), std::forward_as_tuple());
-        // emplace succeeded
-        DCHECK(retval.second == true);
-
-        it = retval.first;
-        it->second.reserve(INITIAL_DELETE_VECTOR_CAPACITY);
-      }
-
+    auto it = deleted_rows_.find(*file_path);
+    // deleted_rows_ filled with the relevant data file names, processing only those.
+    if (it != deleted_rows_.end()) {
       it->second.emplace_back(*id);
-    } else {
-      // Broadcast mode, deleted_rows_ filled with the relevant data file names,
-      // processing only those
-      auto it = deleted_rows_.find(*file_path);
-      if (it != deleted_rows_.end()) {
-        it->second.emplace_back(*id);
-      }
     }
   }
 

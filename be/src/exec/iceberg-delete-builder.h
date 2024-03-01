@@ -71,15 +71,10 @@ class IcebergDeleteBuilderConfig : public JoinBuilderConfig {
 /// files, and stores them in unordered_map<file_path, ordered vector of row ids> to allow
 /// fast probing.
 ///
-/// Similarly to PartitionedHashJoin, there are 2 modes:
+/// Unlike the PartitionedHashJoin, there is only one mode:
 ///
-///   Broadcast: every fragment receives all data from delete files, filters them and
-///   stores only the ones which will be needed to process the assigned data files.
-///
-///   Partitioned: Both data and delete files are hashed by the file path. This means
-///   there is no need to filter further the delete files, but it can cause minor data
-///   skew due to the imbalance in the number of deleted rows corresponding to different
-///   data files.
+///   Directed: each fragment will only receive delete records that apply to data files
+///   processed by this executor
 ///
 /// Shared Build
 /// ------------
@@ -125,15 +120,14 @@ class IcebergDeleteBuilder : public JoinBuilder {
       std::unordered_map<impala::StringValue, DeleteRowVector, StringValueHashWrapper>;
 
   DeleteRowHashTable& deleted_rows() { return deleted_rows_; }
-  bool IsDistributedMode() { return is_distributed_mode_; }
 
  private:
   /// Reads the rows in build_batch and collects them into delete_hash_.
-  Status ProcessBuildBatch(RowBatch* build_batch);
+  Status ProcessBuildBatch(RuntimeState* state, RowBatch* build_batch);
 
   /// Helper method for Send() that does the actual work apart from updating the
   /// counters.
-  Status AddBatch(RowBatch* build_batch);
+  Status AddBatch(RuntimeState* state, RowBatch* build_batch);
 
   /// Helper method for FlushFinal() that does the actual work.
   Status FinalizeBuild(RuntimeState* state);
@@ -153,9 +147,6 @@ class IcebergDeleteBuilder : public JoinBuilder {
   const RowDescriptor* build_row_desc_;
   int file_path_offset_;
   int pos_offset_;
-
-  // Distribution mode of the node
-  bool is_distributed_mode_;
 
   // Use the length of a cache line as initial capacity
   static constexpr size_t INITIAL_DELETE_VECTOR_CAPACITY = 8;
