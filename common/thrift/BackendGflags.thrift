@@ -278,4 +278,6 @@ struct TBackendGflags {
   123: required bool iceberg_allow_datafiles_in_table_location_only
 
   124: required i32 topic_update_log_gc_frequency
+
+  125: required string debug_actions
 }

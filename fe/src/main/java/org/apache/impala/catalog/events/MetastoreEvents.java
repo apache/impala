@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
@@ -79,6 +80,7 @@ import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.MetaStoreUtil;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
@@ -254,6 +256,11 @@ public class MetastoreEvents {
         Metrics metrics) throws MetastoreNotificationException {
       Preconditions.checkNotNull(events);
       if (events.isEmpty()) return Collections.emptyList();
+
+      if (StringUtils.isNotEmpty(BackendConfig.INSTANCE.debugActions())) {
+        DebugUtils.executeDebugAction(
+            BackendConfig.INSTANCE.debugActions(), DebugUtils.GET_FILTERED_EVENTS_DELAY);
+      }
 
       List<MetastoreEvent> metastoreEvents = new ArrayList<>(events.size());
       for (NotificationEvent event : events) {

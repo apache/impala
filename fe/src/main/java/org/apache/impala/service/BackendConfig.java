@@ -457,4 +457,6 @@ public class BackendConfig {
   public boolean allowCatalogCacheOpFromMaskedUsers() {
     return backendCfg_.allow_catalog_cache_op_from_masked_users;
   }
+
+  public String debugActions() { return backendCfg_.debug_actions; }
 }

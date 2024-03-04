@@ -25,8 +25,8 @@ import os
 import pipes
 import psutil
 import socket
-import sys
 import time
+import requests
 from getpass import getuser
 from random import choice
 from signal import SIGKILL
@@ -39,7 +39,7 @@ from tests.common.impala_service import (
     CatalogdService,
     ImpaladService,
     StateStoredService)
-from tests.util.shell_util import exec_process, exec_process_async
+from tests.util.shell_util import exec_process
 
 LOG = logging.getLogger('impala_cluster')
 LOG.setLevel(level=logging.DEBUG)
@@ -69,6 +69,20 @@ DEFAULT_CATALOGD_JVM_DEBUG_PORT = 30030
 # Timeout to use when waiting for a cluster to start up. Set quite high to avoid test
 # flakiness.
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
+
+# Url format used to set JVM log level.
+SET_JAVA_LOGLEVEL_URL = "http://{0}:{1}/set_java_loglevel"
+
+
+def post_data(url, data):
+  """Helper method to post data to a url."""
+  response = requests.head(url)
+  assert response.status_code == requests.codes.ok, "URL: {0} Resp:{1}".format(
+    url, response.text)
+  response = requests.post(url, data=data)
+  assert response.status_code == requests.codes.ok, "URL: {0} Resp:{1}".format(
+    url, response.text)
+  return response
 
 
 # Represents a set of Impala processes.
@@ -208,13 +222,12 @@ class ImpalaCluster(object):
       assert self.statestored is not None
       assert self.catalogd is not None
 
-
     for impalad in self.impalads:
       impalad.service.wait_for_num_known_live_backends(expected_num_ready_impalads,
           timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2,
           early_abort_fn=check_processes_still_running)
-      if (impalad._get_arg_value("is_coordinator", default="true") == "true" and
-         impalad._get_arg_value("stress_catalog_init_delay_ms", default=0) == 0):
+      if (impalad._get_arg_value("is_coordinator", default="true") == "true"
+         and impalad._get_arg_value("stress_catalog_init_delay_ms", default=0) == 0):
         impalad.wait_for_catalog()
 
   def wait_for_num_impalads(self, num_impalads, retries=10):
@@ -439,7 +452,7 @@ class Process(object):
     if self.container_id is None:
       binary = os.path.basename(self.cmd[0])
       restart_args = self.cmd[1:]
-      LOG.info("Starting {0} with arguments".format(binary, restart_args))
+      LOG.info("Starting {0} with arguments {1}".format(binary, restart_args))
       run_daemon(binary, restart_args)
     else:
       LOG.info("Starting container: {0}".format(self.container_id))
@@ -487,6 +500,11 @@ class BaseImpalaProcess(Process):
   def get_webserver_port(self):
     """Return the port for the webserver of this process."""
     return int(self._get_port('webserver_port', self._get_default_webserver_port()))
+
+  def set_jvm_log_level(self, class_name, level="info"):
+    """Helper method to set JVM log level for certain class name.
+    Some daemon might not have JVM in it."""
+    raise NotImplementedError()
 
   def _get_default_webserver_port(self):
     """Different daemons have different defaults. Subclasses must override."""
@@ -563,8 +581,8 @@ class ImpaladProcess(BaseImpalaProcess):
     hs2_port_is_open = False
     num_dbs = 0
     num_tbls = 0
-    while ((time.time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS) and
-        not (beeswax_port_is_open and hs2_port_is_open)):
+    while ((time.time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS)
+        and not (beeswax_port_is_open and hs2_port_is_open)):
       try:
         num_dbs, num_tbls = self.service.get_metric_values(
             ["catalog.num-databases", "catalog.num-tables"])
@@ -581,6 +599,12 @@ class ImpaladProcess(BaseImpalaProcess):
       raise RuntimeError(
           "Unable to open client ports within {num_seconds} seconds.".format(
               num_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS))
+
+  def set_jvm_log_level(self, class_name, level):
+    """Helper method to set JVM log level for certain class name."""
+    url = SET_JAVA_LOGLEVEL_URL.format(
+      self.webserver_interface, self.get_webserver_port())
+    return post_data(url, {"class": class_name, "level": level})
 
 
 # Represents a statestored process
@@ -635,6 +659,12 @@ class CatalogdProcess(BaseImpalaProcess):
       self.service.wait_for_metric_value('statestore-subscriber.connected',
                                          expected_value=1, timeout=30)
 
+  def set_jvm_log_level(self, class_name, level):
+    """Helper method to set JVM log level for certain class name."""
+    url = SET_JAVA_LOGLEVEL_URL.format(
+      self.webserver_interface, self.get_webserver_port())
+    return post_data(url, {"class": class_name, "level": level})
+
 
 # Represents an admission control process.
 class AdmissiondProcess(BaseImpalaProcess):
@@ -645,6 +675,7 @@ class AdmissiondProcess(BaseImpalaProcess):
 
   def _get_default_webserver_port(self):
     return DEFAULT_ADMISSIOND_WEBSERVER_PORT
+
 
 def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching

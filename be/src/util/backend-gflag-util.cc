@@ -116,6 +116,7 @@ DECLARE_int32(catalog_operation_log_size);
 DECLARE_string(hostname);
 DECLARE_bool(allow_catalog_cache_op_from_masked_users);
 DECLARE_int32(topic_update_log_gc_frequency);
+DECLARE_string(debug_actions);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -453,6 +454,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_allow_catalog_cache_op_from_masked_users(
       FLAGS_allow_catalog_cache_op_from_masked_users);
   cfg.__set_topic_update_log_gc_frequency(FLAGS_topic_update_log_gc_frequency);
+  cfg.__set_debug_actions(FLAGS_debug_actions);
   return Status::OK();
 }
 

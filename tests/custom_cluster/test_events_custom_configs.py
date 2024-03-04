@@ -393,12 +393,14 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     verify_skipping_older_events(test_old_table, True, True)
 
   @CustomClusterTestSuite.with_args(
-    catalogd_args="--hms_event_polling_interval_s=5"
-                  " --enable_sync_to_latest_event_on_ddls=true")
+    catalogd_args="--enable_sync_to_latest_event_on_ddls=true "
+                  "--debug_actions=catalogd_get_filtered_events_delay:SLEEP@3000 ")
   def test_skipping_batching_events(self, unique_database):
     """Test to verify IMPALA-10949, improving batching logic for partition events.
     Before batching the events, each event is checked if the event id is greater than
     table's lastSyncEventId then the event can be batched else it can be skipped."""
+    # Print trace logs from DebugUtils.
+    self.cluster.catalogd.set_jvm_log_level("org.apache.impala.util.DebugUtils", "trace")
     test_batch_table = "test_batch_table"
     self.client.execute(
       "create table {}.{} like functional.alltypes"

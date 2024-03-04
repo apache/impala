@@ -67,6 +67,10 @@ public class DebugUtils {
   public static final String UPDATE_CATALOG_ABORT_INSERT_TXN =
       "catalogd_update_catalog_abort_txn";
 
+  // debug action label to delay event processing.
+  public static final String GET_FILTERED_EVENTS_DELAY =
+      "catalogd_get_filtered_events_delay";
+
   // debug action label for introducing delay in loading table metadata.
   public static final String LOAD_TABLES_DELAY = "impalad_load_tables_delay";
 
