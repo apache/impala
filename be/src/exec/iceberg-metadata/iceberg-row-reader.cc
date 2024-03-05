@@ -39,6 +39,7 @@ Status IcebergRowReader::InitJNI() {
 
   // Global class references:
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/List", &list_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/Map", &map_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Boolean", &boolean_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Integer", &integer_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Long", &long_cl_));
@@ -46,9 +47,8 @@ Status IcebergRowReader::InitJNI() {
       &char_sequence_cl_));
 
   // Method ids:
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, list_cl_, "get", "(I)Ljava/lang/Object;",
-      &list_get_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, list_cl_, "size", "()I", &list_size_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, map_cl_, "size", "()I", &map_size_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, boolean_cl_, "booleanValue", "()Z",
       &boolean_value_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, integer_cl_, "intValue", "()I",
@@ -61,7 +61,7 @@ Status IcebergRowReader::InitJNI() {
 }
 
 Status IcebergRowReader::MaterializeTuple(JNIEnv* env,
-    jobject struct_like_row, const TupleDescriptor* tuple_desc, Tuple* tuple,
+    const jobject& struct_like_row, const TupleDescriptor* tuple_desc, Tuple* tuple,
     MemPool* tuple_data_pool, RuntimeState* state) {
   DCHECK(env != nullptr);
   DCHECK(struct_like_row != nullptr);
@@ -73,46 +73,61 @@ Status IcebergRowReader::MaterializeTuple(JNIEnv* env,
     jobject accessed_value;
     RETURN_IF_ERROR(metadata_scanner_->GetValue(env, slot_desc, struct_like_row,
         JavaClassFromImpalaType(slot_desc->type()), &accessed_value));
-    if (accessed_value == nullptr) {
-      tuple->SetNull(slot_desc->null_indicator_offset());
-      continue;
-    }
-    void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-    switch (slot_desc->type().type) {
-      case TYPE_BOOLEAN: { // java.lang.Boolean
-        RETURN_IF_ERROR(WriteBooleanSlot(env, accessed_value, slot));
-        break;
-      } case TYPE_INT: { // java.lang.Integer
-        RETURN_IF_ERROR(WriteIntSlot(env, accessed_value, slot));
-        break;
-      } case TYPE_BIGINT: { // java.lang.Long
-        RETURN_IF_ERROR(WriteLongSlot(env, accessed_value, slot));
-        break;
-      } case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
-        RETURN_IF_ERROR(WriteTimeStampSlot(env, accessed_value, slot));
-        break;
-      } case TYPE_STRING: { // java.lang.String
-        RETURN_IF_ERROR(WriteStringSlot(env, accessed_value, slot, tuple_data_pool));
-        break;
-      } case TYPE_STRUCT: { // Struct type is not used by Impala to access values.
-        RETURN_IF_ERROR(WriteStructSlot(env, struct_like_row, slot_desc, tuple,
-            tuple_data_pool, state));
-        break;
-      } case TYPE_ARRAY: { // java.lang.ArrayList
-        RETURN_IF_ERROR(WriteArraySlot(env, accessed_value, (CollectionValue*)slot,
-            slot_desc, tuple, tuple_data_pool, state));
-        break;
-      }
-      default:
-        // Skip the unsupported type and set it to NULL
-        tuple->SetNull(slot_desc->null_indicator_offset());
-        VLOG(3) << "Skipping unsupported column type: " << slot_desc->type().type;
-    }
+    RETURN_IF_ERROR(WriteSlot(env, &struct_like_row, accessed_value, slot_desc, tuple,
+          tuple_data_pool, state));
     env->DeleteLocalRef(accessed_value);
     RETURN_ERROR_IF_EXC(env);
   }
   return Status::OK();
 }
+
+Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
+    const jobject& accessed_value, const SlotDescriptor* slot_desc, Tuple* tuple,
+    MemPool* tuple_data_pool, RuntimeState* state) {
+  if (accessed_value == nullptr) {
+    tuple->SetNull(slot_desc->null_indicator_offset());
+    return Status::OK();
+  }
+  void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+  switch (slot_desc->type().type) {
+    case TYPE_BOOLEAN: { // java.lang.Boolean
+      RETURN_IF_ERROR(WriteBooleanSlot(env, accessed_value, slot));
+      break;
+    } case TYPE_INT: { // java.lang.Integer
+      RETURN_IF_ERROR(WriteIntSlot(env, accessed_value, slot));
+      break;
+    } case TYPE_BIGINT: { // java.lang.Long
+      RETURN_IF_ERROR(WriteLongSlot(env, accessed_value, slot));
+      break;
+    } case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
+      RETURN_IF_ERROR(WriteTimeStampSlot(env, accessed_value, slot));
+      break;
+    } case TYPE_STRING: { // java.lang.String
+      RETURN_IF_ERROR(WriteStringSlot(env, accessed_value, slot, tuple_data_pool));
+      break;
+    } case TYPE_STRUCT: { // Struct type is not used by Impala to access values.
+      DCHECK(struct_like_row != nullptr);
+      RETURN_IF_ERROR(WriteStructSlot(env, *struct_like_row, slot_desc, tuple,
+          tuple_data_pool, state));
+      break;
+    } case TYPE_ARRAY: { // java.lang.ArrayList
+      RETURN_IF_ERROR(WriteCollectionSlot</*IS_ARRAY*/ true>(env, accessed_value,
+          (CollectionValue*) slot, slot_desc, tuple_data_pool, state));
+      break;
+    } case TYPE_MAP: { // java.lang.Map
+      RETURN_IF_ERROR(WriteCollectionSlot</*IS_ARRAY*/ false>(env, accessed_value,
+          (CollectionValue*) slot, slot_desc, tuple_data_pool, state));
+      break;
+    }
+    default:
+      // Skip the unsupported type and set it to NULL
+      tuple->SetNull(slot_desc->null_indicator_offset());
+      VLOG(3) << "Skipping unsupported column type: " << slot_desc->type().type;
+  }
+  return Status::OK();
+}
+
+
 
 Status IcebergRowReader::WriteBooleanSlot(JNIEnv* env, const jobject &accessed_value,
     void* slot) {
@@ -188,47 +203,113 @@ Status IcebergRowReader::WriteStructSlot(JNIEnv* env, const jobject &struct_like
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteArraySlot(JNIEnv* env, const jobject &struct_like_row,
-    CollectionValue* slot, const SlotDescriptor* slot_desc, Tuple* tuple,
+template <bool IS_ARRAY>
+Status IcebergRowReader::WriteCollectionSlot(JNIEnv* env, const jobject &struct_like_row,
+    CollectionValue* slot, const SlotDescriptor* slot_desc,
     MemPool* tuple_data_pool, RuntimeState* state) {
   DCHECK(slot_desc != nullptr);
-  DCHECK(slot_desc->type().IsCollectionType());
-  DCHECK(env->IsInstanceOf(struct_like_row, list_cl_) == JNI_TRUE);
+
+  if constexpr (IS_ARRAY) {
+    DCHECK(slot_desc->type().IsArrayType());
+    DCHECK(env->IsInstanceOf(struct_like_row, list_cl_) == JNI_TRUE);
+  } else {
+    DCHECK(slot_desc->type().IsMapType());
+    DCHECK(env->IsInstanceOf(struct_like_row, map_cl_) == JNI_TRUE);
+  }
+
   const TupleDescriptor* item_tuple_desc = slot_desc->children_tuple_descriptor();
+  DCHECK(item_tuple_desc != nullptr);
+  DCHECK_EQ(item_tuple_desc->slots().size(), IS_ARRAY ? 1 : 2);
+
   *slot = CollectionValue();
   CollectionValueBuilder coll_value_builder(slot, *item_tuple_desc, tuple_data_pool,
       state);
-  jobject array_scanner;
-  RETURN_IF_ERROR(metadata_scanner_->CreateArrayScanner(env, struct_like_row,
-      array_scanner));
-  int remaining_array_size = env->CallIntMethod(struct_like_row, list_size_);
+
+  jobject collection_scanner;
+  if constexpr (IS_ARRAY) {
+    RETURN_IF_ERROR(metadata_scanner_->CreateArrayScanner(env, struct_like_row,
+        &collection_scanner));
+  } else {
+    RETURN_IF_ERROR(metadata_scanner_->CreateMapScanner(env, struct_like_row,
+        &collection_scanner));
+  }
+
+  int remaining_items = env->CallIntMethod(struct_like_row,
+      IS_ARRAY ? list_size_ : map_size_);
   RETURN_ERROR_IF_EXC(env);
-  while (!scan_node_->ReachedLimit() && remaining_array_size > 0) {
+
+  while (!scan_node_->ReachedLimit() && remaining_items > 0) {
     RETURN_IF_CANCELLED(state);
-    int num_tuples;
     MemPool* tuple_data_pool_collection = coll_value_builder.pool();
     Tuple* tuple;
+    int num_tuples;
     RETURN_IF_ERROR(coll_value_builder.GetFreeMemory(&tuple, &num_tuples));
     // 'num_tuples' can be very high if we're writing to a large CollectionValue. Limit
     // the number of tuples we read at one time so we don't spend too long in the
     // 'num_tuples' loop below before checking for cancellation or limit reached.
     num_tuples = std::min(num_tuples, scan_node_->runtime_state()->batch_size());
     int num_to_commit = 0;
-    while (num_to_commit < num_tuples && remaining_array_size > 0) {
+    while (num_to_commit < num_tuples && remaining_items > 0) {
       tuple->Init(item_tuple_desc->byte_size());
-      jobject item;
-      RETURN_IF_ERROR(metadata_scanner_->GetNextArrayItem(env, array_scanner, &item));
-      RETURN_IF_ERROR(MaterializeTuple(env, item, item_tuple_desc, tuple,
-          tuple_data_pool_collection, state));
+
+      if constexpr (IS_ARRAY) {
+        RETURN_IF_ERROR(WriteArrayItem(env, collection_scanner, item_tuple_desc, tuple,
+            tuple_data_pool_collection, state));
+      } else {
+        RETURN_IF_ERROR(WriteMapKeyAndValue(env, collection_scanner, item_tuple_desc,
+            tuple, tuple_data_pool_collection, state));
+      }
+
       // For filtering please see IMPALA-12853.
       tuple += item_tuple_desc->byte_size();
       ++num_to_commit;
-      --remaining_array_size;
+      --remaining_items;
     }
     coll_value_builder.CommitTuples(num_to_commit);
   }
-  env->DeleteLocalRef(array_scanner);
+  env->DeleteLocalRef(collection_scanner);
   RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
+Status IcebergRowReader::WriteArrayItem(JNIEnv* env, const jobject& array_scanner,
+    const TupleDescriptor* item_tuple_desc, Tuple* tuple,
+    MemPool* tuple_data_pool_collection, RuntimeState* state) {
+  jobject item;
+  RETURN_IF_ERROR(metadata_scanner_->GetNextArrayItem(env, array_scanner, &item));
+
+  const SlotDescriptor* child_slot_desc = item_tuple_desc->slots()[0];
+  const jobject* struct_like_row = child_slot_desc->type().IsStructType()
+    ? &item : nullptr;
+
+  RETURN_IF_ERROR(WriteSlot(env, struct_like_row, item, child_slot_desc, tuple,
+      tuple_data_pool_collection, state));
+
+  env->DeleteLocalRef(item);
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
+Status IcebergRowReader::WriteMapKeyAndValue(JNIEnv* env, const jobject& map_scanner,
+    const TupleDescriptor* item_tuple_desc, Tuple* tuple,
+    MemPool* tuple_data_pool_collection, RuntimeState* state) {
+  jobject key;
+  jobject value;
+  RETURN_IF_ERROR(metadata_scanner_->GetNextMapKeyAndValue(env, map_scanner,
+      &key, &value));
+
+  const SlotDescriptor* key_slot_desc = item_tuple_desc->slots()[0];
+  DCHECK(!key_slot_desc->type().IsStructType());
+  const jobject* key_struct_like_row = nullptr;
+  RETURN_IF_ERROR(WriteSlot(env, key_struct_like_row, key, key_slot_desc, tuple,
+        tuple_data_pool_collection, state));
+
+  const SlotDescriptor* value_slot_desc = item_tuple_desc->slots()[1];
+  const jobject* value_struct_like_row = value_slot_desc->type().IsStructType()
+    ? &value : nullptr;
+  RETURN_IF_ERROR(WriteSlot(env, value_struct_like_row, value, value_slot_desc,
+        tuple, tuple_data_pool_collection, state));
+
   return Status::OK();
 }
 
@@ -243,8 +324,10 @@ jclass IcebergRowReader::JavaClassFromImpalaType(const ColumnType type) {
       return long_cl_;
     } case TYPE_STRING: {    // java.lang.String
       return char_sequence_cl_;
-    } case TYPE_ARRAY: {     // java.lang.util.List
+    } case TYPE_ARRAY: {     // java.util.List
       return list_cl_;
+    } case TYPE_MAP: {       // java.util.Map
+      return map_cl_;
     }
     default:
       VLOG(3) << "Skipping unsupported column type: " << type.type;

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.iceberg.Accessor;
 import org.apache.iceberg.DataTask;
@@ -131,20 +132,34 @@ public class IcebergMetadataScanner {
   }
 
   /**
-   * Wrapper around an array that is the result of a metadata table scan.
+   * Wrapper around an array or a map that is the result of a metadata table scan.
    * It is used to avoid iterating over a list through JNI.
+   * For arrays the returned objects are the elements of the array, for maps they are
+   * {Map.Entry} objects containing the key and value.
    */
-  public class ArrayScanner<T> {
-    private Iterator<T> iterator;
+  public static class CollectionScanner<T> {
+    private Iterator<T> iterator_;
 
-    public ArrayScanner(List<T> array) {
-      this.iterator = array.iterator();
+    private CollectionScanner(Iterator<T> iterator) {
       Preconditions.checkNotNull(iterator);
-      LOG.trace("Created metadata table array scanner, array size: " + array.size());
+      iterator_ = iterator;
     }
 
-    public T GetNextArrayItem() {
-      if (iterator.hasNext()) return iterator.next();
+    public static <G> CollectionScanner<G> fromArray(List<G> array) {
+      CollectionScanner<G> res = new CollectionScanner<>(array.iterator());
+      LOG.trace("Created metadata table array scanner, array size: " + array.size());
+      return res;
+    }
+
+    public static <K, V> CollectionScanner<Map.Entry<K, V>> fromMap(Map<K, V> map) {
+      CollectionScanner<Map.Entry<K, V>> res =
+          new CollectionScanner<>(map.entrySet().iterator());
+      LOG.trace("Created metadata table map scanner, map size: " + map.size());
+      return res;
+    }
+
+    public T GetNextCollectionItem() {
+      if (iterator_.hasNext()) return iterator_.next();
       return null;
     }
   }

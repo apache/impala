@@ -36,14 +36,14 @@ Status IcebergMetadataScanner::InitJNI() {
       "org/apache/impala/util/IcebergMetadataScanner",
       &iceberg_metadata_scanner_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "org/apache/impala/util/IcebergMetadataScanner$ArrayScanner",
-      &iceberg_metadata_scanner_array_scanner_cl_));
+      "org/apache/impala/util/IcebergMetadataScanner$CollectionScanner",
+      &iceberg_metadata_scanner_collection_scanner_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-      "org/apache/iceberg/Accessor", &accessor_cl_));
+      "java/util/Map$Entry", &map_entry_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/List", &list_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/Map", &map_cl_));
 
   // Method ids:
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, accessor_cl_, "get",
-      "(Ljava/lang/Object;)Ljava/lang/Object;", &accessor_get_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
       "<init>", "(Lorg/apache/impala/catalog/FeIcebergTable;Ljava/lang/String;)V",
       &iceberg_metadata_scanner_ctor_));
@@ -59,14 +59,24 @@ Status IcebergMetadataScanner::InitJNI() {
       "GetValueByPosition",
       "(Lorg/apache/iceberg/StructLike;ILjava/lang/Class;)Ljava/lang/Object;",
       &iceberg_metadata_scanner_get_value_by_position_));
+  RETURN_IF_ERROR(JniUtil::GetStaticMethodID(env,
+      iceberg_metadata_scanner_collection_scanner_cl_, "fromArray",
+      "(Ljava/util/List;)Lorg/apache/impala/util/"
+      "IcebergMetadataScanner$CollectionScanner;",
+      &iceberg_metadata_scanner_collection_scanner_from_array_));
+  RETURN_IF_ERROR(JniUtil::GetStaticMethodID(env,
+      iceberg_metadata_scanner_collection_scanner_cl_, "fromMap",
+      "(Ljava/util/Map;)Lorg/apache/impala/util/"
+      "IcebergMetadataScanner$CollectionScanner;",
+      &iceberg_metadata_scanner_collection_scanner_from_map_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env,
-      iceberg_metadata_scanner_array_scanner_cl_, "<init>",
-      "(Lorg/apache/impala/util/IcebergMetadataScanner;Ljava/util/List;)V",
-      &iceberg_metadata_scanner_array_scanner_ctor_));
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env,
-      iceberg_metadata_scanner_array_scanner_cl_,
-      "GetNextArrayItem", "()Ljava/lang/Object;",
-      &iceberg_metadata_scanner_array_scanner_get_next_array_item_));
+      iceberg_metadata_scanner_collection_scanner_cl_,
+      "GetNextCollectionItem", "()Ljava/lang/Object;",
+      &iceberg_metadata_scanner_collection_scanner_get_next_collection_item_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, map_entry_cl_, "getKey",
+      "()Ljava/lang/Object;", &map_entry_get_key_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, map_entry_cl_, "getValue",
+      "()Ljava/lang/Object;", &map_entry_get_value_));
   return Status::OK();
 }
 
@@ -136,13 +146,34 @@ Status IcebergMetadataScanner::GetNext(JNIEnv* env, jobject* result) {
   return Status::OK();
 }
 
-Status IcebergMetadataScanner::GetNextArrayItem(JNIEnv* env, const jobject &scanner,
+Status IcebergMetadataScanner::GetNextArrayItem(JNIEnv* env, const jobject& scanner,
     jobject* result) {
+  return GetNextCollectionScannerItem(env, scanner, result);
+}
+
+Status IcebergMetadataScanner::GetNextMapKeyAndValue(JNIEnv* env, const jobject& scanner,
+    jobject* key, jobject* value) {
+  jobject map_entry;
+  RETURN_IF_ERROR(GetNextCollectionScannerItem(env, scanner, &map_entry));
+  DCHECK(env->IsInstanceOf(map_entry, map_entry_cl_) == JNI_TRUE);
+
+  *key = env->CallObjectMethod(map_entry, map_entry_get_key_);
+  RETURN_ERROR_IF_EXC(env);
+
+  *value = env->CallObjectMethod(map_entry, map_entry_get_value_);
+  RETURN_ERROR_IF_EXC(env);
+  env->DeleteLocalRef(map_entry);
+  return Status::OK();
+}
+
+Status IcebergMetadataScanner::GetNextCollectionScannerItem(JNIEnv* env,
+    const jobject& scanner, jobject* result) {
   *result = env->CallObjectMethod(scanner,
-      iceberg_metadata_scanner_array_scanner_get_next_array_item_);
+      iceberg_metadata_scanner_collection_scanner_get_next_collection_item_);
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();
 }
+
 
 Status IcebergMetadataScanner::GetValue(JNIEnv* env, const SlotDescriptor* slot_desc,
     const jobject &struct_like_row, const jclass& clazz, jobject* result) {
@@ -152,14 +183,13 @@ Status IcebergMetadataScanner::GetValue(JNIEnv* env, const SlotDescriptor* slot_
     // Use accessor when it is available, these are top level primitive types, top level
     // structs and structs inside structs.
     RETURN_IF_ERROR(GetValueByFieldId(env, struct_like_row, field_id_it->second, result));
-  } else if (slot_desc->parent()->isTupleOfStructSlot()) {
+  } else {
     // Accessor is not available, this must be a STRUCT inside an ARRAY.
+    DCHECK(slot_desc->parent()->isTupleOfStructSlot());
     int pos = slot_desc->col_path().back();
     RETURN_IF_ERROR(GetValueByPosition(env, struct_like_row, pos, clazz, result));
-  } else {
-    // Primitive inside an ARRAY, the value can be accessed directly.
-    *result = struct_like_row;
   }
+
   return Status::OK();
 }
 
@@ -180,9 +210,31 @@ Status IcebergMetadataScanner::GetValueByPosition(JNIEnv* env, const jobject &st
 }
 
 Status IcebergMetadataScanner::CreateArrayScanner(JNIEnv* env, const jobject &list,
-    jobject& result) {
-  result = env->NewObject(iceberg_metadata_scanner_array_scanner_cl_,
-      iceberg_metadata_scanner_array_scanner_ctor_, jmetadata_scanner_, list);
+    jobject* result) {
+  return CreateArrayOrMapScanner</*IS_ARRAY*/ true>(env, list, result);
+}
+
+Status IcebergMetadataScanner::CreateMapScanner(JNIEnv* env, const jobject &map,
+    jobject* result) {
+  return CreateArrayOrMapScanner</*IS_ARRAY*/ false>(env, map, result);
+}
+
+template <bool IS_ARRAY>
+Status IcebergMetadataScanner::CreateArrayOrMapScanner(JNIEnv* env,
+    const jobject &list_or_map, jobject* result) {
+  DCHECK(result != nullptr);
+
+  jmethodID* factory_method;
+  if constexpr (IS_ARRAY) {
+    DCHECK(env->IsInstanceOf(list_or_map, list_cl_) == JNI_TRUE);
+    factory_method = &iceberg_metadata_scanner_collection_scanner_from_array_;
+  } else {
+    DCHECK(env->IsInstanceOf(list_or_map, map_cl_) == JNI_TRUE);
+    factory_method = &iceberg_metadata_scanner_collection_scanner_from_map_;
+  }
+
+  *result = env->CallStaticObjectMethod(iceberg_metadata_scanner_collection_scanner_cl_,
+      *factory_method, list_or_map);
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();
 }

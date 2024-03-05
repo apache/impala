@@ -46,21 +46,22 @@ class IcebergRowReader {
   static Status InitJNI() WARN_UNUSED_RESULT;
 
   /// Materialize the StructLike Java objects into Impala rows.
-  Status MaterializeTuple(JNIEnv* env, jobject struct_like_row,
+  Status MaterializeTuple(JNIEnv* env, const jobject& struct_like_row,
       const TupleDescriptor* tuple_desc, Tuple* tuple,  MemPool* tuple_data_pool,
       RuntimeState* state);
 
  private:
   /// Global class references created with JniUtil.
   inline static jclass list_cl_ = nullptr;
+  inline static jclass map_cl_ = nullptr;
   inline static jclass boolean_cl_ = nullptr;
   inline static jclass integer_cl_ = nullptr;
   inline static jclass long_cl_ = nullptr;
   inline static jclass char_sequence_cl_ = nullptr;
 
   /// Method references created with JniUtil.
-  inline static jmethodID list_get_ = nullptr;
   inline static jmethodID list_size_ = nullptr;
+  inline static jmethodID map_size_ = nullptr;
   inline static jmethodID boolean_value_ = nullptr;
   inline static jmethodID integer_value_ = nullptr;
   inline static jmethodID long_value_ = nullptr;
@@ -73,27 +74,44 @@ class IcebergRowReader {
   /// IcebergMetadataScanner class, used to get and access values inside java objects.
   IcebergMetadataScanner* metadata_scanner_;
 
-  /// Reads the value of a primitive from the StructLike, translates it to a matching
-  /// Impala type and writes it into the target tuple. The related Accessor objects are
-  /// stored in the jaccessors_ map and created during Prepare.
-  Status WriteBooleanSlot(JNIEnv* env, const jobject &accessed_value, void* slot);
-  Status WriteIntSlot(JNIEnv* env, const jobject &accessed_value, void* slot);
-  Status WriteLongSlot(JNIEnv* env, const jobject &accessed_value, void* slot);
+  // Writes a Java value into the target tuple. 'struct_like_row' is only used for struct
+  // types. It is needed because struct children reside directly in the parent tuple of
+  // the struct.
+  Status WriteSlot(JNIEnv* env, const jobject* struct_like_row,
+      const jobject& accessed_value, const SlotDescriptor* slot_desc, Tuple* tuple,
+      MemPool* tuple_data_pool, RuntimeState* state) WARN_UNUSED_RESULT;
+
+  /// Translates the value of a Java primitive to the matching Impala type and writes it
+  /// into the target slot.
+  Status WriteBooleanSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
+      WARN_UNUSED_RESULT;
+  Status WriteIntSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
+      WARN_UNUSED_RESULT;
+  Status WriteLongSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
+      WARN_UNUSED_RESULT;
   /// Iceberg TimeStamp is parsed into TimestampValue.
-  Status WriteTimeStampSlot(JNIEnv* env, const jobject &accessed_value, void* slot);
+  Status WriteTimeStampSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
+      WARN_UNUSED_RESULT;
   /// To obtain a character sequence from JNI the JniUtfCharGuard class is used. Then the
   /// data has to be copied to the tuple_data_pool, because the JVM releases the reference
   /// and reclaims the memory area.
   Status WriteStringSlot(JNIEnv* env, const jobject &accessed_value, void* slot,
-      MemPool* tuple_data_pool);
+      MemPool* tuple_data_pool) WARN_UNUSED_RESULT;
 
   /// Nested types recursively call MaterializeTuple method with their child tuple.
   Status WriteStructSlot(JNIEnv* env, const jobject &struct_like_row,
       const SlotDescriptor* slot_desc, Tuple* tuple, MemPool* tuple_data_pool,
-      RuntimeState* state);
-  Status WriteArraySlot(JNIEnv* env, const jobject &accessed_value, CollectionValue* slot,
-      const SlotDescriptor* slot_desc, Tuple* tuple, MemPool* tuple_data_pool,
-      RuntimeState* state);
+      RuntimeState* state) WARN_UNUSED_RESULT;
+  template <bool IS_ARRAY>
+  Status WriteCollectionSlot(JNIEnv* env, const jobject &accessed_value,
+      CollectionValue* slot, const SlotDescriptor* slot_desc, MemPool* tuple_data_pool,
+      RuntimeState* state) WARN_UNUSED_RESULT;
+  Status WriteArrayItem(JNIEnv* env, const jobject& collection_scanner,
+      const TupleDescriptor* item_tuple_desc, Tuple* tuple,
+      MemPool* tuple_data_pool_collection, RuntimeState* state) WARN_UNUSED_RESULT;
+  Status WriteMapKeyAndValue(JNIEnv* env, const jobject& collection_scanner,
+      const TupleDescriptor* item_tuple_desc, Tuple* tuple,
+      MemPool* tuple_data_pool_collection, RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Helper method that gives back the Iceberg Java class for a ColumnType. It is
   /// specified in this class, to avoid defining all the Java type classes in other
