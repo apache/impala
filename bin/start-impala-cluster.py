@@ -163,7 +163,7 @@ parser.add_option("--enable_catalogd_ha", dest="enable_catalogd_ha",
                   help="If true, enables CatalogD HA - the cluster will be launched "
                   "with two catalogd instances as Active-Passive HA pair.")
 parser.add_option("--jni_frontend_class", dest="jni_frontend_class",
-                  action="store", default="org/apache/impala/service/JniFrontend",
+                  action="store", default="",
                   help="Use a custom java frontend interface.")
 parser.add_option("--enable_statestored_ha", dest="enable_statestored_ha",
                   action="store_true", default=False,
@@ -187,6 +187,10 @@ parser.add_option("--tuple_cache_capacity", dest="tuple_cache_capacity",
 parser.add_option("--tuple_cache_eviction_policy", dest="tuple_cache_eviction_policy",
                   default="LRU", help="This specifies the cache eviction policy to use "
                   "for the tuple cache.")
+parser.add_option("--use_calcite_planner", default="False", type="choice",
+                  choices=["true", "True", "false", "False"],
+                  help="If true, use the Calcite planner for query optimization "
+                  "instead of the Impala planner")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -649,7 +653,7 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       args = "{args} -geospatial_library={geospatial_library}".format(
           args=args, geospatial_library=options.geospatial_library)
 
-    if options.jni_frontend_class:
+    if options.jni_frontend_class != "":
       args = "-jni_frontend_class={jni_frontend_class} {args}".format(
           jni_frontend_class=options.jni_frontend_class, args=args)
 
@@ -657,6 +661,12 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       args = "-allow_tuple_caching=false {args}".format(args=args)
     else:
       args = "-allow_tuple_caching=true {args}".format(args=args)
+
+    if options.use_calcite_planner.lower() == 'true':
+      args = "-jni_frontend_class={jni_frontend_class} {args}".format(
+          jni_frontend_class="org/apache/impala/calcite/service/CalciteJniFrontend",
+          args=args)
+      os.environ["USE_CALCITE_PLANNER"] = "true"
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

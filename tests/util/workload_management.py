@@ -417,7 +417,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   index += 1
   assert sql_results.column_labels[index] == EXECUTOR_GROUPS
   ret_data[EXECUTOR_GROUPS] = data[index]
-  exec_groups = re.search(r'\n\s+(Executor group \d+:.*?)\n\s+ImpalaServer', profile_text,
+  exec_groups = re.search(r'\n\s+(Executor group \d+:.*?)\n\s+PlannerInfo', profile_text,
       re.DOTALL)
   if query_state_value == "EXCEPTION":
     assert exec_groups is None, "executor groups should not have been found"

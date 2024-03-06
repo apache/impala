@@ -66,9 +66,8 @@ public class TableName {
     // Avoid "db1." and ".tbl1" being treated as the same. We resolve ".tbl1" as
     // "default.tbl1". But we reject "db1." since it only gives the database name.
     if (fullName == null || fullName.trim().endsWith(".")) return null;
-    // TODO: upgrade Guava to 15+ to use splitToList instead
     List<String> parts = Lists.newArrayList(Splitter.on('.').trimResults()
-        .omitEmptyStrings().split(fullName.toLowerCase()));
+        .omitEmptyStrings().splitToList(fullName.toLowerCase()));
     if (parts.size() == 1) {
       return new TableName(Catalog.DEFAULT_DB, parts.get(0));
     }

@@ -1046,4 +1046,8 @@ public class JniFrontend {
     }
     return "";
   }
+
+  public Frontend getFrontend() {
+    return frontend_;
+  }
 }

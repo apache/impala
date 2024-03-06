@@ -273,6 +273,12 @@ public class Frontend {
   private static final String AVG_ADMISSION_SLOTS_PER_EXECUTOR =
       "AvgAdmissionSlotsPerExecutor";
 
+  // info about the planner used. In this code, we will always use the Original planner,
+  // but other planners may set their own planner values
+  public static final String PLANNER_PROFILE = "PlannerInfo";
+  public static final String PLANNER_TYPE = "PlannerType";
+  private static final String PLANNER = "OriginalPlanner";
+
   /**
    * Plan-time context that allows capturing various artifacts created
    * during the process.
@@ -2135,6 +2141,7 @@ public class Frontend {
   private TExecRequest getTExecRequest(PlanCtx planCtx, EventSequence timeline)
       throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
+    addPlannerToProfile(PLANNER);
     LOG.info("Analyzing query: " + queryCtx.client_request.stmt + " db: "
         + queryCtx.session.database);
 
@@ -2498,6 +2505,12 @@ public class Frontend {
     if (node.getInfo_strings().put(key, value) == null) {
       node.getInfo_strings_display_order().add(key);
     }
+  }
+
+  public static void addPlannerToProfile(String planner) {
+    TRuntimeProfileNode profile = createTRuntimeProfileNode(PLANNER_PROFILE);
+    addInfoString(profile, PLANNER_TYPE, planner);
+    FrontendProfile.getCurrent().addChildrenProfile(profile);
   }
 
   private TExecRequest doCreateExecRequest(PlanCtx planCtx,

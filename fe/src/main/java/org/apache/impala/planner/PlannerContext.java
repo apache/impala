@@ -68,6 +68,7 @@ public class PlannerContext {
   private final EventSequence timeline_;
   private final TQueryCtx queryCtx_;
   private final QueryStmt queryStmt_;
+  private final Analyzer rootAnalyzer_;
 
   public PlannerContext (AnalysisResult analysisResult, TQueryCtx queryCtx,
       EventSequence timeline) {
@@ -85,14 +86,20 @@ public class PlannerContext {
     } else {
       queryStmt_ = analysisResult.getQueryStmt();
     }
+    rootAnalyzer_ = analysisResult.getAnalyzer();
   }
 
   // Constructor useful for an external planner module
   public PlannerContext(TQueryCtx queryCtx, EventSequence timeline) {
+    this((Analyzer) null, queryCtx, timeline);
+  }
+
+  public PlannerContext(Analyzer analyzer, TQueryCtx queryCtx, EventSequence timeline) {
     queryCtx_ = queryCtx;
     timeline_ = timeline;
     analysisResult_ = null;
     queryStmt_ = null;
+    rootAnalyzer_ = analyzer;
   }
 
   public QueryStmt getQueryStmt() { return queryStmt_; }
@@ -100,7 +107,7 @@ public class PlannerContext {
   public TQueryOptions getQueryOptions() { return getRootAnalyzer().getQueryOptions(); }
   public AnalysisResult getAnalysisResult() { return analysisResult_; }
   public EventSequence getTimeline() { return timeline_; }
-  public Analyzer getRootAnalyzer() { return analysisResult_.getAnalyzer(); }
+  public Analyzer getRootAnalyzer() { return rootAnalyzer_; }
   public boolean isSingleNodeExec() { return getQueryOptions().num_nodes == 1; }
   public PlanNodeId getNextNodeId() { return nodeIdGenerator_.getNextId(); }
   public PlanFragmentId getNextFragmentId() { return fragmentIdGenerator_.getNextId(); }
