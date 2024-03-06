@@ -537,6 +537,7 @@ class TestWebPage(ImpalaTestSuite):
       response_json = json.loads(responses[0].text)
     finally:
       self.client.cancel(query_handle)
+      self.client.close_query(query_handle)
     return response_json
 
   @pytest.mark.xfail(run=False, reason="IMPALA-8059")

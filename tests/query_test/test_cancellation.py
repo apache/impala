@@ -25,6 +25,7 @@ import threading
 from time import sleep
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.test_dimensions import add_mandatory_exec_option
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.cancel_util import cancel_query_and_validate_state
@@ -275,3 +276,30 @@ class TestCancellationFullSort(TestCancellation):
 
   def test_cancel_sort(self, vector):
     self.execute_cancel_test(vector)
+
+
+class TestCancellationFinalizeDelayed(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCancellationFinalizeDelayed, cls).add_test_dimensions()
+
+    # Test with a small delay in QueryDriver::Finalize from close() to check that queries
+    # that are finalized as a result of closing the session correctly return "Invalid or
+    # unknown query handle" to the close() RPC.
+    add_mandatory_exec_option(cls, 'debug_action', 'FINALIZE_INFLIGHT_QUERY:SLEEP@10')
+
+    # Debug action is independent of file format, so only testing for
+    # table_format=parquet/none in order to avoid a test dimension explosion.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
+
+  def test_cancellation(self, vector):
+    query = "select l_returnflag from tpch_parquet.lineitem"
+    cancel_delay = 0
+    cancel_query_and_validate_state(self.client, query,
+        vector.get_value('exec_option'), vector.get_value('table_format'), cancel_delay)

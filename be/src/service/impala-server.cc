@@ -1533,6 +1533,10 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   QueryHandle query_handle;
   RETURN_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle));
 
+  if (check_inflight) {
+    DebugActionNoFail(query_handle->query_options(), "FINALIZE_INFLIGHT_QUERY");
+  }
+
   // Do the work of unregistration that needs to be done synchronously. Once
   // Finalize() returns, the query is considered unregistered from the client's point of
   // view. If Finalize() returns OK, this thread is responsible for doing the

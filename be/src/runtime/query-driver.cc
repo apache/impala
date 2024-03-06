@@ -494,7 +494,10 @@ void QueryDriver::HandleRetryFailure(Status* status, string* error_msg,
 
 Status QueryDriver::Finalize(
     QueryHandle* query_handle, bool check_inflight, const Status* cause) {
-  if (check_inflight && !(*query_handle)->is_inflight()) {
+  // If the query's not inflight yet, return an appropriate error. If the query
+  // has been finalized and removed from inflight_queries (but not yet removed
+  // from query_driver_map_) we want to fall-through to the next check.
+  if (check_inflight && !(*query_handle)->is_inflight() && !finalized_.Load()) {
     return Status("Query not yet running");
   }
 
