@@ -1875,6 +1875,19 @@ public class MetastoreEvents {
       if (whitelistedTblProperties.isEmpty()) {
         return false;
       }
+
+      boolean incrementalAcidRefresh =
+          BackendConfig.INSTANCE.getHMSEventIncrementalRefreshTransactionalTable();
+      boolean unpartitioned = afterTable.getPartitionKeysSize() == 0;
+      if (!incrementalAcidRefresh && unpartitioned
+          && AcidUtils.isTransactionalTable(afterTable.getParameters())) {
+        // In case of ACID tables no INSERT event is generated. If flag
+        // hms_event_incremental_refresh_transactional_table is false, then transaction
+        // related events are ignored (including COMMIT_TXN), so Impala has to rely on
+        // ALTER_TABLE events to detect INSERTs to unpartitioned tables (IMPALA-12835).
+        return false;
+      }
+
       // There are lot of other alter statements which doesn't require file metadata
       // reload but these are the most common types for alter statements.
       if (isFieldSchemaChanged(beforeTable, afterTable) ||

@@ -1219,3 +1219,28 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     # finish than 100s (e.g. I saw a run of 5mins).
     # self.assert_catalogd_log_contains("INFO", "Not added ABORTED write id 1 since it's "
     #    + "not opened and might already be cleaned up")
+
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--hms_event_incremental_refresh_transactional_table=false")
+  def test_no_hms_event_incremental_refresh_transactional_table(self, unique_database):
+    """IMPALA-12835: Test that Impala notices inserts to acid tables when
+       hms_event_incremental_refresh_transactional_table is false.
+    """
+    for partitioned in [False, True]:
+      tbl = "part_tbl" if partitioned else "tbl"
+      fq_tbl = unique_database + '.' + tbl
+      part_create = " partitioned by (p int)" if partitioned else ""
+      part_insert = " partition (p = 1)" if partitioned else ""
+
+      self.run_stmt_in_hive(
+          "create transactional table {} (i int){}".format(fq_tbl, part_create))
+      EventProcessorUtils.wait_for_event_processing(self)
+
+      # Load the table in Impala before INSERT
+      self.client.execute("refresh " + fq_tbl)
+      self.run_stmt_in_hive(
+          "insert into {}{} values (1),(2),(3)".format(fq_tbl, part_insert))
+      EventProcessorUtils.wait_for_event_processing(self)
+
+      results = self.client.execute("select i from " + fq_tbl)
+      assert results.data == ["1", "2", "3"]
