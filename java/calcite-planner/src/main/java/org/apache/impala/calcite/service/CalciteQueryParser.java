@@ -20,6 +20,8 @@ package org.apache.impala.calcite.service;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.impala.calcite.parser.ImpalaSqlParserImpl;
+import org.apache.impala.calcite.validate.ImpalaConformance;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +42,9 @@ public class CalciteQueryParser implements CompilerStep {
 
   public SqlNode parse() throws SqlParseException {
     // Create an SQL parser
-    SqlParser parser = SqlParser.create(queryCtx_.getStmt());
+    SqlParser parser = SqlParser.create(queryCtx_.getStmt(),
+        SqlParser.config().withParserFactory(ImpalaSqlParserImpl.FACTORY)
+                .withConformance(ImpalaConformance.INSTANCE));
 
     // Parse the query into an AST
     SqlNode sqlNode = parser.parseQuery();
