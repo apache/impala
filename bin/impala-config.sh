@@ -961,9 +961,22 @@ export IMPALA_ALL_LOGS_DIRS="${IMPALA_CLUSTER_LOGS_DIR}
   ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR} ${IMPALA_MVN_LOGS_DIR}
   ${IMPALA_TIMEOUT_LOGS_DIR}"
 
+# Compute CPUs, using cgroup limits if present and not "max" (v2) or negative (v1)
+awk_divide_roundup='{ cores = $1/$2; print cores==int(cores) ? cores : int(cores)+1 }'
+if grep -v max /sys/fs/cgroup/cpu.max >& /dev/null; then
+  # Get CPU limits under cgroups v2
+  CORES=$(awk "$awk_divide_roundup" /sys/fs/cgroup/cpu.max)
+  echo "Detected $CORES cores from cgroups v2"
+elif grep -v '\-' /sys/fs/cgroup/cpu/cpu.cfs_quota_us >& /dev/null; then
+  # Get CPU limits under cgroups v1
+  CORES=$(paste /sys/fs/cgroup/cpu/cpu.cfs_quota_us /sys/fs/cgroup/cpu/cpu.cfs_period_us |
+          awk "$awk_divide_roundup")
+  echo "Detected $CORES cores from cgroups v1"
+else
+  CORES=$(getconf _NPROCESSORS_ONLN)
+fi
 # Reduce the concurrency for local tests to half the number of cores in the system.
-CORES=$(($(getconf _NPROCESSORS_ONLN) / 2))
-export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-${CORES}}"
+export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-$((CORES / 2))}"
 
 export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-${INTERNAL_LISTEN_HOST}}"
 export KUDU_MASTER_PORT="${KUDU_MASTER_PORT:-7051}"
@@ -1099,8 +1112,37 @@ export ASAN_SYMBOLIZER_PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLV
 
 export CLUSTER_DIR="${IMPALA_HOME}/testdata/cluster"
 
-# The number of parallel build processes we should run at a time.
-export IMPALA_BUILD_THREADS=${IMPALA_BUILD_THREADS-"$(nproc)"}
+# The number of parallel build processes we should run at a time. Require 2GB memory per
+# core as too many compilation processes can exhaust available memory and fail a build.
+if $IS_OSX; then
+  AVAILABLE_MEM=$(($(sysctl -n hw.memsize) / 1024 / 1024 / 1024))
+else
+  # MemTotal:       65550228 kB
+  AVAILABLE_MEM=$(awk '/MemTotal/{print int($2/1024/1024)}' /proc/meminfo)
+fi
+if grep -v max /sys/fs/cgroup/memory.max >& /dev/null; then
+  # Get memory limits under cgroups v2
+  CGROUP_MEM_LIMIT=$(($(cat /sys/fs/cgroup/memory.max) / 1024 / 1024 / 1024))
+  echo "Detected $CGROUP_MEM_LIMIT GB memory limit from cgroups v2"
+elif grep -v '\-' /sys/fs/cgroup/memory/memory.limit_in_bytes >& /dev/null; then
+  # Get memory limits under cgroups v1
+  CGROUP_MEM_LIMIT=$((
+      $(cat /sys/fs/cgroup/memory/memory.limit_in_bytes) / 1024 / 1024 / 1024))
+  echo "Detected $CGROUP_MEM_LIMIT GB memory limit from cgroups v1"
+else
+  CGROUP_MEM_LIMIT=8589934591 # max int64 bytes in GB
+fi
+AVAILABLE_MEM=$((AVAILABLE_MEM > $CGROUP_MEM_LIMIT ? $CGROUP_MEM_LIMIT : $AVAILABLE_MEM))
+BOUNDED_CONCURRENCY=$((AVAILABLE_MEM / 2))
+if [[ $AVAILABLE_MEM -lt 2 ]]; then
+  echo "Insufficient memory ($AVAILABLE_MEM GB) to build Impala"
+  exit 1
+elif [[ $BOUNDED_CONCURRENCY -lt $CORES ]]; then
+  echo "Bounding concurrency for available memory ($AVAILABLE_MEM GB)"
+else
+  BOUNDED_CONCURRENCY=$CORES
+fi
+export IMPALA_BUILD_THREADS=${IMPALA_BUILD_THREADS-"${BOUNDED_CONCURRENCY}"}
 
 # Additional flags to pass to make or ninja.
 export IMPALA_MAKE_FLAGS=${IMPALA_MAKE_FLAGS-}
@@ -1180,6 +1222,8 @@ echo "IMPALA_COS_VERSION      = $IMPALA_COS_VERSION"
 echo "IMPALA_OBS_VERSION      = $IMPALA_OBS_VERSION"
 echo "IMPALA_SYSTEM_PYTHON2   = $IMPALA_SYSTEM_PYTHON2"
 echo "IMPALA_SYSTEM_PYTHON3   = $IMPALA_SYSTEM_PYTHON3"
+echo "IMPALA_BUILD_THREADS    = $IMPALA_BUILD_THREADS"
+echo "NUM_CONCURRENT_TESTS    = $NUM_CONCURRENT_TESTS"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

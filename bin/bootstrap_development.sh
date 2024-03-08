@@ -41,12 +41,31 @@ set -eu -o pipefail
 
 BINDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Check available disk space before starting.
+available_disk=$(command df --output=avail --block-size=1G . | sed 1d)
+if [[ $available_disk -lt 80 ]]; then
+  echo "Insufficient disk space ($available_disk GB), \
+Impala requires at least 80GB to build and load test data"
+  exit 1
+fi
+
 source "${BINDIR}/bootstrap_system.sh"
 
 export MAX_PYTEST_FAILURES=0
 source bin/impala-config.sh > /dev/null 2>&1
-export NUM_CONCURRENT_TESTS=$(nproc)
+
+BOUNDED_CONCURRENCY=$((AVAILABLE_MEM / 4))
+if [[ $AVAILABLE_MEM -lt 4 ]]; then
+  echo "Insufficient memory ($AVAILABLE_MEM GB) to link Impala test binaries"
+  echo "Increase memory, or run buildall.sh -format -testdata -notests"
+  exit 1
+elif [[ $BOUNDED_CONCURRENCY -lt $IMPALA_BUILD_THREADS ]]; then
+  echo "Bounding concurrency to $BOUNDED_CONCURRENCY for link phase"
+  IMPALA_BUILD_THREADS=$BOUNDED_CONCURRENCY
+fi
+
 time -p ./buildall.sh -format -testdata -skiptests
 
 # To then run the tests:
+# export NUM_CONCURRENT_TESTS=$(nproc)
 # time -p bin/run-all-tests.sh

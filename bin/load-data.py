@@ -24,7 +24,6 @@ from __future__ import absolute_import, division, print_function
 import collections
 import getpass
 import logging
-import multiprocessing
 import os
 import re
 import sqlparse
@@ -77,8 +76,9 @@ parser.add_option("--use_kerberos", action="store_true", default=False,
                   help="Load data on a kerberized cluster.")
 parser.add_option("--principal", default=None, dest="principal",
                   help="Kerberos service principal, required if --use_kerberos is set")
-parser.add_option("--num_processes", type="int", default=multiprocessing.cpu_count(),
-                  dest="num_processes", help="Number of parallel processes to use.")
+parser.add_option("--num_processes", type="int", dest="num_processes",
+                  default=os.environ['IMPALA_BUILD_THREADS'],
+                  help="Number of parallel processes to use.")
 
 options, args = parser.parse_args()
 
