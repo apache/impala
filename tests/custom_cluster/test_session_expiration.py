@@ -20,10 +20,13 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 import socket
+
+import re
 from time import sleep
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import DEFAULT_HS2_PORT
+
 
 class TestSessionExpiration(CustomClusterTestSuite):
   """Tests query expiration logic"""
@@ -71,7 +74,6 @@ class TestSessionExpiration(CustomClusterTestSuite):
     sleep(5)
     assert num_expired + 1 == impalad.service.get_metric_value(
       "impala-server.num-sessions-expired")
-
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_session_timeout=5 "
@@ -166,3 +168,36 @@ class TestSessionExpiration(CustomClusterTestSuite):
     assert num_hs2_connections + 1 == impalad.service.get_metric_value(
         "impala.thrift-server.hiveserver2-frontend.connections-in-use")
     sock.close()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--max_hs2_sessions_per_user=2")
+  def test_max_hs2_sessions_per_user(self):
+    """Test that the --max_hs2_sessions_per_user flag restricts the total number of
+    sessions per user. Also checks that the per-user count of hs2 sessions can
+    be seen in the webui."""
+    impalad = self.cluster.get_first_impalad()
+    self.close_impala_clients()
+    # Create 2 sessions.
+    client1 = impalad.service.create_hs2_client()
+    client1.execute_async("select sleep(5000)")
+    client2 = impalad.service.create_hs2_client()
+    client2.execute_async("select sleep(5000)")
+    try:
+      # Trying to open a third session should fail.
+      impalad.service.create_hs2_client()
+      assert False, "should have failed"
+    except Exception as e:
+      assert re.match(r"Number of sessions for user \S+ exceeds coordinator limit 2",
+                      str(e)), "Unexpected exception: " + str(e)
+
+    # Test webui for hs2 sessions.
+    res = impalad.service.get_debug_webpage_json("/sessions")
+    assert res['num_sessions'] == 2
+    assert res['users'][0]['user'] is not None
+    assert res['users'][0]['session_count'] == 2
+    # Let queries finish, session count should go to zero.
+    sleep(6)
+    client1.close()
+    client2.close()
+    res = impalad.service.get_debug_webpage_json("/sessions")
+    assert res['num_sessions'] == 0

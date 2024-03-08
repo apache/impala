@@ -136,6 +136,29 @@ which the session is removed from this list.</div>
   </tbody>
 </table>
 
+<h2>HiveServer2 Sessions by User</h2>
+
+<div class="alert alert-info" role="alert">
+This data is only available if --max_hs2_sessions_per_user is set to a positive value.
+</div>
+
+<table id="users-tbl" class='table table-bordered table-hover table-condensed'>
+  <thead>
+    <tr>
+      <th><small>Name of Connected User</small></th>
+      <th><small>Number of open HiveServer2 Sessions</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#users}}
+    <tr>
+      <td><small>{{user}}</small></td>
+      <td><small>{{session_count}}</small></td>
+    </tr>
+    {{/users}}
+  </tbody>
+</table>
+
 <script>
     $(document).ready(function() {
         $('#client-hosts-tbl').DataTable({
@@ -157,6 +180,15 @@ which the session is removed from this list.</div>
 <script>
     $(document).ready(function() {
         $('#sessions-tbl').DataTable({
+            "order": [[ 1, "desc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
+
+<script>
+    $(document).ready(function() {
+        $('#users-tbl').DataTable({
             "order": [[ 1, "desc" ]],
             "pageLength": 100
         });

@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <mutex>
 #include <sstream>
-#include <boost/lexical_cast.hpp>
 #include <boost/unordered_set.hpp>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
@@ -45,7 +44,6 @@
 #include "service/impala-server.h"
 #include "service/query-state-record.h"
 #include "thrift/protocol/TDebugProtocol.h"
-#include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/logging-support.h"
 #include "util/pretty-printer.h"
@@ -711,6 +709,9 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::WebRequest& req,
 
   VLOG(1) << "Step3: Fill the connections information into the document.";
   FillConnectionsInfo(document, connection_contexts);
+
+  VLOG(1) << "Step4: Fill the hs2 users information into the document.";
+  FillUsersInfo(document);
 }
 
 void ImpalaHttpHandler::FillSessionsInfo(Document* document) {
@@ -774,6 +775,29 @@ void ImpalaHttpHandler::FillSessionsInfo(Document* document) {
   document->AddMember("num_active", num_active, document->GetAllocator());
   document->AddMember("num_inactive", server_->session_state_map_.size() - num_active,
       document->GetAllocator());
+}
+
+// Comparer that will sort the users array by the session_count field.
+bool SessionCountComparer(const Value& a, const Value& b) {
+  return a["session_count"].GetInt64() < b["session_count"].GetInt64();
+}
+
+void ImpalaHttpHandler::FillUsersInfo(Document* document) {
+  Value users(kArrayType);
+  {
+    lock_guard<mutex> l(server_->per_user_session_count_lock_);
+    for (auto const& it : server_->per_user_session_count_map_) {
+      const string& name = it.first;
+      const int64& session_count = it.second;
+      Value users_json(kObjectType);
+      Value user_name(name.c_str(), document->GetAllocator());
+      users_json.AddMember("user", user_name, document->GetAllocator());
+      users_json.AddMember("session_count", session_count, document->GetAllocator());
+      users.PushBack(users_json, document->GetAllocator());
+    }
+  }
+  sort(users.Begin(), users.End(), SessionCountComparer);
+  document->AddMember("users", users, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::FillClientHostsInfo(
@@ -937,7 +961,7 @@ void ImpalaHttpHandler::CatalogHandler(const Webserver::WebRequest& req,
     database.AddMember("name", str, document->GetAllocator());
 
     TGetTablesResult get_table_results;
-    Status status = server_->exec_env_->frontend()->GetTableNames(
+    status = server_->exec_env_->frontend()->GetTableNames(
         db.db_name, NULL, NULL, &get_table_results);
     if (!status.ok()) {
       Value error(status.GetDetail().c_str(), document->GetAllocator());

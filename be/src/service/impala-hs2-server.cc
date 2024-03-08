@@ -20,23 +20,18 @@
 #include "service/impala-server.inline.h"
 
 #include <algorithm>
-#include <type_traits>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_set.hpp>
-#include <jni.h>
 #include <gperftools/heap-profiler.h>
 #include <gperftools/malloc_extension.h>
 #include <gtest/gtest.h>
 #include <gutil/strings/substitute.h>
-#include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
 #include "common/version.h"
-#include "rpc/thrift-util.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/raw-value.h"
@@ -96,6 +91,7 @@ DECLARE_string(hostname);
 DECLARE_int32(webserver_port);
 DECLARE_int32(idle_session_timeout);
 DECLARE_int32(disconnected_session_timeout);
+DECLARE_int32(max_hs2_sessions_per_user);
 DECLARE_bool(ping_expose_webserver_url);
 DECLARE_string(anonymous_user_name);
 
@@ -422,6 +418,11 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     }
   }
 
+  Status status = IncrementAndCheckSessionCount(state->connected_user);
+  HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+
+  // At this point all checks are complete, store session status information.
+
   RegisterSessionTimeout(state->session_timeout);
   TQueryOptionsToMap(state->QueryOptions(), &return_val.configuration);
 
@@ -452,6 +453,57 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
              << ", effective username: " << GetEffectiveUser(*state)
              << ", client address: "
              << "<" << TNetworkAddressToString(state->network_address) << ">.";
+}
+
+void ImpalaServer::DecrementCount(
+    std::map<std::string, int64>& loads, const std::string& key) {
+  // Check if key is present as dereferencing the map will insert it.
+  // FIXME C++20: use contains().
+  if (!loads.count(key)) {
+    string msg = Substitute("Missing key $0 when decrementing count", key);
+    LOG(WARNING) << msg;
+    DCHECK(false) << msg;
+    return;
+  }
+  int64& current_value = loads[key];
+  if (current_value == 1) {
+    // Remove the entry from the map if the current_value will go to zero.
+    loads.erase(key);
+    return;
+  }
+  if (current_value < 1) {
+    // Don't allow decrement below zero.
+    string msg = Substitute("Attempt to decrement below zero with key $0 ", key);
+    LOG(WARNING) << msg;
+    return;
+  }
+  loads[key]--;
+}
+
+void ImpalaServer::DecrementSessionCount(const string& user_name) {
+  if (FLAGS_max_hs2_sessions_per_user > 0) {
+    lock_guard<mutex> l(per_user_session_count_lock_);
+    DecrementCount(per_user_session_count_map_, user_name);
+  }
+}
+
+Status ImpalaServer::IncrementAndCheckSessionCount(const string& user_name) {
+  if (FLAGS_max_hs2_sessions_per_user > 0) {
+    lock_guard<mutex> l(per_user_session_count_lock_);
+    // Only check user limit if there is already a session for the user.
+    if (per_user_session_count_map_.count(user_name)) {
+      int64 load = per_user_session_count_map_[user_name];
+      if (load >= FLAGS_max_hs2_sessions_per_user) {
+        const string& err_msg =
+            Substitute("Number of sessions for user $0 exceeds coordinator limit $1",
+                user_name, FLAGS_max_hs2_sessions_per_user);
+        VLOG(1) << err_msg;
+        return Status::Expected(err_msg);
+      }
+    }
+    per_user_session_count_map_[user_name]++;
+  }
+  return Status::OK();
 }
 
 void ImpalaServer::CloseSession(TCloseSessionResp& return_val,

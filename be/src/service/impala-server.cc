@@ -17,11 +17,9 @@
 
 #include "service/impala-server.h"
 
-#include <netdb.h>
 #include <unistd.h>
 #include <algorithm>
 #include <exception>
-#include <fstream>
 #include <sstream>
 #ifdef CALLONCEHACK
 #include <calloncehack.h>
@@ -32,12 +30,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/bind.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/unordered_set.hpp>
-#include <gperftools/malloc_extension.h>
-#include <gutil/strings/numbers.h>
 #include <gutil/strings/split.h>
 #include <gutil/strings/substitute.h>
 #include <gutil/walltime.h>
@@ -45,9 +38,6 @@
 #include <openssl/evp.h>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-#include <rapidjson/error/en.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include "catalog/catalog-server.h"
@@ -56,7 +46,6 @@
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "common/thread-debug-info.h"
-#include "common/version.h"
 #include "exec/external-data-source-executor.h"
 #include "exprs/timezone_db.h"
 #include "gen-cpp/CatalogService_constants.h"
@@ -70,13 +59,10 @@
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-thread.h"
 #include "rpc/thrift-util.h"
-#include "runtime/client-cache.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
 #include "runtime/query-driver.h"
-#include "runtime/timestamp-value.h"
-#include "runtime/timestamp-value.inline.h"
 #include "runtime/tmp-file-mgr.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "scheduling/admission-control-service.h"
@@ -87,7 +73,6 @@
 #include "service/impala-http-handler.h"
 #include "service/query-state-record.h"
 #include "util/auth-util.h"
-#include "util/bit-util.h"
 #include "util/coding-util.h"
 #include "util/common-metrics.h"
 #include "util/debug-util.h"
@@ -98,7 +83,6 @@
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
-#include "util/parse-util.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
 #include "util/runtime-profile-counters.h"
@@ -112,9 +96,7 @@
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
-#include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/ImpalaService_types.h"
-#include "gen-cpp/LineageGraph_types.h"
 #include "gen-cpp/Frontend_types.h"
 
 #include "common/names.h"
@@ -279,6 +261,10 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
 DEFINE_int32(disconnected_session_timeout, 15 * 60, "The time, in seconds, that a "
     "hiveserver2 session will be maintained after the last connection that it has been "
     "used over is disconnected.");
+DEFINE_int32(max_hs2_sessions_per_user, -1, "The maximum allowed number of HiveServer2 "
+    "sessions that can be opened by any single connected user on a coordinator. "
+    "If set to -1 or 0 then this check is not performed. If set to a positive value "
+    "then the per-user session count is viewable in the webui under /sessions.");
 DEFINE_int32(idle_client_poll_period_s, 30, "The poll period, in seconds, after "
     "no activity from an Impala client which an Impala service thread (beeswax and HS2) "
     "wakes up to check if the connection should be closed. If --idle_session_timeout is "
@@ -604,7 +590,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       }
     }
     if (FLAGS_status_report_cancellation_padding <= 0) {
-      const string& err = "--status_report_cancellationn_padding should be > 0.";
+      const string& err = "--status_report_cancellation_padding should be > 0.";
       LOG(ERROR) << err;
       if (FLAGS_abort_on_config_error) {
         CLEAN_EXIT_WITH_ERROR(Substitute("Aborting Impala Server startup: $0", err));
@@ -1146,7 +1132,7 @@ void ImpalaServer::ArchiveQuery(const QueryHandle& query_handle) {
     }
   }
 
-  // 'fetch_rows_lock()' protects several fields in ClientReqestState that are read
+  // 'fetch_rows_lock()' protects several fields in ClientRequestState that are read
   // during QueryStateRecord creation. There should be no contention on this lock because
   // the query has already been closed (e.g. no more results can be fetched).
   shared_ptr<QueryStateRecord> record = nullptr;
@@ -1808,6 +1794,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS->Increment(-1L);
   } else {
     ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(-1L);
+    DecrementSessionCount(session_state->connected_user);
   }
   unordered_set<TUniqueId> inflight_queries;
   {
@@ -2713,6 +2700,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
             UnregisterSessionTimeout(FLAGS_disconnected_session_timeout);
             query_cancel_status =
                 Status::Expected(TErrorCode::DISCONNECTED_SESSION_CLOSED);
+            DecrementSessionCount(session_state->connected_user);
           } else {
             // Check if the session should be expired.
             if (session_state->expired || session_state->session_timeout == 0) {
@@ -2913,7 +2901,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
     std::unique_ptr<AdmissionControlServiceProxy> proxy;
     Status get_proxy_status = AdmissionControlService::GetProxy(&proxy);
     if (!get_proxy_status.ok()) {
-      LOG(ERROR) << "Admission heartbeat thread was unabe to get an "
+      LOG(ERROR) << "Admission heartbeat thread was unable to get an "
                     "AdmissionControlService proxy:"
                  << get_proxy_status.GetDetail();
       continue;
