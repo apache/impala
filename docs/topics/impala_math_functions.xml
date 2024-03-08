@@ -1463,7 +1463,7 @@ select pmod(5,-2);
       <dlentry id="rand">
 
         <dt>
-          RAND(), RAND(BIGINT seed), RANDOME(), RANDOME(BIGINT seed)
+          RAND(), RAND(BIGINT seed), RANDOM(), RANDOM(BIGINT seed)
         </dt>
 
         <dd>
