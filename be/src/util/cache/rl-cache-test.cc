@@ -212,6 +212,56 @@ TEST_F(FIFOCacheTest, EvictionPolicy) {
   }
 }
 
+TEST_F(FIFOCacheTest, UpdateEvictionPolicy) {
+  static constexpr int kNumElems = 20;
+  const int size_per_elem = cache_size() / kNumElems;
+  // First data chunk: fill the cache up to the capacity.
+  int idx = 0;
+  do {
+    Insert(idx, idx);
+    UpdateCharge(idx, size_per_elem);
+    // Keep looking up the very first entry: this is to make sure lookups
+    // do not affect the recency criteria of the eviction policy for FIFO cache.
+    Lookup(0);
+    ++idx;
+  } while (evicted_keys_.empty());
+  ASSERT_GT(idx, 1);
+
+  // Make sure the earliest inserted entry was evicted.
+  ASSERT_EQ(-1, Lookup(0));
+
+  // Verify that the 'empirical' capacity matches the expected capacity
+  // (it's a single-shard cache).
+  const int capacity = idx - 1;
+  ASSERT_EQ(kNumElems, capacity);
+
+  // Second data chunk: add (capacity / 2) more elements.
+  for (int i = 1; i < capacity / 2; ++i) {
+    // Earlier inserted elements should be gone one-by-one as new elements are
+    // inserted, and lookups should not affect the recency criteria of the FIFO
+    // eviction policy.
+    ASSERT_EQ(i, Lookup(i));
+    Insert(capacity + i, capacity + i);
+    UpdateCharge(capacity + i, size_per_elem);
+    ASSERT_EQ(capacity + i, Lookup(capacity + i));
+    ASSERT_EQ(-1, Lookup(i));
+  }
+  ASSERT_EQ(capacity / 2, evicted_keys_.size());
+
+  // Early inserted elements from the first chunk should be evicted
+  // to accommodate the elements from the second chunk.
+  for (int i = 0; i < capacity / 2; ++i) {
+    SCOPED_TRACE(Substitute("early inserted elements: index $0", i));
+    ASSERT_EQ(-1, Lookup(i));
+  }
+  // The later inserted elements from the first chunk should be still
+  // in the cache.
+  for (int i = capacity / 2; i < capacity; ++i) {
+    SCOPED_TRACE(Substitute("late inserted elements: index $0", i));
+    ASSERT_EQ(i, Lookup(i));
+  }
+}
+
 class LRUCacheTest :
     public CacheBaseTest,
     public ::testing::WithParamInterface<ShardingPolicy> {
@@ -244,6 +294,30 @@ TEST_P(LRUCacheTest, EvictionPolicy) {
   // but the lookup uses NO_UPDATE, so this key is not preserved.
   for (int i = 0; i < kNumElems + 1000; ++i) {
     Insert(1000+i, 2000+i, size_per_elem);
+    ASSERT_EQ(2000+i, Lookup(1000+i));
+    ASSERT_EQ(101, Lookup(100));
+    int entry200val = Lookup(200, Cache::NO_UPDATE);
+    ASSERT_TRUE(entry200val == -1 || entry200val == 201);
+  }
+  ASSERT_EQ(101, Lookup(100));
+  // Since '200' was accessed using NO_UPDATE in the loop above, it should have
+  // been evicted.
+  ASSERT_EQ(-1, Lookup(200));
+}
+
+TEST_P(LRUCacheTest, UpdateEvictionPolicy) {
+  static constexpr int kNumElems = 1000;
+  const int size_per_elem = cache_size() / kNumElems;
+
+  Insert(100, 101);
+  Insert(200, 201);
+
+  // Loop adding and looking up new entries, but repeatedly accessing key 100.
+  // This frequently-used entry should not be evicted. It also accesses key 200,
+  // but the lookup uses NO_UPDATE, so this key is not preserved.
+  for (int i = 0; i < kNumElems + 1000; ++i) {
+    Insert(1000+i, 2000+i);
+    UpdateCharge(1000+i, size_per_elem);
     ASSERT_EQ(2000+i, Lookup(1000+i));
     ASSERT_EQ(101, Lookup(100));
     int entry200val = Lookup(200, Cache::NO_UPDATE);

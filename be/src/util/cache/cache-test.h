@@ -66,6 +66,11 @@ class CacheBaseTest : public ::testing::Test,
     return handle ? DecodeInt(cache_->Value(handle)) : -1;
   }
 
+  void UpdateCharge(int key, int charge) {
+    auto handle(cache_->Lookup(EncodeInt(key), Cache::NO_UPDATE));
+    cache_->UpdateCharge(handle, charge);
+  }
+
   // Insert a key with the give value and charge. Return whether the insert was
   // successful.
   bool Insert(int key, int value, int charge = 1) {

@@ -56,7 +56,7 @@ namespace {
 // criterion (e.g., access time for LRU policy, insertion time for FIFO policy).
 class RLHandle : public HandleBase {
 public:
-  RLHandle(uint8_t* kv_ptr, const Slice& key, int32_t hash, int val_len, int charge)
+  RLHandle(uint8_t* kv_ptr, const Slice& key, int32_t hash, int val_len, size_t charge)
     : HandleBase(kv_ptr, key, hash, val_len, charge) {
     refs.store(0);
     next = nullptr;
@@ -73,6 +73,12 @@ public:
   std::atomic<int32_t> refs;
 };
 
+struct RLThreadState {
+  // Head for a linked-list of handles to evict. Eviction is done without holding
+  // a mutex.
+  RLHandle* to_remove_head = nullptr;
+};
+
 // A single shard of a cache that uses a recency list based eviction policy
 template<Cache::EvictionPolicy policy>
 class RLCacheShard : public CacheShard {
@@ -85,11 +91,12 @@ class RLCacheShard : public CacheShard {
   ~RLCacheShard();
 
   Status Init() override;
-  HandleBase* Allocate(Slice key, uint32_t hash, int val_len, int charge) override;
+  HandleBase* Allocate(Slice key, uint32_t hash, int val_len, size_t charge) override;
   void Free(HandleBase* handle) override;
   HandleBase* Insert(HandleBase* handle,
       Cache::EvictionCallback* eviction_callback) override;
   HandleBase* Lookup(const Slice& key, uint32_t hash, bool caching) override;
+  void UpdateCharge(HandleBase* handle, size_t charge) override;
   void Release(HandleBase* handle) override;
   void Erase(const Slice& key, uint32_t hash) override;
   size_t Invalidate(const Cache::InvalidationControl& ctl) override;
@@ -106,6 +113,16 @@ class RLCacheShard : public CacheShard {
   // Call the user's eviction callback, if it exists, and free the entry.
   void FreeEntry(RLHandle* e);
 
+  // This enforces the capacity constraint for the cache. This should be
+  // called while holding the cache's lock. This accumulates evicted
+  // entries in the provided RLThreadState, which should be freed
+  // via CleanupThreadState().
+  void EnforceCapacity(RLThreadState* tstate);
+
+  // Functions move evictions outside the critical section for mutex_ by
+  // placing the affected entries on the LIRSThreadState. This function handles the
+  // accumulated evictions. It should be called without holding any locks.
+  void CleanupThreadState(RLThreadState* tstate);
 
   // Update the memtracker's consumption by the given amount.
   //
@@ -219,6 +236,10 @@ template<Cache::EvictionPolicy policy>
 void RLCacheShard<policy>::RL_Remove(RLHandle* e) {
   e->next->prev = e->prev;
   e->prev->next = e->next;
+  // Null out the next/prev to make it easy to tell that a handle is
+  // not part of the cache.
+  e->next = nullptr;
+  e->prev = nullptr;
   DCHECK_GE(usage_, e->charge());
   usage_ -= e->charge();
 }
@@ -245,11 +266,13 @@ void RLCacheShard<Cache::EvictionPolicy::LRU>::RL_UpdateAfterLookup(RLHandle* e)
 
 template<Cache::EvictionPolicy policy>
 HandleBase* RLCacheShard<policy>::Allocate(Slice key, uint32_t hash, int val_len,
-    int charge) {
+    size_t charge) {
   DCHECK(initialized_);
   int key_len = key.size();
   DCHECK_GE(key_len, 0);
   DCHECK_GE(val_len, 0);
+  DCHECK_GT(charge, 0);
+  if (charge == 0) return nullptr;
   int key_len_padded = KUDU_ALIGN_UP(key_len, sizeof(void*));
   uint8_t* buf = new uint8_t[sizeof(RLHandle)
                              + key_len_padded + val_len]; // the kv_data VLA data
@@ -277,6 +300,28 @@ void RLCacheShard<policy>::Free(HandleBase* handle) {
 }
 
 template<Cache::EvictionPolicy policy>
+void RLCacheShard<policy>::EnforceCapacity(RLThreadState* tstate) {
+  while (usage_ > capacity_ && rl_.next != &rl_) {
+    RLHandle* old = rl_.next;
+    RL_Remove(old);
+    table_.Remove(old->key(), old->hash());
+    if (Unref(old)) {
+      old->next = tstate->to_remove_head;
+      tstate->to_remove_head = old;
+    }
+  }
+}
+
+template<Cache::EvictionPolicy policy>
+void RLCacheShard<policy>::CleanupThreadState(RLThreadState* tstate) {
+  while (tstate->to_remove_head != nullptr) {
+    RLHandle* next = tstate->to_remove_head->next;
+    FreeEntry(tstate->to_remove_head);
+    tstate->to_remove_head = next;
+  }
+}
+
+template<Cache::EvictionPolicy policy>
 HandleBase* RLCacheShard<policy>::Lookup(const Slice& key,
                                          uint32_t hash,
                                          bool no_updates) {
@@ -293,6 +338,33 @@ HandleBase* RLCacheShard<policy>::Lookup(const Slice& key,
   }
 
   return e;
+}
+
+template<Cache::EvictionPolicy policy>
+void RLCacheShard<policy>::UpdateCharge(HandleBase* handle, size_t charge) {
+  DCHECK(initialized_);
+
+  // Check for eviction based on new usage
+  RLThreadState tstate;
+  {
+    // Hold the lock to avoid concurrent evictions
+    std::lock_guard<decltype(mutex_)> l(mutex_);
+    RLHandle* e = static_cast<RLHandle*>(handle);
+    // If the handle is not part of the cache (i.e. it was evicted),
+    // then we shouldn't update the charge. The caller has a handle to
+    // the entry, so it was previously in the cache.
+    if (e->next == nullptr) return;
+    int64_t delta = charge - handle->charge();
+    handle->set_charge(charge);
+    UpdateMemTracker(delta);
+    usage_ += delta;
+
+    // Evict entries as needed to enforce the capacity constraint
+    EnforceCapacity(&tstate);
+  }
+
+  // we free the entries here outside of mutex for performance reasons
+  CleanupThreadState(&tstate);
 }
 
 template<Cache::EvictionPolicy policy>
@@ -318,7 +390,7 @@ HandleBase* RLCacheShard<policy>::Insert(
   handle->refs.store(2, std::memory_order_relaxed);
   UpdateMemTracker(handle->charge());
 
-  RLHandle* to_remove_head = nullptr;
+  RLThreadState tstate;
   {
     std::lock_guard<decltype(mutex_)> l(mutex_);
 
@@ -328,29 +400,18 @@ HandleBase* RLCacheShard<policy>::Insert(
     if (old != nullptr) {
       RL_Remove(old);
       if (Unref(old)) {
-        old->next = to_remove_head;
-        to_remove_head = old;
+        old->next = tstate.to_remove_head;
+        tstate.to_remove_head = old;
       }
     }
 
-    while (usage_ > capacity_ && rl_.next != &rl_) {
-      RLHandle* old = rl_.next;
-      RL_Remove(old);
-      table_.Remove(old->key(), old->hash());
-      if (Unref(old)) {
-        old->next = to_remove_head;
-        to_remove_head = old;
-      }
-    }
+    // Evict entries as needed to enforce the capacity constraint
+    EnforceCapacity(&tstate);
   }
 
   // we free the entries here outside of mutex for
   // performance reasons
-  while (to_remove_head != nullptr) {
-    RLHandle* next = to_remove_head->next;
-    FreeEntry(to_remove_head);
-    to_remove_head = next;
-  }
+  CleanupThreadState(&tstate);
 
   return handle;
 }
@@ -380,7 +441,7 @@ size_t RLCacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
   DCHECK(initialized_);
   size_t invalid_entry_count = 0;
   size_t valid_entry_count = 0;
-  RLHandle* to_remove_head = nullptr;
+  RLThreadState tstate;
 
   {
     std::lock_guard<decltype(mutex_)> l(mutex_);
@@ -403,8 +464,8 @@ size_t RLCacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
       RL_Remove(h_to_remove);
       table_.Remove(h_to_remove->key(), h_to_remove->hash());
       if (Unref(h_to_remove)) {
-        h_to_remove->next = to_remove_head;
-        to_remove_head = h_to_remove;
+        h_to_remove->next = tstate.to_remove_head;
+        tstate.to_remove_head = h_to_remove;
       }
       ++invalid_entry_count;
     }
@@ -412,11 +473,7 @@ size_t RLCacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
   // Once removed from the lookup table and the recency list, the entries
   // with no references left must be deallocated because Cache::Release()
   // wont be called for them from elsewhere.
-  while (to_remove_head != nullptr) {
-    RLHandle* next = to_remove_head->next;
-    FreeEntry(to_remove_head);
-    to_remove_head = next;
-  }
+  CleanupThreadState(&tstate);
   return invalid_entry_count;
 }
 

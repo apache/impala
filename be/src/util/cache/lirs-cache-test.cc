@@ -93,10 +93,9 @@ class LIRSCacheTest : public CacheBaseTest {
   }
 };
 
+// This tests a very simple case: insert entries, then flush the cache and verify
+// entries are evicted in the appropriate order.
 TEST_F(LIRSCacheTest, BasicEvictionOrdering) {
-  // This tests a very simple case: insert entries, then flush the cache and verify
-  // entries are evicted in the appropriate order.
-
   FillCache();
   FlushCache();
 
@@ -112,11 +111,10 @@ TEST_F(LIRSCacheTest, BasicEvictionOrdering) {
   }
 }
 
+// Lookup operations can be tagged as NO_UPDATE, in which case, nothing should change
+// priority. Verify that adding NO_UPDATE Lookups to the basic case does not change
+// the eviction order because nothing moves.
 TEST_F(LIRSCacheTest, LookupNoUpdate) {
-  // Lookup operations can be tagged as NO_UPDATE, in which case, nothing should change
-  // priority. Verify that adding NO_UPDATE Lookups to the basic case does not change
-  // the eviction order because nothing moves.
-
   FillCache();
 
   // Do a NO_UPDATE lookup on an unprotected element (which otherwise would become
@@ -141,8 +139,8 @@ TEST_F(LIRSCacheTest, LookupNoUpdate) {
   }
 }
 
+// Test that Allocate() rejects anything larger than the protected capacity (which is 95)
 TEST_F(LIRSCacheTest, RejectLarge) {
-  // Allocate() rejects anything larger than the protected capacity (which is 95)
   // Insert() returns false if Allocate() fails.
   ASSERT_FALSE(Insert(100, 100, 96));
   ASSERT_EQ(evicted_keys_.size(), 0);
@@ -154,9 +152,9 @@ TEST_F(LIRSCacheTest, RejectLarge) {
   ASSERT_EQ(evicted_values_.size(), 0);
 }
 
+// This tests that inserting a single large element can evict all of the UNPROTECTED
+// elements, along with itself.
 TEST_F(LIRSCacheTest, LargeInsertUnprotectedEvict) {
-  // This tests that inserting a single large element can evict all of the UNPROTECTED
-  // elements, along with itself.
   FillCache();
   ASSERT_FALSE(Insert(100, 100, 6));
   // All 5 UNPROTECTED got evicted, along with the element being inserted.
@@ -180,10 +178,34 @@ TEST_F(LIRSCacheTest, LargeInsertUnprotectedEvict) {
   }
 }
 
-TEST_F(LIRSCacheTest, LargeProtectedToUnprotectedEvict) {
-  // This tests that a PROTECTED element that is larger than the unprotected capacity
-  // will evict everything including itself when it transitions to UNPROTECTED.
+// This tests that updating a single large element evicts all UNPROTECTED elements
+TEST_F(LIRSCacheTest, LargeUpdateUnprotectedEvict) {
+  FillCache();
+  UpdateCharge(99, 6);
+  // All 5 UNPROTECTED got evicted, along with the element being updated.
+  ASSERT_EQ(evicted_keys_.size(), 5);
+  ASSERT_EQ(evicted_values_.size(), 5);
+  for (int i = 0; i < 5; ++i) {
+    ASSERT_EQ(evicted_keys_[i], 95+i);
+    ASSERT_EQ(evicted_values_[i], 95+i);
+  }
+  evicted_keys_.clear();
+  evicted_values_.clear();
 
+  FlushCache();
+
+  // Only the protected remain, and they are all in order
+  ASSERT_EQ(evicted_keys_.size(), 95);
+  ASSERT_EQ(evicted_values_.size(), 95);
+  for (int i = 0; i < 95; ++i) {
+    ASSERT_EQ(evicted_keys_[i], i);
+    ASSERT_EQ(evicted_values_[i], i);
+  }
+}
+
+// This tests that a PROTECTED element that is larger than the unprotected capacity
+// will evict everything including itself when it transitions to UNPROTECTED.
+TEST_F(LIRSCacheTest, LargeProtectedToUnprotectedEvict) {
   // Insert PROTECTED element that is larger than the unprotected capacity
   ASSERT_TRUE(Insert(0, 0, 95));
   ASSERT_EQ(evicted_keys_.size(), 0);
@@ -213,11 +235,10 @@ TEST_F(LIRSCacheTest, LargeProtectedToUnprotectedEvict) {
   ASSERT_EQ(evicted_values_[4], 0);
 }
 
+// Large unprotected entries can transition directly to being a TOMBSTONE on Insert().
+// This test verifies that this TOMBSTONE entry (which is larger than the unprotected
+// capacity) can be promoted to be PROTECTED if there is another Insert().
 TEST_F(LIRSCacheTest, LargeTombstone) {
-  // Large unprotected entries can transition directly to being a TOMBSTONE on Insert().
-  // This test verifies that this TOMBSTONE entry (which is larger than the unprotected
-  // capacity) can be promoted to be PROTECTED if there is another Insert().
-
   // One protected element
   ASSERT_TRUE(Insert(0, 0, 95));
   ASSERT_EQ(Lookup(0), 0);
@@ -242,11 +263,38 @@ TEST_F(LIRSCacheTest, LargeTombstone) {
   ASSERT_EQ(Lookup(0), -1);
 }
 
-TEST_F(LIRSCacheTest, InsertExistingUnprotected) {
-  // This tests the behavior of insert when there is already an unprotected element with
-  // the same key. It should replace the existing value, but the new element should
-  // continue to be unprotected.
+// A client could hold a handle for an entry that gets evicted and becomes a TOMBSTONE
+// entry. This test verifies that if they call UpdateCharge() on a TOMBSTONE entry,
+// then nothing happens.
+TEST_F(LIRSCacheTest, UpdateChargeTombstone) {
+  FillCache();
 
+  // Get a handle to an entry
+  auto handle(cache_->Lookup(EncodeInt(1), Cache::NO_UPDATE));
+
+  // Flush the cache
+  FlushCache();
+
+  // Verify our key has been evicted. It can't be found via Lookup().
+  ASSERT_EQ(Lookup(1, Cache::NO_UPDATE), -1);
+
+  evicted_keys_.clear();
+  evicted_values_.clear();
+
+  // Try to update the charge for our tombstone entry
+  cache_->UpdateCharge(handle, cache_->MaxCharge());
+  // The charge doesn't actually get updated
+  ASSERT_EQ(cache_->Charge(handle), 1);
+
+  // Nothing gets evicted.
+  ASSERT_EQ(evicted_keys_.size(), 0);
+  ASSERT_EQ(evicted_values_.size(), 0);
+}
+
+// This tests the behavior of insert when there is already an unprotected element with
+// the same key. It should replace the existing value, but the new element should
+// continue to be unprotected.
+TEST_F(LIRSCacheTest, InsertExistingUnprotected) {
   FillCache();
 
   // Replace an unprotected key with a new value
@@ -279,10 +327,9 @@ TEST_F(LIRSCacheTest, InsertExistingUnprotected) {
   }
 }
 
+// This is the same as InsertExistingUnprotected, except that it is verifying that
+// replacing an existing protected key will remain protected.
 TEST_F(LIRSCacheTest, InsertExistingProtected) {
-  // This is the same as InsertExistingUnprotected, except that it is verifying that
-  // replacing an existing protected key will remain protected.
-
   FillCache();
 
   // Replace a protected key with a new value
@@ -314,11 +361,10 @@ TEST_F(LIRSCacheTest, InsertExistingProtected) {
   }
 }
 
+// This is the same as InsertExistingProtected, except that it is verifying that
+// replacing an existing protected key that is the last entry on the recency
+// list will trim the recency list.
 TEST_F(LIRSCacheTest, InsertExistingProtectedNeedsTrim) {
-  // This is the same as InsertExistingProtected, except that it is verifying that
-  // replacing an existing protected key that is the last entry on the recency
-  // list will trim the recency list.
-
   FillCache();
 
   // Lookup every protected value except #25
@@ -364,10 +410,78 @@ TEST_F(LIRSCacheTest, InsertExistingProtectedNeedsTrim) {
   }
 }
 
-TEST_F(LIRSCacheTest, UnprotectedToProtected) {
-  // This tests the behavior of lookup of an unprotected key that is more recent than
-  // the oldest protected key (i.e. it should be promoted to be protected).
+// This tests the behavior of UpdateCharge on an UNPROTECTED element. It should update
+// the change, but the element should continue to be unprotected.
+TEST_F(LIRSCacheTest, UpdateExistingUnprotected) {
+  FillCache();
 
+  // Increase the charge
+  UpdateCharge(96, 2);
+  ASSERT_EQ(1, evicted_keys_.size());
+  ASSERT_EQ(evicted_keys_[0], 95);
+  ASSERT_EQ(evicted_values_[0], 95);
+  evicted_keys_.clear();
+  evicted_values_.clear();
+
+  FlushCache();
+
+  // The only thing we guarantee is that key 96 is still unprotected. None of the other
+  // unprotected elements should have moved around, but the ordering is not particularly
+  // important, so this only verifies that the values are still around.
+  for (int i = 0; i < 4; ++i) {
+    ASSERT_LT(evicted_keys_[i], 100);
+    ASSERT_GE(evicted_keys_[i], 96);
+  }
+  // There were 95 protected elements (0-94). They are not impacted, and they are still
+  // evicted in order.
+  for (int i = 4; i < 99; ++i) {
+    ASSERT_EQ(evicted_keys_[i], i-4);
+    ASSERT_EQ(evicted_values_[i], i-4);
+  }
+}
+
+// This is the same as UpdateExistingUnprotected, except that it is verifying that
+// updating the charge on a protected key remains protected, and evictions cascade.
+TEST_F(LIRSCacheTest, UpdateExistingProtected) {
+  FillCache();
+
+  // Increase the charge on a protected key, pushing a protected key to unprotected and
+  // evicting an unprotected key.
+  UpdateCharge(25, 2);
+  ASSERT_EQ(1, evicted_keys_.size());
+  ASSERT_EQ(evicted_keys_[0], 95);
+  ASSERT_EQ(evicted_values_[0], 95);
+  evicted_keys_.clear();
+  evicted_values_.clear();
+
+  // Evict all unprotected keys.
+  ASSERT_FALSE(Insert(100, 100, 6));
+  ASSERT_EQ(6, evicted_keys_.size());
+  for (int i = 0; i < 4; ++i) {
+    ASSERT_EQ(evicted_keys_[i], 96+i);
+    ASSERT_EQ(evicted_values_[i], 96+i);
+  }
+  // The last evicted element before the Insert was protected.
+  ASSERT_EQ(evicted_keys_[4], 0);
+  ASSERT_EQ(evicted_values_[4], 0);
+  ASSERT_EQ(evicted_keys_[5], 100);
+  ASSERT_EQ(evicted_values_[5], 100);
+  evicted_keys_.clear();
+  evicted_values_.clear();
+
+  FlushCache();
+
+  // None of the other protected elements moved around, but the exact ordering is not
+  // specified.
+  for (int i = 0; i < 94; ++i) {
+    ASSERT_LT(evicted_keys_[i], 95);
+    ASSERT_GE(evicted_keys_[i], 0);
+  }
+}
+
+// This tests the behavior of lookup of an unprotected key that is more recent than
+// the oldest protected key (i.e. it should be promoted to be protected).
+TEST_F(LIRSCacheTest, UnprotectedToProtected) {
   FillCache();
 
   // If we lookup 95, it will move from unprotected to protected.
@@ -395,10 +509,9 @@ TEST_F(LIRSCacheTest, UnprotectedToProtected) {
   }
 }
 
+// This tests the behavior of insert for a key that has a tombstone element in the
+// cache. It should insert the new element as a protected element.
 TEST_F(LIRSCacheTest, TombstoneToProtected) {
-  // This tests the behavior of insert for a key that has a tombstone element in the
-  // cache. It should insert the new element as a protected element.
-
   FillCache();
 
   // Add one more element, which will evict element 95. It is now a tombstone.
@@ -435,8 +548,10 @@ TEST_F(LIRSCacheTest, TombstoneToProtected) {
   }
 }
 
+// This tests the case where there is a lookup of an unprotected element that has been
+// trimmed from the recency queue. In this case, the unprotected element remains
+// unprotected.
 TEST_F(LIRSCacheTest, UnprotectedToUnprotected) {
-
   FillCache();
 
   // If we lookup every element that is protected, then the unprotected elements
@@ -468,9 +583,9 @@ TEST_F(LIRSCacheTest, UnprotectedToUnprotected) {
   }
 }
 
+// This tests the edge case where there is exactly one unprotected element
+// and that element is looked up and remains unprotected.
 TEST_F(LIRSCacheTest, ExactlyOneUnprotectedToUnprotected) {
-  // This tests the edge case where there is exactly one unprotected element
-  // and that element is looked up and remains unprotected.
   FillCache();
 
   // If we lookup every element that is protected, then the unprotected elements
@@ -507,9 +622,8 @@ TEST_F(LIRSCacheTest, ExactlyOneUnprotectedToUnprotected) {
   }
 }
 
+// This tests that Erase works for both unprotected and protected elements.
 TEST_F(LIRSCacheTest, Erase) {
-  // This tests that Erase works for both unprotected and protected elements.
-
   FillCache();
 
   // Erase a protected element
@@ -545,11 +659,10 @@ TEST_F(LIRSCacheTest, Erase) {
   }
 }
 
+// This is the same as InsertExistingProtectedNeedsTrim, except that it is verifying
+// that erasing the last protected key on the recency list will trim the recency
+// list.
 TEST_F(LIRSCacheTest, EraseNeedsTrim) {
-  // This is the same as InsertExistingProtectedNeedsTrim, except that it is verifying
-  // that erasing the last protected key on the recency list will trim the recency
-  // list.
-
   FillCache();
 
   // Lookup every protected value except #25
@@ -592,10 +705,9 @@ TEST_F(LIRSCacheTest, EraseNeedsTrim) {
   }
 }
 
+// This tests the enforcement of the tombstone limit. The lirs_tombstone_multiple is
+// 2.0, so we expect a cache with 100 elements to maintain at most 200 tombstones.
 TEST_F(LIRSCacheTest, TombstoneLimit1) {
-  // This tests the enforcement of the tombstone limit. The lirs_tombstone_multiple is
-  // 2.0, so we expect a cache with 100 elements to maintain at most 200 tombstones.
-
   // Fill the cache to the point where there are 100 normal elements and 200 tombstones.
   FillCacheToTombstoneLimit();
 
@@ -632,10 +744,9 @@ TEST_F(LIRSCacheTest, TombstoneLimit1) {
   }
 }
 
+// This tests the enforcement of the tombstone limit. The lirs_tombstone_multiple is
+// 2.0, so we expect a cache with 100 elements to maintain at most 200 tombstones.
 TEST_F(LIRSCacheTest, TombstoneLimit2) {
-  // This tests the enforcement of the tombstone limit. The lirs_tombstone_multiple is
-  // 2.0, so we expect a cache with 100 elements to maintain at most 200 tombstones.
-
   // Fill the cache to the point where there are 100 normal elements and 200 tombstones.
   FillCacheToTombstoneLimit();
 
@@ -674,10 +785,9 @@ TEST_F(LIRSCacheTest, TombstoneLimit2) {
   ASSERT_EQ(evicted_values_[99], 96);
 }
 
+// This tests the enforcement of the tombstone limit. This is a simple test that
+// verifies we can free multiple tombstones at once.
 TEST_F(LIRSCacheTest, TombstoneLimitFreeMultiple) {
-  // This tests the enforcement of the tombstone limit. This is a simple test that
-  // verifies we can free multiple tombstones at once.
-
   // Fill the cache to the point where there are 100 normal elements and 200 tombstones.
   FillCacheToTombstoneLimit();
 

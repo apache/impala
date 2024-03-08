@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <functional>
 #include <iosfwd>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -92,8 +93,14 @@ class Cache {
         : c_(c) {
     }
 
+    // It is useful to have a constructor without arguments, as
+    // this makes it easier to embed in containers.
+    explicit HandleDeleter()
+      : c_(nullptr) {}
+
     void operator()(Cache::Handle* h) const {
       if (h != nullptr) {
+        DCHECK(c_ != nullptr);
         c_->Release(h);
       }
     }
@@ -120,8 +127,14 @@ class Cache {
         : c_(c) {
     }
 
+    // It is useful to have a constructor without arguments, as
+    // this makes it easier to embed in containers.
+    explicit PendingHandleDeleter()
+      : c_(nullptr) {}
+
     void operator()(Cache::PendingHandle* h) const {
       if (h != nullptr) {
+        DCHECK(c_ != nullptr);
         c_->Free(h);
       }
     }
@@ -178,6 +191,13 @@ class Cache {
   //
   virtual UniqueHandle Lookup(const Slice& key, LookupBehavior behavior = NORMAL) = 0;
 
+  // Return the charge encapsulate in a raw handle returned by a successful
+  // Lookup().
+  virtual size_t Charge(const UniqueHandle& handle) = 0;
+
+  // Update the charge of a handle after insertion.
+  virtual void UpdateCharge(const UniqueHandle& handle, size_t charge) = 0;
+
   // If the cache contains entry for key, erase it.  Note that the
   // underlying entry will be kept around until all existing handles
   // to it have been released.
@@ -214,7 +234,11 @@ class Cache {
 
   // Indicates that the charge of an item in the cache should be calculated
   // based on its memory consumption.
-  static constexpr int kAutomaticCharge = -1;
+  static constexpr size_t kAutomaticCharge = std::numeric_limits<size_t>::max();
+
+  // Returns the maximum charge that will be accepted by this cache.
+  // Can be used to avoid generating data that we won't be able to insert.
+  virtual size_t MaxCharge() const = 0;
 
   // Allocate space for a new entry to be inserted into the cache.
   //
@@ -237,7 +261,7 @@ class Cache {
   // space for the requested allocation.
   //
   // The returned handle owns the allocated memory.
-  virtual UniquePendingHandle Allocate(Slice key, int val_len, int charge) = 0;
+  virtual UniquePendingHandle Allocate(Slice key, int val_len, size_t charge) = 0;
 
   // Default 'charge' should be kAutomaticCharge
   // (default arguments on virtual functions are prohibited).
@@ -245,7 +269,8 @@ class Cache {
     return Allocate(key, val_len, kAutomaticCharge);
   }
 
-  virtual uint8_t* MutableValue(UniquePendingHandle* handle) = 0;
+  // Get the mutable space created by Allocate.
+  virtual uint8_t* MutableValue(UniquePendingHandle* handle) const = 0;
 
   // Commit a prepared entry into the cache.
   //

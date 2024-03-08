@@ -91,9 +91,11 @@ TEST_P(CacheTest, TrackMemory) {
   if (mem_tracker_) {
     Insert(100, 100, 1);
     ASSERT_EQ(1, mem_tracker_->consumption());
+    UpdateCharge(100, 2);
+    ASSERT_EQ(2, mem_tracker_->consumption());
     Erase(100);
     ASSERT_EQ(0, mem_tracker_->consumption());
-    ASSERT_EQ(1, mem_tracker_->peak_consumption());
+    ASSERT_EQ(2, mem_tracker_->peak_consumption());
   }
 }
 
@@ -164,6 +166,43 @@ TEST_P(CacheTest, EntriesArePinned) {
   ASSERT_EQ(102, evicted_values_[1]);
 }
 
+TEST_P(CacheTest, UpdateChargeCausesEviction) {
+  // Canary entries that could be evicted. Insert 1000 entries so
+  // that each shard would have some entries.
+  for (int i = 0; i < 1000; ++i) {
+    Insert(1000 + i, 1000 + i);
+  }
+
+  Insert(100, 100);
+  auto h1 = cache_->Lookup(EncodeInt(100));
+  ASSERT_NE(h1, nullptr);
+
+  // Updating the charge for the cache entry evicts something
+  cache_->UpdateCharge(h1, cache_->MaxCharge());
+  ASSERT_GT(evicted_keys_.size(), 0);
+  ASSERT_GT(evicted_values_.size(), 0);
+}
+
+TEST_P(CacheTest, UpdateChargeForErased) {
+  // Insert 1000 entries so that each shard would have some entries.
+  for (int i = 0; i < 1000; ++i) {
+    Insert(1000 + i, 1000 + i);
+  }
+
+  Insert(100, 100);
+  auto h1 = cache_->Lookup(EncodeInt(100));
+  ASSERT_NE(h1, nullptr);
+
+  Erase(100);
+
+  // Updating the charge for the erased element doesn't do anything,
+  // because the entry has been erased.
+  cache_->UpdateCharge(h1, cache_->MaxCharge());
+
+  ASSERT_EQ(evicted_keys_.size(), 0);
+  ASSERT_EQ(evicted_values_.size(), 0);
+}
+
 // Add a bunch of light and heavy entries and then count the combined
 // size of items still in the cache, which must be approximately the
 // same as the total capacity.
@@ -189,6 +228,46 @@ TEST_P(CacheTest, HeavyEntries) {
     }
   }
   ASSERT_LE(cached_weight, cache_size() + cache_size() / 10);
+}
+
+TEST_P(CacheTest, UpdateHeavyEntries) {
+  const int kLight = cache_size() / 1000;
+  const int kHeavy = cache_size() / 100;
+  int added = 0;
+  int index = 0;
+  while (added < 2 * cache_size()) {
+    Insert(index, 1000+index, kLight);
+    const int weight = (index & 1) ? kLight : kHeavy;
+    UpdateCharge(index, weight);
+    added += weight;
+    ++index;
+  }
+
+  int cached_weight = 0;
+  for (int i = 0; i < index; ++i) {
+    const int weight = (i & 1 ? kLight : kHeavy);
+    int r = Lookup(i);
+    if (r >= 0) {
+      cached_weight += weight;
+      ASSERT_EQ(1000+i, r);
+    }
+  }
+  ASSERT_LE(cached_weight, cache_size() + cache_size() / 10);
+  // FIFO won't use space very efficiently with alternating light/heavy entries.
+  ASSERT_GE(cached_weight, cache_size() / 2);
+}
+
+TEST_P(CacheTest, MaxCharge) {
+  // The default size of the cache is smaller than INTMAXVAL, so the max
+  // charge will be related to the cache size.
+  int max_charge = cache_->MaxCharge();
+  if (FLAGS_cache_force_single_shard) {
+    ASSERT_EQ(max_charge, cache_size());
+  } else {
+    // Split across multiple shards (# of CPUs), but we don't specifically
+    // know how many.
+    ASSERT_LE(max_charge, cache_size());
+  }
 }
 
 }  // namespace impala

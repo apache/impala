@@ -322,11 +322,12 @@ class LIRSCacheShard : public CacheShard {
   ~LIRSCacheShard();
 
   Status Init() override;
-  HandleBase* Allocate(Slice key, uint32_t hash, int val_len, int charge) override;
+  HandleBase* Allocate(Slice key, uint32_t hash, int val_len, size_t charge) override;
   void Free(HandleBase* handle) override;
   HandleBase* Insert(HandleBase* handle,
       Cache::EvictionCallback* eviction_callback) override;
   HandleBase* Lookup(const Slice& key, uint32_t hash, bool no_updates) override;
+  void UpdateCharge(HandleBase* handle, size_t charge) override;
   void Release(HandleBase* handle) override;
   void Erase(const Slice& key, uint32_t hash) override;
   size_t Invalidate(const Cache::InvalidationControl& ctl) override;
@@ -861,7 +862,8 @@ void LIRSCacheShard::ToUninitialized(LIRSThreadState* tstate, LIRSHandle* e,
   }
 }
 
-HandleBase* LIRSCacheShard::Allocate(Slice key, uint32_t hash, int val_len, int charge) {
+HandleBase* LIRSCacheShard::Allocate(Slice key, uint32_t hash, int val_len,
+    size_t charge) {
   DCHECK(initialized_);
   int key_len = key.size();
   DCHECK_GE(key_len, 0);
@@ -940,7 +942,7 @@ HandleBase* LIRSCacheShard::Lookup(const Slice& key, uint32_t hash,
         }
         break;
       default:
-        CHECK(false);
+        CHECK(false) << "Unexpected state for Lookup: " << e->state();
       }
     }
   }
@@ -949,6 +951,47 @@ HandleBase* LIRSCacheShard::Lookup(const Slice& key, uint32_t hash,
   CleanupThreadState(&tstate);
 
   return e;
+}
+
+void LIRSCacheShard::UpdateCharge(HandleBase* handle, size_t charge) {
+  DCHECK(initialized_);
+  LIRSThreadState tstate;
+  {
+    // Hold the lock to avoid concurrent evictions
+    std::lock_guard<MutexType> l(mutex_);
+    LIRSHandle* e = static_cast<LIRSHandle*>(handle);
+    // Entries that are UNINITIALIZED or TOMBSTONE do not count towards
+    // the usage and will be destroyed without interacting with the usage.
+    // Skip modifying the charge.
+    //
+    // In the case of UNINITIALIZED, we know that the caller has a handle
+    // for the entry, so it needs to have been in the cache previously
+    // (i.e. it was found via Lookup() or added via Insert()). So, in this
+    // context, UNINITIALIZED can only mean that it has been evicted.
+    if (e->state() == UNINITIALIZED || e->state() == TOMBSTONE) {
+      return;
+    }
+    DCHECK(e->state() == PROTECTED || e->state() == UNPROTECTED);
+    int64_t delta = charge - handle->charge();
+    handle->set_charge(charge);
+    UpdateMemTracker(delta);
+    // Update usage in existing state, then evict as needed.
+    switch (e->state()) {
+    case PROTECTED:
+      protected_usage_ += delta;
+      EnforceProtectedCapacity(&tstate);
+      break;
+    case UNPROTECTED:
+      unprotected_usage_ += delta;
+      EnforceUnprotectedCapacity(&tstate);
+      break;
+    default:
+      // This can't happen.
+      CHECK(false) << "Unexpected state for UpdateCharge: " << e->state();
+      break;
+    }
+  }
+  CleanupThreadState(&tstate);
 }
 
 void LIRSCacheShard::Release(HandleBase* handle) {

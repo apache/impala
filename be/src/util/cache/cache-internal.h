@@ -39,7 +39,9 @@ class HandleBase {
   //   It must be sized to fit the key and value with appropriate padding. See the
   //   description of kv_data_ptr_ for the memory layout and sizing.
   // - hash - hash of the key
-  HandleBase(uint8_t* kv_ptr, const Slice& key, int32_t hash, int val_len, int charge) {
+  HandleBase(uint8_t* kv_ptr, const Slice& key, int32_t hash, int val_len,
+      size_t charge) {
+    DCHECK_GE(charge, 0);
     next_handle_ = nullptr;
     key_length_ = key.size();
     val_length_ = val_len;
@@ -75,6 +77,10 @@ class HandleBase {
   }
 
   size_t charge() const { return charge_; }
+
+  void set_charge(size_t charge) {
+    charge_ = charge;
+  }
 
  private:
   friend class HandleTable;
@@ -197,11 +203,12 @@ class CacheShard {
   // Initialization function. Must be called before any other function.
   virtual Status Init() = 0;
 
-  virtual HandleBase* Allocate(Slice key, uint32_t hash, int val_len, int charge) = 0;
+  virtual HandleBase* Allocate(Slice key, uint32_t hash, int val_len, size_t charge) = 0;
   virtual void Free(HandleBase* handle) = 0;
   virtual HandleBase* Insert(HandleBase* handle,
       Cache::EvictionCallback* eviction_callback) = 0;
   virtual HandleBase* Lookup(const Slice& key, uint32_t hash, bool no_updates) = 0;
+  virtual void UpdateCharge(HandleBase* handle, size_t new_charge) = 0;
   virtual void Release(HandleBase* handle) = 0;
   virtual void Erase(const Slice& key, uint32_t hash) = 0;
   virtual size_t Invalidate(const Cache::InvalidationControl& ctl) = 0;
@@ -248,6 +255,10 @@ class ShardedCache : public Cache {
     for (int s = 0; s < num_shards; ++s) {
       shards_.push_back(NewCacheShard(policy, mem_tracker_.get(), per_shard));
     }
+
+    if (per_shard < shard_charge_limit_) {
+      shard_charge_limit_ = static_cast<int>(per_shard);
+    }
   }
 
   virtual ~ShardedCache() {
@@ -265,6 +276,18 @@ class ShardedCache : public Cache {
     const uint32_t hash = HashSlice(key);
     HandleBase* h = shards_[Shard(hash)]->Lookup(key, hash, behavior == NO_UPDATE);
     return UniqueHandle(reinterpret_cast<Cache::Handle*>(h), Cache::HandleDeleter(this));
+  }
+
+  size_t Charge(const UniqueHandle& handle) override {
+    return reinterpret_cast<HandleBase*>(handle.get())->charge();
+  }
+
+  void UpdateCharge(const UniqueHandle& handle, size_t charge) override {
+    HandleBase* h = reinterpret_cast<HandleBase*>(handle.get());
+    shards_[Shard(h->hash())]->UpdateCharge(h, charge);
+    // NOTE: the handle could point to an entry that has been evicted, so there is no
+    // guarantee that the charge will actually change. That's why we don't assert that
+    // h->charge() == charge here.
   }
 
   void Erase(const Slice& key) override {
@@ -288,7 +311,11 @@ class ShardedCache : public Cache {
         Cache::HandleDeleter(this));
   }
 
-  UniquePendingHandle Allocate(Slice key, int val_len, int charge) override {
+  size_t MaxCharge() const override {
+    return shard_charge_limit_;
+  }
+
+  UniquePendingHandle Allocate(Slice key, int val_len, size_t charge) override {
     const uint32_t hash = HashSlice(key);
     HandleBase* handle = shards_[Shard(hash)]->Allocate(key, hash, val_len, charge);
     UniquePendingHandle h(reinterpret_cast<PendingHandle*>(handle),
@@ -297,7 +324,7 @@ class ShardedCache : public Cache {
     return h;
   }
 
-  uint8_t* MutableValue(UniquePendingHandle* handle) override {
+  uint8_t* MutableValue(UniquePendingHandle* handle) const override {
     return reinterpret_cast<HandleBase*>(handle->get())->mutable_val_ptr();
   }
 
@@ -337,6 +364,9 @@ class ShardedCache : public Cache {
 
   // Number of bits of hash used to determine the shard.
   const int shard_bits_;
+
+  // Max charge that can be stored in a shard.
+  size_t shard_charge_limit_ = numeric_limits<size_t>::max();
 
   static inline uint32_t HashSlice(const Slice& s) {
     return util_hash::CityHash64(reinterpret_cast<const char *>(s.data()), s.size());
