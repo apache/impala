@@ -4,7 +4,7 @@ CREATE TABLE iceberg_hadoop_tables(
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+TBLPROPERTIES('format-version'='1', 'iceberg.catalog'='hadoop.tables');
 ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
 ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(message STRING, price DECIMAL(8,1));
 ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
@@ -73,7 +73,7 @@ CREATE TABLE iceberg_hadoop_catalog(
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+TBLPROPERTIES('format-version'='1', 'iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE/hadoop_catalog_test');
 ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
 ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(message STRING, price DECIMAL(8,1));
@@ -132,7 +132,7 @@ STRING, BIGINT, BIGINT
 ---- QUERY
 CREATE TABLE iceberg_rename (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hive.catalog');
+TBLPROPERTIES('format-version'='1', 'iceberg.catalog'='hive.catalog');
 INSERT INTO iceberg_rename values (42);
 ALTER TABLE iceberg_rename RENAME TO iceberg_rename2;
 SELECT * FROM iceberg_rename2;
@@ -149,7 +149,7 @@ Could not resolve table reference: 'iceberg_rename'
 ---- QUERY
 CREATE TABLE iceberg_changing_fileformats (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='orc');
+TBLPROPERTIES('format-version'='1', 'write.format.default'='orc');
 DESCRIBE FORMATTED iceberg_changing_fileformats;
 ---- RESULTS: VERIFY_IS_SUBSET
 '','write.format.default','orc                 '
@@ -186,7 +186,8 @@ string, string, string
 ====
 ---- QUERY
 CREATE TABLE ice_alter_cols (f float)
-STORED AS ICEBERG;
+STORED AS ICEBERG
+TBLPROPERTIES('format-version'='1');
 INSERT INTO ice_alter_cols VALUES (2.718);
 SELECT * FROM ice_alter_cols;
 ---- RESULTS
@@ -315,6 +316,7 @@ STRING,STRING,STRING,STRING
 CREATE TABLE iceberg_changing_parq_tblprops (i int)
 STORED AS ICEBERG
 TBLPROPERTIES (
+    'format-version'='1',
     'write.parquet.row-group-size-bytes'='134217728',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -348,91 +350,6 @@ DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
 '','write.parquet.compression-level','11                  '
 '','write.parquet.page-size-bytes','131072              '
 '','write.parquet.dict-size-bytes','65536               '
----- TYPES
-string, string, string
-====
----- QUERY
-CREATE TABLE iceberg_upgrade_v2_no_write_mode (i INT) STORED AS ICEBERG;
-DESCRIBE FORMATTED iceberg_upgrade_v2_no_write_mode;
----- RESULTS: VERIFY_IS_NOT_IN
-'','write.delete.mode   ','merge-on-read       '
-'','write.update.mode   ','merge-on-read       '
-'','write.merge.mode    ','merge-on-read       '
----- TYPES
-string, string, string
-====
----- QUERY
-# Setting format-version to 1 doesn't add write modes.
-ALTER TABLE iceberg_upgrade_v2_no_write_mode SET TBLPROPERTIES('format-version'='1');
-DESCRIBE FORMATTED iceberg_upgrade_v2_no_write_mode;
----- RESULTS: VERIFY_IS_NOT_IN
-'','write.delete.mode   ','merge-on-read       '
-'','write.update.mode   ','merge-on-read       '
-'','write.merge.mode    ','merge-on-read       '
----- TYPES
-string, string, string
-====
----- QUERY
-ALTER TABLE iceberg_upgrade_v2_no_write_mode SET TBLPROPERTIES('format-version'='2');
-DESCRIBE FORMATTED iceberg_upgrade_v2_no_write_mode;
----- RESULTS: VERIFY_IS_SUBSET
-'','write.delete.mode   ','merge-on-read       '
-'','write.update.mode   ','merge-on-read       '
-'','write.merge.mode    ','merge-on-read       '
----- TYPES
-string, string, string
-====
----- QUERY
-CREATE TABLE iceberg_upgrade_v2_delete_mode (i INT) STORED AS ICEBERG;
-ALTER TABLE iceberg_upgrade_v2_delete_mode
-SET TBLPROPERTIES('format-version'='2', 'write.delete.mode'='copy-on-write');
-DESCRIBE FORMATTED iceberg_upgrade_v2_delete_mode;
----- RESULTS: VERIFY_IS_SUBSET
-'','write.delete.mode   ','copy-on-write       '
----- TYPES
-string, string, string
-====
----- QUERY
-DESCRIBE FORMATTED iceberg_upgrade_v2_delete_mode;
----- RESULTS: VERIFY_IS_NOT_IN
-'','write.update.mode   ','merge-on-read       '
-'','write.merge.mode    ','merge-on-read       '
----- TYPES
-string, string, string
-====
----- QUERY
-CREATE TABLE iceberg_upgrade_v2_update_mode (i INT) STORED AS ICEBERG;
-ALTER TABLE iceberg_upgrade_v2_update_mode
-SET TBLPROPERTIES('format-version'='2', 'write.update.mode'='copy-on-write');
-DESCRIBE FORMATTED iceberg_upgrade_v2_update_mode;
----- RESULTS: VERIFY_IS_SUBSET
-'','write.update.mode   ','copy-on-write       '
----- TYPES
-string, string, string
-====
----- QUERY
-DESCRIBE FORMATTED iceberg_upgrade_v2_update_mode;
----- RESULTS: VERIFY_IS_NOT_IN
-'','write.delete.mode   ','merge-on-read       '
-'','write.merge.mode    ','merge-on-read       '
----- TYPES
-string, string, string
-====
----- QUERY
-CREATE TABLE iceberg_upgrade_v2_merge_mode (i INT) STORED AS ICEBERG;
-ALTER TABLE iceberg_upgrade_v2_merge_mode
-SET TBLPROPERTIES('format-version'='2', 'write.merge.mode'='merge-on-read');
-DESCRIBE FORMATTED iceberg_upgrade_v2_merge_mode;
----- RESULTS: VERIFY_IS_SUBSET
-'','write.merge.mode    ','merge-on-read       '
----- TYPES
-string, string, string
-====
----- QUERY
-DESCRIBE FORMATTED iceberg_upgrade_v2_merge_mode;
----- RESULTS: VERIFY_IS_NOT_IN
-'','write.update.mode   ','merge-on-read       '
-'','write.delete.mode   ','merge-on-read       '
 ---- TYPES
 string, string, string
 ====

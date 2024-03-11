@@ -69,8 +69,14 @@ class TestIcebergTable(IcebergTestSuite):
   def test_create_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-create', vector, use_db=unique_database)
 
-  def test_alter_iceberg_tables(self, vector, unique_database):
-    self.run_test_case('QueryTest/iceberg-alter', vector, use_db=unique_database)
+  def test_alter_iceberg_tables_v1(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-alter-v1', vector, use_db=unique_database)
+
+  def test_alter_iceberg_tables_v2(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-alter-v2', vector, use_db=unique_database)
+
+  def test_alter_iceberg_tables_default(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-alter-default', vector, use_db=unique_database)
 
   def test_external_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-external', vector, unique_database)
@@ -179,8 +185,16 @@ class TestIcebergTable(IcebergTestSuite):
   def test_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database)
 
-  def test_partitioned_insert(self, vector, unique_database):
-    self.run_test_case('QueryTest/iceberg-partitioned-insert', vector,
+  def test_partitioned_insert_v1(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-partitioned-insert-v1', vector,
+        use_db=unique_database)
+
+  def test_partitioned_insert_v2(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-partitioned-insert-v2', vector,
+        use_db=unique_database)
+
+  def test_partitioned_insert_default(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-partitioned-insert-default', vector,
         use_db=unique_database)
 
   def test_insert_overwrite(self, vector, unique_database):
@@ -783,10 +797,10 @@ class TestIcebergTable(IcebergTestSuite):
     # Create table
     table_name = "ice_part"
     qualified_table_name = "%s.%s" % (unique_database, table_name)
-    create_table = 'create table %s ' \
-        '(s string, i int) partitioned by spec(truncate(5, s), identity(i)) ' \
-        'stored as iceberg' \
-        % qualified_table_name
+    create_table = """create table {}
+        (s string, i int) partitioned by spec(truncate(5, s), identity(i))
+        stored as iceberg
+        tblproperties ('format-version'='1')""".format(qualified_table_name)
     self.client.execute(create_table)
 
     partition_spec = self.get_current_partition_spec(unique_database, table_name)
@@ -878,17 +892,22 @@ class TestIcebergTable(IcebergTestSuite):
     assert truncate_s['field-id'] == 1004
 
   @SkipIf.not_dfs
-  def test_writing_metrics_to_metadata(self, vector, unique_database):
-    # Create table
-    table_name = "ice_stats"
-    qualified_table_name = "%s.%s" % (unique_database, table_name)
-    query = 'create table %s ' \
-        '(s string, i int, b boolean, bi bigint, ts timestamp, dt date, ' \
-        'dc decimal(10, 3)) ' \
-        'stored as iceberg' \
-        % qualified_table_name
-    self.client.execute(query)
+  def test_writing_metrics_to_metadata_v1(self, vector, unique_database):
+    self._test_writing_metrics_to_metadata_impl(unique_database, 'ice_stats_v1', '1')
 
+  @SkipIf.not_dfs
+  def test_writing_metrics_to_metadata_v2(self, vector, unique_database):
+    self._test_writing_metrics_to_metadata_impl(unique_database, 'ice_stats_v2', '2')
+
+  def _test_writing_metrics_to_metadata_impl(self, unique_database, table_name, version):
+    # Create table
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    query = """create table {}
+        (s string, i int, b boolean, bi bigint, ts timestamp, dt date,
+        dc decimal(10, 3))
+        stored as iceberg
+        tblproperties ('format-version'='{}')""".format(qualified_table_name, version)
+    self.client.execute(query)
     # Insert data
     # 1st data file:
     query = 'insert into %s values ' \

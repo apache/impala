@@ -1,0 +1,495 @@
+====
+---- QUERY
+CREATE TABLE iceberg_hadoop_tables(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
+ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(message STRING, price DECIMAL(8,1));
+ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
+DESCRIBE iceberg_hadoop_tables;
+---- RESULTS
+'level','string','','true'
+'event_time','timestamp','','true'
+'register_time','date','','true'
+'message','string','','true'
+'price','decimal(8,1)','','true'
+'map_test','map<string,array<string>>','','true'
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_tables set TBLPROPERTIES('fake_key'='fake_value');
+DESCRIBE FORMATTED iceberg_hadoop_tables;
+---- RESULTS: VERIFY_IS_SUBSET
+'','fake_key            ','fake_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_tables set TBLPROPERTIES('fake_key'='fake_value');
+ALTER TABLE iceberg_hadoop_tables unset TBLPROPERTIES('fake_key');
+DESCRIBE FORMATTED iceberg_hadoop_tables;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','fake_key            ','fake_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_tables set OWNER USER fake_user;
+DESCRIBE FORMATTED iceberg_hadoop_tables;
+---- RESULTS: VERIFY_IS_SUBSET
+'OwnerType:          ','USER                ','NULL'
+'Owner:              ','fake_user           ','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_tables set OWNER ROLE fake_role;
+DESCRIBE FORMATTED iceberg_hadoop_tables;
+---- RESULTS: VERIFY_IS_SUBSET
+'OwnerType:          ','ROLE                ','NULL'
+'Owner:              ','fake_role           ','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_tables SET PARTITION SPEC (
+  level,
+  TRUNCATE(5, level),
+  HOUR(event_time),
+  YEAR(register_time),
+  BUCKET(15, message),
+  price);
+SHOW PARTITIONS iceberg_hadoop_tables;
+---- RESULTS
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+CREATE TABLE iceberg_hadoop_catalog(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/other/$DATABASE/hadoop_catalog_test');
+ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
+ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(message STRING, price DECIMAL(8,1));
+ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
+DESCRIBE iceberg_hadoop_catalog;
+---- RESULTS
+'level','string','','true'
+'event_time','timestamp','','true'
+'register_time','date','','true'
+'message','string','','true'
+'price','decimal(8,1)','','true'
+'map_test','map<string,array<string>>','','true'
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_catalog set TBLPROPERTIES('test_key'='test_value');
+DESCRIBE FORMATTED iceberg_hadoop_catalog;
+---- RESULTS: VERIFY_IS_SUBSET
+'','test_key            ','test_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_catalog set OWNER USER fake_user;
+DESCRIBE FORMATTED iceberg_hadoop_catalog;
+---- RESULTS: VERIFY_IS_SUBSET
+'OwnerType:          ','USER                ','NULL'
+'Owner:              ','fake_user           ','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_catalog set OWNER ROLE fake_role;
+DESCRIBE FORMATTED iceberg_hadoop_catalog;
+---- RESULTS: VERIFY_IS_SUBSET
+'OwnerType:          ','ROLE                ','NULL'
+'Owner:              ','fake_role           ','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_hadoop_catalog SET PARTITION SPEC (
+  level,
+  TRUNCATE(5, level),
+  HOUR(event_time),
+  YEAR(register_time),
+  BUCKET(15, message),
+  price);
+SHOW PARTITIONS iceberg_hadoop_catalog;
+---- RESULTS
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+CREATE TABLE iceberg_rename (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hive.catalog');
+INSERT INTO iceberg_rename values (42);
+ALTER TABLE iceberg_rename RENAME TO iceberg_rename2;
+SELECT * FROM iceberg_rename2;
+---- RESULTS
+42
+---- TYPES
+INT
+====
+---- QUERY
+SELECT * FROM iceberg_rename;
+---- CATCH
+Could not resolve table reference: 'iceberg_rename'
+====
+---- QUERY
+CREATE TABLE iceberg_changing_fileformats (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.format.default'='orc');
+DESCRIBE FORMATTED iceberg_changing_fileformats;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','orc                 '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('write.format.default'='parquet');
+DESCRIBE FORMATTED iceberg_changing_fileformats;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','parquet             '
+---- TYPES
+string, string, string
+====
+---- QUERY
+INSERT INTO iceberg_changing_fileformats values (123);
+SELECT * FROM iceberg_changing_fileformats;
+---- RESULTS
+123
+---- TYPES
+INT
+====
+---- QUERY
+ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('write.format.default'='ORC');
+---- RESULTS: VERIFY_IS_SUBSET
+'Updated table.'
+====
+---- QUERY
+DESCRIBE FORMATTED iceberg_changing_fileformats;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','ORC                 '
+---- TYPES
+string, string, string
+====
+---- QUERY
+CREATE TABLE ice_alter_cols (f float)
+STORED AS ICEBERG;
+INSERT INTO ice_alter_cols VALUES (2.718);
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+2.718
+---- TYPES
+FLOAT
+====
+---- QUERY
+# Promoting float -> double is allowed by Iceberg.
+ALTER TABLE ice_alter_cols CHANGE COLUMN f d double;
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'d','double','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+INSERT INTO ice_alter_cols VALUES (3.14);
+SELECT round(d, 3) FROM ice_alter_cols;
+---- RESULTS
+2.718
+3.140
+---- TYPES
+DOUBLE
+====
+---- QUERY
+# Demoting double -> float is not allowed.
+ALTER TABLE ice_alter_cols CHANGE COLUMN d f float;
+---- CATCH
+Failed to ALTER table 'ice_alter_cols'
+====
+---- QUERY
+ALTER TABLE ice_alter_cols ADD COLUMN x decimal(10, 3);
+INSERT INTO ice_alter_cols VALUES (1.618, 1.618);
+SELECT round(d, 3), x FROM ice_alter_cols;
+---- RESULTS
+2.718,NULL
+3.140,NULL
+1.618,1.618
+---- TYPES
+DOUBLE,DECIMAL
+====
+---- QUERY
+# Drop first column and check if data is still correctly read.
+ALTER TABLE ice_alter_cols DROP COLUMN d;
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'x','decimal(10,3)','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+NULL
+NULL
+1.618
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Add column with same name as dropped column creates a different,
+# brand new column.
+ALTER TABLE ice_alter_cols ADD COLUMN d double;
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+NULL,NULL
+NULL,NULL
+1.618,NULL
+---- TYPES
+DECIMAL,DOUBLE
+====
+---- QUERY
+# Test type conversion INT -> BIGINT
+# BIGNT -> INT should fail.
+ALTER TABLE ice_alter_cols DROP COLUMN d;
+ALTER TABLE ice_alter_cols ADD COLUMN i int;
+INSERT INTO TABLE ice_alter_cols VALUES (1.11, 11);
+ALTER TABLE ice_alter_cols CHANGE COLUMN i bi bigint;
+INSERT INTO TABLE ice_alter_cols VALUES (2.345, 111222333444555666);
+ALTER TABLE ice_alter_cols CHANGE COLUMN bi i int;
+---- CATCH
+Failed to ALTER table 'ice_alter_cols'
+====
+---- QUERY
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'x','decimal(10,3)','','true'
+'bi','bigint','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+NULL,NULL
+NULL,NULL
+1.618,NULL
+1.110,11
+2.345,111222333444555666
+---- TYPES
+DECIMAL,BIGINT
+====
+---- QUERY
+# Iceberg allows changing precision to a higher value.
+ALTER TABLE ice_alter_cols DROP COLUMN bi;
+ALTER TABLE ice_alter_cols CHANGE COLUMN x d DECIMAL (22, 3);
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+1.618
+1.110
+2.345
+NULL
+NULL
+---- TYPES
+DECIMAL
+====
+---- QUERY
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'d','decimal(22,3)','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+CREATE TABLE iceberg_changing_parq_tblprops (i int)
+STORED AS ICEBERG
+TBLPROPERTIES (
+    'write.parquet.row-group-size-bytes'='134217728',
+    'write.parquet.compression-codec'='zstd',
+    'write.parquet.compression-level'='12',
+    'write.parquet.page-size-bytes'='65536',
+    'write.parquet.dict-size-bytes'='131072'
+);
+DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','parquet             '
+'','write.parquet.row-group-size-bytes','134217728           '
+'','write.parquet.compression-codec','zstd                '
+'','write.parquet.compression-level','12                  '
+'','write.parquet.page-size-bytes','65536               '
+'','write.parquet.dict-size-bytes','131072              '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_changing_parq_tblprops set TBLPROPERTIES(
+    'write.parquet.row-group-size-bytes'='268435456',
+    'write.parquet.compression-codec'='snappy',
+    'write.parquet.compression-level'='11',
+    'write.parquet.page-size-bytes'='131072',
+    'write.parquet.dict-size-bytes'='65536'
+);
+DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','parquet             '
+'','write.parquet.row-group-size-bytes','268435456           '
+'','write.parquet.compression-codec','snappy              '
+'','write.parquet.compression-level','11                  '
+'','write.parquet.page-size-bytes','131072              '
+'','write.parquet.dict-size-bytes','65536               '
+---- TYPES
+string, string, string
+====
+---- QUERY
+CREATE TABLE iceberg_upgrade_v2_no_write_mode (i INT) STORED AS ICEBERG;
+DESCRIBE FORMATTED iceberg_upgrade_v2_no_write_mode;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','write.delete.mode   ','merge-on-read       '
+'','write.update.mode   ','merge-on-read       '
+'','write.merge.mode    ','merge-on-read       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Setting format-version to 1 doesn't add write modes.
+ALTER TABLE iceberg_upgrade_v2_no_write_mode SET TBLPROPERTIES('format-version'='1');
+DESCRIBE FORMATTED iceberg_upgrade_v2_no_write_mode;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','write.delete.mode   ','merge-on-read       '
+'','write.update.mode   ','merge-on-read       '
+'','write.merge.mode    ','merge-on-read       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_upgrade_v2_no_write_mode SET TBLPROPERTIES('format-version'='2');
+DESCRIBE FORMATTED iceberg_upgrade_v2_no_write_mode;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.delete.mode   ','merge-on-read       '
+'','write.update.mode   ','merge-on-read       '
+'','write.merge.mode    ','merge-on-read       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+CREATE TABLE iceberg_upgrade_v2_delete_mode (i INT) STORED AS ICEBERG;
+ALTER TABLE iceberg_upgrade_v2_delete_mode
+SET TBLPROPERTIES('format-version'='2', 'write.delete.mode'='copy-on-write');
+DESCRIBE FORMATTED iceberg_upgrade_v2_delete_mode;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.delete.mode   ','copy-on-write       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+DESCRIBE FORMATTED iceberg_upgrade_v2_delete_mode;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','write.update.mode   ','merge-on-read       '
+'','write.merge.mode    ','merge-on-read       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+CREATE TABLE iceberg_upgrade_v2_update_mode (i INT) STORED AS ICEBERG;
+ALTER TABLE iceberg_upgrade_v2_update_mode
+SET TBLPROPERTIES('format-version'='2', 'write.update.mode'='copy-on-write');
+DESCRIBE FORMATTED iceberg_upgrade_v2_update_mode;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.update.mode   ','copy-on-write       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+DESCRIBE FORMATTED iceberg_upgrade_v2_update_mode;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','write.delete.mode   ','merge-on-read       '
+'','write.merge.mode    ','merge-on-read       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+CREATE TABLE iceberg_upgrade_v2_merge_mode (i INT) STORED AS ICEBERG;
+ALTER TABLE iceberg_upgrade_v2_merge_mode
+SET TBLPROPERTIES('format-version'='2', 'write.merge.mode'='merge-on-read');
+DESCRIBE FORMATTED iceberg_upgrade_v2_merge_mode;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.merge.mode    ','merge-on-read       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+DESCRIBE FORMATTED iceberg_upgrade_v2_merge_mode;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','write.update.mode   ','merge-on-read       '
+'','write.delete.mode   ','merge-on-read       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Add a column that already exists and a new column that does not exist with
+# "if not exists" clause.
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (a bigint, d bigint)
+---- RESULTS
+'Column(s) have been added.'
+---- TYPES
+string
+====
+---- QUERY
+describe ice_alter_cols;
+---- RESULTS
+'d','decimal(22,3)','','true'
+'a','bigint','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Add column for the same name, but of a different type
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (a string, d string)
+---- RESULTS
+'No new column(s) have been added to the table.'
+---- TYPES
+string
+====
+---- QUERY
+# Add a column that already exists and a new column that does not exist with
+# "if not exists" clause.
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (a bigint, b bigint)
+---- RESULTS
+'Column(s) have been added.'
+---- TYPES
+string
+====
+---- QUERY
+DESCRIBE ice_alter_cols
+---- RESULTS
+'d','decimal(22,3)','','true'
+'a','bigint','','true'
+'b','bigint','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+ALTER TABLE ice_alter_cols ADD IF NOT EXISTS COLUMNS (c bigint, c string)
+---- CATCH
+AnalysisException: Duplicate column name: c
+====
+---- QUERY
+ALTER TABLE ice_alter_cols DROP COLUMN a;
+ALTER TABLE ice_alter_cols DROP COLUMN b;
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'d','decimal(22,3)','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====

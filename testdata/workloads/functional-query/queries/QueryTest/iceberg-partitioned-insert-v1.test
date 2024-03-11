@@ -1,0 +1,805 @@
+====
+---- QUERY
+# Test partitioned INSERTs with single column that is also
+# the partitioned column.
+create table ice_only_part (i int)
+partitioned by spec (i)
+stored as iceberg
+tblproperties ('format-version'='1');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_only_part values (1), (2), (3);
+insert into ice_only_part values (cast(4 as tinyint));
+insert into ice_only_part values (NULL);
+select * from ice_only_part;
+---- RESULTS
+1
+2
+3
+4
+NULL
+---- TYPES
+INT
+====
+---- QUERY
+show files in ice_only_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=4/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_only_part;
+---- RESULTS
+'{"i":"1"}',1,1
+'{"i":"2"}',1,1
+'{"i":"3"}',1,1
+'{"i":"4"}',1,1
+'{"i":null}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from ice_only_part
+where i = 1;
+---- RESULTS
+1
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+====
+---- QUERY
+# Test inserts with multple partition columns.
+create table ice_multi_part (i int, d date, s string)
+partitioned by spec(i, d)
+stored as iceberg
+tblproperties ('format-version'='1');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_multi_part
+values (1, '2020-12-07', 'first'), (2, '2020-12-08', 'second');
+select * from ice_multi_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+insert into
+  ice_multi_part (d, s)
+values
+  ('2022-07-26', 'third'),
+  ('2022-07-27', 'fourth'),
+  ('2022-07-28', 'fifth');
+select * from ice_multi_part order by d;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+NULL,2022-07-26,'third'
+NULL,2022-07-27,'fourth'
+NULL,2022-07-28,'fifth'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+insert into
+  ice_multi_part (i, s)
+values
+  (6, 'sixth'),
+  (7, 'seventh');
+select * from ice_multi_part order by d, i;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+NULL,2022-07-26,'third'
+NULL,2022-07-27,'fourth'
+NULL,2022-07-28,'fifth'
+6,NULL,'sixth'
+7,NULL,'seventh'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+show files in ice_multi_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=1/d=2020-12-07/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=2/d=2020-12-08/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=6/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=7/d=__HIVE_DEFAULT_PARTITION__/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-26/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-27/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_multi_part/data/i=__HIVE_DEFAULT_PARTITION__/d=2022-07-28/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from ice_multi_part
+where d = '2020-12-08';
+---- RESULTS
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+====
+---- QUERY
+select
+  *
+from
+  ice_multi_part
+where
+  i is null
+order by
+  d;
+---- RESULTS
+NULL,2022-07-26,'third'
+NULL,2022-07-27,'fourth'
+NULL,2022-07-28,'fifth'
+---- TYPES
+INT, DATE, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Test that Impala only writes one file per partitions.
+create table ice_bigints (i BIGINT, j BIGINT, k BIGINT)
+partitioned by spec (i, j)
+stored as iceberg
+tblproperties ('format-version'='1');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_bigints select id % 2, id % 3, id from functional.alltypes;
+select count(*) from ice_bigints;
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+# When filtered only by partition column Iceberg can do the filtering and no need to read data in Impala.
+select count(*) from ice_bigints
+where i = 0 and j = 0;
+---- RESULTS
+1217
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+aggregation(SUM, NumFileMetadataRead): 1
+====
+---- QUERY
+# When not just partition columns are involved in the filtering then Impala has to read data to answer the query.
+select count(*) from ice_bigints
+where i = 0 and j = 0 and  k >= 0;
+---- RESULTS
+1217
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 1217
+====
+---- QUERY
+# Test partitioning with all supported types.
+# Only timestamp-based partitions are not supported.
+# Also test partition pruning with all of the supported types.
+create table alltypes_part (
+  id INT,
+  bool_col BOOLEAN,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_col DATE,
+  string_col STRING,
+  timestamp_col TIMESTAMP)
+partitioned by spec (
+  id,
+  bool_col,
+  int_col,
+  bigint_col,
+  float_col,
+  double_col,
+  date_col,
+  string_col)
+stored as iceberg
+tblproperties ('format-version'='1');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into alltypes_part
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypestiny;
+select count(*) from alltypes_part;
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
+show files in alltypes_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=0/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=1/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=2/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=3/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=4/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=5/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=6/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=7/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS alltypes_part;
+---- RESULTS
+'{"id":"0","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14245","string_col":"0"}',1,1
+'{"id":"1","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14245","string_col":"1"}',1,1
+'{"id":"2","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14276","string_col":"0"}',1,1
+'{"id":"3","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14276","string_col":"1"}',1,1
+'{"id":"4","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14304","string_col":"0"}',1,1
+'{"id":"5","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14304","string_col":"1"}',1,1
+'{"id":"6","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14335","string_col":"0"}',1,1
+'{"id":"7","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14335","string_col":"1"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# INSERTs with wrong value orderings are rejected.
+insert into alltypes_part
+select bool_col, id, int_col, bigint_col, float_col, double_col,
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypestiny;
+select count(*) from alltypes_part;
+---- CATCH
+Expression 'id' (type: INT) would need to be cast to BOOLEAN for column 'bool_col'
+====
+---- QUERY
+insert into alltypes_part
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), timestamp_col, string_col
+from functional.alltypestiny;
+select count(*) from alltypes_part;
+---- CATCH
+Expression 'timestamp_col' (type: TIMESTAMP) would need to be cast to STRING for column 'string_col'
+====
+---- QUERY
+select count(*) from alltypes_part
+where bool_col = true;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
+====
+---- QUERY
+select count(*) from alltypes_part
+where float_col = 0;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
+====
+---- QUERY
+select count(*) from alltypes_part
+where double_col = 0;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
+====
+---- QUERY
+select count(*) from alltypes_part
+where date_col = '2009-01-01';
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 2
+====
+---- QUERY
+select count(*) from alltypes_part
+where string_col = '0';
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
+====
+---- QUERY
+# 'timestamp_col' is not a partitioning column, so min/max stats will not be used to
+# eliminate row groups
+select count(*) from alltypes_part
+where timestamp_col = now();
+---- RESULTS
+0
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+create table alltypes_part_2 like alltypes_part;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into
+  alltypes_part_2(
+    id,
+    int_col,
+    bigint_col,
+    float_col,
+    double_col,
+    date_col,
+    string_col,
+    timestamp_col
+  )
+select
+  id,
+  int_col,
+  bigint_col,
+  float_col,
+  double_col,
+  CAST(date_string_col as date FORMAT 'MM/DD/YY'),
+  string_col,
+  timestamp_col
+from
+  functional.alltypestiny;
+select count(*) from alltypes_part;
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
+show files in alltypes_part_2;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=0/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=1/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=2/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=3/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=4/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=5/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=6/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=7/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Iceberg partitions independent of column order
+---- QUERY
+# Test inserts with multple partition columns.
+create table ice_part_non_order (i int, d date, s string)
+partitioned by spec(s, d)
+stored as iceberg
+tblproperties ('format-version'='1');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_part_non_order
+values (1, '2020-12-07', 'first'), (2, '2020-12-08', 'second');
+select * from ice_part_non_order where s='second';
+---- RESULTS
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+show files in ice_part_non_order;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=first/d=2020-12-07/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=second/d=2020-12-08/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_part_non_order;
+---- RESULTS
+'{"s":"first","d":"18603"}',1,1
+'{"s":"second","d":"18604"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# Test inserts with different partition specs.
+create table ice_alter_part (i int, d date, s string)
+stored as iceberg
+tblproperties ('format-version'='1');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_alter_part
+values (1, '2020-12-07', 'first'), (2, '2020-12-08', 'second');
+select * from ice_alter_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+alter table ice_alter_part set partition spec(i, d);
+---- RESULTS
+'Updated partition spec.'
+====
+---- QUERY
+insert into ice_alter_part
+values (3, '2020-12-09', 'third'), (4, '2020-12-10', 'fourth');
+select * from ice_alter_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+3,2020-12-09,'third'
+4,2020-12-10,'fourth'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+alter table ice_alter_part set partition spec(year(d), i, bucket(5, s));
+---- RESULTS
+'Updated partition spec.'
+====
+---- QUERY
+insert into ice_alter_part
+values (5, '2020-12-11', 'fifth'), (6, '2020-12-12', 'sixth');
+select * from ice_alter_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+3,2020-12-09,'third'
+4,2020-12-10,'fourth'
+5,2020-12-11,'fifth'
+6,2020-12-12,'sixth'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+show files in ice_alter_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/[^=]*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=3/d=2020-12-09/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=4/d=2020-12-10/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=5/d_year=2020/s_bucket_5=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=6/d_year=2020/s_bucket_5=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_alter_part;
+---- RESULTS
+'{"i":"3","d":"18605"}',1,1
+'{"i":"4","d":"18606"}',1,1
+'{"i":"5","d":null,"d_year":"50","s_bucket_5":"2"}',1,1
+'{"i":"6","d":null,"d_year":"50","s_bucket_5":"0"}',1,1
+'{}',2,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+create table ice_void (i int, s string, d date)
+partitioned by spec (void(i), truncate(1, s), year(d))
+stored as iceberg
+tblproperties ('format-version'='1');
+insert into ice_void values (1, 'one', '2001-01-01'),
+                            (11,'other','2001-01-11'),
+                            (2, 'two', '2002-02-02'),
+                            (3, 'three', '2003-03-03');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+alter table ice_void set partition spec (i, void(s), year(d));
+insert into ice_void values (4, 'four', '2004-04-04');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+4,'four',2004-04-04
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/d_year=2004/i=4/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+'{"i_null":null,"s_trunc":null,"d_year":"34","i":"4","s_null":null}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+alter table ice_void set partition spec (i, void(s), void(d));
+insert into ice_void values (5, 'five', '2005-05-05'), (5, 'other five', '1995-05-05');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+4,'four',2004-04-04
+5,'five',2005-05-05
+5,'other five',1995-05-05
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/d_year=2004/i=4/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+'{"i_null":null,"s_trunc":null,"d_year":"34","i":"4","s_null":null}',1,1
+'{"i_null":null,"s_trunc":null,"d_year":null,"i":"5","s_null":null,"d_null":null}',2,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+alter table ice_void set partition spec (void(i), void(s), void(d));
+insert into ice_void values (6, 'six', '2006-06-06'), (7, 'seven', '2007-07-07');
+select * from ice_void;
+---- RESULTS
+1,'one',2001-01-01
+11,'other',2001-01-11
+2,'two',2002-02-02
+3,'three',2003-03-03
+4,'four',2004-04-04
+5,'five',2005-05-05
+5,'other five',1995-05-05
+6,'six',2006-06-06
+7,'seven',2007-07-07
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+show files in ice_void;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=o/d_year=2001/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2002/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/s_trunc=t/d_year=2003/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/d_year=2004/i=4/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/i=5/[^=/]*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_void/data/[^=/]*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_void;
+---- RESULTS
+'{"i_null":null,"s_trunc":"o","d_year":"31"}',2,1
+'{"i_null":null,"s_trunc":"t","d_year":"32"}',1,1
+'{"i_null":null,"s_trunc":"t","d_year":"33"}',1,1
+'{"i_null":null,"s_trunc":null,"d_year":"34","i":"4","s_null":null}',1,1
+'{"i_null":null,"s_trunc":null,"d_year":null,"i":"5","s_null":null,"d_null":null}',2,1
+'{"i_null":null,"s_trunc":null,"d_year":null,"i":null,"s_null":null,"d_null":null}',2,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+create table store_sales partitioned by spec (ss_sold_date_sk)
+stored as iceberg tblproperties ('format-version'='1')
+as select * from tpcds_parquet.store_sales;
+select count(*) from store_sales;
+---- RESULTS
+2880404
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from store_sales where ss_sold_date_sk is null;
+---- RESULTS
+130093
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Insert into a string partition column some chars that have to be URL encoded for the path creation.
+# Check that result strings are not URL encoded.
+create table special_char_partitions (i int, s string, s2 string)
+partitioned by spec (i, s, truncate(4, s))
+stored as iceberg
+tblproperties ('format-version'='1');
+insert into special_char_partitions
+    values (1, '11/14/31', '44/1'), (2, '11"14"31', '43"3'), (3, '11=14=31', '65=2'), (4, '', 'a'), (5, cast(null as string), 'b');
+select * from special_char_partitions;
+---- RESULTS
+1,'11/14/31','44/1'
+2,'11"14"31','43"3'
+3,'11=14=31','65=2'
+4,'','a'
+5,'NULL','b'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Check that filtering using special chars work as expected.
+select * from special_char_partitions where s = '11/14/31';
+---- RESULTS
+1,'11/14/31','44/1'
+---- TYPES
+INT,STRING,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+select * from special_char_partitions where s = '';
+---- RESULTS
+4,'','a'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+select * from special_char_partitions where s is NULL;
+---- RESULTS
+5,'NULL','b'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Check that the file path contains URL encoded strings.
+show files in special_char_partitions;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=1/s=11%2F14%2F31/s_trunc=11%2F1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=2/s=11%2214%2231/s_trunc=11%221/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=3/s=11%3D14%3D31/s_trunc=11%3D1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=4/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=5/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Check that values in SHOW PARTITIONS are nor URL encoded (but simply escaped).
+show partitions special_char_partitions;
+---- RESULTS
+'{"i":"1","s":"11\\/14\\/31","s_trunc":"11\\/1"}',1,1
+'{"i":"2","s":"11\\"14\\"31","s_trunc":"11\\"1"}',1,1
+'{"i":"3","s":"11=14=31","s_trunc":"11=1"}',1,1
+'{"i":"4","s":"","s_trunc":""}',1,1
+'{"i":"5","s":null,"s_trunc":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Check special chars in a string partition column after partition evolution.
+alter table special_char_partitions set partition spec (s2);
+insert into special_char_partitions values (6, '11/22/33', '98/22');
+select * from special_char_partitions;
+---- RESULTS
+1,'11/14/31','44/1'
+2,'11"14"31','43"3'
+3,'11=14=31','65=2'
+4,'','a'
+5,'NULL','b'
+6,'11/22/33','98/22'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Check that the new partition column's path contains URL encoded strings.
+show files in special_char_partitions;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=1/s=11%2F14%2F31/s_trunc=11%2F1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=2/s=11%2214%2231/s_trunc=11%221/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=3/s=11%3D14%3D31/s_trunc=11%3D1/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=4/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/i=5/s=__HIVE_DEFAULT_PARTITION__/s_trunc=__HIVE_DEFAULT_PARTITION__/.*parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/special_char_partitions/data/s2=98%2F22/.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+show partitions special_char_partitions;
+---- RESULTS
+'{"i":"1","s":"11\\/14\\/31","s_trunc":"11\\/1"}',1,1
+'{"i":"2","s":"11\\"14\\"31","s_trunc":"11\\"1"}',1,1
+'{"i":"3","s":"11=14=31","s_trunc":"11=1"}',1,1
+'{"i":"4","s":"","s_trunc":""}',1,1
+'{"i":"5","s":null,"s_trunc":null}',1,1
+'{"i":null,"s":null,"s_trunc":null,"s2":"98\\/22"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
