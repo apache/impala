@@ -129,8 +129,23 @@ class CatalogServer {
     return protocol_version_;
   }
 
+  /// Blocks until the first catalog update happens (indicated by the variable
+  /// last_sent_catalog_version_ having a value greater than 0). Does not time out.
+  /// Returns `true` or `false` indicating if this catalogd is the active catalogd.
+  /// If catalog ha is not enabled, returns `true`.
+  bool WaitForFirstCatalogUpdate();
+
+  // Initializes workload management by creating or upgrading the necessary database and
+  // tables. Does not check if the current catalogd is active or if workload management is
+  // enabled.
+  Status InitWorkloadManagement();
+
  private:
   friend class CatalogServiceThriftIf;
+
+  // Defines the milliseconds to sleep during the loop that waits for the first catalog
+  // update to take place.
+  static const int WM_INIT_CHECK_SLEEP_MS = 5000;
 
   /// Protocol version of the Catalog Service.
   CatalogServiceVersion::type protocol_version_;
@@ -364,6 +379,10 @@ class CatalogServer {
   /// value) pairs, one for each Hadoop configuration value.
   void HadoopVarzHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
+
+  /// Indicates if the catalog has finished initialization. If last_sent_catalog_version_
+  /// is greater than 0, returns `true`, otherwise returns `false`.
+  inline bool IsCatalogInitialized();
 };
 
 }

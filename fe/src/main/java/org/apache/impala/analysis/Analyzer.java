@@ -35,7 +35,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
@@ -552,6 +554,21 @@ public class Analyzer {
     // TODO: This can be inferred from privilegeReqs. They should be coalesced.
     public Set<TAccessEvent> accessEvents = new HashSet<>();
 
+    // Set of columns used in a select list.
+    private final Set<String> selectColumns = new TreeSet<>();
+
+    // Set of columns used in a where predicate.
+    private final Set<String> whereColumns = new TreeSet<>();
+
+    // Set of columns used in a join clause.
+    private final Set<String> joinColumns = new TreeSet<>();
+
+    // Set of columns used in aggregation, group by and/or having clauses.
+    private final Set<String> aggregateColumns = new TreeSet<>();
+
+    // Set of columns used in an order by clause.
+    private final Set<String> orderByColumns = new TreeSet<>();
+
     // Tracks all warnings (e.g. non-fatal errors) that were generated during analysis.
     // These are passed to the backend and eventually propagated to the shell. Maps from
     // warning message to the number of times that warning was logged (in order to avoid
@@ -668,6 +685,37 @@ public class Analyzer {
   };
 
   private final GlobalState globalState_;
+
+  /**
+   * Defines the various clauses of a SQL query where workload management will track the
+   * columns used.
+   */
+  private enum QueryClause {
+    SELECT("select", gs -> { return gs.selectColumns; }),
+    WHERE("where", gs -> { return gs.whereColumns; }),
+    JOIN("join", gs -> { return gs.joinColumns; }),
+    AGGREGATE("aggregate", gs -> { return gs.aggregateColumns; }),
+    ORDER_BY("order by", gs -> { return gs.orderByColumns; });
+
+    private final String clauseName;
+    private final Function<GlobalState, Set<String>> getColumnSetFunc;
+
+    private QueryClause(
+        final String clauseName, final Function<GlobalState, Set<String>> getColSet) {
+      this.clauseName = clauseName;
+      this.getColumnSetFunc = getColSet;
+    }
+
+    @Override
+    public String toString() {
+      return clauseName;
+    }
+
+    public Set<String> getColumnList(GlobalState gs) {
+      return getColumnSetFunc.apply(gs);
+    }
+  }
+  ;
 
   public boolean containsSubquery() { return globalState_.containsSubquery; }
   public boolean containsSetOperation() { return globalState_.setOperationNeedsRewrite; }
@@ -4551,7 +4599,162 @@ public class Analyzer {
     return isSimplified;
   }
 
-   /**
+  /**
+   * Iterates through a {@link Stream} of {@link Path}s ignoring any {@link Path} that has
+   * less than 3 parts since those paths represents an alias instead of an actual column.
+   * Paths that have 3 or more parts represent an actual column and are converted to dot
+   * delimited strings which are added to the {@code clause} column list.
+   *
+   * @param clause {@link QueryClause} defining the query clause where the columns in
+   *               {@code paths} will be added.
+   * @param paths  {@link Stream} of paths that will be processed one-by-one into dot
+   *               delimited strings while skipping over columns that represent aliases.
+   */
+  private void addColumnsTo(final QueryClause clause, Stream<Path> paths) {
+    paths.forEach(p -> {
+      if (p != null) {
+        List<String> pathParts = p.getFullyQualifiedRawPath(false);
+
+        // Ignore paths containing less than 3 elements since they point to an alias
+        // instead of an actual column.
+        if (pathParts.size() > 2) {
+          // Complex types may include sub items (such as db.tbl.structtype.field1).
+          // Only record the field name and drop any complex type sub items.
+          String fullPath = String.join(".", pathParts.subList(0, 3));
+          clause.getColumnList(globalState_).add(fullPath);
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Adding column '{}' to {} columns", fullPath, clause);
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Adds a {@link List} of {@link SlotRef}s to the specified destination set of columns.
+   * {@code slotRefs} will be resolved to their actual path and not the alias if they
+   * represent an alias.
+   *
+   * @param clause   {@link QueryClause} defining the query clause where the columns in
+   *                 {@code slotRefs} will be added.
+   * @param slotRefs {@link List} of {@link SlotRef}s representing columns to add to the
+   *                 specified set.
+   */
+  private void addColumnsTo(final QueryClause clause, List<SlotRef> slotRefs) {
+    // Add all SlotRefs with an empty source expression which indicates the SlotRef
+    // represents an actual column.
+    addColumnsTo(clause,
+        slotRefs.stream()
+            .filter(slotRef -> { return slotRef.getDesc().getSourceExprs().isEmpty(); })
+            .map(slotRef -> { return slotRef.getResolvedPath(); }));
+
+    // Resolve the actual path for all SlotRefs with non-empty source expressions since
+    // those SlotRefs represent an alias which must be resolved to its actual path.
+    slotRefs.stream()
+        .filter(slotRef -> { return !slotRef.getDesc().getSourceExprs().isEmpty(); })
+        .forEach(slotRef -> { resolveActualPath(clause, slotRef); });
+  }
+
+  /**
+   * Handles the resolution to the actual column(s) of a {@link SlotRef} that <em>does not
+   * represent an actual column</em> (such as aliases, arithmetic expressions, or
+   * functions) by recursively walking the {@link SlotRef}'s source expressions.
+   *
+   * The resolution iterates through all source expressions of the provided
+   * {@link SlotRef} handling three different cases on each source expression.  The first
+   * and second cases apply to source expressions that are themselves instances of
+   * {@link SlotRef} while the third case applies to source expressions that themselves
+   * have child {@link SlotRef}s.
+   * <ol>
+   * <li> No child source expression(s) under the source expression, the source expression
+   *      represents the actual column.  Tree walking is now complete, and that source
+   *      expression's fully qualified path is added to the specified {@link Set}. </li>
+   * <li> One or more child source expressions, the source expression represents a column
+   *      alias. This function is recursively called on those source expressions to
+   *      continue walking the expression tree. </li>
+   * <li> The source expression is not an instance of {@link SlotRef} and has child source
+   *      expressions that are instances of {@link SlotRef}. Some of these child
+   *      expressions need to be recorded as part of the sql statement and some do not.
+   *      If none of the source expressions have slot refs needing to be recorded, the
+   *      tree walking is complete, and no new entries are added to the specified
+   *      {@link Set}. For any source expressions that have child slot expressions that
+   *      need recording, the tree walking continues by calling
+   *      {@link #addColumnsTo(QueryClause, List)}. </li>
+   * </ol>
+   *
+   * @param clause  {@link QueryClause} defining the query clause where the column
+   *                in {@code slotRef} will be added.
+   * @param slotRef {@link SlotRef} to resolve to its actual path.
+   */
+  private void resolveActualPath(final QueryClause clause, final SlotRef slotRef) {
+    slotRef.getDesc().getSourceExprs().stream().forEach(sourceExpr -> {
+      // Only certain types are applicable to columns. Only those types should be
+      // processed with other types being ignored should they be passed to this function.
+      if (sourceExpr instanceof SlotRef) {
+        SlotRef sourceSlotRef = (SlotRef) sourceExpr;
+        if (sourceSlotRef.getDesc().getSourceExprs().size() == 0) {
+          // First case - source expression represents an actual column.
+          // Only record the field name and drop any complex type sub items.
+          clause.getColumnList(globalState_)
+              .add(String.join(".", sourceSlotRef.getResolvedPath().getCanonicalPath()
+              .subList(0, 3)));
+        } else {
+          // Second case - source expression is a column alias too.
+          resolveActualPath(clause, sourceSlotRef);
+        }
+      } else if (sourceExpr.recordChildrenInWorkloadManagement()) {
+        // Third case - source expression is not a SlotRef but does have child expressions
+        // that may need to be recorded.
+        List<SlotRef> childSlotRefs = new ArrayList<>();
+        sourceExpr.collect(Predicates.instanceOf(SlotRef.class), childSlotRefs);
+        addColumnsTo(clause, childSlotRefs);
+      }
+    });
+  }
+
+  public void addSelectColumns(Stream<Path> paths) {
+    addColumnsTo(QueryClause.SELECT, paths);
+  }
+
+  public Set<String> selectColumns() { return globalState_.selectColumns; }
+
+  public void addWhereColumns(Expr where) {
+    if (where == null) { return; }
+
+    List<SlotRef> slotRefs = new ArrayList<>();
+    where.collectAll(Predicates.instanceOf(SlotRef.class), slotRefs);
+    addColumnsTo(QueryClause.WHERE, slotRefs);
+  }
+
+  public Set<String> whereColumns() { return globalState_.whereColumns; }
+
+  public void addJoinColumns(List<SlotRef> slotRefs) {
+    addColumnsTo(QueryClause.JOIN, slotRefs);
+  }
+
+  public Set<String> joinColumns() { return globalState_.joinColumns; }
+
+  public void addAggregateColumns(Stream<Path> paths) {
+    addColumnsTo(QueryClause.AGGREGATE, paths);
+  }
+
+  public void addAggregateColumns(List<SlotRef> slotRefs) {
+    addColumnsTo(QueryClause.AGGREGATE, slotRefs);
+  }
+
+  public Set<String> aggregateColumns() { return globalState_.aggregateColumns; }
+
+  public void addOrderByColumns(Stream<Path> paths) {
+    addColumnsTo(QueryClause.ORDER_BY, paths);
+  }
+
+  public void addOrderByColumns(List<SlotRef> slotRefs) {
+    addColumnsTo(QueryClause.ORDER_BY, slotRefs);
+  }
+
+  public Set<String> orderByColumns() { return globalState_.orderByColumns; }
+
+  /**
    * Get the tuple ids that satisfy null-rejecting from the where or having onjuncts.
    * Return true if has null rejecting tid in tupleIds.
    */

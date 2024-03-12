@@ -171,6 +171,8 @@ public abstract class ModifyStmt extends DmlStatementBase {
     // Add target table to descriptor table.
     analyzer.getDescTbl().setTargetTable(table_);
 
+    analyzer_.addWhereColumns(wherePredicate_);
+
     sqlString_ = toSql();
   }
 

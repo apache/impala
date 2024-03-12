@@ -255,6 +255,23 @@ Status ClientRequestState::Exec() {
   if (!exec_req.tables.empty()) {
     summary_profile_->AddInfoString("Tables Queried", PrintTableList(exec_req.tables));
   }
+  if (!exec_req.select_columns.empty()) {
+    summary_profile_->AddInfoString("Select Columns", join(exec_req.select_columns, ","));
+  }
+  if (!exec_req.where_columns.empty()) {
+    summary_profile_->AddInfoString("Where Columns", join(exec_req.where_columns, ","));
+  }
+  if (!exec_req.join_columns.empty()) {
+    summary_profile_->AddInfoString("Join Columns", join(exec_req.join_columns, ","));
+  }
+  if (!exec_req.aggregate_columns.empty()) {
+    summary_profile_->AddInfoString(
+        "Aggregate Columns", join(exec_req.aggregate_columns, ","));
+  }
+  if (!exec_req.orderby_columns.empty()) {
+    summary_profile_->AddInfoString(
+        "OrderBy Columns", join(exec_req.orderby_columns, ","));
+  }
   if (query_ctx_.__isset.overridden_mt_dop_value) {
     DCHECK(query_ctx_.client_request.query_options.__isset.mt_dop);
     summary_profile_->AddInfoString("MT_DOP limited by admission control",

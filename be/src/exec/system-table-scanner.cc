@@ -18,10 +18,13 @@
 #include "system-table-scanner.h"
 
 #include <memory>
+
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "gen-cpp/SystemTables_types.h"
+
+#include "common/names.h"
 #include "runtime/decimal-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/exec-env.h"
@@ -35,7 +38,7 @@
 #include "runtime/tuple-row.h"
 #include "service/query-state-record.h"
 #include "util/debug-util.h"
-#include "common/names.h"
+#include "workload_mgmt/workload-management.h"
 
 using namespace boost::algorithm;
 using strings::Substitute;
@@ -171,6 +174,7 @@ static void WriteEvent(const QueryStateExpanded& query, const SlotDescriptor* sl
 
 Status QueryScanner::MaterializeNextTuple(
     MemPool* pool, Tuple* tuple, const TupleDescriptor* tuple_desc) {
+  using impala::workloadmgmt::IncludeField;
   DCHECK(!query_records_.empty());
   const QueryStateExpanded& query = *query_records_.front();
   const QueryStateRecord& record = *query.base_state;
@@ -368,6 +372,37 @@ Status QueryScanner::MaterializeNextTuple(
       case TQueryTableColumn::TABLES_QUERIED:
         if (!query.tables.empty()) {
           RETURN_IF_ERROR(WriteStringSlot(PrintTableList(query.tables), pool, slot));
+        }
+        break;
+      case TQueryTableColumn::SELECT_COLUMNS:
+        if (!query.select_columns.empty()
+            && LIKELY(IncludeField(TQueryTableColumn::type::SELECT_COLUMNS))) {
+          RETURN_IF_ERROR(WriteStringSlot(join(query.select_columns, ","), pool, slot));
+        }
+        break;
+      case TQueryTableColumn::WHERE_COLUMNS:
+        if (!query.where_columns.empty()
+            && LIKELY(IncludeField(TQueryTableColumn::type::WHERE_COLUMNS))) {
+          RETURN_IF_ERROR(WriteStringSlot(join(query.where_columns, ","), pool, slot));
+        }
+        break;
+      case TQueryTableColumn::JOIN_COLUMNS:
+        if (!query.join_columns.empty()
+            && LIKELY(IncludeField(TQueryTableColumn::type::JOIN_COLUMNS))) {
+          RETURN_IF_ERROR(WriteStringSlot(join(query.join_columns, ","), pool, slot));
+        }
+        break;
+      case TQueryTableColumn::AGGREGATE_COLUMNS:
+        if (!query.aggregate_columns.empty()
+            && LIKELY(IncludeField(TQueryTableColumn::type::AGGREGATE_COLUMNS))) {
+          RETURN_IF_ERROR(
+              WriteStringSlot(join(query.aggregate_columns, ","), pool, slot));
+        }
+        break;
+      case TQueryTableColumn::ORDERBY_COLUMNS:
+        if (!query.orderby_columns.empty()
+            && LIKELY(IncludeField(TQueryTableColumn::type::ORDERBY_COLUMNS))) {
+          RETURN_IF_ERROR(WriteStringSlot(join(query.orderby_columns, ","), pool, slot));
         }
         break;
       default:

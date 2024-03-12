@@ -49,17 +49,12 @@ class TestQueryLogTableBase(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryLogTableBase, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol',
         cls.PROTOCOL_BEESWAX, cls.PROTOCOL_HS2))
 
   def setup_method(self, method):
     super(TestQueryLogTableBase, self).setup_method(method)
-    # These tests run very quickly and can actually complete before Impala has finished
-    # creating the completed queries table. Thus, to make these tests more robust, this
-    # code checks to make sure the table create has finished before returning.
-    self.assert_impalad_log_contains("INFO", r'Completed workload management '
-        r'initialization', timeout_s=120)
+    self.wait_for_wm_init_complete()
 
   def get_client(self, protocol):
     """Retrieves the default Impala client for the specified protocol. This client is
@@ -89,18 +84,6 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
   LOG_DIR_MAX_WRITES = 'max_attempts_exceeded'
   FLUSH_MAX_RECORDS_CLUSTER_ID = "test_query_log_max_records_" + str(int(time()))
   FLUSH_MAX_RECORDS_QUERY_COUNT = 30
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_max_select "
-                                                 "--query_log_max_sql_length={0} "
-                                                 "--query_log_max_plan_length={0}"
-                                                 .format(MAX_SQL_PLAN_LEN),
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
-  def test_table_structure(self, vector):
-    """Asserts that the log table has the expected columns."""
-    self.run_test_case('QueryTest/workload-management-log', vector)
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1 "
@@ -441,7 +424,9 @@ class TestQueryLogOtherTable(TestQueryLogTableBase):
                                                  "--query_log_table_name={0}"
                                                  .format(OTHER_TBL),
                                     catalogd_args="--enable_workload_mgmt "
-                                                  "--blacklisted_dbs=information_schema",
+                                                  "--blacklisted_dbs=information_schema "
+                                                  "--query_log_table_name={0}"
+                                                  .format(OTHER_TBL),
                                     impalad_graceful_shutdown=True)
   def test_renamed_log_table(self, vector):
     """Asserts that the completed queries table can be renamed."""

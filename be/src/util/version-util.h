@@ -39,6 +39,6 @@ bool operator!=(const Version& lhs, const Version& rhs);
 namespace impala {
 
 // Constructor function that allows for setting the values of some struct members.
-kudu::Version constructVersion(int maj, int min, int maint);
+kudu::Version ConstructVersion(int maj, int min, int maint);
 
-}
+} // namespace impala

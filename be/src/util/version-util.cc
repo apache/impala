@@ -52,7 +52,7 @@ bool operator!=(const Version& lhs, const Version& rhs) {
 
 namespace impala {
 
-kudu::Version constructVersion(int maj, int min, int maint) {
+kudu::Version ConstructVersion(int maj, int min, int maint) {
   kudu::Version v;
 
   v.major = maj;

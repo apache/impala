@@ -346,6 +346,21 @@ struct QueryStateExpanded {
   // Source tables accessed by this query.
   std::vector<TTableName> tables;
 
+  // Columns referenced in a select list.
+  std::vector<std::string> select_columns;
+
+  // Columns referenced in a where clause.
+  std::vector<std::string> where_columns;
+
+  // Columns referenced in a join clause.
+  std::vector<std::string> join_columns;
+
+  // Columns referenced in an aggregation.
+  std::vector<std::string> aggregate_columns;
+
+  // Columns referenced in an order by clause.
+  std::vector<std::string> orderby_columns;
+
   /// Required data will be copied from the provided ClientRequestState into members of
   /// the struct.
   QueryStateExpanded(const ClientRequestState& exec_state,

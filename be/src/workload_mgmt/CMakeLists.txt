@@ -15,25 +15,28 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/catalog")
-set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/catalog")
+# where to put generated libraries
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/workload_mgmt")
 
-add_library(Catalog
-  catalog.cc
-  catalog-server.cc
-  catalog-util.cc
-  catalogd-main.cc
-  workload-management-init.cc
+# where to put generated binaries
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/workload_mgmt")
+
+add_library(WorkloadMgmt
+  workload-management.cc
+  workload-management-flags.cc
 )
-add_dependencies(Catalog gen-deps)
+add_dependencies(WorkloadMgmt gen-deps)
 
 if (BUILD_WITH_NO_TESTS)
   return()
 endif()
 
-add_library(CatalogTests STATIC
-  catalog-util-test.cc
+add_library(WorkloadMgmtTests STATIC
+  workload-management-test.cc
+  workload-management-fields-test.cc
 )
-add_dependencies(CatalogTests gen-deps)
 
-ADD_UNIFIED_BE_LSAN_TEST(catalog-util-test CatalogUtil.*)
+add_dependencies(WorkloadMgmtTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(workload-management-test WorkloadManagementTest.*:WorkloadManagementDeathTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(workload-management-fields-test WorkloadManagementFieldsTest.*)

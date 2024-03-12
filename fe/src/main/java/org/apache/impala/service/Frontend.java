@@ -2607,6 +2607,18 @@ public class Frontend {
     for (TableName table : stmtTableCache.tables.keySet()) {
       result.addToTables(table.toThrift());
     }
+    for (String column : analysisResult.getAnalyzer().selectColumns()) {
+      result.addToSelect_columns(column);
+    }
+    for (String column : analysisResult.getAnalyzer().whereColumns()) {
+      result.addToWhere_columns(column);
+    }
+    for (String column : analysisResult.getAnalyzer().aggregateColumns()) {
+      result.addToAggregate_columns(column);
+    }
+    for (String column : analysisResult.getAnalyzer().orderByColumns()) {
+      result.addToOrderby_columns(column);
+    }
 
     // Transfer the expected number of executors in executor group set to
     // analyzer's global state. The info is needed to compute the number of nodes to be
@@ -2728,6 +2740,10 @@ public class Frontend {
       // create TQueryExecRequest
       TQueryExecRequest queryExecRequest =
           getPlannedExecRequest(planCtx, analysisResult, timeline);
+
+      for (String column : analysisResult.getAnalyzer().joinColumns()) {
+        result.addToJoin_columns(column);
+      }
 
       TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
       if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {

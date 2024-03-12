@@ -27,6 +27,7 @@ import pytest
 import subprocess
 
 from impala_py_lib.helpers import find_all_files, is_core_dump
+from re import search
 from signal import SIGRTMIN
 from subprocess import check_call
 from tests.common.file_utils import cleanup_tmp_test_dir, make_tmp_test_dir
@@ -69,6 +70,10 @@ RESET_RANGER = 'reset_ranger'
 IMPALAD_GRACEFUL_SHUTDOWN = 'impalad_graceful_shutdown'
 # Decorator key to support temporary dir creation.
 TMP_DIR_PLACEHOLDERS = 'tmp_dir_placeholders'
+# Indicates if a failure to start is acceptable or not. If set to `True` and the cluster
+# startup fails with "num_known_live_backends did not reach expected value in time", then
+# the test passes. Any other exception is raised.
+EXPECT_STARTUP_FAIL = 'expect_startup_fail'
 
 # Args that accept additional formatting to supply temporary dir path.
 ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
@@ -132,7 +137,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       impala_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
-      impalad_graceful_shutdown=False, tmp_dir_placeholders=[]):
+      impalad_graceful_shutdown=False, tmp_dir_placeholders=[],
+      expect_startup_fail=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -170,6 +176,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.__dict__[IMPALAD_GRACEFUL_SHUTDOWN] = True
       if tmp_dir_placeholders:
         func.__dict__[TMP_DIR_PLACEHOLDERS] = tmp_dir_placeholders
+      if expect_startup_fail:
+        func.__dict__[EXPECT_STARTUP_FAIL] = True
       return func
     return decorate
 
@@ -272,8 +280,27 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       except Exception:
         self._stop_impala_cluster()
     else:
-      self._start_impala_cluster(cluster_args, **kwargs)
-      super(CustomClusterTestSuite, self).setup_class()
+      try:
+        self._start_impala_cluster(cluster_args, **kwargs)
+
+        # Fail test if cluster startup succeeded when it was supposed to fail.
+        assert not method.__dict__.get(EXPECT_STARTUP_FAIL, False), \
+            "Expected cluster startup to fail, but startup succeeded."
+
+        super(CustomClusterTestSuite, self).setup_class()
+      except AssertionError as e:
+        if method.__dict__.get(EXPECT_STARTUP_FAIL, False):
+          assert e.msg == "num_known_live_backends did not reach expected value " \
+              "in time", "Unexpected exception: {}".format(e)
+        else:
+          raise e
+      except subprocess.CalledProcessError as e:
+        if method.__dict__.get(EXPECT_STARTUP_FAIL, False):
+          assert search(r"returned non-zero exit status", str(e)), \
+              "Unexpected exception: {}".format(e)
+        else:
+          raise e
+
 
   def teardown_method(self, method):
     if method.__dict__.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
@@ -297,8 +324,16 @@ class CustomClusterTestSuite(ImpalaTestSuite):
           core=f, name=method.__name__))
         os.remove(f)
       # Skip teardown_class as setup was skipped.
-    else:
+    elif not method.__dict__.get(EXPECT_STARTUP_FAIL, False):
+      # Skip teardown (which closes all open clients) if a startup failure is expected
+      # since no clients will have been created.
       super(CustomClusterTestSuite, self).teardown_class()
+
+  def wait_for_wm_init_complete(self, timeout_s=120):
+    """Waits for the catalog to report the workload management initialization process
+       has completed."""
+    self.assert_catalogd_log_contains("INFO", r'Completed workload management '
+        r'initialization', timeout_s=timeout_s)
 
   @classmethod
   def _stop_impala_cluster(cls):
@@ -369,7 +404,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             default_query_options=None,
                             statestored_timeout_s=60,
                             impalad_timeout_s=60,
-                            ignore_pid_on_log_rotation=False):
+                            ignore_pid_on_log_rotation=False,
+                            wait_for_backends=True):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -431,8 +467,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       if "--enable_catalogd_ha" in options:
         expected_subscribers += 1
 
-    statestored.service.wait_for_live_subscribers(expected_subscribers,
-                                                  timeout=statestored_timeout_s)
-    for impalad in cls.cluster.impalads:
-      impalad.service.wait_for_num_known_live_backends(expected_num_impalads,
-                                                       timeout=impalad_timeout_s)
+    if wait_for_backends:
+      statestored.service.wait_for_live_subscribers(expected_subscribers,
+                                                    timeout=statestored_timeout_s)
+      for impalad in cls.cluster.impalads:
+        impalad.service.wait_for_num_known_live_backends(expected_num_impalads,
+                                                         timeout=impalad_timeout_s)

@@ -21,7 +21,7 @@
 #include "kudu/util/test_macros.h"
 #include "kudu/util/version_util.h"
 
-namespace kudu {
+using namespace kudu;
 
 // Assert the overloaded equality operators '==' and '!='.
 TEST(VersionUtilTest, EqualityOperators) {
@@ -126,5 +126,3 @@ TEST(VersionUtilTest, OperatorLessThan) {
   ASSERT_OK(ParseVersion("1.0.1-SNAPSHOT", &rhs));
   ASSERT_TRUE(lhs < rhs);
 }
-
-} // namespace impala

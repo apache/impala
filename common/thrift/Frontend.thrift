@@ -699,7 +699,23 @@ struct TExecRequest {
   // Request for "ALTER TABLE ... CONVERT TO" statements.
   19: optional TConvertTableRequest convert_table_request
 
+  // Tables referenced in the query.
   20: optional list<CatalogObjects.TTableName> tables
+
+  // Columns referenced in a select list.
+  21: optional list<string> select_columns
+
+  // Columns referenced in a where clause.
+  22: optional list<string> where_columns
+
+  // Columns referenced in a join clause.
+  23: optional list<string> join_columns
+
+  // Columns referenced in an aggregation.
+  24: optional list<string> aggregate_columns
+
+  // Columns referenced in an order by clause.
+  25: optional list<string> orderby_columns
 }
 
 // Parameters to FeSupport.cacheJar().

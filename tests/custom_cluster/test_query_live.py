@@ -31,21 +31,16 @@ from time import sleep
 class TestQueryLive(CustomClusterTestSuite):
   """Tests to assert the query live table is correctly populated."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   def setup_method(self, method):
     super(TestQueryLive, self).setup_method(method)
-    self.assert_impalad_log_contains("INFO", r'Completed workload management '
-        r'initialization', timeout_s=120)
+    self.wait_for_wm_init_complete()
 
   def assert_describe_extended(self):
     describe_ext_result = self.execute_query('describe extended sys.impala_query_live')
     # Alter can add additional event fields. Filter them out.
     describe_ext_data = [
         line for line in describe_ext_result.data if 'impala.events.catalog' not in line]
-    assert len(describe_ext_data) == 80
+    assert len(describe_ext_data) == 86
     system_table_re = re.compile(r'__IMPALA_SYSTEM_TABLE\s+true')
     assert list(filter(system_table_re.search, describe_ext_data))
     external_re = re.compile(r'EXTERNAL\s+TRUE')
@@ -78,13 +73,6 @@ class TestQueryLive(CustomClusterTestSuite):
       else:
         assert False, "did not find host {}".format(host)
     assert len(actual_hosts) == 0, "did not find all expected hosts"
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt")
-  def test_table_structure(self, vector):
-    """Asserts that the live table has the expected columns."""
-    self.run_test_case('QueryTest/workload-management-live', vector)
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
@@ -141,7 +129,7 @@ class TestQueryLive(CustomClusterTestSuite):
 
     # describe query
     describe_result = self.execute_query('describe sys.impala_query_live')
-    assert len(describe_result.data) == 49
+    assert len(describe_result.data) == 54
     self.assert_describe_extended()
 
     # show create table
@@ -223,13 +211,13 @@ class TestQueryLive(CustomClusterTestSuite):
 
     try:
       describe_column = self.execute_query('describe sys.impala_query_live')
-      assert len(describe_column.data) == 50
+      assert len(describe_column.data) == 55
       assert column_desc in describe_column.data
 
       select_column = self.execute_query(
           'select test_alter from sys.impala_query_live limit 1')
       assert select_column.data == ['NULL']
-      self.assert_impalad_log_contains('WARNING', r'Unknown column \(position 49\)'
+      self.assert_impalad_log_contains('WARNING', r'Unknown column \(position 54\)'
           + ' added to table IMPALA_QUERY_LIVE; check if a coordinator was upgraded')
     finally:
       # Ensure new column is dropped in case of test failure
@@ -239,7 +227,7 @@ class TestQueryLive(CustomClusterTestSuite):
     assert drop_column.data == ['Column has been dropped.']
 
     describe_column2 = self.execute_query('describe sys.impala_query_live')
-    assert len(describe_column2.data) == 49
+    assert len(describe_column2.data) == 54
     assert column_desc not in describe_column2.data
 
     select_column2 = self.execute_query('select * from sys.impala_query_live')

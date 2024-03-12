@@ -217,6 +217,11 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
   row_materialization_rate = exec_state.row_materialization_rate();
   row_materialization_time = exec_state.row_materialization_timer();
   tables = exec_state.tables();
+  select_columns = exec_state.select_columns();
+  where_columns = exec_state.where_columns();
+  join_columns = exec_state.join_columns();
+  aggregate_columns = exec_state.aggregate_columns();
+  orderby_columns = exec_state.orderby_columns();
 
   // Update name_rows_fetched with the final count after query close.
   base_state->num_rows_fetched = exec_state.num_rows_fetched_counter();

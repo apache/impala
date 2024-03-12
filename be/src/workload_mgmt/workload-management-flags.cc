@@ -93,8 +93,22 @@ DEFINE_validator(query_log_max_queued, [](const char* name, int32_t val) {
   return false;
 });
 
+DEFINE_string_hidden(workload_mgmt_maintenance_user, "impala", "Specifies the user that "
+    "will be used to create and update the workload management database tables.");
+
+DEFINE_validator(workload_mgmt_maintenance_user, [](const char* name, const string& val) {
+  if (FLAGS_enable_workload_mgmt && !regex_match(val, alphanum_underscore_dash)) {
+    LOG(ERROR) << "Invalid value for --" << name
+               << ": must be a valid user when workload management is enabled and must "
+                  "only contain alphanumeric characters, underscores, or dashes";
+    return false;
+  }
+
+  return true;
+});
+
 DEFINE_string_hidden(workload_mgmt_user, "impala", "Specifies the user that will be used "
-    "to create, update, and insert records into the query log table.");
+    "to insert records into the query log table.");
 
 DEFINE_validator(workload_mgmt_user, [](const char* name, const string& val) {
   if (FLAGS_enable_workload_mgmt && !regex_match(val, alphanum_underscore_dash)) {
@@ -171,9 +185,10 @@ DEFINE_string_hidden(query_log_table_props, "", "Comma separated list of additio
     "query log table. Only applies when the table is being created. After table "
     "creation, this property does nothing");
 
-DEFINE_string_hidden(workload_mgmt_schema_version, "1.0.0", "Schema version of the "
-    "workload management table.");
+DEFINE_string_hidden(workload_mgmt_schema_version, "", "Schema version of the workload "
+    "management table. Empty value indicates the latest schema version should be used.");
 
-DEFINE_validator(workload_mgmt_schema_version, [](const char* name, const string& val) {
-  return !val.empty();
-});
+DEFINE_string_hidden(workload_mgmt_drop_tables, "", "Specifies which workload management "
+    "tables to drop at startup. Value must be a comma-separated list of table names only "
+    "(without the database name) used in workload managment. This flag will fix "
+    "situations where the tables have become corrupt and are preventing daemon startup.");

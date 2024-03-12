@@ -191,8 +191,9 @@ class TestObservability(ImpalaTestSuite):
 
   def test_profile(self):
     """Test that expected fields are populated in the profile."""
-    query = """select count(distinct a.int_col) from functional.alltypes a
-        inner join functional.alltypessmall b on (a.id = b.id + cast(sleep(15) as INT))"""
+    query = """select a.month, sum(a.int_col) from functional.alltypes a join
+        functional.alltypestiny b using (id) where a.year > 2000 and b.year > 2000
+        group by a.month order by a.month"""
     result = self.execute_query(query)
 
     assert "Query Type: QUERY" in result.runtime_profile
@@ -201,7 +202,36 @@ class TestObservability(ImpalaTestSuite):
     tables = re.search(r'\n\s+Tables Queried:\s+(.*?)\n', result.runtime_profile)
     assert tables is not None
     assert sorted(tables.group(1).split(",")) \
-        == ["functional.alltypes", "functional.alltypessmall"]
+        == ["functional.alltypes", "functional.alltypestiny"]
+
+    select_columns = re.search(r'\n\s+Select Columns:\s+(.*?)\n', result.runtime_profile)
+    assert select_columns is not None and select_columns.group(1) \
+        == 'functional.alltypes.int_col,functional.alltypes.month'
+    where_columns = re.search(r'\n\s+Where Columns:\s+(.*?)\n', result.runtime_profile)
+    assert where_columns is not None and where_columns.group(1) \
+        == 'functional.alltypes.year,functional.alltypestiny.year'
+    join_columns = re.search(r'\n\s+Join Columns:\s+(.*?)\n', result.runtime_profile)
+    assert join_columns is not None
+    assert join_columns.group(1) == 'functional.alltypes.id,functional.alltypestiny.id'
+    agg_columns = re.search(r'\n\s+Aggregate Columns:\s+(.*?)\n', result.runtime_profile)
+    assert agg_columns is not None
+    assert agg_columns.group(1) == 'functional.alltypes.month'
+    ordby_columns = re.search(r'\n\s+OrderBy Columns:\s+(.*?)\n', result.runtime_profile)
+    assert ordby_columns is not None
+    assert ordby_columns.group(1) == 'functional.alltypes.month'
+
+  def test_minimal_profile(self):
+    """Test that empty fields are omitted from the profile."""
+    result = self.execute_query('select 1')
+    assert "Query Type: QUERY" in result.runtime_profile
+    assert "Query State: " in result.runtime_profile
+    assert "Default Db: default" in result.runtime_profile
+    assert re.search(r'\n\s+Tables Queried:\s+(.*?)\n', result.runtime_profile) is None
+    assert re.search(r'\n\s+Select Columns:\s+(.*?)\n', result.runtime_profile) is None
+    assert re.search(r'\n\s+Where Columns:\s+(.*?)\n', result.runtime_profile) is None
+    assert re.search(r'\n\s+Join Columns:\s+(.*?)\n', result.runtime_profile) is None
+    assert re.search(r'\n\s+Aggregate Columns:\s+(.*?)\n', result.runtime_profile) is None
+    assert re.search(r'\n\s+OrderBy Columns:\s+(.*?)\n', result.runtime_profile) is None
 
   def test_exec_summary(self):
     """Test that the exec summary is populated correctly in every query state"""

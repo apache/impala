@@ -2032,4 +2032,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public boolean shouldConvertToCNF() {
     return isConstant();
   }
+
+  /**
+   * For use with workload management. Returns {@code true} if this instance has child
+   * {@link SlotRef}s that need to be included in the workload management lists of columns
+   * used in the query.
+   */
+  public boolean recordChildrenInWorkloadManagement() { return false; }
 }

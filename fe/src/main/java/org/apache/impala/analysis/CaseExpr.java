@@ -461,4 +461,9 @@ public class CaseExpr extends Expr {
 
   @Override
   public Expr clone() { return new CaseExpr(this); }
+
+  @Override
+  public boolean recordChildrenInWorkloadManagement() {
+    return true;
+  }
 }

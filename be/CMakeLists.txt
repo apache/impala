@@ -393,6 +393,7 @@ if (DOXYGEN_FOUND)
     ${CMAKE_SOURCE_DIR}/be/src/thrift/
     ${CMAKE_SOURCE_DIR}/be/src/util/
     ${CMAKE_SOURCE_DIR}/be/src/transport/
+    ${CMAKE_SOURCE_DIR}/be/src/workload_mgmt/
     )
   # CMake appends using ';'. doxygen wants spaces
   string(REPLACE ";" " " DOXYGEN_INPUT "${CMAKE_DOXYGEN_INPUT}")
@@ -549,6 +550,7 @@ set (IMPALA_LIBS
   Util
   UtilIr
   UtilCache
+  WorkloadMgmt
 )
 
 if (NOT BUILD_WITH_NO_TESTS)
@@ -594,6 +596,7 @@ set (UNIFIED_TEST_LIBS
   ServiceTests
   UtilTests
   UtilCacheTests
+  WorkloadMgmtTests
 )
 set (UNIFIED_TEST_LINK_LIBS
   ${WL_START_GROUP}
@@ -635,6 +638,7 @@ if (BUILD_SHARED_LIBS)
     GlobalFlags
     Common
     Udf
+    WorkloadMgmt
     )
 endif ()
 
@@ -880,6 +884,7 @@ add_subdirectory(src/udf)
 add_subdirectory(src/udf_samples)
 add_subdirectory(src/util)
 add_subdirectory(src/transport)
+add_subdirectory(src/workload_mgmt)
 
 add_subdirectory(src/benchmarks)
 add_subdirectory(src/experiments)
@@ -902,6 +907,7 @@ link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/testutil
   ${CMAKE_CURRENT_SOURCE_DIR}/build/util
   ${CMAKE_CURRENT_SOURCE_DIR}/build/transport
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/workload_mgmt
 )
 
 if (NOT BUILD_WITH_NO_TESTS)

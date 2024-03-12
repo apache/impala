@@ -343,6 +343,26 @@ class ClientRequestState {
   TUniqueId parent_query_id() const { return query_ctx_.parent_query_id; }
   const vector<TTableName>& tables() const { return exec_request().tables; }
 
+  const vector<std::string>& select_columns() const {
+    return exec_request().select_columns;
+  }
+
+  const vector<std::string>& where_columns() const {
+    return exec_request().where_columns;
+  }
+
+  const vector<std::string>& join_columns() const {
+    return exec_request().join_columns;
+  }
+
+  const vector<std::string>& aggregate_columns() const {
+    return exec_request().aggregate_columns;
+  }
+
+  const vector<std::string>& orderby_columns() const {
+    return exec_request().orderby_columns;
+  }
+
   const std::vector<std::string>& GetAnalysisWarnings() const {
     return exec_request().analysis_warnings;
   }

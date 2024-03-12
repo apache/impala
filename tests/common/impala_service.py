@@ -140,9 +140,9 @@ class BaseImpalaService(object):
       LOG.info("Sleeping %ds before next retry." % interval)
       sleep(interval)
 
-    LOG.info("Metric {0} did not reach value {1} in {2}s. Failing...".format(metric_name,
-        expected_value, timeout))
-    self.__metric_timeout_assert(metric_name, expected_value, timeout)
+    LOG.info("Metric {0} did not reach value {1} in {2}s. Actual value was '{3}'. "
+        "Failing...".format(metric_name, expected_value, timeout, value))
+    self.__metric_timeout_assert(metric_name, expected_value, timeout, value)
 
   def __request_minidump(self, pid):
     """
@@ -155,7 +155,7 @@ class BaseImpalaService(object):
     cmd = ["kill", "-SIGUSR1", pid]
     subprocess.check_output(cmd)
 
-  def __metric_timeout_assert(self, metric_name, expected_value, timeout):
+  def __metric_timeout_assert(self, metric_name, expected_value, timeout, actual_value):
     """
     Helper function to dump diagnostic information for debugging a metric timeout and
     then assert.
@@ -207,8 +207,8 @@ class BaseImpalaService(object):
     # This is in the logs directory, so it should be packed up along with everything
     # else for automated jobs.
     assert_string = \
-        "Metric {0} did not reach value {1} in {2}s.\n".format(metric_name,
-            expected_value, timeout)
+        "Metric {0} did not reach value {1} in {2}s. Actual value was '{3}'.\n" \
+        .format(metric_name, expected_value, timeout, actual_value)
     assert_string += json_diag_string
     assert_string += minidump_diag_string
     assert 0, assert_string

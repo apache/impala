@@ -23,6 +23,7 @@ namespace java org.apache.impala.thrift
 # When adding new columns, review the default for query_log_max_queued to maintain
 #   query_log_max_queued * len(TQueryTableColumn) < statement_expression_limit(250k)
 enum TQueryTableColumn {
+    # Original Columns for Workload Management Schema Version 1.0.0
     CLUSTER_ID
     QUERY_ID
     SESSION_ID
@@ -72,4 +73,11 @@ enum TQueryTableColumn {
     SQL
     PLAN
     TABLES_QUERIED
+
+    # Change 1 - Added Columns for Workload Management Schema Version 1.1.0
+    SELECT_COLUMNS
+    WHERE_COLUMNS
+    JOIN_COLUMNS
+    AGGREGATE_COLUMNS
+    ORDERBY_COLUMNS
 }

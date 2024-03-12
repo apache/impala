@@ -294,4 +294,9 @@ public class ArithmeticExpr extends Expr {
 
   @Override
   public Expr clone() { return new ArithmeticExpr(this); }
+
+  @Override
+  public boolean recordChildrenInWorkloadManagement() {
+    return true;
+  }
 }

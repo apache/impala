@@ -472,4 +472,9 @@ public class CastExpr extends Expr {
 
   @Override
   public Expr clone() { return new CastExpr(this); }
+
+  @Override
+  public boolean recordChildrenInWorkloadManagement() {
+    return true;
+  }
 }

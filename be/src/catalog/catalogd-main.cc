@@ -37,6 +37,7 @@
 #include "util/openssl-util.h"
 
 DECLARE_int32(catalog_service_port);
+DECLARE_bool(enable_workload_mgmt);
 DECLARE_int32(metrics_webserver_port);
 DECLARE_int32(webserver_port);
 DECLARE_int32(state_store_subscriber_port);
@@ -101,6 +102,11 @@ int CatalogdMain(int argc, char** argv) {
   ABORT_IF_ERROR(server->Start());
   catalog_server.MarkServiceAsStarted();
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
+
+  if (FLAGS_enable_workload_mgmt && catalog_server.WaitForFirstCatalogUpdate()) {
+    ABORT_IF_ERROR(catalog_server.InitWorkloadManagement());
+  }
+
   server->Join();
 
   return 0;

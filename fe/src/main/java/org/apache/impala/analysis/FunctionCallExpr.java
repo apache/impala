@@ -874,4 +874,9 @@ public class FunctionCallExpr extends Expr {
     shouldConvertToCNF_ = Optional.of(result);
     return result;
   }
+
+  @Override
+  public boolean recordChildrenInWorkloadManagement() {
+    return true;
+  }
 }

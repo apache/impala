@@ -93,6 +93,7 @@ from tests.util.test_file_parser import (
   parse_query_test_file,
   write_test_file)
 from tests.util.thrift_util import create_transport
+from tests.util.retry import retry
 
 # Imports required for Hive Metastore Client
 from hive_metastore import ThriftHiveMetastore
@@ -1328,12 +1329,16 @@ class ImpalaTestSuite(BaseTestSuite):
         "impalad", level, line_regex, expected_count, timeout_s, dry_run)
 
   def assert_catalogd_log_contains(self, level, line_regex, expected_count=1,
-      timeout_s=6, dry_run=False):
+      timeout_s=6, dry_run=False, node_index=0):
     """
     Convenience wrapper around assert_log_contains for catalogd logs.
     """
+    daemon = "catalogd"
+    if node_index > 0:
+      daemon += "_node{}".format(node_index)
+
     return self.assert_log_contains(
-        "catalogd", level, line_regex, expected_count, timeout_s, dry_run)
+        daemon, level, line_regex, expected_count, timeout_s, dry_run)
 
   def assert_log_contains(self, daemon, level, line_regex, expected_count=1, timeout_s=6,
       dry_run=False):
@@ -1356,13 +1361,7 @@ class ImpalaTestSuite(BaseTestSuite):
     while True:
       try:
         found = 0
-        if hasattr(self, "impala_log_dir"):
-          log_dir = self.impala_log_dir
-        else:
-          log_dir = EE_TEST_LOGS_DIR
-        log_file_path = os.path.join(log_dir, daemon + "." + level)
-        # Resolve symlinks to make finding the file easier.
-        log_file_path = os.path.realpath(log_file_path)
+        log_file_path = self.__build_log_path(daemon, level)
         last_re_result = None
         with open(log_file_path) as log_file:
           for line in log_file:
@@ -1413,6 +1412,47 @@ class ImpalaTestSuite(BaseTestSuite):
       elif vector.get_value(name) != exec_option[name]:
         pytest.fail("{}[{}]={} does not match against dimension {}={}.".format(
           EXEC_OPTION_KEY, name, exec_option[name], name, vector.get_value(name)))
+
+  def __build_log_path(self, daemon, level):
+    """Builds a path to a log file for a particular daemon. Does not assert that file
+       actually exists.
+
+       Parameters:
+         - daemon: name of the daemon (e.g. catalog, impalad, statestored)
+         - level:  level of the logfile (e.g. INFO, ERROR, FATAL)
+
+        Return: String containing the full path to the log file for the specified daemon
+                and level. Symlinks are resolved to their real path.
+    """
+    if hasattr(self, "impala_log_dir"):
+      log_dir = self.impala_log_dir
+    else:
+      log_dir = EE_TEST_LOGS_DIR
+    log_file_path = os.path.join(log_dir, daemon + "." + level)
+
+    # Resolve symlinks to make finding the file easier.
+    return os.path.realpath(log_file_path)
+
+  def wait_for_log_exists(self, daemon, level, max_attempts=30, sleep_time_s=1):
+    """Waits for a log file to exist. If the file does not come into existence in the
+       specified timeframe, an assertion fails.
+
+       Parameters:
+         - daemon:       name of the daemon (e.g. catalog, impalad, statestored)
+         - level:        level of the logfile (e.g. INFO, ERROR, FATAL)
+         - max_attempts: number of times to check if the file exists
+         - sleep_time_s: seconds to sleep between each file existence check
+
+        Return: nothing
+    """
+    actual_log_path = self.__build_log_path(daemon, level)
+
+    def exists_func(_):
+      return os.path.exists(actual_log_path)
+
+    assert retry(exists_func, max_attempts, sleep_time_s, 1, True), "file '{}' did not " \
+        "come into existence after {}x{} seconds".format(actual_log_path, max_attempts,
+        sleep_time_s)
 
   @staticmethod
   def get_random_name(prefix='', length=5):

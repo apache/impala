@@ -596,6 +596,11 @@ class ImpaladProcess(BaseImpalaProcess):
   def __get_hs2_http_port(self):
     return int(self._get_port('hs2_http_port', DEFAULT_HS2_HTTP_PORT))
 
+  def is_coordinator(self):
+    """Returns boolean True or False depending on whether or not the current process is
+       a coordinator. Both exclusive and non-exclusive coordinators will return true."""
+    return self._get_arg_value("is_coordinator", "true") == "true"
+
   def start(self, wait_until_ready=True, timeout=30):
     """Starts the impalad and waits until the service is ready to accept connections.
     'timeout' is the amount of time to wait for the Impala server to be in the
