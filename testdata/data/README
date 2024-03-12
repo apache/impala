@@ -1090,6 +1090,23 @@ And converted the HiveCatalog metadata to HadoopCatalog metadata via scripts at 
 And rewrote metadata content to the correct lengths with
 testdata/bin/rewrite-iceberg-metadata.py "" testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_lineitem_multiblock/metadata/
 
+iceberg_spark_compaction_with_dangling_delete:
+1) Create an Iceberg table with Impala and insert some rows.
+  create table functional_parquet.iceberg_spark_compaction_with_dangling_delete (id int, j bigint)
+  STORED AS ICEBERG
+  TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+    'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
+    'iceberg.table_identifier'='ice.iceberg_spark_compaction_with_dangling_delete',
+    'format-version'='2');
+  insert into functional_parquet.iceberg_spark_compaction_with_dangling_delete values
+  (1, 10), (2, 20), (3, 30), (4, 40), (5, 50);
+2) Update one field of a row by Impala. This adds a new data and a new delete file to the table.
+  update functional_parquet.iceberg_spark_compaction_with_dangling_delete set j = -100 where id = 4;
+3) Delete the same row with Impala that we updated in step 2). This adds another delete file.
+  delete from functional_parquet.iceberg_spark_compaction_with_dangling_delete where id = 4;
+4) Run compaction on the table with Spark.
+  spark.sql(s"CALL hadoop_catalog.system.rewrite_data_files(table => 'ice.iceberg_spark_compaction_with_dangling_delete', options => map('min-input-files','2') )")
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

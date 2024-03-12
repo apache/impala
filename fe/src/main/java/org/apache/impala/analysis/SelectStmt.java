@@ -1469,7 +1469,8 @@ public class SelectStmt extends QueryStmt {
     analyzer_.checkStmtExprLimit();
     Table iceTable = ((FeIcebergTable) table).getIcebergApiTable();
     if (Utils.hasDeleteFiles(iceTable, tableRef.getTimeTravelSpec())) {
-      optimizePlainCountStarQueryV2(tableRef, (FeIcebergTable)table);
+      // IMPALA-12894 Part1: turn off the optimisation for count(*) queries.
+      // optimizePlainCountStarQueryV2(tableRef, (FeIcebergTable)table);
     } else {
       optimizePlainCountStarQueryV1(tableRef, iceTable);
     }

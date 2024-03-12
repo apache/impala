@@ -3902,6 +3902,21 @@ hadoop fs -Ddfs.block.size=1048576 -put -f ${IMPALA_HOME}/testdata/LineItemMulti
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_spark_compaction_with_dangling_delete
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+              'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
+              'iceberg.table_identifier'='ice.iceberg_spark_compaction_with_dangling_delete',
+              'format-version'='2');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
+hadoop fs -Ddfs.block.size=1048576 -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/iceberg_spark_compaction_with_dangling_delete /test-warehouse/iceberg_test/hadoop_catalog/ice
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 mv1_alltypes_jointbl
 ---- HIVE_MAJOR_VERSION
 3
