@@ -70,6 +70,7 @@ class StatestoreSubscriber;
 class SystemStateInfo;
 class ThreadResourceMgr;
 class TmpFileMgr;
+class TupleCacheMgr;
 class Webserver;
 class CodeGenCache;
 class TCatalogRegistration;
@@ -162,6 +163,8 @@ class ExecEnv {
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
   CodeGenCache* codegen_cache() const { return codegen_cache_.get(); }
   bool codegen_cache_enabled() const { return codegen_cache_ != nullptr; }
+
+  TupleCacheMgr* tuple_cache_mgr() const { return tuple_cache_mgr_.get(); }
 
   const TNetworkAddress& configured_backend_address() const {
     return configured_backend_address_;
@@ -269,6 +272,9 @@ class ExecEnv {
 
   /// Singleton cache for codegen functions.
   boost::scoped_ptr<CodeGenCache> codegen_cache_;
+
+  /// Singleton cache for tuple caching
+  boost::scoped_ptr<TupleCacheMgr> tuple_cache_mgr_;
 
   /// Not owned by this class
   ImpalaServer* impala_server_ = nullptr;

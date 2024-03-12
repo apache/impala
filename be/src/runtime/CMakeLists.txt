@@ -90,6 +90,7 @@ add_library(Runtime
   timestamp-parse-util.cc
   timestamp-value.cc
   tuple.cc
+  tuple-cache-mgr.cc
   tuple-row.cc
   tmp-file-mgr.cc
 )
@@ -118,6 +119,7 @@ add_library(RuntimeTests STATIC
   thread-resource-mgr-test.cc
   timestamp-test.cc
   tmp-file-mgr-test.cc
+  tuple-cache-mgr-test.cc
 )
 add_dependencies(RuntimeTests gen-deps)
 
@@ -143,6 +145,7 @@ ADD_UNIFIED_BE_LSAN_TEST(decimal-test DecimalTest.*)
 ADD_BE_LSAN_TEST(buffered-tuple-stream-test)
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-fs-cache-test "HdfsFsCacheTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(tmp-file-mgr-test "TmpFileMgrTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(tuple-cache-mgr-test "TupleCacheMgrTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(row-batch-serialize-test "RowBatchSerializeTest.*")
 # Exception to unified be tests: Custom main function with global Frontend object
 ADD_UNIFIED_BE_LSAN_TEST(runtime-filter-test "RuntimeFilterTest.*")

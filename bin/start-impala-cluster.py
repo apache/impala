@@ -177,6 +177,16 @@ parser.add_option("--disable_tuple_caching", default=False, action="store_true",
                   help="If true, sets the tuple caching feature flag "
                   "(allow_tuple_caching) to false. This defaults to false to enable "
                   "tuple caching in the development environment")
+parser.add_option("--tuple_cache_dir", dest="tuple_cache_dir",
+                  default=os.environ.get("TUPLE_CACHE_DIR", None),
+                  help="Specifies a base directory for the result tuple cache.")
+parser.add_option("--tuple_cache_capacity", dest="tuple_cache_capacity",
+                  default=os.environ.get("TUPLE_CACHE_CAPACITY", "1GB"),
+                  help="This specifies the maximum storage usage of the tuple cache "
+                       "each Impala daemon can use.")
+parser.add_option("--tuple_cache_eviction_policy", dest="tuple_cache_eviction_policy",
+                  default="LRU", help="This specifies the cache eviction policy to use "
+                  "for the tuple cache.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -573,6 +583,27 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
         tracing_args = "-data_cache_enable_tracing=true {tracing_args}".format(
             tracing_args=tracing_args)
         args = "{tracing_args} {args}".format(tracing_args=tracing_args, args=args)
+
+    if options.tuple_cache_dir:
+      # create the base directory
+      tuple_cache_path = \
+          os.path.join(options.tuple_cache_dir, "impala-tuplecache-{0}".format(str(i)))
+      # Try creating the directory if it doesn't exist already. May raise exception.
+      if not os.path.exists(tuple_cache_path):
+        os.makedirs(tuple_cache_path)
+      if options.docker_network is None:
+        tuple_cache_path_arg = tuple_cache_path
+      else:
+        # The cache directory will always be mounted at the same path inside the
+        # container. Reuses the data cache dedicated mount.
+        tuple_cache_path_arg = DATA_CACHE_CONTAINER_PATH
+
+      args = "-tuple_cache={dir}:{cap} {args}".format(
+          dir=tuple_cache_path_arg, cap=options.tuple_cache_capacity, args=args)
+
+      # Add the eviction policy
+      args = "-tuple_cache_eviction_policy={policy} {args}".format(
+          policy=options.tuple_cache_eviction_policy, args=args)
 
     if options.enable_admission_service:
       args = "{args} -admission_service_host={host}".format(

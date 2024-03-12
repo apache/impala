@@ -80,6 +80,96 @@
     "key": "impala.codegen-cache.entry-sizes"
   },
   {
+    "description": "The total number of cache hits in the Tuple Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Hits",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.hits"
+  },
+  {
+    "description": "The total number of cache misses in the Tuple Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Misses",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.misses"
+  },
+  {
+    "description": "The total number of Tuple Cache that skipped writing",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Skipped Writing",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.skipped"
+  },
+  {
+    "description": "The total number of Tuple Cache that halted writing",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Halted Writing",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.halted"
+  },
+  {
+    "description": "The number of in-use Tuple Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "In-use Tuple Cache Entries",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala.tuple-cache.entries-in-use"
+  },
+  {
+    "description": "The total bytes of in-use Tuple Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "In-use Tuple Cache Entries total bytes",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala.tuple-cache.entries-in-use-bytes"
+  },
+  {
+    "description": "The number of in-use Tuple Cache Tombstones",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "In-use Tuple Cache Tombstones",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala.tuple-cache.tombstones-in-use"
+  },
+  {
+    "description": "The number of evicted Tuple Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Evicted Tuple Cache Entries",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.entries-evicted"
+  },
+  {
+    "description": "Statistics for Tuple Cache Entries sizes.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Entries Sizes.",
+    "units": "BYTES",
+    "kind": "HISTOGRAM",
+    "key": "impala.tuple-cache.entry-sizes"
+  },
+  {
     "description": "Resource Pool $0 Configured Max Mem Resources",
     "contexts": [
       "RESOURCE_POOL"

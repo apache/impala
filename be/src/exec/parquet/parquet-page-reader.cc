@@ -235,7 +235,6 @@ std::ostream& operator<<(std::ostream& out, const ParquetPageReader::State state
     case ParquetPageReader::State::ToReadHeader: out << "ToReadHeader"; break;
     case ParquetPageReader::State::ToReadData: out << "ToReadData"; break;
   }
-
   return out;
 }
 

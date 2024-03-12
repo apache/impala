@@ -43,6 +43,7 @@
 #include "runtime/query-exec-mgr.h"
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tmp-file-mgr.h"
+#include "runtime/tuple-cache-mgr.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/request-pool-service.h"
@@ -243,6 +244,7 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
     frontend_(external_fe ? nullptr : new Frontend()),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
+    tuple_cache_mgr_(new TupleCacheMgr(metrics_.get())),
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     external_fe_(external_fe),
@@ -389,6 +391,9 @@ Status ExecEnv::Init() {
   } else {
     LOG(INFO) << "CodeGen Cache is disabled.";
   }
+
+  // Initialize the tuple cache
+  RETURN_IF_ERROR(tuple_cache_mgr_->Init());
 
   LOG(INFO) << "Admit memory limit: "
             << PrettyPrinter::Print(admit_mem_limit_, TUnit::BYTES);

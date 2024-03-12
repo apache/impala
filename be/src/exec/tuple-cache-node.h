@@ -20,8 +20,12 @@
 #include <string>
 
 #include "exec/exec-node.h"
+#include "runtime/tuple-cache-mgr.h"
 
 namespace impala {
+
+class TupleFileReader;
+class TupleFileWriter;
 
 class TupleCachePlanNode : public PlanNode {
  public:
@@ -31,23 +35,43 @@ class TupleCachePlanNode : public PlanNode {
 
 /// Node that caches rows produced by a child node.
 ///
-/// This is currently a stub implementation that simply returns the RowBatch produced
-/// by its child node.
-///
-/// FUTURE:
-/// This node looks up the subtree_hash_ in the tuple cache. If an entry exists, this
-/// reads rows from the cache rather than executing its child node. If the entry does not
-/// exist, this will read rows from its child, write them to the cache, and returns them.
+/// If the subtree_hash_ matches an existing cache entry, returns result rows from the
+/// cache rather than from the child. Otherwise reads results from the child, writes them
+/// to cache, and returns them.
+
 class TupleCacheNode : public ExecNode {
  public:
   TupleCacheNode(ObjectPool* pool, const TupleCachePlanNode& pnode,
       const DescriptorTbl& descs);
+  ~TupleCacheNode();
 
+  Status Prepare(RuntimeState* state) override;
   Status Open(RuntimeState* state) override;
   Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
+  Status Reset(RuntimeState* state, RowBatch* row_batch) override;
+  void Close(RuntimeState* state) override;
   void DebugString(int indentation_level, std::stringstream* out) const override;
 private:
   const std::string subtree_hash_;
+
+  /// Number of results that were found in the tuple cache
+  RuntimeProfile::Counter* num_hits_counter_ = nullptr;
+  /// Number of results that were too large for the cache
+  RuntimeProfile::Counter* num_halted_counter_ = nullptr;
+  /// Number of results that skip the cache due to a tombstone
+  RuntimeProfile::Counter* num_skipped_counter_ = nullptr;
+
+  /// Whether any RowBatch from a cache file has been returned to a caller
+  /// It is possible to recover from an error reading a cache file if no
+  /// cached RowBatch has been returned to a caller.
+  bool cached_rowbatch_returned_to_caller_ = false;
+
+  void ReleaseResult();
+
+  /// Reader/Writer for caching
+  TupleCacheMgr::UniqueHandle handle_;
+  std::unique_ptr<TupleFileReader> reader_;
+  std::unique_ptr<TupleFileWriter> writer_;
 };
 
 }
