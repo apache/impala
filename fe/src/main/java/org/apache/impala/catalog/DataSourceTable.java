@@ -41,6 +41,7 @@ import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.JsonUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
@@ -182,6 +183,11 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
     // use an external data source so we need to add the table property with the name
     // of builtin JDBC DataSource.
     tblProperties.put(TBL_PROP_DATA_SRC_NAME, IMPALA_BUILTIN_JDBC_DATASOURCE);
+    // Explicitly add table property "transactional=false" to avoid JDBC table to be
+    // set as transactional table.
+    if (!tblPropertyKeys.contains(AcidUtils.TABLE_IS_TRANSACTIONAL)) {
+      tblProperties.put(AcidUtils.TABLE_IS_TRANSACTIONAL, "false");
+    }
   }
 
   /**

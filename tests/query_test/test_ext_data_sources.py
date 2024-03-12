@@ -20,7 +20,8 @@ from __future__ import absolute_import, division, print_function
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_dimensions import (create_uncompressed_text_dimension,
+    extend_exec_option_dimension)
 
 
 class TestExtDataSources(ImpalaTestSuite):
@@ -35,6 +36,7 @@ class TestExtDataSources(ImpalaTestSuite):
     super(TestExtDataSources, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
+    extend_exec_option_dimension(cls, "exec_single_node_rows_threshold", "100")
 
   def _get_tbl_properties(self, table_name):
     """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""

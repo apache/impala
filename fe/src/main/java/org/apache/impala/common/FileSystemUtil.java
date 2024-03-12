@@ -806,7 +806,7 @@ public class FileSystemUtil {
       Path remoteFilePath = new Path(srcUri);
       Path localFilePath = new Path("file://" + localPath);
       FileSystemUtil.copyToLocal(remoteFilePath, localFilePath);
-    } catch (IOException e) {
+    } catch (Exception e) {
       String errorMsg = "Failed to copy " + srcUri + " to local path: " + localPath;
       LOG.error(errorMsg, e);
       throw new IOException(String.format("%s, %s", errorMsg, e.getMessage()));

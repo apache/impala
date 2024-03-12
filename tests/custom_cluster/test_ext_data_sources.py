@@ -24,6 +24,7 @@ import subprocess
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfApacheHive
+from tests.common.test_dimensions import create_exec_option_dimension
 from time import sleep
 
 
@@ -33,6 +34,12 @@ class TestExtDataSources(CustomClusterTestSuite):
   @classmethod
   def get_workload(self):
     return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestExtDataSources, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        exec_single_node_option=[100]))
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -224,6 +231,12 @@ class TestImpalaExtJdbcTables(CustomClusterTestSuite):
   @classmethod
   def get_workload(cls):
     return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestImpalaExtJdbcTables, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        exec_single_node_option=[100]))
 
   @classmethod
   def _download_impala_jdbc_driver(cls):

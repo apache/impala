@@ -17,6 +17,7 @@
 
 package org.apache.impala.util;
 
+import org.apache.impala.planner.DataSourceScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.ScanNode;
@@ -33,10 +34,10 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
   private boolean valid_ = true;
 
   // Max number of rows processed across all instances of a plan node.
-  private long maxRowsProcessed_ ;
+  private long maxRowsProcessed_ = 0;
 
   // Max number of rows processed per backend impala daemon for a plan node.
-  private long maxRowsProcessedPerNode_;
+  private long maxRowsProcessedPerNode_ = 0;
 
   @Override
   public void visit(PlanNode caller) {
@@ -44,7 +45,17 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
 
     PlanFragment fragment = caller.getFragment();
     int numNodes = fragment == null ? 1 : fragment.getNumNodes();
-    if (caller instanceof ScanNode) {
+    if (caller instanceof DataSourceScanNode) {
+      // Operations on DataSourceScanNode are processed on coordinator.
+      if (fragment == null) {
+        numNodes = ((DataSourceScanNode)caller).getNumNodes();
+      }
+      Preconditions.checkState(numNodes == 1);
+      if (numNodes != 1) {
+        valid_ = false;
+        return;
+      }
+    } else if (caller instanceof ScanNode) {
       long numRows = caller.getInputCardinality();
       ScanNode scan = (ScanNode) caller;
       boolean missingStats = scan.isTableMissingStats() || scan.hasCorruptTableStats();
@@ -70,6 +81,8 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
       maxRowsProcessedPerNode_ = Math.max(maxRowsProcessedPerNode_,
           (long)Math.ceil(numRows / (double)numNodes));
     }
+    Preconditions.checkState(maxRowsProcessed_ >= 0);
+    Preconditions.checkState(maxRowsProcessedPerNode_ >= 0);
   }
 
   public boolean valid() { return valid_; }

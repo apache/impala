@@ -607,8 +607,6 @@ select * from functional.alltypes_datasource;
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-01:EXCHANGE [UNPARTITIONED]
-|
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
    row-size=116B cardinality=5.00K
 ====
@@ -626,9 +624,6 @@ select * from functional.alltypes_datasource limit 1000;
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-01:EXCHANGE [UNPARTITIONED]
-|  limit: 1000
-|
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
    limit: 1000
    row-size=116B cardinality=1.00K
@@ -639,9 +634,6 @@ PLAN-ROOT SINK
 select * from functional.alltypes_datasource where id = 1 limit 7
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
-|
-01:EXCHANGE [UNPARTITIONED]
-|  limit: 7
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
 data source predicates: id = 1

@@ -1540,6 +1540,7 @@ select * from functional.alltypes_datasource
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=4.00MB Threads=1
 Per-Host Resource Estimates: Memory=1.00GB
+Codegen disabled by planner
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypes_datasource
 Analyzed query: SELECT * FROM functional.alltypes_datasource
@@ -1557,6 +1558,7 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
 Per-Host Resource Estimates: Memory=1.01GB
+Codegen disabled by planner
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypes_datasource
 Analyzed query: SELECT * FROM functional.alltypes_datasource
@@ -1581,6 +1583,7 @@ Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B thread-reservation=1
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
 Per-Host Resource Estimates: Memory=1.01GB
+Codegen disabled by planner
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypes_datasource
 Analyzed query: SELECT * FROM functional.alltypes_datasource
