@@ -1352,6 +1352,12 @@ public class PlannerTest extends PlannerTestBase {
   public void testIcebergMetadataTableScans() {
     runPlannerTestFile("iceberg-metadata-table-scan", "functional_parquet",
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("iceberg-metadata-table-joined-with-regular-table",
+        "functional_parquet", options, ImmutableSet.of(
+        PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
   }
 
   /**

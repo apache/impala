@@ -104,7 +104,8 @@ struct FragmentScheduleState {
   /// For scheduling, refer to FInstanceExecParamsPB.per_node_scan_ranges
   FragmentScanRangeAssignment scan_range_assignment;
 
-  bool is_coord_fragment;
+  /// The root fragment of the plan runs on the coordinator.
+  bool is_root_coord_fragment;
   const TPlanFragment& fragment;
 
   /// Fragments that are inputs to an ExchangeNode of this fragment.
@@ -350,7 +351,7 @@ class ScheduleState {
   std::unordered_map<int32_t, const TPlanFragment&> fragments_;
 
   /// Populate fragments_ and fragment_schedule_states_ from request_.plan_exec_info.
-  /// Sets is_coord_fragment and exchange_input_fragments.
+  /// Sets is_root_coord_fragment and exchange_input_fragments.
   /// Also populates plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_.
   void Init();
 

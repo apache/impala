@@ -51,7 +51,8 @@ void FInstanceScheduleState::AddScanRanges(
 
 FragmentScheduleState::FragmentScheduleState(
     const TPlanFragment& fragment, FragmentExecParamsPB* exec_params)
-  : is_coord_fragment(false), fragment(fragment), exec_params(exec_params) {
+  : scan_range_assignment{}, is_root_coord_fragment(false),
+    fragment(fragment), exec_params(exec_params) {
   exec_params->set_fragment_idx(fragment.idx);
 }
 
@@ -90,10 +91,10 @@ void ScheduleState::Init() {
         it->second, query_schedule_pb_->add_fragment_exec_params());
   }
 
-  // mark coordinator fragment
+  // mark root coordinator fragment
   const TPlanFragment& root_fragment = request_.plan_exec_info[0].fragments[0];
   if (RequiresCoordinatorFragment()) {
-    fragment_schedule_states_[root_fragment.idx].is_coord_fragment = true;
+    fragment_schedule_states_[root_fragment.idx].is_root_coord_fragment = true;
     // the coordinator instance gets index 0, generated instance ids start at 1
     next_instance_id_ = CreateInstanceId(next_instance_id_, 1);
   }

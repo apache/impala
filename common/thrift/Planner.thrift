@@ -90,6 +90,10 @@ struct TPlanFragment {
   // greater than 0 if query option COMPUTE_PROCESSING_COST=true. Currently not enforced
   // when fragment need to exceed max_fs_writers query option (see IMPALA-8125).
   14: optional i32 effective_instance_count
+
+  // If true, the fragment must be scheduled on the coordinator. In this case 'partition'
+  // must be UNPARTITIONED.
+  15: required bool is_coordinator_only
 }
 
 // location information for a single scan range

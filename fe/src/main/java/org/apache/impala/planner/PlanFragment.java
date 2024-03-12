@@ -90,6 +90,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   private PlanId planId_;
   private CohortId cohortId_;
 
+  private final boolean coordinatorOnly_;
+
   // root of plan tree executed by this fragment
   private PlanNode planRoot_;
 
@@ -178,12 +180,23 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
    */
-  public PlanFragment(PlanFragmentId id, PlanNode root, DataPartition partition) {
+  public PlanFragment(PlanFragmentId id, PlanNode root, DataPartition partition,
+      boolean coordinatorOnly) {
     fragmentId_ = id;
     planRoot_ = root;
     dataPartition_ = partition;
     outputPartition_ = DataPartition.UNPARTITIONED;
     setFragmentInPlanTree(planRoot_);
+    coordinatorOnly_ = coordinatorOnly;
+
+    // Coordinator-only fragments must be unpartitined as there is only one instance of
+    // them.
+    Preconditions.checkState(!coordinatorOnly ||
+        dataPartition_.equals(DataPartition.UNPARTITIONED));
+  }
+
+  public PlanFragment(PlanFragmentId id, PlanNode root, DataPartition partition) {
+    this(id, root, partition, false);
   }
 
   /**
@@ -480,6 +493,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
   }
 
+  public boolean coordinatorOnly() {
+    return coordinatorOnly_;
+  }
+
   public ResourceProfile getPerInstanceResourceProfile() {
     return perInstanceResourceProfile_;
   }
@@ -618,6 +635,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         perBackendResourceProfile_.getMinMemReservationBytes());
     result.setThread_reservation(perInstanceResourceProfile_.getThreadReservation());
     result.setEffective_instance_count(getAdjustedInstanceCount());
+    result.setIs_coordinator_only(coordinatorOnly_);
     return result;
   }
 

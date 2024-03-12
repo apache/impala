@@ -292,6 +292,26 @@ class TestCoordinators(CustomClusterTestSuite):
       self._stop_impala_cluster()
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(cluster_size=3, num_exclusive_coordinators=1)
+  def test_iceberg_metadata_scan_on_coord(self):
+    """ Tests that Iceberg metadata scan fragments are scheduled on the coordinator. If
+    such a fragment is scheduled on an executor, the below queries fail. Regression test
+    for IMPALA-12809"""
+    # A metadata table joined with itself.
+    q1 = """select count(b.parent_id)
+        from functional_parquet.iceberg_query_metadata.history a
+        join functional_parquet.iceberg_query_metadata.history b
+        on a.snapshot_id = b.snapshot_id"""
+    self.execute_query_expect_success(self.client, q1)
+
+    # A metadata table joined with a regular table.
+    q2 = """select count(DISTINCT a.parent_id, a.is_current_ancestor)
+        from functional_parquet.iceberg_query_metadata.history a
+        join functional_parquet.alltypestiny c
+        on a.is_current_ancestor = c.bool_col"""
+    self.execute_query_expect_success(self.client, q2)
+
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="--queue_wait_timeout_ms=2000",
                                     cluster_size=1, num_exclusive_coordinators=1)
   def test_dedicated_coordinator_without_executors(self):

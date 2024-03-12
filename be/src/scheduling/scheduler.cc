@@ -479,13 +479,19 @@ Status Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_confi
     // the plan that must be executed at the coordinator or an unpartitioned fragment
     // that can be executed anywhere.
     VLOG(3) << "Computing exec params for "
-            << (fragment_state->is_coord_fragment ? "coordinator" : "unpartitioned")
+            << (fragment_state->is_root_coord_fragment
+                ? "root coordinator" : "unpartitioned")
             << " fragment " << fragment_state->fragment.display_name;
     NetworkAddressPB host;
     NetworkAddressPB krpc_host;
-    if (fragment_state->is_coord_fragment || executor_config.group.NumExecutors() == 0) {
-      // The coordinator fragment must be scheduled on the coordinator. Otherwise if
-      // no executors are available, we need to schedule on the coordinator.
+    if (fragment_state->is_root_coord_fragment || fragment.is_coordinator_only ||
+        executor_config.group.NumExecutors() == 0) {
+      // 1. The root coordinator fragment ('fragment_state->is_root_coord_fragment') must
+      // be scheduled on the coordinator.
+      // 2. Some other fragments ('fragment.is_coordinator_only'), such as
+      // Iceberg metadata scanner fragments, must also run on the coordinator.
+      // 3. Otherwise if no executors are available, we need to schedule on the
+      // coordinator.
       const BackendDescriptorPB& coord_desc = executor_config.coord_desc;
       host = coord_desc.address();
       DCHECK(coord_desc.has_krpc_address());
@@ -514,8 +520,8 @@ Status Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_confi
     }
     VLOG(3) << "Scheduled unpartitioned fragment on " << krpc_host;
     DCHECK(IsResolvedAddress(krpc_host));
-    // make sure that the coordinator instance ends up with instance idx 0
-    UniqueIdPB instance_id = fragment_state->is_coord_fragment ?
+    // make sure that the root coordinator instance ends up with instance idx 0
+    UniqueIdPB instance_id = fragment_state->is_root_coord_fragment ?
         state->query_id() :
         state->GetNextInstanceId();
     fragment_state->instance_states.emplace_back(

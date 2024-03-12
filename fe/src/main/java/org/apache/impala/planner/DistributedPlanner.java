@@ -405,11 +405,12 @@ public class DistributedPlanner {
   }
 
   /**
-   * Create an Iceberg Metadata scan fragment. This fragment is UNPARTITIONED, so the
-   * scheduler can schedule it as coordinator only fragment.
+   * Create an Iceberg Metadata scan fragment. This fragment is marked as a coordinator
+   * only fragment.
    */
   private PlanFragment createIcebergMetadataScanFragment(PlanNode node) {
-    return new PlanFragment(ctx_.getNextFragmentId(), node, DataPartition.UNPARTITIONED);
+    return new PlanFragment(ctx_.getNextFragmentId(), node, DataPartition.UNPARTITIONED,
+        /* coordinatorOnly */ true);
   }
 
   /**

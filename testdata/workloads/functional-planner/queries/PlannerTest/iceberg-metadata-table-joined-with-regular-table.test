@@ -1,0 +1,103 @@
+select count(DISTINCT a.parent_id, b.is_current_ancestor)
+from functional_parquet.iceberg_query_metadata.history a
+join functional_parquet.iceberg_alltypes_part.history b
+on a.is_current_ancestor = b.is_current_ancestor
+join functional_parquet.alltypes c
+on a.is_current_ancestor = c.bool_col;
+---- DISTRIBUTEDPLAN
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: count(if(a.parent_id IS NULL, NULL, b.is_current_ancestor))
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(if(a.parent_id IS NULL, NULL, b.is_current_ancestor))
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=8B cardinality=1
+|  in pipelines: 12(GETNEXT), 06(OPEN)
+|
+11:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=8B cardinality=1
+|  in pipelines: 06(GETNEXT)
+|
+F03:PLAN FRAGMENT [HASH(a.parent_id,b.is_current_ancestor)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=128.07MB mem-reservation=34.00MB thread-reservation=1
+06:AGGREGATE
+|  output: count(if(a.parent_id IS NULL, NULL, b.is_current_ancestor))
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=8B cardinality=1
+|  in pipelines: 06(GETNEXT), 10(OPEN)
+|
+10:AGGREGATE
+|  group by: a.parent_id, b.is_current_ancestor
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=9B cardinality=11.96K
+|  in pipelines: 10(GETNEXT), 02(OPEN)
+|
+09:EXCHANGE [HASH(a.parent_id,b.is_current_ancestor)]
+|  mem-estimate=73.97KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=9B cardinality=11.96K
+|  in pipelines: 02(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=4.14GB mem-reservation=104.01MB thread-reservation=2 runtime-filters-memory=2.00MB
+05:AGGREGATE [STREAMING]
+|  group by: a.parent_id, b.is_current_ancestor
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=9B cardinality=11.96K
+|  in pipelines: 02(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.is_current_ancestor = b.is_current_ancestor
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- b.is_current_ancestor
+|  mem-estimate=2.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,0,1 row-size=11B cardinality=11.96K
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+|--08:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=1B cardinality=unavailable
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.00KB mem-reservation=0B thread-reservation=1
+|  01:SCAN ICEBERG METADATA [functional_parquet.iceberg_alltypes_part.HISTORY b]
+|     mem-estimate=0B mem-reservation=0B thread-reservation=0
+|     tuple-ids=1 row-size=1B cardinality=unavailable
+|     in pipelines: 01(GETNEXT)
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c.bool_col = a.is_current_ancestor
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF002[bloom] <- a.is_current_ancestor
+|  mem-estimate=2.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,0 row-size=10B cardinality=11.96K
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+|--07:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0 row-size=9B cardinality=unavailable
+|  |  in pipelines: 00(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=52.00KB mem-reservation=0B thread-reservation=1
+|  00:SCAN ICEBERG METADATA [functional_parquet.iceberg_query_metadata.HISTORY a]
+|     mem-estimate=0B mem-reservation=0B thread-reservation=0
+|     tuple-ids=0 row-size=9B cardinality=unavailable
+|     in pipelines: 00(GETNEXT)
+|
+02:SCAN HDFS [functional_parquet.alltypes c, RANDOM]
+   HDFS partitions=24/24 files=24 size=187.63KB
+   runtime filters: RF000[bloom] -> c.bool_col, RF002[bloom] -> c.bool_col
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=11.96K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=2 row-size=1B cardinality=11.96K
+   in pipelines: 02(GETNEXT)
+====
