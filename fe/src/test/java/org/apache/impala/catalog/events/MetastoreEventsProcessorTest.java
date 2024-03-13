@@ -163,6 +163,7 @@ import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdatedPartition;
+import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
@@ -4006,6 +4007,107 @@ public class MetastoreEventsProcessorTest {
       simulateInsertIntoTransactionalTableFromFS(msTable, null, 1, txnId, writeId);
       MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
     }
+  }
+
+  /**
+   * testEmptyPartitionValues() is a regression test for IMPALA-12856 to mimic the
+   * behavior of metastore returning partitions with empty values
+   * @throws Exception
+   */
+  @Test
+  public void testEmptyPartitionValues() throws Exception {
+    String prevFlag = BackendConfig.INSTANCE.debugActions();
+    try {
+      String tblName = "test_empty";
+      String managedTbl = "managedTblEmptyPartVals";
+      createDatabase(TEST_DB_NAME, null);
+      eventsProcessor_.processEvents();
+      createTable(tblName, true);
+      createTransactionalTable(TEST_DB_NAME, managedTbl, true);
+      eventsProcessor_.processEvents();
+      loadTable(tblName);
+      loadTable(managedTbl);
+      List<List<String>> partVals = new ArrayList<>(1);
+      partVals.add(Arrays.asList("1"));
+      addPartitions(TEST_DB_NAME, tblName, partVals);
+      addPartitions(TEST_DB_NAME, managedTbl, partVals);
+      eventsProcessor_.processEvents();
+      // Fire a reload event and process partition with empty values
+      MetastoreShim.fireReloadEventHelper(catalog_.getMetaStoreClient(), true,
+          Arrays.asList("1"), TEST_DB_NAME, tblName, Collections.emptyMap());
+      BackendConfig.INSTANCE.setDebugActions(DebugUtils.MOCK_EMPTY_PARTITION_VALUES);
+      processEventsAndVerifyStatus(prevFlag);
+      // insert partition event
+      simulateFiringInsertEvent(tblName, false);
+      BackendConfig.INSTANCE.setDebugActions(DebugUtils.MOCK_EMPTY_PARTITION_VALUES);
+      processEventsAndVerifyStatus(prevFlag);
+      // Alter partition event, managed and external table
+      String location = "/path/to/partition";
+      alterPartitions(tblName, partVals, location);
+      alterPartitions(managedTbl, partVals, location);
+      BackendConfig.INSTANCE.setDebugActions(DebugUtils.MOCK_EMPTY_PARTITION_VALUES);
+      processEventsAndVerifyStatus(prevFlag);
+      // Batch partition event
+      partVals.clear();
+      partVals.add(Arrays.asList("2"));
+      partVals.add(Arrays.asList("3"));
+      addPartitions(TEST_DB_NAME, tblName, partVals);
+      eventsProcessor_.processEvents();
+      simulateFiringInsertEvent(tblName, false);
+      BackendConfig.INSTANCE.setDebugActions(DebugUtils.MOCK_EMPTY_PARTITION_VALUES);
+      processEventsAndVerifyStatus(prevFlag);
+      // commit compaction event
+      addPartitions(TEST_DB_NAME, managedTbl, partVals);
+      simulateFiringInsertEvent(managedTbl, true);
+      simulateFiringInsertEvent(managedTbl, true);
+      BackendConfig.INSTANCE.setDebugActions(DebugUtils.MOCK_EMPTY_PARTITION_VALUES);
+      eventsProcessor_.processEvents();
+      // Run hive query to trigger compaction
+      try (HiveJdbcClientPool jdbcClientPool = HiveJdbcClientPool.create(1);
+           HiveJdbcClientPool.HiveJdbcClient hiveClient = jdbcClientPool.getClient()) {
+        hiveClient.executeSql(
+            "alter table " + TEST_DB_NAME + '.' + managedTbl +
+                " partition(p1=1) compact 'minor' and wait");
+      }
+      BackendConfig.INSTANCE.setDebugActions(DebugUtils.MOCK_EMPTY_PARTITION_VALUES);
+      processEventsAndVerifyStatus(prevFlag);
+    } finally {
+      BackendConfig.INSTANCE.setDebugActions(prevFlag);
+    }
+  }
+
+  private void simulateFiringInsertEvent(String tblName, boolean isTransactional)
+      throws Exception {
+    org.apache.hadoop.hive.metastore.api.Table msTbl;
+    List<Partition> partitions;
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      msTbl = metaStoreClient.getHiveClient().getTable(TEST_DB_NAME, tblName);
+      partitions = MetastoreShim
+          .getPartitions(metaStoreClient.getHiveClient(), TEST_DB_NAME, tblName);
+    }
+    assertNotNull(msTbl);
+    assertNotNull(partitions);
+    if (isTransactional) {
+      for (Partition part : partitions) {
+        try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+          long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+          long writeId = MetastoreShim.allocateTableWriteId(
+              client.getHiveClient(), txnId, TEST_DB_NAME, tblName);
+          simulateInsertIntoTransactionalTableFromFS(msTbl, part, 1, txnId, writeId);
+          MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+        }
+      }
+    } else {
+      for (Partition part : partitions) {
+        simulateInsertIntoTableFromFS(msTbl, 1, part, false);
+      }
+    }
+  }
+
+  private void processEventsAndVerifyStatus(String prevFlag) {
+    eventsProcessor_.processEvents();
+    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+    BackendConfig.INSTANCE.setDebugActions(prevFlag);
   }
 
   public void testAllocWriteIdEvent(String tblName, boolean isPartitioned,

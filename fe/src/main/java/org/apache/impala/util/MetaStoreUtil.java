@@ -37,6 +37,7 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.apache.thrift.TException;
 
 import org.apache.impala.thrift.TColumn;
@@ -202,11 +203,34 @@ public class MetaStoreUtil {
       // Fetch these partitions from the metastore.
       List<Partition> partitions = client.getPartitionsByNames(
           msTbl.getDbName(), msTbl.getTableName(), partsToFetch);
+      boolean foundEmptyPartitionVals = false;
+      for (Partition partition : partitions) {
+        if (partition.getValues().isEmpty()) {
+          LOG.error("Received partition with empty values: {}.\nRefetching the " +
+              "partition.", partition);
+          foundEmptyPartitionVals = true;
+          break;
+        }
+      }
+      if (foundEmptyPartitionVals) {
+        // Refetch these partitions from metastore because of empty values list
+        partitions = client.getPartitionsByNames(msTbl.getDbName(),
+            msTbl.getTableName(), partsToFetch);
+      }
       replaceSchemaFromTable(partitions, msTbl);
       fetchedPartitions.addAll(partitions);
       numDone += partitions.size();
       LOG.info("Fetched {}/{} partitions for table {}.{}", numDone, partNames.size(),
           msTbl.getDbName(), msTbl.getTableName());
+    }
+    // This action is required for repro in the unit test (MetastoreEventsProcessorTest)
+    // for IMPALA-12856 to mimic the behavior of metastore returning partitions with
+    // empty values
+    if (DebugUtils.hasDebugAction(BackendConfig.INSTANCE.debugActions(),
+        DebugUtils.MOCK_EMPTY_PARTITION_VALUES)) {
+      for (org.apache.hadoop.hive.metastore.api.Partition msPart : fetchedPartitions) {
+        msPart.getValues().clear();
+      }
     }
     return fetchedPartitions;
   }

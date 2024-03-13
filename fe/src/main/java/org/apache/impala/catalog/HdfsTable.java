@@ -2663,8 +2663,12 @@ public class HdfsTable extends Table implements FeFsTable {
   public List<LiteralExpr> getTypeCompatiblePartValues(List<String> values) {
     List<LiteralExpr> result = new ArrayList<>();
     List<Column> partitionColumns = getClusteringColumns();
-    Preconditions.checkState(partitionColumns.size() == values.size());
-    for (int i=0; i<partitionColumns.size(); ++i) {
+    if (partitionColumns.size() != values.size()) {
+      LOG.error("Unmatched numbers of partition values: expected={}, actual={} for " +
+          "table: {}." , partitionColumns.size(), values.size(), getFullName());
+      return null;
+    }
+    for (int i = 0; i < partitionColumns.size(); ++i) {
       Pair<String, LiteralExpr> pair = getPartitionExprFromValue(values.get(i),
           partitionColumns.get(i).getType());
       if (pair == null) {
@@ -2896,10 +2900,21 @@ public class HdfsTable extends Table implements FeFsTable {
 
   /**
    * Reloads the HdfsPartitions which correspond to the given partNames. Returns the
+   * number of partitions which were reloaded. This method also reloads file metadata
+   * of all the partitions for the given partNames
+   */
+  public int reloadPartitionsFromNames(IMetaStoreClient client,
+      List<String> partNames, String reason) throws CatalogException {
+    return reloadPartitionsFromNames(-1L, client, partNames, reason,
+        FileMetadataLoadOpts.FORCE_LOAD);
+  }
+
+  /**
+   * Reloads the HdfsPartitions which correspond to the given partNames. Returns the
    * number of partitions which were reloaded.
    * fileMetadataLoadOpts: decides how to reload file metadata for the partitions
    */
-  public int reloadPartitionsFromNames(IMetaStoreClient client,
+  public int reloadPartitionsFromNames(long eventId, IMetaStoreClient client,
       List<String> partNames, String reason, FileMetadataLoadOpts fileMetadataLoadOpts)
       throws CatalogException {
     Preconditions.checkState(partNames != null && !partNames.isEmpty());
@@ -2910,6 +2925,14 @@ public class HdfsTable extends Table implements FeFsTable {
     try {
       hmsPartitions = MetaStoreUtil.fetchPartitionsByName(client, partNames, msTable_);
       for (Partition partition : hmsPartitions) {
+        if (partition.getValues().isEmpty()) {
+          LOG.error("EventId: {}, EventType: {}, Received partition with empty values:" +
+              " {}.\nThis table will be invalidated.", eventId, reason, partition);
+          throw new InvalidObjectException(String.format("Unmatched numbers of " +
+              "partition values: expected=%d, actual=%d for table:%s",
+              getClusteringColumns().size(), partition.getValues().size(),
+              getFullName()));
+        }
         List<LiteralExpr> partExprs = getTypeCompatiblePartValues(partition.getValues());
         HdfsPartition hdfsPartition = getPartition(partExprs);
         if (hdfsPartition != null) {
@@ -2934,13 +2957,14 @@ public class HdfsTable extends Table implements FeFsTable {
   /**
    * Reload the HdfsPartitions which correspond to the given partitions.
    *
+   * @param eventId of the event from metastore
    * @param client is the HMS client to be used.
    * @param partsFromEvent Partition objects from the event.
    * @param loadFileMetadata If true, file metadata will be reloaded.
    * @param reason Reason for reloading the partitions for logging purposes.
    * @return the number of partitions which were reloaded.
    */
-  public int reloadPartitionsFromEvent(IMetaStoreClient client,
+  public int reloadPartitionsFromEvent(long eventId, IMetaStoreClient client,
       List<Partition> partsFromEvent, boolean loadFileMetadata, String reason)
       throws CatalogException {
     Preconditions.checkArgument(partsFromEvent != null
@@ -2950,13 +2974,20 @@ public class HdfsTable extends Table implements FeFsTable {
     LOG.info("Reloading partition metadata for table: {} ({})", getFullName(), reason);
     Map<Partition, HdfsPartition> hmsPartToHdfsPart = new HashMap<>();
     for (Partition partition : partsFromEvent) {
+      // If the partition values are empty, ignore the event as partition cannot be
+      // refetched
+      if (partition.getValues().isEmpty()) {
+        LOG.error("EventId: {}, EventType: {}, Received partition with empty values: " +
+            "{}.\nIgnoring reloading the partition.", eventId, reason, partition);
+        continue;
+      }
       List<LiteralExpr> partExprs = getTypeCompatiblePartValues(partition.getValues());
       HdfsPartition hdfsPartition = getPartition(partExprs);
       // only reload partitions that have more recent write id
       if (hdfsPartition != null
           && (!AcidUtils.isTransactionalTable(msTable_.getParameters())
-                 || hdfsPartition.getWriteId()
-                     <= MetastoreShim.getWriteIdFromMSPartition(partition))) {
+              || hdfsPartition.getWriteId()
+                  <= MetastoreShim.getWriteIdFromMSPartition(partition))) {
         hmsPartToHdfsPart.put(partition, hdfsPartition);
       }
     }

@@ -90,6 +90,11 @@ public class DebugUtils {
   public static final String WAIT_SYNC_DDL_VER_DELAY =
       "catalogd_wait_sync_ddl_version_delay";
 
+  // debug action label for mock that metastore returns partitions with empty values
+  // This action is required for repro in the unit test for IMPALA-12856 to mimic the
+  // behavior of metastore returning partitions with empty values
+  public static final String MOCK_EMPTY_PARTITION_VALUES = "mock_empty_partition_values";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */

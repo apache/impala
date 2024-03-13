@@ -5068,7 +5068,7 @@ public class CatalogOpExecutor {
       // the partitions from HMS.
       int numOfPartsReloaded;
       try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-        numOfPartsReloaded = hdfsTable.reloadPartitionsFromNames(
+        numOfPartsReloaded = hdfsTable.reloadPartitionsFromNames(eventId,
             metaStoreClient.getHiveClient(), partNames, reason, fileMetadataLoadOpts);
       }
       modification.updateTableCatalogVersion();
@@ -5151,7 +5151,7 @@ public class CatalogOpExecutor {
       HdfsTable hdfsTable = (HdfsTable) table;
       int numOfPartsReloaded;
       try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-        numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(
+        numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(eventId,
             metaStoreClient.getHiveClient(), partsFromEvent, false, reason);
       }
       modification.updateTableCatalogVersion();
@@ -5265,7 +5265,7 @@ public class CatalogOpExecutor {
           MutableValidWriteIdList.WriteIdStatus.COMMITTED);
       int numOfPartsReloaded;
       try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-        numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(
+        numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(eventId,
             metaStoreClient.getHiveClient(), partsToRefresh, true, reason);
       }
       modification.updateTableCatalogVersion();

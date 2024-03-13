@@ -467,6 +467,10 @@ public class BackendConfig {
 
   public String debugActions() { return backendCfg_.debug_actions; }
 
+  public void setDebugActions(String debugActions) {
+    backendCfg_.debug_actions = debugActions;
+  }
+
   public boolean isInvalidateMetadataOnEventProcessFailureEnabled() {
     return backendCfg_.invalidate_metadata_on_event_processing_failure;
   }
