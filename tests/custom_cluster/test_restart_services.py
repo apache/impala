@@ -118,6 +118,9 @@ class TestRestart(CustomClusterTestSuite):
       self.wait_for_state(handle, QueryState.EXCEPTION, 20, client=client)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--catalog_topic_mode=minimal",
+      impalad_args="--use_local_catalog=true")
   def test_catalog_connection_retries(self):
     """Test that connections to the catalogd are retried, both new connections and cached
     connections."""

@@ -522,6 +522,26 @@
     "key": "catalog.server.client-cache.total-clients"
   },
   {
+    "description": "The number of clients currently in use by the Catalog Server client cache for lightweight RPC.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog Server Client Cache Clients In Use for lightweight RPC",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.server.client-cache.clients-in-use-for-lightweight-rpc"
+  },
+  {
+    "description": "The total number of clients in the Catalog Server client cache for lightweight RPC.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog Server Client Cache Total Clients for lightweight RPC",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.server.client-cache.total-clients-for-lightweight-rpc"
+  },
+  {
     "description": "The full version string of the Catalog Server.",
     "contexts": [
       "CATALOGSERVER"

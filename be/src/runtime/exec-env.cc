@@ -161,8 +161,13 @@ DEFINE_int32(backend_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
 
 DEFINE_int32(catalog_client_connection_num_retries, 10, "The number of times connections "
     "or RPCs to the catalog should be retried.");
-DEFINE_int32(catalog_client_rpc_timeout_ms, 0, "(Advanced) The underlying TSocket "
-    "send/recv timeout in milliseconds for a catalog client RPC.");
+DEFINE_int32(catalog_client_rpc_timeout_ms, 36000000, "(Advanced) The underlying TSocket "
+    "send/recv timeout in milliseconds for a catalog client RPC. The default is 10 hours."
+    " Operations take longer than this are usually abnormal and hanging.");
+DEFINE_int32(catalog_lightweight_rpc_timeout_ms, 1800000, "(Advanced) The underlying "
+    "TSocket send/recv timeout in milliseconds for a lightweight catalog RPC which "
+    "shouldn't take long in catalogd, e.g. fetching db/table list. The default is 30 "
+    "minutes which is long enough to tolerate TCP timeout due to retransmission.");
 DEFINE_int32(catalog_client_rpc_retry_interval_ms, 3000, "(Advanced) The time to wait "
     "before retrying when the catalog RPC client fails to connect to catalogd or when "
     "RPCs to the catalogd fail.");
@@ -224,6 +229,10 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
     // ensure that both RPCs and connections are retried.
     catalogd_client_cache_(new CatalogServiceClientCache(1, 0,
         FLAGS_catalog_client_rpc_timeout_ms, FLAGS_catalog_client_rpc_timeout_ms, "",
+        !FLAGS_ssl_client_ca_certificate.empty())),
+    catalogd_lightweight_req_client_cache_(new CatalogServiceClientCache(1, 0,
+        FLAGS_catalog_lightweight_rpc_timeout_ms,
+        FLAGS_catalog_lightweight_rpc_timeout_ms, "",
         !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new io::DiskIoMgr()),
@@ -429,6 +438,8 @@ Status ExecEnv::Init() {
     RETURN_IF_ERROR(metrics_webserver_->Start());
   }
   catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
+  catalogd_lightweight_req_client_cache_->InitMetrics(
+      metrics_.get(), "catalog.server", "for-lightweight-rpc");
   RETURN_IF_ERROR(RegisterMemoryMetrics(
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
   // Initialize impalad metrics

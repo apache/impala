@@ -560,6 +560,20 @@ class TestLocalCatalogObservability(CustomClusterTestSuite):
     finally:
       client.close()
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true",
+      catalogd_args="--catalog_topic_mode=minimal")
+  def test_lightweight_rpc_metrics(self):
+    """Verify catalogd client cache for lightweight RPCs is used correctly"""
+    # Fetching the db and table list should be lightweight requests
+    self.execute_query("describe database functional")
+    self.execute_query("show tables in functional")
+    impalad = self.cluster.impalads[0].service
+    assert 0 == impalad.get_metric_value("catalog.server.client-cache.total-clients")
+    assert 1 == impalad.get_metric_value(
+        "catalog.server.client-cache.total-clients-for-lightweight-rpc")
+
 
 class TestFullAcid(CustomClusterTestSuite):
   @classmethod

@@ -123,7 +123,8 @@ class ClientCacheHelper {
 
   /// Creates two metrics for this cache measuring the number of clients currently used,
   /// and the total number in the cache.
-  void InitMetrics(MetricGroup* metrics, const std::string& key_prefix);
+  void InitMetrics(MetricGroup* metrics, const std::string& key_prefix,
+      const std::string& key_appendix);
 
  private:
   template <class T> friend class ClientCache;
@@ -447,8 +448,9 @@ class ClientCache {
   /// metrics have keys that are prefixed by the key_prefix argument
   /// (which should not end in a period).
   /// Must be called before the cache is used, otherwise the metrics might be wrong
-  void InitMetrics(MetricGroup* metrics, const std::string& key_prefix) {
-    client_cache_helper_.InitMetrics(metrics, key_prefix);
+  void InitMetrics(MetricGroup* metrics, const std::string& key_prefix,
+      const std::string& key_appendix = "") {
+    client_cache_helper_.InitMetrics(metrics, key_prefix, key_appendix);
   }
 
  private:
