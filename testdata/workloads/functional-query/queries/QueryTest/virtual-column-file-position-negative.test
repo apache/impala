@@ -1,0 +1,41 @@
+====
+---- QUERY
+select file__position from functional.alltypes
+---- CATCH
+Virtual column FILE__POSITION is not supported for TEXT files.
+====
+---- QUERY
+select file__position from functional_avro.alltypes
+---- CATCH
+Virtual column FILE__POSITION is not supported for AVRO files.
+====
+---- QUERY
+select file__position from functional_json.alltypes
+---- CATCH
+Virtual column FILE__POSITION is not supported for JSON files.
+====
+---- QUERY
+select file__position from functional_seq.alltypes
+---- CATCH
+Virtual column FILE__POSITION is not supported for SEQUENCE_FILE files.
+====
+---- QUERY
+select file__position from functional_rc.alltypes
+---- CATCH
+Virtual column FILE__POSITION is not supported for RC_FILE files.
+====
+---- QUERY
+select file__position, year, month, id, date_string_col from functional.alltypesmixedformat where year=2009 and month = 3;
+---- CATCH
+Virtual column FILE__POSITION is not supported for RC_FILE files.
+====
+---- QUERY
+select file__position, year, month, id, date_string_col from functional.alltypesmixedformat where year=2009 and month = 1;
+---- CATCH
+Virtual column FILE__POSITION is not supported for TEXT files.
+====
+---- QUERY
+select file__position, year, month, id, date_string_col from functional.alltypesmixedformat;
+---- CATCH
+Virtual column FILE__POSITION is not supported
+====

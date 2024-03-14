@@ -175,6 +175,23 @@ class TestScannersVirtualColumns(ImpalaTestSuite):
     self.run_test_case('QueryTest/mixing-virtual-columns', vector, unique_database)
 
 
+class TestScannersVirtualColumnsNegative(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScannersVirtualColumnsNegative, cls).add_test_dimensions()
+    # In the tests we explicitly refer to the databases, i.e. no need to
+    # run this test with multiple file formats.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+
+  def test_virtual_column_file_position_negative(self, vector):
+    self.run_test_case('QueryTest/virtual-column-file-position-negative', vector)
+
+
 class TestIcebergVirtualColumns(ImpalaTestSuite):
 
   @classmethod

@@ -155,3 +155,34 @@ order by id;
 ---- TYPES
 BIGINT, BIGINT, INT
 ====
+---- QUERY
+# Regression test for IMPALA-12903. The following query uses static pruning. The surviving
+# partitions have file formats that support virtual column FILE__POSITION.
+select file__position, year, month, id, date_string_col
+from functional.alltypesmixedformat
+where year=2009 and month = 4 and id < 905
+order by id;
+---- RESULTS
+regex:\d+,2009,4,900,'04/01/09'
+regex:\d+,2009,4,901,'04/01/09'
+regex:\d+,2009,4,902,'04/01/09'
+regex:\d+,2009,4,903,'04/01/09'
+regex:\d+,2009,4,904,'04/01/09'
+---- TYPES
+BIGINT,INT,INT,INT,STRING
+====
+---- QUERY
+# Regression test for IMPALA-12903. The following query uses dynamic pruning. The
+# surviving partitions have file formats that support virtual column FILE__POSITION.
+select straight_join lhs.file__position, lhs.year, lhs.month, lhs.id
+from functional.alltypesmixedformat lhs, functional.alltypes rhs
+where lhs.id = rhs.id and lhs.year = rhs.year and lhs.month = rhs.month and
+    rhs.id > 900 and rhs.id < 900 + rhs.month
+order by id;
+---- RESULTS
+regex:\d+,2009,4,901
+regex:\d+,2009,4,902
+regex:\d+,2009,4,903
+---- TYPES
+BIGINT,INT,INT,INT
+====

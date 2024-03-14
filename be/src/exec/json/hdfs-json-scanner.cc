@@ -95,8 +95,10 @@ void HdfsJsonScanner::Close(RowBatch* row_batch) {
   // Verify all resources (if any) have been transferred or freed.
   DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
-  scan_node_->RangeComplete(THdfsFileFormat::JSON,
-      stream_->file_desc()->file_compression);
+  if (stream_ != nullptr) {
+    scan_node_->RangeComplete(THdfsFileFormat::JSON,
+        stream_->file_desc()->file_compression);
+  }
   CloseInternal();
 }
 

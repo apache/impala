@@ -209,7 +209,7 @@ void HdfsTextScanner::Close(RowBatch* row_batch) {
   DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(boundary_pool_.get()->total_allocated_bytes(), 0);
-  if (!only_parsing_header_) {
+  if (!only_parsing_header_ && stream_ != nullptr) {
     scan_node_->RangeComplete(THdfsFileFormat::TEXT,
         stream_->file_desc()->file_compression);
   }
