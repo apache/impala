@@ -72,7 +72,7 @@ class TestHS2(HS2TestSuite):
 
   def test_open_session_query_options(self):
     """Check that OpenSession sets query options"""
-    configuration = {'MAX_ERRORS': '45678', 'NUM_NODES': '1234',
+    configuration = {'MAX_ERRORS': '45678', 'NUM_NODES': '1',
                      'MAX_NUM_RUNTIME_FILTERS': '333'}
     with ScopedSession(self.hs2_client, configuration=configuration) as session:
       TestHS2.check_response(session)

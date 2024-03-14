@@ -270,6 +270,7 @@ TEST(QueryOptions, SetIntOptions) {
           {1, qc.MAX_FRAGMENT_INSTANCES_PER_NODE}},
       {MAKE_OPTIONDEF(max_num_filters_aggregated_per_host),
           {-1, I32_MAX}},
+      {MAKE_OPTIONDEF(num_nodes),                      {0, 1}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int32_t>& option_def = test_case.first;

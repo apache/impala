@@ -243,7 +243,8 @@ Status impala::SetQueryOption(const string& key, const string& value,
       };
       case TImpalaQueryOptions::NUM_NODES: {
         int32_t int32_t_val = 0;
-        RETURN_IF_ERROR(QueryOptionParser::Parse<int32_t>(option, value, &int32_t_val));
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<int32_t>(
+            option, value, 0, 1, &int32_t_val));
         query_options->__set_num_nodes(int32_t_val);
         break;
       };
