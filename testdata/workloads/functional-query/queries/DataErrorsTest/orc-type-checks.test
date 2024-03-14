@@ -1,71 +1,71 @@
 ====
 ---- QUERY
-select c1 from illtypes
+select id from illtypes
 ---- CATCH
 Type mismatch: table column BOOLEAN is map to column int in ORC file
 ====
 ---- QUERY
-select c2 from illtypes
+select bool_col from illtypes
 ---- CATCH
 Type mismatch: table column FLOAT is map to column boolean in ORC file
 ====
 ---- QUERY
-select c3 from illtypes
+select tinyint_col from illtypes
 ---- CATCH
 Type mismatch: table column BOOLEAN is map to column tinyint in ORC file
 ====
 ---- QUERY
-select c4 from illtypes
+select smallint_col from illtypes
 ---- CATCH
 Type mismatch: table column TINYINT is map to column smallint in ORC file
 ====
 ---- QUERY
-select c5 from illtypes
+select int_col from illtypes
 ---- CATCH
 Type mismatch: table column SMALLINT is map to column int in ORC file
 ====
 ---- QUERY
-select c6 from illtypes
+select bigint_col from illtypes
 ---- CATCH
 Type mismatch: table column INT is map to column bigint in ORC file
 ====
 ---- QUERY
-select c7 from illtypes
+select float_col from illtypes
 ---- CATCH
 Type mismatch: table column BOOLEAN is map to column float in ORC file
 ====
 ---- QUERY
-select c8 from illtypes
+select double_col from illtypes
 ---- CATCH
 Type mismatch: table column STRING is map to column double in ORC file
 ====
 ---- QUERY
-select c9 from illtypes
+select date_string_col from illtypes
 ---- CATCH
 Type mismatch: table column INT is map to column string in ORC file
 ====
 ---- QUERY
-select c10 from illtypes
+select string_col from illtypes
 ---- CATCH
 Type mismatch: table column FLOAT is map to column string in ORC file
 ====
 ---- QUERY
-select c11 from illtypes
+select timestamp_col from illtypes
 ---- CATCH
 Type mismatch: table column BIGINT is map to column timestamp in ORC file
 ====
 ---- QUERY
-select c11 from illtypes_ts_to_date
+select timestamp_col from illtypes_ts_to_date
 ---- CATCH
 Type mismatch: table column DATE is map to column timestamp in ORC file
 ====
 ---- QUERY
-select c2 from illtypes_date_tbl
+select date_col from illtypes_date_tbl
 ---- CATCH
 Type mismatch: table column TIMESTAMP is map to column date in ORC file
 ====
 ---- QUERY
-select * from safetypes order by c1
+select * from safetypes order by id
 ---- TYPES
 bigint,boolean,smallint,int,bigint,bigint,double,double,char,string,timestamp,int,int
 ---- RESULTS
@@ -150,8 +150,8 @@ insert into $DATABASE.union_complextypes
 create external table $DATABASE.ill_complextypes(
   id int,
   u map<int, double>,
-  int_map map<string, int>,
-  int_array array<int>)
+  int_array map<string, int>,
+  int_map array<int>)
 stored as orc
 location '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes';
 ====
@@ -172,17 +172,17 @@ File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
  Column type: map, ORC schema: uniontype<int,boolean>
 ====
 ---- QUERY
-select m.key, m.value from ill_complextypes.int_map m
----- CATCH
-File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
- has an incompatible ORC schema for column '$DATABASE.ill_complextypes.int_map',
- Column type: map, ORC schema: array<int>
-====
----- QUERY
-select a.item from ill_complextypes.int_array a
+select m.key, m.value from ill_complextypes.int_array m
 ---- CATCH
 File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
  has an incompatible ORC schema for column '$DATABASE.ill_complextypes.int_array',
+ Column type: map, ORC schema: array<int>
+====
+---- QUERY
+select a.item from ill_complextypes.int_map a
+---- CATCH
+File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
+ has an incompatible ORC schema for column '$DATABASE.ill_complextypes.int_map',
  Column type: array, ORC schema: map<string,int>
 ====
 ---- HIVE_QUERY

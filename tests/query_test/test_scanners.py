@@ -42,6 +42,7 @@ from tests.common.skip import (
     SkipIfLocal,
     SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (
+    add_exec_option_dimension,
     create_single_exec_option_dimension,
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -1639,7 +1640,7 @@ class TestOrc(ImpalaTestSuite):
     super(TestOrc, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'orc')
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
+    add_exec_option_dimension(cls, 'orc_schema_resolution', [0, 1])
 
   @SkipIfFS.hdfs_small_block
   @SkipIfLocal.multiple_impalad
@@ -1713,6 +1714,8 @@ class TestOrc(ImpalaTestSuite):
   # queries that hang in some cases (IMPALA-9345). It would be possible to separate
   # the tests that use Hive and run most tests on S3, but I think that running these on
   # S3 doesn't add too much coverage.
+  # TODO(IMPALA-12349): Rename the columns to use the correct names (see
+  # test_type_conversions_hive3).
   @SkipIfFS.hive
   @SkipIfHive3.non_acid
   def test_type_conversions_hive2(self, vector, unique_database):
@@ -1772,23 +1775,28 @@ class TestOrc(ImpalaTestSuite):
     tmp_alltypes = unique_database + ".alltypes"
     create_plain_orc_table("functional.alltypestiny", tmp_alltypes)
     tbl_loc = self._get_table_location(tmp_alltypes, vector)
-    self.client.execute("""create table %s.illtypes (c1 boolean, c2 float,
-        c3 boolean, c4 tinyint, c5 smallint, c6 int, c7 boolean, c8 string, c9 int,
-        c10 float, c11 bigint) partitioned by (year int, month int) stored as ORC
+    self.client.execute("""create table %s.illtypes (id boolean, bool_col float,
+        tinyint_col boolean, smallint_col tinyint, int_col smallint, bigint_col int,
+        float_col boolean, double_col string, date_string_col int, string_col float,
+        timestamp_col bigint) partitioned by (year int, month int) stored as ORC
         location '%s'""" % (unique_database, tbl_loc))
-    self.client.execute("""create table %s.illtypes_ts_to_date (c1 boolean,
-        c2 float, c3 boolean, c4 tinyint, c5 smallint, c6 int, c7 boolean, c8 string,
-        c9 int, c10 float, c11 date) partitioned by (year int, month int) stored as ORC
+    self.client.execute("""create table %s.illtypes_ts_to_date (id boolean,
+        bool_col float, tinyint_col boolean, smallint_col tinyint, int_col smallint,
+        bigint_col int, float_col boolean, double_col string,
+        date_string_col int, string_col float, timestamp_col date)
+        partitioned by (year int, month int) stored as ORC
         location '%s'""" % (unique_database, tbl_loc))
-    self.client.execute("""create table %s.safetypes (c1 bigint, c2 boolean,
-        c3 smallint, c4 int, c5 bigint, c6 bigint, c7 double, c8 double, c9 char(3),
-        c10 varchar(3), c11 timestamp) partitioned by (year int, month int) stored as ORC
+    self.client.execute("""create table %s.safetypes (id bigint, bool_col boolean,
+        tinyint_col smallint, smallint_col int, int_col bigint, bigint_col bigint,
+        float_col double, double_col double, date_string_col char(3),
+        string_col varchar(3), timestamp_col timestamp)
+        partitioned by (year int, month int) stored as ORC
         location '%s'""" % (unique_database, tbl_loc))
     tmp_date_tbl = unique_database + ".date_tbl"
     create_plain_orc_table("functional.date_tbl", tmp_date_tbl)
     date_tbl_loc = self._get_table_location(tmp_date_tbl, vector)
-    self.client.execute("""create table %s.illtypes_date_tbl (c1 boolean,
-        c2 timestamp) partitioned by (date_part date) stored as ORC location '%s'"""
+    self.client.execute("""create table %s.illtypes_date_tbl (id boolean,
+        date_col timestamp) partitioned by (date_part date) stored as ORC location '%s'"""
         % (unique_database, date_tbl_loc))
     self.client.execute("alter table %s.illtypes recover partitions" % unique_database)
     self.client.execute("alter table %s.illtypes_ts_to_date recover partitions"
