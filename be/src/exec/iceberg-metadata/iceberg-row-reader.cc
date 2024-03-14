@@ -89,7 +89,8 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
     return Status::OK();
   }
   void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-  switch (slot_desc->type().type) {
+  const ColumnType& type = slot_desc->type();
+  switch (type.type) {
     case TYPE_BOOLEAN: { // java.lang.Boolean
       RETURN_IF_ERROR(WriteBooleanSlot(env, accessed_value, slot));
       break;
@@ -103,7 +104,12 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
       RETURN_IF_ERROR(WriteTimeStampSlot(env, accessed_value, slot));
       break;
     } case TYPE_STRING: { // java.lang.String
-      RETURN_IF_ERROR(WriteStringSlot(env, accessed_value, slot, tuple_data_pool));
+      if (type.IsBinaryType()) {
+        // TODO IMPALA-12651,IMPALA-11491: Display BINARY correctly instead of NULLing it.
+        tuple->SetNull(slot_desc->null_indicator_offset());
+      } else {
+        RETURN_IF_ERROR(WriteStringSlot(env, accessed_value, slot, tuple_data_pool));
+      }
       break;
     } case TYPE_STRUCT: { // Struct type is not used by Impala to access values.
       DCHECK(struct_like_row != nullptr);
@@ -126,8 +132,6 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
   }
   return Status::OK();
 }
-
-
 
 Status IcebergRowReader::WriteBooleanSlot(JNIEnv* env, const jobject &accessed_value,
     void* slot) {

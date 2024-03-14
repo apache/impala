@@ -457,6 +457,19 @@ public class Path {
   }
 
   /**
+   * Returns whether the given path belongs to a (possibly nested) field from an Iceberg
+   * metadata table.
+   */
+  public boolean comesFromIcebergMetadataTable() {
+    Preconditions.checkState(rootTable_ != null || rootDesc_ != null);
+    if (rootDesc_ != null) {
+      return rootDesc_.getTable() instanceof IcebergMetadataTable;
+    } else {
+      return rootTable_ instanceof IcebergMetadataTable;
+    }
+  }
+
+  /**
    * Returns the absolute explicit path starting from the fully-qualified table name.
    * The goal is produce a canonical non-ambiguous path that can be used as an
    * identifier for table and slot references.
