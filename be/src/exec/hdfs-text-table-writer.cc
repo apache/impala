@@ -100,11 +100,9 @@ Status HdfsTextTableWriter::AppendRows(
             StringValue sv(val_ptr, StringValue::UnpaddedCharLength(val_ptr, type.len));
             PrintEscaped(&sv);
           } else if (type.IsVarLenStringType()) {
-            const ColumnDescriptor& col_desc =
-                table_desc_->col_descs()[num_partition_cols + j];
             const StringValue* string_value = reinterpret_cast<const StringValue*>(value);
-            if (col_desc.auxType().IsBinaryStringSubtype()) {
-              // TODO: try to find a more efficient imlementation
+            if (type.IsBinaryType()) {
+              // TODO: try to find a more efficient implementation
               Base64Encode(
                   string_value->Ptr() , string_value->Len(), &rowbatch_stringstream_);
             } else {

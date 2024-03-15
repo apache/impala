@@ -53,7 +53,6 @@ class TextConverter {
 
   /// Converts slot data, of length 'len',  into type of slot_desc,
   /// and writes the result into the tuples's slot.
-  /// auxType is used to differentiate between BINARY and STRING types.
   /// copy_string indicates whether we need to make a separate copy of the string data:
   /// For regular unescaped strings, we point to the original data in the file_buf_.
   /// For regular escaped strings, we copy its unescaped string into a separate buffer
@@ -62,9 +61,8 @@ class TextConverter {
   /// 'pool' is unused.
   /// Unsuccessful conversions are turned into NULLs.
   /// Returns true if the value was written successfully.
-  bool WriteSlot(const SlotDescriptor* slot_desc, const AuxColumnType* auxType,
-      Tuple* tuple, const char* data, int len, bool copy_string, bool need_escape,
-      MemPool* pool);
+  bool WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple, const char* data, int len,
+      bool copy_string, bool need_escape, MemPool* pool);
 
   /// Removes escape characters from len characters of the null-terminated string src,
   /// and copies the unescaped string into dest, changing *len to the unescaped length.
@@ -81,21 +79,19 @@ class TextConverter {
   /// bool WriteSlot(Tuple* tuple, const char* data, int len);
   /// The codegen function returns true if the slot could be written and false
   /// otherwise.
-  /// auxType is used to differentiate between BINARY and STRING types.
   /// If check_null is set, then the codegen'd function sets the target slot to NULL
   /// if its input string matches null_vol_val.
   /// The codegenerated function does not support escape characters and should not
   /// be used for partitions that contain escapes.
   /// strict_mode: If set, numerical overflow/underflow are considered to be parse
   /// errors.
-  static Status CodegenWriteSlot(LlvmCodeGen* codegen,
-      TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc,
-      const AuxColumnType* auxType, llvm::Function** fn, const char* null_col_val,
-      int len, bool check_null, bool strict_mode = false);
+  static Status CodegenWriteSlot(LlvmCodeGen* codegen, TupleDescriptor* tuple_desc,
+      SlotDescriptor* slot_desc, llvm::Function** fn, const char* null_col_val, int len,
+      bool check_null, bool strict_mode = false);
 
   /// Returns whether codegen is supported for the given type.
-  static bool SupportsCodegenWriteSlot(const ColumnType& col_type,
-      const AuxColumnType& auxType);
+  static bool SupportsCodegenWriteSlot(const ColumnType& col_type);
+
  private:
   char escape_char_;
   /// Special string to indicate NULL column values.

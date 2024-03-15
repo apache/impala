@@ -155,7 +155,7 @@ Status HBaseTableWriter::AppendRows(RowBatch* batch) {
             string_value.clear();
             output_expr_evals_[j]->PrintValue(value, &string_value);
             const ColumnDescriptor& col_desc = table_desc_->col_descs()[j];
-            if (col_desc.auxType().IsBinaryStringSubtype()) {
+            if (col_desc.type().IsBinaryType()) {
               Base64Encode(string_value , &base64_encoded_value);
               data = base64_encoded_value.data();
               data_len = base64_encoded_value.length();

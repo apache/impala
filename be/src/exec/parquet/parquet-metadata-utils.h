@@ -66,7 +66,7 @@ class ParquetMetadataUtils {
   /// and this function's arguments.
   static void FillSchemaElement(const ColumnType& col_type,
       bool string_utf8, TParquetTimestampType::type timestamp_type,
-      const AuxColumnType& aux_type, parquet::SchemaElement* col_schema);
+      parquet::SchemaElement* col_schema);
 };
 
 struct ParquetFileVersion {

@@ -47,7 +47,7 @@ enum PrimitiveType {
   TYPE_STRING,
   TYPE_DATE,
   TYPE_DATETIME,    // Not implemented
-  TYPE_BINARY,      // Not used, see AuxColumnType::StringSubtype
+  TYPE_BINARY,      // Not used, see ColumnType::is_binary
   TYPE_DECIMAL,
   TYPE_CHAR,
   TYPE_VARCHAR,
@@ -62,28 +62,6 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
 
-// Contains information about a type that generally doesn't affect how it should be
-// handled by backend, but can affect encoding / decoding.
-struct AuxColumnType {
-  // Differentiates between STRING and BINARY.
-  // As STRING is just a byte array in Impala (no UTF-8 encoding), the two types are
-  // practically the same in the backend - only some file format readers/writers
-  // differentiate between the two. Instead of using PrimitiveType::TYPE_BINARY BINARY
-  // uses TYPE_STRING to ensure that everything that works for STRING also works for
-  // BINARY.
-  enum class StringSubtype {
-    STRING,
-    BINARY
-  };
-  StringSubtype string_subtype = StringSubtype::STRING;
-
-  AuxColumnType(const TColumnType& thrift_type);
-
-  inline bool IsBinaryStringSubtype() const {
-    return string_subtype == StringSubtype::BINARY;
-  }
-};
-
 std::string TypeToOdbcString(const TColumnType& type);
 
 // Describes a type. Includes the enum, children types, and any type-specific metadata
@@ -91,6 +69,7 @@ std::string TypeToOdbcString(const TColumnType& type);
 // TODO for 2.3: rename to TypeDescriptor
 struct ColumnType {
   PrimitiveType type;
+
   /// Only set if type one of TYPE_CHAR, TYPE_VARCHAR, TYPE_FIXED_UDA_INTERMEDIATE.
   int len;
   static const int MAX_VARCHAR_LENGTH = (1 << 16) - 1; // 65535
@@ -120,7 +99,7 @@ struct ColumnType {
   static const char* LLVM_CLASS_NAME;
 
   explicit ColumnType(PrimitiveType type = INVALID_TYPE)
-    : type(type), len(-1), precision(-1), scale(-1) {
+    : type(type), len(-1), precision(-1), scale(-1), is_binary_(false) {
     DCHECK_NE(type, TYPE_CHAR);
     DCHECK_NE(type, TYPE_VARCHAR);
     DCHECK_NE(type, TYPE_BINARY);
@@ -234,6 +213,8 @@ struct ColumnType {
     return type == TYPE_STRING || type == TYPE_VARCHAR;
   }
 
+  inline bool IsBinaryType() const { return is_binary_; }
+
   inline bool IsComplexType() const {
     return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP;
   }
@@ -276,6 +257,16 @@ struct ColumnType {
   ColumnType(const std::vector<TTypeNode>& types, int* idx);
 
  private:
+  // Differentiates between STRING and BINARY. As STRING is just a byte array in Impala
+  // (no UTF-8 encoding), the two types are practically the same in the backend - only
+  // some code parts, e.g. file format readers/writers differentiate between the two.
+  // Instead of PrimitiveType::TYPE_BINARY, TYPE_STRING is used for the BINARY type to
+  // ensure that everything that works for STRING also works for BINARY.
+  //
+  // This variable is true if 'type' is TYPE_STRING and this object represents the BINARY
+  // type, and false in all other cases.
+  bool  is_binary_ = false;
+
   /// Recursive implementation of ToThrift() that populates 'thrift_type' with the
   /// TTypeNodes for this type and its children.
   void ToThrift(TColumnType* thrift_type) const;

@@ -866,7 +866,6 @@ bool impala::isOneFieldSet(const impala::TColumnValue& value) {
 thrift::TTypeEntry impala::ColumnToHs2Type(
     const TColumnType& columnType) {
   const ColumnType& type = ColumnType::FromThrift(columnType);
-  AuxColumnType aux_type(columnType);
   thrift::TPrimitiveTypeEntry type_entry;
   switch (type.type) {
     // Map NULL_TYPE to BOOLEAN, otherwise Hive's JDBC driver won't
@@ -902,7 +901,7 @@ thrift::TTypeEntry impala::ColumnToHs2Type(
       type_entry.__set_type(thrift::TTypeId::TIMESTAMP_TYPE);
       break;
     case TYPE_STRING:
-      if (aux_type.string_subtype == AuxColumnType::StringSubtype::BINARY) {
+      if (type.IsBinaryType()) {
         type_entry.__set_type(thrift::TTypeId::BINARY_TYPE);
       } else {
         type_entry.__set_type(thrift::TTypeId::STRING_TYPE);

@@ -1504,7 +1504,7 @@ Status HdfsParquetTableWriter::CreateSchema() {
     const int field_id = col_desc.field_id();
     if (field_id != -1) col_schema.__set_field_id(field_id);
     ParquetMetadataUtils::FillSchemaElement(col_type, string_utf8_, timestamp_type_,
-                                            col_desc.auxType(), &col_schema);
+        &col_schema);
   }
 
   return Status::OK();

@@ -590,10 +590,8 @@ Status HdfsRCFileScanner::ProcessRange(RowBatch* row_batch) {
           return Status(ss.str());
         }
 
-        const AuxColumnType& aux_type =
-            scan_node_->hdfs_table()->GetColumnDesc(slot_desc).auxType();
-        if (!text_converter_->WriteSlot(slot_desc, &aux_type, tuple, col_start,
-             field_len, false, false, row_batch->tuple_data_pool())) {
+        if (!text_converter_->WriteSlot(slot_desc, tuple, col_start, field_len, false,
+              false, row_batch->tuple_data_pool())) {
           ReportColumnParseError(slot_desc, col_start, field_len);
           error_in_row = true;
         }

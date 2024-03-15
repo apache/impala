@@ -344,10 +344,8 @@ void HdfsJsonScanner::SubmitRow() {
 bool HdfsJsonScanner::InvokeWriteSlot(const SlotDescriptor* slot_desc, const char* data,
     int len) {
   // TODO: Support Invoke CodeGend WriteSlot
-  const AuxColumnType& aux_type =
-      scan_node_->hdfs_table()->GetColumnDesc(slot_desc).auxType();
-  if (LIKELY(text_converter_->WriteSlot(slot_desc, &aux_type, tuple_, data, len, true,
-      false, current_pool_))) {
+  if (LIKELY(text_converter_->WriteSlot(slot_desc, tuple_, data, len, true, false,
+      current_pool_))) {
     return true;
   }
   return HandleConvertError(slot_desc, data, len);

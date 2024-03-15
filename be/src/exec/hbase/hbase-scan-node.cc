@@ -147,9 +147,8 @@ void HBaseScanNode::WriteTextSlot(
     const string& family, const string& qualifier,
     void* value, int value_length, SlotDescriptor* slot_desc,
     RuntimeState* state, MemPool* pool, Tuple* tuple, bool* error_in_row) {
-  const AuxColumnType& aux_type = hbase_table_->GetColumnDesc(slot_desc).auxType();
-  if (!text_converter_->WriteSlot(slot_desc, &aux_type, tuple,
-      reinterpret_cast<char*>(value), value_length, true, false, pool)) {
+  if (!text_converter_->WriteSlot(slot_desc, tuple, reinterpret_cast<char*>(value),
+        value_length, true, false, pool)) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
       stringstream ss;

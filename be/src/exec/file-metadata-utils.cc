@@ -118,9 +118,7 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
         continue;
       }
       if (field_id != transform->source_id()) continue;
-      const AuxColumnType& aux_type =
-          scan_node_->hdfs_table()->GetColumnDesc(slot_desc).auxType();
-      if (!text_converter.WriteSlot(slot_desc, &aux_type, *template_tuple,
+      if (!text_converter.WriteSlot(slot_desc, *template_tuple,
                                     (const char*)transform->transform_value()->data(),
                                     transform->transform_value()->size(),
                                     true, false,

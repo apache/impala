@@ -334,7 +334,6 @@ class ColumnDescriptor {
   int field_map_key_id() const { return field_map_key_id_; }
   int field_map_value_id() const { return field_map_value_id_; }
 
-  const AuxColumnType& auxType() const { return aux_type_; }
   std::string DebugString() const;
 
  private:
@@ -344,8 +343,6 @@ class ColumnDescriptor {
   int field_id_ = -1;
   int field_map_key_id_ = -1;
   int field_map_value_id_ = -1;
-
-  AuxColumnType aux_type_;
 };
 
 /// Base class for table descriptors.

@@ -22,6 +22,14 @@ INT, STRING
 8,'FF4433221100'
 ====
 ---- QUERY
+select id, hex(cast(binary_col as string)) from binary_tbl
+where binary_col = cast(unhex("FF4433221100") as binary)
+---- TYPES
+INT, STRING
+---- RESULTS
+8,'FF4433221100'
+====
+---- QUERY
 set utf8_mode=0;
 select string_col, length(binary_col) from binary_tbl
 ---- TYPES

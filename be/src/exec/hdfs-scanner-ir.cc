@@ -125,9 +125,7 @@ bool HdfsScanner::TextConverterWriteSlotInterpretedIR(HdfsScanner* hdfs_scanner,
   }
 
   SlotDescriptor* slot_desc = hdfs_scanner->scan_node_->materialized_slots()[slot_idx];
-  const AuxColumnType& auxType =
-      hdfs_scanner->scan_node_->hdfs_table_->GetColumnDesc(slot_desc).auxType();
-  return hdfs_scanner->text_converter_->WriteSlot(slot_desc, &auxType, tuple, data, len,
+  return hdfs_scanner->text_converter_->WriteSlot(slot_desc, tuple, data, len,
        copy_string, need_escape, pool);
 }
 
