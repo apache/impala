@@ -1799,6 +1799,20 @@ partition by range(id)
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+zipcode_timezones
+---- COLUMNS
+zip STRING
+timezone STRING
+---- ROW_FORMAT
+DELIMITED FIELDS TERMINATED BY ','
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/zipcodes_timezones.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 unsupported_timestamp_partition
 ---- CREATE_HIVE
 -- Create a table that is partitioned on an unsupported partition-column type

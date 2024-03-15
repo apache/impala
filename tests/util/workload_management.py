@@ -297,17 +297,23 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   index += 1
   assert sql_results.column_labels[index] == PER_HOST_MEM_ESTIMATE
   ret_data[PER_HOST_MEM_ESTIMATE] = data[index]
-  if query_state_value == "EXCEPTION":
+  if query_state_value == "EXCEPTION" or query_type == "DDL":
     assert data[index] == "0", "per-host memory estimate incorrect"
   else:
-    if query_type != "DDL":
+    # First check the Estimated Per-Host Mem from the query profile. This value may not
+    # match though because certain query options can cause this value to diverge from the
+    # per-host memory estimate stored in the query history table.
+    est_perhost_mem = re.search(r'\n\s+Estimated Per-Host Mem:\s+(\d+)\n', profile_text)
+    assert est_perhost_mem is not None
+    if est_perhost_mem.group(1) != data[index]:
+      # The profile and db values diverged, use the Per-Host Resource Estimates field from
+      # the query profile as the expected value. Since query profile value is an estimate,
+      # it's not as good to use, but it's all we have available.
       perhost_mem_est = re.search(r'\nPer-Host Resource Estimates:\s+Memory\=(.*?)\n',
           profile_text)
       assert perhost_mem_est is not None
       assert_byte_str(expected_str=perhost_mem_est.group(1), actual_bytes=data[index],
           msg="per-host memory estimate incorrect", unit_combined=True)
-    else:
-      assert data[index] == "0", "per-host memory estimate not 0"
 
   # Dedicated Coordinator Memory Estimate
   # This value is different because it is the minimum of the query option
