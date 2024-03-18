@@ -2,7 +2,7 @@
 ---- QUERY
 # Create external JDBC DataSource table
 DROP TABLE IF EXISTS alltypes_jdbc_datasource;
-CREATE TABLE alltypes_jdbc_datasource (
+CREATE EXTERNAL TABLE alltypes_jdbc_datasource (
  id INT,
  bool_col BOOLEAN,
  tinyint_col TINYINT,

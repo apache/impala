@@ -2966,18 +2966,31 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'  '", "URI path cannot be empty.");
 
     // Create JDBC tables
-    AnalyzesOk("CREATE TABLE Foo (i int) STORED BY JDBC " +
+    AnalyzesOk("CREATE EXTERNAL TABLE Foo (i int) STORED BY JDBC " +
         "TBLPROPERTIES ('database.type'='a', 'jdbc.url'='b', " +
         "'jdbc.driver'='c', 'driver.url'='d', 'dbcp.username'='e', " +
         "'dbcp.password'='f', 'table'='g')");
-    AnalysisError("CREATE TABLE Foo (i int) STORED BY JDBC TBLPROPERTIES ('a'='b')",
+    AnalysisError("CREATE TABLE Foo (i int) STORED BY JDBC " +
+        "TBLPROPERTIES ('database.type'='a', 'jdbc.url'='b', " +
+        "'jdbc.driver'='c', 'driver.url'='d', 'dbcp.username'='e', " +
+        "'dbcp.password'='f', 'table'='g')",
+        "JDBC table must be created as external table");
+    AnalysisError("CREATE EXTERNAL TABLE Foo STORED BY JDBC " +
+        "TBLPROPERTIES ('database.type'='a', 'jdbc.url'='b', " +
+        "'jdbc.driver'='c', 'driver.url'='d', 'dbcp.username'='e', " +
+        "'dbcp.password'='f', 'table'='g')",
+        "Table requires at least 1 column");
+    AnalysisError("CREATE EXTERNAL TABLE Foo (i int) STORED BY JDBC " +
+        "TBLPROPERTIES ('a'='b')",
         "Cannot create table 'Foo': Required JDBC config 'database.type' is not " +
         "present in table properties.");
-    AnalysisError("CREATE TABLE Foo (i int) STORED BY JDBC CACHED IN 'testPool'",
+    AnalysisError("CREATE EXTERNAL TABLE Foo (i int) STORED BY JDBC " +
+        "CACHED IN 'testPool'",
         "A JDBC table cannot be cached in HDFS.");
-    AnalysisError("CREATE TABLE Foo (i int) STORED BY JDBC LOCATION " +
+    AnalysisError("CREATE EXTERNAL TABLE Foo (i int) STORED BY JDBC LOCATION " +
         "'/test-warehouse/new_table'", "LOCATION cannot be specified for a JDBC table.");
-    AnalysisError("CREATE TABLE Foo (i int) PARTITIONED BY (d decimal) STORED BY JDBC ",
+    AnalysisError("CREATE EXTERNAL TABLE Foo (i int) PARTITIONED BY (d decimal) " +
+        "STORED BY JDBC ",
         "PARTITIONED BY cannot be used in a JDBC table.");
 
     // Create table PRODUCED BY DATA SOURCE

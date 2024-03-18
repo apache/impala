@@ -47,7 +47,7 @@ CREATE TABLE alltypes_datasource (
 PRODUCED BY DATA SOURCE AllTypesDataSource("TestInitString");
 
 DROP TABLE IF EXISTS alltypes_jdbc_datasource;
-CREATE TABLE alltypes_jdbc_datasource (
+CREATE EXTERNAL TABLE alltypes_jdbc_datasource (
  id INT,
  bool_col BOOLEAN,
  tinyint_col TINYINT,
@@ -70,7 +70,7 @@ TBLPROPERTIES (
 "table"="alltypes");
 
 DROP TABLE IF EXISTS alltypes_jdbc_datasource_2;
-CREATE TABLE alltypes_jdbc_datasource_2 (
+CREATE EXTERNAL TABLE alltypes_jdbc_datasource_2 (
  id INT,
  bool_col BOOLEAN,
  tinyint_col TINYINT,

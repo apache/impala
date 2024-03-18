@@ -741,7 +741,8 @@ public class LdapHS2Test {
     String dropTableQuery = "DROP TABLE IF EXISTS %s";
     // Set JDBC authentication mechanisms as LDAP (3) with username/password as
     // TEST_USER_1/TEST_PASSWORD_1.
-    String createTableQuery = String.format("CREATE TABLE impala_jdbc_ext_test_table (" +
+    String createTableQuery =
+        String.format("CREATE EXTERNAL TABLE impala_jdbc_ext_test_table (" +
         "id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT, " +
         "int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE, " +
         "date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP) " +
@@ -758,7 +759,7 @@ public class LdapHS2Test {
         internalListenHost, fileSystemPrefix, TEST_USER_1, TEST_PASSWORD_1);
     // Set JDBC authentication mechanisms as LDAP with wrong password.
     String createTableWithWrongPassword =
-        String.format("CREATE TABLE impala_jdbc_tbl_wrong_password (" +
+        String.format("CREATE EXTERNAL TABLE impala_jdbc_tbl_wrong_password (" +
         "id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT, " +
         "int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE, " +
         "date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP) " +
@@ -775,7 +776,7 @@ public class LdapHS2Test {
         internalListenHost, fileSystemPrefix, TEST_USER_1);
     // Set JDBC authentication mechanisms as LDAP without AuthMech.
     String createTableWithoutAuthMech =
-        String.format("CREATE TABLE impala_jdbc_tbl_without_auth_mech (" +
+        String.format("CREATE EXTERNAL TABLE impala_jdbc_tbl_without_auth_mech (" +
         "id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT, " +
         "int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE, " +
         "date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP) " +

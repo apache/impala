@@ -269,7 +269,7 @@ public class CreateTableStmt extends StatementBase {
     // schema. Likewise for external Kudu tables, the schema can be read from Kudu.
     if (getColumnDefs().isEmpty() && getFileFormat() != THdfsFileFormat.AVRO
         && getFileFormat() != THdfsFileFormat.KUDU && getFileFormat() !=
-        THdfsFileFormat.ICEBERG && getFileFormat() != THdfsFileFormat.JDBC) {
+        THdfsFileFormat.ICEBERG) {
       throw new AnalysisException("Table requires at least 1 column");
     }
     if (getRowFormat() != null) {
@@ -896,6 +896,9 @@ public class CreateTableStmt extends StatementBase {
    * HMS.
    */
   private void analyzeJdbcSchema(Analyzer analyzer) throws AnalysisException {
+    if (!isExternal()) {
+      throw new AnalysisException("JDBC table must be created as external table");
+    }
     for (ColumnDef col: getColumnDefs()) {
       if (!DataSourceTable.isSupportedColumnType(col.getType())) {
         throw new AnalysisException("Tables stored by JDBC do not support the column " +
