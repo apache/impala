@@ -28,7 +28,8 @@
 # GTEST_INCLUDE_DIR, where to find gtest include files, etc.
 # GTEST_LIBRARIES, the libraries to link against to use gtest.
 # GTEST_FOUND, If false, do not try to use gtest.
-# GTEST_STATIC_LIB, where to find the GTest library.
+# GTEST_STATIC_LIB, path to libgtest.a.
+# GTEST_SHARED_LIB, path to libgtest.so.
 
 set(GTEST_H gtest/gtest.h)
 
@@ -44,18 +45,24 @@ find_library(GTEST_STATIC_LIB NAMES libgtest.a
   DOC   "Google's framework for writing C++ tests (gtest)"
 )
 
+find_library(GTEST_SHARED_LIB NAMES libgtest.so
+  PATHS ${GTEST_ROOT}/lib
+        NO_DEFAULT_PATH
+  DOC   "Google's framework for writing C++ tests (gtest)"
+)
+
 find_library(GTEST_MAIN_LIBRARY NAMES libgtest_main.a
   PATHS ${GTEST_ROOT}/lib
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest_main)"
 )
 
-if(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_MAIN_LIBRARY)
-  set(GTEST_LIBRARIES ${GTEST_STATIC_LIB} ${GTEST_MAIN_LIBRARY})
+if(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_SHARED_LIB AND GTEST_MAIN_LIBRARY)
+  set(GTEST_LIBRARIES ${GTEST_STATIC_LIB} ${GTEST_SHARED_LIB} ${GTEST_MAIN_LIBRARY})
   set(GTEST_FOUND TRUE)
-else(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_MAIN_LIBRARY)
+else(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_SHARED_LIB AND GTEST_MAIN_LIBRARY)
   set(GTEST_FOUND FALSE)
-endif(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_MAIN_LIBRARY)
+endif(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_SHARED_LIB AND GTEST_MAIN_LIBRARY)
 
 if(GTEST_FOUND)
   if(NOT GTEST_FIND_QUIETLY)
@@ -68,4 +75,6 @@ endif(GTEST_FOUND)
 mark_as_advanced(
   GTEST_INCLUDE_DIR
   GTEST_LIBRARIES
-  GTEST_STATIC_LIB)
+  GTEST_STATIC_LIB
+  GTEST_SHARED_LIB
+)
