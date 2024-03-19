@@ -1,0 +1,39 @@
+RANGER-4771.diff and IMPALA-12921_addendum.diff are provided with IMPALA-12921 to
+facilitate the verification of the results of authorization-related tests when we build
+Apache Impala on the master branch (with tip being
+https://github.com/apache/impala/commit/1233ac3) with Apache Ranger on the master branch
+(with tip being https://github.com/apache/ranger/commit/4abb993).
+After applying these 2 patches, we only found the following 3 failed tests. They failed
+because the support for storage handler privileges is not yet supported by Apache Ranger
+and hence the test cases added in IMPALA-10436 could fail.
+
+1. TestRanger::test_show_grant() in test_ranger.py.
+2. TestRanger::test_grant_revoke_with_role() in test_ranger.py.
+3. AuthorizationStmtTest#testCreateTable() in AuthorizationStmtTest.java.
+
+In what follows we give more details regarding why these 2 patches are required to verify
+the results of authorization-related tests when we build Apache Impala with Apache
+Ranger.
+
+RANGER-4771.diff should be applied to Apache Ranger on the master branch (with tip being
+https://github.com/apache/ranger/commit/4abb993) so that an Impala administrator could
+manage policies using GRANT/REVOKE statements in the Impala shell in the non-Kerberized
+environment. Recall that currently in Impala's development environment, we run the
+authorization-related tests without Kerberos.
+
+IMPALA-12921_addendum.diff should be applied due to the following reasons.
+
+1. fe/pom.xml needs to be patched to prevent the compilation of Impala's frontend from
+   failing. This is done by excluding the hive-storage-api dependency that is
+   transitively pulled in by ranger-plugins-audit because the locally built
+   ranger-plugins-audit could pull in an incompatible version of hive-storage-api.
+2. Various files have to be patched to add a startup flag
+   'support_storage_type_in_ranger'. This flag is needed because when it is set to false,
+   a) the catalog server will not send to the Ranger server a GrantRevokeRequest
+   involving the resource type of 'storage-type' (e.g., in GRANT ALL ON SERVER TO USER
+   <grantee>), and b) the coordinator will skip the check for the privileges on resources
+   of type 'storage-type' (e.g., when the ALL privilege on SERVER is registered in a
+   query).
+3. AuthorizationTestBase.java and test_ranger.py have to be patched to set
+   'support_storage_type_in_ranger' to false when we start the coordinators and the
+   catalog server.

@@ -1,0 +1,199 @@
+diff --git a/be/src/util/backend-gflag-util.cc b/be/src/util/backend-gflag-util.cc
+index f1b94562b..c7368ef90 100644
+--- a/be/src/util/backend-gflag-util.cc
++++ b/be/src/util/backend-gflag-util.cc
+@@ -272,6 +272,9 @@ DEFINE_double_hidden(query_cpu_root_factor, 1.5,
+     "(Advance) The Nth root value to control sublinear scale down of unbounded "
+     "cpu requirement for executor group set selection.");
+ 
++DEFINE_bool(support_storage_type_in_ranger, true,
++    "If true, support the resource type of 'storage-type' added in IMPALA-10436.");
++
+ using strings::Substitute;
+ 
+ namespace impala {
+@@ -486,6 +489,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
+   cfg.__set_dbcp_max_conn_pool_size(FLAGS_dbcp_max_conn_pool_size);
+   cfg.__set_dbcp_max_wait_millis_for_conn(FLAGS_dbcp_max_wait_millis_for_conn);
+   cfg.__set_dbcp_data_source_idle_timeout(FLAGS_dbcp_data_source_idle_timeout_s);
++  cfg.__set_support_storage_type_in_ranger(FLAGS_support_storage_type_in_ranger);
+   return Status::OK();
+ }
+ 
+diff --git a/common/thrift/BackendGflags.thrift b/common/thrift/BackendGflags.thrift
+index e51b6bad4..5ca65000f 100644
+--- a/common/thrift/BackendGflags.thrift
++++ b/common/thrift/BackendGflags.thrift
+@@ -304,4 +304,6 @@ struct TBackendGflags {
+   136: required i32 dbcp_max_wait_millis_for_conn
+ 
+   137: required i32 dbcp_data_source_idle_timeout
++
++  138: required bool support_storage_type_in_ranger
+ }
+diff --git a/fe/pom.xml b/fe/pom.xml
+index 9dd29855a..3227b5c09 100644
+--- a/fe/pom.xml
++++ b/fe/pom.xml
+@@ -221,6 +221,19 @@ under the License.
+           <groupId>com.amazonaws</groupId>
+           <artifactId>aws-java-sdk-bundle</artifactId>
+         </exclusion>
++        <!-- Exclude the hive-storage-api dependency. If we are using a locally built
++        ranger-plugins-audit that may pull in a hive-storage-api of incompatible
++        version, the compilation of MetastoreShim.java could fail because the class
++        TableName is not defined in this version of hive-storage-api. This is the case
++        if the version is 2.7.2, which is still used by Apache Ranger on the master
++        branch (with tip being RANGER-4745). A compatible hive-storage-api of version
++        ${hive.storage.api.version} will still be pulled in via hive-standalone-metastore
++        since this specific version is added as an exception to the excludes in the
++        banned dependencies. -->
++        <exclusion>
++          <groupId>org.apache.hive</groupId>
++          <artifactId>hive-storage-api</artifactId>
++        </exclusion>
+       </exclusions>
+     </dependency>
+ 
+diff --git a/fe/src/main/java/org/apache/impala/authorization/ranger/RangerAuthorizationChecker.java b/fe/src/main/java/org/apache/impala/authorization/ranger/RangerAuthorizationChecker.java
+index b5dadfdd6..5f98a8449 100644
+--- a/fe/src/main/java/org/apache/impala/authorization/ranger/RangerAuthorizationChecker.java
++++ b/fe/src/main/java/org/apache/impala/authorization/ranger/RangerAuthorizationChecker.java
+@@ -104,8 +104,13 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
+         resources.add(new RangerImpalaResourceBuilder().uri("*").build());
+         if (privilege == Privilege.ALL || privilege == Privilege.OWNER ||
+             privilege == Privilege.RWSTORAGE) {
+-          resources.add(new RangerImpalaResourceBuilder()
+-              .storageType("*").storageUri("*").build());
++          // Do not add a resource of type 'storage-type' so that the privilege on this
++          // resource type will not be checked if this type is not supported by the
++          // Ranger service.
++          if (BackendConfig.INSTANCE.supportStorageTypeInRanger()) {
++            resources.add(new RangerImpalaResourceBuilder()
++                .storageType("*").storageUri("*").build());
++          }
+         }
+         break;
+       case DB:
+@@ -159,10 +164,15 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
+             .build());
+         break;
+       case STORAGEHANDLER_URI:
+-        resources.add(new RangerImpalaResourceBuilder()
+-            .storageType(authorizable.getStorageType())
+-            .storageUri(authorizable.getStorageUri())
+-            .build());
++        // Do not add a resource of type 'storage-type' so that the privilege on this
++        // resource type will not be checked if this type is not supported by the Ranger
++        // service.
++        if (BackendConfig.INSTANCE.supportStorageTypeInRanger()) {
++          resources.add(new RangerImpalaResourceBuilder()
++              .storageType(authorizable.getStorageType())
++              .storageUri(authorizable.getStorageUri())
++              .build());
++        }
+         break;
+       default:
+         throw new IllegalArgumentException(String.format("Invalid authorizable type: %s",
+diff --git a/fe/src/main/java/org/apache/impala/authorization/ranger/RangerCatalogdAuthorizationManager.java b/fe/src/main/java/org/apache/impala/authorization/ranger/RangerCatalogdAuthorizationManager.java
+index 809f2928b..7082b638f 100644
+--- a/fe/src/main/java/org/apache/impala/authorization/ranger/RangerCatalogdAuthorizationManager.java
++++ b/fe/src/main/java/org/apache/impala/authorization/ranger/RangerCatalogdAuthorizationManager.java
+@@ -29,6 +29,7 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
+ import org.apache.impala.common.ImpalaException;
+ import org.apache.impala.common.InternalException;
+ import org.apache.impala.common.UnsupportedFeatureException;
++import org.apache.impala.service.BackendConfig;
+ import org.apache.impala.thrift.TCatalogServiceRequestHeader;
+ import org.apache.impala.thrift.TCreateDropRoleParams;
+ import org.apache.impala.thrift.TDdlExecResponse;
+@@ -409,13 +410,25 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager
+         requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
+         requests.add(createRequest.apply(RangerUtil.createFunctionResource(p)));
+       } else if (p.getStorage_url() != null || p.getStorage_type() != null) {
+-        requests.add(createRequest.apply(RangerUtil.createStorageHandlerUriResource(p)));
++        // Do not send a GrantRevokeRequest for a resource of type 'storage-type' if such
++        // a type is not supported by the Ranger service. This prevents the Ranger
++        // service from throwing an exception.
++        if (BackendConfig.INSTANCE.supportStorageTypeInRanger()) {
++          requests.add(createRequest.apply(RangerUtil.createStorageHandlerUriResource(p)));
++        } else {
++          LOG.warn("Resource type of 'storage-type' in Ranger is not supported");
++        }
+       } else {
+         // Server is used by column, function, URI, and storage handler URI resources.
+         requests.add(createRequest.apply(RangerUtil.createColumnResource(p)));
+         requests.add(createRequest.apply(RangerUtil.createFunctionResource(p)));
+         requests.add(createRequest.apply(RangerUtil.createUriResource(p)));
+-        requests.add(createRequest.apply(RangerUtil.createStorageHandlerUriResource(p)));
++        // Do not send a GrantRevokeRequest for a resource of type 'storage-type' if such
++        // a type is not supported by the Ranger service. This prevents the Ranger
++        // service from throwing an exception.
++        if (BackendConfig.INSTANCE.supportStorageTypeInRanger()) {
++          requests.add(createRequest.apply(RangerUtil.createStorageHandlerUriResource(p)));
++        }
+       }
+     }
+ 
+diff --git a/fe/src/main/java/org/apache/impala/service/BackendConfig.java b/fe/src/main/java/org/apache/impala/service/BackendConfig.java
+index a050fe016..4a362784d 100644
+--- a/fe/src/main/java/org/apache/impala/service/BackendConfig.java
++++ b/fe/src/main/java/org/apache/impala/service/BackendConfig.java
+@@ -518,4 +518,10 @@ public class BackendConfig {
+   public int getDbcpDataSourceIdleTimeoutInSeconds() {
+     return backendCfg_.dbcp_data_source_idle_timeout;
+   }
++
++  public boolean supportStorageTypeInRanger() { return backendCfg_.support_storage_type_in_ranger; }
++
++  public void setSupportStorageTypeInRanger(boolean supportStorageTypeInRanger) {
++    backendCfg_.setSupport_storage_type_in_ranger(supportStorageTypeInRanger);
++  }
+ }
+diff --git a/fe/src/test/java/org/apache/impala/authorization/AuthorizationTestBase.java b/fe/src/test/java/org/apache/impala/authorization/AuthorizationTestBase.java
+index 364628456..cdff0d5b0 100644
+--- a/fe/src/test/java/org/apache/impala/authorization/AuthorizationTestBase.java
++++ b/fe/src/test/java/org/apache/impala/authorization/AuthorizationTestBase.java
+@@ -32,6 +32,7 @@ import org.apache.impala.catalog.Type;
+ import org.apache.impala.common.AnalysisException;
+ import org.apache.impala.common.FrontendTestBase;
+ import org.apache.impala.common.ImpalaException;
++import org.apache.impala.service.BackendConfig;
+ import org.apache.impala.service.Frontend;
+ import org.apache.impala.testutil.CatalogServiceTestCatalog;
+ import org.apache.impala.testutil.ImpaladTestCatalog;
+@@ -135,6 +136,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
+         rangerRestClient_ = new RangerRESTClient(RANGER_ADMIN_URL, null,
+             rangerImpalaPlugin_.getConfig());
+         rangerRestClient_.setBasicAuthInfo(RANGER_USER, RANGER_PASSWORD);
++        BackendConfig.INSTANCE.setSupportStorageTypeInRanger(false);
+         break;
+       default:
+         throw new IllegalArgumentException(String.format(
+diff --git a/tests/authorization/test_ranger.py b/tests/authorization/test_ranger.py
+index f83680614..a6fcf39bb 100644
+--- a/tests/authorization/test_ranger.py
++++ b/tests/authorization/test_ranger.py
+@@ -47,14 +47,18 @@ RANGER_AUTH = ("admin", "admin")
+ RANGER_HOST = "http://localhost:6080"
+ REST_HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
+ IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+-               "--ranger_app_id=impala --authorization_provider=ranger"
++               "--ranger_app_id=impala --authorization_provider=ranger " \
++               "--support_storage_type_in_ranger=false"
+ CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+-                "--ranger_app_id=impala --authorization_provider=ranger"
++                "--ranger_app_id=impala --authorization_provider=ranger " \
++                "--support_storage_type_in_ranger=false"
+ 
+ LOCAL_CATALOG_IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+-    "--ranger_app_id=impala --authorization_provider=ranger --use_local_catalog=true"
++    "--ranger_app_id=impala --authorization_provider=ranger --use_local_catalog=true " \
++    "--support_storage_type_in_ranger=false"
+ LOCAL_CATALOG_CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+-    "--ranger_app_id=impala --authorization_provider=ranger --catalog_topic_mode=minimal"
++    "--ranger_app_id=impala --authorization_provider=ranger " \
++    "--catalog_topic_mode=minimal --support_storage_type_in_ranger=false"
+ 
+ LOG = logging.getLogger('impala_test_suite')
+ 

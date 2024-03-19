@@ -5,7 +5,7 @@
     "denyExceptions": [],
     "denyPolicyItems": [],
     "description": "Policy for all - database",
-    "id": 5,
+    "id": ${ALL_DATABASE_POLICY_ID},
     "isAuditEnabled": true,
     "isDenyAllElse": false,
     "isEnabled": true,

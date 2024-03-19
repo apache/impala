@@ -1,0 +1,29 @@
+diff --git a/security-admin/src/main/java/org/apache/ranger/rest/ServiceREST.java b/security-admin/src/main/java/org/apache/ranger/rest/ServiceREST.java
+index a6c759234..e85cf1a3c 100644
+--- a/security-admin/src/main/java/org/apache/ranger/rest/ServiceREST.java
++++ b/security-admin/src/main/java/org/apache/ranger/rest/ServiceREST.java
+@@ -1283,7 +1283,6 @@ public RESTResponse grantAccess(@PathParam("serviceName") String serviceName, Gr
+ 	
+ 						if(policyUpdated) {
+ 							policy.setZoneName(zoneName);
+-							ensureAdminAccess(policy);
+ 							svcStore.updatePolicy(policy);
+ 						} else {
+ 							LOG.error("processGrantRequest processing failed");
+@@ -1321,7 +1320,6 @@ public RESTResponse grantAccess(@PathParam("serviceName") String serviceName, Gr
+ 						policy.getPolicyItems().add(policyItem);
+ 						policy.setZoneName(zoneName);
+ 
+-						ensureAdminAccess(policy);
+ 						svcStore.createPolicy(policy);
+ 					}
+ 				} catch(WebApplicationException excp) {
+@@ -1525,8 +1523,6 @@ public RESTResponse revokeAccess(@PathParam("serviceName") String serviceName, G
+ 						if(policyUpdated) {
+ 							policy.setZoneName(zoneName);
+ 
+-							ensureAdminAccess(policy);
+-
+ 							svcStore.updatePolicy(policy);
+ 						} else {
+ 							LOG.error("processRevokeRequest processing failed");

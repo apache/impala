@@ -75,7 +75,18 @@ impala-config.sh, they may cause confusion when switching between branches or ve
 Apache Impala.
 
 | Environment variable | Description |
+|----------------------|-------------|
 | HIVE_VERSION_OVERRIDE | Used to specify different Hive version from default |
 | HIVE_STORAGE_API_VERSION_OVERRIDE | Used to specify different Hive Storage API version from default |
 | HIVE_METASTORE_THRIFT_DIR_OVERRIDE | Used to specify location of metastore thrift files to use during Thrift compilation |
 | HIVE_HOME_OVERRIDE | Used to specify location of Hive |
+
+## Ranger Dependency Overrides
+Typically used together to specify a local build of Apache Ranger. Care should be taken
+while using these variables since they take precedence over the defaults in
+impala-config.sh.
+
+| Environment variable | Description |
+|----------------------|-------------|
+| RANGER_VERSION_OVERRIDE | Used to specify different Ranger version from default |
+| RANGER_HOME_OVERRIDE | Used to specify location of Ranger |

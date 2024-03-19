@@ -336,9 +336,11 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
 
     List<RangerAccessRequest> requests = new ArrayList<>();
     for (Map<String, String> resource : resources) {
-      requests.add(new RangerAccessRequestImpl(
-          new RangerAccessResourceImpl(Collections.unmodifiableMap(resource)),
-          RangerPolicyEngine.ANY_ACCESS, null, null));
+      RangerAccessRequestImpl request = new RangerAccessRequestImpl();
+      request.setResource(
+          new RangerAccessResourceImpl(Collections.unmodifiableMap(resource)));
+      request.setAccessType(RangerPolicyEngine.ANY_ACCESS);
+      requests.add(request);
     }
     return requests;
   }

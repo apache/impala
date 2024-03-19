@@ -526,12 +526,17 @@ def get_hadoop_downloads():
   ranger = CdpComponent("ranger", archive_basename_tmpl="ranger-${version}-admin")
   use_override_hive = \
       "HIVE_VERSION_OVERRIDE" in os.environ and os.environ["HIVE_VERSION_OVERRIDE"] != ""
+  use_override_ranger = \
+      "RANGER_VERSION_OVERRIDE" in os.environ and \
+      os.environ["RANGER_VERSION_OVERRIDE"] != ""
   # If we are using a locally built Hive we do not have a need to pull hive as a
-  # dependency
+  # dependency. The same applies to Ranger.
   cluster_components.extend([hadoop, hbase, ozone])
   if not use_override_hive:
     cluster_components.extend([hive, hive_src])
-  cluster_components.extend([tez, ranger])
+  if not use_override_ranger:
+    cluster_components.extend([ranger])
+  cluster_components.extend([tez])
   return cluster_components
 
 

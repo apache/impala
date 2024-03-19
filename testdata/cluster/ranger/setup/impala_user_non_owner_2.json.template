@@ -1,0 +1,7 @@
+{
+  "name" : "non_owner_2",
+  "firstName" : "First name of non_owner_2",
+  "password" : "Password123",
+  "userRoleList" : [ "ROLE_USER" ],
+  "groupIdList" : [ "${GROUP_ID_NON_OWNER_2}" ]
+}

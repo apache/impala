@@ -243,6 +243,9 @@ popd
 RANGER_SERVER_CONF_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf"
 RANGER_SERVER_CONFDIST_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf.dist"
 RANGER_SERVER_LIB_DIR="${RANGER_HOME}/ews/webapp/WEB-INF/lib"
+RANGER_ADMIN_LOGBACK_CONF_FILE="${RANGER_SERVER_CONFDIST_DIR}/logback.xml"
+RANGER_ADMIN_LOG4J2_CONF_FILE="${RANGER_HOME}/ews/webapp/WEB-INF/log4j2.properties"
+RANGER_LOG_DIR="${IMPALA_CLUSTER_LOGS_DIR}/ranger"
 if [[ ! -d "${RANGER_SERVER_CONF_DIR}" ]]; then
     mkdir -p "${RANGER_SERVER_CONF_DIR}"
 fi
@@ -252,6 +255,21 @@ cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-logdir.sh" "${RANGER_SERVER_CONF
 cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-piddir.sh" "${RANGER_SERVER_CONF_DIR}"
 cp -f "${RANGER_SERVER_CONFDIST_DIR}/security-applicationContext.xml" \
     "${RANGER_SERVER_CONF_DIR}"
+# For Apache Ranger, we need logback.xml under ${RANGER_SERVER_CONF_DIR} so that the log
+# files like ranger-admin-$(hostname)-$(whoami).log could be created under
+# ${RANGER_LOG_DIR}.
+if [[ -f ${RANGER_ADMIN_LOGBACK_CONF_FILE} ]]; then
+  cp -f ${RANGER_ADMIN_LOGBACK_CONF_FILE} ${RANGER_SERVER_CONF_DIR}
+fi
+# For CDP Ranger, we change the value of the property 'log.dir' in the corresponding
+# log4j2.properties so that the log files like ranger-admin-server.log could be created
+# under ${RANGER_LOG_DIR}.
+if [[ -f ${RANGER_ADMIN_LOG4J2_CONF_FILE} ]]; then
+  # Use vertical bar instead of slash as the separator to prevent the slash(es) in
+  # ${RANGER_LOG_DIR} from interfering with the parsing of sed.
+  sed -i "s|property\.log\.dir=.*|property.log.dir=${RANGER_LOG_DIR}|g" \
+      ${RANGER_ADMIN_LOG4J2_CONF_FILE}
+fi
 
 # Prepend the following 5 URL's to the line starting with "<intercept-url pattern="/**"".
 # Before the end-to-end tests could be performed in a Kerberized environment

@@ -47,6 +47,14 @@ function setup-ranger {
     python -c "import sys, json; print(json.load(sys.stdin)['id'])")
   export GROUP_ID_NON_OWNER
 
+  GROUP_ID_NON_OWNER_2=$(wget -qO - --auth-no-challenge --user=admin \
+    --password=admin --post-file="${RANGER_SETUP_DIR}/impala_group_non_owner_2.json" \
+    --header="accept:application/json" \
+    --header="Content-Type:application/json" \
+    http://localhost:6080/service/xusers/secure/groups |
+    python -c "import sys, json; print(json.load(sys.stdin)['id'])")
+  export GROUP_ID_NON_OWNER_2
+
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
     "${RANGER_SETUP_DIR}/impala_user_owner.json.template" > \
     "${RANGER_SETUP_DIR}/impala_user_owner.json"
@@ -55,6 +63,10 @@ function setup-ranger {
     "${RANGER_SETUP_DIR}/impala_user_non_owner.json.template" > \
     "${RANGER_SETUP_DIR}/impala_user_non_owner.json"
 
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    "${RANGER_SETUP_DIR}/impala_user_non_owner_2.json.template" > \
+    "${RANGER_SETUP_DIR}/impala_user_non_owner_2.json"
+
   if grep "\${[A-Z_]*}" "${RANGER_SETUP_DIR}/impala_user_owner.json"; then
     echo "Found undefined variables in ${RANGER_SETUP_DIR}/impala_user_owner.json."
     exit 1
@@ -62,6 +74,11 @@ function setup-ranger {
 
   if grep "\${[A-Z_]*}" "${RANGER_SETUP_DIR}/impala_user_non_owner.json"; then
     echo "Found undefined variables in ${RANGER_SETUP_DIR}/impala_user_non_owner.json."
+    exit 1
+  fi
+
+  if grep "\${[A-Z_]*}" "${RANGER_SETUP_DIR}/impala_user_non_owner_2.json"; then
+    echo "Found undefined variables in ${RANGER_SETUP_DIR}/impala_user_non_owner_2.json."
     exit 1
   fi
 
@@ -76,14 +93,39 @@ function setup-ranger {
     http://localhost:6080/service/xusers/secure/users
 
   wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
+    --post-file="${RANGER_SETUP_DIR}/impala_user_non_owner_2.json" \
+    --header="Content-Type:application/json" \
+    http://localhost:6080/service/xusers/secure/users
+
+  wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
     --post-file="${RANGER_SETUP_DIR}/impala_service.json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/public/v2/api/service
 
+  # The policy id corresponding to all the databases and tables is 4 in Apache Ranger,
+  # whereas it is 5 in CDP Ranger. Getting the policy id via the following API call
+  # makes this script more resilient to the change in the policy id.
+  ALL_DATABASE_POLICY_ID=$(curl -u admin:admin -X GET \
+    http://localhost:6080/service/public/v2/api/service/test_impala/policy/\
+all%20-%20database \
+    -H 'accept: application/json' | \
+  python -c "import sys, json; print(json.load(sys.stdin)['id'])")
+  export ALL_DATABASE_POLICY_ID
+
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    "${RANGER_SETUP_DIR}/all_database_policy_revised.json.template" > \
+    "${RANGER_SETUP_DIR}/all_database_policy_revised.json"
+
+  if grep "\${[A-Z_]*}" "${RANGER_SETUP_DIR}/all_database_policy_revised.json"; then
+    echo "Found undefined variables in \
+    ${RANGER_SETUP_DIR}/all_database_policy_revised.json."
+    exit 1
+  fi
+
   curl -f -u admin:admin -H "Accept: application/json" \
     -H "Content-Type: application/json" \
-    -X PUT http://localhost:6080/service/public/v2/api/policy/5 \
-    -d @"${RANGER_SETUP_DIR}/policy_5_revised.json"
+    -X PUT http://localhost:6080/service/public/v2/api/policy/${ALL_DATABASE_POLICY_ID} \
+    -d @"${RANGER_SETUP_DIR}/all_database_policy_revised.json"
 }
 
 setup-ranger
