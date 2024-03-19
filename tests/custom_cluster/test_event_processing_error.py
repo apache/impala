@@ -330,7 +330,7 @@ class TestEventProcessingError(CustomClusterTestSuite):
       self.run_stmt_in_hive(
           "alter table {}.{} add partition(year=2024)"
           .format(unique_database, tbl_name))
-      EventProcessorUtils.wait_for_event_processing(self)
+      EventProcessorUtils.wait_for_event_processing(self, error_status_possible=True)
       assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
       result = self.client.execute("describe formatted {}.{}"
           .format(unique_database, tbl_name))
