@@ -20,7 +20,7 @@ from builtins import range
 from hive_metastore.ttypes import FireEventRequest
 from hive_metastore.ttypes import FireEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (SkipIfCatalogV2)
+from tests.common.skip import SkipIfCatalogV2, SkipIfFS
 from tests.metadata.test_event_processing_base import TestEventProcessingBase
 from tests.util.acid_txn import AcidTxn
 from tests.util.event_processor_utils import EventProcessorUtils
@@ -96,6 +96,7 @@ class TestEventProcessingError(CustomClusterTestSuite):
       assert "hive_table_add_partition/year=2024" in result.get_data()
       assert len(result.data) == 2
 
+  @SkipIfFS.hive
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal "
@@ -118,6 +119,7 @@ class TestEventProcessingError(CustomClusterTestSuite):
       assert "2024" in result.get_data()
       assert len(result.data) == 2
 
+  @SkipIfFS.hive
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal "
@@ -241,6 +243,7 @@ class TestEventProcessingError(CustomClusterTestSuite):
       self.client.execute("describe formatted {}.{}"
           .format(unique_database, tbl_name))
 
+  @SkipIfFS.hive
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal "
@@ -279,6 +282,7 @@ class TestEventProcessingError(CustomClusterTestSuite):
       self.client.execute("describe formatted {}.{}"
           .format(unique_database, tbl_name))
 
+  @SkipIfFS.hive
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal "
@@ -337,6 +341,7 @@ class TestEventProcessingError(CustomClusterTestSuite):
       self.verify_owner_property(result, 'test-user')
       assert "2024" in result.get_data()
 
+  @SkipIfFS.hive
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal "
