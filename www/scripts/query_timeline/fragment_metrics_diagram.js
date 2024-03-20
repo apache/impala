@@ -155,7 +155,7 @@ export function getFragmentMetricsWrapperHeight() {
 
 export function toogleFragmentMetricsVisibility() {
   if (fragment_id_selections.size > 0 && fragment_metrics_parse_successful) {
-    fragment_metrics_wrapper.style.display = "initial";
+    fragment_metrics_wrapper.style.display = "inline-block";
   } else {
     fragment_metrics_wrapper.style.display = "none";
   }

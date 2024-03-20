@@ -197,7 +197,7 @@ export function resetUtilizationHeight() {
 
 export function toogleUtilizationVisibility() {
   if (utilization_metrics_parse_successful && host_utilization_visible) {
-    host_utilization_wrapper.style.display = "initial";
+    host_utilization_wrapper.style.display = "inline-block";
   } else {
     host_utilization_wrapper.style.display = "none";
   }

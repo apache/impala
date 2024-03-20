@@ -555,7 +555,7 @@ export function setTimingDiagramDimensions(ignored_arg) {
   fragment_diagram.parentElement.style.width = `${diagram_width}px`;
   phases_header.parentElement.style.width = `${diagram_width}px`;
   timeticks_footer.parentElement.style.width = `${diagram_width}px`;
-  timing_diagram.parentElement.style.width = `${diagram_width}px`;
+  timing_diagram.style.width = `${diagram_width}px`;
 
   fragment_diagram.style.width = `${diagram_width}px`;
   phases_header.style.width = `${diagram_width}px`;
@@ -578,12 +578,12 @@ fragment_diagram.addEventListener('mouseout', function(e) {
 });
 
 fragment_diagram.addEventListener('mousemove', function(e) {
-  if (e.pageX >= name_width && e.pageX <= name_width + chart_width){
+  if (e.clientX + scrollable_screen.scrollLeft >= name_width && e.clientX + scrollable_screen.scrollLeft <= name_width + chart_width){
     removeChildIfExists(fragment_diagram, timestamp_gridline);
-    timestamp_gridline = getSvgLine(stroke_fill_colors.black, e.pageX, 0, e.pageX,
+    timestamp_gridline = getSvgLine(stroke_fill_colors.black, e.clientX + scrollable_screen.scrollLeft, 0, e.clientX + scrollable_screen.scrollLeft,
         parseInt(fragment_diagram.style.height));
     fragment_diagram.appendChild(timestamp_gridline);
-    var gridline_time = ((maxts * (e.pageX - name_width) / chart_width) / 1e9);
+    var gridline_time = ((maxts * (e.clientX + scrollable_screen.scrollLeft - name_width) / chart_width) / 1e9);
     showTooltip(host_utilization_chart, gridline_time);
     showTooltip(fragment_metrics_chart, gridline_time);
     fragment_diagram_title.textContent = gridline_time.toFixed(decimals) + " s";
