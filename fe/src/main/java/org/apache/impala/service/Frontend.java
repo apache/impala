@@ -2139,6 +2139,7 @@ public class Frontend {
           + planCtx.compilationState_.getAvailableCoresPerNode() + " cores per node.");
 
       String retryMsg = "";
+      String errorMsg = "";
       while (true) {
         try {
           req = doCreateExecRequest(planCtx, timeline);
@@ -2158,7 +2159,11 @@ public class Frontend {
           LOG.warn("Retrying plan of query {}: {} (retry #{} of {})",
               queryCtx.client_request.stmt, retryMsg, attempt,
               INCONSISTENT_METADATA_NUM_RETRIES);
-        }
+        } catch (AnalysisException e) {
+          errorMsg = e.getMessage();
+          LOG.warn("Analysis Exception query {}: {}",
+              queryCtx.client_request.stmt, errorMsg);
+          throw e;
       }
 
       // Counters about this group set.
