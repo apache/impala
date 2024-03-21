@@ -809,7 +809,7 @@ public class IcebergScanPlanner {
     List<SlotId> slotIds = Lists.newArrayList();
     expr.getIds(tupleIds, slotIds);
 
-    if (tupleIds.size() > 1) return false;
+    if (tupleIds.size() != 1) return false;
     if (!tupleIds.get(0).equals(tblRef_.getDesc().getId())) return false;
 
     for (SlotId sId : slotIds) {

@@ -1186,3 +1186,95 @@ select p_int from functional_parquet.iceberg_alltypes_part where i = 1 and p_int
 ---- TYPES
 INT
 ====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table
+select * from iceberg_avro_format where rand(6) < 0.5;
+---- RESULTS
+1,'A',0.5,true
+3,'C',2.5,false
+---- TYPES
+INT, STRING, DOUBLE, BOOLEAN
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table
+select * from iceberg_avro_format where rand(6) < 0.5 and string_col = 'C';
+---- RESULTS
+3,'C',2.5,false
+---- TYPES
+INT, STRING, DOUBLE, BOOLEAN
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table.
+# Scanning iceberg_v2_positional_update_all_rows involves a UNION node which behaves
+# differently if it is scheduled on 1 node or 2 nodes. Setting num_nodes is not
+# allowed, so let's just check that not all rows are returned.
+select count(*) < 6 from iceberg_v2_positional_update_all_rows where rand(6) < 0.5;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table. Also time travel is involved
+select * from iceberg_v2_positional_update_all_rows for system_version as of 5392552459484846077 where rand(6) < 0.5;
+---- RESULTS
+1,'a'
+3,'c'
+1,'A'
+3,'C'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table. Also time travel is involved
+select count(*) from iceberg_v2_positional_update_all_rows for system_version as of 5392552459484846077 where rand(6) < 0.5;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table
+# iceberg_partition_evolution is written during data loading, so the results are not deterministic.
+select count(*) < 100 from iceberg_partition_evolution where rand(3) < 0.1 and month = 1 and id < 100;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table
+# iceberg_partition_evolution is written during data loading, so the results are not deterministic.
+select count(*) < 6000 from iceberg_partition_evolution where rand(3) < 0.1;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table
+# iceberg_partition_evolution is written during data loading, so the results are not deterministic.
+select count(*) < 6000 from iceberg_partition_evolution where rand(4) < 0.1;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table
+# iceberg_partition_evolution is written during data loading, so the results are not deterministic.
+select count(*) < 300 from iceberg_partition_evolution where rand(3) < 0.1 and month = 1;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
