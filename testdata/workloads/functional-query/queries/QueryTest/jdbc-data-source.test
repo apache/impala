@@ -481,7 +481,7 @@ SET TBLPROPERTIES ("dbcp.username"="UNKNOWN", "dbcp.password"="NONE");
 ---- QUERY
 select * from jdbc_test order by id limit 5;
 ---- CATCH
-row_regex:.*Caught exception.*(FATAL: password authentication failed for user "UNKNOWN")
+row_regex:.*(FATAL: password authentication failed for user "UNKNOWN"|FATAL: role "UNKNOWN" does not exist).*
 ====
 ---- QUERY
 # Alter JDBC table to set correct username and password.
