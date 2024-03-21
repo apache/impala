@@ -133,3 +133,26 @@ select * from functional_parquet.iceberg_v2_delete_pos_and_multi_eq_ids
 ---- TYPES
 INT,STRING,DATE
 ====
+---- QUERY
+# Query an Iceberg table with primary keys that has schema evolution and equality
+# deletes. Note, the schema evolution didn't touch the primary keys
+# (identifier-field-ids).
+select * from functional_parquet.iceberg_v2_equality_delete_schema_evolution;
+---- RESULTS
+1,2024-03-20,'str1',NULL
+44,2024-03-21,'str4',4444
+5,2024-03-22,'str5',NULL
+---- TYPES
+INT,DATE,STRING,INT
+====
+---- QUERY
+# Time travel before the schema evolution was done on the table.
+select * from functional_parquet.iceberg_v2_equality_delete_schema_evolution
+for system_version as of 3986738438831924669;
+---- RESULTS
+1,2024-03-20,'str1'
+4,2024-03-21,'str4'
+5,2024-03-22,'str5'
+---- TYPES
+INT,DATE,STRING
+====

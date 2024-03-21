@@ -1882,3 +1882,62 @@ PLAN-ROOT SINK
    constant-operands=1
    row-size=8B cardinality=1
 ====
+# Query a table that has schema evolution and equality deletes.
+select * from functional_parquet.iceberg_v2_equality_delete_schema_evolution;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:UNION
+|  pass-through-operands: all
+|  row-size=32B cardinality=6
+|
+|--02:HASH JOIN [LEFT ANTI JOIN]
+|  |  hash predicates: functional_parquet.iceberg_v2_equality_delete_schema_evolution.d IS NOT DISTINCT FROM functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01.d, functional_parquet.iceberg_v2_equality_delete_schema_evolution.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01.i
+|  |  other join predicates: functional_parquet.iceberg_v2_equality_delete_schema_evolution.iceberg__data__sequence__number < functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01.iceberg__data__sequence__number
+|  |  row-size=32B cardinality=4
+|  |
+|  |--01:SCAN HDFS [functional_parquet.iceberg_v2_equality_delete_schema_evolution-EQUALITY-DELETE-01 functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01]
+|  |     HDFS partitions=1/1 files=3 size=1.97KB
+|  |     Iceberg snapshot id: 5816823095034839884
+|  |     row-size=16B cardinality=3
+|  |
+|  00:SCAN HDFS [functional_parquet.iceberg_v2_equality_delete_schema_evolution]
+|     HDFS partitions=1/1 files=2 size=1.63KB
+|     Iceberg snapshot id: 5816823095034839884
+|     row-size=32B cardinality=4
+|
+03:SCAN HDFS [functional_parquet.iceberg_v2_equality_delete_schema_evolution]
+   HDFS partitions=1/1 files=2 size=1.90KB
+   Iceberg snapshot id: 5816823095034839884
+   row-size=32B cardinality=2
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+04:UNION
+|  pass-through-operands: all
+|  row-size=32B cardinality=6
+|
+|--02:HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  |  hash predicates: functional_parquet.iceberg_v2_equality_delete_schema_evolution.d IS NOT DISTINCT FROM functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01.d, functional_parquet.iceberg_v2_equality_delete_schema_evolution.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01.i
+|  |  other join predicates: functional_parquet.iceberg_v2_equality_delete_schema_evolution.iceberg__data__sequence__number < functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01.iceberg__data__sequence__number
+|  |  row-size=32B cardinality=4
+|  |
+|  |--05:EXCHANGE [BROADCAST]
+|  |  |
+|  |  01:SCAN HDFS [functional_parquet.iceberg_v2_equality_delete_schema_evolution-EQUALITY-DELETE-01 functional_parquet.iceberg_v2_equality_delete_schema_evolution-equality-delete-01]
+|  |     HDFS partitions=1/1 files=3 size=1.97KB
+|  |     Iceberg snapshot id: 5816823095034839884
+|  |     row-size=16B cardinality=3
+|  |
+|  00:SCAN HDFS [functional_parquet.iceberg_v2_equality_delete_schema_evolution]
+|     HDFS partitions=1/1 files=2 size=1.63KB
+|     Iceberg snapshot id: 5816823095034839884
+|     row-size=32B cardinality=4
+|
+03:SCAN HDFS [functional_parquet.iceberg_v2_equality_delete_schema_evolution]
+   HDFS partitions=1/1 files=2 size=1.90KB
+   Iceberg snapshot id: 5816823095034839884
+   row-size=32B cardinality=2
+====

@@ -1107,6 +1107,29 @@ iceberg_spark_compaction_with_dangling_delete:
 4) Run compaction on the table with Spark.
   spark.sql(s"CALL hadoop_catalog.system.rewrite_data_files(table => 'ice.iceberg_spark_compaction_with_dangling_delete', options => map('min-input-files','2') )")
 
+iceberg_v2_equality_delete_schema_evolution:
+1: Create and populate an Iceberg table with primary keys with Impala:
+  create table functional_parquet.iceberg_v2_equality_delete_schema_evolution
+    (i int not null, d date not null, s string, primary key(i, d) not enforced)
+    PARTITIONED BY SPEC (d)
+    STORED AS ICEBERG
+    TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+        'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
+        'iceberg.table_identifier'='ice.iceberg_v2_equality_delete_schema_evolution',
+        'format-version'='2');
+  insert into functional_parquet.iceberg_v2_equality_delete_schema_evolution values
+    (1, "2024-03-20", "str1"),
+    (2, "2024-03-20", "str2"),
+    (3, "2024-03-21", "str3"),
+    (4, "2024-03-21", "str4"),
+    (5, "2024-03-22", "str5");
+2: Delete some rows with Nifi where i=2, i=3
+3: Do some schema evolution on the table with Impala:
+  alter table functional_parquet.iceberg_v2_equality_delete_schema_evolution change s str string;
+  alter table functional_parquet.iceberg_v2_equality_delete_schema_evolution add column j int;
+4: Update a row with Nifi where i=4 to the following:
+  (44, 2024-03-21, "str4", 4444)
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {
