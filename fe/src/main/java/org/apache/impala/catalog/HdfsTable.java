@@ -877,6 +877,10 @@ public class HdfsTable extends Table implements FeFsTable {
    *              {@link #getAvailableAccessLevel(String, Path, FsPermissionCache)}
    */
   private static boolean assumeReadWriteAccess(FileSystem fs) {
+    // Avoid loading permissions in local catalog mode since they are not used in
+    // LocalFsTable. Remove this once we resolve IMPALA-7539.
+    if (BackendConfig.INSTANCE.isMinimalTopicMode()) return true;
+
     // Avoid calling getPermissions() on file path for S3 files, as that makes a round
     // trip to S3. Also, the S3A connector is currently unable to manage S3 permissions,
     // so for now it is safe to assume that all files(objects) have READ_WRITE

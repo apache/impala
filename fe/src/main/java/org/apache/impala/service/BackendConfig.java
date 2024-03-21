@@ -487,4 +487,8 @@ public class BackendConfig {
   public String queryLogTableName() {
     return backendCfg_.query_log_table_name;
   }
+
+  public boolean isMinimalTopicMode() {
+    return backendCfg_.catalog_topic_mode.equalsIgnoreCase("minimal");
+  }
 }
