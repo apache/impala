@@ -24,6 +24,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.validate.ImpalaConformance;
 
@@ -52,7 +53,7 @@ public class CalciteValidator implements CompilerStep {
     this.catalogReader = mdHandler.getCalciteCatalogReader();
 
     this.sqlValidator = SqlValidatorUtil.newValidator(
-        SqlStdOperatorTable.instance(),
+        ImpalaOperatorTable.getInstance(),
         catalogReader, typeFactory,
         SqlValidator.Config.DEFAULT
             .withConformance(ImpalaConformance.INSTANCE)

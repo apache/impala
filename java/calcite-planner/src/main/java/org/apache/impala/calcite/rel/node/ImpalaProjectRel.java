@@ -68,7 +68,6 @@ public class ImpalaProjectRel extends Project
 
   @Override
   public NodeWithExprs getPlanNode(ParentPlanRelContext context) throws ImpalaException {
-
     NodeWithExprs inputWithExprs = getChildPlanNode(context);
 
     // get the output exprs for this node that are needed by the parent node.
@@ -88,8 +87,8 @@ public class ImpalaProjectRel extends Project
       throws ImpalaException {
     ImpalaPlanRel inputRel = (ImpalaPlanRel) getInput(0);
 
-    CreateExprVisitor visitor =
-        new CreateExprVisitor(inputNodeWithExprs.outputExprs_);
+    CreateExprVisitor visitor = new CreateExprVisitor(getCluster().getRexBuilder(),
+        inputNodeWithExprs.outputExprs_, basicAnalyzer);
 
     ImmutableList.Builder<Expr> builder = new ImmutableList.Builder();
     for (RexNode rexNode : getProjects()) {

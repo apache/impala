@@ -23,17 +23,11 @@ import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.util.ConversionUtil;
-import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TPrimitiveType;
 
-import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +71,10 @@ public class ImpalaTypeConverter {
     map.put(Type.DOUBLE, factory.createSqlType(SqlTypeName.DOUBLE));
     map.put(Type.TIMESTAMP, factory.createSqlType(SqlTypeName.TIMESTAMP));
     map.put(Type.DATE, factory.createSqlType(SqlTypeName.DATE));
+    map.put(Type.DECIMAL, factory.createSqlType(SqlTypeName.DECIMAL));
     map.put(Type.BINARY, factory.createSqlType(SqlTypeName.BINARY));
+    map.put(Type.CHAR, factory.createSqlType(SqlTypeName.CHAR, 1));
+    map.put(Type.VARCHAR, factory.createSqlType(SqlTypeName.VARCHAR, 1));
     map.put(Type.STRING, factory.createSqlType(SqlTypeName.VARCHAR, Integer.MAX_VALUE));
     map.put(Type.NULL, factory.createSqlType(SqlTypeName.NULL));
 
@@ -116,6 +113,18 @@ public class ImpalaTypeConverter {
         Type normalizedImpalaType = getImpalaType(primitiveType);
         return impalaToCalciteMap.get(normalizedImpalaType);
     }
+  }
+
+  /**
+   * Get the normalized RelDataType given an impala type.
+   */
+  public static RelDataType getRelDataType(Type impalaType) {
+    if (impalaType == null) {
+      return null;
+    }
+    TPrimitiveType primitiveType = impalaType.getPrimitiveType().toThrift();
+    Type normalizedImpalaType = getImpalaType(primitiveType);
+    return impalaToCalciteMap.get(normalizedImpalaType);
   }
 
   /**
@@ -162,5 +171,169 @@ public class ImpalaTypeConverter {
       default:
         throw new RuntimeException("Unknown type " + argType);
     }
+  }
+
+  /**
+   * Create a new impala type given a relDataType
+   */
+  public static Type createImpalaType(RelDataType relDataType) {
+    // First retrieve the normalized impala type
+    if (relDataType.getSqlTypeName() == SqlTypeName.VARCHAR &&
+        ((relDataType.getPrecision() == Integer.MAX_VALUE) ||
+        (relDataType.getPrecision() == -1))) {
+      return Type.STRING;
+    }
+    Type impalaType = getType(relDataType.getSqlTypeName());
+    // create the impala type given the normalized type, precision, and scale.
+    return createImpalaType(impalaType, relDataType.getPrecision(),
+        relDataType.getScale());
+  }
+
+  public static Type createImpalaType(Type impalaType, int precision, int scale) {
+    TPrimitiveType primitiveType = impalaType.getPrimitiveType().toThrift();
+    // Char, varchar, decimal, and fixed_uda_intermediate contain precisions and need to
+    // be treated separately.
+    switch (primitiveType) {
+      case CHAR:
+        return ScalarType.createCharType(precision);
+      case VARCHAR:
+        return (precision == Integer.MAX_VALUE || precision == -1)
+           ? Type.STRING
+           : ScalarType.createVarcharType(precision);
+      case DECIMAL:
+        if (precision == -1) {
+          return Type.DECIMAL;
+        }
+        return ScalarType.createDecimalType(precision, scale);
+      case FIXED_UDA_INTERMEDIATE:
+        return ScalarType.createFixedUdaIntermediateType(precision);
+      default:
+        return impalaType;
+    }
+  }
+
+  public static Type getType(SqlTypeName calciteTypeName) {
+    switch (calciteTypeName) {
+      case TINYINT:
+        return Type.TINYINT;
+      case SMALLINT:
+        return Type.SMALLINT;
+      case INTEGER:
+        return Type.INT;
+      case INTERVAL_YEAR:
+      case INTERVAL_MONTH:
+      case INTERVAL_DAY:
+      case INTERVAL_HOUR:
+      case INTERVAL_MINUTE:
+      case INTERVAL_SECOND:
+      case BIGINT:
+        return Type.BIGINT;
+      case VARCHAR:
+        return Type.VARCHAR;
+      case BOOLEAN:
+        return Type.BOOLEAN;
+      case REAL:
+      case FLOAT:
+        return Type.FLOAT;
+      case DOUBLE:
+        return Type.DOUBLE;
+      case DECIMAL:
+        return Type.DECIMAL;
+      case CHAR:
+        return Type.CHAR;
+      case TIMESTAMP:
+        return Type.TIMESTAMP;
+      case DATE:
+        return Type.DATE;
+      case NULL:
+        return Type.NULL;
+      case BINARY:
+        return Type.BINARY;
+      default:
+        throw new RuntimeException("Type " + calciteTypeName + "  not supported yet.");
+    }
+  }
+
+  // helper function to handle translation of lists.
+  public static List<Type> getNormalizedImpalaTypes(List<RelDataType> relDataTypes) {
+    return Lists.transform(relDataTypes, ImpalaTypeConverter::getNormalizedImpalaType);
+  }
+
+  /**
+   * Return the default impala type given a reldatatype that potentially has precision.
+   */
+  public static ScalarType getNormalizedImpalaType(RelDataType relDataType) {
+    SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
+    if (SqlTypeName.INTERVAL_TYPES.contains(sqlTypeName)) {
+      return Type.BIGINT;
+    }
+    switch (sqlTypeName) {
+      case VARCHAR:
+        return relDataType.getPrecision() == Integer.MAX_VALUE
+            ? Type.STRING : Type.VARCHAR;
+      case CHAR:
+        return Type.CHAR;
+      case DECIMAL:
+        return Type.DECIMAL;
+      case BOOLEAN:
+        return Type.BOOLEAN;
+      case TINYINT:
+        return Type.TINYINT;
+      case SMALLINT:
+        return Type.SMALLINT;
+      case INTEGER:
+        return Type.INT;
+      case BIGINT:
+        return Type.BIGINT;
+      case FLOAT:
+      case REAL:
+        return Type.FLOAT;
+      case DOUBLE:
+        return Type.DOUBLE;
+      case TIMESTAMP:
+        return Type.TIMESTAMP;
+      case DATE:
+        return Type.DATE;
+      case BINARY:
+        return Type.BINARY;
+      case SYMBOL:
+        return null;
+      case NULL:
+        return Type.NULL;
+      default:
+        throw new RuntimeException("Unknown SqlTypeName " + sqlTypeName +
+            " to convert to Impala.");
+    }
+  }
+
+  public static List<RelDataType> createRelDataTypes(List<Type> impalaTypes) {
+    List<RelDataType> result = Lists.newArrayList();
+    for (Type t : impalaTypes) {
+      result.add(createRelDataType(t));
+    }
+    return result;
+  }
+
+  /**
+   * Create a new RelDataType given the Impala type.
+   */
+  public static RelDataType createRelDataType(Type impalaType) {
+    if (impalaType == null) {
+      return null;
+    }
+    TPrimitiveType primitiveType = impalaType.getPrimitiveType().toThrift();
+    if (primitiveType == TPrimitiveType.DECIMAL) {
+      ScalarType scalarType = (ScalarType) impalaType;
+      RexBuilder rexBuilder =
+          new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
+      RelDataTypeFactory factory = rexBuilder.getTypeFactory();
+      RelDataType decimalDefinedRetType = factory.createSqlType(SqlTypeName.DECIMAL,
+          scalarType.decimalPrecision(), scalarType.decimalScale());
+      return factory.createTypeWithNullability(decimalDefinedRetType, true);
+    }
+    // for all other arguments besides decimal, we just normalize the datatype and return
+    // the previously created RelDataType.
+    Type normalizedImpalaType = getImpalaType(primitiveType);
+    return impalaToCalciteMap.get(normalizedImpalaType);
   }
 }

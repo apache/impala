@@ -17,6 +17,8 @@
 
 package org.apache.impala.calcite.rel.util;
 
+import com.google.common.collect.Lists;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexCorrelVariable;
 import org.apache.calcite.rex.RexDynamicParam;
@@ -31,23 +33,34 @@ import org.apache.calcite.rex.RexRangeRef;
 import org.apache.calcite.rex.RexSubQuery;
 import org.apache.calcite.rex.RexTableInputRef;
 import org.apache.calcite.rex.RexVisitorImpl;
+
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.calcite.functions.RexCallConverter;
+import org.apache.impala.calcite.functions.RexLiteralConverter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * CreateExprVisitor will generate Impala expressions for function calls and literals.
- * TODO: In this iteration, it only handles input refs.
  */
 public class CreateExprVisitor extends RexVisitorImpl<Expr> {
 
+  private final RexBuilder rexBuilder_;
+
   private final List<Expr> inputExprs_;
 
-  public CreateExprVisitor(List<Expr> inputExprs) {
+  private final Analyzer analyzer_;
+
+  public CreateExprVisitor(RexBuilder rexBuilder, List<Expr> inputExprs,
+      Analyzer analyzer) {
     super(false);
     this.inputExprs_ = inputExprs;
+    this.rexBuilder_ = rexBuilder;
+    this.analyzer_ = analyzer;
   }
 
   @Override
@@ -57,12 +70,24 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
 
   @Override
   public Expr visitCall(RexCall rexCall) {
-    throw new RuntimeException("Not supported");
+    try {
+      List<Expr> params = Lists.newArrayList();
+      for (RexNode operand : rexCall.getOperands()) {
+        params.add(operand.accept(this));
+      }
+      return RexCallConverter.getExpr(rexCall, params, rexBuilder_, analyzer_);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
   public Expr visitLiteral(RexLiteral rexLiteral) {
-    throw new RuntimeException("Not supported");
+    try {
+      return RexLiteralConverter.getExpr(rexLiteral, analyzer_);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -121,5 +146,14 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
     } catch (Exception e) {
       throw new AnalysisException(e);
     }
+  }
+
+  public static List<Expr> getExprs(CreateExprVisitor visitor, List<RexNode> operands)
+      throws ImpalaException {
+    List<Expr> exprs = new ArrayList<>();
+    for (RexNode operand : operands) {
+      exprs.add(getExpr(visitor, operand));
+    }
+    return exprs;
   }
 }

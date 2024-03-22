@@ -115,3 +115,38 @@ int,string,binary
 ---- RUNTIME_PROFILE
 row_regex: .*PlannerType: CalcitePlanner.*
 ====
+---- QUERY
+# Tiny test for Calcite. At the point of this commit, very few functions work. This
+# is a test that includes one of the functions that does.
+# The ultimate goal is to include all tests in the testing framework, so there is
+# no need to be extensive about testing in this file.
+select bigint_col, abs(cast(-3 as bigint)), abs(-3000000000) from functional.alltypestiny;
+---- RESULTS
+0,3,3000000000
+10,3,3000000000
+0,3,3000000000
+10,3,3000000000
+0,3,3000000000
+10,3,3000000000
+0,3,3000000000
+10,3,3000000000
+---- TYPES
+bigint,bigint,bigint
+====
+---- QUERY
+# Tiny test for Calcite. At the point of this commit, very few functions work. This
+# is a test that includes one of the functions that does.
+# The ultimate goal is to include all tests in the testing framework, so there is
+# no need to be extensive about testing in this file.
+select cast(cast('2005-12-13 08:00:00' as string)  AS TIMESTAMP) from functional.alltypestiny;
+---- RESULTS
+2005-12-13 08:00:00
+2005-12-13 08:00:00
+2005-12-13 08:00:00
+2005-12-13 08:00:00
+2005-12-13 08:00:00
+2005-12-13 08:00:00
+2005-12-13 08:00:00
+2005-12-13 08:00:00
+---- TYPES
+timestamp

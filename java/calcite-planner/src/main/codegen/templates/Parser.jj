@@ -6000,6 +6000,8 @@ SqlTypeNameSpec CharacterTypeName(Span s) :
     int precision = -1;
     final SqlTypeName sqlTypeName;
     String charSetName = null;
+    // Added Impala code to handle String type
+    boolean isString = false;
 }
 {
     (
@@ -6011,6 +6013,9 @@ SqlTypeNameSpec CharacterTypeName(Span s) :
         )
     |
         <VARCHAR> { s.add(this); sqlTypeName = SqlTypeName.VARCHAR; }
+    |
+        // Added Impala code to handle String type
+        <STRING> { s.add(this); sqlTypeName = SqlTypeName.VARCHAR; isString = true;}
     )
     precision = PrecisionOpt()
     [
@@ -6018,6 +6023,8 @@ SqlTypeNameSpec CharacterTypeName(Span s) :
         charSetName = Identifier()
     ]
     {
+        // Added Impala code to handle String type
+        if (isString) precision = Integer.MAX_VALUE;
         return new SqlBasicTypeNameSpec(sqlTypeName, precision, charSetName, s.end(this));
     }
 }

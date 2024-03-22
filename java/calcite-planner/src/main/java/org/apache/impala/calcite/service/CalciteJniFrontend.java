@@ -23,8 +23,11 @@ import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.impala.calcite.functions.FunctionResolver;
+import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.rel.node.NodeWithExprs;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
@@ -68,6 +71,7 @@ public class CalciteJniFrontend extends JniFrontend {
   public CalciteJniFrontend(byte[] thriftBackendConfig, boolean isBackendTest)
       throws ImpalaException, TException {
     super(thriftBackendConfig, isBackendTest);
+    loadCalciteImpalaFunctions();
   }
 
   /**
@@ -189,6 +193,10 @@ public class CalciteJniFrontend extends JniFrontend {
     if (LOG.isDebugEnabled()) {
       compilerStep.logDebug(stepResult);
     }
+  }
+
+  private static void loadCalciteImpalaFunctions() {
+    ImpalaOperatorTable.create(BuiltinsDb.getInstance());
   }
 
   public static class QueryContext {

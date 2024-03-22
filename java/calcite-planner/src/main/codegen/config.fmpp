@@ -29,6 +29,7 @@ parser: {
   # List of new keywords. Example: "DATABASES", "TABLES". If the keyword is
   # not a reserved keyword, add it to the 'nonReservedKeywords' section.
   keywords: [
+    "STRING"
   ]
 
   # List of keywords from "keywords" section that are not reserved.
