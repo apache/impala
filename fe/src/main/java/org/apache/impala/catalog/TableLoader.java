@@ -24,8 +24,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
-import org.apache.impala.catalog.events.EventFactory;
-import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.CreateTableEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.common.Metrics;
@@ -101,11 +99,8 @@ public class TableLoader {
         // we are only interested in fetching the events if we have a valid eventId
         // for a table. For tables where eventId is unknown are not created by
         // this catalogd and hence the self-event detection logic does not apply.
-        events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(catalog_,
-            eventId, notificationEvent -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
-                .equals(notificationEvent.getEventType())
-                && notificationEvent.getDbName().equalsIgnoreCase(db.getName())
-                && notificationEvent.getTableName().equalsIgnoreCase(tblName));
+        events = MetastoreEventsProcessor.getNextMetastoreEventsInBatchesForTable(
+            catalog_, eventId, db.getName(), tblName, CreateTableEvent.EVENT_TYPE);
         catalogTimeline.markEvent(FETCHED_HMS_EVENT_BATCH);
       }
       if (events != null && !events.isEmpty()) {

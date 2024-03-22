@@ -349,6 +349,16 @@ public class CatalogServiceCatalog extends Catalog {
   // A variable to test expected failed events
   private final Set<String> failureEventsForTesting_;
 
+  // List of event types to skip by default while fetching notification events from
+  // metastore.
+  private final List<String> defaultSkippedHmsEventTypes_;
+
+  // List of common known HMS event types. Ignores those that are rare in regular (e.g.
+  // daily) jobs. The list is used to generate a complement set for wanted HMS event
+  // types. We need this list until HIVE-28146 is resolved. After that we can directly
+  // specify what event types we want.
+  private final List<String> commonHmsEventTypes_;
+
   // Total number of dbs, tables and functions in the catalog cache.
   // Updated in each catalog topic update (getCatalogDelta()).
   private int numDbs_ = 0;
@@ -415,6 +425,21 @@ public class CatalogServiceCatalog extends Catalog {
         Splitter.on(',').trimResults().omitEmptyStrings().split(failureEvents)) {
       failureEventsForTesting_.add(tblProps);
     }
+    defaultSkippedHmsEventTypes_ = Lists.newArrayList();
+    Iterable<String> eventTypes = Splitter.on(',')
+        .trimResults().omitEmptyStrings()
+        .split(BackendConfig.INSTANCE.getDefaultSkippedHmsEventTypes());
+    for (String eventType : eventTypes) {
+      defaultSkippedHmsEventTypes_.add(eventType);
+    }
+    LOG.info("Default skipped HMS event types: " + defaultSkippedHmsEventTypes_);
+    commonHmsEventTypes_ = Lists.newArrayList();
+    eventTypes = Splitter.on(',').trimResults().omitEmptyStrings()
+        .split(BackendConfig.INSTANCE.getCommonHmsEventTypes());
+    for (String eventType : eventTypes) {
+      commonHmsEventTypes_.add(eventType);
+    }
+    LOG.info("Common HMS event types: " + commonHmsEventTypes_);
   }
 
   public void startEventsProcessor() {
@@ -4104,7 +4129,6 @@ public class CatalogServiceCatalog extends Catalog {
     this.metastoreEventProcessor_ = metastoreEventProcessor;
   }
 
-  @VisibleForTesting
   public void setCatalogMetastoreServer(ICatalogMetastoreServer catalogMetastoreServer) {
     this.catalogMetastoreServer_ = catalogMetastoreServer;
   }
@@ -4141,4 +4165,10 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   public Set<String> getFailureEventsForTesting() { return failureEventsForTesting_; }
+
+  public List<String> getDefaultSkippedHmsEventTypes() {
+    return defaultSkippedHmsEventTypes_;
+  }
+
+  public List<String> getCommonHmsEventTypes() { return commonHmsEventTypes_; }
 }

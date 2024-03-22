@@ -22,6 +22,7 @@ import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -54,6 +55,7 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.DropDatabaseEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.common.Metrics;
@@ -277,19 +279,54 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   private static final long SECOND_IN_NANOS = 1000 * 1000 * 1000L;
 
-  // List of event types to skip while fetching notification events from metastore
-  private static final List<String> EVENT_SKIP_LIST = Arrays.asList("OPEN_TXN");
+  public static List<NotificationEvent> getNextMetastoreEventsInBatchesForDb(
+      CatalogServiceCatalog catalog, long eventId, String dbName, String eventType)
+      throws MetastoreNotificationException {
+    return getNextMetastoreEventsInBatchesForDb(catalog, eventId,
+        MetastoreShim.getDefaultCatalogName(), dbName, eventType);
+  }
 
-  /**
-   * Wrapper around {@link
-   * MetastoreEventsProcessor#getNextMetastoreEventsInBatches(CatalogServiceCatalog,
-   * long, NotificationFilter, int)} which passes the default batch size.
-   */
-  public static List<NotificationEvent> getNextMetastoreEventsInBatches(
-      CatalogServiceCatalog catalog, long eventId, NotificationFilter filter)
-      throws MetastoreNotificationFetchException {
+  public static List<NotificationEvent> getNextMetastoreEventsInBatchesForDb(
+      CatalogServiceCatalog catalog, long eventId, String catName,
+      String dbName, String eventType) throws MetastoreNotificationException {
+    Preconditions.checkNotNull(eventType, "eventType is null in fetching db events");
+    Preconditions.checkNotNull(catName, "catName is null in fetching db events");
+    Preconditions.checkNotNull(dbName, "dbName is null in fetching db events");
+    NotificationFilter filter = notificationEvent ->
+        eventType.equals(notificationEvent.getEventType())
+            && catName.equalsIgnoreCase(notificationEvent.getCatName())
+            && dbName.equalsIgnoreCase(notificationEvent.getDbName());
+    return getNextMetastoreEventsInBatches(catalog, eventId, filter, eventType);
+  }
+
+  public static List<NotificationEvent> getNextMetastoreEventsInBatchesForTable(
+      CatalogServiceCatalog catalog, long eventId, String dbName, String tblName,
+      String eventType) throws MetastoreNotificationException {
+    return getNextMetastoreEventsInBatchesForTable(catalog, eventId,
+        MetastoreShim.getDefaultCatalogName(), dbName, tblName, eventType);
+  }
+
+  public static List<NotificationEvent> getNextMetastoreEventsInBatchesForTable(
+      CatalogServiceCatalog catalog, long eventId, String catName, String dbName,
+      String tblName, String eventType) throws MetastoreNotificationException {
+    Preconditions.checkNotNull(eventType, "eventType is null in fetching table events");
+    Preconditions.checkNotNull(catName, "catName is null in fetching table events");
+    Preconditions.checkNotNull(dbName, "dbName is null in fetching table events");
+    Preconditions.checkNotNull(tblName, "tblName is null in fetching table events");
+    NotificationFilter filter = notificationEvent ->
+        eventType.equals(notificationEvent.getEventType())
+            && catName.equalsIgnoreCase(notificationEvent.getCatName())
+            && dbName.equalsIgnoreCase(notificationEvent.getDbName())
+            && tblName.equalsIgnoreCase(notificationEvent.getTableName());
     return getNextMetastoreEventsInBatches(catalog, eventId, filter,
-        EVENTS_BATCH_SIZE_PER_RPC);
+        EVENTS_BATCH_SIZE_PER_RPC, eventType);
+  }
+
+  public static List<NotificationEvent> getNextMetastoreEventsInBatches(
+      CatalogServiceCatalog catalog, long eventId, NotificationFilter filter,
+      String... eventTypes) throws MetastoreNotificationFetchException {
+    return getNextMetastoreEventsInBatches(catalog, eventId, filter,
+        EVENTS_BATCH_SIZE_PER_RPC, eventTypes);
   }
 
   /**
@@ -309,7 +346,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   @VisibleForTesting
   public static List<NotificationEvent> getNextMetastoreEventsInBatches(
       CatalogServiceCatalog catalog, long eventId, NotificationFilter filter,
-      int eventsBatchSize) throws MetastoreNotificationFetchException {
+      int eventsBatchSize, String... eventTypes)
+      throws MetastoreNotificationFetchException {
     Preconditions.checkArgument(eventsBatchSize > 0);
     List<NotificationEvent> result = new ArrayList<>();
     try (MetaStoreClient msc = catalog.getMetaStoreClient()) {
@@ -317,6 +355,17 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           .getEventId();
       if (toEventId <= eventId) return result;
       long currentEventId = eventId;
+      List<String> eventTypeSkipList = catalog.getDefaultSkippedHmsEventTypes();
+      String typeStr = null;
+      if (eventTypes != null && eventTypes.length > 0) {
+        eventTypeSkipList = Lists.newArrayList(catalog.getCommonHmsEventTypes());
+        eventTypeSkipList.removeIf(s -> Arrays.asList(eventTypes).contains(s));
+        typeStr = String.join(",", eventTypes) + " ";
+      }
+      LOG.info("Fetching {}events started from id {} to {}. Gap: {}",
+          typeStr == null ? "" : typeStr, eventId, toEventId,
+          toEventId - eventId);
+      int numFilteredEvents = 0;
       while (currentEventId < toEventId) {
         int batchSize = Math
             .min(eventsBatchSize, (int)(toEventId - currentEventId));
@@ -328,16 +377,27 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         eventRequest.setMaxEvents(batchSize);
         eventRequest.setLastEvent(currentEventId);
         NotificationEventResponse notificationEventResponse =
-            MetastoreShim.getNextNotification(msc.getHiveClient(), eventRequest, true);
+            MetastoreShim.getNextNotification(msc.getHiveClient(), eventRequest,
+                eventTypeSkipList);
         if (notificationEventResponse.getEvents().isEmpty()) {
           // Possible to receive empty list due to event skip list in request
-          return result;
+          break;
         }
+
         for (NotificationEvent event : notificationEventResponse.getEvents()) {
           // if no filter is provided we add all the events
-          if (filter == null || filter.accept(event)) result.add(event);
+          if (filter == null || filter.accept(event)) {
+            result.add(event);
+          } else {
+            numFilteredEvents++;
+          }
           currentEventId = event.getEventId();
         }
+      }
+      if (numFilteredEvents > 0) {
+        LOG.info("Got {} events and filtered out {} locally from {} events start " +
+                "from id {}",
+            result.size(), numFilteredEvents, toEventId - eventId, eventId + 1);
       }
       return result;
     } catch (MetastoreClientInstantiationException | TException e) {
@@ -785,7 +845,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     eventRequest.setMaxEvents(1);
     try {
       NotificationEventResponse response = MetastoreShim.getNextNotification(
-          msClient.getHiveClient(), eventRequest, false);
+          msClient.getHiveClient(), eventRequest, null);
       Iterator<NotificationEvent> eventIter = response.getEventsIterator();
       if (!eventIter.hasNext()) {
         LOG.warn("Unable to fetch event {}. It has been cleaned up", eventId);
@@ -917,7 +977,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       eventRequest.setLastEvent(eventId);
       eventRequest.setMaxEvents(batchSize);
       NotificationEventResponse response =
-          MetastoreShim.getNextNotification(msClient.getHiveClient(), eventRequest, true);
+          MetastoreShim.getNextNotification(msClient.getHiveClient(), eventRequest,
+              catalog_.getDefaultSkippedHmsEventTypes());
       LOG.info(String.format("Received %d events. Start event id : %d",
           response.getEvents().size(), eventId));
       if (filter == null) return response.getEvents();
@@ -1373,6 +1434,4 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static MessageDeserializer getMessageDeserializer() {
     return MESSAGE_DESERIALIZER;
   }
-
-  public static List<String> getEventSkipList() { return EVENT_SKIP_LIST; }
 }

@@ -123,6 +123,8 @@ DECLARE_string(inject_process_event_failure_event_types);
 DECLARE_double(inject_process_event_failure_ratio);
 DECLARE_bool(enable_workload_mgmt);
 DECLARE_string(query_log_table_name);
+DECLARE_string(default_skipped_hms_event_types);
+DECLARE_string(common_hms_event_types);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -476,6 +478,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_enable_workload_mgmt(FLAGS_enable_workload_mgmt);
   cfg.__set_query_log_table_name(FLAGS_query_log_table_name);
   cfg.__set_query_cpu_root_factor(FLAGS_query_cpu_root_factor);
+  cfg.__set_default_skipped_hms_event_types(FLAGS_default_skipped_hms_event_types);
+  cfg.__set_common_hms_event_types(FLAGS_common_hms_event_types);
   return Status::OK();
 }
 

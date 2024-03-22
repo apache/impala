@@ -294,4 +294,8 @@ struct TBackendGflags {
   131: required string query_log_table_name
 
   132: required double query_cpu_root_factor
+
+  133: required string default_skipped_hms_event_types
+
+  134: required string common_hms_event_types
 }

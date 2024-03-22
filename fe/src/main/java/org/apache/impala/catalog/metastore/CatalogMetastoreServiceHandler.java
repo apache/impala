@@ -214,13 +214,9 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
           throw e;
         }
       }
-      List<NotificationEvent> events =
-          MetastoreEventsProcessor.getNextMetastoreEventsInBatches(catalog_, fromEventId,
-              notificationEvent ->
-                  MetastoreEvents.CreateDatabaseEvent.CREATE_DATABASE_EVENT_TYPE
-                      .equals(notificationEvent.getEventType())
-                      && dbName.equalsIgnoreCase(notificationEvent.getDbName()));
-
+      List<NotificationEvent> events = MetastoreEventsProcessor
+          .getNextMetastoreEventsInBatchesForDb(catalog_, fromEventId, dbName,
+              MetastoreEvents.CreateDatabaseEvent.EVENT_TYPE);
       Preconditions.checkArgument(events.size() == 1,
           "Db %s was recreated in metastore " +
               "while the current db creation was in progress", dbName);
@@ -1330,12 +1326,11 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
       T resp = task.execute();
       // Rename scenario, remove old table and add new one
       try {
+        // the alter table event is generated on the renamed table
         List<NotificationEvent> events =
-            MetastoreEventsProcessor.getNextMetastoreEventsInBatches(catalog_,
-                currentEventId, event -> "ALTER_TABLE".equals(event.getEventType())
-                // the alter table event is generated on the renamed table
-                && newTable.getDbName().equalsIgnoreCase(event.getDbName())
-                && newTable.getTableName().equalsIgnoreCase(event.getTableName()));
+            MetastoreEventsProcessor.getNextMetastoreEventsInBatchesForTable(catalog_,
+                currentEventId, newTable.getDbName(), newTable.getTableName(),
+                MetastoreEvents.AlterTableEvent.EVENT_TYPE);
         Preconditions.checkState(events.size() == 1, String.format("For table %s.%s, "
             + "from event id: %s, expected ALTER_TABLE events size to be 1 but is %s",
             newTable.getDbName(), newTable.getTableName(), currentEventId,
@@ -1418,13 +1413,8 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
             "exception {} from metastore", dbName, tblName, e.getClass().getName());
       }
       List<NotificationEvent> events =
-          MetastoreEventsProcessor
-              .getNextMetastoreEventsInBatches(catalog_, fromEventId,
-                  event -> MetastoreEvents.CreateTableEvent.CREATE_TABLE_EVENT_TYPE
-                      .equals(event.getEventType())
-                      && dbName.equalsIgnoreCase(event.getDbName())
-                      && tblName.equalsIgnoreCase(event.getTableName()));
-
+          MetastoreEventsProcessor.getNextMetastoreEventsInBatchesForTable(catalog_,
+              fromEventId, dbName, tblName, MetastoreEvents.CreateTableEvent.EVENT_TYPE);
       Preconditions.checkState(events.size() == 1,
           "Table %s.%s was recreated in metastore since event id %s" +
               "while the current table creation was in progress", dbName, tblName,

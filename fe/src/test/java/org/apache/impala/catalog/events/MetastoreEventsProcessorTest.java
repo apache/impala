@@ -57,14 +57,10 @@ import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.api.SerDeInfo;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
@@ -323,16 +319,16 @@ public class MetastoreEventsProcessorTest {
     createTable("testNextMetastoreEvents2", false);
     List<NotificationEvent> events =
         MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
-        eventsProcessor_.catalog_, currentEventId, null, 2);
+        eventsProcessor_.catalog_, currentEventId, /*filter*/null, 2);
     assertEquals(3, events.size());
     events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
-        eventsProcessor_.catalog_, currentEventId+1, null, 10);
+        eventsProcessor_.catalog_, currentEventId+1, /*filter*/null, 10);
     assertEquals(2, events.size());
     events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
-        eventsProcessor_.catalog_, currentEventId, null, 3);
+        eventsProcessor_.catalog_, currentEventId, /*filter*/null, 3);
     assertEquals(3, events.size());
     events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
-        eventsProcessor_.catalog_, currentEventId+3, null, 3);
+        eventsProcessor_.catalog_, currentEventId+3, /*filter*/null, 3);
     assertEquals(0, events.size());
   }
 
@@ -3639,7 +3635,6 @@ public class MetastoreEventsProcessorTest {
 
   /**
    * Test fetching events in batch when last occurred event is open transaction
-   * @throws Exception
    */
   @Test
   public void testFetchEventsInBatchWithOpenTxnAsLastEvent() throws Exception {
@@ -3649,12 +3644,68 @@ public class MetastoreEventsProcessorTest {
       assertEquals(currentEventId + 1, eventsProcessor_.getCurrentEventId());
       List<NotificationEvent> events =
           MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
-              eventsProcessor_.catalog_, currentEventId, null);
+              eventsProcessor_.catalog_, currentEventId, null, null);
       // Open transaction event is not returned from metastore
       assertEquals(0, events.size());
       MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
       assertEquals(currentEventId + 2, eventsProcessor_.getCurrentEventId());
     }
+  }
+
+  @Test
+  public void testNotFetchingUnwantedEvents() throws Exception {
+    String tblName = "test_event_skip_list";
+    createDatabase(TEST_DB_NAME, null);
+    Map<String, String> params = new HashMap<>();
+    params.put("EXTERNAL", "true");
+    params.put("external.table.purge", "true");
+    createTable(null, TEST_DB_NAME, tblName, params, true, "EXTERNAL_TABLE");
+    eventsProcessor_.processEvents();
+
+    Table tbl = catalog_.getTable(TEST_DB_NAME, tblName);
+    assertTrue("tbl should be unloaded", tbl instanceof IncompleteTable);
+    long createEventId = tbl.getCreateEventId();
+    assertEquals(eventsProcessor_.getLatestEventId(), createEventId);
+
+    // create 2 partitions and update partition stats using Hive
+    try (HiveJdbcClientPool jdbcClientPool = HiveJdbcClientPool.create(1);
+         HiveJdbcClientPool.HiveJdbcClient hiveClient = jdbcClientPool.getClient()) {
+      hiveClient.executeSql("set hive.exec.dynamic.partition.mode=nonstrict");
+      hiveClient.executeSql(String.format(
+          "insert into %s.%s partition(p1) values (0,0,0),(1,1,1)",
+          TEST_DB_NAME, tblName));
+      hiveClient.executeSql(String.format(
+          "analyze table %s.%s compute statistics for columns", TEST_DB_NAME, tblName));
+    }
+    // All the new events are:
+    // OPEN_TXN
+    // ADD_PARTITION one for adding 2 partitions
+    // COMMIT_TXN
+    // OPEN_TXN
+    // ALTER_PARTITION
+    // ALTER_PARTITION
+    // UPDATE_PART_COL_STAT_EVENT
+    // UPDATE_PART_COL_STAT_EVENT
+    // COMMIT_TXN
+    // Fetch all events with the default skip list.
+    List<NotificationEvent> events =
+        MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
+            eventsProcessor_.catalog_, createEventId, null);
+    assertEquals(5, events.size());
+
+    // Fetch events with a null filter but specifying the wanted event type.
+    events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
+        eventsProcessor_.catalog_, createEventId, /*filter*/null,
+        MetastoreEvents.CreateTableEvent.EVENT_TYPE);
+    assertEquals(0, events.size());
+    events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
+        eventsProcessor_.catalog_, createEventId, /*filter*/null,
+        MetastoreEvents.AddPartitionEvent.EVENT_TYPE);
+    assertEquals(1, events.size());
+    events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
+        eventsProcessor_.catalog_, createEventId, /*filter*/null,
+        AlterPartitionEvent.EVENT_TYPE);
+    assertEquals(2, events.size());
   }
 
   /**
@@ -3702,7 +3753,7 @@ public class MetastoreEventsProcessorTest {
     try {
       MetaStoreClientPool badPool = new IncompetentMetastoreClientPool(0, 0);
       catalog_.setMetaStoreClientPool(badPool);
-      MetastoreEventsProcessor.getNextMetastoreEventsInBatches(catalog_, 0, null);
+      MetastoreEventsProcessor.getNextMetastoreEventsInBatches(catalog_, 0, null, null);
     } finally {
       catalog_.setMetaStoreClientPool(origPool);
     }
