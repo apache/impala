@@ -18,9 +18,9 @@
 #include "runtime/types.h"
 
 #include <ostream>
-#include <sstream>
 
 #include "codegen/llvm-codegen.h"
+#include "gutil/strings/substitute.h"
 
 #include "common/names.h"
 
@@ -258,20 +258,17 @@ void ColumnType::ToThrift(TColumnType* thrift_type) const {
 }
 
 string ColumnType::DebugString() const {
-  stringstream ss;
   switch (type) {
+    case TYPE_STRING:
+      return is_binary_ ? "BINARY" : "STRING";
     case TYPE_CHAR:
-      ss << "CHAR(" << len << ")";
-      return ss.str();
+      return Substitute("CHAR($0)", len);
     case TYPE_DECIMAL:
-      ss << "DECIMAL(" << precision << "," << scale << ")";
-      return ss.str();
+      return Substitute("DECIMAL($0,$1)", precision, scale);
     case TYPE_VARCHAR:
-      ss << "VARCHAR(" << len << ")";
-      return ss.str();
+      return Substitute("VARCHAR($0)", len);
     case TYPE_FIXED_UDA_INTERMEDIATE:
-      ss << "FIXED_UDA_INTERMEDIATE(" << len << ")";
-      return ss.str();
+      return Substitute("FIXED_UDA_INTERMEDIATE($0)", len);
     default:
       return TypeToString(type);
   }

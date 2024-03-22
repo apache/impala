@@ -53,71 +53,81 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
     bool copy_strings, kudu::KuduPartialRow* row) {
   // TODO: codegen this to eliminate branching on type.
   PrimitiveType type = col_type.type;
+  const char* VALUE_ERROR_MSG = "Could not set Kudu row value.";
   switch (type) {
     case TYPE_VARCHAR: {
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
       kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->Ptr()), sv->Len());
       if (copy_strings) {
-        KUDU_RETURN_IF_ERROR(row->SetVarchar(col, slice),
-            "Could not set Kudu row value.");
+        KUDU_RETURN_IF_ERROR(row->SetVarchar(col, slice), VALUE_ERROR_MSG);
       } else {
-        KUDU_RETURN_IF_ERROR(row->SetVarcharNoCopyUnsafe(col, slice),
-            "Could not set Kudu row value.");
+        KUDU_RETURN_IF_ERROR(row->SetVarcharNoCopyUnsafe(col, slice), VALUE_ERROR_MSG);
       }
       break;
     }
     case TYPE_STRING: {
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
       kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->Ptr()), sv->Len());
-      if (copy_strings) {
-        KUDU_RETURN_IF_ERROR(row->SetString(col, slice), "Could not set Kudu row value.");
+      if (col_type.IsBinaryType()) {
+        if (copy_strings) {
+          KUDU_RETURN_IF_ERROR(
+              row->SetBinary(col, slice), VALUE_ERROR_MSG);
+        } else {
+          KUDU_RETURN_IF_ERROR(
+              row->SetBinaryNoCopy(col, slice), VALUE_ERROR_MSG);
+        }
       } else {
-        KUDU_RETURN_IF_ERROR(
-            row->SetStringNoCopy(col, slice), "Could not set Kudu row value.");
+        if (copy_strings) {
+          KUDU_RETURN_IF_ERROR(
+              row->SetString(col, slice), VALUE_ERROR_MSG);
+        } else {
+          KUDU_RETURN_IF_ERROR(
+              row->SetStringNoCopy(col, slice), VALUE_ERROR_MSG);
+        }
       }
       break;
     }
     case TYPE_FLOAT:
       KUDU_RETURN_IF_ERROR(row->SetFloat(col, *reinterpret_cast<const float*>(value)),
-          "Could not set Kudu row value.");
+          VALUE_ERROR_MSG);
       break;
     case TYPE_DOUBLE:
       KUDU_RETURN_IF_ERROR(row->SetDouble(col, *reinterpret_cast<const double*>(value)),
-          "Could not set Kudu row value.");
+          VALUE_ERROR_MSG);
       break;
     case TYPE_BOOLEAN:
       KUDU_RETURN_IF_ERROR(row->SetBool(col, *reinterpret_cast<const bool*>(value)),
-          "Could not set Kudu row value.");
+          VALUE_ERROR_MSG);
       break;
     case TYPE_TINYINT:
       KUDU_RETURN_IF_ERROR(row->SetInt8(col, *reinterpret_cast<const int8_t*>(value)),
-          "Could not set Kudu row value.");
+          VALUE_ERROR_MSG);
       break;
     case TYPE_SMALLINT:
       KUDU_RETURN_IF_ERROR(row->SetInt16(col, *reinterpret_cast<const int16_t*>(value)),
-          "Could not set Kudu row value.");
+          VALUE_ERROR_MSG);
       break;
     case TYPE_INT:
       KUDU_RETURN_IF_ERROR(row->SetInt32(col, *reinterpret_cast<const int32_t*>(value)),
-          "Could not set Kudu row value.");
+          VALUE_ERROR_MSG);
       break;
     case TYPE_BIGINT:
       KUDU_RETURN_IF_ERROR(row->SetInt64(col, *reinterpret_cast<const int64_t*>(value)),
-          "Could not set Kudu row value.");
+          VALUE_ERROR_MSG);
       break;
     case TYPE_TIMESTAMP:
       int64_t ts_micros;
       RETURN_IF_ERROR(ConvertTimestampValueToKudu(
           reinterpret_cast<const TimestampValue*>(value), &ts_micros));
       KUDU_RETURN_IF_ERROR(
-          row->SetUnixTimeMicros(col, ts_micros), "Could not set Kudu row value.");
+          row->SetUnixTimeMicros(col, ts_micros), VALUE_ERROR_MSG);
       break;
     case TYPE_DATE:
     {
       int32_t days = 0;
       RETURN_IF_ERROR(ConvertDateValueToKudu(
             reinterpret_cast<const DateValue*>(value), &days));
-      KUDU_RETURN_IF_ERROR(row->SetDate(col, days), "Could not set Kudu row value.");
+      KUDU_RETURN_IF_ERROR(row->SetDate(col, days), VALUE_ERROR_MSG);
       break;
     }
     case TYPE_DECIMAL:
@@ -126,19 +136,19 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
           KUDU_RETURN_IF_ERROR(
               row->SetUnscaledDecimal(
                   col, reinterpret_cast<const Decimal4Value*>(value)->value()),
-              "Could not set Kudu row value.");
+              VALUE_ERROR_MSG);
           break;
         case 8:
           KUDU_RETURN_IF_ERROR(
               row->SetUnscaledDecimal(
                   col, reinterpret_cast<const Decimal8Value*>(value)->value()),
-              "Could not set Kudu row value.");
+              VALUE_ERROR_MSG);
           break;
         case 16:
           KUDU_RETURN_IF_ERROR(
               row->SetUnscaledDecimal(
                   col, reinterpret_cast<const Decimal16Value*>(value)->value()),
-              "Could not set Kudu row value.");
+              VALUE_ERROR_MSG);
           break;
         default:
           DCHECK(false) << "Unknown decimal byte size: " << col_type.GetByteSize();

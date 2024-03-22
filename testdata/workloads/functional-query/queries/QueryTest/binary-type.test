@@ -155,3 +155,38 @@ INT,  INT, BINARY, BINARY
 2,2,'01/01/09','01/01/09'
 2,0,'01/01/09','01/01/09'
 ====
+---- QUERY
+# Check that simple filters on binary columns can be pushed down to Kudu.
+select count(*) from binary_tbl
+where binary_col = cast("not_in_table" as binary)
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE: table_format=kudu
+!row_regex:.*TotalKuduScanRoundTrips: 1.*
+====
+---- QUERY
+# Check that filters with constant folding and non ascii characters cannot
+# be pushed down to kudu (IMPALA-10349).
+select count(*) from binary_tbl
+where binary_col = cast("á" as binary)
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE: table_format=kudu
+row_regex:.*TotalKuduScanRoundTrips: 1.*
+====
+---- QUERY
+# Check that filters with constant folding and not valid utf8 characters cannot
+# be pushed down to kudu (IMPALA-10349).
+select count(*) from binary_tbl
+where binary_col = cast(unhex("AA") as binary)
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE: table_format=kudu
+row_regex:.*TotalKuduScanRoundTrips: 1.*
+====

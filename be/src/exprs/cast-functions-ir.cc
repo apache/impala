@@ -368,13 +368,24 @@ StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const DateVal& va
   return sv;
 }
 
-StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const StringVal& val) {
+// This function handles the following casts:
+// STRING / CHAR(N) / VARCHAR(N) -> VARCHAR(N)
+StringVal CastFunctions::CastToVarchar(FunctionContext* ctx, const StringVal& val) {
   if (val.is_null) return StringVal::null();
   StringVal sv;
   sv.ptr = val.ptr;
   sv.len = val.len;
   AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
   return sv;
+}
+
+// This function handles the following casts:
+// BINARY / CHAR(N) / VARCHAR(N) -> STRING
+// STRING -> BINARY
+// These casts are esentially NOOP, but it is useful to have a function in the
+// expression tree to be able to get the exact return type.
+StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const StringVal& val) {
+  return val;
 }
 
 StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) {

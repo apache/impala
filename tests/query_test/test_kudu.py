@@ -30,7 +30,8 @@ from kudu.schema import (
     SchemaBuilder,
     STRING,
     BINARY,
-    UNIXTIME_MICROS)
+    UNIXTIME_MICROS,
+    DATE)
 from kudu.client import Partitioning
 from kudu.util import to_unixtime_micros
 import logging
@@ -732,7 +733,8 @@ class TestCreateExternalTable(KuduTestSuite):
   def test_col_types(self, cursor, kudu_client):
     """Check that a table can be created using all available column types."""
     # TODO: Add DECIMAL when the Kudu python client supports decimal
-    kudu_types = [STRING, BOOL, DOUBLE, FLOAT, INT16, INT32, INT64, INT8]
+    kudu_types = [STRING, BOOL, DOUBLE, FLOAT, INT16, INT32, INT64, INT8, BINARY,
+                  UNIXTIME_MICROS, DATE]
     with self.temp_kudu_table(kudu_client, kudu_types) as kudu_table:
       impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
       props = "TBLPROPERTIES('kudu.table_name'='%s')" % kudu_table.name
@@ -746,22 +748,6 @@ class TestCreateExternalTable(KuduTestSuite):
           assert col_name == kudu_col.name
           assert col_type.upper() == \
               self.kudu_col_type_to_impala_col_type(kudu_col.type.type)
-
-  @SkipIfKudu.hms_integration_enabled()
-  def test_unsupported_binary_col(self, cursor, kudu_client):
-    """Check that external tables with BINARY columns fail gracefully.
-    """
-    with self.temp_kudu_table(kudu_client, [INT32, BINARY]) as kudu_table:
-      impala_table_name = self.random_table_name()
-      try:
-        cursor.execute("""
-            CREATE EXTERNAL TABLE %s
-            STORED AS KUDU
-            TBLPROPERTIES('kudu.table_name' = '%s')""" % (impala_table_name,
-                kudu_table.name))
-        assert False
-      except Exception as e:
-        assert "Kudu type 'binary' is not supported in Impala" in str(e)
 
   @SkipIfKudu.hms_integration_enabled()
   def test_drop_external_table(self, cursor, kudu_client):

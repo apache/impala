@@ -4362,6 +4362,17 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/binary_tbl/000000_0.txt' OVE
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name}
 select id, string_col, binary_col from functional.{table_name};
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  id INT PRIMARY KEY,
+  string_col STRING,
+  binary_col BINARY
+)
+PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
+---- DEPENDENT_LOAD_KUDU
+insert into table {db_name}{db_suffix}.{table_name}
+select id, string_col, binary_col from functional.{table_name};
 ====
 ---- DATASET
 functional
@@ -4385,6 +4396,23 @@ select id, int_col, cast(string_col as binary),
     from functional.alltypes;
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name} partition(year, month)
+select id, int_col, cast(string_col as binary),
+       cast(case when id % 2 = 0 then date_string_col else NULL end as binary),
+       year, month
+    from functional.alltypes;
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  id INT PRIMARY KEY,
+  int_col INT,
+  binary_col BINARY,
+  binary_col_with_nulls BINARY,
+  year INT,
+  month INT
+)
+PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
+---- DEPENDENT_LOAD_KUDU
+insert into table {db_name}{db_suffix}.{table_name}
 select id, int_col, cast(string_col as binary),
        cast(case when id % 2 = 0 then date_string_col else NULL end as binary),
        year, month

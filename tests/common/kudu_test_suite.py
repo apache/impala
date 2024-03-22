@@ -33,7 +33,8 @@ from kudu.schema import (
     SchemaBuilder,
     STRING,
     BINARY,
-    UNIXTIME_MICROS)
+    UNIXTIME_MICROS,
+    DATE)
 from kudu.client import Partitioning
 from random import choice, sample
 from string import ascii_lowercase, digits
@@ -188,7 +189,10 @@ class KuduTestSuite(ImpalaTestSuite):
         INT32: "INT",
         INT64: "BIGINT",
         INT8: "TINYINT",
-        STRING: "STRING"}
+        STRING: "STRING",
+        BINARY: "BINARY",
+        UNIXTIME_MICROS: "TIMESTAMP",
+        DATE: "DATE"}
     if col_type not in mapping:
       raise Exception("Unexpected column type: %s" % col_type)
     return mapping[col_type]

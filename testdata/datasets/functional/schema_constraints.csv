@@ -293,6 +293,8 @@ table_name:strings_with_quotes, constraint:only, table_format:kudu/none/none
 table_name:manynulls, constraint:only, table_format:kudu/none/none
 table_name:date_tbl, constraint:only, table_format:kudu/none/none
 table_name:timestamp_at_dst_changes, constraint:only, table_format:kudu/none/none
+table_name:binary_tbl, constraint:only, table_format:kudu/none/none
+table_name:binary_tbl_big, constraint:only, table_format:kudu/none/none
 
 # Skipping header lines is only effective with text tables
 table_name:table_with_header, constraint:restrict_to, table_format:text/none/none
@@ -329,8 +331,6 @@ table_name:date_tbl_error, constraint:restrict_to, table_format:text/snap/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/def/block
 table_name:insert_date_tbl, constraint:restrict_to, table_format:hbase/none/none
 
-table_name:binary_tbl, constraint:exclude, table_format:kudu/none/none
-table_name:binary_tbl_big, constraint:exclude, table_format:kudu/none/none
 table_name:binary_in_complex_types, constraint:restrict_to, table_format:parquet/none/none
 table_name:binary_in_complex_types, constraint:restrict_to, table_format:orc/def/block
 

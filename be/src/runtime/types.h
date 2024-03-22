@@ -136,6 +136,12 @@ struct ColumnType {
     return ret;
   }
 
+  static ColumnType CreateBinaryType() {
+    ColumnType ret(TYPE_STRING);
+    ret.is_binary_ = true;
+    return ret;
+  }
+
   static bool ValidateDecimalParams(int precision, int scale) {
     return precision >= 1 && precision <= MAX_PRECISION && scale >= 0
         && scale <= MAX_SCALE && scale <= precision;
@@ -175,6 +181,7 @@ struct ColumnType {
     if (children != o.children) return false;
     if (type == TYPE_CHAR || type == TYPE_FIXED_UDA_INTERMEDIATE) return len == o.len;
     if (type == TYPE_DECIMAL) return precision == o.precision && scale == o.scale;
+    if (type == TYPE_STRING) return is_binary_ == o.is_binary_;
     return true;
   }
 
@@ -265,7 +272,7 @@ struct ColumnType {
   //
   // This variable is true if 'type' is TYPE_STRING and this object represents the BINARY
   // type, and false in all other cases.
-  bool  is_binary_ = false;
+  bool is_binary_ = false;
 
   /// Recursive implementation of ToThrift() that populates 'thrift_type' with the
   /// TTypeNodes for this type and its children.

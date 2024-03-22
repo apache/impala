@@ -580,6 +580,11 @@ public class KuduScanNode extends ScanNode {
             ((StringLiteral)literal).getUnescapedValue());
         break;
       }
+      case BINARY: {
+        kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
+            ((StringLiteral)literal).getUnescapedValue().getBytes());
+        break;
+      }
       case TIMESTAMP: {
         try {
           // TODO: Simplify when Impala supports a 64-bit TIMESTAMP type.

@@ -442,10 +442,10 @@ public class KuduUtil {
       case DECIMAL: return org.apache.kudu.Type.DECIMAL;
       case DATE: return org.apache.kudu.Type.DATE;
       case VARCHAR: return org.apache.kudu.Type.VARCHAR;
+      case BINARY: return org.apache.kudu.Type.BINARY;
       /* Fall through below */
       case INVALID_TYPE:
       case NULL_TYPE:
-      case BINARY:
       case DATETIME:
       case CHAR:
       default:
@@ -471,6 +471,7 @@ public class KuduUtil {
         return ScalarType.createDecimalType(
             typeAttributes.getPrecision(), typeAttributes.getScale());
       case VARCHAR: return ScalarType.createVarcharType(typeAttributes.getLength());
+      case BINARY: return Type.BINARY;
       default:
         throw new ImpalaRuntimeException(String.format(
             "Kudu type '%s' is not supported in Impala", t.getName()));

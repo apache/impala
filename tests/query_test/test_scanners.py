@@ -1995,9 +1995,8 @@ class TestBinaryType(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestBinaryType, cls).add_test_dimensions()
-    # todo: IMPALA-5323: Support Kudu BINARY
     cls.ImpalaTestMatrix.add_constraint(
-        lambda v: v.get_value('table_format').file_format not in ['kudu', 'json'])
+      lambda v: v.get_value('table_format').file_format != 'json')
 
   def test_binary_type(self, vector):
     self.run_test_case('QueryTest/binary-type', vector)

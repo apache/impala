@@ -48,6 +48,8 @@ public class CastExpr extends Expr {
 
   // Prefix for naming cast functions.
   protected final static String CAST_FUNCTION_PREFIX = "castto";
+  private final static String CAST_TO_CHAR_FN = "impala::CastFunctions::CastToChar";
+  private final static String CAST_TO_VARCHAR_FN = "impala::CastFunctions::CastToVarchar";
 
   // Stores the value of the FORMAT clause.
   private final String castFormat_;
@@ -152,55 +154,63 @@ public class CastExpr extends Expr {
         if (fromType.getPrimitiveType() == PrimitiveType.STRING
             && toType.getPrimitiveType() == PrimitiveType.CHAR) {
           // Allow casting from String to Char(N)
-          String beSymbol = "impala::CastFunctions::CastToChar";
           db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.CHAR),
               Lists.newArrayList((Type) ScalarType.STRING), false, ScalarType.CHAR,
-              beSymbol, null, null, true));
+              CAST_TO_CHAR_FN, null, null, true));
           continue;
         }
         if (fromType.getPrimitiveType() == PrimitiveType.CHAR
             && toType.getPrimitiveType() == PrimitiveType.CHAR) {
           // Allow casting from CHAR(N) to Char(N)
-          String beSymbol = "impala::CastFunctions::CastToChar";
           db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.CHAR),
               Lists.newArrayList((Type) ScalarType.createCharType(-1)), false,
-              ScalarType.CHAR, beSymbol, null, null, true));
+              ScalarType.CHAR, CAST_TO_CHAR_FN, null, null, true));
           continue;
         }
         if (fromType.getPrimitiveType() == PrimitiveType.VARCHAR
             && toType.getPrimitiveType() == PrimitiveType.VARCHAR) {
           // Allow casting from VARCHAR(N) to VARCHAR(M)
-          String beSymbol = "impala::CastFunctions::CastToStringVal";
           db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.VARCHAR),
               Lists.newArrayList((Type) ScalarType.VARCHAR), false, ScalarType.VARCHAR,
-              beSymbol, null, null, true));
+              CAST_TO_VARCHAR_FN, null, null, true));
           continue;
         }
         if (fromType.getPrimitiveType() == PrimitiveType.VARCHAR
             && toType.getPrimitiveType() == PrimitiveType.CHAR) {
           // Allow casting from VARCHAR(N) to CHAR(M)
-          String beSymbol = "impala::CastFunctions::CastToChar";
           db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.CHAR),
               Lists.newArrayList((Type) ScalarType.VARCHAR), false, ScalarType.CHAR,
-              beSymbol, null, null, true));
+              CAST_TO_CHAR_FN, null, null, true));
           continue;
         }
         if (fromType.getPrimitiveType() == PrimitiveType.CHAR
             && toType.getPrimitiveType() == PrimitiveType.VARCHAR) {
           // Allow casting from CHAR(N) to VARCHAR(M)
-          String beSymbol = "impala::CastFunctions::CastToStringVal";
           db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.VARCHAR),
               Lists.newArrayList((Type) ScalarType.CHAR), false, ScalarType.VARCHAR,
-              beSymbol, null, null, true));
+              CAST_TO_VARCHAR_FN, null, null, true));
+          continue;
+        }
+       if (fromType.getPrimitiveType() == PrimitiveType.STRING
+            && toType.getPrimitiveType() == PrimitiveType.VARCHAR) {
+          // Allow casting from STRING to VARCHAR(M)
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.VARCHAR),
+              Lists.newArrayList((Type) ScalarType.STRING), false, ScalarType.VARCHAR,
+              CAST_TO_VARCHAR_FN, null, null, true));
+          continue;
+        }
+        // Disable binary<->non-string casts.
+        // TODO(IMPALA-7998): invalid cases could be identified in ScalarType's
+        //                    compatibility matrix
+        if (fromType.isBinary() && !toType.isString()) {
+          continue;
+        }
+        if (toType.isBinary() && !fromType.isString()) {
           continue;
         }
         // Disable no-op casts
         if (fromType.equals(toType) && !fromType.isDecimal()) continue;
-        // No built-in function needed for BINARY <-> STRING conversion, while there is
-        // no conversion from / to any other type.
-        if (fromType.isBinary() || toType.isBinary()) {
-          continue;
-        }
+
         String beClass = toType.isDecimal() || fromType.isDecimal() ?
             "DecimalOperators" : "CastFunctions";
         String beSymbol = "impala::" + beClass + "::CastTo" + Function.getUdfType(toType);
@@ -389,13 +399,6 @@ public class CastExpr extends Expr {
     // This can happen if the child node gets substituted and its type changes.
     noOp_ = childType.equals(type_);
     if (noOp_) return;
-
-    // BINARY can be only converted from / to STRING and the conversion is NOOP.
-    if ((childType.isBinary() && type_.getPrimitiveType() == PrimitiveType.STRING)
-        || (type_.isBinary() && childType.getPrimitiveType() == PrimitiveType.STRING)) {
-      noOp_ = true;
-      return;
-    }
 
     FunctionName fnName = new FunctionName(BuiltinsDb.NAME, getFnName(type_));
     Type[] args = { childType };

@@ -150,7 +150,7 @@ ColumnType KuduDataTypeToColumnType(
     case DataType::BOOL: return ColumnType(PrimitiveType::TYPE_BOOLEAN);
     case DataType::FLOAT: return ColumnType(PrimitiveType::TYPE_FLOAT);
     case DataType::DOUBLE: return ColumnType(PrimitiveType::TYPE_DOUBLE);
-    case DataType::BINARY: return ColumnType(PrimitiveType::TYPE_BINARY);
+    case DataType::BINARY: return ColumnType::CreateBinaryType();
     case DataType::UNIXTIME_MICROS: return ColumnType(PrimitiveType::TYPE_TIMESTAMP);
     case DataType::DECIMAL:
       return ColumnType::CreateDecimalType(
