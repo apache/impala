@@ -17,7 +17,9 @@
 
 package org.apache.impala.catalog;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -369,5 +371,15 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
   public static boolean isDataSourceTable(
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     return msTbl.getParameters().containsKey(TBL_PROP_DATA_SRC_NAME);
+  }
+
+  /**
+   * Returns a list of keys of external JDBC table properties for which the property
+   * values should be masked in the output of "desc formatted" and "show create table"
+   * commands.
+   */
+  public static Set<String> getJdbcTblPropertyMaskKeys() {
+    return new HashSet<String>(Arrays.asList(
+        JdbcStorageConfig.DBCP_PASSWORD.getPropertyName()));
   }
 }

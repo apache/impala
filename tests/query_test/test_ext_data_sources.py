@@ -65,8 +65,23 @@ class TestExtDataSources(ImpalaTestSuite):
   def test_verify_jdbc_table_properties(self, vector):
     jdbc_tbl_name = "functional.alltypes_jdbc_datasource"
     properties = self._get_tbl_properties(jdbc_tbl_name)
-    # Verify data source related table properties
+    # Verify table properties specific for external JDBC table
     assert properties['__IMPALA_DATA_SOURCE_NAME'] == 'impalajdbcdatasource'
+    assert properties['database.type'] == 'POSTGRES'
+    assert properties['jdbc.driver'] == 'org.postgresql.Driver'
+    assert properties['dbcp.username'] == 'hiveuser'
+    assert properties['table'] == 'alltypes'
+    # Verify dbcp.password is masked in the output of DESCRIBE FORMATTED command
+    assert properties['dbcp.password'] == '******'
+
+    # Verify dbcp.password is masked in the output of SHOW CREATE TABLE command
+    result = self.client.execute("SHOW CREATE TABLE {0}".format(jdbc_tbl_name))
+    match = False
+    for row in result.data:
+      if "'dbcp.password'='******'" in row:
+        match = True
+        break
+    assert match, result.data
 
   def test_data_source_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)

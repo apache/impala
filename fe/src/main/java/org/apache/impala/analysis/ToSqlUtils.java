@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.RecognitionException;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -467,6 +470,14 @@ public class ToSqlUtils {
         foreignKeySql = ((FeFsTable) table).getForeignKeysSql();
       } catch (Exception e) {
         throw new CatalogException("Could not get primary key/foreign keys sql.", e);
+      }
+    } else if (table instanceof FeDataSourceTable) {
+      // Mask sensitive table properties for external JDBC table.
+      Set<String> keysToBeMasked = DataSourceTable.getJdbcTblPropertyMaskKeys();
+      for (String key : properties.keySet()) {
+        if (keysToBeMasked.contains(key.toLowerCase())) {
+          properties.put(key, "******");
+        }
       }
     }
 

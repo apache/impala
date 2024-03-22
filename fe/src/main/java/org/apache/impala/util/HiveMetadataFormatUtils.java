@@ -49,6 +49,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
 import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
+import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.compat.MetastoreShim;
@@ -557,7 +558,13 @@ public class HiveMetadataFormatUtils {
 
     if (tbl.getParameters().size() > 0) {
       tableInfo.append("Table Parameters:").append(LINE_DELIM);
-      displayAllParameters(tbl.getParameters(), tableInfo, false, isOutputPadded);
+      // Mask sensitive table properties for external JDBC table.
+      Set<String> keysToBeMasked = null;
+      if (DataSourceTable.isDataSourceTable(tbl)) {
+        keysToBeMasked = DataSourceTable.getJdbcTblPropertyMaskKeys();
+      }
+      displayAllParameters(
+          tbl.getParameters(), tableInfo, false, isOutputPadded, keysToBeMasked);
     }
   }
 
@@ -573,7 +580,8 @@ public class HiveMetadataFormatUtils {
    * escaped.
    */
   private static void displayAllParameters(Map<String, String> params,
-      StringBuilder tableInfo, boolean escapeUnicode, boolean isOutputPadded) {
+      StringBuilder tableInfo, boolean escapeUnicode, boolean isOutputPadded,
+      Set<String> keysToBeMasked) {
     List<String> keys = new ArrayList<String>(params.keySet());
     Collections.sort(keys);
     for (String key : keys) {
@@ -583,6 +591,8 @@ public class HiveMetadataFormatUtils {
         if ("0".equals(value)) {
           continue;
         }
+      } else if (keysToBeMasked != null && keysToBeMasked.contains(key.toLowerCase())) {
+        value = "******";
       }
       tableInfo.append(FIELD_DELIM); // Ensures all params are indented.
       formatOutput(key, escapeUnicode ? StringEscapeUtils.escapeJava(value)
@@ -692,7 +702,7 @@ public class HiveMetadataFormatUtils {
     if (storageDesc.getSerdeInfo().getParametersSize() > 0) {
       tableInfo.append("Storage Desc Params:").append(LINE_DELIM);
       displayAllParameters(storageDesc.getSerdeInfo().getParameters(), tableInfo, true,
-          false);
+          false, /* keysToBeMasked */ null);
     }
   }
 
