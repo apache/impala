@@ -206,7 +206,7 @@ SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files 
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 5
+aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
@@ -216,7 +216,7 @@ SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
@@ -267,7 +267,7 @@ SELECT count(*) from iceberg_v2_positional_update_all_rows for system_version as
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
@@ -277,7 +277,7 @@ SELECT count(*) from iceberg_v2_positional_update_all_rows
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
@@ -750,4 +750,20 @@ select count(*) from functional_parquet.iceberg_spark_compaction_with_dangling_d
 4
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+# IMPALA-12984: Let's see that we can disable Iceberg statistic-based
+# count(*) optimization.
+set iceberg_disable_count_star_optimization=true;
+select count(*) from functional_parquet.iceberg_spark_compaction_with_dangling_delete;
+---- RESULTS
+4
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 1
 ====

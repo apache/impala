@@ -154,7 +154,7 @@ SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files_
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumOrcStripes): 5
+aggregation(SUM, NumOrcStripes): 2
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
@@ -164,7 +164,7 @@ SELECT count(*) from iceberg_v2_positional_not_all_data_files_have_delete_files_
 ---- TYPES
 bigint
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumOrcStripes): 6
+aggregation(SUM, NumOrcStripes): 4
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY

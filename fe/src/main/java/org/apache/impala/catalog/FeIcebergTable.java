@@ -985,17 +985,26 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     /**
-     * Return true if the Iceberg has DeleteFiles.
+     * Return true if the Iceberg has DeleteFiles. Only non-dangling delete files count
+     * so we don't use the snapshot summary for this.
      */
-    public static boolean hasDeleteFiles(Table icebergTable, TimeTravelSpec travelSpec) {
-      Map<String, String> summary = getSnapshotSummary(icebergTable, travelSpec);
-      if (summary == null) return false;
-      String totalDeleteFilesStr = summary.get(SnapshotSummary.TOTAL_DELETE_FILES_PROP);
-      if (!Strings.isNullOrEmpty(totalDeleteFilesStr)) {
-        long totalDeleteFiles = Long.parseLong(totalDeleteFilesStr);
-        return totalDeleteFiles > 0;
+    public static boolean hasDeleteFiles(FeIcebergTable table,
+        TimeTravelSpec travelSpec) throws AnalysisException {
+      if (travelSpec == null) {
+        IcebergContentFileStore fileStore = table.getContentFileStore();
+        return !fileStore.getPositionDeleteFiles().isEmpty()
+            || !fileStore.getEqualityDeleteFiles().isEmpty();
+      } else {
+        try {
+          GroupedContentFiles groupedFiles =
+              IcebergUtil.getIcebergFiles(table, Lists.newArrayList(), travelSpec);
+          return !groupedFiles.positionDeleteFiles.isEmpty()
+              || !groupedFiles.equalityDeleteFiles.isEmpty();
+        } catch (TableLoadingException e) {
+          throw new AnalysisException("Failed to get record count of Iceberg V2 table: "
+              + table.getFullName(), e);
+        }
       }
-      return false;
     }
 
     /**

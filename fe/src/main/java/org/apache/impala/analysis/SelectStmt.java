@@ -1465,14 +1465,15 @@ public class SelectStmt extends QueryStmt {
           Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + tableName.getDb(), e);
     }
     if (!(table instanceof FeIcebergTable)) return;
-
+    if (analyzer_.getQueryOptions().iceberg_disable_count_star_optimization) {
+      return;
+    }
     analyzer_.checkStmtExprLimit();
-    Table iceTable = ((FeIcebergTable) table).getIcebergApiTable();
+    FeIcebergTable iceTable = ((FeIcebergTable) table);
     if (Utils.hasDeleteFiles(iceTable, tableRef.getTimeTravelSpec())) {
-      // IMPALA-12894 Part1: turn off the optimisation for count(*) queries.
-      // optimizePlainCountStarQueryV2(tableRef, (FeIcebergTable)table);
+      optimizePlainCountStarQueryV2(tableRef, iceTable);
     } else {
-      optimizePlainCountStarQueryV1(tableRef, iceTable);
+      optimizePlainCountStarQueryV1(tableRef, iceTable.getIcebergApiTable());
     }
   }
 

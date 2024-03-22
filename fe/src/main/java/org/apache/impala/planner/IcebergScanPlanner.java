@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.curator.shaded.com.google.common.collect.Lists;
 import org.apache.iceberg.ContentFile;
@@ -42,8 +41,6 @@ import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.ExpressionUtil;
 import org.apache.iceberg.expressions.ExpressionVisitors;
-import org.apache.iceberg.expressions.Expressions;
-import org.apache.iceberg.expressions.Expression.Operation;
 import org.apache.iceberg.expressions.True;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.impala.analysis.Analyzer;
@@ -193,6 +190,8 @@ public class IcebergScanPlanner {
 
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
     if (noDeleteFiles()) {
+      Preconditions.checkState(
+          !ctx_.getQueryCtx().isOptimize_count_star_for_iceberg_v2());
       // If there are no delete files we can just create a single SCAN node.
       Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
       PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,

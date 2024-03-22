@@ -921,6 +921,9 @@ enum TImpalaQueryOptions {
   // potentially insert tuple cache nodes into the plan. This can only be set if the
   // allow_tuple_caching feature startup flag is set to true.
   ENABLE_TUPLE_CACHE = 174
+
+  // Disables statistic-based count(*)-optimization for Iceberg tables.
+  ICEBERG_DISABLE_COUNT_STAR_OPTIMIZATION = 175
 }
 
 // The summary of a DML statement.
