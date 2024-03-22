@@ -498,4 +498,12 @@ public class BackendConfig {
   }
 
   public double getQueryCpuRootFactor() { return backendCfg_.query_cpu_root_factor; }
+
+  public String getDefaultSkippedHmsEventTypes() {
+    return backendCfg_.default_skipped_hms_event_types;
+  }
+
+  public String getCommonHmsEventTypes() {
+    return backendCfg_.common_hms_event_types;
+  }
 }

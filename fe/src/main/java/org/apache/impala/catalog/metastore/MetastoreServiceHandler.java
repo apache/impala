@@ -152,7 +152,6 @@ import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.ListPackageRequest;
-import org.apache.hadoop.hive.metastore.api.ListStoredProcedureRequest;
 import org.apache.hadoop.hive.metastore.api.LockRequest;
 import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.MapSchemaVersionToSerdeRequest;
@@ -290,8 +289,6 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.EventFactory;
 import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Reference;
@@ -3198,12 +3195,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     dbName = catAndDbName[1];
     try {
       List<NotificationEvent> events = MetastoreEventsProcessor
-          .getNextMetastoreEventsInBatches(catalog_, beforeDropEventId,
-              event -> event.getEventType()
-                  .equalsIgnoreCase(DropTableEvent.DROP_TABLE_EVENT_TYPE)
-                  && catName.equalsIgnoreCase(event.getCatName())
-                  && dbName.equalsIgnoreCase(event.getDbName())
-                  && tableName.equalsIgnoreCase(event.getTableName()));
+          .getNextMetastoreEventsInBatchesForTable(catalog_, beforeDropEventId,
+              catName, dbName, tableName, DropTableEvent.EVENT_TYPE);
       if (events.isEmpty()) {
         throw new MetaException(
             "Drop table event not received. Check if notification events are "
@@ -3294,13 +3287,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
 
     try {
       List<NotificationEvent> events = MetastoreEventsProcessor
-          .getNextMetastoreEventsInBatches(catalog_, beforeDropEventId,
-              event -> event.getEventType()
-                  .equalsIgnoreCase(MetastoreEvents.DropDatabaseEvent
-                      .DROP_DATABASE_EVENT_TYPE)
-                  && catName.equalsIgnoreCase(event.getCatName())
-                  && dbName.equalsIgnoreCase(event.getDbName()));
-
+          .getNextMetastoreEventsInBatchesForDb(catalog_, beforeDropEventId, catName,
+              dbName, MetastoreEvents.DropDatabaseEvent.EVENT_TYPE);
       if (events.size() == 0) {
         if (ignoreUnknownDb) {
           LOG.debug("db {} does not exist in metastore. Removing it from catalog if "

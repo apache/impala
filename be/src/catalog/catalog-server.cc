@@ -190,6 +190,30 @@ DEFINE_double_hidden(inject_process_event_failure_ratio, 1.0,
     "event failure. If the generated random number is lesser than this value, then we"
     "fail the event processor(EP).");
 
+DEFINE_string(default_skipped_hms_event_types,
+    "OPEN_TXN,UPDATE_TBL_COL_STAT_EVENT,UPDATE_PART_COL_STAT_EVENT",
+    "HMS event types that are not used by Impala. They are skipped by default in "
+    "fetching HMS event batches. Only in few places they will be fetched, e.g. fetching "
+    "the latest event time in HMS.");
+DEFINE_string(common_hms_event_types, "ADD_PARTITION,ALTER_PARTITION,DROP_PARTITION,"
+    "ADD_PARTITION,ALTER_PARTITION,DROP_PARTITION,CREATE_TABLE,ALTER_TABLE,DROP_TABLE,"
+    "CREATE_DATABASE,ALTER_DATABASE,DROP_DATABASE,INSERT,OPEN_TXN,COMMIT_TXN,ABORT_TXN,"
+    "ALLOC_WRITE_ID_EVENT,ACID_WRITE_EVENT,BATCH_ACID_WRITE_EVENT,"
+    "UPDATE_TBL_COL_STAT_EVENT,DELETE_TBL_COL_STAT_EVENT,UPDATE_PART_COL_STAT_EVENT,"
+    "UPDATE_PART_COL_STAT_EVENT_BATCH,DELETE_PART_COL_STAT_EVENT,COMMIT_COMPACTION_EVENT,"
+    "RELOAD",
+    "Common HMS event types that will be used in eventTypeSkipList when fetching events "
+    "from HMS. The strings come from constants in "
+    "org.apache.hadoop.hive.metastore.messaging.MessageBuilder. When bumping Hive "
+    "versions, the list might need to be updated accordingly. To avoid bringing too much "
+    "computation overhead to HMS's underlying RDBMS in evaluating predicates of "
+    "EVENT_TYPE != 'xxx', rare event types are not tracked in this list. They are "
+    "CREATE_FUNCTION,DROP_FUNCTION,ADD_PRIMARYKEY,ADD_FOREIGNKEY,ADD_UNIQUECONSTRAINT,"
+    "ADD_NOTNULLCONSTRAINT, ADD_DEFAULTCONSTRAINT, ADD_CHECKCONSTRAINT, DROP_CONSTRAINT,"
+    "CREATE_ISCHEMA, ALTER_ISCHEMA, DROP_ISCHEMA, ADD_SCHEMA_VERSION,"
+    "ALTER_SCHEMA_VERSION, DROP_SCHEMA_VERSION, CREATE_CATALOG, ALTER_CATALOG,"
+    "DROP_CATALOG, CREATE_DATACONNECTOR, ALTER_DATACONNECTOR, DROP_DATACONNECTOR.");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);

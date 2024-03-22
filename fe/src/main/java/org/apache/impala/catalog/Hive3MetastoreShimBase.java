@@ -298,14 +298,21 @@ public class Hive3MetastoreShimBase {
 
   // hive-3 introduces a catalog object in hive
   // Impala only supports the default catalog of hive
-  private static final String defaultCatalogName_ = MetaStoreUtils
+  private static final String DEFAULT_CATALOG_NAME = MetaStoreUtils
       .getDefaultCatalog(MetastoreConf.newMetastoreConf());
 
   /**
    * Gets the name of the default catalog from metastore configuration.
    */
   public static String getDefaultCatalogName() {
-    return defaultCatalogName_;
+    return DEFAULT_CATALOG_NAME;
+  }
+
+  /**
+   * Returns whether the catalog name is the default catalog.
+   */
+  public static boolean isDefaultCatalog(String catalogName) {
+    return DEFAULT_CATALOG_NAME.equalsIgnoreCase(catalogName);
   }
 
   /**

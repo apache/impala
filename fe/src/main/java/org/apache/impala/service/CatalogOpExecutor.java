@@ -2128,12 +2128,8 @@ public class CatalogOpExecutor {
           long eventId = getCurrentEventId(msClient, catalogTimeline);
           msClient.getHiveClient().createDatabase(db);
           catalogTimeline.markEvent("Created database in Metastore");
-          List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(
-              catalogTimeline, eventId,
-              notificationEvent ->
-                  CreateDatabaseEvent.CREATE_DATABASE_EVENT_TYPE
-                      .equals(notificationEvent.getEventType())
-                      && dbName.equalsIgnoreCase(notificationEvent.getDbName()));
+          List<NotificationEvent> events = getNextMetastoreEventsForDbIfEnabled(
+              catalogTimeline, eventId, dbName, CreateDatabaseEvent.EVENT_TYPE);
           Pair<Long, Database> eventDbPair = getDatabaseFromEvents(events,
               params.if_not_exists);
           if (eventDbPair == null) {
@@ -2196,16 +2192,53 @@ public class CatalogOpExecutor {
 
   /**
    * Wrapper around
-   * {@code MetastoreEventsProcessor#getNextMetastoreEventsInBatches} with the
+   * {@code MetastoreEventsProcessor#getNextMetastoreEventsInBatchesForTable} with the
    * addition that it checks if events processing is active or not. If not active,
-   * returns an empty list. Also updates the given 'catalogTimeline'
+   * returns an empty list. Also updates the given 'catalogTimeline'.
    */
-  private List<NotificationEvent> getNextMetastoreEventsIfEnabled(
-      EventSequence catalogTimeline, long eventId, NotificationFilter eventsFilter)
+  private List<NotificationEvent> getNextMetastoreEventsForTableIfEnabled(
+      EventSequence catalogTimeline, long eventId, String dbName, String tblName,
+      String eventType) throws MetastoreNotificationException {
+    if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
+    List<NotificationEvent> events = MetastoreEventsProcessor
+        .getNextMetastoreEventsInBatchesForTable(catalog_, eventId, dbName, tblName,
+            eventType);
+    catalogTimeline.markEvent(FETCHED_HMS_EVENT_BATCH);
+    return events;
+  }
+
+  /**
+   * Wrapper around
+   * {@code MetastoreEventsProcessor#getNextMetastoreEventsInBatchesForDb} with the
+   * addition that it checks if events processing is active or not. If not active,
+   * returns an empty list. Also updates the given 'catalogTimeline'.
+   */
+  private List<NotificationEvent> getNextMetastoreEventsForDbIfEnabled(
+      EventSequence catalogTimeline, long eventId, String dbName, String eventType)
       throws MetastoreNotificationException {
     if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
     List<NotificationEvent> events = MetastoreEventsProcessor
-        .getNextMetastoreEventsInBatches(catalog_, eventId, eventsFilter);
+        .getNextMetastoreEventsInBatchesForDb(catalog_, eventId, dbName, eventType);
+    catalogTimeline.markEvent(FETCHED_HMS_EVENT_BATCH);
+    return events;
+  }
+
+  /**
+   * Fetches CreateDatabase and CreateTable events of a db if events processing is active.
+   * Returns an empty list if not active. Also updates the given 'catalogTimeline'.
+   */
+  private List<NotificationEvent> getNextMetastoreDropEventsForDbIfEnabled(
+      EventSequence catalogTimeline, long eventId, String dbName)
+      throws MetastoreNotificationException {
+    if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
+    List<String> eventTypes = Lists.newArrayList(
+        DropDatabaseEvent.EVENT_TYPE, DropTableEvent.EVENT_TYPE);
+    NotificationFilter filter = e -> dbName.equalsIgnoreCase(e.getDbName())
+        && MetastoreShim.isDefaultCatalog(e.getCatName())
+        && eventTypes.contains(e.getEventType());
+    List<NotificationEvent> events = MetastoreEventsProcessor
+        .getNextMetastoreEventsInBatches(catalog_, eventId, filter,
+            DropDatabaseEvent.EVENT_TYPE, DropTableEvent.EVENT_TYPE);
     catalogTimeline.markEvent(FETCHED_HMS_EVENT_BATCH);
     return events;
   }
@@ -2236,7 +2269,9 @@ public class CatalogOpExecutor {
       MetastoreEvent event = catalog_
           .getMetastoreEventProcessor().getEventsFactory()
           .get(events.get(events.size() - 1), null);
-      Preconditions.checkState(event instanceof CreateDatabaseEvent);
+      Preconditions.checkState(event instanceof CreateDatabaseEvent,
+          "Expects CreateDatabaseEvent but got %s. All events: %s",
+          event, events);
       return new Pair<>(events.get(0).getEventId(),
           ((CreateDatabaseEvent) event).getDatabase());
     } catch (MetastoreNotificationException e) {
@@ -2746,11 +2781,8 @@ public class CatalogOpExecutor {
             dbName, /* deleteData */true, /* ignoreIfUnknown */false,
             params.cascade);
         catalogTimeline.markEvent("Dropped database in Metastore");
-        List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(
-            catalogTimeline, eventId,
-            event -> dbName.equalsIgnoreCase(event.getDbName()) && (
-                DropDatabaseEvent.DROP_DATABASE_EVENT_TYPE.equals(event.getEventType()) ||
-                    DropTableEvent.DROP_TABLE_EVENT_TYPE.equals(event.getEventType())));
+        List<NotificationEvent> events = getNextMetastoreDropEventsForDbIfEnabled(
+            catalogTimeline, eventId, dbName);
         addToDeleteEventLog(events);
         addSummary(resp, "Database has been dropped.");
       } catch (TException e) {
@@ -2801,12 +2833,12 @@ public class CatalogOpExecutor {
     for (NotificationEvent event : events) {
       String eventType = event.getEventType();
       Preconditions.checkState(
-          eventType.equals(DropDatabaseEvent.DROP_DATABASE_EVENT_TYPE) ||
-          eventType.equals(DropTableEvent.DROP_TABLE_EVENT_TYPE) ||
+          eventType.equals(DropDatabaseEvent.EVENT_TYPE) ||
+          eventType.equals(DropTableEvent.EVENT_TYPE) ||
           eventType.equals(DropPartitionEvent.EVENT_TYPE), "Can not add event type: " +
               "%s to deleteEventLog", eventType);
       String key;
-      if (DropDatabaseEvent.DROP_DATABASE_EVENT_TYPE.equals(event.getEventType())) {
+      if (DropDatabaseEvent.EVENT_TYPE.equals(event.getEventType())) {
         key = DeleteEventLog.getDbKey(event.getDbName());
       } else {
         Preconditions.checkNotNull(event.getTableName());
@@ -3073,12 +3105,9 @@ public class CatalogOpExecutor {
               String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);
         }
       }
-      List<NotificationEvent> events;
-      final org.apache.hadoop.hive.metastore.api.Table finalMsTbl = msTbl;
-      events = getNextMetastoreEventsIfEnabled(catalogTimeline, eventId,
-          event -> DropTableEvent.DROP_TABLE_EVENT_TYPE.equals(event.getEventType())
-              && finalMsTbl.getDbName().equalsIgnoreCase(event.getDbName())
-              && finalMsTbl.getTableName().equalsIgnoreCase(event.getTableName()));
+      List<NotificationEvent> events = getNextMetastoreEventsForTableIfEnabled(
+          catalogTimeline, eventId, tableName.getDb(), tableName.getTbl(),
+          DropTableEvent.EVENT_TYPE);
       addSummary(resp, (params.is_table ? "Table " : "View ") + "has been dropped.");
       addToDeleteEventLog(events);
       Table table = catalog_.removeTable(params.getTable_name().db_name,
@@ -3714,12 +3743,8 @@ public class CatalogOpExecutor {
             addSummary(response, "Table already exists.");
             return false;
           }
-          events = getNextMetastoreEventsIfEnabled(catalogTimeline, eventId,
-                  event -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
-                      .equals(event.getEventType())
-                      && newTable.getDbName().equalsIgnoreCase(event.getDbName())
-                      && newTable.getTableName()
-                      .equalsIgnoreCase(event.getTableName()));
+          events = getNextMetastoreEventsForTableIfEnabled(catalogTimeline, eventId,
+              newTable.getDbName(), newTable.getTableName(), CreateTableEvent.EVENT_TYPE);
         }
       }
       // in case of synchronized tables it is possible that Kudu doesn't generate
@@ -3798,15 +3823,9 @@ public class CatalogOpExecutor {
         }
         catalogTimeline.markEvent(CREATED_HMS_TABLE);
         addSummary(response, "Table has been created.");
-        final org.apache.hadoop.hive.metastore.api.Table finalNewTable = newTable;
-        List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(
-            catalogTimeline, eventId,
-            notificationEvent -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
-                .equals(notificationEvent.getEventType())
-                && finalNewTable.getDbName()
-                .equalsIgnoreCase(notificationEvent.getDbName())
-                && finalNewTable.getTableName()
-                .equalsIgnoreCase(notificationEvent.getTableName()));
+        List<NotificationEvent> events = getNextMetastoreEventsForTableIfEnabled(
+            catalogTimeline, eventId, newTable.getDbName(), newTable.getTableName(),
+            CreateTableEvent.EVENT_TYPE);
         eventIdTblPair = getTableFromEvents(events, if_not_exists);
         if (eventIdTblPair == null) {
           // TODO (HIVE-21807): Creating a table and retrieving the table information is
@@ -4021,10 +4040,8 @@ public class CatalogOpExecutor {
             msClient.getHiveClient().createTable(newTable);
             catalogTimeline.markEvent(CREATED_HMS_TABLE);
           }
-          events = getNextMetastoreEventsIfEnabled(catalogTimeline, eventId, event ->
-              CreateTableEvent.CREATE_TABLE_EVENT_TYPE.equals(event.getEventType())
-                  && newTable.getDbName().equalsIgnoreCase(event.getDbName())
-                  && newTable.getTableName().equalsIgnoreCase(event.getTableName()));
+          events = getNextMetastoreEventsForTableIfEnabled(catalogTimeline, eventId,
+              newTable.getDbName(), newTable.getTableName(), CreateTableEvent.EVENT_TYPE);
         } else {
           addSummary(response, "Table already exists.");
           return false;
@@ -5126,12 +5143,9 @@ public class CatalogOpExecutor {
         LOG.info("Added {}/{} partitions in HMS for table {}", numDone,
             allHmsPartitionsToAdd.size(), tbl.getFullName());
         org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable();
-        List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(
-            catalogTimeline, eventId,
-            event -> AddPartitionEvent.ADD_PARTITION_EVENT_TYPE
-                .equals(event.getEventType())
-                && msTbl.getDbName().equalsIgnoreCase(event.getDbName())
-                && msTbl.getTableName().equalsIgnoreCase(event.getTableName()));
+        List<NotificationEvent> events = getNextMetastoreEventsForTableIfEnabled(
+            catalogTimeline, eventId, msTbl.getDbName(), msTbl.getTableName(),
+            AddPartitionEvent.EVENT_TYPE);
         Map<Partition, Long> partitionToEventSubMap = Maps.newHashMap();
         getPartitionsFromEvent(events, partitionToEventSubMap);
         // set the eventId to last one which we received so the we fetch the next
@@ -5351,13 +5365,9 @@ public class CatalogOpExecutor {
         }
         catalogTimeline.markEvent("Dropped partitions in Metastore");
       }
-      List<NotificationEvent> events = getNextMetastoreEventsIfEnabled(
-          catalogTimeline, currentEventId,
-          notificationEvent ->
-              tableName.getDb().equalsIgnoreCase(notificationEvent.getDbName())
-                  && tableName.getTbl().equalsIgnoreCase(notificationEvent.getTableName())
-                  && DropPartitionEvent.EVENT_TYPE
-                  .equals(notificationEvent.getEventType()));
+      List<NotificationEvent> events = getNextMetastoreEventsForTableIfEnabled(
+          catalogTimeline, currentEventId, tableName.getDb(), tableName.getTbl(),
+          DropPartitionEvent.EVENT_TYPE);
       addDroppedPartitionsFromEvent(
           ((HdfsTable) tbl).getClusteringColNames(), events, droppedPartsFromEvent);
     } catch (TException e) {
@@ -5462,11 +5472,9 @@ public class CatalogOpExecutor {
       }
     }
     List<NotificationEvent> events = null;
-    events = getNextMetastoreEventsIfEnabled(catalogTimeline, eventId,
-        event -> "ALTER_TABLE".equals(event.getEventType())
-            // the alter table event is generated on the renamed table
-            && msTbl.getDbName().equalsIgnoreCase(event.getDbName())
-            && msTbl.getTableName().equalsIgnoreCase(event.getTableName()));
+    // the alter table event is generated on the renamed table
+    events = getNextMetastoreEventsForTableIfEnabled(catalogTimeline, eventId,
+        msTbl.getDbName(), msTbl.getTableName(), AlterTableEvent.EVENT_TYPE);
     Pair<Long, Pair<org.apache.hadoop.hive.metastore.api.Table,
         org.apache.hadoop.hive.metastore.api.Table>> renamedTable =
         getRenamedTableFromEvents(events);

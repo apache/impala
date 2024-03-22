@@ -83,7 +83,6 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.DebugUtils;
-import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
 import org.slf4j.LoggerFactory;
@@ -279,8 +278,7 @@ public class MetastoreEvents {
         String catalogName = currentEvent.getCatalogName();
         String eventDb = currentEvent.getDbName();
         String eventTbl = currentEvent.getTableName();
-        if (catalogName != null && !MetastoreShim.getDefaultCatalogName()
-            .equalsIgnoreCase(catalogName)) {
+        if (catalogName != null && !MetastoreShim.isDefaultCatalog(catalogName)) {
           // currently Impala doesn't support custom hive catalogs and hence we should
           // ignore all the events which are on non-default catalog namespaces.
           LOG.debug(currentEvent.debugString(
@@ -1405,7 +1403,7 @@ public class MetastoreEvents {
    */
   public static class CreateTableEvent extends MetastoreTableEvent {
 
-    public static final String CREATE_TABLE_EVENT_TYPE = "CREATE_TABLE";
+    public static final String EVENT_TYPE = "CREATE_TABLE";
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
      */
@@ -1662,6 +1660,7 @@ public class MetastoreEvents {
    * MetastoreEvent for ALTER_TABLE event type
    */
   public static class AlterTableEvent extends MetastoreTableEvent {
+    public static final String EVENT_TYPE = "ALTER_TABLE";
     protected org.apache.hadoop.hive.metastore.api.Table tableBefore_;
     // the table object after alter operation, as parsed from the NotificationEvent
     protected org.apache.hadoop.hive.metastore.api.Table tableAfter_;
@@ -2074,7 +2073,7 @@ public class MetastoreEvents {
    */
   public static class DropTableEvent extends MetastoreTableEvent {
 
-    public static final String DROP_TABLE_EVENT_TYPE = "DROP_TABLE";
+    public static final String EVENT_TYPE = "DROP_TABLE";
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -2145,7 +2144,7 @@ public class MetastoreEvents {
    */
   public static class CreateDatabaseEvent extends MetastoreDatabaseEvent {
 
-    public static final String CREATE_DATABASE_EVENT_TYPE = "CREATE_DATABASE";
+    public static final String EVENT_TYPE = "CREATE_DATABASE";
     // metastore database object as parsed from NotificationEvent message
     private final Database createdDatabase_;
 
@@ -2294,7 +2293,7 @@ public class MetastoreEvents {
    */
   public static class DropDatabaseEvent extends MetastoreDatabaseEvent {
 
-    public static final String DROP_DATABASE_EVENT_TYPE = "DROP_DATABASE";
+    public static final String EVENT_TYPE = "DROP_DATABASE";
     // Metastore database object as parsed from NotificationEvent message
     private final Database droppedDatabase_;
     /**
@@ -2395,7 +2394,7 @@ public class MetastoreEvents {
   }
   public static class AddPartitionEvent extends MetastoreTableEvent {
 
-    public static final String ADD_PARTITION_EVENT_TYPE = "ADD_PARTITION";
+    public static final String EVENT_TYPE = "ADD_PARTITION";
     private final List<Partition> addedPartitions_;
     private final List<List<TPartitionKeyValue>> partitionKeyVals_;
 
@@ -2501,6 +2500,7 @@ public class MetastoreEvents {
   }
 
   public static class AlterPartitionEvent extends MetastoreTableEvent {
+    public static final String EVENT_TYPE = "ALTER_PARTITION";
     // the Partition object before alter operation, as parsed from the NotificationEvent
     private final org.apache.hadoop.hive.metastore.api.Partition partitionBefore_;
     // the Partition object after alter operation, as parsed from the NotificationEvent
