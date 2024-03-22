@@ -1458,6 +1458,11 @@ public class MetastoreEvents {
           debugLog("Incremented skipped metric to " + metrics_
               .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount());
         }
+      } catch (DatabaseNotFoundException ex) {
+        // This is an incorrect setup where DB is not found in cache for a table event.
+        // Don't put the event processor into error state, instead ignore this event.
+        errorLog("Create table {}.{} failed because the database does not exist cache." +
+            " Ignoring the CREATE_TABLE event", dbName_, tblName_, ex);
       } catch (CatalogException e) {
         // if a DatabaseNotFoundException is caught here it means either we incorrectly
         // determined that the event needs to be processed instead of skipped, or we

@@ -3909,6 +3909,24 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  @Test
+  public void testCreateTblOnUnloadedDB() throws Exception {
+    eventsProcessor_.pause();
+    createDatabase(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    assertEquals(EventProcessorStatus.PAUSED, eventsProcessor_.getStatus());
+    assertNull(
+        "Test database should not be in catalog when event processing is stopped",
+        catalog_.getDb(TEST_DB_NAME));
+    long currentEventId = eventsProcessor_.getCurrentEventId();
+    eventsProcessor_.start(currentEventId);
+    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+    String tblName = "test_create_tbl";
+    createTable(tblName, false);
+    eventsProcessor_.processEvents();
+    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+  }
+
   private void insertIntoTable(String dbName, String tableName) throws Exception {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTable =
