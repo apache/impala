@@ -125,3 +125,11 @@ data source predicates: timestamp_col >= TIMESTAMP '2009-01-02 00:00:00', timest
    limit: 15
    row-size=64B cardinality=1
 ====
+select * from functional.jdbc_decimal_tbl where d3 > 123.456 and d5 < 10.0
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN DATA SOURCE [functional.jdbc_decimal_tbl]
+data source predicates: d3 > 123.456, d5 < 10.0
+   row-size=52B cardinality=1
+====

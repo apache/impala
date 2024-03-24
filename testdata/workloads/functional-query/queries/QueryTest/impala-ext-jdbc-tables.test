@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-# Create external JDBC DataSource table
+# Create external JDBC table
 DROP TABLE IF EXISTS alltypes_jdbc_datasource;
 CREATE EXTERNAL TABLE alltypes_jdbc_datasource (
  id INT,
@@ -29,7 +29,7 @@ TBLPROPERTIES (
 'Table has been created.'
 ====
 ---- QUERY
-# Create external JDBC DataSource table
+# Create external JDBC table
 DROP TABLE IF EXISTS alltypes_jdbc_datasource_2;
 CREATE EXTERNAL TABLE alltypes_jdbc_datasource_2 (
  id INT,
@@ -54,6 +54,108 @@ TBLPROPERTIES (
 "dbcp.username"="impala",
 "dbcp.password"="cloudera",
 "table"="alltypes");
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create external JDBC table with decimal type of columns.
+# The decimal precisions and scales of decimal columns equal to the decimal precisions
+# and scales of the corresponding decimal columns in the remote table.
+DROP TABLE IF EXISTS jdbc_decimal_tbl;
+CREATE EXTERNAL TABLE jdbc_decimal_tbl (
+ d1 DECIMAL(9,0),
+ d2 DECIMAL(10,0),
+ d3 DECIMAL(20,10),
+ d4 DECIMAL(38,38),
+ d5 DECIMAL(10,5),
+ d6 DECIMAL(9,0))
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="IMPALA",
+"jdbc.url"="jdbc:impala://$INTERNAL_LISTEN_HOST:21050/functional",
+"jdbc.auth"="AuthMech=0",
+"jdbc.driver"="com.cloudera.impala.jdbc.Driver",
+"driver.url"="$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
+"dbcp.username"="impala",
+"dbcp.password"="cloudera",
+"table"="decimal_tbl");
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create external JDBC table with decimal type.
+# The decimal precisions and scales of decimal columns are greater than or equal to the
+# decimal precision and scales of the corresponding decimal columns in the remote table.
+DROP TABLE IF EXISTS jdbc_decimal_tbl_2;
+CREATE EXTERNAL TABLE jdbc_decimal_tbl_2 (
+ d1 DECIMAL(10,1),
+ d2 DECIMAL(11,1),
+ d3 DECIMAL(21,11),
+ d4 DECIMAL(38,38),
+ d5 DECIMAL(11,6),
+ d6 DECIMAL(10,1))
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="IMPALA",
+"jdbc.url"="jdbc:impala://$INTERNAL_LISTEN_HOST:21050/functional",
+"jdbc.auth"="AuthMech=0",
+"jdbc.driver"="com.cloudera.impala.jdbc.Driver",
+"driver.url"="$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
+"dbcp.username"="impala",
+"dbcp.password"="cloudera",
+"table"="decimal_tbl");
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create external JDBC table with decimal type.
+# The decimal scales of two columns d3 and d5 are less than the decimal scales of the
+# corresponding decimal columns in the remote table, which cause truncation, hence
+# exception will be thrown.
+DROP TABLE IF EXISTS jdbc_decimal_tbl_3;
+CREATE EXTERNAL TABLE jdbc_decimal_tbl_3 (
+ d1 DECIMAL(9,0),
+ d2 DECIMAL(10,0),
+ d3 DECIMAL(20,9),
+ d4 DECIMAL(38,38),
+ d5 DECIMAL(10,4),
+ d6 DECIMAL(9,0))
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="IMPALA",
+"jdbc.url"="jdbc:impala://$INTERNAL_LISTEN_HOST:21050/functional",
+"jdbc.auth"="AuthMech=0",
+"jdbc.driver"="com.cloudera.impala.jdbc.Driver",
+"driver.url"="$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
+"dbcp.username"="impala",
+"dbcp.password"="cloudera",
+"table"="decimal_tbl");
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create external JDBC table with decimal type.
+# The decimal scale of column d5 is larger than the decimal scale of the corresponding
+# decimal columns in the remote table, but their decimal precisions are same, which cause
+# truncation, hence exception will be thrown.
+DROP TABLE IF EXISTS jdbc_decimal_tbl_4;
+CREATE EXTERNAL TABLE jdbc_decimal_tbl_4 (
+ d1 DECIMAL(9,0),
+ d2 DECIMAL(10,0),
+ d3 DECIMAL(20,10),
+ d4 DECIMAL(38,38),
+ d5 DECIMAL(10,6),
+ d6 DECIMAL(9,0))
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="IMPALA",
+"jdbc.url"="jdbc:impala://$INTERNAL_LISTEN_HOST:21050/functional",
+"jdbc.auth"="AuthMech=0",
+"jdbc.driver"="com.cloudera.impala.jdbc.Driver",
+"driver.url"="$FILESYSTEM_PREFIX/test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
+"dbcp.username"="impala",
+"dbcp.password"="cloudera",
+"table"="decimal_tbl");
 ---- RESULTS
 'Table has been created.'
 ====
@@ -202,6 +304,38 @@ row_regex: .*RowsRead: 3 .*
 aggregation(SUM, RowsRead): 6
 ====
 ---- QUERY
+select * from jdbc_decimal_tbl;
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000,1
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000,1
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from jdbc_decimal_tbl_2;
+---- RESULTS
+1234.0,2222.0,1.23456789000,0.12345678900000000000000000000000000000,12345.789000,1.0
+2345.0,111.0,12.34567890000,0.12345678900000000000000000000000000000,3.141000,1.0
+12345.0,333.0,123.45678900000,0.12345678900000000000000000000000000000,11.220000,1.0
+12345.0,333.0,1234.56789000000,0.12345678900000000000000000000000000000,0.100000,1.0
+132842.0,333.0,12345.67890000000,0.12345678900000000000000000000000000000,0.778890,1.0
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from jdbc_decimal_tbl_3;
+---- CATCH
+row_regex: .*Invalid DECIMAL\(20, 9\) for column d3 since there is possible loss of precision when casting from DECIMAL\(11, 10\).*
+====
+---- QUERY
+select * from jdbc_decimal_tbl_4;
+---- CATCH
+row_regex: .*Invalid DECIMAL\(10, 6\) for column d5 since there is possible loss of precision when casting from DECIMAL\(10, 5\).*
+====
+---- QUERY
 # Drop table
 DROP TABLE alltypes_jdbc_datasource;
 ---- RESULTS
@@ -210,6 +344,30 @@ DROP TABLE alltypes_jdbc_datasource;
 ---- QUERY
 # Drop table
 DROP TABLE alltypes_jdbc_datasource_2;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+# Drop table
+DROP TABLE jdbc_decimal_tbl;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+# Drop table
+DROP TABLE jdbc_decimal_tbl_2;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+# Drop table
+DROP TABLE jdbc_decimal_tbl_3;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+# Drop table
+DROP TABLE jdbc_decimal_tbl_4;
 ---- RESULTS
 'Table has been dropped.'
 ====

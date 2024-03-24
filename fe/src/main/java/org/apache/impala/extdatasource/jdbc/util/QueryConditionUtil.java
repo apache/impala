@@ -27,6 +27,8 @@ import org.apache.impala.extdatasource.jdbc.dao.DatabaseAccessor;
 import org.apache.impala.extdatasource.thrift.TBinaryPredicate;
 import org.apache.impala.extdatasource.thrift.TComparisonOp;
 import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TPrimitiveType;
+import org.apache.impala.thrift.TTypeNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +53,8 @@ public class QueryConditionUtil {
         String name = predicate.getCol().getName();
         name = columnMapping.getOrDefault(name, name);
         String op = converse(predicate.getOp());
-        String value = getTColumnValueAsString(predicate.getValue(), dbAccessor_);
+        String value = getTColumnValueAsString(predicate.getValue(),
+            predicate.getCol().getType().getTypes().get(0), dbAccessor_);
         joiner.add(String.format("%s %s %s", name, op, value));
       }
       condition.add(joiner.toString());
@@ -65,7 +68,7 @@ public class QueryConditionUtil {
    *
    * @see org.apache.impala.planner.DataSourceScanNode#literalToColumnValue
    */
-  public static String getTColumnValueAsString(TColumnValue value,
+  public static String getTColumnValueAsString(TColumnValue value, TTypeNode node,
       DatabaseAccessor dbAccessor_) {
     Preconditions.checkState(value != null);
     StringBuilder sb = new StringBuilder();
@@ -82,11 +85,17 @@ public class QueryConditionUtil {
     } else if (value.isSetDouble_val()) {
       sb.append(value.double_val);
     } else if (value.isSetString_val()) {
-      sb.append(String.format("'%s'", value.string_val));
+      // DECIMAL and TIMESTAMP types of predicates are represented as string.
+      if (node.getScalar_type().getType() == TPrimitiveType.DECIMAL) {
+        // Check column data type and don't add quotes for decimal string.
+        sb.append(String.format("%s", value.string_val));
+      } else {
+        sb.append(String.format("'%s'", value.string_val));
+      }
     } else if (value.isSetDate_val()) {
       sb.append(String.format("'%s'", dbAccessor_.getDateString(value.date_val)));
     } else {
-      // TODO: Support data types of DECIMAL, TIMESTAMP, DATE and binary for predicates.
+      // TODO: Support data types of binary for predicates.
       // Keep in-sync with DataSourceScanNode.literalToColumnValue().
       throw new IllegalArgumentException("Unsupported data type.");
     }

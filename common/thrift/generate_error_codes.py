@@ -487,7 +487,9 @@ error_codes = (
 
   ("STATESTORE_INCOMPATIBLE_PROTOCOL", 158,
    "Subscriber '$0' has incompatible protocol version V$1 conflicting with statestored's "
-   "version V$2")
+   "version V$2"),
+
+  ("JDBC_CONFIGURATION_ERROR", 159, "Error in JDBC table configuration: $0.")
 )
 
 import sys

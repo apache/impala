@@ -123,6 +123,24 @@ __EOT__
 docker exec -i mysql mysql -uroot -psecret functional < \
   /tmp/mysql_jdbc_alltypes_with_case_sensitive_names.sql
 
+# Create a table with decimal type of columns.
+# Note that the decimal scale in MySQL has a range of 0 to 30, which is smaller than the
+# scale range in Impala (0 to 38).
+cat > /tmp/mysql_jdbc_decimal_tbl.sql <<__EOT__
+DROP TABLE IF EXISTS decimal_tbl;
+CREATE TABLE decimal_tbl
+(
+    d1 DECIMAL(9,0),
+    d2 DECIMAL(10,0),
+    d3 DECIMAL(20,10),
+    d4 DECIMAL(38,30),
+    d5 DECIMAL(10,5)
+);
+__EOT__
+
+docker exec -i mysql mysql -uroot -psecret functional < \
+  /tmp/mysql_jdbc_decimal_tbl.sql
+
 # Load data to jdbc table
 cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/mysql_jdbc_alltypes.csv
 docker cp /tmp/mysql_jdbc_alltypes.csv mysql:/tmp
@@ -140,6 +158,15 @@ loadCmd="LOAD DATA LOCAL INFILE '/tmp/mysql_jdbc_alltypes.csv' INTO TABLE \
   timestamp_col) set date_col = STR_TO_DATE(@date_col, '%m/%d/%Y')"
 
 docker exec -i mysql mysql -uroot -psecret functional --local-infile=1 <<<  "$loadCmd"
+
+cat ${IMPALA_HOME}/testdata/data/decimal_tbl.txt > /tmp/mysql_jdbc_decimal_tbl.csv
+docker cp /tmp/mysql_jdbc_decimal_tbl.csv mysql:/tmp
+
+loadCmd="LOAD DATA LOCAL INFILE '/tmp/mysql_jdbc_decimal_tbl.csv' INTO TABLE \
+  decimal_tbl COLUMNS TERMINATED BY ','"
+
+docker exec -i mysql mysql -uroot -psecret functional --local-infile=1 <<<  "$loadCmd"
+
 
 EXT_DATA_SOURCE_SRC_PATH=${IMPALA_HOME}/java/ext-data-source
 EXT_DATA_SOURCES_HDFS_PATH=${FILESYSTEM_PREFIX}/test-warehouse/data-sources

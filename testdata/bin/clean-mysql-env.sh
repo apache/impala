@@ -35,6 +35,7 @@ rm -rf /tmp/mysql-8.2.0.*
 # Clean tmp files
 rm -f /tmp/mysql_jdbc_alltypes.*
 rm -f /tmp/mysql_jdbc.*sql
+rm -f /tmp/mysql_jdbc_decimal_tbl.*
 
 EXT_DATA_SOURCES_HDFS_PATH=${FILESYSTEM_PREFIX}/test-warehouse/data-sources
 JDBC_DRIVERS_HDFS_PATH=${EXT_DATA_SOURCES_HDFS_PATH}/jdbc-drivers

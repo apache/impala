@@ -69,12 +69,30 @@ CREATE TABLE "AllTypesWithQuote"
 __EOT__
 sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_alltypes_with_quote.sql
 
+# Create a table with decimal type of columns
+cat > /tmp/jdbc_decimal_tbl.sql <<__EOT__
+DROP TABLE IF EXISTS decimal_tbl;
+CREATE TABLE decimal_tbl
+(
+    d1 DECIMAL(9,0),
+    d2 DECIMAL(10,0),
+    d3 DECIMAL(20,10),
+    d4 DECIMAL(38,38),
+    d5 DECIMAL(10,5)
+);
+__EOT__
+sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_decimal_tbl.sql
+
 # Load data to jdbc table
 cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/jdbc_alltypes.csv
 loadCmd="COPY alltypes FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
 sudo -u postgres psql -d functional -c "$loadCmd"
 
 loadCmd="COPY \"AllTypesWithQuote\" FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
+sudo -u postgres psql -d functional -c "$loadCmd"
+
+cat ${IMPALA_HOME}/testdata/data/decimal_tbl.txt > /tmp/jdbc_decimal_tbl.csv
+loadCmd="COPY decimal_tbl FROM '/tmp/jdbc_decimal_tbl.csv' DELIMITER ',' CSV"
 sudo -u postgres psql -d functional -c "$loadCmd"
 
 # Create impala tables and load data
@@ -109,4 +127,5 @@ ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -f /tmp/impala_jdbc_alltypes.sq
 # Clean tmp files
 rm /tmp/jdbc_alltypes.*
 rm /tmp/jdbc_alltypes_with_quote.*
+rm /tmp/jdbc_decimal_tbl.*
 rm /tmp/impala_jdbc_alltypes.sql

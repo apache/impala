@@ -131,7 +131,7 @@ public class JdbcDataSource implements ExternalDataSource {
     Preconditions.checkState(state_ == DataSourceState.CREATED);
     if (!convertInitStringToConfiguration(params.getInit_string())) {
       return new TPrepareResult(
-          new TStatus(TErrorCode.INTERNAL_ERROR,
+          new TStatus(TErrorCode.JDBC_CONFIGURATION_ERROR,
               Lists.newArrayList("Invalid init_string value")));
     }
     List<Integer> acceptedPredicates = acceptedPredicates(params.getPredicates());
@@ -149,7 +149,7 @@ public class JdbcDataSource implements ExternalDataSource {
     // the frontend and used a different instance of this JdbcDataSource class.
     if (!convertInitStringToConfiguration(params.getInit_string())) {
       return new TOpenResult(
-          new TStatus(TErrorCode.INTERNAL_ERROR,
+          new TStatus(TErrorCode.JDBC_CONFIGURATION_ERROR,
               Lists.newArrayList("Invalid init_string value")));
     }
     // 2. Build the query and execute it
@@ -159,7 +159,7 @@ public class JdbcDataSource implements ExternalDataSource {
       buildQueryAndExecute(params);
     } catch (JdbcDatabaseAccessException e) {
       return new TOpenResult(
-          new TStatus(TErrorCode.INTERNAL_ERROR, Lists.newArrayList(e.getMessage())));
+          new TStatus(TErrorCode.RUNTIME_ERROR, Lists.newArrayList(e.getMessage())));
     }
     scanHandle_ = UUID.randomUUID().toString();
     return new TOpenResult(STATUS_OK).setScan_handle(scanHandle_);
@@ -176,7 +176,7 @@ public class JdbcDataSource implements ExternalDataSource {
     if (schema_.getColsSize() != 0) {
       if (iterator_ == null) {
         return new TGetNextResult(
-            new TStatus(TErrorCode.INTERNAL_ERROR,
+            new TStatus(TErrorCode.RUNTIME_ERROR,
                 Lists.newArrayList("Iterator of JDBC resultset is null")));
       }
       for (int i = 0; i < schema_.getColsSize(); ++i) {
@@ -189,6 +189,9 @@ public class JdbcDataSource implements ExternalDataSource {
           iterator_.next(schema_.getCols(), cols);
           ++numRows;
         }
+      } catch (UnsupportedOperationException e) {
+        return new TGetNextResult(new TStatus(
+            TErrorCode.JDBC_CONFIGURATION_ERROR, Lists.newArrayList(e.getMessage())));
       } catch (Exception e) {
         hasNext = false;
       }
@@ -214,7 +217,7 @@ public class JdbcDataSource implements ExternalDataSource {
       return new TCloseResult(STATUS_OK);
     } catch (Exception e) {
       return new TCloseResult(
-          new TStatus(TErrorCode.INTERNAL_ERROR, Lists.newArrayList(e.getMessage())));
+          new TStatus(TErrorCode.RUNTIME_ERROR, Lists.newArrayList(e.getMessage())));
     }
   }
 

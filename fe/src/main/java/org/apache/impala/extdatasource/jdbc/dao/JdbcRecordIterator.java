@@ -92,7 +92,8 @@ public class JdbcRecordIterator {
     }
   }
 
-  public void next(List<TColumnDesc> colDescs, List<TColumnData> colDatas) {
+  public void next(List<TColumnDesc> colDescs, List<TColumnData> colDatas)
+      throws UnsupportedOperationException {
     Preconditions.checkState(colDescs.size() == colDatas.size());
     for (int i = 0; i < colDescs.size(); ++i) {
       TColumnType type = colDescs.get(i).getType();
@@ -149,8 +150,20 @@ public class JdbcRecordIterator {
             break;
           case DECIMAL:
             BigDecimal val = rs.getBigDecimal(i + 1);
-            colData.addToBinary_vals(
-                SerializationUtils.encodeDecimal(new BigDecimal(val.byteValue())));
+            int valPrecision = val.precision();
+            int valScale = val.scale();
+            // Check if there is enough precision and scale in the destination decimal.
+            if (scalarType.scale < valScale ||
+                scalarType.precision < valPrecision + scalarType.scale - valScale) {
+              throw new UnsupportedOperationException(String.format("Invalid DECIMAL" +
+                  "(%d, %d) for column %s since there is possible loss of precision " +
+                  "when casting from DECIMAL(%d, %d)",
+                  scalarType.precision, scalarType.scale, colDescs.get(i).getName(),
+                  valPrecision, valScale));
+            } else if (scalarType.scale > valScale) {
+              val = val.setScale(scalarType.scale);
+            }
+            colData.addToBinary_vals(SerializationUtils.encodeDecimal(val));
             break;
           case BINARY:
           case CHAR:

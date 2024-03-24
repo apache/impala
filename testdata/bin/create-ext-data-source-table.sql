@@ -92,3 +92,20 @@ TBLPROPERTIES (
 "dbcp.password"="password",
 "table"="AllTypesWithQuote",
 "column.mapping"="id=id, bool_col=Bool_col, tinyint_col=Tinyint_col, smallint_col=Smallint_col, int_col=Int_col, bigint_col=Bigint_col, float_col=Float_col, double_col=Double_col, date_string_col=Date_string_col, string_col=String_col, timestamp=Timestamp");
+
+DROP TABLE IF EXISTS jdbc_decimal_tbl;
+CREATE EXTERNAL TABLE jdbc_decimal_tbl (
+ d1 DECIMAL(9,0),
+ d2 DECIMAL(10,0),
+ d3 DECIMAL(20,10),
+ d4 DECIMAL(38,38),
+ d5 DECIMAL(10,5))
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="POSTGRES",
+"jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+"jdbc.driver"="org.postgresql.Driver",
+"driver.url"="hdfs://localhost:20500/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"dbcp.username"="hiveuser",
+"dbcp.password"="password",
+"table"="decimal_tbl");
