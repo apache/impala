@@ -49,7 +49,7 @@ public class RexCallConverter {
 
     String funcName = rexCall.getOperator().getName().toLowerCase();
 
-    Function fn = getFunction(funcName, rexCall.getOperands(), rexCall.getType());
+    Function fn = getFunction(rexCall);
 
     Type impalaRetType = ImpalaTypeConverter.createImpalaType(fn.getReturnType(),
         rexCall.getType().getPrecision(), rexCall.getType().getScale());
@@ -57,13 +57,13 @@ public class RexCallConverter {
     return new AnalyzedFunctionCallExpr(fn, params, rexCall, impalaRetType, analyzer);
   }
 
-  private static Function getFunction(String name, List<RexNode> args,
-      RelDataType retType) throws ImpalaException {
-    List<RelDataType> argTypes = Lists.transform(args, RexNode::getType);
-    Function fn = FunctionResolver.getFunction(name, argTypes);
+  private static Function getFunction(RexCall call) throws ImpalaException {
+    List<RelDataType> argTypes = Lists.transform(call.getOperands(), RexNode::getType);
+    String name = call.getOperator().getName();
+    Function fn = FunctionResolver.getFunction(name, call.getKind(), argTypes);
     if (fn == null) {
       throw new AnalysisException("Could not find function \"" + name + "\" in Impala "
-          + "with args " + argTypes + " and return type " + retType);
+          + "with args " + argTypes + " and return type " + call.getType());
     }
     return fn;
   }

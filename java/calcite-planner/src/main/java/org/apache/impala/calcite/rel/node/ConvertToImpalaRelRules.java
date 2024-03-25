@@ -20,6 +20,7 @@ package org.apache.impala.calcite.rel.node;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 
@@ -40,6 +41,18 @@ public class ConvertToImpalaRelRules {
     public void onMatch(RelOptRuleCall call) {
       final LogicalProject project = call.rel(0);
       call.transformTo(new ImpalaProjectRel(project));
+    }
+  }
+
+  public static class ImpalaFilterRule extends RelOptRule {
+    public ImpalaFilterRule() {
+      super(operand(LogicalFilter.class, any()));
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      final LogicalFilter filter = call.rel(0);
+      call.transformTo(new ImpalaFilterRel(filter));
     }
   }
 

@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.rel.node;
 
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.planner.PlannerContext;
@@ -31,16 +32,21 @@ public class ParentPlanRelContext {
   // ctx:  This doesn't change throughout the tree
   public final PlannerContext ctx_;
 
+  // filterCondition: A filter which can be used by the current node.
+  public final RexNode filterCondition_;
+
   // The input refs used by the parent PlanRel Node
   public final ImmutableBitSet inputRefs_;
 
   private ParentPlanRelContext(Builder builder) {
     this.ctx_ = builder.context_;
+    this.filterCondition_ = builder.filterCondition_;
     this.inputRefs_ = builder.inputRefs_;
   }
 
   public static class Builder {
     private PlannerContext context_;
+    private RexNode filterCondition_;
     private ImmutableBitSet inputRefs_;
 
     public Builder(PlannerContext plannerContext) {
@@ -49,6 +55,11 @@ public class ParentPlanRelContext {
 
     public Builder(ParentPlanRelContext planRelContext, ImpalaPlanRel planRel) {
       this.context_ = planRelContext.ctx_;
+      this.filterCondition_ = planRelContext.filterCondition_;
+    }
+
+    public void setFilterCondition(RexNode filterCondition) {
+      this.filterCondition_ = filterCondition;
     }
 
     public void setInputRefs(ImmutableBitSet inputRefs) {

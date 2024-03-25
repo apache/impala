@@ -26,6 +26,7 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.calcite.rel.phys.ImpalaHdfsScanNode;
+import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.HdfsTable;
@@ -63,11 +64,17 @@ public class ImpalaHdfsScanRel extends TableScan
     // outputExprs will contain all the needed columns from the table
     List<Expr> outputExprs = createScanOutputExprs(tupleDesc.getSlots());
 
+    // break up the filter condition (if given) to ones that can be used for
+    // partition pruning and ones that cannot.
+    ExprConjunctsConverter converter = new ExprConjunctsConverter(
+        context.filterCondition_, outputExprs, getCluster().getRexBuilder(),
+        context.ctx_.getRootAnalyzer());
     List<? extends FeFsPartition> impalaPartitions = table.getPrunedPartitions(
         context.ctx_.getRootAnalyzer(), tupleDesc);
 
-    // TODO: filters are not handled yet, nor are partitions
-    List<Expr> filterConjuncts = new ArrayList<>();
+    // TODO: All conjuncts will be nonpartitioned conjuncts until the partition
+    // pruning feature is committed.
+    List<Expr> filterConjuncts = converter.getImpalaConjuncts();
     List<Expr> partitionConjuncts = new ArrayList<>();
 
     PlanNodeId nodeId = context.ctx_.getNextNodeId();

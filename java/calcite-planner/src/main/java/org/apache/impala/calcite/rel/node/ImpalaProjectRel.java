@@ -102,6 +102,8 @@ public class ImpalaProjectRel extends Project
 
   private NodeWithExprs getChildPlanNode(ParentPlanRelContext context
       ) throws ImpalaException {
+    Preconditions.checkState(context.filterCondition_ == null,
+        "Failure, Filter RelNode needs to be passed through the Project Rel Node.");
     ImpalaPlanRel relInput = (ImpalaPlanRel) getInput(0);
     ParentPlanRelContext.Builder builder =
         new ParentPlanRelContext.Builder(context, this);

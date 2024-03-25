@@ -150,3 +150,18 @@ select cast(cast('2005-12-13 08:00:00' as string)  AS TIMESTAMP) from functional
 2005-12-13 08:00:00
 ---- TYPES
 timestamp
+====
+---- QUERY
+select * from calcite_alltypes where bigint_col = 20;
+---- RESULTS
+2,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2',2009-01-01 00:02:00.100000000,2009,1
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+====
+---- QUERY
+select tinyint_col from calcite_alltypes where bigint_col = 20;
+---- RESULTS
+2
+---- TYPES
+tinyint
+====

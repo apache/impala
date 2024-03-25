@@ -19,22 +19,18 @@ package org.apache.impala.calcite.functions;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +43,20 @@ import org.slf4j.LoggerFactory;
 public class FunctionResolver {
   protected static final Logger LOG =
       LoggerFactory.getLogger(FunctionResolver.class.getName());
+
+  // Map of the Calcite Kind to an Impala function name
+  public static Map<SqlKind, String> CALCITE_KIND_TO_IMPALA_FUNC =
+      ImmutableMap.<SqlKind, String> builder()
+      .put(SqlKind.EQUALS, "eq")
+      .build();
+
+  public static Function getFunction(String name, SqlKind kind,
+      List<RelDataType> argTypes) {
+    String mappedName = CALCITE_KIND_TO_IMPALA_FUNC.get(kind);
+    return mappedName == null
+        ? getFunction(name, argTypes)
+        : getFunction(mappedName, argTypes);
+  }
 
   public static Function getFunction(String name, List<RelDataType> argTypes) {
     String lowercaseName = name.toLowerCase();

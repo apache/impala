@@ -58,6 +58,7 @@ public class CalciteOptimizer implements CompilerStep {
     builder.addRuleCollection(
         ImmutableList.of(
             new ConvertToImpalaRelRules.ImpalaScanRule(),
+            new ConvertToImpalaRelRules.ImpalaFilterRule(),
             new ConvertToImpalaRelRules.ImpalaProjectRule()));
 
     HepPlanner planner = new HepPlanner(builder.build(),
