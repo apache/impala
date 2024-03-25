@@ -247,6 +247,10 @@ struct TIcebergOperationParam {
 
   // The data files referenced by the position delete files.
   7: optional list<string> data_files_referenced_by_position_deletes
+
+  // Data files without deletes that are replaced by OPTIMIZE operation. Set only if there
+  // is file filtering. Unset in case of full table compaction, which rewrites all files.
+  8: optional set<string> replaced_data_files_without_deletes;
 }
 
 // Per-partion info needed by Catalog to handle an INSERT.

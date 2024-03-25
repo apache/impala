@@ -31,9 +31,9 @@ import java.util.Set;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
-import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -163,6 +163,10 @@ public class TableRef extends StmtNode {
   // FOR SYSTEM_TIME AS OF <timestamp> or FOR SYSTEM_TIME AS OF <version> clause.
   protected TimeTravelSpec timeTravelSpec_;
 
+  // Iceberg data files without deletes selected for OPTIMIZE from this table ref.
+  // Used only in PARTIAL optimization mode, otherwise it is null.
+  private List<HdfsPartition.FileDescriptor> selectedDataFilesWithoutDeletesForOptimize_;
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -265,6 +269,8 @@ public class TableRef extends StmtNode {
     columns_ = new LinkedHashMap<>(other.columns_);
     isHidden_ = other.isHidden_;
     zippingUnnestType_ = other.zippingUnnestType_;
+    selectedDataFilesWithoutDeletesForOptimize_ =
+        other.selectedDataFilesWithoutDeletesForOptimize_;
   }
 
   @Override
@@ -805,6 +811,7 @@ public class TableRef extends StmtNode {
     correlatedTupleIds_.clear();
     desc_ = null;
     if (timeTravelSpec_ != null) timeTravelSpec_.reset();
+    selectedDataFilesWithoutDeletesForOptimize_ = null;
   }
 
   public boolean isTableMaskingView() { return false; }
@@ -841,6 +848,15 @@ public class TableRef extends StmtNode {
     Preconditions.checkState(res.size() == columns_.size(),
         "missing columns: " + res.size() + " != " + columns_.size());
     return res;
+  }
+
+  public void setSelectedDataFilesForOptimize(
+      List<HdfsPartition.FileDescriptor> fileDescs) {
+    selectedDataFilesWithoutDeletesForOptimize_ = fileDescs;
+  }
+
+  public List<HdfsPartition.FileDescriptor> getSelectedDataFilesForOptimize() {
+    return selectedDataFilesWithoutDeletesForOptimize_;
   }
 
   void migratePropertiesTo(TableRef other) {

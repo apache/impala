@@ -1,5 +1,58 @@
 ====
 ---- QUERY
+CREATE TABLE ice_optimize_part (int_col int, string_col string, bool_col boolean)
+PARTITIONED BY SPEC(int_col)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Insert a value then delete everything from the table.
+INSERT INTO ice_optimize_part VALUES(1, 'one', true);
+DELETE FROM ice_optimize_part WHERE bool_col=true;
+SHOW FILES IN ice_optimize_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/int_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part/data/int_col=1/delete-.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Testing that OPTIMIZE merged the data and delete files and the result is an empty snapshot.
+OPTIMIZE TABLE ice_optimize_part;
+SHOW FILES IN ice_optimize_part;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Testing that OPTIMIZE empty table is no-op.
+DESCRIBE HISTORY ice_optimize_part;
+---- LABELS
+creation_time,snapshot_id,parent_id,is_current_ancestor
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'.*','.*','NULL','TRUE'
+row_regex:'.*','.*','.*','TRUE'
+row_regex:'.*','.*','.*','TRUE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+OPTIMIZE TABLE ice_optimize_part;
+DESCRIBE HISTORY ice_optimize_part;
+---- LABELS
+creation_time,snapshot_id,parent_id,is_current_ancestor
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'.*','.*','NULL','TRUE'
+row_regex:'.*','.*','.*','TRUE'
+row_regex:'.*','.*','.*','TRUE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
 CREATE TABLE ice_optimize (int_col int, string_col string, bool_col boolean)
 STORED BY ICEBERG
 TBLPROPERTIES ('format-version'='2');
@@ -24,6 +77,30 @@ SHOW FILES IN ice_optimize;
 ---- LABELS
 Path,Size,Partition,EC Policy
 ---- RESULTS: VERIFY_IS_EQUAL
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Testing that OPTIMIZE empty table is no-op.
+DESCRIBE HISTORY ice_optimize;
+---- LABELS
+creation_time,snapshot_id,parent_id,is_current_ancestor
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'.*','.*','NULL','TRUE'
+row_regex:'.*','.*','.*','TRUE'
+row_regex:'.*','.*','.*','TRUE'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+OPTIMIZE TABLE ice_optimize;
+DESCRIBE HISTORY ice_optimize;
+---- LABELS
+creation_time,snapshot_id,parent_id,is_current_ancestor
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'.*','.*','NULL','TRUE'
+row_regex:'.*','.*','.*','TRUE'
+row_regex:'.*','.*','.*','TRUE'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====

@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
+from collections import defaultdict, namedtuple
 import datetime
 import logging
 import os
@@ -1790,6 +1791,128 @@ class TestIcebergV2Table(IcebergTestSuite):
             tbl_name, snapshot_before_last.get_snapshot_id()))
     assert result_after_opt.data.sort() == result_time_travel.data.sort()
 
+  def _check_file_filtering(self, tbl_name, threshold_mb, mode, had_partition_evolution):
+    threshold_bytes = threshold_mb * 1024 * 1024
+    DATA_FILE = "0"
+    DELETE_FILE = "1"
+    FileMetadata = namedtuple('FileMetadata', 'content, path, partition, size')
+    metadata_query = """select content, file_path, `partition`, file_size_in_bytes
+                    from {0}.`files`;""".format(tbl_name)
+    result = self.execute_query(metadata_query)
+    files_before = set()
+    files_per_partition = defaultdict(set)
+    for line in result.data:
+      file = FileMetadata._make(line.split("\t"))
+      partition = file.partition
+      files_per_partition[partition].add(file)
+      files_before.add(file)
+
+    selected_files = set()
+    partitions_with_removed_files = set()
+    for partition, files in files_per_partition.items():
+        if len(files) > 1:
+          num_small_files = 0
+          # count small datafiles
+          for file in files:
+            if file.content == DATA_FILE and int(file.size) < threshold_bytes:
+              num_small_files += 1
+          for file in files:
+            # We assume that a delete file in a partition references all data files in
+            # that partition, because we cannot differentiate between data files
+            # with/without deletes.
+            if file.content == DELETE_FILE:
+              selected_files.update(files)
+              partitions_with_removed_files.add(partition)
+              break
+            # Only merge small files if there are at least 2 of them.
+            elif num_small_files > 1 and int(file.size) < threshold_bytes:
+              selected_files.add(file)
+              partitions_with_removed_files.add(partition)
+
+    self.execute_query(
+        "OPTIMIZE TABLE {0} (file_size_threshold_mb={1});".format(tbl_name, threshold_mb))
+    optimized_result = self.execute_query(metadata_query)
+    files_after = set()
+    for line in optimized_result.data:
+      file = FileMetadata._make(line.split("\t"))
+      files_after.add(file)
+
+    # Check the resulting files and the modified partitions after the OPTIMIZE operation.
+    # files_after = files_before - selected_files + 1 new file per partition
+    # The result should not contain the files that were selected and should contain 1 new
+    # file per written partition.
+    unchanged_files = files_before - selected_files
+    # Check that files that were not selected are still present in the result.
+    assert unchanged_files.issubset(files_after)
+    # Check that selected files are rewritten and not present in the result.
+    assert selected_files.isdisjoint(files_after)
+    new_files = files_after - unchanged_files
+    assert new_files == files_after - files_before
+
+    if mode == "NOOP":
+      assert selected_files == set([])
+      assert files_after == files_before
+    elif mode == "REWRITE_ALL":
+      assert selected_files == files_before
+      assert files_after.isdisjoint(files_before)
+    elif mode == "PARTIAL":
+      assert selected_files < files_before and selected_files != set([])
+      assert unchanged_files < files_after and unchanged_files != set([])
+      assert unchanged_files == files_after.intersection(files_before)
+
+    # Check that all delete files were merged.
+    for file in files_after:
+      assert file.content == DATA_FILE
+    # Check that there's only one new file in every partition.
+    partitions_with_new_files = set()
+    for file in new_files:
+      assert file.partition not in partitions_with_new_files
+      partitions_with_new_files.add(file.partition)
+    assert len(new_files) == len(partitions_with_new_files)
+
+    # WITH PARTITION EVOLUTION
+    # Only new partitions are written to.
+    # WITHOUT PARTITION EVOLUTION
+    if not had_partition_evolution:
+      # Check that 1 new content file is written in every updated partition.
+      assert len(new_files) == len(partitions_with_removed_files)
+      assert partitions_with_new_files == partitions_with_removed_files
+
+  def test_optimize_file_filtering(self, unique_database):
+    tbl_name = unique_database + ".ice_optimize_filter"
+    self.execute_query("""CREATE TABLE {0} partitioned by spec (l_linenumber)
+                       STORED BY ICEBERG TBLPROPERTIES ('format-version'='2')
+                       AS SELECT * FROM tpch_parquet.lineitem
+                       WHERE l_quantity < 10;""".format(tbl_name))
+    self.execute_query("""INSERT INTO {0} SELECT * FROM tpch_parquet.lineitem
+                       WHERE l_quantity>=10 AND l_quantity<=12;""".format(tbl_name))
+    # There are no delete files in the table, so this should be a no-op. Check that no new
+    # snapshot was created.
+    self._check_file_filtering(tbl_name, 0, "NOOP", False)
+    assert len(get_snapshots(self.client, tbl_name)) == 2
+    self._check_file_filtering(tbl_name, 5, "PARTIAL", False)
+    self._check_file_filtering(tbl_name, 50, "PARTIAL", False)
+    # Check that the following is a no-op, since the table is already in a compact form.
+    self._check_file_filtering(tbl_name, 100, "NOOP", False)
+    self.execute_query("""UPDATE {0} SET l_linenumber=7 WHERE l_linenumber>4 AND
+                       l_linestatus='F';""".format(tbl_name))
+    self._check_file_filtering(tbl_name, 6, "PARTIAL", False)
+    self.execute_query("""ALTER TABLE {0} SET PARTITION SPEC(l_linestatus);"""
+                       .format(tbl_name))
+    self.execute_query("""UPDATE {0} SET l_shipmode='AIR' WHERE l_shipmode='MAIL'
+                       AND l_linenumber<4;""".format(tbl_name))
+    self.execute_query("""INSERT INTO {0} SELECT * FROM tpch_parquet.lineitem
+                       WHERE l_quantity=13 AND l_linenumber<3;""".format(tbl_name))
+    self.execute_query("""INSERT INTO {0} SELECT * FROM tpch_parquet.lineitem
+                       WHERE l_quantity=14 AND l_linenumber<3;""".format(tbl_name))
+    # Merges the delete files and rewrites the small files.
+    self._check_file_filtering(tbl_name, 2, "PARTIAL", True)
+    # Rewrites the remaining small files (2MB <= file_size < 100MB).
+    self._check_file_filtering(tbl_name, 100, "PARTIAL", True)
+    self.execute_query("""UPDATE {0} SET l_shipmode='AIR' WHERE l_shipmode='MAIL';"""
+                       .format(tbl_name))
+    # All partitions have delete files, therefore the entire table is rewritten.
+    self._check_file_filtering(tbl_name, 100, "REWRITE_ALL", True)
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it

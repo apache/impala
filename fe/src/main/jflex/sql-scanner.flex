@@ -137,6 +137,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("fields", SqlParserSymbols.KW_FIELDS);
     keywordMap.put("fileformat", SqlParserSymbols.KW_FILEFORMAT);
     keywordMap.put("files", SqlParserSymbols.KW_FILES);
+    keywordMap.put("file_size_threshold_mb", SqlParserSymbols.KW_FILE_SIZE_THRESHOLD_MB);
     keywordMap.put("finalize_fn", SqlParserSymbols.KW_FINALIZE_FN);
     keywordMap.put("first", SqlParserSymbols.KW_FIRST);
     keywordMap.put("float", SqlParserSymbols.KW_FLOAT);

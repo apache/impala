@@ -768,12 +768,12 @@ public interface FeIcebergTable extends FeFsTable {
      * path, using org.apache.hadoop.fs.Path to normalize the paths.
      */
     public static IcebergContentFileStore loadAllPartition(
-        IcebergTable table, GroupedContentFiles icebergFiles)
+        FeIcebergTable table, GroupedContentFiles icebergFiles)
         throws IOException, ImpalaRuntimeException {
       Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap = new HashMap<>();
-      Collection<HdfsPartition> partitions =
-          ((HdfsTable)table.getFeFsTable()).partitionMap_.values();
-      for (HdfsPartition partition : partitions) {
+      Collection<? extends FeFsPartition> partitions =
+          FeCatalogUtils.loadAllPartitions(table.getFeFsTable());
+      for (FeFsPartition partition : partitions) {
         for (FileDescriptor fileDesc : partition.getFileDescriptors()) {
           Path path = new Path(fileDesc.getAbsolutePath(table.getHdfsBaseDir()));
           hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
@@ -801,7 +801,7 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     private static Pair<String, HdfsPartition.FileDescriptor> getPathHashAndFd(
-        ContentFile<?> contentFile, IcebergTable table,
+        ContentFile<?> contentFile, FeIcebergTable table,
         Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap) throws IOException {
       String pathHash = IcebergUtil.getFilePathHash(contentFile);
       HdfsPartition.FileDescriptor fd = getOrCreateIcebergFd(
@@ -809,7 +809,7 @@ public interface FeIcebergTable extends FeFsTable {
       return new Pair<>(pathHash, fd);
     }
 
-    private static FileDescriptor getOrCreateIcebergFd(IcebergTable table,
+    private static FileDescriptor getOrCreateIcebergFd(FeIcebergTable table,
         Map<String, HdfsPartition.FileDescriptor> hdfsFileDescMap,
         ContentFile<?> contentFile) throws IllegalArgumentException, IOException {
       Path path = new Path(contentFile.path().toString());

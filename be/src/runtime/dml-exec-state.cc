@@ -157,7 +157,8 @@ int64_t DmlExecState::GetNumModifiedRows() {
   return result;
 }
 
-bool DmlExecState::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {
+bool DmlExecState::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update,
+    const TFinalizeParams& finalize_params) {
   lock_guard<mutex> l(lock_);
   for (const PartitionStatusMap::value_type& partition : per_partition_status_) {
     TUpdatedPartition updatedPartition;
@@ -170,6 +171,10 @@ bool DmlExecState::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {
       updatedPartition.files.push_back(file.final_path());
     }
     catalog_update->updated_partitions[partition.first] = updatedPartition;
+  }
+  if (finalize_params.__isset.iceberg_params
+      && finalize_params.iceberg_params.operation == TIcebergOperation::OPTIMIZE) {
+    return true;
   }
   return catalog_update->updated_partitions.size() != 0;
 }

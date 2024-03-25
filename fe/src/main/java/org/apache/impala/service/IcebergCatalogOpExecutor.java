@@ -366,7 +366,7 @@ public class IcebergCatalogOpExecutor {
       case INSERT: appendFiles(feIcebergTable, txn, icebergOp); break;
       case DELETE: deleteRows(feIcebergTable, txn, icebergOp); break;
       case UPDATE: updateRows(feIcebergTable, txn, icebergOp); break;
-      case OPTIMIZE: rewriteTable(feIcebergTable, txn, icebergOp); break;
+      case OPTIMIZE: optimizeTable(feIcebergTable, txn, icebergOp); break;
       default: throw new ImpalaRuntimeException(
           "Unknown Iceberg operation: " + icebergOp.operation);
     }
@@ -521,7 +521,7 @@ public class IcebergCatalogOpExecutor {
         nullValueCounts, null, lowerBounds, upperBounds);
   }
 
-  private static void rewriteTable(FeIcebergTable feIcebergTable, Transaction txn,
+  private static void optimizeTable(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
     GroupedContentFiles contentFiles;
     try {
@@ -533,11 +533,21 @@ public class IcebergCatalogOpExecutor {
       throw new ImpalaRuntimeException(e.getMessage(), e);
     }
     RewriteFiles rewrite = txn.newRewrite();
-    // Delete current data files from table.
-    for (DataFile dataFile : contentFiles.dataFilesWithDeletes) {
-      rewrite.deleteFile(dataFile);
+    // Delete current data files from table if the operation is a full table rewrite.
+    // If there was file filtering, keep the data files without deletes that were not
+    // selected, and delete only the selected, rewritten files.
+    if (icebergOp.isSetReplaced_data_files_without_deletes()) {
+      for (DataFile dataFile : contentFiles.dataFilesWithoutDeletes) {
+        if (icebergOp.replaced_data_files_without_deletes.contains(dataFile.path())) {
+          rewrite.deleteFile(dataFile);
+        }
+      }
+    } else {
+      for (DataFile dataFile : contentFiles.dataFilesWithoutDeletes) {
+        rewrite.deleteFile(dataFile);
+      }
     }
-    for (DataFile dataFile : contentFiles.dataFilesWithoutDeletes) {
+    for (DataFile dataFile : contentFiles.dataFilesWithDeletes) {
       rewrite.deleteFile(dataFile);
     }
     // Delete current delete files from table.

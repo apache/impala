@@ -1967,6 +1967,13 @@ public class ParserTest extends FrontendTestBase {
   @Test
   public void TestOptimize() {
     ParsesOk("optimize table t");
+    ParsesOk("optimize table t (file_size_threshold_mb=10)");
+    ParsesOk("optimize table t (file_size_threshold_mb=0)");
+    ParserError("optimize table t file_size_threshold_mb=10");
+    ParserError("optimize table t file_size_threshold_mb 10");
+    ParserError("optimize table t (file_size_threshold_mb=-10)");
+    ParserError("optimize table t (file_size_threshold_mb=0.1)");
+    ParserError("optimize table t 10");
     ParserError("optimize t");
     ParserError("optimize table t for system_time as of now()");
     ParserError("optimize table t for system_version as of 12345");

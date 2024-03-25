@@ -87,6 +87,7 @@ import org.apache.impala.analysis.DropTableOrViewStmt;
 import org.apache.impala.analysis.GrantRevokePrivStmt;
 import org.apache.impala.analysis.GrantRevokeRoleStmt;
 import org.apache.impala.analysis.InsertStmt;
+import org.apache.impala.analysis.OptimizeStmt;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.ResetMetadataStmt;
@@ -194,6 +195,8 @@ import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TConvertTableRequest;
+import org.apache.impala.thrift.TIcebergOptimizationMode;
+import org.apache.impala.thrift.TIcebergOptimizeParams;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPoolConfig;
@@ -2761,8 +2764,8 @@ public class Frontend {
           addFinalizationParamsForIcebergModify(queryCtx, queryExecRequest,
               analysisResult.getUpdateStmt(), TIcebergOperation.UPDATE);
         } else if (analysisResult.isOptimizeStmt()) {
-          addFinalizationParamsForIcebergModify(queryCtx, queryExecRequest,
-              analysisResult.getOptimizeStmt(), TIcebergOperation.OPTIMIZE);
+          addFinalizationParamsForIcebergOptimize(queryCtx, queryExecRequest,
+              analysisResult.getOptimizeStmt());
         }
       }
       return result;
@@ -2827,8 +2830,8 @@ public class Frontend {
   }
 
   /**
-   * Add the finalize params to the queryExecRequest for a non-INSERT Iceberg DML
-   * statement: DELETE, UPDATE and OPTIMIZE.
+   * Add the finalize params to the queryExecRequest for an Iceberg modify statement:
+   * DELETE and UPDATE.
    */
   private static void addFinalizationParamsForIcebergModify(TQueryCtx queryCtx,
       TQueryExecRequest queryExecRequest, DmlStatementBase dmlStmt,
@@ -2844,6 +2847,25 @@ public class Frontend {
         queryCtx, targetTable, false);
     TIcebergDmlFinalizeParams iceFinalizeParams =
         addFinalizationParamsForIcebergDml((FeIcebergTable)targetTable, iceOperation);
+    finalizeParams.setIceberg_params(iceFinalizeParams);
+    queryExecRequest.setFinalize_params(finalizeParams);
+  }
+
+  private static void addFinalizationParamsForIcebergOptimize(TQueryCtx queryCtx,
+      TQueryExecRequest queryExecRequest, OptimizeStmt optimizeStmt) {
+    FeTable targetTable = optimizeStmt.getTargetTable();
+    Preconditions.checkState(targetTable instanceof FeIcebergTable);
+    TFinalizeParams finalizeParams = addFinalizationParamsForDml(
+        queryCtx, targetTable, false);
+    TIcebergDmlFinalizeParams iceFinalizeParams = addFinalizationParamsForIcebergDml(
+            (FeIcebergTable)targetTable, TIcebergOperation.OPTIMIZE);
+    TIcebergOptimizeParams optimizeParams = new TIcebergOptimizeParams();
+    optimizeParams.setMode(optimizeStmt.getOptimizationMode());
+    if (optimizeStmt.getOptimizationMode() == TIcebergOptimizationMode.PARTIAL) {
+      optimizeParams.setSelected_data_files_without_deletes(
+          optimizeStmt.getSelectedIcebergFilePaths());
+    }
+    iceFinalizeParams.setOptimize_params(optimizeParams);
     finalizeParams.setIceberg_params(iceFinalizeParams);
     queryExecRequest.setFinalize_params(finalizeParams);
   }

@@ -1548,7 +1548,7 @@ Status ClientRequestState::UpdateCatalog() {
       catalog_update.__set_debug_action(exec_req.query_options.debug_action);
     }
     DmlExecState* dml_exec_state = GetCoordinator()->dml_exec_state();
-    if (!dml_exec_state->PrepareCatalogUpdate(&catalog_update)) {
+    if (!dml_exec_state->PrepareCatalogUpdate(&catalog_update, finalize_params)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
                  << PrintId(query_id()) << ")";
     } else {
@@ -1575,7 +1575,8 @@ Status ClientRequestState::UpdateCatalog() {
         TIcebergOperationParam& cat_ice_op = catalog_update.iceberg_operation;
         catalog_update.__isset.iceberg_operation = true;
         if (!CreateIcebergCatalogOps(finalize_params, &cat_ice_op)) {
-          // No change, no need to update catalog.
+          VLOG_QUERY << "No Iceberg partitions altered, not updating metastore "
+                     << "(query id: " << PrintId(query_id()) << ")";
           return Status::OK();
         }
       }
@@ -1671,8 +1672,19 @@ bool ClientRequestState::CreateIcebergCatalogOps(
       update_catalog = false;
     }
   } else if (ice_finalize_params.operation == TIcebergOperation::OPTIMIZE) {
-    cat_ice_op->__set_iceberg_data_files_fb(
-        dml_exec_state->CreateIcebergDataFilesVector());
+    DCHECK(ice_finalize_params.__isset.optimize_params);
+    const TIcebergOptimizeParams& optimize_params = ice_finalize_params.optimize_params;
+    if (optimize_params.mode == TIcebergOptimizationMode::NOOP) {
+      update_catalog = false;
+    } else {
+      cat_ice_op->__set_iceberg_data_files_fb(
+          dml_exec_state->CreateIcebergDataFilesVector());
+      if (optimize_params.mode == TIcebergOptimizationMode::PARTIAL) {
+        DCHECK(optimize_params.__isset.selected_data_files_without_deletes);
+        cat_ice_op->__set_replaced_data_files_without_deletes(
+            optimize_params.selected_data_files_without_deletes);
+      }
+    }
   }
   if (!update_catalog) query_events_->MarkEvent("No-op Iceberg DML statement");
   return update_catalog;

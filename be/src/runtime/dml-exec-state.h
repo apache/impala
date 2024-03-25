@@ -109,7 +109,8 @@ class DmlExecState {
 
   /// Populates 'catalog_update' with PartitionStatusMap data.
   /// Returns true if a catalog update is required, false otherwise.
-  bool PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update);
+  bool PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update,
+      const TFinalizeParams& finalize_params);
 
   /// For HDFS (and other Hadoop FileSystem) INSERT, moves all temporary staging files
   /// to their final destinations, as indicated by 'params', and creates new partitions

@@ -176,7 +176,11 @@ public class IcebergScanPlanner {
 
   private void setFileDescriptorsBasedOnFileStore() throws ImpalaException {
     IcebergContentFileStore fileStore = getIceTable().getContentFileStore();
-    dataFilesWithoutDeletes_ = fileStore.getDataFilesWithoutDeletes();
+    if (tblRef_.getSelectedDataFilesForOptimize() != null) {
+      dataFilesWithoutDeletes_ = tblRef_.getSelectedDataFilesForOptimize();
+    } else {
+      dataFilesWithoutDeletes_ = fileStore.getDataFilesWithoutDeletes();
+    }
     dataFilesWithDeletes_ = fileStore.getDataFilesWithDeletes();
     positionDeleteFiles_ = new HashSet<>(fileStore.getPositionDeleteFiles());
     initEqualityIds(fileStore.getEqualityDeleteFiles());

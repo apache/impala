@@ -940,6 +940,26 @@ struct TPlanExecInfo {
       per_node_scan_ranges
 }
 
+// Determines the type of the OPTIMIZE operation. Based on the number of files selected
+// for compaction, it can be
+// 1. a full table rewrite,
+// 2. a partial optimization with file filtering, or
+// 3. no-op with no selected files.
+enum TIcebergOptimizationMode {
+  REWRITE_ALL = 0
+  PARTIAL = 1
+  NOOP = 2
+}
+
+struct TIcebergOptimizeParams {
+  1: required TIcebergOptimizationMode mode;
+
+  // Stores the file paths to the data files without deletes that are targeted by the
+  // OPTIMIZE operation. Set only if the mode is PARTIAL, which means that data files are
+  // filtered (by size).
+  2: optional set<string> selected_data_files_without_deletes;
+}
+
 struct TIcebergDmlFinalizeParams {
   // Type of the Iceberg operation
   1: required Types.TIcebergOperation operation
@@ -949,6 +969,9 @@ struct TIcebergDmlFinalizeParams {
 
   // Stores the Iceberg snapshot id of the target table for this DML operation.
   3: optional i64 initial_snapshot_id;
+
+  // Stores additional information about the OPTIMIZE operation.
+  4: optional TIcebergOptimizeParams optimize_params;
 }
 
 // Metadata required to finalize a query - that is, to clean up after the query is done.
