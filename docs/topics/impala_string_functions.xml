@@ -183,10 +183,6 @@ under the License.
       </li>
 
       <li>
-        <xref href="#string_functions/prettyprint_duration">PRETTYPRINT_DURATION</xref>
-      </li>
-
-      <li>
         <xref href="#string_functions/prettyprint_bytes">PRETTYPRINT_BYTES</xref>
       </li>
 
@@ -1136,45 +1132,6 @@ select instr('foo bar bletch', 'b', 1, 2);
           </p>
         </dd>
 
-      </dlentry>
-
-      <dlentry id="prettyprint_duration">
-
-        <dt>
-          PRETTYPRINT_DURATION(TINYINT / SMALLINT / INT / BIGINT nanoseconds)
-        </dt>
-
-        <dd>
-          <b>Purpose:</b> Formats numeric nanoseconds in a human readable manner.
-          <p>
-            <b>Return type:</b> <codeph>STRING</codeph>
-          </p>
-
-          <p>
-            <b>Usage notes:</b>
-          </p>
-
-          <p>
-            Negative durations are not fully supported. No conversion to milliseconds/seconds/minutes/hours
-            is performed. The input value is directly returned with the <codeph>ns</codeph> suffix added.
-          </p>
-
-          <p>
-            <b>Examples:</b>
-          </p>
-
-          <p>
-<codeblock>
-select prettyprint_duration(1), prettyprint_duration(12345678), prettyprint_duration(1234567890123), prettyprint_duration(98765432141451), prettyprint_duration(-436512);
-
-+-------------------------+--------------------------------+-------------------------------------+--------------------------------------+-------------------------------+
-| prettyprint_duration(1) | prettyprint_duration(12345678) | prettyprint_duration(1234567890123) | prettyprint_duration(98765432141451) | prettyprint_duration(-436512) |
-+-------------------------+--------------------------------+-------------------------------------+--------------------------------------+-------------------------------+
-| 1.000ns                 | 12.345ms                       | 20m34s                              | 27h26m                               | -436512.000ns                 |
-+-------------------------+--------------------------------+-------------------------------------+--------------------------------------+-------------------------------+
-</codeblock>
-          </p>
-        </dd>
       </dlentry>
 
       <dlentry id="prettyprint_bytes">

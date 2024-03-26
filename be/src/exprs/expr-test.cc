@@ -4347,37 +4347,6 @@ TEST_P(ExprTest, StringFunctions) {
         "jaro-winkler boost threshold values can range between 0.0 and 1.0\n");
   }
 
-  // Test prettyprint_duration
-  TestStringValue("prettyprint_duration(-1)", "-1.000ns");
-  TestStringValue("prettyprint_duration(0)", "0.000ns");
-  TestStringValue("prettyprint_duration(1234)", "1.234us");
-  TestStringValue("prettyprint_duration(123456789012)", "2m3s");
-  TestStringValue("prettyprint_duration(12345678901292)", "3h25m");
-  TestIsNull("prettyprint_duration(NULL)", TYPE_STRING);
-
-  // Test at the type boundaries for tinyint.
-  TestStringValue("prettyprint_duration(127)", "127.000ns");
-  TestStringValue("prettyprint_duration(128)", "128.000ns");
-  TestStringValue("prettyprint_duration(-128)", "-128.000ns");
-  TestStringValue("prettyprint_duration(-129)", "-129.000ns");
-
-  // Test at the type boundaries for smallint.
-  TestStringValue("prettyprint_duration(32767)", "32.767us");
-  TestStringValue("prettyprint_duration(32768)", "32.768us");
-  TestStringValue("prettyprint_duration(-32768)", "-32768.000ns");
-  TestStringValue("prettyprint_duration(-32769)", "-32769.000ns");
-
-  // Test at the type boundaries for int.
-  TestStringValue("prettyprint_duration(2147483647)", "2s147ms");
-  TestStringValue("prettyprint_duration(2147483648)", "2s147ms");
-  TestStringValue("prettyprint_duration(-2147483648)", "-2147483648.000ns");
-  TestStringValue("prettyprint_duration(-2147483649)", "-2147483649.000ns");
-
-  // Test at the type boundaries for bigint.
-  TestStringValue("prettyprint_duration(9223372036854775807)", "2562047h47m");
-  TestStringValue("prettyprint_duration(-9223372036854775808)",
-      "-9223372036854775808.000ns");
-
   // Test prettyprint_bytes
   TestStringValue("prettyprint_bytes(-1234)", "-1.21 KB");
   TestStringValue("prettyprint_bytes(0)", "0");

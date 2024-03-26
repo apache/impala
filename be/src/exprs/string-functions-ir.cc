@@ -1907,26 +1907,6 @@ static StringVal prettyPrint(FunctionContext* context, const T& int_val,
   return result;
 }
 
-StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
-    const BigIntVal& duration_us) {
-  return prettyPrint(context, duration_us, TUnit::TIME_NS);
-}
-
-StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
-    const IntVal& duration_us) {
-  return prettyPrint(context, duration_us, TUnit::TIME_NS);
-}
-
-StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
-    const SmallIntVal& duration_us) {
-  return prettyPrint(context, duration_us, TUnit::TIME_NS);
-}
-
-StringVal StringFunctions::PrettyPrintDuration(FunctionContext* context,
-    const TinyIntVal& duration_us) {
-  return prettyPrint(context, duration_us, TUnit::TIME_NS);
-}
-
 StringVal StringFunctions::PrettyPrintMemory(FunctionContext* context,
     const BigIntVal& bytes) {
   return prettyPrint(context, bytes, TUnit::BYTES);

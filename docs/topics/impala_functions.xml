@@ -1039,13 +1039,6 @@ under the License.
           <row>
             <entry>
               <xref href=
-                "impala_string_functions.xml#string_functions/prettyprint_duration">
-                PRETTYPRINT_DURATION</xref>
-            </entry>
-          </row>
-          <row>
-            <entry>
-              <xref href=
                 "impala_string_functions.xml#string_functions/prettyprint_bytes">
                 PRETTYPRINT_BYTES</xref>
             </entry>

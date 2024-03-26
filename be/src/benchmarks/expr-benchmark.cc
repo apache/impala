@@ -556,9 +556,8 @@ Benchmark* BenchmarkConditionalFunctions(bool codegen) {
 //                         find_in_set                321      323      325     0.765X     0.761X      0.76X
 //                      regexp_extract                 42     42.8       43       0.1X     0.101X     0.101X
 //                      regexp_replace               2.94     2.96        3   0.00701X   0.00698X   0.00702X
-//                prettyprint_duration               18.3     18.6     18.7    0.0437X    0.0439X    0.0438X
 //                  prettyprint_bytes                9.54     9.72     9.75    0.0227X    0.0229X    0.0228X
-// 
+//
 // StringFnCodegen:           Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
@@ -588,7 +587,6 @@ Benchmark* BenchmarkConditionalFunctions(bool codegen) {
 //                         find_in_set                320      323      325     0.694X     0.693X     0.691X
 //                      regexp_extract               42.2       43     43.2    0.0915X    0.0922X    0.0918X
 //                      regexp_replace               2.89     2.94        3   0.00626X   0.00631X   0.00637X
-//                prettyprint_duration               18.3     18.6     18.7    0.0398X      0.04X    0.0397X
 //                  prettyprint_bytes                9.55     9.72     9.74    0.0207X    0.0208X    0.0207X
 Benchmark* BenchmarkStringFunctions(bool codegen) {
   Benchmark* suite = new Benchmark(BenchmarkName("StringFn", codegen));
@@ -618,7 +616,6 @@ Benchmark* BenchmarkStringFunctions(bool codegen) {
   BENCHMARK("find_in_set", "find_in_set('ab', 'abc,ad,ab,ade,cde')");
   BENCHMARK("regexp_extract", "regexp_extract('abxcy1234a', 'a.x.y.*a', 0)");
   BENCHMARK("regexp_replace", "regexp_replace('axcaycazc', '', 'r')");
-  BENCHMARK("prettyprint_duration", "prettyprint_duration(123456789)");
   BENCHMARK("prettyprint_bytes", "prettyprint_bytes(987654321)");
   return suite;
 }
