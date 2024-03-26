@@ -145,9 +145,13 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   // from an RPC. As a best effort, we use the type of the operation.
   map<int, const char*>::const_iterator query_text_it =
       _TMetadataOpcode_VALUES_TO_NAMES.find(request->opcode);
-  const string& query_text = query_text_it == _TMetadataOpcode_VALUES_TO_NAMES.end() ?
-      "N/A" : query_text_it->second;
-  query_ctx.client_request.stmt = query_text;
+  if (query_text_it == _TMetadataOpcode_VALUES_TO_NAMES.end()) {
+    query_ctx.client_request.stmt = "N/A";
+  } else {
+    query_ctx.client_request.stmt = query_text_it->second;
+    query_ctx.client_request.__set_hs2_metadata_op(true);
+  }
+
   QueryHandle query_handle;
   QueryDriver::CreateNewDriver(this, &query_handle, query_ctx, session);
   Status register_status = RegisterQuery(query_ctx.query_id, session, &query_handle);

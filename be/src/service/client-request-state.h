@@ -332,6 +332,7 @@ class ClientRequestState {
   const TQueryOptions& query_options() const {
     return query_ctx_.client_request.query_options;
   }
+  bool hs2_metadata_op() const { return query_ctx_.client_request.hs2_metadata_op; }
   /// Returns 0:0 if this is a root query
   TUniqueId parent_query_id() const { return query_ctx_.parent_query_id; }
   const vector<TTableName>& tables() const { return exec_request().tables; }

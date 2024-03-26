@@ -723,6 +723,9 @@ struct TClientRequest {
 
   // Redacted SQL stmt
   3: optional string redacted_stmt
+
+  // Indicates if an HS2 metadata operation code was provided in the client request
+  4: optional bool hs2_metadata_op
 }
 
 // Per-client session state

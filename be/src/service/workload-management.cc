@@ -225,12 +225,27 @@ void ImpalaServer::EnqueueCompletedQuery(const QueryHandle& query_handle,
       case TCatalogOpType::DESCRIBE_TABLE:
       case TCatalogOpType::DESCRIBE_DB:
       case TCatalogOpType::DESCRIBE_HISTORY:
-        return;  // Note: early return
+        VLOG_QUERY << "skipping enqueue of completed query '" <<
+            PrintId(query_handle->query_id()) << "' with type '" <<
+          query_handle->stmt_type() << "' and catalog op type '" <<
+          query_handle->catalog_op_type() << "'";
+        return;  // Note: early return, query will not be added to the queue
       case TCatalogOpType::RESET_METADATA:
       case TCatalogOpType::DDL:
+        // No-op, continue execution of this function.
         break;
       default:
-        LOG(FATAL) << "unknown ddl type: " << to_string(query_handle->catalog_op_type());
+        LOG(WARNING) << "unknown ddl type: " <<
+            to_string(query_handle->catalog_op_type());
+        DCHECK(false);
+        return;  // Note: early return
+    }
+  } else if(query_handle->stmt_type() == TStmtType::UNKNOWN) {
+    if (query_handle->hs2_metadata_op()) {
+      VLOG_QUERY << "skipping enqueue of completed query '" <<
+          PrintId(query_handle->query_id()) << "' with type '" <<
+          query_handle->stmt_type() << "'";
+      return;  // Note: early return, query will not be added to the queue
     }
   }
 
@@ -246,6 +261,9 @@ void ImpalaServer::EnqueueCompletedQuery(const QueryHandle& query_handle,
       completed_queries_cv_.notify_all();
     }
   }
+
+  VLOG_QUERY << "enqueued completed '" << query_handle->stmt_type() << "' query '" <<
+      PrintId(query_handle->query_id()) << "'";
 } // ImpalaServer::EnqueueCompletedQuery
 
 void ImpalaServer::CompletedQueriesThread() {
