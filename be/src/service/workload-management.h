@@ -53,10 +53,14 @@ struct FieldDefinition {
   const std::string db_column_name;
   const TPrimitiveType::type db_column_type;
   const FieldParser parser;
+  const int16_t precision;
+  const int16_t scale;
 
   FieldDefinition(const std::string db_col_name, const TPrimitiveType::type db_col_type,
-      const FieldParser fp) : db_column_name(std::move(db_col_name)),
-      db_column_type(std::move(db_col_type)), parser(std::move(fp)) {}
+      const FieldParser fp, const int16_t precision = 0,
+      const int16_t scale = 0) : db_column_name(std::move(db_col_name)),
+      db_column_type(std::move(db_col_type)), parser(std::move(fp)),
+      precision(precision), scale(scale) {}
 }; // struct FieldDefinition
 
 /// This list is the main data structure for workload management. Each list entry

@@ -15,24 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-def assert_time_str(expected_str, actual_time_ns, msg, tolerance=0.005):
-  """Asserts a pretty printed time string matches a specific number of nanoseconds."""
+def assert_time_str(expected_str, actual_time_ms, msg, tolerance=0.005):
+  """Asserts a pretty printed time string matches a specific number of milliseconds."""
 
-  total_nanoseconds = convert_to_nanos(expected_str)
-  actual_time_ns = int(actual_time_ns)
+  total_ms = convert_to_milliseconds(expected_str)
+  actual_time_ms = float(actual_time_ms)
 
-  expected_min = total_nanoseconds - (total_nanoseconds * tolerance)
-  expected_max = total_nanoseconds + (total_nanoseconds * tolerance)
-  assert expected_min <= actual_time_ns <= expected_max, \
+  expected_min = total_ms - (total_ms * tolerance)
+  expected_max = total_ms + (total_ms * tolerance)
+  assert expected_min <= actual_time_ms <= expected_max, \
       "{0} -- expected: {1}, actual: {2}, calculated: {3}, tolerance: {4}" \
-      .format(msg, expected_str, actual_time_ns, total_nanoseconds, tolerance)
+      .format(msg, expected_str, actual_time_ms, total_ms, tolerance)
 
 
-def convert_to_nanos(time_str):
-  """Convert a pretty printed time string into integer nanoseconds."""
-  units = {'h': 3600 * 1e9, 'm': 60 * 1e9, 's': 1e9, 'ms': 1e6, 'us': 1e3, 'ns': 1}
+def convert_to_milliseconds(time_str):
+  """Convert a pretty printed time string into a float with up to three digits for the
+     decimal places."""
+  units = {'h': 3600000, 'm': 60000, 's': 1000, 'ms': 1, 'us': 1e-3, 'ns': 1e-6}
 
-  total_nanoseconds = 0
+  total_ms = 0.0
   current_number = ''
   current_unit = ''
 
@@ -40,7 +41,7 @@ def convert_to_nanos(time_str):
     if char.isdigit() or char == '.':
       if current_unit != '':
         if current_unit in units:
-          total_nanoseconds += int(float(current_number) * units[current_unit])
+          total_ms += float(current_number) * units[current_unit]
           current_number = ''
           current_unit = ''
         else:
@@ -52,6 +53,8 @@ def convert_to_nanos(time_str):
     else:
       raise ValueError("Invalid character in time string")
 
-  total_nanoseconds += int(float(current_number) * units[current_unit])
+  total_ms += float(current_number) * units[current_unit]
 
-  return total_nanoseconds
+  # The differences between round in Python 2 and Python 3 do not matter here.
+  # pylint: disable=round-builtin
+  return round(total_ms, 3)

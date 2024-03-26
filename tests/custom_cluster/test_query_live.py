@@ -82,7 +82,7 @@ class TestQueryLive(CustomClusterTestSuite):
     # query filtering
     result3 = self.execute_query(
         "select query_id from sys.impala_query_live "
-        "where total_time_ns > 0.0 order by start_time_utc")
+        "where total_time_ms > 0.0 order by start_time_utc")
     assert len(result3.data) == 4
     assert result1.query_id == result3.data[0]
     assert result2.query_id == result3.data[2]
@@ -184,7 +184,7 @@ class TestQueryLive(CustomClusterTestSuite):
     assert result.data[0] == result2.data[0]
 
     def remove_dynamic_fields(fields):
-      # Excludes QUERY_STATE, IMPALA_QUERY_END_STATE, QUERY_TYPE, TOTAL_TIME_NS, and
+      # Excludes QUERY_STATE, IMPALA_QUERY_END_STATE, QUERY_TYPE, TOTAL_TIME_MS, and
       # everything after QUERY_OPTS_CONFIG as they change over the course of compiling
       # and running the query.
       return fields[:10] + fields[13:15] + fields[16:17]
@@ -297,7 +297,7 @@ class TestQueryLive(CustomClusterTestSuite):
     logged = self.execute_query_expect_success(self.client,
         'select count(*) from functional.alltypes')
     self.cluster.get_first_impalad().service.wait_for_metric_value(
-        "impala-server.completed-queries.written", 1, 30, allow_greater=True)
+        "impala-server.completed-queries.written", 2, 30, allow_greater=True)
 
     query = """select query_id from
         (select query_id, start_time_utc from sys.impala_query_live live

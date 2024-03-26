@@ -22,6 +22,8 @@
 #include <gutil/strings/substitute.h>
 
 #include "gen-cpp/SystemTables_types.h"
+#include "runtime/decimal-value.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
@@ -44,6 +46,10 @@ namespace impala {
 
 static const string ERROR_MEM_LIMIT_EXCEEDED =
     "SystemTableScanNode::$0() failed to allocate $1 bytes.";
+
+// Constant declaring how to convert from micro and nano seconds to milliseconds.
+static constexpr double MICROS_TO_MILLIS = 1000;
+static constexpr double NANOS_TO_MILLIS = 1000000;
 
 Status SystemTableScanner::CreateScanner(RuntimeState* state, RuntimeProfile* profile,
     TSystemTableName::type table_name, std::unique_ptr<SystemTableScanner>* scanner) {
@@ -87,6 +93,23 @@ static void WriteBigIntSlot(int64_t value, void* slot) {
 
 static void WriteIntSlot(int32_t value, void* slot) {
   *reinterpret_cast<int32_t*>(slot) = value;
+}
+
+static void WriteDecimalSlot(
+    const ColumnType& type, double value, void* slot) {
+  bool overflow = false;
+  switch (type.GetByteSize()) {
+    case 4:
+      *reinterpret_cast<Decimal4Value*>(slot) =
+          Decimal4Value::FromDouble(type, value, false, &overflow);
+    case 8:
+      *reinterpret_cast<Decimal8Value*>(slot) =
+          Decimal8Value::FromDouble(type, value, false, &overflow);
+    case 16:
+      *reinterpret_cast<Decimal16Value*>(slot) =
+          Decimal16Value::FromDouble(type, value, false, &overflow);
+  }
+  DCHECK(!overflow);
 }
 
 QueryScanner::QueryScanner(RuntimeState* state, RuntimeProfile* profile)
@@ -138,10 +161,11 @@ Status QueryScanner::Open() {
   return Status::OK();
 }
 
-static void WriteEvent(const QueryStateExpanded& query, void* slot, QueryEvent name) {
+static void WriteEvent(const QueryStateExpanded& query, const SlotDescriptor* slot_desc,
+    void* slot, QueryEvent name) {
   const auto& event = query.events.find(name);
   DCHECK(event != query.events.end());
-  WriteBigIntSlot(event->second, slot);
+  WriteDecimalSlot(slot_desc->type(), event->second / NANOS_TO_MILLIS, slot);
 }
 
 Status QueryScanner::MaterializeNextTuple(
@@ -205,11 +229,11 @@ Status QueryScanner::MaterializeNextTuple(
       case TQueryTableColumn::START_TIME_UTC:
         WriteUnixTimestampSlot(record.start_time_us, slot);
         break;
-      case TQueryTableColumn::TOTAL_TIME_NS: {
+      case TQueryTableColumn::TOTAL_TIME_MS: {
         const int64_t end_time_us =
             record.end_time_us > 0 ? record.end_time_us : UnixMicros();
-        const int64_t duration_us = end_time_us - record.start_time_us;
-        WriteBigIntSlot(duration_us * 1000, slot);
+        double duration_us = (end_time_us - record.start_time_us) / MICROS_TO_MILLIS;
+        WriteDecimalSlot(slot_desc->type(), duration_us, slot);
         break;
       }
       case TQueryTableColumn::QUERY_OPTS_CONFIG:
@@ -262,41 +286,44 @@ Status QueryScanner::MaterializeNextTuple(
       case TQueryTableColumn::ROW_MATERIALIZATION_ROWS_PER_SEC:
         WriteBigIntSlot(query.row_materialization_rate, slot);
         break;
-      case TQueryTableColumn::ROW_MATERIALIZATION_TIME_NS:
-        WriteBigIntSlot(query.row_materialization_time, slot);
+      case TQueryTableColumn::ROW_MATERIALIZATION_TIME_MS:
+        WriteDecimalSlot(slot_desc->type(),
+            query.row_materialization_time / NANOS_TO_MILLIS, slot);
         break;
       case TQueryTableColumn::COMPRESSED_BYTES_SPILLED:
         WriteBigIntSlot(query.compressed_bytes_spilled, slot);
         break;
       case TQueryTableColumn::EVENT_PLANNING_FINISHED:
-        WriteEvent(query, slot, QueryEvent::PLANNING_FINISHED);
+        WriteEvent(query, slot_desc, slot, QueryEvent::PLANNING_FINISHED);
         break;
       case TQueryTableColumn::EVENT_SUBMIT_FOR_ADMISSION:
-        WriteEvent(query, slot, QueryEvent::SUBMIT_FOR_ADMISSION);
+        WriteEvent(query, slot_desc, slot, QueryEvent::SUBMIT_FOR_ADMISSION);
         break;
       case TQueryTableColumn::EVENT_COMPLETED_ADMISSION:
-        WriteEvent(query, slot, QueryEvent::COMPLETED_ADMISSION);
+        WriteEvent(query, slot_desc, slot, QueryEvent::COMPLETED_ADMISSION);
         break;
       case TQueryTableColumn::EVENT_ALL_BACKENDS_STARTED:
-        WriteEvent(query, slot, QueryEvent::ALL_BACKENDS_STARTED);
+        WriteEvent(query, slot_desc, slot, QueryEvent::ALL_BACKENDS_STARTED);
         break;
       case TQueryTableColumn::EVENT_ROWS_AVAILABLE:
-        WriteEvent(query, slot, QueryEvent::ROWS_AVAILABLE);
+        WriteEvent(query, slot_desc, slot, QueryEvent::ROWS_AVAILABLE);
         break;
       case TQueryTableColumn::EVENT_FIRST_ROW_FETCHED:
-        WriteEvent(query, slot, QueryEvent::FIRST_ROW_FETCHED);
+        WriteEvent(query, slot_desc, slot, QueryEvent::FIRST_ROW_FETCHED);
         break;
       case TQueryTableColumn::EVENT_LAST_ROW_FETCHED:
-        WriteEvent(query, slot, QueryEvent::LAST_ROW_FETCHED);
+        WriteEvent(query, slot_desc, slot, QueryEvent::LAST_ROW_FETCHED);
         break;
       case TQueryTableColumn::EVENT_UNREGISTER_QUERY:
-        WriteEvent(query, slot, QueryEvent::UNREGISTER_QUERY);
+        WriteEvent(query, slot_desc, slot, QueryEvent::UNREGISTER_QUERY);
         break;
-      case TQueryTableColumn::READ_IO_WAIT_TOTAL_NS:
-        WriteBigIntSlot(query.read_io_wait_time_total, slot);
+      case TQueryTableColumn::READ_IO_WAIT_TOTAL_MS:
+        WriteDecimalSlot(slot_desc->type(),
+            query.read_io_wait_time_total / NANOS_TO_MILLIS, slot);
         break;
-      case TQueryTableColumn::READ_IO_WAIT_MEAN_NS:
-        WriteBigIntSlot(query.read_io_wait_time_mean, slot);
+      case TQueryTableColumn::READ_IO_WAIT_MEAN_MS:
+        WriteDecimalSlot(slot_desc->type(),
+            query.read_io_wait_time_mean / NANOS_TO_MILLIS, slot);
         break;
       case TQueryTableColumn::BYTES_READ_CACHE_TOTAL:
         WriteBigIntSlot(query.bytes_read_cache_total, slot);

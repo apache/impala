@@ -106,7 +106,13 @@ static const Status SetupDbTable(InternalServer* server, const string& table_nam
   create_table_sql << "CREATE TABLE IF NOT EXISTS " << table_name << "(";
 
   for (const auto& field : FIELD_DEFINITIONS) {
-    create_table_sql << field.db_column_name << " " << field.db_column_type << ",";
+    create_table_sql << field.db_column_name << " " << field.db_column_type;
+
+    if (field.db_column_type == TPrimitiveType::DECIMAL) {
+      create_table_sql << "(" << field.precision << "," << field.scale << ")";
+    }
+
+    create_table_sql << ",";
   }
   create_table_sql.move_back();
 

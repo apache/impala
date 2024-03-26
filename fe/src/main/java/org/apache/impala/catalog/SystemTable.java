@@ -55,6 +55,11 @@ public final class SystemTable extends Table {
   private static final Map<String, TSystemTableName> SYSTEM_TABLE_NAME_MAP =
       ImmutableMap.of(QUERY_LIVE, TSystemTableName.QUERY_LIVE);
 
+  // Constants declaring how durations measured in milliseconds will be stored in the db.
+  // Must match constants with the same name declared in workload-management-fields.cc.
+  private static final int DURATION_DECIMAL_PRECISION = 18;
+  private static final int DURATION_DECIMAL_SCALE = 3;
+
   private SystemTable(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     super(msTable, db, name, owner);
@@ -65,24 +70,12 @@ public final class SystemTable extends Table {
     switch (column) {
       case START_TIME_UTC:
         return Type.TIMESTAMP;
-      case TOTAL_TIME_NS:
       case PER_HOST_MEM_ESTIMATE:
       case DEDICATED_COORD_MEM_ESTIMATE:
       case CLUSTER_MEMORY_ADMITTED:
       case NUM_ROWS_FETCHED:
       case ROW_MATERIALIZATION_ROWS_PER_SEC:
-      case ROW_MATERIALIZATION_TIME_NS:
       case COMPRESSED_BYTES_SPILLED:
-      case EVENT_PLANNING_FINISHED:
-      case EVENT_SUBMIT_FOR_ADMISSION:
-      case EVENT_COMPLETED_ADMISSION:
-      case EVENT_ALL_BACKENDS_STARTED:
-      case EVENT_ROWS_AVAILABLE:
-      case EVENT_FIRST_ROW_FETCHED:
-      case EVENT_LAST_ROW_FETCHED:
-      case EVENT_UNREGISTER_QUERY:
-      case READ_IO_WAIT_TOTAL_NS:
-      case READ_IO_WAIT_MEAN_NS:
       case BYTES_READ_CACHE_TOTAL:
       case BYTES_READ_TOTAL:
       case PERNODE_PEAK_MEM_MIN:
@@ -91,6 +84,20 @@ public final class SystemTable extends Table {
         return Type.BIGINT;
       case BACKENDS_COUNT:
         return Type.INT;
+      case TOTAL_TIME_MS:
+      case ROW_MATERIALIZATION_TIME_MS:
+      case EVENT_PLANNING_FINISHED:
+      case EVENT_SUBMIT_FOR_ADMISSION:
+      case EVENT_COMPLETED_ADMISSION:
+      case EVENT_ALL_BACKENDS_STARTED:
+      case EVENT_ROWS_AVAILABLE:
+      case EVENT_FIRST_ROW_FETCHED:
+      case EVENT_LAST_ROW_FETCHED:
+      case EVENT_UNREGISTER_QUERY:
+      case READ_IO_WAIT_TOTAL_MS:
+      case READ_IO_WAIT_MEAN_MS:
+        return ScalarType.createDecimalType(
+            DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE);
       default:
         return Type.STRING;
     }

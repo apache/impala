@@ -21,12 +21,11 @@ import re
 import requests
 
 from datetime import datetime
-from tests.util.assert_time import assert_time_str, convert_to_nanos
+from tests.util.assert_time import assert_time_str, convert_to_milliseconds
 from tests.util.memory import assert_byte_str, convert_to_bytes
 
 DEDICATED_COORD_SAFETY_BUFFER_BYTES = 104857600
 EXPECTED_QUERY_COLS = 49
-
 
 CLUSTER_ID = "CLUSTER_ID"
 QUERY_ID = "QUERY_ID"
@@ -43,7 +42,7 @@ IMPALA_QUERY_END_STATE = "IMPALA_QUERY_END_STATE"
 QUERY_TYPE = "QUERY_TYPE"
 NETWORK_ADDRESS = "NETWORK_ADDRESS"
 START_TIME_UTC = "START_TIME_UTC"
-TOTAL_TIME_NS = "TOTAL_TIME_NS"
+TOTAL_TIME_MS = "TOTAL_TIME_MS"
 QUERY_OPTS_CONFIG = "QUERY_OPTS_CONFIG"
 RESOURCE_POOL = "RESOURCE_POOL"
 PER_HOST_MEM_ESTIMATE = "PER_HOST_MEM_ESTIMATE"
@@ -57,7 +56,7 @@ EXECUTOR_GROUPS = "EXECUTOR_GROUPS"
 EXEC_SUMMARY = "EXEC_SUMMARY"
 NUM_ROWS_FETCHED = "NUM_ROWS_FETCHED"
 ROW_MATERIALIZATION_ROWS_PER_SEC = "ROW_MATERIALIZATION_ROWS_PER_SEC"
-ROW_MATERIALIZATION_TIME_NS = "ROW_MATERIALIZATION_TIME_NS"
+ROW_MATERIALIZATION_TIME_MS = "ROW_MATERIALIZATION_TIME_MS"
 COMPRESSED_BYTES_SPILLED = "COMPRESSED_BYTES_SPILLED"
 EVENT_PLANNING_FINISHED = "EVENT_PLANNING_FINISHED"
 EVENT_SUBMIT_FOR_ADMISSION = "EVENT_SUBMIT_FOR_ADMISSION"
@@ -67,8 +66,8 @@ EVENT_ROWS_AVAILABLE = "EVENT_ROWS_AVAILABLE"
 EVENT_FIRST_ROW_FETCHED = "EVENT_FIRST_ROW_FETCHED"
 EVENT_LAST_ROW_FETCHED = "EVENT_LAST_ROW_FETCHED"
 EVENT_UNREGISTER_QUERY = "EVENT_UNREGISTER_QUERY"
-READ_IO_WAIT_TOTAL_NS = "READ_IO_WAIT_TOTAL_NS"
-READ_IO_WAIT_MEAN_NS = "READ_IO_WAIT_MEAN_NS"
+READ_IO_WAIT_TOTAL_MS = "READ_IO_WAIT_TOTAL_MS"
+READ_IO_WAIT_MEAN_MS = "READ_IO_WAIT_MEAN_MS"
 BYTES_READ_CACHE_TOTAL = "BYTES_READ_CACHE_TOTAL"
 BYTES_READ_TOTAL = "BYTES_READ_TOTAL"
 PERNODE_PEAK_MEM_MIN = "PERNODE_PEAK_MEM_MIN"
@@ -77,6 +76,12 @@ PERNODE_PEAK_MEM_MEAN = "PERNODE_PEAK_MEM_MEAN"
 SQL = "SQL"
 PLAN = "PLAN"
 TABLES_QUERIED = "TABLES_QUERIED"
+
+
+def round_to_3(val):
+  # The differences between round in Python 2 and Python 3 do not matter here.
+  # pylint: disable=round-builtin
+  return round(val, 3)
 
 
 def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impalad=None,
@@ -262,12 +267,12 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
 
   # Query Duration (allow values that are within 1 second)
   index += 1
-  assert sql_results.column_labels[index] == TOTAL_TIME_NS
-  ret_data[TOTAL_TIME_NS] = data[index]
+  assert sql_results.column_labels[index] == TOTAL_TIME_MS
+  ret_data[TOTAL_TIME_MS] = data[index]
   duration = end_time_obj - start_time_obj
-  min_allowed = int(duration.total_seconds() * 1000000000) - 1
-  max_allowed = min_allowed + 2
-  assert min_allowed <= int(data[index]) <= max_allowed, "total time incorrect"
+  min_allowed = round_to_3(duration.total_seconds() * 1000 * 0.999)
+  max_allowed = round_to_3(duration.total_seconds() * 1000 * 1.001)
+  assert min_allowed <= float(data[index]) <= max_allowed, "total time incorrect"
 
   # Query Options Set By Configuration
   index += 1
@@ -467,8 +472,8 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
 
   # Row Materialization Time
   index += 1
-  assert sql_results.column_labels[index] == ROW_MATERIALIZATION_TIME_NS
-  ret_data[ROW_MATERIALIZATION_TIME_NS] = data[index]
+  assert sql_results.column_labels[index] == ROW_MATERIALIZATION_TIME_MS
+  ret_data[ROW_MATERIALIZATION_TIME_MS] = data[index]
   row_mat_tmr = re.search(r'\n\s+\-\s+RowMaterializationTimer:\s+(.*?)\n', profile_text)
   if query_state_value == "EXCEPTION":
     assert row_mat_tmr is None
@@ -477,7 +482,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
     assert row_mat_tmr.group(1) == "0.000ns", "row materialization timer incorrect"
   else:
     assert row_mat_tmr is not None
-    assert_time_str(row_mat_tmr.group(1), (int(data[index])),
+    assert_time_str(row_mat_tmr.group(1), data[index],
         "row materialization time incorrect")
 
   # Compressed Bytes Spilled
@@ -499,7 +504,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   assert sql_results.column_labels[index] == EVENT_PLANNING_FINISHED
   ret_data[EVENT_PLANNING_FINISHED] = data[index]
   if query_state_value == "EXCEPTION":
-    assert data[index] == "0", "planning finished event incorrect"
+    assert data[index] == "0.000", "planning finished event incorrect"
   else:
     event = re.search(r'\n\s+\-\s+Planning finished:\s+(\S+)', timeline)
     assert event is not None, "planning finished event missing"
@@ -510,7 +515,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   assert sql_results.column_labels[index] == EVENT_SUBMIT_FOR_ADMISSION
   ret_data[EVENT_SUBMIT_FOR_ADMISSION] = data[index]
   if query_state_value == "EXCEPTION" or query_type == "DDL":
-    assert data[index] == "0", "submit for admission event incorrect"
+    assert data[index] == "0.000", "submit for admission event incorrect"
   else:
     event = re.search(r'\n\s+\-\s+Submit for admission:\s+(\S+)', timeline)
     assert event is not None, "submit for admission event missing"
@@ -521,7 +526,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   assert sql_results.column_labels[index] == EVENT_COMPLETED_ADMISSION
   ret_data[EVENT_COMPLETED_ADMISSION] = data[index]
   if query_state_value == "EXCEPTION" or query_type == "DDL":
-    assert data[index] == "0", "completed admission event incorrect"
+    assert data[index] == "0.000", "completed admission event incorrect"
   else:
     event = re.search(r'\n\s+\-\s+Completed admission:\s+(\S+)', timeline)
     assert event is not None, "completed admission event missing"
@@ -532,7 +537,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   assert sql_results.column_labels[index] == EVENT_ALL_BACKENDS_STARTED
   ret_data[EVENT_ALL_BACKENDS_STARTED] = data[index]
   if query_state_value == "EXCEPTION" or query_type == "DDL":
-    assert data[index] == "0", "all backends started event incorrect"
+    assert data[index] == "0.000", "all backends started event incorrect"
   else:
     event = re.search(r'\n\s+\-\s+All \d+ execution backends \(\d+ fragment instances\)'
         r' started:\s+(\S+)', timeline)
@@ -544,7 +549,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   assert sql_results.column_labels[index] == EVENT_ROWS_AVAILABLE
   ret_data[EVENT_ROWS_AVAILABLE] = data[index]
   if query_state_value == "EXCEPTION" or query_type == "DML":
-    assert data[index] == "0", "rows available event incorrect"
+    assert data[index] == "0.000", "rows available event incorrect"
   else:
     event = re.search(r'\n\s+\-\s+Rows available:\s+(\S+)', timeline)
     assert event is not None, "rows available event missing"
@@ -555,7 +560,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   assert sql_results.column_labels[index] == EVENT_FIRST_ROW_FETCHED
   ret_data[EVENT_FIRST_ROW_FETCHED] = data[index]
   if query_state_value == "EXCEPTION" or query_type == "DDL" or query_type == "DML":
-    assert data[index] == "0", "first row fetched event incorrect"
+    assert data[index] == "0.000", "first row fetched event incorrect"
   else:
     event = re.search(r'\n\s+\-\s+First row fetched:\s+(\S+)', timeline)
     assert event is not None, "first row fetched event missing"
@@ -566,7 +571,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
   assert sql_results.column_labels[index] == EVENT_LAST_ROW_FETCHED
   ret_data[EVENT_LAST_ROW_FETCHED] = data[index]
   if query_state_value == "EXCEPTION" or query_type == "DDL":
-    assert data[index] == "0", "last row fetched event incorrect"
+    assert data[index] == "0.000", "last row fetched event incorrect"
   else:
     event = re.search(r'\n\s+\-\s+Last row fetched:\s+(\S+)', timeline)
     assert event is not None, "last row fetched event missing"
@@ -582,33 +587,33 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
 
   # Read IO Wait Total
   index += 1
-  assert sql_results.column_labels[index] == READ_IO_WAIT_TOTAL_NS
-  ret_data[READ_IO_WAIT_TOTAL_NS] = data[index]
+  assert sql_results.column_labels[index] == READ_IO_WAIT_TOTAL_MS
+  ret_data[READ_IO_WAIT_TOTAL_MS] = data[index]
   total_read_wait = 0
   if (query_state_value != "EXCEPTION" and query_type == "QUERY") or data[index] != "0":
     re_wait_time = re.compile(r'^\s+\-\s+ScannerIoWaitTime:\s+(.*?)$')
     read_waits = assert_scan_node_metrics(re_wait_time, profile_lines)
     for r in read_waits:
-      total_read_wait += int(convert_to_nanos(r))
+      total_read_wait += convert_to_milliseconds(r)
 
     tolerance = total_read_wait * 0.001
 
-    assert total_read_wait - tolerance <= int(data[index]) <= \
+    assert total_read_wait - tolerance <= float(data[index]) <= \
         total_read_wait + tolerance, "read io wait time total incorrect"
   else:
-    assert data[index] == "0"
+    assert data[index] == "0.000"
 
   # Read IO Wait Average
   index += 1
-  assert sql_results.column_labels[index] == READ_IO_WAIT_MEAN_NS
-  ret_data[READ_IO_WAIT_MEAN_NS] = data[index]
+  assert sql_results.column_labels[index] == READ_IO_WAIT_MEAN_MS
+  ret_data[READ_IO_WAIT_MEAN_MS] = data[index]
   if (query_state_value != "EXCEPTION" and query_type == "QUERY"
-      and len(read_waits) != 0) or data[index] != "0":
-    avg_read_wait = int(total_read_wait / len(read_waits))
-    assert avg_read_wait - tolerance <= int(data[index]) <= avg_read_wait + tolerance, \
+      and len(read_waits) != 0) or data[index] != "0.000":
+    avg_read_wait = round_to_3(float(total_read_wait / len(read_waits)))
+    assert avg_read_wait - tolerance <= float(data[index]) <= avg_read_wait + tolerance, \
         "read io wait time average incorrect"
   else:
-    assert data[index] == "0"
+    assert data[index] == "0.000"
 
   # Total Bytes Read From Cache
   index += 1
