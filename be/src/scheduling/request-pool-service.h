@@ -54,6 +54,10 @@ class RequestPoolService {
   /// is ignored.
   Status GetPoolConfig(const std::string& pool_name, TPoolConfig* pool_config);
 
+  /// Returns (in the output parameter) the list of groups for the given user.
+  Status GetHadoopGroups(const TGetHadoopGroupsRequest& request,
+      TGetHadoopGroupsResponse* response);
+
  private:
   /// Metric measuring the time ResolveRequestPool() takes, in milliseconds.
   StatsMetric<double>* resolve_pool_ms_metric_;
@@ -77,6 +81,7 @@ class RequestPoolService {
   jobject jni_request_pool_service_;
   jmethodID resolve_request_pool_id_;  // RequestPoolService.resolveRequestPool()
   jmethodID get_pool_config_id_;  // RequestPoolService.getPoolConfig()
+  jmethodID get_hadoop_groups_id_;  // RequestPoolService.getHadoopGroups()
   jmethodID ctor_;
 };
 

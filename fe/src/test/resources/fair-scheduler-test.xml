@@ -1,6 +1,18 @@
 <?xml version="1.0"?>
 <allocations>
   <queue name="root">
+    <userQueryLimit>
+      <user>userB</user>
+      <totalCount>6</totalCount>
+    </userQueryLimit>
+    <userQueryLimit>
+      <user>*</user>
+      <totalCount>10</totalCount>
+    </userQueryLimit>
+    <groupQueryLimit>
+      <group>group3</group>
+      <totalCount>5</totalCount>
+    </groupQueryLimit>
     <queue name="queueA">
       <aclSubmitApps>* </aclSubmitApps>
       <maxResources>1024 mb, 2 vcores</maxResources>
@@ -11,6 +23,28 @@
     <queue name="queueC">
       <aclSubmitApps>* </aclSubmitApps>
       <maxResources>1024 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="queueD">
+      <aclSubmitApps>userA,userB </aclSubmitApps>
+      <userQueryLimit>
+        <user>*</user>
+        <totalCount>3</totalCount>
+      </userQueryLimit>
+      <userQueryLimit>
+        <user>userA</user>
+        <user>userF</user>
+        <totalCount>2</totalCount>
+      </userQueryLimit>
+      <userQueryLimit>
+        <!-- test that whitespace is trimmed -->
+        <user> userG </user>
+        <totalCount> 101 </totalCount>
+      </userQueryLimit>
+      <groupQueryLimit>
+        <group>group1</group>
+        <group>group2</group>
+        <totalCount>1</totalCount>
+      </groupQueryLimit>
     </queue>
     <aclSubmitApps> </aclSubmitApps>
   </queue>

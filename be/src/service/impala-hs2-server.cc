@@ -478,29 +478,29 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
              << "<" << TNetworkAddressToString(state->network_address) << ">.";
 }
 
-void ImpalaServer::DecrementCount(
-    std::map<std::string, int64>& loads, const std::string& key) {
+int64_t ImpalaServer::DecrementCount(
+    std::map<std::string, int64_t>& loads, const std::string& key) {
   // Check if key is present as dereferencing the map will insert it.
   // FIXME C++20: use contains().
   if (!loads.count(key)) {
     string msg = Substitute("Missing key $0 when decrementing count", key);
     LOG(WARNING) << msg;
     DCHECK(false) << msg;
-    return;
+    return 0;
   }
-  int64& current_value = loads[key];
+  int64_t& current_value = loads[key];
   if (current_value == 1) {
     // Remove the entry from the map if the current_value will go to zero.
     loads.erase(key);
-    return;
+    return 0;
   }
   if (current_value < 1) {
     // Don't allow decrement below zero.
     string msg = Substitute("Attempt to decrement below zero with key $0 ", key);
     LOG(WARNING) << msg;
-    return;
+    return 0;
   }
-  loads[key]--;
+  return --loads[key];
 }
 
 void ImpalaServer::DecrementSessionCount(const string& user_name) {
@@ -515,7 +515,7 @@ Status ImpalaServer::IncrementAndCheckSessionCount(const string& user_name) {
     lock_guard<mutex> l(per_user_session_count_lock_);
     // Only check user limit if there is already a session for the user.
     if (per_user_session_count_map_.count(user_name)) {
-      int64 load = per_user_session_count_map_[user_name];
+      int64_t load = per_user_session_count_map_[user_name];
       if (load >= FLAGS_max_hs2_sessions_per_user) {
         const string& err_msg =
             Substitute("Number of sessions for user $0 exceeds coordinator limit $1",

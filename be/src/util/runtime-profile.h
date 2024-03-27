@@ -762,6 +762,7 @@ class RuntimeProfile : public RuntimeProfileBase {
 
  private:
   friend class AggregatedRuntimeProfile;
+  friend class AdmissionControllerTest;
 
   /// A set of bucket counters registered in this runtime profile.
   std::set<std::vector<Counter*>*> bucketing_counters_;

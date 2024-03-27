@@ -193,7 +193,7 @@ function renderGraph() {
   }
 }
 
-// Picks up all the elemets classified as memory and replaces it with pretty printed
+// Picks up all the elements classified as memory and replaces it with pretty printed
 // value.
 function formatMemoryColumns() {
   var cols = document.getElementsByClassName("memory");
@@ -411,6 +411,14 @@ Time since last statestore update containing admission control topic state (ms):
     <tr>
       <td>Time in queue (exponential moving average)</td>
       <td colspan='2'>{{wait_time_ms_ema}} ms</td>
+    </tr>
+    <tr>
+      <td>Users with queries queued or running on this coordinator (visible if pool has user quotas configured)</td>
+      <td colspan='2'>{{local_current_users}}</td>
+    </tr>
+    <tr>
+      <td>Users with queries queued or running, aggregated across coordinators (visible if pool has user quotas configured)</td>
+      <td colspan='2'>{{agg_current_users}}</td>
     </tr>
     <tr>
       <td colspan='3'>

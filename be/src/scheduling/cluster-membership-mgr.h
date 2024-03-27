@@ -290,6 +290,7 @@ class ClusterMembershipMgr {
 
   friend class impala::test::SchedulerWrapper;
   friend class ClusterMembershipMgrUnitTest_TestPopulateExpectedExecGroupSets_Test;
+  friend class AdmissionControllerTest;
 };
 
 /// Helper method to populate a thrift request object 'update_req' for cluster membership

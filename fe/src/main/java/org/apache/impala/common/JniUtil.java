@@ -30,6 +30,7 @@ import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
 import java.lang.management.ThreadInfo;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
@@ -380,5 +381,33 @@ public class JniUtil {
       sb.append(entry.getKey() + ":" + entry.getValue() + "\n");
     }
     return sb.toString();
+  }
+
+  /**
+   * Evaluate the groups that the user is in when injected groups are being used.
+   * @param flags input string which is the format of the backend
+   *     'injected_group_members_debug_only' flag
+   * @param username the username
+   * @return a list of group names
+   */
+  public static List<String> decodeInjectedGroups(String flags, String username) {
+    List<String> groups = new ArrayList<>();
+    if (flags == null || username == null) { return groups; }
+
+    for (String group : flags.split(";")) {
+      String[] parts = group.split(":");
+      if (parts.length != 2) {
+        throw new IllegalStateException(
+            "group " + group + " is malformed in injected groups string '" + flags + "'");
+      }
+      String groupName = parts[0];
+      for (String member : parts[1].split(",")) {
+        if (member.equals(username)) {
+          groups.add(groupName);
+          break; // Skip to the next group after finding the user.
+        }
+      }
+    }
+    return groups;
   }
 }

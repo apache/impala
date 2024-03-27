@@ -18,6 +18,7 @@
 #include "util/auth-util.h"
 
 #include <ostream>
+#include <regex>
 
 #include <boost/algorithm/string/classification.hpp>
 
@@ -45,6 +46,29 @@ const string& GetEffectiveUser(const TSessionState& session) {
     return session.delegated_user;
   }
   return session.connected_user;
+}
+
+Status GetEffectiveShortUser(const TSessionState& session, std::string* short_name) {
+  const string& effective_user = GetEffectiveUser(session);
+  if (IsKerberosEnabled() && (effective_user.find('@') != std::string::npos)) {
+    // Regex to match kerberos names, based on org.apache.hadoop.security.KerberosName.
+    static const std::regex kerberos_name("([^/@]*)(/([^/@]*))*@([^/@]*)");
+    std::smatch groups;
+    if (std::regex_match(effective_user, groups, kerberos_name)) {
+      DCHECK_GE(groups.size(), 2);
+      // The first group contains the name.
+      if (!groups[1].str().empty()) {
+        *short_name = groups[1].str();
+        return Status::OK();
+      }
+    }
+    stringstream ss;
+    ss << "Could not parse Kerberos name " << effective_user;
+    return Status::Expected(ss.str());
+  } else {
+    *short_name = effective_user;
+  }
+  return Status::OK();
 }
 
 const string& GetEffectiveUser(const ImpalaServer::SessionState& session) {

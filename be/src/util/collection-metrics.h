@@ -48,8 +48,9 @@ template <typename T>
 class SetMetric : public Metric {
  public:
   static SetMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
-      const std::set<T>& value) {
-    return metrics->RegisterMetric(new SetMetric(MetricDefs::Get(key), value));
+      const std::set<T>& value, const std::string& metric_def_arg = "") {
+    return metrics->RegisterMetric(
+        new SetMetric(MetricDefs::Get(key, metric_def_arg), value));
   }
 
   SetMetric(const TMetricDef& def, const std::set<T>& value)

@@ -97,7 +97,7 @@ enum class AdmissionOutcome {
 /// A pool may be configured to allow a maximum amount of memory resources to be
 /// 'reserved' by requests admitted to that pool. While Impala does not yet truly
 /// 'reserve' the memory at admission (i.e. Impala does not yet guarantee the memory for
-/// a request, it is still possible to overadmit such that multiple queries think they
+/// a request, it is still possible to over-admit such that multiple queries think they
 /// have reserved the same memory), the admission controller uses several metrics to
 /// estimate the available memory and admit only when it thinks the necessary memory is
 /// available. Future work will enable real reservations, but this is a much larger
@@ -151,10 +151,7 @@ enum class AdmissionOutcome {
 ///     there is no latency, but this does not account for memory from requests admitted
 ///     by other impalads).
 ///  c) Num Admitted: the number of queries that have been admitted and are therefore
-///     considered to be currently running. Note that there is currently no equivalent to
-///     the reserved memory reporting, i.e. hosts do not report the actual number of
-///     queries that are currently executing (IMPALA-8762). This prevents using multiple
-///     coordinators with executor groups.
+///     considered to be currently running.
 ///
 /// As described, both the 'reserved' and 'admitted' mem accounting mechanisms have
 /// different advantages and disadvantages. The 'reserved' mem accounting works well in
@@ -164,6 +161,27 @@ enum class AdmissionOutcome {
 /// making admission decisions, which works well when either relatively few coordinators
 /// are used or, if there is a wide distribution of requests across impalads, the rate of
 /// submission is low enough that new state is able to be updated by the statestore.
+///
+/// User Quotas:
+/// In addition to the checks described before, User Quotas can be configured to limit
+/// the number of concurrent queries that can be run by a user.
+///
+/// The User Model for User Quotas is implemented by rules in the fair-scheduler.xml
+/// configuration file. The rules can be set at the root level, or at the pool level.
+/// The root level rules and pool level rules must both be passed for a new query to be
+/// queued. The rules dictate a maximum number of queries that can run.
+///
+/// At the root level and at the pool level there are 3 types of rules. These rules have
+/// a precedence. The rules are evaluated in this order:
+///  1) Rules that specify a user name
+///  2) Rules that specify a group name
+///  3) Wildcard rules that match any user
+/// When evaluating rules at either the root level, or at the pool level, when a rule
+/// matches a user then there is no more evaluation done. So, for example, if there is a
+/// rule at the pool level about the specific user ‘sunil’, and a rule about the user
+/// group ‘workers’ (which group includes ‘sunil’), and if a query is submitted by
+/// sunil, then once the user-specific rule has been evaluated, the rule about the user
+/// group ‘workers’ is skipped.
 ///
 /// Releasing Queries:
 /// When queries complete they must be explicitly released from the admission controller
@@ -184,13 +202,13 @@ enum class AdmissionOutcome {
 /// resources released, regardless of any failures.
 /// There are a few failure cases to consider:
 /// - ReleaseQuery rpc fails: coordinators periodically send a list of registered query
-///   ids via a heartbeat rpc, allowing the admission contoller to clean up any queries
+///   ids via a heartbeat rpc, allowing the admission controller to clean up any queries
 ///   that are not in that list.
 /// - Coordinator fails: the admission control service uses the statestore to detect when
 ///   a coordinator has been removed from the cluster membership and releases all queries
 ///   that were running at that coordinator.
-/// - RelaseQueryBackends rpc fails: when ReleaseQuery is eventually called (as guaranteed
-///   by the above), it will automatically release any remaining backends.
+/// - ReleaseQueryBackends rpc fails: when ReleaseQuery is eventually called (as
+///   guaranteed by the above), it will automatically release any remaining backends.
 ///
 /// Releasing Backends releases the admitted memory used by that Backend and decrements
 /// the number of running queries on the host running that Backend. Releasing a query does
@@ -298,7 +316,7 @@ enum class AdmissionOutcome {
 /// and admit requests. Instead, we use a simple heuristic to try to dequeue a number of
 /// requests proportional to the number of requests that are waiting in each individual
 /// admission controller to the total number of requests queued across all admission
-/// controllers (i.e. impalads). This limits the amount of overadmission that may result
+/// controllers (i.e. impalads). This limits the amount of over-admission that may result
 /// from a large amount of resources becoming available at the same time. When there are
 /// requests queued in multiple pools on the same host, the admission controller simply
 /// iterates over the pools in pool_stats_ and attempts to dequeue from each. This is fine
@@ -410,7 +428,7 @@ class AdmissionController {
   std::vector<UniqueIdPB> CleanupQueriesForHost(
       const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB>& query_ids);
 
-  /// Relases the resources for any queries currently running on coordinators that do not
+  /// Releases the resources for any queries currently running on coordinators that do not
   /// appear in 'current_backends'. Called in response to statestore updates. Returns a
   /// map from the backend id of any coordinator detected to have failed to a list of
   /// queries that were released for that coordinator.
@@ -446,7 +464,7 @@ class AdmissionController {
   // currently registered backends.
   typedef std::unordered_map<std::string, THostStats> PerHostStats;
 
-  // Populates the input map with the per host memory reserved and admitted in the
+  // Populates the input map with the per-host memory reserved and admitted in the
   // following format: <host_address_str, pair<mem_reserved, mem_admitted>>.
   // Only used for populating the 'backends' debug page.
   void PopulatePerHostMemReservedAndAdmitted(PerHostStats* host_stats);
@@ -457,6 +475,14 @@ class AdmissionController {
   /// Caller must not hold 'admission_ctrl_lock_'.
   std::string GetStalenessDetail(const std::string& prefix,
       int64_t* ms_since_last_update = nullptr);
+
+  /// Holder class for parameters used with user quotas.
+  /// This is only valid if 'track_per_user' is true.
+  struct PerUserTracking {
+    const std::string& user;
+    bool was_queued;
+    bool track_per_user;
+  };
 
  private:
   class PoolStats;
@@ -511,6 +537,66 @@ class AdmissionController {
   /// executor groups).
   IntCounter* total_dequeue_failed_coordinator_limited_ = nullptr;
 
+  /// A typedef for a holder of per-user loads.
+  /// This matches the thrift-generated type of user_loads in TPoolStats.
+  /// There are a few helper functions for this type.
+  /// Key is user name, value is a count of queries.
+  typedef std::map<std::string, int64_t> UserLoads;
+
+  /// Helper function on UserLoads that increments the value associated with the given
+  /// key by 1, and returns the new value.
+  static int64_t IncrementCount(UserLoads& loads, const std::string& key);
+
+  /// Helper function on UserLoads that returns a dump of the contents of the object.
+  static std::string DebugString(const UserLoads& loads);
+
+  /// A Holder for aggregated per-user loads.
+  /// This is a wrapper around a UserLoads object.
+  class AggregatedUserLoads {
+   public:
+    AggregatedUserLoads() = default;
+
+    /// Insert a new key-value pair into the map.
+    void insert(const std::string& key, int64_t value);
+
+    /// Return the integer value corresponding to the given key, or 0 if the key does not
+    /// exist.
+    int64_t get(const std::string& key) const;
+
+    /// Increment the value associated with the given key by 1.
+    int64_t increment(const std::string& key);
+
+    /// Decrement the value associated with the given key by 1, and return the new value.
+    int64_t decrement(const std::string& key);
+
+    /// Return the number of keys. For testing only.
+    int64_t size() const;
+
+    /// Clear all values.
+    void clear();
+
+    /// Clear the value for a key.
+    void clear_key(const std::string& key);
+
+    /// Merge in loads from a UserLoads object.
+    void add_loads(const UserLoads& loads);
+
+    /// Export user names to a metrics set.
+    void export_users(SetMetric<std::string>* metrics) const;
+
+    /// Return a dump of the contents of the object
+    [[nodiscard]] std::string DebugString() const;
+
+    /// Return the underlying UserLoads object
+    [[nodiscard]] const UserLoads& get_user_loads() const { return loads_; }
+
+   private:
+    UserLoads loads_;
+
+    FRIEND_TEST(AdmissionControllerTest, AggregatedUserLoads);
+    friend class AdmissionControllerTest;
+  };
+
   /// Contains all per-pool statistics and metrics. Accessed via GetPoolStats().
   class PoolStats {
    public:
@@ -530,6 +616,7 @@ class AdmissionController {
       IntGauge* agg_num_running;
       IntGauge* agg_num_queued;
       IntGauge* agg_mem_reserved;
+      SetMetric<string>* agg_current_users;
       IntGauge* local_mem_admitted;
 
       /// The following mirror the current values of local_stats_.
@@ -538,6 +625,7 @@ class AdmissionController {
       IntGauge* local_num_queued;
       IntGauge* local_backend_mem_reserved;
       IntGauge* local_backend_mem_usage;
+      SetMetric<string>* local_current_users;
 
       /// Metrics exposing the pool settings.
       IntGauge* pool_max_mem_resources;
@@ -573,13 +661,20 @@ class AdmissionController {
 
     // ADMISSION LIFECYCLE METHODS
     /// Updates the pool stats when the request represented by 'state' is admitted.
-    void AdmitQueryAndMemory(const ScheduleState& state, bool is_trivial);
+    void AdmitQueryAndMemory(
+        const ScheduleState& state, bool is_trivial, PerUserTracking& per_user_tracking);
     /// Updates the pool stats except the memory admitted stat.
-    void ReleaseQuery(int64_t peak_mem_consumption, bool is_trivial);
+    /// The 'user' parameter is empty unless user quotas are configured.
+    void ReleaseQuery(
+        int64_t peak_mem_consumption, bool is_trivial, const std::string& user);
     /// Releases the specified memory from the pool stats.
     void ReleaseMem(int64_t mem_to_release);
     /// Updates the pool stats when the request represented by 'state' is queued.
     void Queue();
+    /// Increment per-user stats for a user.
+    void IncrementPerUser(const std::string& user);
+    /// Decrement per-user stats for a user.
+    void DecrementPerUser(const std::string& user);
     /// Updates the pool stats when the request represented by 'state is dequeued.
     void Dequeue(bool timed_out);
 
@@ -602,18 +697,19 @@ class AdmissionController {
     typedef boost::unordered_map<std::string, int64_t> HostMemMap;
 
     /// Called after updating local_stats_ and remote_stats_ to update the aggregate
-    /// values of agg_num_running_, agg_num_queued_, and agg_mem_reserved_. The in/out
+    /// values of agg_num_running_, agg_num_queued_, agg_mem_reserved_
+    /// and agg_user_loads_. The in/out
     /// parameter host_mem_reserved is a map from host id to memory reserved used to
     /// aggregate the mem reserved values across all pools for each host. Used by
     /// UpdateClusterAggregates() to update host_mem_reserved_; it provides the host
-    /// aggregates when called over all pools.
+    /// aggregates when called over all pools. Must hold admission_ctrl_lock_.
     void UpdateAggregates(HostMemMap* host_mem_reserved);
 
     const TPoolStats& local_stats() const { return local_stats_; }
 
     // A map from the id of a host to the TPoolStats about that host.
     typedef boost::unordered_map<std::string, TPoolStats> RemoteStatsMap;
-    const RemoteStatsMap& remote_stats() const { return  remote_stats_; }
+    const RemoteStatsMap& remote_stats() const { return remote_stats_; }
 
     /// Return the TPoolStats for a remote host in remote_stats_ if it can be found.
     /// Return nullptr otherwise.
@@ -641,6 +737,14 @@ class AdmissionController {
     /// average of wait time.
     void ResetInformationalStats();
 
+    /// Return the count of queries for the given user in the PoolStats object.
+    int64_t GetUserLoad(const string& user);
+
+    /// Return the embedded AggregatedUserLoads object that tracks per-user loads.
+    [[nodiscard]] AggregatedUserLoads& get_aggregated_user_loads() {
+      return agg_user_loads_;
+    }
+
     const std::string& name() const { return name_; }
 
     /// The max number of running trivial queries that can be allowed at the same time.
@@ -663,6 +767,11 @@ class AdmissionController {
     /// every host, i.e. the sum of all local_stats_.mem_reserved from all
     /// other hosts. Updated only by UpdateAggregates().
     int64_t agg_mem_reserved_;
+
+    // Aggregate (across all coordinators) per-user loads in this pool.
+    // Updated by UpdateAggregates(), and kept up to date by IncrementPerUser and
+    // DecrementPerUser().
+    AdmissionController::AggregatedUserLoads agg_user_loads_;
 
     /// Number of running trivial queries in this pool that have been admitted by this
     /// local coordinator. The purpose of it is to control the concurrency of running
@@ -712,16 +821,20 @@ class AdmissionController {
 
     // Append a string about the memory consumption part of a TPoolStats object to 'ss'.
     static void AppendStatsForConsumedMemory(
-      std::stringstream& ss, const TPoolStats& stats);
+        std::stringstream& ss, const TPoolStats& stats);
 
-    FRIEND_TEST(AdmissionControllerTest, Simple);
-    FRIEND_TEST(AdmissionControllerTest, PoolStats);
-    FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
+    FRIEND_TEST(AdmissionControllerTest, AggregatedUserLoads);
     FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestCount);
+    FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
+    FRIEND_TEST(AdmissionControllerTest, DequeueLoop);
     FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
+    FRIEND_TEST(AdmissionControllerTest, PoolStats);
     FRIEND_TEST(AdmissionControllerTest, QueryRejection);
+    FRIEND_TEST(AdmissionControllerTest, QuotaExamples);
+    FRIEND_TEST(AdmissionControllerTest, Simple);
     FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
     FRIEND_TEST(AdmissionControllerTest, EraseHostStats);
+    FRIEND_TEST(AdmissionControllerTest, UserAndGroupQuotas);
     friend class AdmissionControllerTest;
   };
 
@@ -730,20 +843,24 @@ class AdmissionController {
   // pools in a host. The string is composed of up to 5 sections, where
   // each section is about one pool describing the following: the top queries
   // and stats about all queries in the pool. The sum of all top queries
-  // in these secions is at most 5.
+  // in these sections is at most 5.
   std::string GetLogStringForTopNQueriesOnHost(const std::string& host_id);
 
   // Return a string reporting top 5 queries with most memory consumed among all
   // hosts in the pool. The string is composed of up to 5 sections, where
   // each is about one host describing the following: the top queries and
-  // and stats about them in the host. The sum of all top queries
-  // in these secions is at most 5.
+  // stats about them in the host. The sum of all top queries
+  // in these sections is at most 5.
   std::string GetLogStringForTopNQueriesInPool(const std::string& pool_name);
 
   /// Map of pool names to pool stats. Accessed via GetPoolStats().
   /// Protected by admission_ctrl_lock_.
   typedef boost::unordered_map<std::string, PoolStats> PoolStatsMap;
   PoolStatsMap pool_stats_;
+
+  /// User loads aggregated across all pools. Updated by UpdateClusterAggregates().
+  /// Protected by admission_ctrl_lock_.
+  AggregatedUserLoads root_agg_user_loads_;
 
   /// This struct groups together a schedule and the executor group that it was scheduled
   /// on. It is used to attempt admission without rescheduling the query in case the
@@ -793,6 +910,9 @@ class AdmissionController {
     /// Config of the pool this query will be scheduled on.
     string pool_name;
     TPoolConfig pool_cfg;
+
+    /// Config of the root pool this query will be scheduled on.
+    TPoolConfig root_cfg;
 
     /// END: Members that are valid for new objects after initialization
     /////////////////////////////////////////
@@ -876,12 +996,15 @@ class AdmissionController {
     /// The executor group this query was scheduled on.
     std::string executor_group;
 
-    /// Map from backend addresses to the resouces this query was allocated on them. When
+    /// Map from backend addresses to the resources this query was allocated on them. When
     /// backends are released, they are removed from this map.
     std::unordered_map<NetworkAddressPB, BackendAllocation> per_backend_resources;
 
     /// Indicate whether the query is admitted as a trivial query.
     bool is_trivial;
+
+    /// The effective user running the query. Set only if user quotas are configured.
+    std::string user;
   };
 
   /// Map from host id to a map from query id of currently running queries to information
@@ -917,21 +1040,21 @@ class AdmissionController {
   std::string request_queue_topic_name_;
 
   /// Resolves the resource pool name in 'query_ctx.request_pool' and stores the resulting
-  /// name in 'pool_name' and the resulting config in 'pool_config'.
-  Status ResolvePoolAndGetConfig(const TQueryCtx& query_ctx, std::string* pool_name,
-      TPoolConfig* pool_config);
+  /// name in 'pool_name' the resulting config in 'pool_config', and the
+  /// root config in 'root_config'.
+  Status ResolvePoolAndGetConfig(const TQueryCtx& query_ctx, string* pool_name,
+      TPoolConfig* pool_config, TPoolConfig* root_config);
 
   /// Statestore subscriber callback that sends outgoing topic deltas (see
-  /// AddPoolUpdates()) and processes incoming topic deltas, updating the PoolStats
-  /// state.
-  void UpdatePoolStats(
-      const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+  /// AddPoolAndPerHostStatsUpdates()) and processes incoming topic deltas, updating the
+  /// PoolStats state.
+  void UpdatePoolStats(const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   /// Adds outgoing topic updates to subscriber_topic_updates for pools that have changed
-  /// since the last call to AddPoolUpdates(). Also adds the complete local view of
-  /// per-host statistics. Called by UpdatePoolStats() before UpdateClusterAggregates().
-  /// Must hold admission_ctrl_lock_.
+  /// since the last call to AddPoolAndPerHostStatsUpdates(). Also adds the complete local
+  /// view of per-host statistics. Called by UpdatePoolStats() before
+  /// UpdateClusterAggregates(). Must hold admission_ctrl_lock_.
   void AddPoolAndPerHostStatsUpdates(std::vector<TTopicDelta>* subscriber_topic_updates);
 
   /// Updates the remote stats with per-host topic_updates coming from the statestore.
@@ -972,15 +1095,16 @@ class AdmissionController {
   /// method returns false and sets queue_node->not_admitted_reason.
   /// The is_trivial is set to true when is_trivial is not null if the query is admitted
   /// as a trivial query.
-  bool FindGroupToAdmitOrReject(
-      const ClusterMembershipMgr::SnapshotPtr& membership_snapshot,
-      const TPoolConfig& pool_config, bool admit_from_queue, PoolStats* pool_stats,
-      QueueNode* queue_node, bool& coordinator_resource_limited,
+  bool FindGroupToAdmitOrReject(ClusterMembershipMgr::SnapshotPtr& membership_snapshot,
+      const TPoolConfig& pool_config, const TPoolConfig& root_cfg, bool admit_from_queue,
+      PoolStats* pool_stats, QueueNode* queue_node, bool& coordinator_resource_limited,
       bool* is_trivial = nullptr);
 
   /// Dequeues the queued queries when notified by dequeue_cv_ and admits them if they
   /// have not been cancelled yet.
   void DequeueLoop();
+  /// Attempt to Dequeue a single query.
+  void TryDequeue();
 
   /// Returns true if schedule can be admitted to the pool with pool_cfg.
   /// admit_from_queue is true if attempting to admit from the queue. Otherwise, returns
@@ -990,8 +1114,16 @@ class AdmissionController {
   /// enough memory resources available for the query. Caller owns not_admitted_reason and
   /// not_admitted_details. Must hold admission_ctrl_lock_.
   bool CanAdmitRequest(const ScheduleState& state, const TPoolConfig& pool_cfg,
-      bool admit_from_queue, string* not_admitted_reason, string* not_admitted_details,
-      bool& coordinator_resource_limited);
+      const TPoolConfig& root_cfg, bool admit_from_queue, string* not_admitted_reason,
+      string* not_admitted_details, bool& coordinator_resource_limited);
+
+  /// Returns true if User Quotas allow the schedule to be admitted to the pool with
+  /// config 'pool_cfg' and root config 'root_cfg'.
+  /// If no quotas are configured then True is returned.
+  /// User and group Quotas are checked on the pool and the root pool.
+  /// Caller owns not_admitted_reason
+  bool CanAdmitQuota(const ScheduleState& state, const TPoolConfig& pool_cfg,
+      const TPoolConfig& root_cfg, string* not_admitted_reason);
 
   /// Returns true if the query can be admitted as a trivial query, therefore it can
   /// bypass the admission control immediately.
@@ -1033,7 +1165,8 @@ class AdmissionController {
   /// Updates the memory admitted and the num of queries running for each backend in
   /// 'state'. Also updates the stats of its associated resource pool. Used only when
   /// the 'state' is admitted.
-  void UpdateStatsOnAdmission(const ScheduleState& state, bool is_trivial);
+  void UpdateStatsOnAdmission(
+      const ScheduleState& state, bool is_trivial, PerUserTracking& per_user_tracking);
 
   /// Updates the memory admitted and the num of queries running for each backend in
   /// 'state' which have been release/completed. The list of completed backends is
@@ -1102,7 +1235,7 @@ class AdmissionController {
   /// Sets the per host mem limit and mem admitted in the schedule and does the necessary
   /// accounting and logging on successful submission.
   /// Caller must hold 'admission_ctrl_lock_'.
-  void AdmitQuery(QueueNode* node, bool was_queued, bool is_trivial);
+  void AdmitQuery(QueueNode* node, string& user, bool was_queued, bool is_trivial);
 
   /// Same as PoolToJson() but requires 'admission_ctrl_lock_' to be held by the caller.
   /// Is a helper method used by both PoolToJson() and AllPoolsToJson()
@@ -1145,6 +1278,30 @@ class AdmissionController {
   /// Returns the maximum number of requests that can be queued in the pool.
   static int64_t GetMaxQueuedForPool(const TPoolConfig& pool_config);
 
+  /// Return True if the pool configuration contains a User Quota.
+  static bool HasQuotaConfig(const TPoolConfig& pool_cfg);
+
+  /// Returns true if this query has sufficient user and group quotas in the specified
+  /// pool with config 'pool_cfg'.
+  /// Returns true if quotas are not configured.
+  /// Must hold admission_ctrl_lock_.
+  bool HasSufficientPoolQuotas(const string& user, const TPoolConfig& pool_cfg,
+      const string& pool_level, int64_t user_load, string* quota_exceeded_reason) const;
+
+  /// Check that the query will not exceed a per-user limit for the delegated user.
+  /// Returns True if there is sufficient quota or if no per-user quota is configured.
+  /// When a rule is evaluated, and passed, then *key_matched is set to True.
+  static bool HasSufficientUserQuota(const string& user, const TPoolConfig& pool_cfg,
+      const string& pool_name, int64_t user_load, string* quota_exceeded_reason,
+      bool use_wildcard, bool* key_matched);
+
+  /// Check that the query will not exceed a per-group limit for the delegated user.
+  /// Returns True if there is sufficient quota or if no per-group quota is configured.
+  /// When a rule is evaluated, and passed, then *key_matched is set to True.
+  bool HasSufficientGroupQuota(const string& user, const TPoolConfig& pool_cfg,
+      const string& pool_name, int64_t user_load, string* quota_exceeded_reason,
+      bool* key_matched) const;
+
   /// Returns available memory and slots of the executor group.
   const std::pair<int64_t, int64_t> GetAvailableMemAndSlots(
       const ExecutorGroup& group) const;
@@ -1159,10 +1316,6 @@ class AdmissionController {
 
   /// Returns the current size of the cluster.
   int64_t GetClusterSize(const ClusterMembershipMgr::Snapshot& membership_snapshot);
-
-  /// Returns the size of executor group 'group_name' in 'membership_snapshot'.
-  int64_t GetExecutorGroupSize(const ClusterMembershipMgr::Snapshot& membership_snapshot,
-      const std::string& group_name);
 
   /// Get the amount of memory to admit for the Backend with the given
   /// BackendScheduleState. This method may return different values depending on if the
@@ -1211,8 +1364,8 @@ class AdmissionController {
       std::vector<Item>& listOfTopNs, std::vector<int>& indices, int indent) const;
 
   // Report the topN queries in a string and append it to 'ss'. These queries are
-  // a subset of items in listOfTopNs whose indices are in 'indices'. One query Id
-  // together its mem consumed is reported per line. 'indent' provides the initial
+  // a subset of items in listOfTopNs whose indices are in 'indices'. One query id
+  // together with its mem consumed is reported per line. 'indent' provides the initial
   // value of indentation. 'total_mem_consumed' contains the total memory consumed,
   // from which a fraction of mem consumed by the topN queries can be reported.
   void ReportTopNQueriesAtIndices(std::stringstream& ss, std::vector<Item>& listOfTopNs,
@@ -1222,18 +1375,22 @@ class AdmissionController {
   void ReleaseQueryBackendsLocked(const UniqueIdPB& query_id, const UniqueIdPB& coord_id,
       const vector<NetworkAddressPB>& host_addr);
 
-  FRIEND_TEST(AdmissionControllerTest, Simple);
-  FRIEND_TEST(AdmissionControllerTest, PoolStats);
-  FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
+  FRIEND_TEST(AdmissionControllerTest, AggregatedUserLoads);
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestCount);
+  FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestSlots);
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestSlotsDefault);
-  FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
-  FRIEND_TEST(AdmissionControllerTest, QueryRejection);
-  FRIEND_TEST(AdmissionControllerTest, DedicatedCoordScheduleState);
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordAdmissionChecks);
+  FRIEND_TEST(AdmissionControllerTest, DedicatedCoordScheduleState);
+  FRIEND_TEST(AdmissionControllerTest, DequeueLoop);
+  FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
+  FRIEND_TEST(AdmissionControllerTest, PoolStats);
+  FRIEND_TEST(AdmissionControllerTest, QueryRejection);
+  FRIEND_TEST(AdmissionControllerTest, QuotaExamples);
+  FRIEND_TEST(AdmissionControllerTest, Simple);
   FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
   FRIEND_TEST(AdmissionControllerTest, EraseHostStats);
+  FRIEND_TEST(AdmissionControllerTest, UserAndGroupQuotas);
   friend class AdmissionControllerTest;
 };
 

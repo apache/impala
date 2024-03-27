@@ -545,4 +545,8 @@ public class BackendConfig {
   public boolean isCatalogdHAEnabled() {
     return backendCfg_.enable_catalogd_ha;
   }
+
+  public String getInjectedGroupMembersDebugOnly() {
+    return backendCfg_.injected_group_members_debug_only;
+  }
 }

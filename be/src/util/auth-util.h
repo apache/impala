@@ -41,6 +41,13 @@ const std::string& GetEffectiveUser(const TSessionState& session);
 /// Same behavior as the function above with different input parameter type.
 const std::string& GetEffectiveUser(const ImpalaServer::SessionState& session);
 
+/// Semantically the same as the above GetEffectiveUser(), but obtains the short form of
+/// the name. If Kerberos is enabled and the name is a Kerberos principal then it is
+/// mapped to a short username (e.g., the testuser in testuser/scm@EXAMPLE.COM).
+/// Fills a reference to the "effective user" from the specified session
+/// in 'short_name'.
+Status GetEffectiveShortUser(const TSessionState& session, std::string* short_name);
+
 /// Checks if 'user' can access the runtime profile or execution summary of a
 /// statement by comparing 'user' with the user that run the statement, 'effective_user',
 /// and checking if 'effective_user' is authorized to access the profile, as indicated by

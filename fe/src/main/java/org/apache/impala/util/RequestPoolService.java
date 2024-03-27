@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -68,7 +69,7 @@ import com.google.common.collect.Lists;
  * Yarn {@link AllocationFileLoaderService} and the Llama configuration uses a subclass of
  * the {@link FileWatchService}. There are two different mechanisms because there is
  * different parsing/configuration code for the allocation file and the Llama
- * configuration (which is a regular Hadoop conf file so it can use the
+ * configuration (which is a regular Hadoop conf file, so it can use the
  * {@link Configuration} class). start() and stop() will start/stop watching and reloading
  * both of these files.
  *
@@ -138,7 +139,7 @@ public class RequestPoolService {
   @VisibleForTesting
   final AllocationFileLoaderService allocLoader_;
 
-  // Provides access to the fair scheduler allocation file. An AtomicReference becaus it
+  // Provides access to the fair scheduler allocation file. An AtomicReference because it
   // is reset when the allocation configuration file changes and other threads access it.
   private final AtomicReference<AllocationConfiguration> allocationConf_;
 
@@ -369,6 +370,11 @@ public class RequestPoolService {
     long maxMemoryMb = allocationConf_.get().getMaxResources(pool).getMemory();
     result.setMax_mem_resources(
         maxMemoryMb == Integer.MAX_VALUE ? -1 : maxMemoryMb * ByteUnits.MEGABYTE);
+    Map<String, Integer> userQueryLimits = allocationConf_.get().getUserQueryLimits(pool);
+    result.setUser_query_limits(userQueryLimits);
+    Map<String, Integer> groupQueryLimits =
+        allocationConf_.get().getGroupQueryLimits(pool);
+    result.setGroup_query_limits(groupQueryLimits);
     if (conf_ == null) {
       result.setMax_requests(MAX_PLACED_RESERVATIONS_DEFAULT);
       result.setMax_queued(MAX_QUEUED_RESERVATIONS_DEFAULT);
@@ -404,12 +410,15 @@ public class RequestPoolService {
               + " max_queued={},  queue_timeout_ms={}, default_query_options={},"
               + " max_query_mem_limit={}, min_query_mem_limit={},"
               + " clamp_mem_limit_query_option={}, max_query_cpu_core_per_node_limit={},"
-              + " max_query_cpu_core_coordinator_limit={}",
+              + " max_query_cpu_core_coordinator_limit={}"
+              + " user_query_limits={}"
+              + " group_query_limits={}",
           pool, result.max_mem_resources, result.max_requests, result.max_queued,
           result.queue_timeout_ms, result.default_query_options,
           result.max_query_mem_limit, result.min_query_mem_limit,
           result.clamp_mem_limit_query_option, result.max_query_cpu_core_per_node_limit,
-          result.max_query_cpu_core_coordinator_limit);
+          result.max_query_cpu_core_coordinator_limit, result.user_query_limits,
+          result.group_query_limits);
     }
     return result;
   }

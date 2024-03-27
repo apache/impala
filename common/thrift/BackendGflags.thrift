@@ -314,4 +314,6 @@ struct TBackendGflags {
   141: required i64 data_stream_sender_buffer_size_used_by_planner
 
   142: required bool disable_reading_puffin_stats
+
+  143: required string injected_group_members_debug_only
 }

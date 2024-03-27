@@ -16,8 +16,11 @@
 // under the License.
 
 #include "testutil/gtest-util.h"
+#include "testutil/scoped-flag-setter.h"
 #include "common/init.h"
 #include "common/logging.h"
+#include "kudu/rpc/sasl_common.h"
+#include "kudu/security/init.h"
 #include "kudu/security/test/mini_kdc.h"
 #include "rpc/authentication.h"
 #include "rpc/authentication-util.h"
@@ -26,7 +29,6 @@
 #include "util/kudu-status-util.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
-#include "util/thread.h"
 
 #include <ldap.h>
 
@@ -314,6 +316,76 @@ TEST(Auth, GetXFFOriginClientAddress) {
   status = GetXFFOriginClientAddress(xff_addresses, origin);
   ASSERT_EQ(origin, "10.90.11.23");
   ASSERT_TRUE(status.ok());
+}
+
+// Checks that GetEffectiveUser() returns the expected values.
+void assertEffectiveUser(
+    const string& connected_user, const string& delegated_user, const string& expected) {
+  TSessionState session;
+  if (!connected_user.empty()) session.__set_connected_user(connected_user);
+  if (!delegated_user.empty()) session.__set_delegated_user(delegated_user);
+  ASSERT_EQ(GetEffectiveUser(session), expected);
+}
+
+// Checks that GetEffectiveShortUser() returns the expected values.
+void assertEffectiveShortUser(
+    const string& connected_user, const string& delegated_user, const string& expected) {
+  TSessionState session;
+  if (!connected_user.empty()) session.__set_connected_user(connected_user);
+  if (!delegated_user.empty()) session.__set_delegated_user(delegated_user);
+  string returned_user;
+  ASSERT_OK(GetEffectiveShortUser(session, &returned_user));
+  ASSERT_EQ(returned_user, expected)
+      << "connected=" << connected_user << " delegated=" << delegated_user;
+}
+
+// Unit test for GetEffectiveShortUser().
+TEST(Auth, UserUtilities) {
+  // Enable Kerberos so we can test kerberos names in GetEffectiveShortUser().
+  auto enable_kerberos =
+      ScopedFlagSetter<string>::Make(&FLAGS_principal, "service_name/_HOST@some.realm");
+
+  // Usernames that are not mutated by GetEffectiveShortUser().
+  const char* unchanged_usernames[] = {
+      "andrew", "andrew_sherman", "andrew-sherman", "Andrew"};
+  for (auto& name : unchanged_usernames) {
+    assertEffectiveUser(name, "", name);
+    assertEffectiveShortUser(name, "", name);
+  }
+
+  // Test GetEffectiveShortUser() maps Kerberos usernames to the expected short name.
+  std::pair<const char*, const char*> kerberos_name_mappings[] = {
+      {"impala@ROOT.COMOPS.SITE", "impala"},
+      {"changepw/kdc1.example.com@example.com", "changepw"},
+      {"krbtgt/EAST.EXAMPLE.COM@WEST.EXAMPLE.COM", "krbtgt"},
+      {"User1/admin/STAFF/employees@WEST.EXAMPLE.COM", "User1"},
+      {"employees@", "employees"}
+  };
+  for (const auto& pair : kerberos_name_mappings) {
+    assertEffectiveShortUser(pair.first, "", pair.second);
+  }
+
+  // Test GetEffectiveUser() logic.
+  assertEffectiveUser("connected1", "delegated1", "delegated1");
+  assertEffectiveUser("connected1", "", "connected1");
+  assertEffectiveUser("impala@ROOT.COMOPS.SITE", "", "impala@ROOT.COMOPS.SITE");
+
+  // Illegal kerberos user names.
+  // These all fail kudu::security::MapPrincipalToLocalName().
+  const char* illegal_kerberos_usernames[] = {
+      "buggy@EAST.EXAMPLE.COM/WEST.EXAMPLE.COM",
+      "two_ats@kdc1.example.com@EXAMPLE.COM",
+      "two_slash/kdc1.example.com@/EXAMPLE.COM",
+      "/User1/admin/STAFF/employees@WEST.EXAMPLE.COM",
+  };
+  for (auto& bad_name : illegal_kerberos_usernames) {
+    TSessionState session;
+    session.__set_connected_user(bad_name);
+    string unused;
+    stringstream ss;
+    ss << "Could not parse Kerberos name " << bad_name;
+    ASSERT_ERROR_MSG(GetEffectiveShortUser(session, &unused), ss.str());
+  }
 }
 
 }

@@ -131,6 +131,7 @@ DECLARE_int32(dbcp_max_conn_pool_size);
 DECLARE_int32(dbcp_max_wait_millis_for_conn);
 DECLARE_int32(dbcp_data_source_idle_timeout_s);
 DECLARE_bool(enable_catalogd_ha);
+DECLARE_string(injected_group_members_debug_only);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -500,6 +501,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_dbcp_data_source_idle_timeout(FLAGS_dbcp_data_source_idle_timeout_s);
   cfg.__set_data_stream_sender_buffer_size_used_by_planner(
       FLAGS_data_stream_sender_buffer_size_used_by_planner);
+  cfg.__set_injected_group_members_debug_only(FLAGS_injected_group_members_debug_only);
 #ifdef NDEBUG
   cfg.__set_is_release_build(true);
 #else

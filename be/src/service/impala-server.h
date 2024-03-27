@@ -716,9 +716,11 @@ class ImpalaServer : public ImpalaServiceIf,
     TQueryOptions QueryOptions();
   };
 
-  /// Helper function that decrements the value associated with the given key.
-  /// Removes the entry from the map if the value becomes zero.
-  static void DecrementCount(std::map<std::string, int64>& loads, const std::string& key);
+  /// Helper function that decrements the value associated with the given key, and
+  /// returns the new value. If the value becomes zero, then the entry is removed from
+  /// the map
+  static int64_t DecrementCount(
+      std::map<std::string, int64_t>& loads, const std::string& key);
 
  private:
   struct ExpirationEvent;
@@ -1438,7 +1440,7 @@ class ImpalaServer : public ImpalaServiceIf,
   std::mutex connection_to_sessions_map_lock_;
 
   /// A map from user to a count of sessions created by the user.
-  typedef std::map<std::string, int64> SessionCounts;
+  typedef std::map<std::string, int64_t> SessionCounts;
   SessionCounts per_user_session_count_map_;
 
   /// Protects per_user_session_count_map_. See "Locking" in the class comment for lock

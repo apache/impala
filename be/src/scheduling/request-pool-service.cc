@@ -17,24 +17,23 @@
 
 #include "scheduling/request-pool-service.h"
 
-#include <boost/algorithm/string.hpp>
-#include <boost/algorithm/string/join.hpp>
 #include <list>
 #include <string>
+
+#include <boost/algorithm/string/join.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "common/constant-strings.h"
 #include "common/logging.h"
+#include "common/names.h"
 #include "rpc/jni-thrift-util.h"
-#include "service/query-options.h"
 #include "util/auth-util.h"
+#include "util/backend-gflag-util.h"
 #include "util/collection-metrics.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/test-info.h"
 #include "util/time.h"
-
-#include "common/names.h"
 
 using namespace impala;
 
@@ -115,10 +114,12 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
 
   jmethodID start_id; // JniRequestPoolService.start(), only called in this method.
   JniMethodDescriptor methods[] = {
-      {"<init>", "(Ljava/lang/String;Ljava/lang/String;Z)V", &ctor_},
+      {"<init>", "([BLjava/lang/String;Ljava/lang/String;Z)V", &ctor_},
       {"start", "()V", &start_id},
       {"resolveRequestPool", "([B)[B", &resolve_request_pool_id_},
-      {"getPoolConfig", "([B)[B", &get_pool_config_id_}};
+      {"getPoolConfig", "([B)[B", &get_pool_config_id_},
+      {"getHadoopGroups", "([B)[B", &get_hadoop_groups_id_}
+  };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
   jni_request_pool_service_class_ =
@@ -130,6 +131,9 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
         JniUtil::LoadJniMethod(jni_env, jni_request_pool_service_class_, &(methods[i])));
   }
 
+  jbyteArray cfg_bytes;
+  ABORT_IF_ERROR(GetThriftBackendGFlagsForJNI(jni_env, &cfg_bytes));
+
   jstring fair_scheduler_config_path =
       jni_env->NewStringUTF(FLAGS_fair_scheduler_allocation_path.c_str());
   ABORT_IF_EXC(jni_env);
@@ -139,7 +143,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
 
   jboolean is_be_test = TestInfo::is_be_test();
   jobject jni_request_pool_service = jni_env->NewObject(jni_request_pool_service_class_,
-      ctor_, fair_scheduler_config_path, llama_site_path, is_be_test);
+      ctor_, cfg_bytes, fair_scheduler_config_path, llama_site_path, is_be_test);
   ABORT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(
       jni_env, jni_request_pool_service, &jni_request_pool_service_));
@@ -204,4 +208,10 @@ Status RequestPoolService::GetPoolConfig(const string& pool_name,
   if (FLAGS_disable_pool_max_requests) pool_config->__set_max_requests(-1);
   if (FLAGS_disable_pool_mem_limits) pool_config->__set_max_mem_resources(-1);
   return Status::OK();
+}
+
+Status RequestPoolService::GetHadoopGroups(
+    const TGetHadoopGroupsRequest& request, TGetHadoopGroupsResponse* response) {
+  return JniUtil::CallJniMethod(
+      jni_request_pool_service_, get_hadoop_groups_id_, request, response);
 }

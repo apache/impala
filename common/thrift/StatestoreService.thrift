@@ -77,6 +77,9 @@ struct TPoolStats {
   // a pool. These queries must be tracked by some query mem trackers. In comparison,
   // num_admitted_running tracks the number of queries admitted in a host.
   8: required i64 num_running;
+
+  // Per-user count of queries that are queued or running.
+  9: required map<string, i64> user_loads
 }
 
 struct THostStats {

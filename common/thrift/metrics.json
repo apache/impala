@@ -290,6 +290,16 @@
     "key": "admission-controller.agg-num-running.$0"
   },
   {
+    "description": "Resource Pool $0 Aggregate Users",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Aggregate Users",
+    "units": "NONE",
+    "kind": "SET",
+    "key": "admission-controller.agg-current-users.$0"
+  },
+  {
     "description": "Total number of requests admitted to pool $0",
     "contexts": [
       "RESOURCE_POOL"
@@ -368,6 +378,16 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "admission-controller.local-num-admitted-running.$0"
+  },
+  {
+    "description": "Resource Pool $0 Local Users",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Users",
+    "units": "NONE",
+    "kind": "SET",
+    "key": "admission-controller.local-current-users.$0"
   },
   {
     "description": "Total number of requests queued in pool $0",

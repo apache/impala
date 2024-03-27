@@ -19,10 +19,17 @@ package org.apache.impala.util;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TErrorCode;
+import org.apache.hadoop.security.Groups;
+import org.apache.impala.thrift.TGetHadoopGroupsRequest;
+import org.apache.impala.thrift.TGetHadoopGroupsResponse;
 import org.apache.impala.thrift.TPoolConfigParams;
 import org.apache.impala.thrift.TPoolConfig;
 import org.apache.impala.thrift.TResolveRequestPoolParams;
@@ -34,6 +41,10 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * JNI interface for RequestPoolService.
@@ -47,6 +58,10 @@ public class JniRequestPoolService {
   // A single instance is created by the backend and lasts the duration of the process.
   private final RequestPoolService requestPoolService_;
 
+
+  private static final Configuration CONF = new Configuration();
+  private static final Groups GROUPS = Groups.getUserToGroupsMappingService(CONF);
+
   /**
    * Creates a RequestPoolService instance with a configuration containing the specified
    * fair-scheduler.xml and llama-site.xml.
@@ -54,9 +69,13 @@ public class JniRequestPoolService {
    * @param fsAllocationPath path to the fair scheduler allocation file.
    * @param sitePath path to the configuration file.
    */
-  JniRequestPoolService(
-      final String fsAllocationPath, final String sitePath, boolean isBackendTest) {
+  public JniRequestPoolService(byte[] thriftBackendConfig, final String fsAllocationPath,
+      final String sitePath, boolean isBackendTest) throws ImpalaException {
     Preconditions.checkNotNull(fsAllocationPath);
+    TBackendGflags cfg = new TBackendGflags();
+    JniUtil.deserializeThrift(protocolFactory_, cfg, thriftBackendConfig);
+
+    BackendConfig.create(cfg, false);
     requestPoolService_ =
         RequestPoolService.getInstance(fsAllocationPath, sitePath, isBackendTest);
   }
@@ -108,5 +127,49 @@ public class JniRequestPoolService {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Returns the list of Hadoop groups for the given user name.
+   */
+  public static byte[] getHadoopGroupsInternal(byte[] serializedRequest)
+      throws ImpalaException {
+    TGetHadoopGroupsRequest request = new TGetHadoopGroupsRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
+    TGetHadoopGroupsResponse result = new TGetHadoopGroupsResponse();
+    String user  = request.getUser();
+    String injectedGroups = BackendConfig.INSTANCE.getInjectedGroupMembersDebugOnly();
+    if (StringUtils.isEmpty(injectedGroups)) {
+      try {
+        result.setGroups(GROUPS.getGroups(user));
+      } catch (IOException e) {
+        // HACK: https://issues.apache.org/jira/browse/HADOOP-15505
+        // There is no easy way to know if no groups found for a user
+        // other than reading the exception message.
+        if (e.getMessage().startsWith("No groups found for user")) {
+          result.setGroups(Collections.emptyList());
+        } else {
+          LOG.error("Error getting Hadoop groups for user: " + request.getUser(), e);
+          throw new InternalException(e.getMessage());
+        }
+      }
+    } else {
+      List<String> groups = JniUtil.decodeInjectedGroups(injectedGroups, user);
+      LOG.info("getHadoopGroups returns injected groups " + groups + " for user " + user);
+      result.setGroups(groups);
+    }
+    try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Returns the list of Hadoop groups for the given user name.
+   */
+  public byte[] getHadoopGroups(byte[] serializedRequest) throws ImpalaException {
+    return getHadoopGroupsInternal(serializedRequest);
   }
 }
