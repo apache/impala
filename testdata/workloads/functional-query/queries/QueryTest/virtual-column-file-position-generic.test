@@ -174,6 +174,7 @@ BIGINT,INT,INT,INT,STRING
 ---- QUERY
 # Regression test for IMPALA-12903. The following query uses dynamic pruning. The
 # surviving partitions have file formats that support virtual column FILE__POSITION.
+set RUNTIME_FILTER_WAIT_TIME_MS=30000;
 select straight_join lhs.file__position, lhs.year, lhs.month, lhs.id
 from functional.alltypesmixedformat lhs, functional.alltypes rhs
 where lhs.id = rhs.id and lhs.year = rhs.year and lhs.month = rhs.month and
