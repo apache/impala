@@ -1,0 +1,110 @@
+====
+---- QUERY: TPCDS-Q1-CPC-PLANNER-CPU-ASK
+-- This EE tests should match test cases in
+-- functional-planner/queries/PlannerTest/processing-cost-plan-admission-slots.test
+-- Any modification here should be applied there as well.
+--
+-- Expect a total of 16 admission slots given to this query if using PLANNER_CPU_ASK strategy.
+-- TODO: Figure out how to enable QUERYOPTIONS section for EE test. Currently, it is only
+-- work for FE Planner tests via TestFileParser.java.
+SET COMPUTE_PROCESSING_COST=True;
+SET SLOT_COUNT_STRATEGY=PLANNER_CPU_ASK;
+with customer_total_return as (
+  select sr_customer_sk as ctr_customer_sk,
+    sr_store_sk as ctr_store_sk,
+    sum(SR_RETURN_AMT) as ctr_total_return
+  from tpcds_partitioned_parquet_snap.store_returns,
+    tpcds_partitioned_parquet_snap.date_dim
+  where sr_returned_date_sk = d_date_sk
+  and d_year = 2000
+  group by sr_customer_sk, sr_store_sk
+) select c_customer_id
+from customer_total_return ctr1,
+  tpcds_partitioned_parquet_snap.store,
+  tpcds_partitioned_parquet_snap.customer
+where ctr1.ctr_total_return > (
+  select avg(ctr_total_return) * 1.2
+  from customer_total_return ctr2
+  where ctr1.ctr_store_sk = ctr2.ctr_store_sk)
+and s_store_sk = ctr1.ctr_store_sk
+and s_state = 'TN'
+and ctr1.ctr_customer_sk = c_customer_sk
+order by c_customer_id
+limit 100;
+---- RUNTIME_PROFILE
+aggregation(SUM, AdmissionSlots): 16
+row_regex: .* AvgAdmissionSlotsPerExecutor: 6 .*
+row_regex: .* Executor group 2 \(large\):.*
+row_regex: .* CpuAsk: 16 .*
+row_regex: .* EffectiveParallelism: 16 .*
+====
+---- QUERY: TPCDS-Q1-CPC-LARGEST-FRAGMENT
+-- Expect a total of 3 admission slots given to this query if using LARGEST_FRAGMENT strategy.
+-- AvgAdmissionSlotsPerExecutor counter should not exist in query profile.
+SET COMPUTE_PROCESSING_COST=True;
+SET SLOT_COUNT_STRATEGY=LARGEST_FRAGMENT;
+with customer_total_return as (
+  select sr_customer_sk as ctr_customer_sk,
+    sr_store_sk as ctr_store_sk,
+    sum(SR_RETURN_AMT) as ctr_total_return
+  from tpcds_partitioned_parquet_snap.store_returns,
+    tpcds_partitioned_parquet_snap.date_dim
+  where sr_returned_date_sk = d_date_sk
+  and d_year = 2000
+  group by sr_customer_sk, sr_store_sk
+) select c_customer_id
+from customer_total_return ctr1,
+  tpcds_partitioned_parquet_snap.store,
+  tpcds_partitioned_parquet_snap.customer
+where ctr1.ctr_total_return > (
+  select avg(ctr_total_return) * 1.2
+  from customer_total_return ctr2
+  where ctr1.ctr_store_sk = ctr2.ctr_store_sk)
+and s_store_sk = ctr1.ctr_store_sk
+and s_state = 'TN'
+and ctr1.ctr_customer_sk = c_customer_sk
+order by c_customer_id
+limit 100;
+---- RUNTIME_PROFILE
+aggregation(SUM, AdmissionSlots): 3
+!row_regex: .* AvgAdmissionSlotsPerExecutor: .*
+row_regex: .* Executor group 2 \(large\):.*
+row_regex: .* CpuAsk: 16 .*
+row_regex: .* EffectiveParallelism: 16 .*
+====
+---- QUERY: TPCDS-Q1-NO-CPC
+-- Expect a total of 3 admission slots given to this query if COMPUTE_PROCESSING_COST is disabled.
+-- Set MT_DOP=1 to keep query compiled in multi thread parallelism mode.
+-- Counters related to COMPUTE_PROCESSING_COST options should not exist in profile.
+-- It should still go to large executor group due to min memory requirement.
+SET COMPUTE_PROCESSING_COST=False;
+SET MT_DOP=1;
+with customer_total_return as (
+  select sr_customer_sk as ctr_customer_sk,
+    sr_store_sk as ctr_store_sk,
+    sum(SR_RETURN_AMT) as ctr_total_return
+  from tpcds_partitioned_parquet_snap.store_returns,
+    tpcds_partitioned_parquet_snap.date_dim
+  where sr_returned_date_sk = d_date_sk
+  and d_year = 2000
+  group by sr_customer_sk, sr_store_sk
+) select c_customer_id
+from customer_total_return ctr1,
+  tpcds_partitioned_parquet_snap.store,
+  tpcds_partitioned_parquet_snap.customer
+where ctr1.ctr_total_return > (
+  select avg(ctr_total_return) * 1.2
+  from customer_total_return ctr2
+  where ctr1.ctr_store_sk = ctr2.ctr_store_sk)
+and s_store_sk = ctr1.ctr_store_sk
+and s_state = 'TN'
+and ctr1.ctr_customer_sk = c_customer_sk
+order by c_customer_id
+limit 100;
+---- RUNTIME_PROFILE
+aggregation(SUM, AdmissionSlots): 3
+!row_regex: .* AvgAdmissionSlotsPerExecutor: .*
+row_regex: .* Executor group 2 \(large\):.*
+!row_regex: .* CpuAsk: .*
+!row_regex: .* EffectiveParallelism: .*
+====

@@ -637,7 +637,8 @@ TEST_F(AdmissionControllerTest, QueryRejection) {
   EXPECT_STR_CONTAINS(rejected_slots_reason,
       "number of admission control slots needed "
       "(16) on backend 'host1:25000' is greater than total slots available 4. Reduce "
-      "mt_dop to less than 4 to ensure that the query can execute.");
+      "MT_DOP or MAX_FRAGMENT_INSTANCES_PER_NODE to less than 4 to ensure that the "
+      "query can execute.");
   rejected_slots_reason = "";
   // Reduce mt_dop to ensure it can execute.
   SetHostsInScheduleState(

@@ -204,6 +204,7 @@ import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowStatsOp;
+import org.apache.impala.thrift.TSlotCountStrategy;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTruncateParams;
@@ -266,6 +267,8 @@ public class Frontend {
   private static final String MEMORY_ASK = "MemoryAsk";
   private static final String CPU_MAX = "CpuMax";
   private static final String CPU_ASK = "CpuAsk";
+  private static final String AVG_ADMISSION_SLOTS_PER_EXECUTOR =
+      "AvgAdmissionSlotsPerExecutor";
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -2329,6 +2332,17 @@ public class Frontend {
 
       if (matchFound) {
         setGroupNamePrefix(default_executor_group, clientSetRequestPool, req, group_set);
+        if (isComputeCost && req.query_exec_request != null
+            && queryOptions.slot_count_strategy == TSlotCountStrategy.PLANNER_CPU_ASK) {
+          // Use 'cores_requirement' instead of 'scaled_cores_requirement' since the
+          // former is derived from the real number of fragment instances.
+          int avgSlotsUsePerBackend =
+              getAvgSlotsUsePerBackend(req, cores_requirement, group_set);
+          FrontendProfile.getCurrent().setToCounter(
+              AVG_ADMISSION_SLOTS_PER_EXECUTOR, TUnit.UNIT, avgSlotsUsePerBackend);
+          req.query_exec_request.setMax_slot_per_executor(
+              group_set.getNum_cores_per_executor());
+        }
         break;
       }
 
@@ -2377,6 +2391,15 @@ public class Frontend {
     req.setUser_has_profile_access(planCtx.compilationState_.userHasProfileAccess());
 
     return req;
+  }
+
+  private static int getAvgSlotsUsePerBackend(
+      TExecRequest req, int cores_requirement, TExecutorGroupSet group_set) {
+    int numExecutors = expectedNumExecutor(group_set);
+    Preconditions.checkState(cores_requirement > 0);
+    Preconditions.checkState(numExecutors > 0);
+    int idealSlot = (int) Math.ceil((double) cores_requirement / numExecutors);
+    return Math.max(1, Math.min(idealSlot, group_set.getNum_cores_per_executor()));
   }
 
   private static void setGroupNamePrefix(boolean default_executor_group,

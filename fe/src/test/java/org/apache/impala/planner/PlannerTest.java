@@ -1448,6 +1448,17 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Test that shows query plan for the same test cases at EE test
+   * test_processing_cost.py::TestProcessingCost::test_admission_slots.
+   */
+  @Test
+  public void testProcessingCostPlanAdmissionSlots() {
+    TQueryOptions options = tpcdsParquetQueryOptions();
+    runPlannerTestFile("processing-cost-plan-admission-slots",
+        "tpcds_partitioned_parquet_snap", options, tpcdsParquetTestOptions());
+  }
+
+  /**
    * Test SELECTIVITY hints
    */
   @Test

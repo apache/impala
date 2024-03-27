@@ -1165,23 +1165,64 @@ void Scheduler::ComputeBackendExecParams(
   }
 
   // Compute 'slots_to_use' for each backend based on the max # of instances of
-  // any fragment on that backend.
+  // any fragment on that backend. If 'compute_processing_cost' is on, and Planner
+  // set 'max_slot_per_executor', pick the min between 'dominant_instance_count' and
+  // 'max_slot_per_executor'.
+  bool cap_slots = state->query_options().compute_processing_cost
+      && state->query_options().slot_count_strategy == TSlotCountStrategy::PLANNER_CPU_ASK
+      && state->request().__isset.max_slot_per_executor
+      && state->request().max_slot_per_executor > 0;
   for (auto& backend : state->per_backend_schedule_states()) {
-    int be_max_instances = 0;
+    int be_max_instances = 0; // max # of instances of any fragment.
+    int dominant_instance_count = 0; // sum of all dominant fragment instances.
+
     // Instances for a fragment are clustered together because of how the vector is
-    // constructed above. So we can compute the max # of instances of any fragment
-    // with a single pass over the vector.
+    // constructed above. For example, 3 fragments with 2 instances each will be in this
+    // order inside exec_params->instance_params() vector.
+    //   [F00_a, F00_b, F01_c, F01_d, F02_e, F02_f]
+    // So we can compute the max # of instances of any fragment with a single pass over
+    // the vector.
     int curr_fragment_idx = -1;
     int curr_instance_count = 0; // Number of instances of the current fragment seen.
+    bool is_dominant = false;
     for (auto& finstance : backend.second.exec_params->instance_params()) {
       if (curr_fragment_idx == -1 || curr_fragment_idx != finstance.fragment_idx()) {
+        // We arrived at new fragment group. Update 'be_max_instances'.
+        be_max_instances = max(be_max_instances, curr_instance_count);
+        // Reset 'curr_fragment_idx' and other counting related variables.
         curr_fragment_idx = finstance.fragment_idx();
         curr_instance_count = 0;
+        is_dominant =
+            state->GetFragmentScheduleState(curr_fragment_idx)->fragment.is_dominant;
       }
       ++curr_instance_count;
-      be_max_instances = max(be_max_instances, curr_instance_count);
+      if (is_dominant) ++dominant_instance_count;
     }
-    backend.second.exec_params->set_slots_to_use(be_max_instances);
+    // Update 'be_max_instances' one last time.
+    be_max_instances = max(be_max_instances, curr_instance_count);
+
+    // Default slots to use number from IMPALA-8998.
+    // For fragment with largest num of instances running in this backend, it
+    // ensures allocation of 1 slot for each instance of that fragment.
+    int slots_to_use = be_max_instances;
+
+    // Done looping exec_params->instance_params(). Derived 'slots_to_use' based on
+    // finalized 'be_max_instances' and 'dominant_instance_count'.
+    if (cap_slots) {
+      if (dominant_instance_count >= be_max_instances) {
+        // One case where it is possible to have 'dominant_instance_count' <
+        // 'be_max_instances' is with dedicated coordinator setup. The schedule would
+        // only assign one coordinator fragment instance to the coordinator node,
+        // but 'dominant_instance_count' can be 0 if fragment.is_dominant == false.
+        // In that case, ignore 'dominant_instance_count' and continue with
+        // 'be_max_instances'.
+        // However, if 'dominant_instance_count' >= 'be_max_instances',
+        // continue with 'dominant_instance_count'.
+        slots_to_use = dominant_instance_count;
+      }
+      slots_to_use = min(slots_to_use, state->request().max_slot_per_executor);
+    }
+    backend.second.exec_params->set_slots_to_use(slots_to_use);
   }
 
   // This also ensures an entry always exists for the coordinator backend.

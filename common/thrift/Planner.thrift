@@ -94,6 +94,11 @@ struct TPlanFragment {
   // If true, the fragment must be scheduled on the coordinator. In this case 'partition'
   // must be UNPARTITIONED.
   15: required bool is_coordinator_only
+
+  // Marker on whether this is a dominant fragment or not. Only possible to be true if
+  // COMPUTE_PROCESSING_COST=true. Otherwise, always false.
+  // See PlanFragment.java for definition of dominant fragment.
+  16: optional bool is_dominant = false
 }
 
 // location information for a single scan range

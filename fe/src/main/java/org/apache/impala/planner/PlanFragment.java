@@ -173,6 +173,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   private int thisTreeCpuCore_ = -1;
   private int subtreeCpuCore_ = -1;
 
+  // Determine whether this fragment is the dominant one in the plan tree based on
+  // calculation initiated by Planner.computeBlockingAwareCores().
+  // A fragment is dominant if it contribute towards the final CoreCount.
+  private boolean isDominantFragment_ = false;
+
   public long getProducedRuntimeFiltersMemReservationBytes() {
     return producedRuntimeFiltersMemReservationBytes_;
   }
@@ -636,6 +641,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     result.setThread_reservation(perInstanceResourceProfile_.getThreadReservation());
     result.setEffective_instance_count(getAdjustedInstanceCount());
     result.setIs_coordinator_only(coordinatorOnly_);
+    result.setIs_dominant(isDominantFragment_);
     return result;
   }
 
@@ -826,6 +832,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     planRoot_ = root;
     setFragmentInPlanTree(planRoot_);
   }
+  protected void markDominant() { isDominantFragment_ = true; }
 
   /**
    * Set the destination node of this fragment's sink, i.e. an ExchangeNode or a JoinNode.

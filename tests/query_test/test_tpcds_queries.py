@@ -24,6 +24,7 @@ from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfDockerizedCluster
 from tests.common.test_dimensions import (
+    add_mandatory_exec_option,
     create_single_exec_option_dimension,
     is_supported_insert_format)
 
@@ -39,7 +40,7 @@ class TestTpcdsQuery(ImpalaTestSuite):
         v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and
         v.get_value('table_format').compression_codec in ['none', 'snap'] and
         v.get_value('table_format').compression_type != 'record')
-    cls.ImpalaTestMatrix.add_mandatory_exec_option('decimal_v2', 0)
+    add_mandatory_exec_option(cls, 'decimal_v2', 0)
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only
@@ -754,8 +755,9 @@ class TestTpcdsQueryWithProcessingCost(TestTpcdsQuery):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTpcdsQueryWithProcessingCost, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_mandatory_exec_option('compute_processing_cost', 1)
-    cls.ImpalaTestMatrix.add_mandatory_exec_option('max_fragment_instances_per_node', 4)
+    add_mandatory_exec_option(cls, 'compute_processing_cost', 1)
+    add_mandatory_exec_option(cls, 'max_fragment_instances_per_node', 4)
+    add_mandatory_exec_option(cls, 'slot_count_strategy', 'planner_cpu_ask')
 
   def test_tpcds_q51a(self, vector):
     """Reduce max_fragment_instances_per_node to lower memory requirement."""

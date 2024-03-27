@@ -19,10 +19,10 @@ package org.apache.impala.planner;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import org.apache.impala.common.Id;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -39,28 +39,59 @@ public class CoreCount {
   // List of CPU core count contributing to this CoreCount.
   private final ImmutableList<Integer> counts_;
 
-  // Sum of all elements in count_.
-  // Cached after the first call of total().
-  private int total_ = -1;
+  // Set of unique fragment that contributes toward this CoreCount.
+  private final ImmutableSet<PlanFragmentId> uniqueFragmentIds_;
 
-  public CoreCount(Id id, int count) {
+  // True if this CoreCount include a plan root sink.
+  private final boolean hasPlanRootSink_;
+
+  // Sum of all elements in count_.
+  private final int total_;
+
+  public CoreCount(PlanFragment fragment, int count) {
     Preconditions.checkArgument(count >= 0, "Core count must be a non-negative number");
-    ids_ = ImmutableList.of(id);
+    ids_ = ImmutableList.of(fragment.getId());
     counts_ = ImmutableList.of(count);
+    uniqueFragmentIds_ = ImmutableSet.of(fragment.getId());
+    hasPlanRootSink_ = (fragment.getSink() instanceof PlanRootSink);
+    total_ = counts_.stream().mapToInt(v -> v).sum();
   }
 
-  private CoreCount(ImmutableList<Id> ids, ImmutableList<Integer> counts) {
+  public CoreCount(PlanNode node, int count) {
+    Preconditions.checkArgument(count >= 0, "Core count must be a non-negative number");
+    ids_ = ImmutableList.of(node.getId());
+    counts_ = ImmutableList.of(count);
+    PlanFragment fragment = node.getFragment();
+    uniqueFragmentIds_ = ImmutableSet.of(fragment.getId());
+    hasPlanRootSink_ = false;
+    total_ = counts_.stream().mapToInt(v -> v).sum();
+  }
+
+  private CoreCount(ImmutableList<Id> ids, ImmutableList<Integer> counts,
+      ImmutableSet<PlanFragmentId> uniqueFragments, boolean hasPlanRootSink) {
     Preconditions.checkArgument(
         ids.size() == counts.size(), "ids and counts must have same size!");
     ids_ = ids;
     counts_ = counts;
+    uniqueFragmentIds_ = uniqueFragments;
+    hasPlanRootSink_ = hasPlanRootSink;
+    total_ = counts_.stream().mapToInt(v -> v).sum();
   }
 
-  public int total() {
-    if (total_ < 0) {
-      total_ = counts_.stream().mapToInt(v -> v).sum();
-    }
-    return total_;
+  public int total() { return total_; }
+  public boolean hasCoordinator() { return hasPlanRootSink_; }
+
+  /**
+   * If this CoreCount has coordinator fragment in it, return total() - 1.
+   * Otherwise, return the same value as total().
+   */
+  public int totalWithoutCoordinator() { return total_ - (hasPlanRootSink_ ? 1 : 0); }
+
+  /**
+   * Return a set of PlanFragmentId that contribute toward this CoreCount.
+   */
+  public ImmutableSet<PlanFragmentId> getUniqueFragmentIds() {
+    return uniqueFragmentIds_;
   }
 
   @Override
@@ -85,26 +116,28 @@ public class CoreCount {
   protected static CoreCount sum(List<CoreCount> cores) {
     ImmutableList.Builder<Id> idBuilder = new ImmutableList.Builder<Id>();
     ImmutableList.Builder<Integer> countBuilder = new ImmutableList.Builder<Integer>();
+    ImmutableSet.Builder<PlanFragmentId> fragmentIdBuilder =
+        new ImmutableSet.Builder<PlanFragmentId>();
+    boolean hasPlanRootSink = false;
     for (CoreCount coreRequirement : cores) {
       idBuilder.addAll(coreRequirement.ids_);
       countBuilder.addAll(coreRequirement.counts_);
+      fragmentIdBuilder.addAll(coreRequirement.uniqueFragmentIds_);
+      hasPlanRootSink |= coreRequirement.hasPlanRootSink_;
     }
-    return new CoreCount(idBuilder.build(), countBuilder.build());
+    return new CoreCount(idBuilder.build(), countBuilder.build(),
+        fragmentIdBuilder.build(), hasPlanRootSink);
   }
 
   protected static CoreCount sum(CoreCount core1, CoreCount core2) {
-    ImmutableList.Builder<Id> idBuilder = new ImmutableList.Builder<Id>();
-    ImmutableList.Builder<Integer> countBuilder = new ImmutableList.Builder<Integer>();
-
-    idBuilder.addAll(core1.ids_);
-    idBuilder.addAll(core2.ids_);
-    countBuilder.addAll(core1.counts_);
-    countBuilder.addAll(core2.counts_);
-
-    return new CoreCount(idBuilder.build(), countBuilder.build());
+    return sum(ImmutableList.of(core1, core2));
   }
 
   protected static CoreCount max(CoreCount core1, CoreCount core2) {
-    return (core1.total() < core2.total()) ? core2 : core1;
+    if (core1.totalWithoutCoordinator() < core2.totalWithoutCoordinator()) {
+      return core2;
+    } else {
+      return core1;
+    }
   }
 }

@@ -930,6 +930,11 @@ enum TImpalaQueryOptions {
   //   RUNTIME_FILTER_IDS_TO_SKIP="1,2,3"
   // If using impala-shell client, double quote is not required.
   RUNTIME_FILTER_IDS_TO_SKIP = 176
+
+  // Decide what strategy to use to compute number of slot per node to run a query.
+  // Default to number of instances of largest query fragment (LARGEST_FRAGMENT).
+  // See TSlotCountStrategy in Query.thrift for documentation of its possible values.
+  SLOT_COUNT_STRATEGY = 177
 }
 
 // The summary of a DML statement.
