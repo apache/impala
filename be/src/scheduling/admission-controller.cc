@@ -212,8 +212,8 @@ const string REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION =
     "profile for more information about the per-node memory requirements.";
 const string REASON_NOT_ENOUGH_SLOTS_ON_BACKEND =
     "number of admission control slots needed ($0) on backend '$1' is greater than total "
-    "slots available $2. Reduce mt_dop to less than $2 to ensure that the query can "
-    "execute.";
+    "slots available $2. Reduce MT_DOP or MAX_FRAGMENT_INSTANCES_PER_NODE to less than "
+    "$2 to ensure that the query can execute.";
 const string REASON_MIN_RESERVATION_OVER_POOL_MEM =
     "minimum memory reservation needed is greater than pool max mem resources. Pool "
     "max mem resources: $0. Cluster-wide memory reservation needed: $1. Increase the "

@@ -117,6 +117,24 @@ enum TCodeGenOptLevel {
   O3
 }
 
+// Option to decide how to compute slots_to_use for a query.
+// See Scheduler::ComputeBackendExecParams.
+enum TSlotCountStrategy {
+  // Compute slots to use for each backend based on the max number of instances of any
+  // fragment on that backend. This is the default and only strategy available if
+  // COMPUTE_PROCESSING_COST option is disabled. See IMPALA-8998.
+  LARGEST_FRAGMENT = 0,
+
+  // Compute slots to use for each backend based on CpuAsk counter from Planner.
+  // The CpuAsk is the largest sum of fragments instances subset that can run in-parallel
+  // without waiting for each other. This strategy relies on blocking operator analysis
+  // that is only available if COMPUTE_PROCESSING_COST option is enabled, and will
+  // schedule more or equal admission control slots than the LARGEST_FRAGMENT strategy.
+  // The scheduler will silently ignore this choice and fallback to LARGEST_FRAGMENT if
+  // COMPUTE_PROCESSING_COST is disabled.
+  PLANNER_CPU_ASK = 1
+}
+
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
 const i32 NUM_NODES_ALL_RACKS = -1
@@ -705,6 +723,10 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   177: optional set<i32> runtime_filter_ids_to_skip
+
+  // See comment in ImpalaService.thrift
+  178: optional TSlotCountStrategy slot_count_strategy =
+    TSlotCountStrategy.LARGEST_FRAGMENT
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
@@ -997,10 +1019,9 @@ struct TQueryExecRequest {
   // Indicate whether the request is a trivial query. Used by admission control.
   13: optional bool is_trivial_query
 
-  // CPU core count required to run the query. Used by admission control to decide which
-  // executor group to run the query. Non-positive value means no specific CPU core count
-  // is required.
-  14: optional i32 cores_required;
+  // CPU core count required to run the query. Used by Frontend to decide which
+  // executor group to run the query. Should either unset or set with positive value.
+  14: optional i32 cores_required
 
   // Estimated per-host memory. The planner generates this value which may or may not be
   // overridden to come up with a final per-host memory estimate.
@@ -1008,5 +1029,9 @@ struct TQueryExecRequest {
 
   // Used for system tables that need to run on all nodes.
   16: optional bool include_all_coordinators
+
+  // Maximum admission control slot to use per executor backend.
+  // Only set if COMPUTE_PROCESSING_COST option is True.
+  17: optional i32 max_slot_per_executor
 }
 

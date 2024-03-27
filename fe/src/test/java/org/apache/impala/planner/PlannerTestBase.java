@@ -70,6 +70,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TReplicaPreference;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
+import org.apache.impala.thrift.TSlotCountStrategy;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTupleDescriptor;
@@ -426,6 +427,7 @@ public class PlannerTestBase extends FrontendTestBase {
         .setCompute_processing_cost(true)
         .setMax_fragment_instances_per_node(12)
         .setReplica_preference(TReplicaPreference.REMOTE)
+        .setSlot_count_strategy(TSlotCountStrategy.PLANNER_CPU_ASK)
         .setPlanner_testcase_mode(true);
   }
 

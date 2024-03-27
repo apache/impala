@@ -19,8 +19,10 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Collectors;
 
@@ -54,7 +56,6 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
-import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
@@ -566,10 +567,25 @@ public class Planner {
 
     computeEffectiveParallelism(postOrderFragments,
         rootAnalyzer.getMinParallelismPerNode(), rootAnalyzer.getMaxParallelismPerNode());
-    CoreCount effectiveCores = computeBlockingAwareCores(postOrderFragments);
-    request.setCores_required(effectiveCores.total());
 
-    LOG.info("CoreCount=" + effectiveCores);
+    // Count bounded core count. This is taken from final instance count from previous
+    // step.
+    CoreCount boundedCores = computeBlockingAwareCores(postOrderFragments);
+    Set<PlanFragmentId> dominantFragmentIds =
+        new HashSet<>(boundedCores.getUniqueFragmentIds());
+    int coresRequired = Math.max(1, boundedCores.totalWithoutCoordinator());
+    if (boundedCores.hasCoordinator()) {
+      // exclude coordinator fragment from dominantFragmentIds.
+      dominantFragmentIds.remove(rootFragment.getId());
+    }
+    request.setCores_required(coresRequired);
+    LOG.info("CoreCount=" + boundedCores + ", coresRequired=" + coresRequired);
+
+    // Mark dominant fragment. This will be used by scheduler in scheduler.cc to count
+    // admission slot requirement.
+    for (PlanFragment fragment : postOrderFragments) {
+      if (dominantFragmentIds.contains(fragment.getId())) fragment.markDominant();
+    }
   }
 
   /**

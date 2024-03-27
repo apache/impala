@@ -77,6 +77,16 @@ public class CostingSegment extends TreeNode<CostingSegment> {
     }
   }
 
+  private CoreCount createCoreCount() {
+    if (isOutputSegment()) {
+      return new CoreCount(sink_.getFragment(), cost_.getNumInstancesExpected());
+    } else {
+      Preconditions.checkState(!nodes_.isEmpty());
+      PlanNode topNode = nodes_.get(nodes_.size() - 1);
+      return new CoreCount(topNode, cost_.getNumInstancesExpected());
+    }
+  }
+
   private void appendCost(ProcessingCost additionalCost) {
     Preconditions.checkArgument(additionalCost.isValid());
     ProcessingCost newTotalCost = ProcessingCost.sumCost(additionalCost, cost_);
@@ -106,7 +116,7 @@ public class CostingSegment extends TreeNode<CostingSegment> {
   protected CoreCount traverseBlockingAwareCores(
       Map<PlanFragmentId, Pair<CoreCount, List<CoreCount>>> fragmentCoreState,
       ImmutableList.Builder<CoreCount> subtreeCoreBuilder) {
-    CoreCount segmentCore = new CoreCount(getRootId(), cost_.getNumInstancesExpected());
+    CoreCount segmentCore = createCoreCount();
     // If not in input segment, gather cost of children first.
     for (CostingSegment childSegment : getChildren()) {
       CoreCount childSegmentCores =
