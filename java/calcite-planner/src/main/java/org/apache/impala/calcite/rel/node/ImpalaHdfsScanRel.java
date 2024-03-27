@@ -129,4 +129,9 @@ public class ImpalaHdfsScanRel extends TableScan
     }
     return inputRefFieldNames;
   }
+
+  @Override
+  public RelNodeType relNodeType() {
+    return RelNodeType.HDFSSCAN;
+  }
 }

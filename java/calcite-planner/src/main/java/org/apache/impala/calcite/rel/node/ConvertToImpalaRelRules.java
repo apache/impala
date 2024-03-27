@@ -19,10 +19,11 @@ package org.apache.impala.calcite.rel.node;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalTableScan;
+import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.logical.LogicalValues;
 
 /**
  * ConvertToImpalaRelRules.  Contains the rules used to change the Calcite RelNodes
@@ -66,6 +67,32 @@ public class ConvertToImpalaRelRules {
     public void onMatch(RelOptRuleCall call) {
       final LogicalTableScan scan = call.rel(0);
       call.transformTo(new ImpalaHdfsScanRel(scan));
+    }
+  }
+
+  public static class ImpalaUnionRule extends RelOptRule {
+
+    public ImpalaUnionRule() {
+      super(operand(LogicalUnion.class, any()));
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      final LogicalUnion union = call.rel(0);
+      call.transformTo(new ImpalaUnionRel(union));
+    }
+  }
+
+  public static class ImpalaValuesRule extends RelOptRule {
+
+    public ImpalaValuesRule() {
+      super(operand(LogicalValues.class, none()));
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      final LogicalValues values = call.rel(0);
+      call.transformTo(new ImpalaValuesRel(values));
     }
   }
 

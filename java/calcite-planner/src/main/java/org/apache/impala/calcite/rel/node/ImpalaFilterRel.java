@@ -99,4 +99,9 @@ public class ImpalaFilterRel extends Filter
     List<RexNode> conditions = ImmutableList.of(previousCondition, newCondition);
     return RexUtil.composeConjunction(getCluster().getRexBuilder(), conditions);
   }
+
+  @Override
+  public RelNodeType relNodeType() {
+    return RelNodeType.FILTER;
+  }
 }

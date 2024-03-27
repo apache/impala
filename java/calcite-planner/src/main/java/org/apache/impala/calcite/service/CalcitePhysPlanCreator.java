@@ -21,7 +21,6 @@ import org.apache.impala.calcite.rel.node.NodeWithExprs;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.rel.node.ParentPlanRelContext;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.PlannerContext;
@@ -63,9 +62,9 @@ public class CalcitePhysPlanCreator implements CompilerStep {
    * returns the root plan node along with its output expressions.
    */
   public NodeWithExprs create(ImpalaPlanRel optimizedPlan) throws ImpalaException {
-    ParentPlanRelContext.Builder builder =
-        new ParentPlanRelContext.Builder(plannerContext_);
-    NodeWithExprs rootNodeWithExprs = optimizedPlan.getPlanNode(builder.build());
+    ParentPlanRelContext rootContext =
+        ParentPlanRelContext.createRootContext(plannerContext_);
+    NodeWithExprs rootNodeWithExprs = optimizedPlan.getPlanNode(rootContext);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Printing PlanNode tree...");
       printPlanNodeTree(rootNodeWithExprs.planNode_, "");

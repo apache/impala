@@ -110,4 +110,9 @@ public class ImpalaProjectRel extends Project
     builder.setInputRefs(RelOptUtil.InputFinder.bits(getProjects(), null));
     return relInput.getPlanNode(builder.build());
   }
+
+  @Override
+  public RelNodeType relNodeType() {
+    return RelNodeType.PROJECT;
+  }
 }

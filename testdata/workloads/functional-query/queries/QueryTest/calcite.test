@@ -165,3 +165,41 @@ select tinyint_col from calcite_alltypes where bigint_col = 20;
 ---- TYPES
 tinyint
 ====
+---- QUERY
+# Values test
+select abs(cast(-8 as bigint));
+---- RESULTS
+8
+---- TYPES
+bigint
+====
+---- QUERY
+# TODO: Char types are not yet supported, see comment in ImpalaValuesRel for details.
+select 'hello'
+---- CATCH
+Char type values are not yet supported.
+====
+---- QUERY
+# Union test
+select 3 union select 4;
+---- RESULTS
+3
+4
+---- TYPES
+# IMPALA-13022: Calcite always casts literal numbers as INT. To avoid backward compatibility
+# issues, the return type should be TINYINT here. There are many tests in the Impala
+# test suite which will have this problem.
+int
+====
+---- QUERY
+select * from (values (1)) union (values (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+# IMPALA-13022: Calcite always casts literal numbers as INT. To avoid backward compatibility
+# issues, the return type should be TINYINT here. There are many tests in the Impala
+# test suite which will have this problem.
+int
+====

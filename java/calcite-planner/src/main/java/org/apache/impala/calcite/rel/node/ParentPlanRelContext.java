@@ -19,7 +19,6 @@ package org.apache.impala.calcite.rel.node;
 
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.planner.PlannerContext;
 
 /**
@@ -38,24 +37,44 @@ public class ParentPlanRelContext {
   // The input refs used by the parent PlanRel Node
   public final ImmutableBitSet inputRefs_;
 
+  // type of parent RelNode
+  public final ImpalaPlanRel.RelNodeType parentType_;
+
+  /**
+   * Constructor meant for root node.
+   */
+  private ParentPlanRelContext(PlannerContext plannerContext) {
+    this.ctx_ = plannerContext;
+    this.filterCondition_ = null;
+    this.inputRefs_ = null;
+    this.parentType_ = null;
+  }
+
   private ParentPlanRelContext(Builder builder) {
     this.ctx_ = builder.context_;
     this.filterCondition_ = builder.filterCondition_;
     this.inputRefs_ = builder.inputRefs_;
+    this.parentType_ = builder.parentType_;
   }
 
   public static class Builder {
     private PlannerContext context_;
     private RexNode filterCondition_;
     private ImmutableBitSet inputRefs_;
+    private ImpalaPlanRel.RelNodeType parentType_;
 
+    /**
+     * Should only be called from root level.
+     */
     public Builder(PlannerContext plannerContext) {
       this.context_ = plannerContext;
+      this.parentType_ = null;
     }
 
     public Builder(ParentPlanRelContext planRelContext, ImpalaPlanRel planRel) {
       this.context_ = planRelContext.ctx_;
       this.filterCondition_ = planRelContext.filterCondition_;
+      this.parentType_ = planRel.relNodeType();
     }
 
     public void setFilterCondition(RexNode filterCondition) {
@@ -69,5 +88,9 @@ public class ParentPlanRelContext {
     public ParentPlanRelContext build() {
       return new ParentPlanRelContext(this);
     }
+  }
+
+  public static ParentPlanRelContext createRootContext(PlannerContext context) {
+    return new ParentPlanRelContext(context);
   }
 }

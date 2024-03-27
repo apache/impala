@@ -92,6 +92,16 @@ public class SelectNode extends PlanNode {
     return selectNode;
   }
 
+  /**
+   * Create a SelectNode directly from the Calcite module. The Calcite module
+   * has done some pre-analysis, so it can bypass some of the steps in the
+   * "create".
+   */
+  public static SelectNode createFromCalcite(PlanNodeId id, PlanNode child,
+      List<Expr> conjuncts) {
+    return new SelectNode(id, child, conjuncts);
+  }
+
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);

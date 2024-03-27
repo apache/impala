@@ -31,8 +31,6 @@ import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +57,8 @@ public class CalciteOptimizer implements CompilerStep {
         ImmutableList.of(
             new ConvertToImpalaRelRules.ImpalaScanRule(),
             new ConvertToImpalaRelRules.ImpalaFilterRule(),
+            new ConvertToImpalaRelRules.ImpalaValuesRule(),
+            new ConvertToImpalaRelRules.ImpalaUnionRule(),
             new ConvertToImpalaRelRules.ImpalaProjectRule()));
 
     HepPlanner planner = new HepPlanner(builder.build(),
