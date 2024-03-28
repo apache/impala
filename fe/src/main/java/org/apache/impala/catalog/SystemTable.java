@@ -42,6 +42,7 @@ import org.apache.impala.thrift.TSystemTableName;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.base.Preconditions;
@@ -154,8 +155,8 @@ public final class SystemTable extends Table {
 
   @Override
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
-      throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
+      EventSequence catalogTimeline) throws TableLoadingException {
     // Table is always loaded.
     Preconditions.checkState(false);
   }
