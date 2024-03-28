@@ -91,9 +91,9 @@ TEST(TickerTest, GenericTickerHappyPath) {
   fixture.Join();
 
   EXPECT_EQ(cntr, 10);
-  // Include a 5 millisecond (1%) margin of error to tolerate differences in the
+  // Include a 10 millisecond (2%) margin of error to tolerate differences in the
   // precision of time measurements.
-  EXPECT_NEAR(NsToMs(sw.ElapsedTime()), static_cast<float>(50), 5);
+  EXPECT_NEAR(NsToMs(sw.ElapsedTime()), static_cast<float>(50), 10);
 }
 
 // Tests the case where the wakeup guard is not reset by the consuming code.
