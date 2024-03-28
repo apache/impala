@@ -56,9 +56,25 @@ class TestQueryLogTableBase(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol',
         cls.PROTOCOL_BEESWAX, cls.PROTOCOL_HS2))
 
-  def get_client(self, protocol):
+  def get_client(self, protocol, query_table_name=""):
     """Retrieves the default Impala client for the specified protocol. This client is
-       automatically closed after the test completes."""
+       automatically closed after the test completes. Also ensures the completed queries
+       table has been successfully created by checking the logs to verify the create
+       table sql has finished."""
+    if query_table_name == "":
+      query_table_name = self.QUERY_TBL
+
+    # These tests run very quickly and can actually complete before Impala has finished
+    # creating the completed queries table. Thus, to make these tests more robust, this
+    # code checks to make sure the table create has finished before returning.
+    create_re = r'\]\s+(\w+:\w+)\]\s+Analyzing query: CREATE TABLE IF NOT EXISTS {}' \
+        .format(query_table_name)
+    create_match = self.assert_impalad_log_contains("INFO", create_re)
+
+    finish_re = r'Query successfully unregistered: query_id={}' \
+        .format(create_match.group(1))
+    self.assert_impalad_log_contains("INFO", finish_re)
+
     if protocol == self.PROTOCOL_BEESWAX:
       return self.client
     elif protocol == self.PROTOCOL_HS2:
@@ -241,9 +257,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=5 "
                                                  "--shutdown_grace_period_s=10 "
-                                                 "--shutdown_deadline_s=60 "
-                                                 "--log_dir={0}"
-                                                 .format(LOG_DIR_MAX_WRITES),
+                                                 "--shutdown_deadline_s=60 ",
+                                    impala_log_dir=LOG_DIR_MAX_WRITES,
                                     catalogd_args="--enable_workload_mgmt",
                                     impalad_graceful_shutdown=True)
   def test_query_log_max_attempts_exceeded(self, vector):
@@ -365,13 +380,14 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
   def test_query_log_table_different_table(self, vector):
     """Asserts that the completed queries table can be renamed."""
 
-    client = self.get_client(vector.get_value('protocol'))
+    client = self.get_client(vector.get_value('protocol'),
+        "{}.{}".format(self.WM_DB, self.OTHER_TBL))
 
     try:
       res = client.execute("show tables in {0}".format(self.WM_DB))
       assert res.success
       assert len(res.data) > 0, "could not find any tables in database {0}" \
-          .format(self.DB)
+          .format(self.WM_DB)
 
       tbl_found = False
       for tbl in res.data:
@@ -379,7 +395,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
           tbl_found = True
           break
       assert tbl_found, "could not find table '{0}' in database '{1}'" \
-          .format(self.OTHER_TBL, self.DB)
+          .format(self.OTHER_TBL, self.WM_DB)
     finally:
       client.execute("drop table {0}.{1} purge".format(self.WM_DB, self.OTHER_TBL))
 
@@ -470,6 +486,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
        these operations have a type of unknown and a normally invalid sql syntax. This
        test asserts those queries are not written to the completed queries table since
        they are trivial."""
+    client = self.get_client(vector.get_value('protocol'))
+
     host, port = IMPALAD_HS2_HOST_PORT.split(":")
     socket = TSocket(host, port)
     transport = TBufferedTransport(socket)
@@ -568,9 +586,6 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     finally:
       socket.close()
 
-    # Assert none of the queries were written to the completed queries table.
-    client = self.create_impala_client(protocol=vector.get_value('protocol'))
-
     # Execute a general query and wait for it to appear in the completed queries table to
     # ensure there are no false positives caused by the assertion query executing before
     # Impala has a chance to write queued queries to the completed queries table.
@@ -581,13 +596,11 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     # Force Impala to process the inserts to the completed queries table.
     client.execute("refresh {}".format(self.QUERY_TBL))
 
-    try:
-      assert_results = client.execute("select count(*) from {} where cluster_id='{}'"
-          .format(self.QUERY_TBL, self.HS2_OPERATIONS_CLUSTER_ID))
-      assert assert_results.success
-      assert assert_results.data[0] == "1"
-    finally:
-      client.close()
+    # Assert only the one expected query was written to the completed queries table.
+    assert_results = client.execute("select count(*) from {} where cluster_id='{}'"
+        .format(self.QUERY_TBL, self.HS2_OPERATIONS_CLUSTER_ID))
+    assert assert_results.success
+    assert assert_results.data[0] == "1"
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1 "

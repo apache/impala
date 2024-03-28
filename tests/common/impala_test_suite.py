@@ -1267,14 +1267,16 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     Convenience wrapper around assert_log_contains for impalad logs.
     """
-    self.assert_log_contains("impalad", level, line_regex, expected_count, timeout_s)
+    return self.assert_log_contains(
+        "impalad", level, line_regex, expected_count, timeout_s)
 
   def assert_catalogd_log_contains(self, level, line_regex, expected_count=1,
       timeout_s=6):
     """
     Convenience wrapper around assert_log_contains for catalogd logs.
     """
-    self.assert_log_contains("catalogd", level, line_regex, expected_count, timeout_s)
+    return self.assert_log_contains(
+        "catalogd", level, line_regex, expected_count, timeout_s)
 
   def assert_log_contains(self, daemon, level, line_regex, expected_count=1, timeout_s=6):
     """
@@ -1287,6 +1289,9 @@ class ImpalaTestSuite(BaseTestSuite):
     make sure that log buffering has been disabled, for example by adding
     '-logbuflevel=-1' to the daemon startup options or set timeout_s to a value higher
     than the log flush interval.
+
+    Returns the result of the very last call to line_regex.search or None if
+    expected_count is 0 or the line_regex did not match any lines.
     """
     pattern = re.compile(line_regex)
     start_time = time.time()
@@ -1300,10 +1305,13 @@ class ImpalaTestSuite(BaseTestSuite):
         log_file_path = os.path.join(log_dir, daemon + "." + level)
         # Resolve symlinks to make finding the file easier.
         log_file_path = os.path.realpath(log_file_path)
+        last_re_result = None
         with open(log_file_path) as log_file:
           for line in log_file:
-            if pattern.search(line):
+            re_result = pattern.search(line)
+            if re_result:
               found += 1
+              last_re_result = re_result
         if expected_count == -1:
           assert found > 0, "Expected at least one line in file %s matching regex '%s'"\
             ", but found none." % (log_file_path, line_regex)
@@ -1312,7 +1320,7 @@ class ImpalaTestSuite(BaseTestSuite):
             "Expected %d lines in file %s matching regex '%s', but found %d lines. "\
             "Last line was: \n%s" %\
             (expected_count, log_file_path, line_regex, found, line)
-        return
+        return last_re_result
       except AssertionError as e:
         # Re-throw the exception to the caller only when the timeout is expired. Otherwise
         # sleep before retrying.
