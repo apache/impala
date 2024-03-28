@@ -48,6 +48,11 @@ public class FunctionResolver {
   public static Map<SqlKind, String> CALCITE_KIND_TO_IMPALA_FUNC =
       ImmutableMap.<SqlKind, String> builder()
       .put(SqlKind.EQUALS, "eq")
+      .put(SqlKind.GREATER_THAN, "gt")
+      .put(SqlKind.GREATER_THAN_OR_EQUAL, "ge")
+      .put(SqlKind.LESS_THAN, "lt")
+      .put(SqlKind.LESS_THAN_OR_EQUAL, "le")
+      .put(SqlKind.NOT_EQUALS, "ne")
       .build();
 
   public static Function getFunction(String name, SqlKind kind,

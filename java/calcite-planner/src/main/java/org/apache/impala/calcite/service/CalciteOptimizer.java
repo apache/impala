@@ -57,6 +57,7 @@ public class CalciteOptimizer implements CompilerStep {
         ImmutableList.of(
             new ConvertToImpalaRelRules.ImpalaScanRule(),
             new ConvertToImpalaRelRules.ImpalaFilterRule(),
+            new ConvertToImpalaRelRules.ImpalaSortRule(),
             new ConvertToImpalaRelRules.ImpalaValuesRule(),
             new ConvertToImpalaRelRules.ImpalaUnionRule(),
             new ConvertToImpalaRelRules.ImpalaProjectRule()));

@@ -203,3 +203,118 @@ select * from (values (1)) union (values (2), (3));
 # test suite which will have this problem.
 int
 ====
+---- QUERY
+# sort test
+select id, abs(bigint_col) from functional.alltypestiny where id > 3 order by abs(bigint_col), id;
+---- RESULTS
+4,0
+6,0
+5,10
+7,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# sort test
+select id, abs(bigint_col) from functional.alltypestiny where id >= 3 order by abs(bigint_col), id;
+---- RESULTS
+4,0
+6,0
+3,10
+5,10
+7,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# sort test
+select id, abs(bigint_col) from functional.alltypestiny where id < 3 order by abs(bigint_col), id;
+---- RESULTS
+0,0
+2,0
+1,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# sort test
+select id, abs(bigint_col) from functional.alltypestiny where id <= 3 order by abs(bigint_col), id;
+---- RESULTS
+0,0
+2,0
+1,10
+3,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# sort test
+select id, abs(bigint_col) from functional.alltypestiny where id != 3 order by abs(bigint_col), id;
+---- RESULTS
+0,0
+2,0
+4,0
+6,0
+1,10
+5,10
+7,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# sort test
+select id, abs(bigint_col) from functional.alltypestiny where id != 3 order by abs(bigint_col) desc, id;
+---- RESULTS
+1,10
+5,10
+7,10
+0,0
+2,0
+4,0
+6,0
+---- TYPES
+int, bigint
+====
+---- QUERY
+# sort test
+select group_str, some_nulls from functional.nullrows where group_str = 'a' order by some_nulls  nulls first;
+---- RESULTS
+'a','NULL'
+'a','NULL'
+'a','NULL'
+'a','NULL'
+'a','a'
+---- TYPES
+string, string
+====
+---- QUERY
+# sort test
+select group_str, some_nulls from functional.nullrows where group_str = 'a' order by some_nulls  nulls last;
+---- RESULTS
+'a','a'
+'a','NULL'
+'a','NULL'
+'a','NULL'
+'a','NULL'
+---- TYPES
+string, string
+====
+---- QUERY
+# limit test
+select bigint_col from functional.alltypestiny where bigint_col = 0 limit 2;
+---- RESULTS
+0
+0
+---- TYPES
+bigint
+====
+---- QUERY
+# limit test
+select id, abs(bigint_col) from functional.alltypestiny where id > 2 order by abs(bigint_col), id limit 3;
+---- RESULTS
+4,0
+6,0
+3,10
+---- TYPES
+int, bigint
+====
