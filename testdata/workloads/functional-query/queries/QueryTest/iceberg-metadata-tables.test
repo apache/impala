@@ -58,7 +58,7 @@ TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 select * from functional_parquet.iceberg_query_metadata.metadata_log_entries;
 ---- RESULTS
 # Example:
-# 2023-08-16 12:18:11.061000000,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/00000-0ae98ebd-b200-4381-9d97-1f93954423a9.metadata.json',NULL,NULL,NULL
+# 2023-08-16 12:18:11.061000000,'$NAMENODE/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/00000-0ae98ebd-b200-4381-9d97-1f93954423a9.metadata.json',NULL,NULL,NULL
 row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.metadata.json',NULL,NULL,NULL
 row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.metadata.json',\d+,0,1
 row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.metadata.json',\d+,0,2
@@ -101,9 +101,9 @@ INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT,STRING
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.`partitions`;
 ---- RESULTS
-3,3,1,1,0,0
+3,3,1053,1,1,0,0,regex:.*,regex:\d+
 ---- TYPES
-BIGINT,INT,BIGINT,INT,BIGINT,INT
+BIGINT, INT, BIGINT, BIGINT, INT, BIGINT, INT, TIMESTAMP, BIGINT
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_data_files;
@@ -995,10 +995,13 @@ describe functional_parquet.iceberg_query_metadata.`partitions`;
 ---- RESULTS
 'record_count','bigint','Count of records in data files','true'
 'file_count','int','Count of data files','true'
+'total_data_file_size_in_bytes','bigint','Total size in bytes of data files','true'
 'position_delete_record_count','bigint','Count of records in position delete files','true'
 'position_delete_file_count','int','Count of position delete files','true'
 'equality_delete_record_count','bigint','Count of records in equality delete files','true'
 'equality_delete_file_count','int','Count of equality delete files','true'
+'last_updated_at','timestamp','Commit time of snapshot that last updated this partition','true'
+'last_updated_snapshot_id','bigint','Id of snapshot that last updated this partition','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====

@@ -35,6 +35,7 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
+import org.apache.iceberg.TableProperties;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
@@ -187,6 +188,11 @@ public class ToSqlUtils {
       }
       commonProps.remove(KuduTable.KEY_TABLE_ID);
     } else if (table instanceof FeIcebergTable) {
+      FeIcebergTable feIcebergTable = (FeIcebergTable) table;
+      if (feIcebergTable.getFormatVersion() == IcebergTable.ICEBERG_FORMAT_V1) {
+        commonProps.put(TableProperties.FORMAT_VERSION,
+                String.valueOf(IcebergTable.ICEBERG_FORMAT_V1));
+      }
       // Hide Iceberg internal metadata properties
       removeHiddenIcebergTableProperties(commonProps);
     } else if (table instanceof FePaimonTable) {
@@ -551,8 +557,8 @@ public class ToSqlUtils {
       if (table instanceof FeIcebergTable) {
         storageHandlerClassName = null;
 
+        FeIcebergTable feIcebergTable = (FeIcebergTable)table;
         // Fill "PARTITIONED BY SPEC" part if the Iceberg table is partitioned.
-        FeIcebergTable feIcebergTable= (FeIcebergTable)table;
         if (!feIcebergTable.getPartitionSpecs().isEmpty()) {
           IcebergPartitionSpec latestPartitionSpec =
               feIcebergTable.getDefaultPartitionSpec();

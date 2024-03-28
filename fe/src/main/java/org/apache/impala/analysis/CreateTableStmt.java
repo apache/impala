@@ -699,7 +699,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
   private void addMergeOnReadPropertiesIfNeeded() {
     Map<String, String> tblProps = getTblProperties();
     String formatVersion = tblProps.get(TableProperties.FORMAT_VERSION);
-    if (formatVersion == null ||
+    if (formatVersion != null &&
         Integer.valueOf(formatVersion) < IcebergTable.ICEBERG_FORMAT_V2) {
       return;
     }
@@ -715,16 +715,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
 
   private void validateIcebergParquetCompressionCodec(
       TIcebergFileFormat icebergFileFormat) throws AnalysisException {
-    if (icebergFileFormat != TIcebergFileFormat.PARQUET) {
-      if (getTblProperties().containsKey(IcebergTable.PARQUET_COMPRESSION_CODEC)) {
-          throw new AnalysisException(IcebergTable.PARQUET_COMPRESSION_CODEC +
-              " should be set only for parquet file format");
-      }
-      if (getTblProperties().containsKey(IcebergTable.PARQUET_COMPRESSION_LEVEL)) {
-          throw new AnalysisException(IcebergTable.PARQUET_COMPRESSION_LEVEL +
-              " should be set only for parquet file format");
-      }
-    } else {
+    if (icebergFileFormat == TIcebergFileFormat.PARQUET) {
       StringBuilder errMsg = new StringBuilder();
       if (IcebergUtil.parseParquetCompressionCodec(true, getTblProperties(), errMsg)
           == null) {

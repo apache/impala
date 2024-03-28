@@ -612,6 +612,9 @@ STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
     'external.table.purge'='TRUE',
+    'write.delete.mode'='merge-on-read',
+    'write.update.mode'='merge-on-read',
+    'write.merge.mode'='merge-on-read',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -642,6 +645,9 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test2 (
 STORED AS ICEBERG
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
     'external.table.purge'='TRUE',
+    'write.delete.mode'='merge-on-read',
+    'write.update.mode'='merge-on-read',
+    'write.merge.mode'='merge-on-read',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -674,6 +680,9 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test3 (
 STORED AS ICEBERG
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
     'external.table.purge'='TRUE',
+    'write.delete.mode'='merge-on-read',
+    'write.update.mode'='merge-on-read',
+    'write.merge.mode'='merge-on-read',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -732,6 +741,9 @@ PARTITIONED BY SPEC (
 STORED AS ICEBERG
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
     'external.table.purge'='TRUE',
+    'write.delete.mode'='merge-on-read',
+    'write.update.mode'='merge-on-read',
+    'write.merge.mode'='merge-on-read',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -756,8 +768,10 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test_orc (
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='orc',
-'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables')
+'external.table.purge'='TRUE', 'write.format.default'='orc',
+'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables',
+'write.delete.mode'='merge-on-read', 'write.update.mode'='merge-on-read',
+'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 # Default Iceberg table
@@ -771,8 +785,10 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_default_tbl (
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('write.format.default'='parquet', 'engine.hive.enabled'='true',
-'external.table.purge'='TRUE', 'table_type'='ICEBERG')
+TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read',
+ 'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read',
+ 'write.parquet.compression-codec'='snappy')
 ====
 ---- CREATE_TABLE
 # Default Iceberg table with ORC format
@@ -789,8 +805,10 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_default_tbl_orc (
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'write.format.default'='orc',
-'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG')
+'write.format.default'='orc', 'write.parquet.compression-codec'='snappy',
+'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG',
+'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read',
+'write.delete.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 # Iceberg table in HiveCatalog
@@ -807,8 +825,10 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_hive_cat_explicit (
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'write.format.default'='parquet', 'iceberg.catalog'='hive.catalog',
-'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG')
+'write.format.default'='parquet', 'iceberg.catalog'='hive.catalog',
+'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG',
+'write.parquet.compression-codec'='snappy', 'write.delete.mode'='merge-on-read',
+'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_nullable_test (
@@ -835,6 +855,9 @@ STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
     'external.table.purge'='TRUE',
+    'write.delete.mode'='merge-on-read',
+    'write.update.mode'='merge-on-read',
+    'write.merge.mode'='merge-on-read',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -858,7 +881,9 @@ PARTITIONED BY SPEC (p, d)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'engine.hive.enabled'='true', 'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.parquet.compression-codec'='snappy',
+'write.delete.mode'='merge-on-read', 'write.update.mode'='merge-on-read',
+'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_ctas
@@ -875,7 +900,9 @@ PARTITIONED BY SPEC (BUCKET(5, id))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'engine.hive.enabled'='true', 'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.parquet.compression-codec'='snappy',
+'write.delete.mode'='merge-on-read', 'write.update.mode'='merge-on-read',
+'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_ctas_ht
@@ -894,8 +921,9 @@ PARTITIONED BY SPEC (BUCKET(5, id))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
-'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables')
+'external.table.purge'='TRUE', 'write.format.default'='parquet',
+'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables', 'write.delete.mode'='merge-on-read',
+'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hive (i int)
@@ -909,8 +937,10 @@ PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
-'engine.hive.enabled'='true', 'table_type'='ICEBERG')
+'external.table.purge'='TRUE', 'write.format.default'='parquet',
+'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.parquet.compression-codec'='snappy',
+'write.delete.mode'='merge-on-read', 'write.update.mode'='merge-on-read',
+'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hadoop (i int)
@@ -924,8 +954,9 @@ PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
-'engine.hive.enabled'='true', 'iceberg.catalog'='ice_hadoop_cat')
+'external.table.purge'='TRUE', 'write.format.default'='parquet',
+'engine.hive.enabled'='true', 'iceberg.catalog'='ice_hadoop_cat', 'write.delete.mode'='merge-on-read',
+'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_void_transform (i int, j int)
@@ -937,7 +968,9 @@ PARTITIONED BY SPEC (VOID(i), VOID(j))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'engine.hive.enabled'='true', 'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.parquet.compression-codec'='snappy'
+'write.delete.mode'='merge-on-read', 'write.update.mode'='merge-on-read',
+'write.merge.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 # Creating V1 tables explicitly should not set 'merge-on-read' write modes if no write mode is
@@ -950,8 +983,9 @@ CREATE EXTERNAL TABLE show_create_table_test_db.ice_explicit_v1 (i INT NULL)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
- 'engine.hive.enabled'='true', 'table_type'='ICEBERG')
+'format-version'='1', 'engine.hive.enabled'='true', 'external.table.purge'='TRUE',
+'table_type'='ICEBERG',
+'write.format.default'='parquet', 'write.parquet.compression-codec'='snappy')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should set 'merge-on-read' write modes if no write mode is specified.
@@ -965,7 +999,8 @@ LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
     'external.table.purge'='TRUE', 'write.format.default'='parquet',
  'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read',
- 'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read')
+ 'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read',
+ 'write.parquet.compression-codec'='snappy')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should not set write mode if user specified any of it to any value.
@@ -978,8 +1013,9 @@ CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_delete (i INT NU
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
- 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read')
+ 'external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read',
+ 'write.parquet.compression-codec'='snappy')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should not set write mode if user specified any of it to any value.
@@ -992,8 +1028,9 @@ CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_delete_2 (i INT 
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
- 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='copy-on-write')
+ 'external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='copy-on-write',
+ 'write.parquet.compression-codec'='snappy')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should not set write mode if user specified any of it to any value.
@@ -1006,8 +1043,9 @@ CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_update (i INT NU
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
- 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.update.mode'='copy-on-write')
+ 'external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.update.mode'='copy-on-write',
+ 'write.parquet.compression-codec'='snappy')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should not set write mode if user specified any of it to any value.
@@ -1020,8 +1058,9 @@ CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_merge (i INT NUL
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
-    'external.table.purge'='TRUE', 'write.format.default'='parquet',
- 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.merge.mode'='copy-on-write')
+ 'external.table.purge'='TRUE', 'write.format.default'='parquet',
+ 'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.merge.mode'='copy-on-write',
+ 'write.parquet.compression-codec'='snappy')
 ====
 ---- CREATE_TABLE
 # Test create Bucketed Table

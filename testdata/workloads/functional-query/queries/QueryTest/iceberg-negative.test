@@ -602,14 +602,6 @@ TBLPROPERTIES('write.parquet.dict-size-bytes'='1073741825');
 Parquet dictionary page size for Iceberg table should fall in the range of [65536..1073741824]
 ====
 ---- QUERY
-CREATE TABLE iceberg_wrong_parquet_comp_codec1 ( i int)
-STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='orc',
-'write.parquet.compression-codec'='snappy');
----- CATCH
-write.parquet.compression-codec should be set only for parquet file format
-====
----- QUERY
 CREATE TABLE iceberg_wrong_parquet_comp_codec2 ( i int)
 STORED AS ICEBERG
 TBLPROPERTIES('write.parquet.compression-codec'='snapp');
@@ -623,14 +615,6 @@ ALTER TABLE iceberg_set_wrong_parquet_comp_codec2 SET
 TBLPROPERTIES('write.parquet.compression-codec'='snapp');
 ---- CATCH
 Invalid parquet compression codec for Iceberg table: snapp
-====
----- QUERY
-CREATE TABLE iceberg_wrong_parquet_comp_level1 ( i int)
-STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='orc',
-'write.parquet.compression-level'='2');
----- CATCH
-write.parquet.compression-level should be set only for parquet file format
 ====
 ---- QUERY
 CREATE TABLE iceberg_wrong_parquet_comp_level2 ( i int)
