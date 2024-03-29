@@ -50,6 +50,30 @@ bigint,bigint,bigint,string
 row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
+# IMPALA-12960: Test the case of rollup.
+select l_orderkey, l_partkey, count(*)
+from tpch.lineitem
+group by rollup(1, 2)
+order by 3 desc, 1, 2
+limit 10;
+---- RESULTS
+NULL,NULL,6001215
+7,NULL,7
+68,NULL,7
+129,NULL,7
+164,NULL,7
+194,NULL,7
+225,NULL,7
+226,NULL,7
+322,NULL,7
+326,NULL,7
+---- TYPES
+bigint,bigint,bigint
+---- RUNTIME_PROFILE
+# Verify that at least one passthrough number should be 0 for rollup.
+row_regex: .*RowsPassedThrough: 0
+====
+---- QUERY
 # Test for preaggregation passthrough optimization: two-phase count distinct aggregation.
 select count(distinct p_comment)
 from part

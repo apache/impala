@@ -505,6 +505,7 @@ Status GroupingAggregator::AddBatchStreaming(
   }
 
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
+  int64_t num_row_out_batch_old = out_batch->num_rows();
   GroupingAggregatorConfig::AddBatchStreamingImplFn fn
       = add_batch_streaming_impl_fn_.load();
   if (fn != nullptr) {
@@ -515,8 +516,8 @@ Status GroupingAggregator::AddBatchStreaming(
         child_batch, out_batch, ht_ctx_.get(), remaining_capacity));
   }
   *eos = (streaming_idx_ == 0);
-
-  num_rows_returned_ += out_batch->num_rows();
+  DCHECK_GE(out_batch->num_rows(), num_row_out_batch_old);
+  num_rows_returned_ += out_batch->num_rows() - num_row_out_batch_old;
   COUNTER_SET(num_passthrough_rows_, num_rows_returned_);
   return Status::OK();
 }
