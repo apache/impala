@@ -19,6 +19,7 @@ package org.apache.impala.calcite.service;
 
 import org.apache.impala.calcite.rel.node.NodeWithExprs;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
+import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.rel.node.ParentPlanRelContext;
@@ -51,7 +52,7 @@ public class CalcitePhysPlanCreator implements CompilerStep {
     // instantiation.
     AuthorizationFactory authzFactory =
         AuthorizationUtil.authzFactoryFrom(BackendConfig.INSTANCE);
-    this.analyzer_ = new Analyzer(mdHandler.getStmtTableCache(),
+    this.analyzer_ = new SimplifiedAnalyzer(mdHandler.getStmtTableCache(),
         queryCtx_.getTQueryCtx(), authzFactory, null);
     this.plannerContext_ =
         new PlannerContext(analyzer_, queryCtx_.getTQueryCtx(), queryCtx_.getTimeline());

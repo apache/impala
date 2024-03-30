@@ -17,8 +17,6 @@
 
 package org.apache.impala.calcite.rel.node;
 
-import com.google.common.collect.ImmutableList;
-
 import org.apache.impala.common.ImpalaException;
 
 /**
@@ -35,6 +33,7 @@ public interface ImpalaPlanRel {
    * be handled differently.
    */
   public enum RelNodeType {
+    AGGREGATE,
     FILTER,
     HDFSSCAN,
     PROJECT,

@@ -19,6 +19,7 @@ package org.apache.impala.calcite.rel.node;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
@@ -93,6 +94,19 @@ public class ConvertToImpalaRelRules {
     public void onMatch(RelOptRuleCall call) {
       final LogicalUnion union = call.rel(0);
       call.transformTo(new ImpalaUnionRel(union));
+    }
+  }
+
+  public static class ImpalaAggRule extends RelOptRule {
+
+    public ImpalaAggRule() {
+      super(operand(LogicalAggregate.class, any()));
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      final LogicalAggregate agg = call.rel(0);
+      call.transformTo(new ImpalaAggRel(agg));
     }
   }
 

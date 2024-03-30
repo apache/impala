@@ -318,3 +318,66 @@ select id, abs(bigint_col) from functional.alltypestiny where id > 2 order by ab
 ---- TYPES
 int, bigint
 ====
+---- QUERY
+# aggregation test
+select sum(bigint_col) from functional.alltypestiny;
+---- RESULTS
+40
+---- TYPES
+bigint
+====
+---- QUERY
+# aggregation test
+select id, sum(bigint_col) from functional.alltypestiny group by id order by id;
+---- RESULTS
+0,0
+1,10
+2,0
+3,10
+4,0
+5,10
+6,0
+7,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# aggregation test
+select id, sum(bigint_col) from functional.alltypestiny group by id
+having sum(bigint_col) > cast(5 as bigint)  order by id;
+---- RESULTS
+1,10
+3,10
+5,10
+7,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# aggregation test
+select id, bigint_col, sum(bigint_col)
+from functional.alltypestiny
+group by grouping sets((id, bigint_col), (id), (bigint_col))
+order by id, bigint_col;
+---- RESULTS
+0,0,0
+0,NULL,0
+1,10,10
+1,NULL,10
+2,0,0
+2,NULL,0
+3,10,10
+3,NULL,10
+4,0,0
+4,NULL,0
+5,10,10
+5,NULL,10
+6,0,0
+6,NULL,0
+7,10,10
+7,NULL,10
+NULL,0,0
+NULL,10,40
+---- TYPES
+int, bigint, bigint
+====

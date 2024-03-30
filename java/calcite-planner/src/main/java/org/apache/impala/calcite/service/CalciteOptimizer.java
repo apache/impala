@@ -55,6 +55,7 @@ public class CalciteOptimizer implements CompilerStep {
     // rules to convert Calcite nodes into ImpalaPlanRel nodes
     builder.addRuleCollection(
         ImmutableList.of(
+            new ConvertToImpalaRelRules.ImpalaAggRule(),
             new ConvertToImpalaRelRules.ImpalaScanRule(),
             new ConvertToImpalaRelRules.ImpalaFilterRule(),
             new ConvertToImpalaRelRules.ImpalaSortRule(),
