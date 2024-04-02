@@ -34,6 +34,8 @@ class TQueryOptions;
 std::ostream& operator<<(std::ostream& out,
     const std::set<impala::TRuntimeFilterType::type>& filter_types);
 
+std::ostream& operator<<(std::ostream& out, const std::set<int32_t>& filter_ids);
+
 // Maps query option names to option levels used for displaying the query
 // options via SET and SET ALL
 typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
@@ -50,7 +52,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::ICEBERG_DISABLE_COUNT_STAR_OPTIMIZATION + 1);                 \
+      TImpalaQueryOptions::RUNTIME_FILTER_IDS_TO_SKIP + 1);                              \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -326,6 +328,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(enable_tuple_cache, ENABLE_TUPLE_CACHE, TQueryOptionLevel::ADVANCED)      \
   QUERY_OPT_FN(iceberg_disable_count_star_optimization,                                  \
       ICEBERG_DISABLE_COUNT_STAR_OPTIMIZATION, TQueryOptionLevel::ADVANCED)              \
+  QUERY_OPT_FN(runtime_filter_ids_to_skip,                                               \
+      RUNTIME_FILTER_IDS_TO_SKIP, TQueryOptionLevel::DEVELOPMENT)                        \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.
@@ -375,7 +379,8 @@ Status ValidateQueryOptions(TQueryOptions* query_options);
 /// Parse a "," separated key=value pair of query options and set it in 'query_options'.
 /// If the same query option is specified more than once, the last one wins. The
 /// set_query_options_mask bitmask is updated to reflect the query options which were
-/// set. Returns an error status containing an error detail for any invalid options (e.g.
+/// set. Double quote can be used to wrap a query option value that has "," char in it.
+/// Returns an error status containing an error detail for any invalid options (e.g.
 /// bad format or invalid query option), but all valid query options are still handled.
 Status ParseQueryOptions(const std::string& options, TQueryOptions* query_options,
     QueryOptionsMask* set_query_options_mask);

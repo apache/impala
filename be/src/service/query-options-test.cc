@@ -448,6 +448,22 @@ TEST(QueryOptions, SetSpecialOptions) {
   }
 }
 
+void VerifyFilterTypes(const set<TRuntimeFilterType::type>& types,
+    const std::initializer_list<TRuntimeFilterType::type>& expects) {
+  EXPECT_EQ(expects.size(), types.size());
+  for (const auto t : expects) {
+    EXPECT_NE(types.end(), types.find(t));
+  }
+}
+
+void VerifyFilterIds(
+    const set<int32_t>& types, const std::initializer_list<int32_t>& expects) {
+  EXPECT_EQ(expects.size(), types.size());
+  for (const auto t : expects) {
+    EXPECT_NE(types.end(), types.find(t));
+  }
+}
+
 TEST(QueryOptions, ParseQueryOptions) {
   QueryOptionsMask expectedMask;
   expectedMask.set(TImpalaQueryOptions::NUM_NODES);
@@ -470,6 +486,36 @@ TEST(QueryOptions, ParseQueryOptions) {
     EXPECT_EQ(options.num_nodes, 1);
     EXPECT_EQ(options.mem_limit, 42);
     EXPECT_EQ(mask, expectedMask);
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.msg().details().size(), 2);
+  }
+
+  QueryOptionsMask expectedMask2;
+  expectedMask2.set(TImpalaQueryOptions::ENABLED_RUNTIME_FILTER_TYPES);
+  expectedMask2.set(TImpalaQueryOptions::RUNTIME_FILTER_IDS_TO_SKIP);
+
+  {
+    TQueryOptions options;
+    QueryOptionsMask mask;
+    Status status = ParseQueryOptions("enabled_runtime_filter_types=\"bloom,min_max\","
+                                      "runtime_filter_ids_to_skip=\"1,2\"",
+        &options, &mask);
+    VerifyFilterTypes(options.enabled_runtime_filter_types,
+        {TRuntimeFilterType::BLOOM, TRuntimeFilterType::MIN_MAX});
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {1, 2});
+    EXPECT_EQ(mask, expectedMask2);
+    EXPECT_TRUE(status.ok());
+  }
+
+  {
+    TQueryOptions options;
+    QueryOptionsMask mask;
+    Status status = ParseQueryOptions("enabled_runtime_filter_types=bloom,min_max,"
+                                      "runtime_filter_ids_to_skip=1,2",
+        &options, &mask);
+    VerifyFilterTypes(options.enabled_runtime_filter_types, {TRuntimeFilterType::BLOOM});
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {1});
+    EXPECT_EQ(mask, expectedMask2);
     EXPECT_FALSE(status.ok());
     EXPECT_EQ(status.msg().details().size(), 2);
   }
@@ -602,14 +648,6 @@ TEST(QueryOptions, CompressionCodec) {
 #undef ENTRY
 }
 
-void VerifyFilterTypes(const set<TRuntimeFilterType::type>& types,
-    const std::initializer_list<TRuntimeFilterType::type>& expects) {
-  EXPECT_EQ(expects.size(), types.size());
-  for (const auto t : expects) {
-    EXPECT_NE(types.end(), types.find(t));
-  }
-}
-
 // Tests for setting of ENABLED_RUNTIME_FILTER_TYPES.
 TEST(QueryOptions, EnabledRuntimeFilterTypes) {
   const string KEY = "enabled_runtime_filter_types";
@@ -649,12 +687,74 @@ TEST(QueryOptions, EnabledRuntimeFilterTypes) {
   }
   {
     TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "bloom , , min_max", &options, nullptr).ok());
+    VerifyFilterTypes(options.enabled_runtime_filter_types,
+        {
+            TRuntimeFilterType::BLOOM,
+            TRuntimeFilterType::MIN_MAX
+        });
+  }
+  {
+    TQueryOptions options;
     EXPECT_TRUE(SetQueryOption(KEY, "in_list,bloom", &options, nullptr).ok());
     VerifyFilterTypes(options.enabled_runtime_filter_types,
                       {
                           TRuntimeFilterType::BLOOM,
                           TRuntimeFilterType::IN_LIST
                       });
+  }
+}
+
+// Tests for setting of RUNTIME_FILTER_IDS_TO_SKIP.
+TEST(QueryOptions, RuntimeFilterIdsToSkip) {
+  const string KEY = "runtime_filter_ids_to_skip";
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "0", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {0});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "0,1", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {0, 1});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "111,2,33", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {2, 33, 111});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "-1,0,1", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {-1, 0, 1});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "1,6.9", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {1, 6});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "0, 1", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {0, 1});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "0,,1", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {0, 1});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption(KEY, "0, 1, , 2", &options, nullptr).ok());
+    VerifyFilterIds(options.runtime_filter_ids_to_skip, {0, 1, 2});
+  }
+  {
+    TQueryOptions options;
+    EXPECT_FALSE(SetQueryOption(KEY, "1,b", &options, nullptr).ok());
+  }
+  {
+    TQueryOptions options;
+    EXPECT_FALSE(SetQueryOption(KEY, "1,4294967295", &options, nullptr).ok());
   }
 }
 

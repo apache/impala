@@ -702,6 +702,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   176: optional bool iceberg_disable_count_star_optimization = false;
+
+  // See comment in ImpalaService.thrift
+  177: optional set<i32> runtime_filter_ids_to_skip
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

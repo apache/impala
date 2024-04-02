@@ -145,6 +145,10 @@ void PrintQueryOptionValue(const set<impala::TRuntimeFilterType::type>& filter_t
   val << filter_types;
 }
 
+void PrintQueryOptionValue(const std::set<int32_t>& filter_ids, stringstream& val) {
+  val << filter_ids;
+}
+
 void ChildQuery::SetQueryOptions(TExecuteStatementReq* exec_stmt_req) {
   map<string, string> conf;
   const TQueryOptions& parent_options =

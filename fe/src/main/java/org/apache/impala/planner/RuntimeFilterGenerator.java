@@ -888,7 +888,8 @@ public final class RuntimeFilterGenerator {
     RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator(
         ctx.getQueryOptions());
     filterGenerator.generateFilters(ctx, plan);
-    List<RuntimeFilter> filters = Lists.newArrayList(filterGenerator.getRuntimeFilters());
+    List<RuntimeFilter> filters =
+        Lists.newArrayList(filterGenerator.getRuntimeFilters(ctx));
     if (filters.size() > maxNumBloomFilters) {
       // If more than 'maxNumBloomFilters' were generated, sort them by increasing
       // selectivity and keep the 'maxNumBloomFilters' most selective bloom filters.
@@ -1035,10 +1036,18 @@ public final class RuntimeFilterGenerator {
   /**
    * Returns a list of all the registered runtime filters, ordered by filter ID.
    */
-  public List<RuntimeFilter> getRuntimeFilters() {
+  public List<RuntimeFilter> getRuntimeFilters(PlannerContext ctx) {
     Set<RuntimeFilter> resultSet = new HashSet<>();
     for (List<RuntimeFilter> filters: runtimeFiltersByTid_.values()) {
-      resultSet.addAll(filters);
+      for (RuntimeFilter filter : filters) {
+        if (ctx.getQueryOptions().isSetRuntime_filter_ids_to_skip()
+            && ctx.getQueryOptions().runtime_filter_ids_to_skip.contains(
+                filter.getFilterId().asInt())) {
+          // Skip this filter because it is explicitly excluded via query option.
+          continue;
+        }
+        resultSet.add(filter);
+      }
     }
     List<RuntimeFilter> resultList = Lists.newArrayList(resultSet);
     Collections.sort(resultList, new Comparator<RuntimeFilter>() {

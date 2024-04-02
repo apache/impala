@@ -20,6 +20,7 @@
 #include <limits>
 #include <regex>
 #include <sstream>
+#include <string>
 
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/strip.h>
@@ -102,6 +103,22 @@ const string PrintQueryOptionValue(
   return val.str();
 }
 
+std::ostream& impala::operator<<(std::ostream& out, const std::set<int32_t>& filter_ids) {
+  bool first = true;
+  for (const auto& t : filter_ids) {
+    if (!first) out << ",";
+    out << t;
+    first = false;
+  }
+  return out;
+}
+
+const string PrintQueryOptionValue(const std::set<int32_t>& filter_ids) {
+  std::stringstream val;
+  val << filter_ids;
+  return val.str();
+}
+
 void impala::TQueryOptionsToMap(
     const TQueryOptions& query_options, std::map<string, string>* configuration) {
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)                                    \
@@ -160,6 +177,18 @@ string impala::DebugQueryOptions(const TQueryOptions& query_options) {
 #undef QUERY_OPT_FN
 #undef REMOVED_QUERY_OPT_FN
   return ss.str();
+}
+
+inline void TrimAndRemoveEmptyString(vector<string>& values) {
+  int i = 0;
+  while (i < values.size()) {
+    trim(values[i]);
+    if (values[i].length() == 0) {
+      values.erase(values.begin() + i);
+    } else {
+      i++;
+    }
+  }
 }
 
 // Returns the TImpalaQueryOptions enum for the given "key". Input is case insensitive.
@@ -858,6 +887,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
           // Parse and verify the enabled runtime filter types.
           vector<string> str_types;
           split(str_types, filter_value, is_any_of(","), token_compress_on);
+          TrimAndRemoveEmptyString(str_types);
           for (const auto& t : str_types) {
             TRuntimeFilterType::type filter_type;
             RETURN_IF_ERROR(GetThriftEnum(t, "runtime filter type",
@@ -1229,6 +1259,25 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_iceberg_disable_count_star_optimization(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::RUNTIME_FILTER_IDS_TO_SKIP: {
+        std::set<int32_t> filter_ids;
+        // This does quote handling similar as ENABLED_RUNTIME_FILTER_TYPES option.
+        const string filter_value = std::regex_replace(value, std::regex("^\"|\"$"), "");
+        vector<string> str_ids;
+        split(str_ids, filter_value, is_any_of(","), token_compress_on);
+        TrimAndRemoveEmptyString(str_ids);
+        for (const auto& t : str_ids) {
+          try {
+            int32_t filter_id = std::stoi(t);
+            filter_ids.insert(filter_id);
+          } catch (std::exception&) {
+            return Status::Expected(
+                "RUNTIME_FILTER_IDS_TO_SKIP is not a valid comma separated integers.");
+          }
+        }
+        query_options->__set_runtime_filter_ids_to_skip(filter_ids);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
@@ -1252,7 +1301,20 @@ Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_opt
     QueryOptionsMask* set_query_options_mask) {
   if (options.length() == 0) return Status::OK();
   vector<string> kv_pairs;
-  split(kv_pairs, options, is_any_of(","), token_compress_on);
+  int double_quote_ct = 0;
+  int begin = 0;
+  int end = 0;
+  while (end < options.length()) {
+    if (options.at(end) == '"') {
+      double_quote_ct = (double_quote_ct + 1) % 2;
+    } else if (options.at(end) == ',' && double_quote_ct == 0) {
+      // Found comma that is not within two double quotes. This is an option separator.
+      if (begin < end) kv_pairs.push_back(options.substr(begin, end - begin));
+      begin = end + 1;
+    }
+    end++;
+  }
+  if (begin < end) kv_pairs.push_back(options.substr(begin, end - begin));
   // Construct an error status which is used to aggregate errors encountered during
   // parsing. It is only returned if the number of error details is greater than 0.
   Status errorStatus = Status::Expected("Errors parsing query options");

@@ -924,6 +924,12 @@ enum TImpalaQueryOptions {
 
   // Disables statistic-based count(*)-optimization for Iceberg tables.
   ICEBERG_DISABLE_COUNT_STAR_OPTIMIZATION = 175
+
+  // List of runtime filter id to skip if it exists in query plan.
+  // If using JDBC client, use double quote to wrap multiple ids, like:
+  //   RUNTIME_FILTER_IDS_TO_SKIP="1,2,3"
+  // If using impala-shell client, double quote is not required.
+  RUNTIME_FILTER_IDS_TO_SKIP = 176
 }
 
 // The summary of a DML statement.
