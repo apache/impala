@@ -58,6 +58,7 @@ class IcebergRowReader {
   inline static jclass integer_cl_ = nullptr;
   inline static jclass long_cl_ = nullptr;
   inline static jclass char_sequence_cl_ = nullptr;
+  inline static jclass byte_buffer_cl_ = nullptr;
 
   /// Method references created with JniUtil.
   inline static jmethodID list_size_ = nullptr;
@@ -66,7 +67,6 @@ class IcebergRowReader {
   inline static jmethodID integer_value_ = nullptr;
   inline static jmethodID long_value_ = nullptr;
   inline static jmethodID char_sequence_to_string_ = nullptr;
-
 
   /// The scan node that started this row reader.
   ScanNode* scan_node_;
@@ -94,10 +94,8 @@ class IcebergRowReader {
   /// Iceberg TimeStamp is parsed into TimestampValue.
   Status WriteTimeStampSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
       WARN_UNUSED_RESULT;
-  /// To obtain a character sequence from JNI the JniUtfCharGuard class is used. Then the
-  /// data has to be copied to the tuple_data_pool, because the JVM releases the reference
-  /// and reclaims the memory area.
-  Status WriteStringSlot(JNIEnv* env, const jobject &accessed_value, void* slot,
+  template <bool IS_BINARY>
+  Status WriteStringOrBinarySlot(JNIEnv* env, const jobject &accessed_value, void* slot,
       MemPool* tuple_data_pool) WARN_UNUSED_RESULT;
 
   /// Nested types recursively call MaterializeTuple method with their child tuple.

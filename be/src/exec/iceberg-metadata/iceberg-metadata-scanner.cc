@@ -42,6 +42,7 @@ Status IcebergMetadataScanner::InitJNI() {
       "java/util/Map$Entry", &map_entry_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/List", &list_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/Map", &map_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "[B", &byte_array_cl_));
 
   // Method ids:
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
@@ -73,6 +74,10 @@ Status IcebergMetadataScanner::InitJNI() {
       iceberg_metadata_scanner_collection_scanner_cl_,
       "GetNextCollectionItem", "()Ljava/lang/Object;",
       &iceberg_metadata_scanner_collection_scanner_get_next_collection_item_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
+      "ByteBufferToByteArray", "(Ljava/nio/ByteBuffer;)[B",
+      &iceberg_metadata_scanner_byte_buffer_to_byte_array_));
+
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, map_entry_cl_, "getKey",
       "()Ljava/lang/Object;", &map_entry_get_key_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, map_entry_cl_, "getValue",
@@ -236,6 +241,16 @@ Status IcebergMetadataScanner::CreateArrayOrMapScanner(JNIEnv* env,
   *result = env->CallStaticObjectMethod(iceberg_metadata_scanner_collection_scanner_cl_,
       *factory_method, list_or_map);
   RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
+Status IcebergMetadataScanner::ConvertJavaByteBufferToByteArray(JNIEnv* env,
+    const jobject& byte_buffer, jbyteArray* result) {
+  jobject arr = env->CallObjectMethod(jmetadata_scanner_,
+      iceberg_metadata_scanner_byte_buffer_to_byte_array_, byte_buffer);
+  RETURN_ERROR_IF_EXC(env);
+  DCHECK(env->IsInstanceOf(arr, byte_array_cl_));
+  *result = static_cast<jbyteArray>(arr);
   return Status::OK();
 }
 

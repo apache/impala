@@ -15,9 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "exec/iceberg-metadata/iceberg-row-reader.h"
+
+#include <type_traits>
+
 #include "exec/exec-node.inline.h"
 #include "exec/iceberg-metadata/iceberg-metadata-scanner.h"
-#include "exec/iceberg-metadata/iceberg-row-reader.h"
 #include "exec/scan-node.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/runtime-state.h"
@@ -45,6 +48,8 @@ Status IcebergRowReader::InitJNI() {
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Long", &long_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/CharSequence",
       &char_sequence_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/nio/ByteBuffer",
+      &byte_buffer_cl_));
 
   // Method ids:
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, list_cl_, "size", "()I", &list_size_));
@@ -106,12 +111,13 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
     } case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
       RETURN_IF_ERROR(WriteTimeStampSlot(env, accessed_value, slot));
       break;
-    } case TYPE_STRING: { // java.lang.String
-      if (type.IsBinaryType()) {
-        // TODO IMPALA-12651,IMPALA-11491: Display BINARY correctly instead of NULLing it.
-        tuple->SetNull(slot_desc->null_indicator_offset());
-      } else {
-        RETURN_IF_ERROR(WriteStringSlot(env, accessed_value, slot, tuple_data_pool));
+    } case TYPE_STRING: {
+      if (type.IsBinaryType()) { // byte[]
+        RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ true>(
+            env, accessed_value, slot, tuple_data_pool));
+      } else { // java.lang.String
+        RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ false>(
+            env, accessed_value, slot, tuple_data_pool));
       }
       break;
     } case TYPE_STRUCT: { // Struct type is not used by Impala to access values.
@@ -129,9 +135,8 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
       break;
     }
     default:
-      // Skip the unsupported type and set it to NULL
+      DCHECK(false) << "Unsupported column type: " << slot_desc->type().type;
       tuple->SetNull(slot_desc->null_indicator_offset());
-      VLOG(3) << "Skipping unsupported column type: " << slot_desc->type().type;
   }
   return Status::OK();
 }
@@ -194,25 +199,46 @@ Status IcebergRowReader::WriteTimeStampSlot(JNIEnv* env, const jobject &accessed
   return Status::OK();
 }
 
-Status IcebergRowReader::WriteStringSlot(JNIEnv* env, const jobject &accessed_value,
-    void* slot, MemPool* tuple_data_pool) {
+/// To obtain bytes from JNI the JniByteArrayGuard or the JniUtfCharGuard class is used.
+/// Then the data has to be copied to the tuple_data_pool, because the JVM releases the
+/// reference and reclaims the memory area.
+template <bool IS_BINARY>
+Status IcebergRowReader::WriteStringOrBinarySlot(JNIEnv* env,
+    const jobject &accessed_value, void* slot, MemPool* tuple_data_pool) {
+  using jbufferType = typename std::conditional<IS_BINARY, jbyteArray, jstring>::type;
+  using GuardType = typename std::conditional<
+      IS_BINARY, JniByteArrayGuard, JniUtfCharGuard>::type;
+  const jclass& jobject_subclass = IS_BINARY ? byte_buffer_cl_ : char_sequence_cl_;
+
   DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, char_sequence_cl_) == JNI_TRUE);
-  jstring result = static_cast<jstring>(env->CallObjectMethod(accessed_value,
-      char_sequence_to_string_));
-  RETURN_ERROR_IF_EXC(env);
-  JniUtfCharGuard str_guard;
-  RETURN_IF_ERROR(JniUtfCharGuard::create(env, result, &str_guard));
-  // Allocate memory and copy the string from the JVM to the RowBatch
-  int str_len = strlen(str_guard.get());
-  char* buffer = reinterpret_cast<char*>(tuple_data_pool->TryAllocateUnaligned(str_len));
-  if (UNLIKELY(buffer == nullptr)) {
-    string details = strings::Substitute("Failed to allocate $1 bytes for string.",
-        str_len);
-    return tuple_data_pool->mem_tracker()->MemLimitExceeded(nullptr, details, str_len);
+  DCHECK(env->IsInstanceOf(accessed_value, jobject_subclass) == JNI_TRUE);
+
+  jbufferType jbuffer;
+  if constexpr (IS_BINARY) {
+    RETURN_IF_ERROR(metadata_scanner_->ConvertJavaByteBufferToByteArray(
+        env, accessed_value, &jbuffer));
+  } else {
+    jbuffer = static_cast<jstring>(env->CallObjectMethod(accessed_value,
+        char_sequence_to_string_));
+    RETURN_ERROR_IF_EXC(env);
   }
-  memcpy(buffer, str_guard.get(), str_len);
-  reinterpret_cast<StringValue*>(slot)->Assign(buffer, str_len);
+
+  GuardType jbuffer_guard;
+  RETURN_IF_ERROR(GuardType::create(env, jbuffer, &jbuffer_guard));
+  uint32_t jbuffer_size = jbuffer_guard.get_size();
+
+  // Allocate memory and copy the bytes from the JVM to the RowBatch.
+  char* buffer = reinterpret_cast<char*>(
+      tuple_data_pool->TryAllocateUnaligned(jbuffer_size));
+  if (UNLIKELY(buffer == nullptr)) {
+    string details = strings::Substitute("Failed to allocate $0 bytes for $1.",
+        jbuffer_size, IS_BINARY ? "binary" : "string");
+    return tuple_data_pool->mem_tracker()->MemLimitExceeded(
+        nullptr, details, jbuffer_size);
+  }
+
+  memcpy(buffer, jbuffer_guard.get(), jbuffer_size);
+  reinterpret_cast<StringValue*>(slot)->Assign(buffer, jbuffer_size);
   return Status::OK();
 }
 
@@ -339,19 +365,23 @@ Status IcebergRowReader::WriteMapKeyAndValue(JNIEnv* env, const jobject& map_sca
 
 jclass IcebergRowReader::JavaClassFromImpalaType(const ColumnType type) {
   switch (type.type) {
-    case TYPE_BOOLEAN: {     // java.lang.Boolean
+    case TYPE_BOOLEAN: {         // java.lang.Boolean
       return boolean_cl_;
     } case TYPE_DATE:
-      case TYPE_INT: {       // java.lang.Integer
+      case TYPE_INT: {           // java.lang.Integer
       return integer_cl_;
-    } case TYPE_BIGINT:      // java.lang.Long
-      case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
+    } case TYPE_BIGINT:          // java.lang.Long
+      case TYPE_TIMESTAMP: {     // org.apache.iceberg.types.TimestampType
       return long_cl_;
-    } case TYPE_STRING: {    // java.lang.String
-      return char_sequence_cl_;
-    } case TYPE_ARRAY: {     // java.util.List
+    } case TYPE_STRING: {
+      if (type.IsBinaryType()) { // java.nio.ByteBuffer
+        return byte_buffer_cl_;
+      } else {                   // java.lang.CharSequence
+        return char_sequence_cl_;
+      }
+    } case TYPE_ARRAY: {         // java.util.List
       return list_cl_;
-    } case TYPE_MAP: {       // java.util.Map
+    } case TYPE_MAP: {           // java.util.Map
       return map_cl_;
     }
     default:

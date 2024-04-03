@@ -20,6 +20,7 @@ package org.apache.impala.util;
 import com.cloudera.cloud.storage.relocated.protobuf.Struct;
 import com.google.common.base.Preconditions;
 
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -129,6 +130,17 @@ public class IcebergMetadataScanner {
   public <T> T GetValueByPosition(StructLike structLike, int pos, Class<T> javaClass)
   {
     return structLike.get(pos, javaClass);
+  }
+
+
+  /**
+   * Extracts the contents of a ByteBuffer into a byte array.
+   */
+  public byte[] ByteBufferToByteArray(ByteBuffer buffer) {
+    int length = buffer.remaining();
+    byte[] res = new byte[length];
+    buffer.get(res);
+    return res;
   }
 
   /**

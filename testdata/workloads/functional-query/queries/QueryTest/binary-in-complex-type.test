@@ -1,0 +1,40 @@
+====
+---- QUERY
+# Tests specifically for BINARY type in complex types.
+select binary_member_col.b from binary_in_complex_types
+---- TYPES
+BINARY
+---- RESULTS
+'member'
+====
+---- QUERY
+select a.item from binary_in_complex_types t, t.binary_item_col a
+---- TYPES
+BINARY
+---- RESULTS
+'item1'
+'item2'
+====
+---- QUERY
+select m.key, m.value from binary_in_complex_types t, t.binary_key_col m
+---- TYPES
+BINARY,INT
+---- RESULTS
+'key1',1
+'key2',2
+====
+---- QUERY
+select m.key, m.value from binary_in_complex_types t, t.binary_value_col m
+---- TYPES
+INT,BINARY
+---- RESULTS
+1,'value1'
+2,'value2'
+====
+---- QUERY
+select binary_item_col, binary_key_col, binary_value_col, binary_member_col from binary_in_complex_types
+---- TYPES
+STRING,STRING,STRING,STRING
+---- RESULTS
+'["aXRlbTE=","aXRlbTI="]','{"a2V5MQ==":1,"a2V5Mg==":2}','{1:"dmFsdWUx",2:"dmFsdWUy"}','{"i":0,"b":"bWVtYmVy"}'
+====

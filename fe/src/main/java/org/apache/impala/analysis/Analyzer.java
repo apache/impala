@@ -1801,13 +1801,6 @@ public class Analyzer {
     boolean isResolved = resolvedPath.resolve();
     Preconditions.checkState(isResolved);
 
-    if (resolvedPath.destType().isBinary() &&
-        !collTblRef.getResolvedPath().comesFromIcebergMetadataTable()) {
-      // We allow BINARY fields in collections from Iceberg metadata tables but NULL them
-      // out.
-      throw new AnalysisException(
-          "Binary type inside collection types is not supported (IMPALA-11491).");
-    }
     registerSlotRef(resolvedPath, false);
   }
 

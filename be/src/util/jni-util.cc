@@ -32,24 +32,43 @@ DEFINE_int64(jvm_deadlock_detector_interval_s, 60,
 
 namespace impala {
 
-Status JniUtfCharGuard::create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out) {
-  DCHECK(jstr != nullptr);
+template <class T>
+Status JniBufferGuard<T>::create(JNIEnv* env, T jbuffer, JniBufferGuard<T>* out) {
+  DCHECK(jbuffer != nullptr);
   DCHECK(!env->ExceptionCheck());
   jboolean is_copy;
-  const char* utf_chars = env->GetStringUTFChars(jstr, &is_copy);
+  const char* buffer = nullptr;
+  uint32_t size = -1;
+  if constexpr (std::is_same_v<T, jstring>) {
+    size = env->GetStringLength(jbuffer);
+    buffer = env->GetStringUTFChars(jbuffer, &is_copy);
+  } else {
+    static_assert(std::is_same_v<T, jbyteArray>);
+    size = env->GetArrayLength(jbuffer);
+    buffer = reinterpret_cast<char*>(env->GetByteArrayElements(jbuffer, &is_copy));
+  }
+  DCHECK_NE(size, -1);
+
   bool exception_check = static_cast<bool>(env->ExceptionCheck());
-  if (utf_chars == nullptr || exception_check) {
+  if (buffer == nullptr || exception_check) {
     if (exception_check) env->ExceptionClear();
-    if (utf_chars != nullptr) env->ReleaseStringUTFChars(jstr, utf_chars);
-    auto fail_message = "GetStringUTFChars failed. Probable OOM on JVM side";
+    if (buffer != nullptr) Release(env, jbuffer, buffer);
+    std::string fail_message = Substitute("$0 $1",
+        std::is_same_v<T, jstring> ? "GetStringUTFChars" : "GetByteArrayElements",
+        "failed. Probable OOM on JVM side.");
     LOG(ERROR) << fail_message;
     return Status(fail_message);
   }
   out->env = env;
-  out->jstr = jstr;
-  out->utf_chars = utf_chars;
+  out->jbuffer = jbuffer;
+  out->size = size;
+  out->buffer = buffer;
   return Status::OK();
 }
+
+// JniBufferGuard<jstring> is instantiated implicitly because functons in the header use
+// it, but JniBufferGuard<jbyteArray> needs to be instantiated explicitly.
+template class JniBufferGuard<jbyteArray>;
 
 bool JniScopedArrayCritical::Create(JNIEnv* env, jbyteArray jarr,
     JniScopedArrayCritical* out) {

@@ -984,6 +984,20 @@ If a snapshot has multiple manifest files, then you need to change manually the 
 *_json files and transform it back using avro tools, the last step of avro_iceberg_convert.sh, or
 use testdata/bin/rewrite-iceberg-metadata.py
 
+iceberg_test/hadoop_catalog/ice/iceberg_with_key_metadata:
+Created by the following steps:
+ - saved the HDFS directory of 'iceberg_v2_no_deletes' to local
+   ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice
+ - converted the avro manifest file to json
+ - manually replaced the 'null' value for "key_metadata" with "{"bytes" :
+   "binary_key_metadata"}"
+ - converted the modified json file back to avro.
+ - adjusted the length of manifest file in the avro snapshot file
+
+The commands for converting the avro file to json and back are listed under
+'iceberg_v2_no_deletes' in the script avro_iceberg_convert.sh. Adjusting the length is
+described after the script.
+
 iceberg_v2_partitioned_position_deletes:
 iceberg_v2_partitioned_position_deletes_orc:
 Created similarly to iceberg_v2_no_deletes.

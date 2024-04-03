@@ -74,6 +74,11 @@ class IcebergMetadataScanner {
   Status GetNextMapKeyAndValue(JNIEnv* env, const jobject& scanner,
       jobject* key, jobject* value) WARN_UNUSED_RESULT;
 
+  /// Helper function that extracts the contents of a java.nio.ByteBuffer into a Java
+  /// primitive byte array. This is used with BINARY fields.
+  Status ConvertJavaByteBufferToByteArray(JNIEnv* env, const jobject& byte_buffer,
+      jbyteArray* result) WARN_UNUSED_RESULT;
+
   /// Removes global references.
   void Close(RuntimeState* state);
 
@@ -84,6 +89,7 @@ class IcebergMetadataScanner {
   inline static jclass list_cl_ = nullptr;
   inline static jclass map_cl_ = nullptr;
   inline static jclass map_entry_cl_ = nullptr;
+  inline static jclass byte_array_cl_ = nullptr;
 
   /// Method references created with JniUtil.
   inline static jmethodID iceberg_metadata_scanner_ctor_ = nullptr;
@@ -97,6 +103,8 @@ class IcebergMetadataScanner {
       iceberg_metadata_scanner_collection_scanner_from_map_ = nullptr;
   inline static jmethodID
       iceberg_metadata_scanner_collection_scanner_get_next_collection_item_ = nullptr;
+  inline static jmethodID
+      iceberg_metadata_scanner_byte_buffer_to_byte_array_ = nullptr;
 
   inline static jmethodID map_entry_get_key_ = nullptr;
   inline static jmethodID map_entry_get_value_ = nullptr;

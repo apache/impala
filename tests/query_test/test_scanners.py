@@ -2002,6 +2002,21 @@ class TestBinaryType(ImpalaTestSuite):
     self.run_test_case('QueryTest/binary-type', vector)
 
 
+class TestBinaryInComplexType(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestBinaryInComplexType, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format in ['parquet', 'orc'])
+
+  def test_binary_in_complex_type(self, vector):
+    self.run_test_case('QueryTest/binary-in-complex-type', vector)
+
+
 class TestParquetV2(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

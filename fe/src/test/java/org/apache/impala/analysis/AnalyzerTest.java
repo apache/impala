@@ -294,21 +294,6 @@ public class AnalyzerTest extends FrontendTestBase {
         "Failed to load metadata for table: 'functional.unsupported_binary_partition'");
     // Try with hbase
     AnalyzesOk("describe functional_hbase.allcomplextypes");
-    // Returning complex types with BINARY in select list is not yet implemented
-    // (IMPALA-11491). Note that this is also problematic in Hive (HIVE-26454).
-    AnalysisError(
-        "select binary_item_col from functional_parquet.binary_in_complex_types",
-        "Binary type inside collection types is not supported (IMPALA-11491).");
-    AnalysisError(
-        "select binary_member_col from functional_parquet.binary_in_complex_types",
-        "Struct containing a BINARY type is not allowed in the select list " +
-        "(IMPALA-11491).");
-    AnalysisError(
-        "select binary_key_col from functional_parquet.binary_in_complex_types",
-        "Binary type inside collection types is not supported (IMPALA-11491).");
-    AnalysisError(
-        "select binary_value_col from functional_parquet.binary_in_complex_types",
-        "Binary type inside collection types is not supported (IMPALA-11491).");
 
     for (ScalarType t: Type.getUnsupportedTypes()) {
       // Create/Alter table.

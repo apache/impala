@@ -1061,6 +1061,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Unable to INSERT into target table (default.new_tbl) because the column " +
             "'tiny_struct' has a complex type 'STRUCT<b:BOOLEAN>' and Impala doesn't " +
             "support inserting into tables containing complex type columns");
+    // Binary in complex types is also supported.
+    AnalyzesOk("select binary_item_col from functional_parquet.binary_in_complex_types");
+    AnalyzesOk(
+        "select binary_member_col from functional_parquet.binary_in_complex_types");
+    AnalyzesOk("select binary_key_col from functional_parquet.binary_in_complex_types");
+    AnalyzesOk("select binary_value_col from functional_parquet.binary_in_complex_types");
 
     //Make complex types available in star queries
     ctx.getQueryOptions().setExpand_complex_types(true);
@@ -1085,9 +1091,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Allow also structs in collections and vice versa.
     AnalyzesOk("select * from functional_parquet.allcomplextypes", ctx);
     AnalyzesOk("select * from functional_orc_def.complextypestbl", ctx);
-
-    AnalysisError("select * from functional_parquet.binary_in_complex_types", ctx,
-        "Binary type inside collection types is not supported (IMPALA-11491).");
+    AnalyzesOk("select * from functional_parquet.binary_in_complex_types", ctx);
   }
 
   @Test

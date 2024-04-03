@@ -214,12 +214,6 @@ public class SlotRef extends Expr {
         throw new AnalysisException("Unsupported type '"
             + fieldType.toSql() + "' in '" + toSql() + "'.");
       }
-      if (fieldType.isBinary() && !desc_.getPath().comesFromIcebergMetadataTable()) {
-        // We allow BINARY fields in collections from Iceberg metadata tables but NULL
-        // them out.
-        throw new AnalysisException("Struct containing a BINARY type is not " +
-            "allowed in the select list (IMPALA-11491).");
-      }
 
       if (fieldType.isStructType()) {
         Preconditions.checkState(child instanceof SlotRef);

@@ -20,6 +20,7 @@
 #include <string>
 
 #include "runtime/raw-value.inline.h"
+#include "util/coding-util.h"
 
 namespace impala {
 
@@ -58,6 +59,20 @@ void ComplexValueWriter<JsonStream>::PrimitiveValueToJSON(void* value,
   RawValue::PrintValue(value, type, scale, &tmp);
   const bool should_convert_to_string = map_key && stringify_map_keys_;
   if (IsPrimitiveTypePrintedAsString(type) || should_convert_to_string) {
+    if (type.IsBinaryType()) {
+      int64_t base64_max_len;
+      bool succ = Base64EncodeBufLen(tmp.size(), &base64_max_len);
+      DCHECK(succ);
+
+      // 'base64_max_len' includes the null terminator.
+      string buf(base64_max_len - 1, '\0');
+      unsigned base64_len = 0;
+      succ = Base64Encode(tmp.c_str(), tmp.size(), base64_max_len, buf.data(),
+          &base64_len);
+      DCHECK(succ);
+
+      tmp = std::move(buf);
+    }
     writer_->String(tmp.c_str());
   } else {
     writer_->RawValue(tmp.c_str(), tmp.size(),
