@@ -899,6 +899,7 @@ public class SelectStmt extends QueryStmt {
       Path starExpandedPath = Path.createRelPath(resolvedRootPath, relRawPath);
       Preconditions.checkState(starExpandedPath.resolve());
       if (starExpandedPath.destType().isComplexType() &&
+          !starExpandedPath.comesFromIcebergMetadataTable() &&
           !analyzer_.getQueryCtx().client_request.query_options.expand_complex_types) {
         return;
       }
