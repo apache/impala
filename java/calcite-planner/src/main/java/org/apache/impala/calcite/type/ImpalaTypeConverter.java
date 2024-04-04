@@ -336,4 +336,9 @@ public class ImpalaTypeConverter {
     Type normalizedImpalaType = getImpalaType(primitiveType);
     return impalaToCalciteMap.get(normalizedImpalaType);
   }
+
+  // helper function to handle translation of lists.
+  public static List<RelDataType> getRelDataTypesForArgs(List<Type> impalaTypes) {
+    return Lists.transform(impalaTypes, ImpalaTypeConverter::getRelDataType);
+  }
 }

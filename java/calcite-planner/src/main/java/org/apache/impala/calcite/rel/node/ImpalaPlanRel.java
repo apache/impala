@@ -36,6 +36,7 @@ public interface ImpalaPlanRel {
     AGGREGATE,
     FILTER,
     HDFSSCAN,
+    JOIN,
     PROJECT,
     SORT,
     UNION,

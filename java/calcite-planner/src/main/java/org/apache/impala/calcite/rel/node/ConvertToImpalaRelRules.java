@@ -21,6 +21,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
@@ -120,6 +121,19 @@ public class ConvertToImpalaRelRules {
     public void onMatch(RelOptRuleCall call) {
       final LogicalValues values = call.rel(0);
       call.transformTo(new ImpalaValuesRel(values));
+    }
+  }
+
+  public static class ImpalaJoinRule extends RelOptRule {
+
+    public ImpalaJoinRule() {
+      super(operand(LogicalJoin.class, any()));
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      final LogicalJoin join = call.rel(0);
+      call.transformTo(new ImpalaJoinRel(join));
     }
   }
 

@@ -381,3 +381,109 @@ NULL,10,40
 ---- TYPES
 int, bigint, bigint
 ====
+---- QUERY
+# having test
+select id, sum(bigint_col) from functional.alltypestiny group by id having sum(bigint_col) > cast(5 as bigint) order by id;
+---- RESULTS
+1,10
+3,10
+5,10
+7,10
+---- TYPES
+int, bigint
+====
+---- QUERY
+# join test
+select a.id, a.bigint_col, b.bigint_col
+from functional.alltypestiny a
+join functional.alltypessmall b
+on (a.id = b.id) order by a.id;
+---- RESULTS
+0,0,0
+1,10,10
+2,0,20
+3,10,30
+4,0,40
+5,10,50
+6,0,60
+7,10,70
+---- TYPES
+int, bigint, bigint
+====
+---- QUERY
+# join inequality test
+select a.id, b.id, a.bigint_col, b.bigint_col
+from functional.alltypestiny a
+join functional.alltypessmall b
+on (b.id < a.id)
+where b.id = 0
+order by a.id;
+---- RESULTS
+1,0,10,0
+2,0,0,0
+3,0,10,0
+4,0,0,0
+5,0,10,0
+6,0,0,0
+7,0,10,0
+---- TYPES
+int, int, bigint,  bigint
+====
+---- QUERY
+# cross join test
+select a.id, b.id, a.bigint_col, b.bigint_col
+from functional.alltypestiny a, functional.alltypessmall b
+where b.id < 2
+order by a.id, b.id;
+---- RESULTS
+0,0,0,0
+0,1,0,10
+1,0,10,0
+1,1,10,10
+2,0,0,0
+2,1,0,10
+3,0,10,0
+3,1,10,10
+4,0,0,0
+4,1,0,10
+5,0,10,0
+5,1,10,10
+6,0,0,0
+6,1,0,10
+7,0,10,0
+7,1,10,10
+---- TYPES
+int, int, bigint, bigint
+====
+---- QUERY
+# left outer join test
+select a.id, a.bigint_col, b.bigint_col
+from functional.alltypessmall a
+left outer join functional.alltypestiny b
+on (a.id = b.id)
+where a.id < 20
+order by a.id
+---- RESULTS
+0,0,0
+1,10,10
+2,20,0
+3,30,10
+4,40,0
+5,50,10
+6,60,0
+7,70,10
+8,80,NULL
+9,90,NULL
+10,0,NULL
+11,10,NULL
+12,20,NULL
+13,30,NULL
+14,40,NULL
+15,50,NULL
+16,60,NULL
+17,70,NULL
+18,80,NULL
+19,90,NULL
+---- TYPES
+int, bigint, bigint
+====

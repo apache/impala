@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.functions;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
@@ -34,12 +35,8 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.ImpalaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -113,6 +110,6 @@ public class RexLiteralConverter {
     List<Expr> argList =
         Lists.newArrayList(new StringLiteral(timestamp, Type.STRING, false));
     Function castFunc = FunctionResolver.getFunction("casttotimestamp", typeNames);
-    return new AnalyzedFunctionCallExpr(castFunc, argList, null, Type.TIMESTAMP);
+    return new AnalyzedFunctionCallExpr(castFunc, argList, Type.TIMESTAMP);
   }
 }

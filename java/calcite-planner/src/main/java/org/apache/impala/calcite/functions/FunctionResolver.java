@@ -24,11 +24,9 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.BuiltinsDb;
-import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 

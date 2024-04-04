@@ -54,7 +54,7 @@ public class NodeCreationUtils {
     SelectNode selectNode =
         SelectNode.createFromCalcite(nodeId, nodeWithExprs.planNode_, filterConjuncts);
     selectNode.init(analyzer);
-    return new NodeWithExprs(selectNode, nodeWithExprs.outputExprs_);
+    return new NodeWithExprs(selectNode, nodeWithExprs);
   }
 
   public static NodeWithExprs createEmptySetPlanNode(PlanNodeId nodeId,
@@ -87,7 +87,7 @@ public class NodeCreationUtils {
 
     unionNode.init(analyzer);
 
-    return new NodeWithExprs(unionNode, outputExprs);
+    return new NodeWithExprs(unionNode, outputExprs, childrenPlanNodes);
   }
 
   public static List<Expr> createOutputExprs(List<SlotDescriptor> slotDescs) {

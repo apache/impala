@@ -20,16 +20,19 @@ package org.apache.impala.calcite.service;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptCostImpl;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
+import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.InternalException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,30 +53,78 @@ public class CalciteOptimizer implements CompilerStep {
   }
 
   public ImpalaPlanRel optimize(RelNode logPlan) throws ImpalaException {
+    RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(logPlan.getCluster(),
+        validator_.getCatalogReader());
+
+    RelNode optimizedPlan = runJoinProgram(relBuilder, logPlan);
+
+    ImpalaPlanRel finalOptimizedPlan =
+        runImpalaConvertProgram(relBuilder, optimizedPlan);
+
+    return finalOptimizedPlan;
+  }
+
+  /**
+   * Run the rules specifically for join ordering.
+   *
+   */
+  public RelNode runJoinProgram(RelBuilder relBuilder,
+      RelNode plan) throws ImpalaException {
+
     HepProgramBuilder builder = new HepProgramBuilder();
 
-    // rules to convert Calcite nodes into ImpalaPlanRel nodes
-    builder.addRuleCollection(
-        ImmutableList.of(
-            new ConvertToImpalaRelRules.ImpalaAggRule(),
-            new ConvertToImpalaRelRules.ImpalaScanRule(),
-            new ConvertToImpalaRelRules.ImpalaFilterRule(),
-            new ConvertToImpalaRelRules.ImpalaSortRule(),
-            new ConvertToImpalaRelRules.ImpalaValuesRule(),
-            new ConvertToImpalaRelRules.ImpalaUnionRule(),
-            new ConvertToImpalaRelRules.ImpalaProjectRule()));
+    builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
 
-    HepPlanner planner = new HepPlanner(builder.build(),
-        logPlan.getCluster().getPlanner().getContext(),
-            false, null, RelOptCostImpl.FACTORY);
-    logPlan.getCluster().setMetadataProvider(JaninoRelMetadataProvider.DEFAULT);
-    planner.setRoot(logPlan);
-    RelNode optimizedPlan = planner.findBestExp();
-    if (!(optimizedPlan instanceof ImpalaPlanRel)) {
-      throw new InternalException("Could not generate Impala RelNode plan. Plan " +
-          "is \n" + getDebugString(optimizedPlan));
-    }
-    return (ImpalaPlanRel) optimizedPlan;
+    // Merge the filter nodes into the Join. Also include
+    // The filter/project transpose in case the Filter
+    // exists above the Project in the RelNode so it can
+    // then be merged into the Join. The idea is to place
+    // joins next to each other if possible for the join
+    // optimization step.
+    builder.addRuleCollection(ImmutableList.of(
+        CoreRules.FILTER_INTO_JOIN,
+        CoreRules.FILTER_PROJECT_TRANSPOSE
+        ));
+
+    // Join rules work in a two step process.  The first step
+    // is to merge all adjacent joins into one big "multijoin"
+    // RelNode (the JOIN_TO_MULTIJOIN rule). Then the
+    // MULTI_JOIN_OPTIMIZE rule is used to determine the join
+    // ordering.
+    builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+    builder.addRuleInstance(CoreRules.JOIN_TO_MULTI_JOIN);
+    builder.addRuleInstance(CoreRules.MULTI_JOIN_OPTIMIZE);
+
+    return runProgram(plan, builder.build());
+  }
+
+  public ImpalaPlanRel runImpalaConvertProgram(RelBuilder relBuilder,
+      RelNode plan) throws ImpalaException {
+
+    HepProgramBuilder builder = new HepProgramBuilder();
+
+    builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+    builder.addRuleCollection(ImmutableList.of(
+        new ConvertToImpalaRelRules.ImpalaScanRule(),
+        new ConvertToImpalaRelRules.ImpalaSortRule(),
+        new ConvertToImpalaRelRules.ImpalaProjectRule(),
+        new ConvertToImpalaRelRules.ImpalaAggRule(),
+        new ConvertToImpalaRelRules.ImpalaJoinRule(),
+        new ConvertToImpalaRelRules.ImpalaFilterRule(),
+        new ConvertToImpalaRelRules.ImpalaUnionRule(),
+        new ConvertToImpalaRelRules.ImpalaValuesRule()
+        ));
+
+    return (ImpalaPlanRel) runProgram(plan, builder.build());
+  }
+
+  private RelNode runProgram(RelNode currentNode, HepProgram program) {
+    HepPlanner planner = new HepPlanner(program,
+        currentNode.getCluster().getPlanner().getContext(), true, null,
+        RelOptCostImpl.FACTORY);
+    planner.setRoot(currentNode);
+
+    return planner.findBestExp();
   }
 
   public String getDebugString(Object optimizedPlan) {

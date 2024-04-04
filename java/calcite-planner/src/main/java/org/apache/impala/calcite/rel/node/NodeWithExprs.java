@@ -36,4 +36,22 @@ public class NodeWithExprs {
     this.planNode_ = planNode;
     this.outputExprs_ = outputExprs;
   }
+
+  public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs,
+      List<NodeWithExprs> childrenNodeWithExprs) {
+    this.planNode_ = planNode;
+    this.outputExprs_ = outputExprs;
+  }
+
+  public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs,
+      NodeWithExprs childNodeWithExprs) {
+    this.planNode_ = planNode;
+    this.outputExprs_ = outputExprs;
+  }
+
+  public NodeWithExprs(PlanNode planNode, NodeWithExprs childNodeWithExprs) {
+
+    this.planNode_ = planNode;
+    this.outputExprs_ = childNodeWithExprs.outputExprs_;
+  }
 }

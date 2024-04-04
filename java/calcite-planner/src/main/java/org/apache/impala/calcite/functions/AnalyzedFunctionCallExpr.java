@@ -17,8 +17,6 @@
 
 package org.apache.impala.calcite.functions;
 
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
@@ -26,7 +24,6 @@ import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.ImpalaException;
 
 import java.util.List;
 
@@ -48,15 +45,13 @@ public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
   private final Function savedFunction_;
 
   // c'tor that takes a list of Exprs that eventually get converted to FunctionParams
-  public AnalyzedFunctionCallExpr(Function fn, List<Expr> params,
-      RexCall rexCall, Type retType) {
+  public AnalyzedFunctionCallExpr(Function fn, List<Expr> params, Type retType) {
     super(fn.getFunctionName(), params);
     this.savedFunction_ = fn;
     this.type_ = retType;
   }
 
-  // c'tor which does not depend on Calcite's RexCall but is used when Impala's
-  // FunctionParams are created or there is some modifications to it
+  // c'tor when FunctionParams are known
   public AnalyzedFunctionCallExpr(Function fn, FunctionParams funcParams,
       Type retType) {
     super(fn.getFunctionName(), funcParams);
