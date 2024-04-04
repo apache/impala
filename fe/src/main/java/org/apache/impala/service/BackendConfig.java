@@ -496,4 +496,6 @@ public class BackendConfig {
   public boolean isMinimalTopicMode() {
     return backendCfg_.catalog_topic_mode.equalsIgnoreCase("minimal");
   }
+
+  public double getQueryCpuRootFactor() { return backendCfg_.query_cpu_root_factor; }
 }

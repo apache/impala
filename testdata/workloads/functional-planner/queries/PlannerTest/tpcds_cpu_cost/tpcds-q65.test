@@ -265,7 +265,7 @@ max-parallelism=80 segment-costs=[712023759, 705357736, 19] cpu-comparison-resul
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=1.18GB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1824 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  05:AGGREGATE [STREAMING]
 |  |  output: sum(ss_sales_price)
 |  |  group by: ss_store_sk, ss_item_sk
@@ -410,7 +410,7 @@ max-parallelism=80 segment-costs=[712023759, 705357736, 19] cpu-comparison-resul
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=1.18GB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 10:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
 |  group by: ss_store_sk, ss_item_sk
@@ -556,7 +556,7 @@ max-parallelism=80 segment-costs=[712023759, 705357736, 19] cpu-comparison-resul
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=1.18GB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1824 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  05:AGGREGATE [STREAMING]
 |  |  output: sum(ss_sales_price)
 |  |  group by: ss_store_sk, ss_item_sk
@@ -701,7 +701,7 @@ max-parallelism=80 segment-costs=[712023759, 705357736, 19] cpu-comparison-resul
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=1.18GB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[34785941968, 6431183] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 10:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
 |  group by: ss_store_sk, ss_item_sk

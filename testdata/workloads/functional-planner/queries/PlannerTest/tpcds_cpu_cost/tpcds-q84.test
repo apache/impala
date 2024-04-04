@@ -295,7 +295,7 @@ max-parallelism=1410 segment-costs=[14062042891, 7] cpu-comparison-result=220 [m
 |
 |--F11:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=45.78MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=120 segment-costs=[32342796]
+|  |  max-parallelism=1410 segment-costs=[32342796]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: c_current_cdemo_sk
@@ -528,7 +528,7 @@ max-parallelism=1410 segment-costs=[14062042891, 7] cpu-comparison-result=220 [m
 |
 |--F11:PLAN FRAGMENT [HASH(cd_demo_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=45.78MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=120 segment-costs=[32342796]
+|  |  max-parallelism=1410 segment-costs=[32342796]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: c_current_cdemo_sk

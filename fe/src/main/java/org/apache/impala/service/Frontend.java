@@ -20,6 +20,7 @@ package org.apache.impala.service;
 import static org.apache.impala.common.ByteUnits.MEGABYTE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
@@ -262,11 +263,13 @@ public class Frontend {
   private static final String EXECUTOR_GROUPS_CONSIDERED = "ExecutorGroupsConsidered";
   private static final String CPU_COUNT_DIVISOR = "CpuCountDivisor";
   private static final String EFFECTIVE_PARALLELISM = "EffectiveParallelism";
+  private static final String MAX_PARALLELISM = "MaxParallelism";
   private static final String VERDICT = "Verdict";
   private static final String MEMORY_MAX = "MemoryMax";
   private static final String MEMORY_ASK = "MemoryAsk";
   private static final String CPU_MAX = "CpuMax";
   private static final String CPU_ASK = "CpuAsk";
+  private static final String CPU_ASK_BOUNDED = "CpuAskBounded";
   private static final String AVG_ADMISSION_SLOTS_PER_EXECUTOR =
       "AvgAdmissionSlotsPerExecutor";
 
@@ -306,8 +309,12 @@ public class Frontend {
 
       // The processing cores required to execute the query.
       // Certain queries such as EXPLAIN do not populate TExecRequest.query_exec_request.
-      // Therefore, cores requirement will be set here through setCoresRequired().
-      protected int cores_required_ = -1;
+      // Default to 1 if copyTQueryExecRequestFieldsForExplain() is not called.
+      protected int coresRequired_ = 1;
+
+      // An unbounded version of cores_required_.
+      // Default to 1 if copyTQueryExecRequestFieldsForExplain() is not called.
+      protected int coresRequiredUnbounded_ = 1;
 
       // The initial length of content in explain buffer to help return the buffer
       // to the initial position prior to another auto-scaling compilation.
@@ -336,11 +343,15 @@ public class Frontend {
 
       public boolean disableAuthorization() { return disableAuthorization_; }
 
-      public long getEstimatedMemoryPerHost() { return estimated_memory_per_host_; }
-      public void setEstimatedMemoryPerHost(long x) { estimated_memory_per_host_ = x; }
+      public void copyTQueryExecRequestFieldsForExplain(TQueryExecRequest req) {
+        estimated_memory_per_host_ = req.getPer_host_mem_estimate();
+        coresRequired_ = req.getCores_required();
+        coresRequiredUnbounded_ = req.getCores_required_unbounded();
+      }
 
-      public int getCoresRequired() { return cores_required_; }
-      public void setCoresRequired(int x) { cores_required_ = x; }
+      public long getEstimatedMemoryPerHost() { return estimated_memory_per_host_; }
+      public int getCoresRequired() { return coresRequired_; }
+      public int getCoresRequiredUnbounded() { return coresRequiredUnbounded_; }
 
       public int getAvailableCoresPerNode() {
         Preconditions.checkState(availableCoresPerNode_ >= 0);
@@ -1949,11 +1960,8 @@ public class Frontend {
     planCtx.explainBuf_.append(planner.getExplainString(allFragments, result));
     result.setQuery_plan(planCtx.getExplainString());
 
-    // copy estimated memory per host to planCtx for auto-scaling.
-    planCtx.compilationState_.setEstimatedMemoryPerHost(
-        result.getPer_host_mem_estimate());
-
-    planCtx.compilationState_.setCoresRequired(result.getCores_required());
+    // copy estimated memory per host and core requirements to planCtx for auto-scaling.
+    planCtx.compilationState_.copyTQueryExecRequestFieldsForExplain(result);
 
     return result;
   }
@@ -2154,13 +2162,14 @@ public class Frontend {
             enable_replan
                 && (RuntimeEnv.INSTANCE.isTestEnv() || queryOptions.isTest_replan()));
 
-    int num_executor_group_sets = executorGroupSetsToUse.size();
-    if (num_executor_group_sets == 0) {
+    int numExecutorGroupSets = executorGroupSetsToUse.size();
+    if (numExecutorGroupSets == 0) {
       throw new AnalysisException(
           "No suitable executor group sets can be identified and used.");
     }
     LOG.info("A total of {} executor group sets to be considered for auto-scaling: "
-            + executorGroupSetsToUse, num_executor_group_sets);
+            + executorGroupSetsToUse,
+        numExecutorGroupSets);
 
     TExecRequest req = null;
 
@@ -2168,6 +2177,7 @@ public class Frontend {
     planCtx.compilationState_.captureState();
     boolean isComputeCost = queryOptions.isCompute_processing_cost();
 
+    double cpuCountRootFactor = BackendConfig.INSTANCE.getQueryCpuRootFactor();
     double cpuCountDivisor = BackendConfig.INSTANCE.getQueryCpuCountDivisor();
     if (isComputeCost) {
       if (queryOptions.isSetQuery_cpu_count_divisor()) {
@@ -2180,10 +2190,15 @@ public class Frontend {
     TExecutorGroupSet group_set = null;
     String reason = "Unknown";
     int attempt = 0;
+    int firstExecutorGroupTotalCores = expectedTotalCores(executorGroupSetsToUse.get(0));
     int lastExecutorGroupTotalCores =
-        expectedTotalCores(executorGroupSetsToUse.get(num_executor_group_sets - 1));
+        expectedTotalCores(executorGroupSetsToUse.get(numExecutorGroupSets - 1));
     int i = 0;
-    while (i < num_executor_group_sets) {
+    while (i < numExecutorGroupSets) {
+      boolean isLastEG = (i == numExecutorGroupSets - 1);
+      boolean skipResourceCheckingAtLastEG = isLastEG
+          && BackendConfig.INSTANCE.isSkipResourceCheckingOnLastExecutorGroupSet();
+
       group_set = executorGroupSetsToUse.get(i);
       planCtx.compilationState_.setGroupSet(group_set);
       if (isComputeCost) {
@@ -2220,7 +2235,7 @@ public class Frontend {
       }
 
       // Counters about this group set.
-      int available_cores = expectedTotalCores(group_set);
+      int availableCores = expectedTotalCores(group_set);
       String profileName = "Executor group " + (i + 1);
       if (group_set.isSetExec_group_name_prefix()
           && !group_set.getExec_group_name_prefix().isEmpty()) {
@@ -2232,7 +2247,7 @@ public class Frontend {
               LongMath.saturatedMultiply(
                   expectedNumExecutor(group_set), group_set.getMax_mem_limit())));
       if (isComputeCost) {
-        addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, available_cores));
+        addCounter(groupSetProfile, new TCounter(CPU_MAX, TUnit.UNIT, availableCores));
       }
 
       // If it is for a single node plan, enable_replan is disabled, or it is not a query
@@ -2258,29 +2273,34 @@ public class Frontend {
       }
 
       // Find out the per host memory estimated from two possible sources.
-      long per_host_mem_estimate = -1;
-      int cores_requirement = -1;
+      long perHostMemEstimate = -1;
+      int cpuAskBounded = -1;
+      int cpuAskUnbounded = -1;
       if (req.query_exec_request != null) {
         // For non-explain queries
-        per_host_mem_estimate = req.query_exec_request.per_host_mem_estimate;
-        cores_requirement = req.query_exec_request.getCores_required();
+        perHostMemEstimate = req.query_exec_request.per_host_mem_estimate;
+        cpuAskBounded = req.query_exec_request.getCores_required();
+        cpuAskUnbounded = req.query_exec_request.getCores_required_unbounded();
       } else {
         // For explain queries
-        per_host_mem_estimate = planCtx.compilationState_.getEstimatedMemoryPerHost();
-        cores_requirement = planCtx.compilationState_.getCoresRequired();
+        perHostMemEstimate = planCtx.compilationState_.getEstimatedMemoryPerHost();
+        cpuAskBounded = planCtx.compilationState_.getCoresRequired();
+        cpuAskUnbounded = planCtx.compilationState_.getCoresRequiredUnbounded();
       }
 
-      Preconditions.checkState(per_host_mem_estimate >= 0);
-      boolean memReqSatisfied = per_host_mem_estimate <= group_set.getMax_mem_limit();
+      Preconditions.checkState(perHostMemEstimate >= 0);
+      boolean memReqSatisfied = perHostMemEstimate <= group_set.getMax_mem_limit();
       addCounter(groupSetProfile,
           new TCounter(MEMORY_ASK, TUnit.BYTES,
               LongMath.saturatedMultiply(
-                  expectedNumExecutor(group_set), per_host_mem_estimate)));
+                  expectedNumExecutor(group_set), perHostMemEstimate)));
 
       boolean cpuReqSatisfied = true;
-      int scaled_cores_requirement = -1;
+      int scaledCpuAskBounded = -1;
+      int scaledCpuAskUnbounded = -1;
       if (isComputeCost) {
-        Preconditions.checkState(cores_requirement > 0);
+        Preconditions.checkState(cpuAskBounded > 0);
+        Preconditions.checkState(cpuAskUnbounded > 0);
         if (queryOptions.getProcessing_cost_min_threads()
             > queryOptions.getMax_fragment_instances_per_node()) {
           throw new AnalysisException(
@@ -2291,14 +2311,30 @@ public class Frontend {
               + queryOptions.getMax_fragment_instances_per_node() + ").");
         }
 
-        scaled_cores_requirement = (int) Math.min(
-            Integer.MAX_VALUE, Math.ceil(cores_requirement / cpuCountDivisor));
-        cpuReqSatisfied = scaled_cores_requirement <= available_cores;
-
+        // Mark parallelism before scaling.
         addCounter(
-            groupSetProfile, new TCounter(CPU_ASK, TUnit.UNIT, scaled_cores_requirement));
+            groupSetProfile, new TCounter(MAX_PARALLELISM, TUnit.UNIT, cpuAskUnbounded));
         addCounter(groupSetProfile,
-            new TCounter(EFFECTIVE_PARALLELISM, TUnit.UNIT, cores_requirement));
+            new TCounter(EFFECTIVE_PARALLELISM, TUnit.UNIT, cpuAskBounded));
+
+        // Scale down cpuAskUnbounded using non-linear function, but cap it at least
+        // equal to cpuAskBounded at minimum.
+        cpuAskUnbounded = scaleDownCpuSublinear(cpuCountRootFactor,
+            firstExecutorGroupTotalCores, cpuAskBounded, cpuAskUnbounded);
+
+        // Do another scale down, but linearly using QUERY_CPU_COUNT_DIVISOR option.
+        scaledCpuAskBounded = scaleDownCpuLinear(cpuCountDivisor, cpuAskBounded);
+        scaledCpuAskUnbounded = scaleDownCpuLinear(cpuCountDivisor, cpuAskUnbounded);
+
+        // Check if cpu requirement match.
+        Preconditions.checkState(scaledCpuAskBounded <= scaledCpuAskUnbounded);
+        cpuReqSatisfied = scaledCpuAskUnbounded <= availableCores;
+
+        // Mark parallelism after scaling.
+        addCounter(
+            groupSetProfile, new TCounter(CPU_ASK, TUnit.UNIT, scaledCpuAskUnbounded));
+        addCounter(groupSetProfile,
+            new TCounter(CPU_ASK_BOUNDED, TUnit.UNIT, scaledCpuAskBounded));
       }
 
       boolean matchFound = false;
@@ -2312,16 +2348,18 @@ public class Frontend {
         addInfoString(groupSetProfile, VERDICT, reason);
         matchFound = true;
       } else if (memReqSatisfied && cpuReqSatisfied) {
-        reason = "suitable group found (estimated per-host memory="
-            + PrintUtils.printBytes(per_host_mem_estimate)
-            + ", estimated cpu cores required=" + cores_requirement
-            + ", scaled cpu cores=" + scaled_cores_requirement + ")";
+        reason = "suitable group found. "
+            + MoreObjects.toStringHelper("requirement")
+                  .add(MEMORY_ASK, PrintUtils.printBytes(perHostMemEstimate))
+                  .add(CPU_ASK, scaledCpuAskUnbounded)
+                  .add(CPU_ASK_BOUNDED, scaledCpuAskBounded)
+                  .add(EFFECTIVE_PARALLELISM, cpuAskBounded)
+                  .toString();
         addInfoString(groupSetProfile, VERDICT, "Match");
         matchFound = true;
       }
 
-      if (!matchFound && (i >= num_executor_group_sets - 1)
-          && BackendConfig.INSTANCE.isSkipResourceCheckingOnLastExecutorGroupSet()) {
+      if (!matchFound && skipResourceCheckingAtLastEG) {
         reason = "no executor group set fit. Admit to last executor group set.";
         addInfoString(groupSetProfile, VERDICT, reason);
         matchFound = true;
@@ -2334,10 +2372,10 @@ public class Frontend {
         setGroupNamePrefix(default_executor_group, clientSetRequestPool, req, group_set);
         if (isComputeCost && req.query_exec_request != null
             && queryOptions.slot_count_strategy == TSlotCountStrategy.PLANNER_CPU_ASK) {
-          // Use 'cores_requirement' instead of 'scaled_cores_requirement' since the
-          // former is derived from the real number of fragment instances.
+          // Use 'cpuAskBounded' because it is the actual total number of fragment
+          // instances that will be distributed.
           int avgSlotsUsePerBackend =
-              getAvgSlotsUsePerBackend(req, cores_requirement, group_set);
+              getAvgSlotsUsePerBackend(req, cpuAskBounded, group_set);
           FrontendProfile.getCurrent().setToCounter(
               AVG_ADMISSION_SLOTS_PER_EXECUTOR, TUnit.UNIT, avgSlotsUsePerBackend);
           req.query_exec_request.setMax_slot_per_executor(
@@ -2346,19 +2384,21 @@ public class Frontend {
         break;
       }
 
+      // At this point, no match is found and planner will step up to the next bigger
+      // executor group set.
       List<String> verdicts = Lists.newArrayListWithCapacity(2);
       List<String> reasons = Lists.newArrayListWithCapacity(2);
       if (!memReqSatisfied) {
         String verdict = "not enough per-host memory";
         verdicts.add(verdict);
-        reasons.add(verdict + " (require=" + per_host_mem_estimate
+        reasons.add(verdict + " (require=" + perHostMemEstimate
             + ", max=" + group_set.getMax_mem_limit() + ")");
       }
       if (!cpuReqSatisfied) {
         String verdict = "not enough cpu cores";
         verdicts.add(verdict);
-        reasons.add(verdict + " (require=" + scaled_cores_requirement
-            + ", max=" + available_cores + ")");
+        reasons.add(verdict + " (require=" + scaledCpuAskUnbounded
+            + ", max=" + availableCores + ")");
       }
       reason = String.join(", ", reasons);
       addInfoString(groupSetProfile, VERDICT, String.join(", ", verdicts));
@@ -2394,12 +2434,26 @@ public class Frontend {
   }
 
   private static int getAvgSlotsUsePerBackend(
-      TExecRequest req, int cores_requirement, TExecutorGroupSet group_set) {
-    int numExecutors = expectedNumExecutor(group_set);
-    Preconditions.checkState(cores_requirement > 0);
+      TExecRequest req, int cpuAskBounded, TExecutorGroupSet groupSet) {
+    int numExecutors = expectedNumExecutor(groupSet);
+    Preconditions.checkState(cpuAskBounded > 0);
     Preconditions.checkState(numExecutors > 0);
-    int idealSlot = (int) Math.ceil((double) cores_requirement / numExecutors);
-    return Math.max(1, Math.min(idealSlot, group_set.getNum_cores_per_executor()));
+    int idealSlot = (int) Math.ceil((double) cpuAskBounded / numExecutors);
+    return Math.max(1, Math.min(idealSlot, groupSet.getNum_cores_per_executor()));
+  }
+
+  private static int scaleDownCpuSublinear(double cpuCountRootFactor,
+      int smallestEGTotalCores, int cpuAskBounded, int cpuAskUnbounded) {
+    // Find Nth root of cpuAskUnbounded with N = cpuCountRootFactor.
+    double exponent = 1.0 / cpuCountRootFactor;
+    double nthRootSmallestEGTotalCores = Math.pow(smallestEGTotalCores, exponent);
+    double scaledCpuAskUnbounded = Math.pow(cpuAskUnbounded, exponent)
+        / nthRootSmallestEGTotalCores * smallestEGTotalCores;
+    return Math.max(cpuAskBounded, (int) Math.round(scaledCpuAskUnbounded));
+  }
+
+  private static int scaleDownCpuLinear(double cpuCountDivisor, int cpuAsk) {
+    return Math.min(Integer.MAX_VALUE, (int) Math.ceil(cpuAsk / cpuCountDivisor));
   }
 
   private static void setGroupNamePrefix(boolean default_executor_group,

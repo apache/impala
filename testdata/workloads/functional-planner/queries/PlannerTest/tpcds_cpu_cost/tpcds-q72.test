@@ -420,7 +420,7 @@ max-parallelism=556900 segment-costs=[5568985430776, 9996825600] cpu-comparison-
 |
 |--F17:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=467.89MB mem-reservation=36.00MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=120 segment-costs=[2087306718]
+|  |  max-parallelism=556900 segment-costs=[2087306718]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: inv_item_sk, inv_date_sk
@@ -857,7 +857,7 @@ max-parallelism=556900 segment-costs=[5568985430776, 9996825600] cpu-comparison-
 |
 |--F17:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=467.89MB mem-reservation=36.00MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=120 segment-costs=[2087306718]
+|  |  max-parallelism=556900 segment-costs=[2087306718]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: inv_item_sk, inv_date_sk

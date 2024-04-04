@@ -491,7 +491,7 @@ PLAN-ROOT SINK
 |  |
 |  F29:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  30:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -546,7 +546,7 @@ PLAN-ROOT SINK
 |  |
 |  F27:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  28:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -601,7 +601,7 @@ PLAN-ROOT SINK
 |  |
 |  F25:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  26:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -656,7 +656,7 @@ PLAN-ROOT SINK
 |  |
 |  F23:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  24:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -711,7 +711,7 @@ PLAN-ROOT SINK
 |  |
 |  F21:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  22:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -766,7 +766,7 @@ PLAN-ROOT SINK
 |  |
 |  F19:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  20:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -821,7 +821,7 @@ PLAN-ROOT SINK
 |  |
 |  F17:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  18:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -876,7 +876,7 @@ PLAN-ROOT SINK
 |  |
 |  F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  16:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -931,7 +931,7 @@ PLAN-ROOT SINK
 |  |
 |  F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  14:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -986,7 +986,7 @@ PLAN-ROOT SINK
 |  |
 |  F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  12:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1041,7 +1041,7 @@ PLAN-ROOT SINK
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  10:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1096,7 +1096,7 @@ PLAN-ROOT SINK
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  08:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1151,7 +1151,7 @@ PLAN-ROOT SINK
 |  |
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  06:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1206,7 +1206,7 @@ PLAN-ROOT SINK
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  04:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1274,7 +1274,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[18268815040, 1]
+max-parallelism=1824 segment-costs=[18268815040, 1]
 02:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1338,7 +1338,7 @@ PLAN-ROOT SINK
 |  |
 |  F29:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  30:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1393,7 +1393,7 @@ PLAN-ROOT SINK
 |  |
 |  F27:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  28:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1448,7 +1448,7 @@ PLAN-ROOT SINK
 |  |
 |  F25:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  26:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1503,7 +1503,7 @@ PLAN-ROOT SINK
 |  |
 |  F23:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  24:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1558,7 +1558,7 @@ PLAN-ROOT SINK
 |  |
 |  F21:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  22:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1613,7 +1613,7 @@ PLAN-ROOT SINK
 |  |
 |  F19:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  20:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1668,7 +1668,7 @@ PLAN-ROOT SINK
 |  |
 |  F17:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  18:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1723,7 +1723,7 @@ PLAN-ROOT SINK
 |  |
 |  F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  16:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1778,7 +1778,7 @@ PLAN-ROOT SINK
 |  |
 |  F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  14:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1833,7 +1833,7 @@ PLAN-ROOT SINK
 |  |
 |  F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  12:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1888,7 +1888,7 @@ PLAN-ROOT SINK
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  10:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1943,7 +1943,7 @@ PLAN-ROOT SINK
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18268815040, 1]
+|  max-parallelism=1824 segment-costs=[18268815040, 1]
 |  08:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1998,7 +1998,7 @@ PLAN-ROOT SINK
 |  |
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  06:AGGREGATE
 |  |  output: avg(ss_net_profit)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -2053,7 +2053,7 @@ PLAN-ROOT SINK
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[18302564032, 1]
+|  max-parallelism=1824 segment-costs=[18302564032, 1]
 |  04:AGGREGATE
 |  |  output: avg(ss_ext_discount_amt)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -2121,7 +2121,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[18268815040, 1]
+max-parallelism=1824 segment-costs=[18268815040, 1]
 02:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0

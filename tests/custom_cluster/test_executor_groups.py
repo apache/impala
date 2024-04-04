@@ -1084,22 +1084,33 @@ class TestExecutorGroups(CustomClusterTestSuite):
         ["EffectiveParallelism:", "CpuAsk:", "AvgAdmissionSlotsPerExecutor:"])
 
     # Test combination of PROCESSING_COST_MIN_THREADS and MAX_FRAGMENT_INSTANCES_PER_NODE.
+    # Show how CpuAsk and CpuAskBounded react to it, among other things.
     self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '3'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
         ["Executor Group: root.large-group", "EffectiveParallelism: 9",
-         "ExecutorGroupsConsidered: 3", "AvgAdmissionSlotsPerExecutor: 3"])
+         "ExecutorGroupsConsidered: 3", "AvgAdmissionSlotsPerExecutor: 3",
+         "CpuAsk: 9", "CpuAskBounded: 9"])
     self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '4'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
         ["Executor Group: root.large-group", "EffectiveParallelism: 12",
-         "ExecutorGroupsConsidered: 3", "AvgAdmissionSlotsPerExecutor: 4"])
+         "ExecutorGroupsConsidered: 3", "AvgAdmissionSlotsPerExecutor: 4",
+         "CpuAsk: 12", "CpuAskBounded: 12"])
     self._set_query_options({'PROCESSING_COST_MIN_THREADS': '2'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
         ["Executor Group: root.large-group", "EffectiveParallelism: 12",
-         "ExecutorGroupsConsidered: 3", "AvgAdmissionSlotsPerExecutor: 4"])
+         "ExecutorGroupsConsidered: 3", "AvgAdmissionSlotsPerExecutor: 4",
+         # at root.tiny
+         "Verdict: not enough per-host memory, not enough cpu cores",
+         "CpuAsk: 6", "CpuAskBounded: 4",
+         # at root.small
+         "Verdict: not enough per-host memory", "CpuAsk: 8", "CpuAskBounded: 8",
+         # at root.large
+         "Verdict: Match", "CpuAsk: 12", "CpuAskBounded: 12"])
     self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '2'})
     self._run_query_and_verify_profile(GROUPING_TEST_QUERY,
         ["Executor Group: root.small-group", "EffectiveParallelism: 4",
-         "ExecutorGroupsConsidered: 2", "AvgAdmissionSlotsPerExecutor: 2"])
+         "ExecutorGroupsConsidered: 2", "AvgAdmissionSlotsPerExecutor: 2",
+         "CpuAsk: 6", "CpuAskBounded: 4"])
     self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '1'})
     result = self.execute_query_expect_failure(self.client, CPU_TEST_QUERY)
     status = (r"PROCESSING_COST_MIN_THREADS \(2\) can not be larger than "
@@ -1328,23 +1339,33 @@ class TestExecutorGroups(CustomClusterTestSuite):
       'MAX_FRAGMENT_INSTANCES_PER_NODE': '1'})
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
         ["Executor Group: root.large-group", "EffectiveParallelism: 3",
-         "ExecutorGroupsConsidered: 3", "CpuAsk: 100",
-         "Verdict: Match", "AvgAdmissionSlotsPerExecutor: 1"])
+         "ExecutorGroupsConsidered: 3", "CpuAsk: 267",
+         "Verdict: no executor group set fit. Admit to last executor group set.",
+         "AvgAdmissionSlotsPerExecutor: 1"])
+
+    # set MAX_FRAGMENT_INSTANCES_PER_NODE=3.
+    self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '3'})
+    self._run_query_and_verify_profile(CPU_TEST_QUERY,
+        ["Executor Group: root.large-group", "EffectiveParallelism: 9",
+         "ExecutorGroupsConsidered: 3", "CpuAsk: 267",
+         "Verdict: no executor group set fit. Admit to last executor group set.",
+         "AvgAdmissionSlotsPerExecutor: 3"])
 
     # Unset MAX_FRAGMENT_INSTANCES_PER_NODE.
     self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': ''})
 
     # Expect that a query still admitted to last group even if
     # its resource requirement exceed the limit on that last executor group.
+    # CpuAsk is 534 at root.small and 500 at other group sets.
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
         ["Executor Group: root.large-group", "EffectiveParallelism: 15",
-         "ExecutorGroupsConsidered: 3", "CpuAsk: 534",
+         "ExecutorGroupsConsidered: 3", "CpuAsk: 534", "CpuAsk: 500",
          "Verdict: no executor group set fit. Admit to last executor group set.",
          "AvgAdmissionSlotsPerExecutor: 5"])
 
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.large", 2)
-    self._verify_total_admitted_queries("root.large", 2)
+    self._verify_query_num_for_resource_pool("root.large", 3)
+    self._verify_total_admitted_queries("root.large", 3)
 
   @pytest.mark.execute_serially
   def test_no_skip_resource_checking(self):
@@ -1387,14 +1408,14 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # if MAX_FRAGMENT_INSTANCES_PER_NODE is limited to 1.
     self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '1'})
     self._run_query_and_verify_profile(high_scan_cost_query,
-        ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
-          "Verdict: Match", "CpuAsk: 1",
+        ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+          "Verdict: Match", "CpuAsk: 8",
           "AvgAdmissionSlotsPerExecutor: 1"])
 
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_query_num_for_resource_pool("root.small", 1)
     self._verify_query_num_for_resource_pool("root.large", 2)
-    self._verify_total_admitted_queries("root.tiny", 1)
+    self._verify_total_admitted_queries("root.small", 1)
     self._verify_total_admitted_queries("root.large", 2)
 
   @pytest.mark.execute_serially

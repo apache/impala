@@ -77,13 +77,33 @@ public class CostingSegment extends TreeNode<CostingSegment> {
     }
   }
 
-  private CoreCount createCoreCount() {
+  private CoreCount createCoreCount(boolean isUnbounded) {
+    PlanFragment fragment;
+    PlanNode topNode = null;
     if (isOutputSegment()) {
-      return new CoreCount(sink_.getFragment(), cost_.getNumInstancesExpected());
+      fragment = sink_.getFragment();
     } else {
       Preconditions.checkState(!nodes_.isEmpty());
-      PlanNode topNode = nodes_.get(nodes_.size() - 1);
-      return new CoreCount(topNode, cost_.getNumInstancesExpected());
+      topNode = nodes_.get(nodes_.size() - 1);
+      fragment = topNode.getFragment();
+    }
+
+    int maxParallelism = cost_.getNumInstancesExpected();
+    if (isUnbounded) {
+      maxParallelism = fragment.getMaxParallelism();
+      UnionNode unionNode = fragment.getUnionNode();
+      if (unionNode != null) {
+        // Union fragment need recalculation because its max parallelism is bounded by
+        // its children's adjusted count.
+        maxParallelism = fragment.getMaxParallelismForUnionFragment(unionNode, true);
+      }
+    }
+
+    if (topNode == null) {
+      return new CoreCount(sink_.getFragment(), maxParallelism);
+    } else {
+      Preconditions.checkNotNull(topNode);
+      return new CoreCount(topNode, maxParallelism);
     }
   }
 
@@ -110,17 +130,19 @@ public class CostingSegment extends TreeNode<CostingSegment> {
    * subtreeCoreBuilder with {@link CoreCount} of child-blocking-subtree.
    * @param fragmentCoreState A map holding per-fragment core state.
    * @param subtreeCoreBuilder An ImmutableList builder to populate.
+   * @param findUnboundedCount if True, return the unbounded core count.
+   *                           Otherwise, return the bounded one.
    * @return A {@link CoreCount} value of segment tree
    * rooted at this segment.
    */
   protected CoreCount traverseBlockingAwareCores(
       Map<PlanFragmentId, Pair<CoreCount, List<CoreCount>>> fragmentCoreState,
-      ImmutableList.Builder<CoreCount> subtreeCoreBuilder) {
-    CoreCount segmentCore = createCoreCount();
+      ImmutableList.Builder<CoreCount> subtreeCoreBuilder, boolean findUnboundedCount) {
+    CoreCount segmentCore = createCoreCount(findUnboundedCount);
     // If not in input segment, gather cost of children first.
     for (CostingSegment childSegment : getChildren()) {
-      CoreCount childSegmentCores =
-          childSegment.traverseBlockingAwareCores(fragmentCoreState, subtreeCoreBuilder);
+      CoreCount childSegmentCores = childSegment.traverseBlockingAwareCores(
+          fragmentCoreState, subtreeCoreBuilder, findUnboundedCount);
       if (childSegmentCores.total() > 0) {
         segmentCore = CoreCount.max(segmentCore, childSegmentCores);
       }
@@ -137,8 +159,8 @@ public class CostingSegment extends TreeNode<CostingSegment> {
         Preconditions.checkNotNull(childCores);
 
         if (childFragment.hasBlockingNode()) {
-          CoreCount childCoreCount =
-              childFragment.maxCore(childCores.first, CoreCount.sum(childCores.second));
+          CoreCount childCoreCount = childFragment.maxCore(
+              childCores.first, CoreCount.sum(childCores.second), findUnboundedCount);
           subtreeCoreBuilder.add(childCoreCount);
         } else {
           Preconditions.checkState(node instanceof ExchangeNode);

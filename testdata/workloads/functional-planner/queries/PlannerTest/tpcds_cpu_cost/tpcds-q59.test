@@ -361,7 +361,7 @@ max-parallelism=10 segment-costs=[10416118, 27] cpu-comparison-result=284 [max(1
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  Per-Instance Resources: mem-estimate=714.25MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1824 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  11:AGGREGATE [STREAMING]
 |  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  |  group by: d_week_seq, ss_store_sk
@@ -518,7 +518,7 @@ max-parallelism=10 segment-costs=[63384540, 12594879] cpu-comparison-result=142 
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=714.25MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 03:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: d_week_seq, ss_store_sk
@@ -713,7 +713,7 @@ max-parallelism=10 segment-costs=[10416118, 27] cpu-comparison-result=284 [max(1
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  Per-Instance Resources: mem-estimate=714.25MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1824 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  11:AGGREGATE [STREAMING]
 |  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  |  group by: d_week_seq, ss_store_sk
@@ -870,7 +870,7 @@ max-parallelism=10 segment-costs=[63384540, 12594879] cpu-comparison-result=142 
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=714.25MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[86591807200, 841508] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 03:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: d_week_seq, ss_store_sk

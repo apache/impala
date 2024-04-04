@@ -200,7 +200,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[28601287292, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
+max-parallelism=374 segment-costs=[28601287292, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -393,7 +393,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[28601287292, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
+max-parallelism=374 segment-costs=[28601287292, 1] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0

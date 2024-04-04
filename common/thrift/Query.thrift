@@ -1019,8 +1019,8 @@ struct TQueryExecRequest {
   // Indicate whether the request is a trivial query. Used by admission control.
   13: optional bool is_trivial_query
 
-  // CPU core count required to run the query. Used by Frontend to decide which
-  // executor group to run the query. Should either unset or set with positive value.
+  // CPU core count required to run the query. Used by Frontend to do executor group-set
+  // assignment for the query. Should either be unset or set with positive value.
   14: optional i32 cores_required
 
   // Estimated per-host memory. The planner generates this value which may or may not be
@@ -1033,5 +1033,9 @@ struct TQueryExecRequest {
   // Maximum admission control slot to use per executor backend.
   // Only set if COMPUTE_PROCESSING_COST option is True.
   17: optional i32 max_slot_per_executor
+
+  // The unbounded version of cores_required. Used by Frontend to do executor group-set
+  // assignment for the query. Should either be unset or set with positive value.
+  18: optional i32 cores_required_unbounded
 }
 

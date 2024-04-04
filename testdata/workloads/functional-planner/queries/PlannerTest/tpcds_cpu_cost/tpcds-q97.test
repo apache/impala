@@ -166,7 +166,7 @@ max-parallelism=5620 segment-costs=[17381120224, 56159909888, 1] cpu-comparison-
 |
 |--F07:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=1.71GB mem-reservation=68.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[8690781560, 8640155648] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=5620 segment-costs=[8690781560, 8640155648] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: cs_bill_customer_sk, cs_item_sk
@@ -186,7 +186,7 @@ max-parallelism=5620 segment-costs=[17381120224, 56159909888, 1] cpu-comparison-
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=536.62MB mem-reservation=35.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[13102409376, 50625912] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1320 segment-costs=[13102409376, 50625912] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  07:AGGREGATE [STREAMING]
 |  |  group by: cs_bill_customer_sk, cs_item_sk
 |  |  mem-estimate=514.99MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
@@ -257,7 +257,7 @@ max-parallelism=5620 segment-costs=[17381120224, 56159909888, 1] cpu-comparison-
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=848.27MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[26112255712, 101249248] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[26112255712, 101249248] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 03:AGGREGATE [STREAMING]
 |  group by: ss_customer_sk, ss_item_sk
 |  mem-estimate=826.65MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
@@ -354,7 +354,7 @@ max-parallelism=5620 segment-costs=[17381120224, 56159909888, 1] cpu-comparison-
 |
 |--F07:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=1.71GB mem-reservation=68.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[8690781560, 8640155648] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=5620 segment-costs=[8690781560, 8640155648] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: cs_bill_customer_sk, cs_item_sk
@@ -374,7 +374,7 @@ max-parallelism=5620 segment-costs=[17381120224, 56159909888, 1] cpu-comparison-
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=536.62MB mem-reservation=35.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[13102409376, 50625912] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1320 segment-costs=[13102409376, 50625912] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  07:AGGREGATE [STREAMING]
 |  |  group by: cs_bill_customer_sk, cs_item_sk
 |  |  mem-estimate=514.99MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
@@ -445,7 +445,7 @@ max-parallelism=5620 segment-costs=[17381120224, 56159909888, 1] cpu-comparison-
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=848.27MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[26112255712, 101249248] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[26112255712, 101249248] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 03:AGGREGATE [STREAMING]
 |  group by: ss_customer_sk, ss_item_sk
 |  mem-estimate=826.65MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0

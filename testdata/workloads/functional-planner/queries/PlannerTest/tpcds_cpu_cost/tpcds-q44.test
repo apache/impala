@@ -439,7 +439,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |  |  |  |
 |  |  |  |  F10:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  |  |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=10.00MB thread-reservation=1
-|  |  |  |  max-parallelism=120 segment-costs=[17477682390, 11]
+|  |  |  |  max-parallelism=1750 segment-costs=[17477682390, 11]
 |  |  |  |  03:AGGREGATE [STREAMING]
 |  |  |  |  |  output: avg(ss_net_profit)
 |  |  |  |  |  group by: ss_store_sk
@@ -475,7 +475,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |  |  |
 |  |  |  F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=11.00MB thread-reservation=1
-|  |  |  max-parallelism=120 segment-costs=[8857656658, 5628]
+|  |  |  max-parallelism=890 segment-costs=[8857656658, 5628]
 |  |  |  01:AGGREGATE [STREAMING]
 |  |  |  |  output: avg(ss_net_profit)
 |  |  |  |  group by: ss_item_sk
@@ -597,7 +597,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |  |
 |  |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=10.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[17477682390, 11]
+|  |  max-parallelism=1750 segment-costs=[17477682390, 11]
 |  |  12:AGGREGATE [STREAMING]
 |  |  |  output: avg(ss_net_profit)
 |  |  |  group by: ss_store_sk
@@ -633,7 +633,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=11.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[8857656658, 5628]
+|  max-parallelism=890 segment-costs=[8857656658, 5628]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_item_sk
@@ -856,7 +856,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |  |  |  |
 |  |  |  |  F10:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  |  |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=10.00MB thread-reservation=1
-|  |  |  |  max-parallelism=120 segment-costs=[17477682390, 11]
+|  |  |  |  max-parallelism=1750 segment-costs=[17477682390, 11]
 |  |  |  |  03:AGGREGATE [STREAMING]
 |  |  |  |  |  output: avg(ss_net_profit)
 |  |  |  |  |  group by: ss_store_sk
@@ -892,7 +892,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |  |  |
 |  |  |  F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=11.00MB thread-reservation=1
-|  |  |  max-parallelism=120 segment-costs=[8857656658, 5628]
+|  |  |  max-parallelism=890 segment-costs=[8857656658, 5628]
 |  |  |  01:AGGREGATE [STREAMING]
 |  |  |  |  output: avg(ss_net_profit)
 |  |  |  |  group by: ss_item_sk
@@ -1022,7 +1022,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |  |
 |  |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=10.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[17477682390, 11]
+|  |  max-parallelism=1750 segment-costs=[17477682390, 11]
 |  |  12:AGGREGATE [STREAMING]
 |  |  |  output: avg(ss_net_profit)
 |  |  |  group by: ss_store_sk
@@ -1058,7 +1058,7 @@ max-parallelism=4 segment-costs=[573669, 1] cpu-comparison-result=480 [max(4 (se
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.62MB mem-reservation=11.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[8857656658, 5628]
+|  max-parallelism=890 segment-costs=[8857656658, 5628]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_item_sk

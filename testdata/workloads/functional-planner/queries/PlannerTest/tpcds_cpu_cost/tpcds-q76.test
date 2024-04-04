@@ -412,7 +412,7 @@ max-parallelism=120 segment-costs=[24435663828, 5369] cpu-comparison-result=240 
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  Per-Instance Resources: mem-estimate=25.38MB mem-reservation=128.00KB thread-reservation=1
-|  max-parallelism=120 segment-costs=[2284928041]
+|  max-parallelism=230 segment-costs=[2284928041]
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=84.18MB
 |     predicates: ws_ship_hdemo_sk IS NULL
@@ -731,7 +731,7 @@ max-parallelism=120 segment-costs=[24435138014, 5369] cpu-comparison-result=250 
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  Per-Instance Resources: mem-estimate=16.78MB mem-reservation=128.00KB thread-reservation=1
-|  max-parallelism=120 segment-costs=[2284928041]
+|  max-parallelism=230 segment-costs=[2284928041]
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=84.18MB
 |     predicates: ws_ship_hdemo_sk IS NULL

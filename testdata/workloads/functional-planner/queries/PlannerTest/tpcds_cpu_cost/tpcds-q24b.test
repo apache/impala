@@ -530,7 +530,7 @@ max-parallelism=10 segment-costs=[48705523, 35898928, 840287] cpu-comparison-res
 |  |
 |  |--F25:PLAN FRAGMENT [HASH(ss_item_sk,ss_ticket_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=314.51MB mem-reservation=51.00MB thread-reservation=1 runtime-filters-memory=17.00MB
-|  |  |  max-parallelism=120 segment-costs=[1741477038]
+|  |  |  max-parallelism=2030 segment-costs=[1741477038]
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=02
 |  |  |  build expressions: sr_item_sk, sr_ticket_number
@@ -566,7 +566,7 @@ max-parallelism=10 segment-costs=[48705523, 35898928, 840287] cpu-comparison-res
 |  F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=35.00MB mem-reservation=35.00MB thread-reservation=0 runtime-filters-memory=35.00MB
 |  Per-Instance Resources: mem-estimate=56.75MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[2213742480]
+|  max-parallelism=230 segment-costs=[2213742480]
 |  19:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash-table-id=05
 |  |  hash predicates: ss_store_sk = s_store_sk
@@ -1091,7 +1091,7 @@ max-parallelism=10 segment-costs=[48705523, 35898928, 840287] cpu-comparison-res
 |  |
 |  |--F25:PLAN FRAGMENT [HASH(ss_item_sk,ss_ticket_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=314.51MB mem-reservation=51.00MB thread-reservation=1 runtime-filters-memory=17.00MB
-|  |  |  max-parallelism=120 segment-costs=[1741477038]
+|  |  |  max-parallelism=2030 segment-costs=[1741477038]
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=02
 |  |  |  build expressions: sr_item_sk, sr_ticket_number
@@ -1127,7 +1127,7 @@ max-parallelism=10 segment-costs=[48705523, 35898928, 840287] cpu-comparison-res
 |  F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=35.00MB mem-reservation=35.00MB thread-reservation=0 runtime-filters-memory=35.00MB
 |  Per-Instance Resources: mem-estimate=56.75MB mem-reservation=8.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[2213742480]
+|  max-parallelism=230 segment-costs=[2213742480]
 |  19:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash-table-id=05
 |  |  hash predicates: ss_store_sk = s_store_sk

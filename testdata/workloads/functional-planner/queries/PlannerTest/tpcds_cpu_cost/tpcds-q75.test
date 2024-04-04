@@ -830,7 +830,7 @@ max-parallelism=10 segment-costs=[6359079, 8] cpu-comparison-result=700 [max(10 
 |  |  |  F24:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  |  Per-Instance Resources: mem-estimate=22.40MB mem-reservation=8.00MB thread-reservation=1
-|  |  |  max-parallelism=120 segment-costs=[2030835613]
+|  |  |  max-parallelism=210 segment-costs=[2030835613]
 |  |  |  37:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  |  hash-table-id=05
 |  |  |  |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -1287,7 +1287,7 @@ max-parallelism=20 segment-costs=[11682782269, 10827281] cpu-comparison-result=3
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  Per-Instance Resources: mem-estimate=22.40MB mem-reservation=8.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[2030835613]
+|  |  max-parallelism=210 segment-costs=[2030835613]
 |  |  13:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash-table-id=14
 |  |  |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -1788,7 +1788,7 @@ max-parallelism=10 segment-costs=[6359079, 8] cpu-comparison-result=700 [max(10 
 |  |  |  F24:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  |  Per-Instance Resources: mem-estimate=22.40MB mem-reservation=8.00MB thread-reservation=1
-|  |  |  max-parallelism=120 segment-costs=[2030835613]
+|  |  |  max-parallelism=210 segment-costs=[2030835613]
 |  |  |  37:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  |  hash-table-id=05
 |  |  |  |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -2245,7 +2245,7 @@ max-parallelism=20 segment-costs=[11682782269, 10827281] cpu-comparison-result=3
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  Per-Instance Resources: mem-estimate=22.40MB mem-reservation=8.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[2030835613]
+|  |  max-parallelism=210 segment-costs=[2030835613]
 |  |  13:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash-table-id=14
 |  |  |  hash predicates: ss_sold_date_sk = d_date_sk

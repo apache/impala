@@ -135,7 +135,7 @@ max-parallelism=10 segment-costs=[62079, 900, 16] cpu-comparison-result=120 [max
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=32.25MB mem-reservation=11.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[11567246304, 1059] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
+max-parallelism=374 segment-costs=[11567246304, 1059] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
@@ -271,7 +271,7 @@ max-parallelism=10 segment-costs=[62079, 900, 16] cpu-comparison-result=120 [max
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=32.25MB mem-reservation=11.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[11567246304, 1059] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
+max-parallelism=374 segment-costs=[11567246304, 1059] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id

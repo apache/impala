@@ -266,7 +266,7 @@ max-parallelism=487520 segment-costs=[4875148176256]
 |
 |--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=1.09GB mem-reservation=34.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[4421184496] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=487520 segment-costs=[4421184496] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date, ws_item_sk
@@ -310,7 +310,7 @@ max-parallelism=487520 segment-costs=[4875148176256]
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=492.60MB mem-reservation=34.12MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[10916352000, 59061624] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1100 segment-costs=[10916352000, 59061624] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  03:AGGREGATE [STREAMING]
 |  |  output: sum(ws_sales_price)
 |  |  group by: ws_item_sk, d_date
@@ -408,7 +408,7 @@ max-parallelism=2620 segment-costs=[26156055728, 17279870976, 9044932480] cpu-co
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=1.18GB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[43392128000, 236248240] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[43392128000, 236248240] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
 |  group by: ss_item_sk, d_date
@@ -532,7 +532,7 @@ max-parallelism=487520 segment-costs=[4875148176256]
 |
 |--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=1.09GB mem-reservation=34.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[4421184496] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=487520 segment-costs=[4421184496] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date, ws_item_sk
@@ -576,7 +576,7 @@ max-parallelism=487520 segment-costs=[4875148176256]
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=492.60MB mem-reservation=34.12MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[10916352000, 59061624] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1100 segment-costs=[10916352000, 59061624] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  03:AGGREGATE [STREAMING]
 |  |  output: sum(ws_sales_price)
 |  |  group by: ws_item_sk, d_date
@@ -674,7 +674,7 @@ max-parallelism=2620 segment-costs=[26156055728, 17279870976, 9044932480] cpu-co
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=1.18GB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[43392128000, 236248240] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+max-parallelism=1824 segment-costs=[43392128000, 236248240] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
 |  group by: ss_item_sk, d_date

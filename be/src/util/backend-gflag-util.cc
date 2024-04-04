@@ -263,13 +263,17 @@ DEFINE_double_hidden(max_filter_error_rate_from_full_scan, 0.9,
     "query option or max_filter_error_rate backend flag. Setting value less than 0 "
     "will disable this runtime filter reduction feature.");
 
+DEFINE_double_hidden(query_cpu_root_factor, 1.5,
+    "(Advance) The Nth root value to control sublinear scale down of unbounded "
+    "cpu requirement for executor group set selection.");
+
 using strings::Substitute;
 
 namespace impala {
 
 // Flag validation
 // ------------------------------------------------------------
-static bool ValidateCpuCountDivisor(const char* flagname, double value) {
+static bool ValidatePositiveDouble(const char* flagname, double value) {
   if (0.0 < value) {
     return true;
   }
@@ -287,8 +291,9 @@ static bool ValidateMinProcessingPerThread(const char* flagname, int64_t value) 
   return false;
 }
 
-DEFINE_validator(query_cpu_count_divisor, &ValidateCpuCountDivisor);
+DEFINE_validator(query_cpu_count_divisor, &ValidatePositiveDouble);
 DEFINE_validator(min_processing_per_thread, &ValidateMinProcessingPerThread);
+DEFINE_validator(query_cpu_root_factor, &ValidatePositiveDouble);
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
   result.clear();
@@ -470,6 +475,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_inject_process_event_failure_ratio(FLAGS_inject_process_event_failure_ratio);
   cfg.__set_enable_workload_mgmt(FLAGS_enable_workload_mgmt);
   cfg.__set_query_log_table_name(FLAGS_query_log_table_name);
+  cfg.__set_query_cpu_root_factor(FLAGS_query_cpu_root_factor);
   return Status::OK();
 }
 

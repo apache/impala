@@ -35,8 +35,10 @@ limit 100;
 aggregation(SUM, AdmissionSlots): 16
 row_regex: .* AvgAdmissionSlotsPerExecutor: 6 .*
 row_regex: .* Executor group 2 \(large\):.*
-row_regex: .* CpuAsk: 16 .*
+row_regex: .* CpuAsk: 18 .*
+row_regex: .* CpuAskBounded: 16 .*
 row_regex: .* EffectiveParallelism: 16 .*
+row_regex: .* MaxParallelism: 16 .*
 ====
 ---- QUERY: TPCDS-Q1-CPC-LARGEST-FRAGMENT
 -- Expect a total of 3 admission slots given to this query if using LARGEST_FRAGMENT strategy.
@@ -69,8 +71,10 @@ limit 100;
 aggregation(SUM, AdmissionSlots): 3
 !row_regex: .* AvgAdmissionSlotsPerExecutor: .*
 row_regex: .* Executor group 2 \(large\):.*
-row_regex: .* CpuAsk: 16 .*
+row_regex: .* CpuAsk: 18 .*
+row_regex: .* CpuAskBounded: 16 .*
 row_regex: .* EffectiveParallelism: 16 .*
+row_regex: .* MaxParallelism: 16 .*
 ====
 ---- QUERY: TPCDS-Q1-NO-CPC
 -- Expect a total of 3 admission slots given to this query if COMPUTE_PROCESSING_COST is disabled.
@@ -106,5 +110,7 @@ aggregation(SUM, AdmissionSlots): 3
 !row_regex: .* AvgAdmissionSlotsPerExecutor: .*
 row_regex: .* Executor group 2 \(large\):.*
 !row_regex: .* CpuAsk: .*
+!row_regex: .* CpuAskBounded: .*
 !row_regex: .* EffectiveParallelism: .*
+!row_regex: .* MaxParallelism: .*
 ====

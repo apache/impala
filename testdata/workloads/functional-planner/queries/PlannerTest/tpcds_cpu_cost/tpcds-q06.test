@@ -233,7 +233,7 @@ max-parallelism=10 segment-costs=[104, 10, 1] cpu-comparison-result=120 [max(10 
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=18.00MB mem-reservation=18.00MB thread-reservation=0 runtime-filters-memory=18.00MB
 Per-Instance Resources: mem-estimate=27.02MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[39849780476, 2] cpu-comparison-result=120 [max(120 (self) vs 85 (sum children))]
+max-parallelism=1824 segment-costs=[39849780476, 2] cpu-comparison-result=120 [max(120 (self) vs 85 (sum children))]
 16:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: a.ca_state
@@ -571,7 +571,7 @@ max-parallelism=10 segment-costs=[104, 10, 1] cpu-comparison-result=120 [max(10 
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=18.00MB mem-reservation=18.00MB thread-reservation=0 runtime-filters-memory=18.00MB
 Per-Instance Resources: mem-estimate=27.02MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[39849780476, 2] cpu-comparison-result=120 [max(120 (self) vs 85 (sum children))]
+max-parallelism=1824 segment-costs=[39849780476, 2] cpu-comparison-result=120 [max(120 (self) vs 85 (sum children))]
 16:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: a.ca_state

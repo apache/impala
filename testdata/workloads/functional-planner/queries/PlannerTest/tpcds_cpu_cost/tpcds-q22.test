@@ -171,7 +171,7 @@ max-parallelism=1390 segment-costs=[12619154693, 13891241984, 500, 6] cpu-compar
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=3.84GB mem-reservation=138.25MB thread-reservation=1
-max-parallelism=120 segment-costs=[27917335342, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=261 segment-costs=[27917335342, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
@@ -337,7 +337,7 @@ max-parallelism=1390 segment-costs=[12619154693, 13891241984, 500, 6] cpu-compar
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=3.84GB mem-reservation=138.25MB thread-reservation=1
-max-parallelism=120 segment-costs=[27917335342, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
+max-parallelism=261 segment-costs=[27917335342, 1043120064] cpu-comparison-result=120 [max(120 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
