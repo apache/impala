@@ -298,7 +298,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |
 |--F12:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=3.30GB mem-reservation=44.50MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=120 segment-costs=[28652108028, 182858479] cpu-comparison-result=290 [max(140 (self) vs 290 (sum children))]
+|  |  max-parallelism=6110 segment-costs=[28652108028, 182858479] cpu-comparison-result=290 [max(140 (self) vs 290 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ws1.ws_order_number
@@ -314,7 +314,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |  |
 |  |--F13:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=23.14MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  |  max-parallelism=120 segment-costs=[7099675] cpu-comparison-result=150 [max(150 (self) vs 42 (sum children))]
+|  |  |  max-parallelism=6110 segment-costs=[7099675] cpu-comparison-result=150 [max(150 (self) vs 42 (sum children))]
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: ws1.ws_order_number
@@ -473,7 +473,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |  |
 |  |--F17:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=894.14MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  |  max-parallelism=120 segment-costs=[2193717500]
+|  |  |  max-parallelism=6110 segment-costs=[2193717500]
 |  |  JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=02
 |  |  |  build expressions: ws2.ws_order_number
@@ -538,7 +538,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |
 |--F18:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=102.72MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  max-parallelism=120 segment-costs=[218533970]
+|  |  max-parallelism=6110 segment-costs=[218533970]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: wr_order_number
@@ -577,7 +577,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |
 |--F19:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=894.14MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  max-parallelism=120 segment-costs=[2193717500]
+|  |  max-parallelism=6110 segment-costs=[2193717500]
 |  JOIN BUILD
 |  |  join-table-id=07 plan-id=08 cohort-id=01
 |  |  build expressions: ws2.ws_order_number
@@ -677,7 +677,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |
 |--F12:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=3.30GB mem-reservation=44.50MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=120 segment-costs=[28652108028, 182858479] cpu-comparison-result=290 [max(140 (self) vs 290 (sum children))]
+|  |  max-parallelism=6110 segment-costs=[28652108028, 182858479] cpu-comparison-result=290 [max(140 (self) vs 290 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ws1.ws_order_number
@@ -693,7 +693,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |  |
 |  |--F13:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=23.14MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  |  max-parallelism=120 segment-costs=[7099675] cpu-comparison-result=150 [max(150 (self) vs 42 (sum children))]
+|  |  |  max-parallelism=6110 segment-costs=[7099675] cpu-comparison-result=150 [max(150 (self) vs 42 (sum children))]
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: ws1.ws_order_number
@@ -852,7 +852,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |  |
 |  |--F17:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=894.14MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  |  max-parallelism=120 segment-costs=[2193717500]
+|  |  |  max-parallelism=6110 segment-costs=[2193717500]
 |  |  JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=02
 |  |  |  build expressions: ws2.ws_order_number
@@ -917,7 +917,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |
 |--F18:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=102.72MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  max-parallelism=120 segment-costs=[218533970]
+|  |  max-parallelism=6110 segment-costs=[218533970]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: wr_order_number
@@ -956,7 +956,7 @@ max-parallelism=6110 segment-costs=[61063014652, 144764852, 19579100, 1] cpu-com
 |
 |--F19:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=894.14MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  max-parallelism=120 segment-costs=[2193717500]
+|  |  max-parallelism=6110 segment-costs=[2193717500]
 |  JOIN BUILD
 |  |  join-table-id=07 plan-id=08 cohort-id=01
 |  |  build expressions: ws2.ws_order_number

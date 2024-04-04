@@ -218,7 +218,7 @@ max-parallelism=20 segment-costs=[164665069, 1] cpu-comparison-result=145 [max(2
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=33.62MB mem-reservation=18.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[13102409376, 5628] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1320 segment-costs=[13102409376, 5628] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  06:AGGREGATE [STREAMING]
 |  |  output: avg(cs_ext_discount_amt)
 |  |  group by: cs_item_sk
@@ -428,7 +428,7 @@ max-parallelism=10 segment-costs=[13669196, 1] cpu-comparison-result=145 [max(30
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=33.62MB mem-reservation=18.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[13102409376, 5628] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
+|  max-parallelism=1320 segment-costs=[13102409376, 5628] cpu-comparison-result=120 [max(120 (self) vs 11 (sum children))]
 |  06:AGGREGATE [STREAMING]
 |  |  output: avg(cs_ext_discount_amt)
 |  |  group by: cs_item_sk

@@ -153,7 +153,7 @@ max-parallelism=10 segment-costs=[20710, 100, 4] cpu-comparison-result=120 [max(
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-reservation=0 runtime-filters-memory=17.00MB
 Per-Instance Resources: mem-estimate=27.45MB mem-reservation=3.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[2100750182, 368] cpu-comparison-result=120 [max(120 (self) vs 51 (sum children))]
+max-parallelism=187 segment-costs=[2100750182, 368] cpu-comparison-result=120 [max(120 (self) vs 51 (sum children))]
 07:AGGREGATE [STREAMING]
 |  output: sum(cs_sales_price)
 |  group by: ca_zip
@@ -342,7 +342,7 @@ max-parallelism=130 segment-costs=[1225867312, 368] cpu-comparison-result=220 [m
 |
 |--F07:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=26.88MB mem-reservation=16.50MB thread-reservation=1 runtime-filters-memory=8.00MB
-|  |  max-parallelism=120 segment-costs=[15571290]
+|  |  max-parallelism=130 segment-costs=[15571290]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ca_address_sk

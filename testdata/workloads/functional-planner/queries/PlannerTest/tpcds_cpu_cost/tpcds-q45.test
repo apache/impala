@@ -197,7 +197,7 @@ max-parallelism=10 segment-costs=[56827531, 200, 7] cpu-comparison-result=120 [m
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=18.00MB mem-reservation=18.00MB thread-reservation=0 runtime-filters-memory=18.00MB
 Per-Instance Resources: mem-estimate=104.15MB mem-reservation=34.12MB thread-reservation=1
-max-parallelism=120 segment-costs=[1668962985, 1141303] cpu-comparison-result=120 [max(120 (self) vs 75 (sum children))]
+max-parallelism=170 segment-costs=[1668962985, 1141303] cpu-comparison-result=120 [max(120 (self) vs 75 (sum children))]
 12:AGGREGATE [STREAMING]
 |  output: sum(ws_sales_price)
 |  group by: ca_zip, ca_county

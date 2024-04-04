@@ -398,6 +398,7 @@ Status Scheduler::CheckEffectiveInstanceCount(
   if (!state->query_options().compute_processing_cost) return Status::OK();
 
   int effective_instance_count = fragment_state->fragment.effective_instance_count;
+  DCHECK_GT(effective_instance_count, 0);
   if (effective_instance_count < fragment_state->instance_states.size()) {
     initializeSchedulerWarning(state->summary_profile());
     string warn_message = Substitute(
@@ -648,7 +649,7 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   if (request_query_option.compute_processing_cost) {
     // Numbers should follow 'effective_instance_count' from planner.
     // 'effective_instance_count' is total instances across all executors.
-    DCHECK(fragment.effective_instance_count > 0);
+    DCHECK_GT(fragment.effective_instance_count, 0);
     int inst_per_host =
         ceil((float)fragment.effective_instance_count / instances_per_host.size());
     max_num_instances = max(1, inst_per_host);

@@ -348,7 +348,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |
 |--F14:PLAN FRAGMENT [HASH(cs_bill_customer_sk,cs_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=141.87MB mem-reservation=51.00MB thread-reservation=1 runtime-filters-memory=17.00MB
-|  |  max-parallelism=120 segment-costs=[91888627] cpu-comparison-result=290 [max(290 (self) vs 176 (sum children))]
+|  |  max-parallelism=150 segment-costs=[91888627] cpu-comparison-result=290 [max(290 (self) vs 176 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: sr_customer_sk, sr_item_sk
@@ -446,7 +446,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |  |
 |  |--F17:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=413.14MB mem-reservation=67.00MB thread-reservation=1 runtime-filters-memory=33.00MB
-|  |  |  max-parallelism=120 segment-costs=[2615590384]
+|  |  |  max-parallelism=170 segment-costs=[2615590384]
 |  |  JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=02
 |  |  |  build expressions: sr_customer_sk, sr_item_sk, sr_ticket_number
@@ -684,7 +684,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |
 |--F14:PLAN FRAGMENT [HASH(cs_bill_customer_sk,cs_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=141.87MB mem-reservation=51.00MB thread-reservation=1 runtime-filters-memory=17.00MB
-|  |  max-parallelism=120 segment-costs=[91888627] cpu-comparison-result=290 [max(290 (self) vs 176 (sum children))]
+|  |  max-parallelism=150 segment-costs=[91888627] cpu-comparison-result=290 [max(290 (self) vs 176 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: sr_customer_sk, sr_item_sk
@@ -782,7 +782,7 @@ max-parallelism=150 segment-costs=[1420576432, 1368504] cpu-comparison-result=31
 |  |
 |  |--F17:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=413.14MB mem-reservation=67.00MB thread-reservation=1 runtime-filters-memory=33.00MB
-|  |  |  max-parallelism=120 segment-costs=[2615590384]
+|  |  |  max-parallelism=170 segment-costs=[2615590384]
 |  |  JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=02
 |  |  |  build expressions: sr_customer_sk, sr_item_sk, sr_ticket_number

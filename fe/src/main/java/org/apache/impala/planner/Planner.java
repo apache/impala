@@ -485,7 +485,7 @@ public class Planner {
       if (!(fragment.getSink() instanceof JoinBuildSink)) {
         // Only adjust parallelism of non-join build fragment.
         // Join build fragment will be adjusted later by fragment hosting the join node.
-        fragment.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode, -1);
+        fragment.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode, null);
       }
     }
 
@@ -502,7 +502,7 @@ public class Planner {
    * been called over the plan fragment list.
    */
   private static CoreCount computeBlockingAwareCores(
-      List<PlanFragment> postOrderFragments) {
+      List<PlanFragment> postOrderFragments, boolean findUnboundedCount) {
     // fragmentCoreState is a mapping between a fragment (through its PlanFragmentId) and
     // its CoreCount. The first element of the pair is the CoreCount of subtree rooted at
     // that fragment. The second element of the pair is the CoreCount of blocking-child
@@ -513,13 +513,15 @@ public class Planner {
         Maps.newHashMap();
 
     for (PlanFragment fragment : postOrderFragments) {
-      fragment.computeBlockingAwareCores(fragmentCoreState);
+      fragment.computeBlockingAwareCores(fragmentCoreState, findUnboundedCount);
     }
 
     PlanFragment root = postOrderFragments.get(postOrderFragments.size() - 1);
     Pair<CoreCount, List<CoreCount>> rootCores = fragmentCoreState.get(root.getId());
 
-    return root.maxCore(rootCores.first, CoreCount.sum(rootCores.second));
+    CoreCount maxCores = root.maxCore(
+        rootCores.first, CoreCount.sum(rootCores.second), findUnboundedCount);
+    return maxCores;
   }
 
   /**
@@ -570,7 +572,7 @@ public class Planner {
 
     // Count bounded core count. This is taken from final instance count from previous
     // step.
-    CoreCount boundedCores = computeBlockingAwareCores(postOrderFragments);
+    CoreCount boundedCores = computeBlockingAwareCores(postOrderFragments, false);
     Set<PlanFragmentId> dominantFragmentIds =
         new HashSet<>(boundedCores.getUniqueFragmentIds());
     int coresRequired = Math.max(1, boundedCores.totalWithoutCoordinator());
@@ -586,6 +588,13 @@ public class Planner {
     for (PlanFragment fragment : postOrderFragments) {
       if (dominantFragmentIds.contains(fragment.getId())) fragment.markDominant();
     }
+
+    // Count unbounded core count. This is based on maximum parallelism of each fragment.
+    CoreCount unboundedCores = computeBlockingAwareCores(postOrderFragments, true);
+    int coresRequiredUnbounded = Math.max(1, unboundedCores.totalWithoutCoordinator());
+    request.setCores_required_unbounded(coresRequiredUnbounded);
+    LOG.info("CoreCountUnbounded=" + unboundedCores
+        + ", coresRequiredUnbounded=" + coresRequiredUnbounded);
   }
 
   /**

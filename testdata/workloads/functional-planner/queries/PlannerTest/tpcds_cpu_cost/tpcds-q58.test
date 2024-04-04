@@ -458,7 +458,7 @@ max-parallelism=10 segment-costs=[379841, 545771, 8] cpu-comparison-result=360 [
 |  F14:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=27.88MB mem-reservation=2.12MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[6593625912, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+|  max-parallelism=660 segment-costs=[6593625912, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 |  32:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: i_item_id
@@ -671,7 +671,7 @@ max-parallelism=10 segment-costs=[379841, 545771, 8] cpu-comparison-result=360 [
 |  F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=27.88MB mem-reservation=3.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[13096830510, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+|  max-parallelism=1310 segment-costs=[13096830510, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 |  21:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price)
 |  |  group by: i_item_id
@@ -868,7 +868,7 @@ max-parallelism=10 segment-costs=[379841, 545771, 8] cpu-comparison-result=360 [
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=27.88MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[26101094864, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+max-parallelism=1824 segment-costs=[26101094864, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 10:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id
@@ -1108,7 +1108,7 @@ max-parallelism=10 segment-costs=[379841, 545771, 8] cpu-comparison-result=360 [
 |  F14:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=27.88MB mem-reservation=2.12MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[6593625912, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+|  max-parallelism=660 segment-costs=[6593625912, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 |  32:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: i_item_id
@@ -1321,7 +1321,7 @@ max-parallelism=10 segment-costs=[379841, 545771, 8] cpu-comparison-result=360 [
 |  F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=27.88MB mem-reservation=3.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[13096830510, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+|  max-parallelism=1310 segment-costs=[13096830510, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 |  21:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price)
 |  |  group by: i_item_id
@@ -1518,7 +1518,7 @@ max-parallelism=10 segment-costs=[379841, 545771, 8] cpu-comparison-result=360 [
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=27.88MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[26101094864, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+max-parallelism=1824 segment-costs=[26101094864, 8699] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 10:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id

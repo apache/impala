@@ -209,7 +209,7 @@ max-parallelism=1320 segment-costs=[13125921748, 475716832] cpu-comparison-resul
 |
 |--F08:PLAN FRAGMENT [HASH(i_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=61.43MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=120 segment-costs=[104970938]
+|  |  max-parallelism=1320 segment-costs=[104970938]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: inv_item_sk
@@ -224,7 +224,7 @@ max-parallelism=1320 segment-costs=[13125921748, 475716832] cpu-comparison-resul
 |  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=256.00KB thread-reservation=1
-|  max-parallelism=120 segment-costs=[2093896922]
+|  max-parallelism=210 segment-costs=[2093896922]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.inventory, RANDOM]
 |     HDFS partitions=261/261 files=261 size=44.10MB
 |     predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)
@@ -394,7 +394,7 @@ max-parallelism=1320 segment-costs=[13125921748, 475716832] cpu-comparison-resul
 |
 |--F08:PLAN FRAGMENT [HASH(i_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=61.43MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=120 segment-costs=[104970938]
+|  |  max-parallelism=1320 segment-costs=[104970938]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: inv_item_sk
@@ -409,7 +409,7 @@ max-parallelism=1320 segment-costs=[13125921748, 475716832] cpu-comparison-resul
 |  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=256.00KB thread-reservation=1
-|  max-parallelism=120 segment-costs=[2093896922]
+|  max-parallelism=210 segment-costs=[2093896922]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.inventory, RANDOM]
 |     HDFS partitions=261/261 files=261 size=44.10MB
 |     predicates: inv_quantity_on_hand <= CAST(500 AS INT), inv_quantity_on_hand >= CAST(100 AS INT)

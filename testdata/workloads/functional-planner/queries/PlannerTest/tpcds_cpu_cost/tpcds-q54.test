@@ -649,7 +649,7 @@ max-parallelism=30 segment-costs=[249887815, 47575] cpu-comparison-result=212 [m
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=19.28MB mem-reservation=8.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[8834586785]
+max-parallelism=890 segment-costs=[8834586785]
 20:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=05
 |  hash predicates: ss_customer_sk = c_customer_sk
@@ -1187,7 +1187,7 @@ max-parallelism=30 segment-costs=[249887815, 47575] cpu-comparison-result=212 [m
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=19.28MB mem-reservation=8.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[8834586785]
+max-parallelism=890 segment-costs=[8834586785]
 20:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=05
 |  hash predicates: ss_customer_sk = c_customer_sk

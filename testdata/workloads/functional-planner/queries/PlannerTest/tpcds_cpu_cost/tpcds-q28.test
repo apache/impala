@@ -315,7 +315,7 @@ PLAN-ROOT SINK
 |  |
 |  F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  16:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -392,7 +392,7 @@ PLAN-ROOT SINK
 |  |
 |  F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  13:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -469,7 +469,7 @@ PLAN-ROOT SINK
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -546,7 +546,7 @@ PLAN-ROOT SINK
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  07:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -623,7 +623,7 @@ PLAN-ROOT SINK
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  04:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -679,7 +679,7 @@ max-parallelism=10 segment-costs=[61225, 60750, 1] cpu-comparison-result=120 [ma
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[28737987584, 475]
+max-parallelism=1824 segment-costs=[28737987584, 475]
 01:AGGREGATE [STREAMING]
 |  output: avg(ss_list_price), count(ss_list_price)
 |  group by: ss_list_price
@@ -766,7 +766,7 @@ PLAN-ROOT SINK
 |  |
 |  F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  16:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -843,7 +843,7 @@ PLAN-ROOT SINK
 |  |
 |  F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  13:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -920,7 +920,7 @@ PLAN-ROOT SINK
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -997,7 +997,7 @@ PLAN-ROOT SINK
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  07:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -1074,7 +1074,7 @@ PLAN-ROOT SINK
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[28737987584, 475]
+|  max-parallelism=1824 segment-costs=[28737987584, 475]
 |  04:AGGREGATE [STREAMING]
 |  |  output: avg(ss_list_price), count(ss_list_price)
 |  |  group by: ss_list_price
@@ -1130,7 +1130,7 @@ max-parallelism=10 segment-costs=[61225, 60750, 1] cpu-comparison-result=120 [ma
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=26.94MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[28737987584, 475]
+max-parallelism=1824 segment-costs=[28737987584, 475]
 01:AGGREGATE [STREAMING]
 |  output: avg(ss_list_price), count(ss_list_price)
 |  group by: ss_list_price

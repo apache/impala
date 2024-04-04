@@ -497,7 +497,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F29:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ca_county
@@ -639,7 +639,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F32:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: ca_county
@@ -781,7 +781,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F35:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: ca_county
@@ -923,7 +923,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F38:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  build expressions: ca_county
@@ -953,7 +953,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  17:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
@@ -1057,7 +1057,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F41:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=12 plan-id=13 cohort-id=01
 |  |  build expressions: ca_county
@@ -1087,7 +1087,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  11:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
@@ -1204,7 +1204,7 @@ max-parallelism=10 segment-costs=[5798599, 75399] cpu-comparison-result=120 [max
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+max-parallelism=187 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
@@ -1333,7 +1333,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F29:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ca_county
@@ -1475,7 +1475,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F32:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: ca_county
@@ -1617,7 +1617,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F35:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=140 [max(120 (self) vs 140 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: ca_county
@@ -1759,7 +1759,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F38:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  build expressions: ca_county
@@ -1789,7 +1789,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  17:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
@@ -1893,7 +1893,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |
 |--F41:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  max-parallelism=2147483640 segment-costs=[1506199] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=12 plan-id=13 cohort-id=01
 |  |  build expressions: ca_county
@@ -1923,7 +1923,7 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 11705881825640448
 |  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  11:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
@@ -2040,7 +2040,7 @@ max-parallelism=10 segment-costs=[5798599, 75399] cpu-comparison-result=120 [max
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=9.00MB mem-reservation=9.00MB thread-reservation=0 runtime-filters-memory=9.00MB
 Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+max-parallelism=187 segment-costs=[5191623302, 75399] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year

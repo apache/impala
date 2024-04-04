@@ -309,7 +309,7 @@ max-parallelism=390 segment-costs=[3897933946, 183759] cpu-comparison-result=176
 |
 |--F11:PLAN FRAGMENT [HASH(cs_item_sk,cs_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=167.72MB mem-reservation=34.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[872471816]
+|  |  max-parallelism=390 segment-costs=[872471816]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: cr_item_sk, cr_order_number
@@ -525,7 +525,7 @@ max-parallelism=390 segment-costs=[3897933946, 183759] cpu-comparison-result=176
 |
 |--F11:PLAN FRAGMENT [HASH(cs_item_sk,cs_order_number)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=167.72MB mem-reservation=34.00MB thread-reservation=1
-|  |  max-parallelism=120 segment-costs=[872471816]
+|  |  max-parallelism=390 segment-costs=[872471816]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: cr_item_sk, cr_order_number
