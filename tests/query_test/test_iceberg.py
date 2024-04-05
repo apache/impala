@@ -1438,7 +1438,6 @@ class TestIcebergV2Table(IcebergTestSuite):
   # The test uses pre-written Iceberg tables where the position delete files refer to
   # the data files via full URI, i.e. they start with 'hdfs://localhost:2050/...'. In the
   # dockerised environment the namenode is accessible on a different hostname/port.
-  @pytest.mark.skip(reason="IMPALA-12894")
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
   def test_plain_count_star_optimization(self, vector):
