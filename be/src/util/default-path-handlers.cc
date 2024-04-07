@@ -23,6 +23,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
+#include <gnu/libc-version.h>
 
 #include "common/logging.h"
 #include "kudu/util/flags.h"
@@ -250,6 +251,11 @@ void RootHandler(const Webserver::WebRequest& req, Document* document) {
   document->AddMember("process_state_info", process_state_info, document->GetAllocator());
   Value cgroup_info(CGroupUtil::DebugString().c_str(), document->GetAllocator());
   document->AddMember("cgroup_info", cgroup_info, document->GetAllocator());
+
+  Value effective_locale(std::locale("").name().c_str(), document->GetAllocator());
+  document->AddMember("effective_locale", effective_locale, document->GetAllocator());
+  Value glibc_version(gnu_get_libc_version(), document->GetAllocator());
+  document->AddMember("glibc_version", glibc_version, document->GetAllocator());
 
   if (CommonMetrics::PROCESS_START_TIME != nullptr) {
     Value process_start_time(
