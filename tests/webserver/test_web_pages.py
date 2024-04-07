@@ -115,6 +115,14 @@ class TestWebPage(ImpalaTestSuite):
       if build_flags["cmake_build_type"] in ["debug"]:
         assert not is_ndebug
 
+  def test_root_other_info(self):
+    """Tests to check glibc version and locale is available"""
+    for port in self.TEST_PORTS_WITH_SS:
+      other_info_page = requests.get(self.ROOT_URL.format(port) + "/?json").text
+      other_info = json.loads(other_info_page)
+      assert "effective_locale" in other_info
+      assert "glibc_version" in other_info
+
   def test_memz(self):
     """Tests /memz at impalad / statestored / catalogd"""
 
