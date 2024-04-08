@@ -423,14 +423,13 @@ install(DIRECTORY "www/" DESTINATION ${IMPALA_INSTALLDIR}/www)
 install(FILES fe/target/impala-frontend-$ENV{IMPALA_VERSION}.jar
   DESTINATION ${IMPALA_INSTALLDIR}/jar)
 
-set(IMPALA_GCC_HOME $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-$ENV{IMPALA_GCC_VERSION})
-FILE(GLOB gcc_lib ${IMPALA_GCC_HOME}/lib64/libgcc_s.so.1*)
+FILE(GLOB gcc_lib ${GCC_ROOT}/lib64/libgcc_s.so.1*)
 install(FILES ${gcc_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib)
 
-FILE(GLOB cpp_lib ${IMPALA_GCC_HOME}/lib64/libstdc++.so.6*)
+FILE(GLOB cpp_lib ${GCC_ROOT}/lib64/libstdc++.so.6*)
 install(FILES ${cpp_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib)
 
-set(KUDU_HOME $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$ENV{IMPALA_KUDU_VERSION}/release)
+set(KUDU_HOME $ENV{IMPALA_TOOLCHAIN}/kudu-$ENV{IMPALA_KUDU_VERSION}/release)
 # The parent folder is lib64 on centos/redhat, while on ubuntu it's lib.
 FILE(GLOB kudu_lib ${KUDU_HOME}/lib*/libkudu_client.so*)
 install(FILES ${kudu_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib)
