@@ -136,7 +136,11 @@ prerun() {
   fi
   export LIBHDFS_OPTS="${LIBHDFS_OPTS:=} -Djava.library.path=${HADOOP_LIB_DIR}"
   export LC_ALL=en_US.utf8
-  export CLASSPATH="${CLASSPATH}:${IMPALA_HOME}/conf:${IMPALA_HOME}/lib/jars/*"
+  CLASSPATH="${CLASSPATH}:${IMPALA_HOME}/conf"
+  for jar in ${IMPALA_HOME}/lib/jars/*; do
+    CLASSPATH="${CLASSPATH}:$jar"
+  done
+  export CLASSPATH
   export LD_LIBRARY_PATH+=":${IMPALA_HOME}/lib/native:${lib_jvm_dir}:${lib_jsig_dir}"
 }
 
