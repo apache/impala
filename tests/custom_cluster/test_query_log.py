@@ -56,13 +56,11 @@ class TestQueryLogTableBase(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol',
         cls.PROTOCOL_BEESWAX, cls.PROTOCOL_HS2))
 
-  def get_client(self, protocol, query_table_name=""):
+  def get_client(self, protocol, query_table_name=QUERY_TBL):
     """Retrieves the default Impala client for the specified protocol. This client is
        automatically closed after the test completes. Also ensures the completed queries
        table has been successfully created by checking the logs to verify the create
        table sql has finished."""
-    if query_table_name == "":
-      query_table_name = self.QUERY_TBL
 
     # These tests run very quickly and can actually complete before Impala has finished
     # creating the completed queries table. Thus, to make these tests more robust, this
@@ -704,24 +702,24 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     impalad = self.cluster.get_first_impalad()
     client = self.get_client(vector.get_value('protocol'))
 
+    # Execute sql statements to ensure all get written to the query log table.
+    sql1 = client.execute("select 1")
+    assert sql1.success
+
+    sql2 = client.execute("select 2")
+    assert sql2.success
+
+    sql3 = client.execute("select 3")
+    assert sql3.success
+
+    impalad.service.wait_for_metric_value("impala-server.completed-queries.queued", 3,
+        60)
+
+    impalad.kill_and_wait_for_exit(SIGRTMIN)
+
+    client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
+
     try:
-      # Execute sql statements to ensure all get written to the query log table.
-      sql1 = client.execute("select 1")
-      assert sql1.success
-
-      sql2 = client.execute("select 2")
-      assert sql2.success
-
-      sql3 = client.execute("select 3")
-      assert sql3.success
-
-      impalad.service.wait_for_metric_value("impala-server.completed-queries.queued", 3,
-          60)
-
-      impalad.kill_and_wait_for_exit(SIGRTMIN)
-
-      client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
-
       def assert_func(last_iteration):
         results = client2.execute("select query_id,sql from {0} where query_id in "
                                   "('{1}','{2}','{3}')".format(self.QUERY_TBL,
@@ -783,30 +781,27 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     tbl_name = "{0}.{1}".format(unique_database, unique_name)
     client = self.get_client(vector.get_value('protocol'))
 
+    # Create the test table.
+    create_tbl_sql = "create table {0} (id INT, product_name STRING) " \
+      "partitioned by (category INT)".format(tbl_name)
+    create_tbl_results = client.execute(create_tbl_sql)
+    assert create_tbl_results.success
+
+    insert_sql = "insert into {0} (id,category,product_name) values " \
+                  "(0,1,'the product')".format(tbl_name)
+    res = client.execute(insert_sql, fetch_profile_after_close=True)
+    assert res.success
+
+    # Include the two queries run by the unique_database fixture setup.
+    self.cluster.get_first_impalad().service.wait_for_metric_value(
+        "impala-server.completed-queries.written", 4, 60)
+
+    client2 = self.create_client_for_nth_impalad(2, vector.get_value('protocol'))
     try:
-      # Create the test table.
-      create_tbl_sql = "create table {0} (id INT, product_name STRING) " \
-        "partitioned by (category INT)".format(tbl_name)
-      create_tbl_results = client.execute(create_tbl_sql)
-      assert create_tbl_results.success
-
-      insert_sql = "insert into {0} (id,category,product_name) values " \
-                   "(0,1,'the product')".format(tbl_name)
-      res = client.execute(insert_sql, fetch_profile_after_close=True)
-      assert res.success
-
-      # Include the two queries run by the unique_database fixture setup.
-      self.cluster.get_first_impalad().service.wait_for_metric_value(
-          "impala-server.completed-queries.written", 4, 60)
-
-      client2 = self.create_client_for_nth_impalad(2, vector.get_value('protocol'))
-      try:
-        assert client2 is not None
-        assert_query(self.QUERY_TBL, client2, "test_query_hist_3", res.runtime_profile)
-      finally:
-        client2.close()
+      assert client2 is not None
+      assert_query(self.QUERY_TBL, client2, "test_query_hist_3", res.runtime_profile)
     finally:
-      client.execute("drop table if exists {0}".format(tbl_name))
+      client2.close()
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1 "
