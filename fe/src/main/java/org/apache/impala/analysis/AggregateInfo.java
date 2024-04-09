@@ -67,6 +67,18 @@ import com.google.common.collect.Lists;
 public class AggregateInfo extends AggregateInfoBase {
   private final static Logger LOG = LoggerFactory.getLogger(AggregateInfo.class);
 
+  // Coefficients for estimating CPU processing cost.  Derived from benchmarking.
+  // Cost per input row for each additional agg function evaluated
+  private static final double COST_COEFFICIENT_AGG_EXPR = 0.07;
+  // Cost per input row with single grouping expr with single agg expr
+  private static final double COST_COEFFICIENT_AGG_INPUT_SINGLE_GROUP = 0.2925;
+  // Cost per output row produced with single grouping expr and single agg expr
+  private static final double COST_COEFFICIENT_AGG_OUTPUT_SINGLE_GROUP = 2.6072;
+  // Cost per input row with multiple grouping exprs and single agg expr
+  private static final double COST_COEFFICIENT_AGG_INPUT_MULTI_GROUP = 1.3741;
+  // Cost per output row produced with multiple grouping exprs and single agg expr
+  private static final double COST_COEFFICIENT_AGG_OUTPUT_MULTI_GROUP = 4.5285;
+
   // created by createMergeAggInfo()
   private AggregateInfo mergeAggInfo_;
 
@@ -720,10 +732,37 @@ public class AggregateInfo extends AggregateInfoBase {
   @Override
   public AggregateInfo clone() { return new AggregateInfo(this); }
 
-  public ProcessingCost computeProcessingCost(String label, long inputCardinality) {
-    float weight = ExprUtil.computeExprsTotalCost(getGroupingExprs())
-        + ExprUtil.computeExprsTotalCost(getAggregateExprs());
+  public ProcessingCost computeProcessingCost(
+      String label, long inputCardinality, long intermediateOutputCardinality) {
+    // Benchmarking suggests we can estimate the processing cost as a linear function
+    // based the probe input cardinality, the "intermediate" output cardinality, and
+    // an incremental cost per input row for each additional aggregate function.
+    // The intermediate output cardinality is an attempt to account for the fact that
+    // there are typically duplicate keys across multiple fragments in any preaggregation.
+    // The coefficients are derived from benchmarking and are different for different
+    // numbers of grouping columns.
+    int numGroupingExprs = getGroupingExprs().size();
+    int numAggExprs = getMaterializedAggregateExprs().size();
+    int numExtraAggExprs = numAggExprs > 1 ? numAggExprs - 1 : 0;
+    double totalCost = 0.0;
+    if (numGroupingExprs == 0) {
+      totalCost = (inputCardinality * numAggExprs * COST_COEFFICIENT_AGG_EXPR);
+    } else if (numGroupingExprs == 1) {
+      totalCost = (inputCardinality * COST_COEFFICIENT_AGG_INPUT_SINGLE_GROUP)
+          + (intermediateOutputCardinality * COST_COEFFICIENT_AGG_OUTPUT_SINGLE_GROUP)
+          + (inputCardinality * numExtraAggExprs * COST_COEFFICIENT_AGG_EXPR);
+    } else {
+      totalCost = (inputCardinality * COST_COEFFICIENT_AGG_INPUT_MULTI_GROUP)
+          + (intermediateOutputCardinality * COST_COEFFICIENT_AGG_OUTPUT_MULTI_GROUP)
+          + (inputCardinality * numExtraAggExprs * COST_COEFFICIENT_AGG_EXPR);
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Total CPU cost estimate: " + totalCost
+          + ", Grouping Exprs Count: " + numGroupingExprs
+          + ", Agg Exprs Count: " + numAggExprs + ", Input Card: " + inputCardinality
+          + ", Intermediate Output Card: " + intermediateOutputCardinality);
+    }
 
-    return ProcessingCost.basicCost(label, inputCardinality, weight);
+    return ProcessingCost.basicCost(label, totalCost);
   }
 }

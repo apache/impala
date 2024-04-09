@@ -570,10 +570,18 @@ public class AggregationNode extends PlanNode {
     processingCost_ = ProcessingCost.zero();
     AggregationNode prevAgg = getPrevAggInputNode();
     for (AggregateInfo aggInfo : aggInfos_) {
-      // TODO: Cost should be much lower for NonGroupingAggregator
-      // (aggInfo.getGroupingExprs() is empty).
-      ProcessingCost aggCost = aggInfo.computeProcessingCost(
-          getDisplayLabel(), getAggClassNumGroup(prevAgg, aggInfo));
+      // The cost is a function of both the input size and the output size (NDV). For
+      // estimating cost for any pre-aggregation we need to account for the likelihood of
+      // duplicate keys across fragments.  Calculate an overall "intermediate" output
+      // cardinality that attempts to account for the dups. Cap it at the input
+      // cardinality because an aggregation cannot increase the cardinality.
+      long inputCardinality = getAggClassNumGroup(prevAgg, aggInfo);
+      long perInstanceNdv = fragment_.getPerInstanceNdvForCpuCosting(
+          inputCardinality, aggInfo.getGroupingExprs());
+      long intermediateOutputCardinality = Math.min(
+          inputCardinality, perInstanceNdv * fragment_.getNumInstancesForCosting());
+      ProcessingCost aggCost = aggInfo.computeProcessingCost(getDisplayLabel(),
+          getAggClassNumGroup(prevAgg, aggInfo), intermediateOutputCardinality);
       processingCost_ = ProcessingCost.sumCost(processingCost_, aggCost);
     }
   }

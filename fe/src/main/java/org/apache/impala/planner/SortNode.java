@@ -53,6 +53,12 @@ import com.google.common.base.Preconditions;
 public class SortNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SortNode.class);
 
+  // Coefficiencts for estimating scan processing cost. Derived from benchmarking.
+  private static final double COST_COEFFICIENT_SORT_TOTAL_SMALL_ROW = 0.0301;
+  private static final double COST_COEFFICIENT_SORT_TOTAL_ROWS = 0.4071;
+  private static final double COST_COEFFICIENT_SORT_TOTAL_BYTES = 0.0435;
+  private static final double COST_COEFFICIENT_SORT_TOPN = 0.5638;
+
   // Memory limit for partial sorts, specified in bytes. TODO: determine the value for
   // this, consider making it configurable, enforce it in the BE. (IMPALA-5669)
   private final long PARTIAL_SORT_MEM_LIMIT = 128 * 1024 * 1024;
@@ -455,8 +461,40 @@ public class SortNode extends PlanNode {
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
-    processingCost_ =
-        getSortInfo().computeProcessingCost(getDisplayLabel(), getCardinality());
+    // For TOTAL sorts benchmarked costs fall into two categories. For smaller row widths
+    // (<= 10 bytes) the sort time is proportional to NlogN of the row count.  For larger
+    // row widths the time is best predicted as a linear function of the row count and
+    // byte count (likely because the time is dominated by materialization costs and not
+    // the actual key sorting cost). Benchmark coefficients were derived from cases with
+    // moderately low NDV and with just one or two sorting runs and minimal or no
+    // spilling.  These are close to best case costs intentionally to avoid overestimating
+    // costs and required resources. We currently use the same costing for partial and
+    // total sorts.
+    // TODO: Benchmark partial sort cost separately.
+    // TODO: Improve this for larger spilling sorts.
+    double totalCost = 0.0F;
+    long inputCardinality = getChild(0).getFilteredCardinality();
+    if (type_ == TSortType.TOTAL || type_ == TSortType.PARTIAL) {
+      if (avgRowSize_ <= 10) {
+        totalCost = inputCardinality * (Math.log(inputCardinality) / Math.log(2))
+            * COST_COEFFICIENT_SORT_TOTAL_SMALL_ROW;
+      } else {
+        double fullInputSize = inputCardinality * avgRowSize_;
+        totalCost = (inputCardinality * COST_COEFFICIENT_SORT_TOTAL_ROWS)
+            + (fullInputSize * COST_COEFFICIENT_SORT_TOTAL_BYTES);
+      }
+    } else {
+      Preconditions.checkState(
+          type_ == TSortType.TOPN || type_ == TSortType.PARTITIONED_TOPN);
+      // Benchmarked TopN sort costs were ~ NlogN rows.
+      totalCost = inputCardinality * (Math.log(inputCardinality) / Math.log(2))
+          * COST_COEFFICIENT_SORT_TOPN;
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Sort CPU cost estimate: " + totalCost + ", Type: " + type_
+          + ", Input Card: " + inputCardinality + ", Row Size: " + avgRowSize_);
+    }
+    processingCost_ = ProcessingCost.basicCost(getDisplayLabel(), totalCost);
   }
 
   @Override

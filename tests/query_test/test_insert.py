@@ -452,14 +452,14 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
             "select ss_item_sk, ss_ticket_number, ss_store_sk " \
             "from tpcds_parquet.store_sales".format(unique_database)
     self.__run_insert_and_verify_instances(query, max_fs_writers=0,
-                                           expected_num_instances_per_host=[5, 5, 5],
+                                           expected_num_instances_per_host=[2, 2, 2],
                                            processing_cost_min_threads=1)
     # Partitioned insert can still be limited by max_fs_writers option.
     query = "create table {0}.test6 partitioned by (ss_store_sk) as " \
             "select ss_item_sk, ss_ticket_number, ss_store_sk " \
             "from tpcds_parquet.store_sales".format(unique_database)
     self.__run_insert_and_verify_instances(query, max_fs_writers=2,
-                                           expected_num_instances_per_host=[4, 5, 5],
+                                           expected_num_instances_per_host=[1, 2, 2],
                                            processing_cost_min_threads=1)
 
   def __run_insert_and_verify_instances(self, query, max_fs_writers=0, mt_dop=0,

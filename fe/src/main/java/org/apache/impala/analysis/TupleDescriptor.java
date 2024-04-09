@@ -108,6 +108,7 @@ public class TupleDescriptor {
   private int byteSize_;  // of all slots plus null indicators
   private int numNullBytes_;
   private float avgSerializedSize_;  // in bytes; includes serialization overhead
+  private float serializedPadSize_; // total padding bytes in avgSerializedSize_
 
   // Underlying masked table if this is the tuple of a table masking view.
   private BaseTableRef maskedTable_ = null;
@@ -213,6 +214,7 @@ public class TupleDescriptor {
   public StructType getType() { return type_; }
   public int getByteSize() { return byteSize_; }
   public float getAvgSerializedSize() { return avgSerializedSize_; }
+  public float getSerializedPadSize() { return serializedPadSize_; }
   public boolean isMaterialized() {
     return isMaterialized_;
   }
@@ -352,6 +354,7 @@ public class TupleDescriptor {
 
     boolean alwaysAddNullBit = hasNullableKuduScanSlots();
     avgSerializedSize_ = 0;
+    serializedPadSize_ = 0;
 
     // maps from slot size to slot descriptors with that size
     Map<Integer, List<SlotDescriptor>> slotsBySize = new HashMap<>();
@@ -475,6 +478,8 @@ public class TupleDescriptor {
     ColumnStats stats = slotDesc.getStats();
     if (stats.hasAvgSize()) {
       avgSerializedSize_ += stats.getAvgSerializedSize();
+      serializedPadSize_ +=
+          Math.max(0, stats.getAvgSerializedSize() - stats.getAvgSize());
     } else {
       // Note, there are no stats for complex types slots so can't use average serialized
       // size from stats for them.
@@ -484,6 +489,7 @@ public class TupleDescriptor {
     // Add padding for a KUDU string slot.
     if (slotDesc.isKuduStringSlot()) {
       avgSerializedSize_ += KUDU_STRING_PADDING;
+      serializedPadSize_ += KUDU_STRING_PADDING;
     }
   }
 

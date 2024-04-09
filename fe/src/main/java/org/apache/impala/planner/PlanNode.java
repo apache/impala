@@ -156,6 +156,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // sum of tupleIds_' avgSerializedSizes; set in computeStats()
   protected float avgRowSize_;
 
+  // Sum of tupleIds_' padding bytes that is included in avgRowSize_.
+  // Set in computeStats().
+  protected float rowPadSize_;
+
   // If true, disable codegen for this plan node.
   protected boolean disableCodegen_;
 
@@ -245,6 +249,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public int getNumInstances() { return numInstances_; }
   public ResourceProfile getNodeResourceProfile() { return nodeResourceProfile_; }
   public float getAvgRowSize() { return avgRowSize_; }
+  public float getRowPadSize() { return rowPadSize_; }
+  public float getAvgRowSizeWithoutPad() {
+    return Math.max(0.0F, avgRowSize_ - rowPadSize_);
+  }
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
   public List<Expr> getConjuncts() { return conjuncts_; }
@@ -698,9 +706,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   public void computeStats(Analyzer analyzer) {
     avgRowSize_ = 0.0F;
+    rowPadSize_ = 0.0F;
     for (TupleId tid: tupleIds_) {
       TupleDescriptor desc = analyzer.getTupleDesc(tid);
       avgRowSize_ += desc.getAvgSerializedSize();
+      rowPadSize_ += desc.getSerializedPadSize();
     }
     if (!children_.isEmpty()) {
       numNodes_ = getChild(0).numNodes_;

@@ -97,11 +97,6 @@ abstract public class ScanNode extends PlanNode {
   // Refer to the comment of 'TableRef.tableNumRowsHint_'
   protected long tableNumRowsHint_ = -1;
 
-  // Maximum number of scanner threads after considering number of scan ranges
-  // and related query options. Calculated at computeScanProcessingCost.
-  // Default to MIN_NUM_SCAN_THREADS.
-  protected int maxScannerThreads_ = MIN_NUM_SCAN_THREADS;
-
   // Selectivity estimates of scan ranges to open if this scan node consumes a partition
   // filter. This selectivity is based on assumption that scan ranges are uniformly
   // distributed across all partitions. Set in reduceCardinalityByRuntimeFilter().
@@ -397,6 +392,24 @@ abstract public class ScanNode extends PlanNode {
   }
 
   /**
+   * Maximum number of scanner threads (when using CPC costing) after considering
+   * number of scan ranges and related query options.
+   */
+  protected int computeMaxScannerThreadsForCPC(TQueryOptions queryOptions) {
+    Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
+
+    // maxThread calculation below intentionally does not include core count from
+    // executor group config. This is to allow scan fragment parallelism to scale
+    // regardless of the core count limit.
+    int maxThreadsPerNode = Math.max(queryOptions.getProcessing_cost_min_threads(),
+        queryOptions.getMax_fragment_instances_per_node());
+    int maxThreadsGlobal = IntMath.saturatedMultiply(getNumNodes(), maxThreadsPerNode);
+    int maxScannerThreads = Math.max(MIN_NUM_SCAN_THREADS,
+        (int) Math.min(estScanRangeAfterRuntimeFilter(), maxThreadsGlobal));
+    return maxScannerThreads;
+  }
+
+  /**
    * Compute processing cost of this scan node.
    * <p>
    * This method does not mutate any state of the scan node object, including
@@ -406,14 +419,7 @@ abstract public class ScanNode extends PlanNode {
   protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
     Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
 
-    // maxThread calculation below intentionally does not include core count from
-    // executor group config. This is to allow scan fragment parallelism to scale
-    // regardless of the core count limit.
-    int maxThreadsPerNode = Math.max(queryOptions.getProcessing_cost_min_threads(),
-        queryOptions.getMax_fragment_instances_per_node());
-    int maxThreadsGlobal = IntMath.saturatedMultiply(getNumNodes(), maxThreadsPerNode);
-    maxScannerThreads_ = Math.max(MIN_NUM_SCAN_THREADS,
-        (int) Math.min(estScanRangeAfterRuntimeFilter(), maxThreadsGlobal));
+    int maxScannerThreads = computeMaxScannerThreadsForCPC(queryOptions);
     long inputCardinality = getFilteredInputCardinality();
 
     if (inputCardinality >= 0) {
@@ -427,13 +433,13 @@ abstract public class ScanNode extends PlanNode {
       return cardinalityBasedCost;
     } else {
       // Input cardinality is unknown. Return synthetic ProcessingCost based on
-      // maxScannerThreads_.
+      // maxScannerThreads.
       long syntheticCardinality =
-          Math.max(1, Math.min(inputCardinality, maxScannerThreads_));
+          Math.max(1, Math.min(inputCardinality, maxScannerThreads));
       long syntheticPerRowCost = LongMath.saturatedMultiply(
           Math.max(1,
               BackendConfig.INSTANCE.getMinProcessingPerThread() / syntheticCardinality),
-          maxScannerThreads_);
+          maxScannerThreads);
 
       return ProcessingCost.basicCost(
           getDisplayLabel(), syntheticCardinality, 0, syntheticPerRowCost);

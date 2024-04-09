@@ -95,7 +95,8 @@ public class CostingSegment extends TreeNode<CostingSegment> {
       if (unionNode != null) {
         // Union fragment need recalculation because its max parallelism is bounded by
         // its children's adjusted count.
-        maxParallelism = fragment.getMaxParallelismForUnionFragment(unionNode, true);
+        maxParallelism =
+            fragment.getMaxParallelismForUnionFragment(unionNode, true, null);
       }
     }
 

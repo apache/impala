@@ -48,11 +48,11 @@ group by rollup (
   ss_ext_sales_price)
 limit 100
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.76GB Threads=11
-Per-Host Resource Estimates: Memory=2.28GB
+Max Per-Host Resource Reservation: Memory=1.59GB Threads=10
+Per-Host Resource Estimates: Memory=2.08GB
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[604] cpu-comparison-result=21 [max(1 (self) vs 21 (sum children))]
+|  max-parallelism=1 segment-costs=[625] cpu-comparison-result=18 [max(1 (self) vs 18 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN ss_net_paid_inc_tax WHEN 2 THEN ss_net_paid_inc_tax WHEN 3 THEN ss_net_paid_inc_tax WHEN 4 THEN ss_net_paid_inc_tax WHEN 5 THEN ss_net_paid_inc_tax WHEN 6 THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN ss_ext_list_price WHEN 2 THEN ss_ext_list_price WHEN 3 THEN ss_ext_list_price WHEN 4 THEN ss_ext_list_price WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN ss_net_profit WHEN 2 THEN ss_net_profit WHEN 3 THEN ss_net_profit WHEN 4 THEN NULL WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN ss_net_paid WHEN 2 THEN ss_net_paid WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN ss_ext_sales_price WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN NULL WHEN 6 THEN NULL END, aggif(valid_tid(1,2,3,4,5,6) IN (1, 2, 3, 4, 5, 6), CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN sum(ss_store_sk) WHEN 2 THEN sum(ss_store_sk) WHEN 3 THEN sum(ss_store_sk) WHEN 4 THEN sum(ss_store_sk) WHEN 5 THEN sum(ss_store_sk) WHEN 6 THEN sum(ss_store_sk) END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=600
@@ -60,18 +60,18 @@ PLAN-ROOT SINK
 05:EXCHANGE [UNPARTITIONED]
 |  limit: 100
 |  mem-estimate=32.68KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=7 row-size=32B cardinality=100 cost=4
+|  tuple-ids=7 row-size=32B cardinality=100 cost=25
 |  in pipelines: 02(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 2 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 3 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 4 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 5 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_ext_list_price) WHEN 2 THEN murmur_hash(ss_ext_list_price) WHEN 3 THEN murmur_hash(ss_ext_list_price) WHEN 4 THEN murmur_hash(ss_ext_list_price) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_net_profit) WHEN 2 THEN murmur_hash(ss_net_profit) WHEN 3 THEN murmur_hash(ss_net_profit) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_net_paid) WHEN 2 THEN murmur_hash(ss_net_paid) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_ext_sales_price) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)] hosts=3 instances=9 (adjusted from 48)
 Per-Instance Resources: mem-estimate=303.35MB mem-reservation=188.94MB thread-reservation=1
-max-parallelism=9 segment-costs=[75109407, 84972256, 4] cpu-comparison-result=21 [max(9 (self) vs 21 (sum children))]
+max-parallelism=9 segment-costs=[84585042, 71651035, 257] cpu-comparison-result=18 [max(9 (self) vs 18 (sum children))]
 02:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(1,2,3,4,5,6) IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT), CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(1,2,3,4,5,6) WHEN CAST(1 AS INT) THEN sum(ss_store_sk) WHEN CAST(2 AS INT) THEN sum(ss_store_sk) WHEN CAST(3 AS INT) THEN sum(ss_store_sk) WHEN CAST(4 AS INT) THEN sum(ss_store_sk) WHEN CAST(5 AS INT) THEN sum(ss_store_sk) WHEN CAST(6 AS INT) THEN sum(ss_store_sk) END)
 |  group by: CASE valid_tid(1,2,3,4,5,6) WHEN CAST(1 AS INT) THEN ss_net_paid_inc_tax WHEN CAST(2 AS INT) THEN ss_net_paid_inc_tax WHEN CAST(3 AS INT) THEN ss_net_paid_inc_tax WHEN CAST(4 AS INT) THEN ss_net_paid_inc_tax WHEN CAST(5 AS INT) THEN ss_net_paid_inc_tax WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN CAST(1 AS INT) THEN ss_ext_list_price WHEN CAST(2 AS INT) THEN ss_ext_list_price WHEN CAST(3 AS INT) THEN ss_ext_list_price WHEN CAST(4 AS INT) THEN ss_ext_list_price WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN CAST(1 AS INT) THEN ss_net_profit WHEN CAST(2 AS INT) THEN ss_net_profit WHEN CAST(3 AS INT) THEN ss_net_profit WHEN CAST(4 AS INT) THEN NULL WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN CAST(1 AS INT) THEN ss_net_paid WHEN CAST(2 AS INT) THEN ss_net_paid WHEN CAST(3 AS INT) THEN NULL WHEN CAST(4 AS INT) THEN NULL WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN CAST(1 AS INT) THEN ss_ext_sales_price WHEN CAST(2 AS INT) THEN NULL WHEN CAST(3 AS INT) THEN NULL WHEN CAST(4 AS INT) THEN NULL WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(1,2,3,4,5,6) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) END
 |  limit: 100
 |  mem-estimate=56.60MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=7 row-size=32B cardinality=100 cost=84972256
+|  tuple-ids=7 row-size=32B cardinality=100 cost=71651035
 |  in pipelines: 02(GETNEXT), 04(OPEN)
 |
 04:AGGREGATE [FINALIZE]
@@ -94,17 +94,17 @@ max-parallelism=9 segment-costs=[75109407, 84972256, 4] cpu-comparison-result=21
 |    output: sum:merge(ss_store_sk)
 |    group by: NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=246.76MB mem-reservation=154.94MB thread-reservation=0
-|  tuple-ids=1N,2N,3N,4N,5N,6N row-size=168B cardinality=12.14M cost=72833364
+|  tuple-ids=1N,2N,3N,4N,5N,6N row-size=168B cardinality=12.14M cost=71621918
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 2 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 3 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 4 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 5 THEN murmur_hash(ss_net_paid_inc_tax) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_ext_list_price) WHEN 2 THEN murmur_hash(ss_ext_list_price) WHEN 3 THEN murmur_hash(ss_ext_list_price) WHEN 4 THEN murmur_hash(ss_ext_list_price) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_net_profit) WHEN 2 THEN murmur_hash(ss_net_profit) WHEN 3 THEN murmur_hash(ss_net_profit) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_net_paid) WHEN 2 THEN murmur_hash(ss_net_paid) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6) WHEN 1 THEN murmur_hash(ss_ext_sales_price) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)]
-|  mem-estimate=13.94MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1N,2N,3N,4N,5N,6N row-size=168B cardinality=12.14M cost=2276043
+|  mem-estimate=13.38MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N,3N,4N,5N,6N row-size=168B cardinality=12.14M cost=12963124
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=21 (adjusted from 48)
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=18 (adjusted from 48)
 Per-Instance Resources: mem-estimate=202.75MB mem-reservation=176.00MB thread-reservation=1
-max-parallelism=21 segment-costs=[194962048, 2276043]
+max-parallelism=18 segment-costs=[89349069, 168856871]
 01:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(CAST(ss_store_sk AS BIGINT))
@@ -125,18 +125,18 @@ max-parallelism=21 segment-costs=[194962048, 2276043]
 |    output: sum(CAST(ss_store_sk AS BIGINT))
 |    group by: NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=180.00MB mem-reservation=172.00MB thread-reservation=0
-|  tuple-ids=1N,2N,3N,4N,5N,6N row-size=168B cardinality=12.14M cost=103694544
+|  tuple-ids=1N,2N,3N,4N,5N,6N row-size=168B cardinality=12.14M cost=88353602
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.36MB
+   HDFS partitions=1824/1824 files=1824 size=199.18MB
    stored statistics:
-     table: rows=2.88M size=199.36MB
+     table: rows=2.88M size=199.18MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=0 row-size=24B cardinality=2.88M cost=91267504
+   tuple-ids=0 row-size=24B cardinality=2.88M cost=995467
    in pipelines: 00(GETNEXT)
 ====
 select * from income_band;
@@ -145,19 +145,19 @@ Max Per-Host Resource Reservation: Memory=4.02MB Threads=2
 Per-Host Resource Estimates: Memory=20MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[61]
+|  max-parallelism=1 segment-costs=[63]
 PLAN-ROOT SINK
 |  output exprs: tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk, tpcds_partitioned_parquet_snap.income_band.ib_lower_bound, tpcds_partitioned_parquet_snap.income_band.ib_upper_bound
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=60
 |
 01:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=12B cardinality=20 cost=1
+|  tuple-ids=0 row-size=12B cardinality=20 cost=3
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
-max-parallelism=1 segment-costs=[50002]
+max-parallelism=1 segment-costs=[28]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
    HDFS partitions=1/1 files=1 size=1.21KB
    stored statistics:
@@ -165,7 +165,7 @@ max-parallelism=1 segment-costs=[50002]
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=20
    mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=20 cost=50001
+   tuple-ids=0 row-size=12B cardinality=20 cost=3
    in pipelines: 00(GETNEXT)
 ====
 # Scan cost should be exactly the same as select star without limit.
@@ -175,7 +175,7 @@ Max Per-Host Resource Reservation: Memory=4.02MB Threads=2
 Per-Host Resource Estimates: Memory=20MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[61]
+|  max-parallelism=1 segment-costs=[63]
 PLAN-ROOT SINK
 |  output exprs: tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk, tpcds_partitioned_parquet_snap.income_band.ib_lower_bound, tpcds_partitioned_parquet_snap.income_band.ib_upper_bound
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=60
@@ -183,12 +183,12 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |  limit: 1000000000
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=12B cardinality=20 cost=1
+|  tuple-ids=0 row-size=12B cardinality=20 cost=3
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
-max-parallelism=1 segment-costs=[50002]
+max-parallelism=1 segment-costs=[28]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
    HDFS partitions=1/1 files=1 size=1.21KB
    stored statistics:
@@ -197,6 +197,6 @@ max-parallelism=1 segment-costs=[50002]
    extrapolated-rows=disabled max-scan-range-rows=20
    limit: 1000000000
    mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
-   tuple-ids=0 row-size=12B cardinality=20 cost=50001
+   tuple-ids=0 row-size=12B cardinality=20 cost=3
    in pipelines: 00(GETNEXT)
 ====
