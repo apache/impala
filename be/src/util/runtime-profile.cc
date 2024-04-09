@@ -1687,7 +1687,7 @@ Status RuntimeProfile::DeserializeFromArchiveString(
 
   vector<uint8_t> decoded_buffer;
   decoded_buffer.resize(decoded_max);
-  int64_t decoded_len;
+  unsigned decoded_len;
   if (!Base64Decode(archive_str.c_str(), archive_str.size(), decoded_max,
           reinterpret_cast<char*>(decoded_buffer.data()), &decoded_len)) {
     return Status("Error in DeserializeFromArchiveString: Base64Decode failed.");

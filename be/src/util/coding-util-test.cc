@@ -58,9 +58,9 @@ void TestBase64(const string& input, const string& expected_encoded) {
   int64_t out_max = 0;
   EXPECT_TRUE(Base64DecodeBufLen(intermediate.c_str(), intermediate.size(), &out_max));
   string output(out_max, '\0');
-  int64_t out_len = 0;
+  unsigned out_len = 0;
   EXPECT_TRUE(Base64Decode(intermediate.c_str(), intermediate.size(),
-        out_max, const_cast<char*>(output.c_str()), &out_len));
+      out_max, const_cast<char*>(output.c_str()), &out_len));
   output.resize(out_len);
   EXPECT_EQ(input, output);
 
@@ -71,6 +71,28 @@ void TestBase64(const string& input, const string& expected_encoded) {
   string intermediate2;
   Base64Encode(input_vector, &intermediate2);
   EXPECT_EQ(intermediate, intermediate2);
+}
+
+// Test Base64 encoding when the variables in which the calculated maximal output size and
+// the actual output size are stored have specific initial values (regression test for
+// IMPALA-12986).
+void TestBase64EncodeWithInitialValues(int64_t initial_max_value,
+    int64_t initial_out_value) {
+  const string bytes = "abc\1\2\3";
+
+  int64_t base64_max_len = initial_max_value;
+  bool succ = Base64EncodeBufLen(bytes.size(), &base64_max_len);
+  EXPECT_TRUE(succ);
+
+  // 'base64_max_len' includes the null terminator.
+  string buf(base64_max_len - 1, '\0');
+  unsigned base64_len = initial_out_value;
+  succ = Base64Encode(bytes.c_str(), bytes.size(), base64_max_len, buf.data(),
+      &base64_len);
+  EXPECT_TRUE(succ);
+
+  const string expected = "YWJjAQID";
+  EXPECT_EQ(expected, buf);
 }
 
 // Test URL encoding. Check that the values that are put in are the
@@ -110,6 +132,13 @@ TEST(Base64Test, Basic) {
   TestBase64(string("abcdef\0", 7), "YWJjZGVmAA==");
   TestBase64(string("a\0b", 3), "YQBi");
   TestBase64(string("a\0b\0", 4), "YQBiAA==");
+}
+
+TEST(Base64Test, VariousInitialVariableValues) {
+  TestBase64EncodeWithInitialValues(0, 0);
+  TestBase64EncodeWithInitialValues(5, -10);
+  // Test a value that doesn't fit in 32 bits.
+  TestBase64EncodeWithInitialValues(5, 88090617260393);
 }
 
 TEST(HtmlEscapingTest, Basic) {

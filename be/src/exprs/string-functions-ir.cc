@@ -1529,7 +1529,7 @@ StringVal StringFunctions::Base64Encode(FunctionContext* ctx, const StringVal& s
   }
   StringVal result(ctx, out_max);
   if (UNLIKELY(result.is_null)) return result;
-  int64_t out_len = 0;
+  unsigned out_len = 0;
   if (UNLIKELY(!impala::Base64Encode(
           reinterpret_cast<const char*>(str.ptr), str.len,
           out_max, reinterpret_cast<char*>(result.ptr), &out_len))) {
@@ -1558,7 +1558,7 @@ StringVal StringFunctions::Base64Decode(FunctionContext* ctx, const StringVal& s
   }
   StringVal result(ctx, out_max);
   if (UNLIKELY(result.is_null)) return result;
-  int64_t out_len = 0;
+  unsigned out_len = 0;
   if (UNLIKELY(!impala::Base64Decode(
           reinterpret_cast<const char*>(str.ptr), static_cast<int64_t>(str.len),
           out_max, reinterpret_cast<char*>(result.ptr), &out_len))) {

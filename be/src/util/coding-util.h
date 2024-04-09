@@ -48,9 +48,9 @@ bool Base64EncodeBufLen(int64_t in_len, int64_t* out_max);
 /// data, the space of size out_max should be allocated before calling this function.
 /// out_len saves the actual length of encoded string.
 bool Base64Encode(const char* in, int64_t in_len, int64_t out_max, char* out,
-    int64_t* out_len);
+    unsigned* out_len);
 
-/// Utility method to encode input as base-64 encoded.  This is not
+/// Utility method to encode input as base-64 encoded. This is not
 /// very performant (multiple string copies) and should not be used
 /// in a hot path.
 void Base64Encode(const std::vector<uint8_t>& in, std::string* out);
@@ -68,7 +68,7 @@ bool Base64DecodeBufLen(const char* in, int64_t in_len, int64_t* out_max);
 /// out_max should be allocated before calling this function. out_len saves the actual
 /// length of decoded string.
 bool Base64Decode(const char* in, int64_t in_len, int64_t out_max, char* out,
-    int64_t* out_len);
+    unsigned* out_len);
 
 /// Replaces &, < and > with &amp;, &lt; and &gt; respectively. This is
 /// not the full set of required encodings, but one that should be

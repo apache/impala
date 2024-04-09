@@ -94,7 +94,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
             reinterpret_cast<char*>(slot);
         if (UNLIKELY(str.ptr == nullptr)) return false;
         if (base64_decode) {
-          int64_t out_len;
+          unsigned out_len;
           if(!Base64Decode(data, len, buffer_len, str.ptr, &out_len)) return false;
           DCHECK_LE(out_len, buffer_len);
           str.len = out_len;
