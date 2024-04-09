@@ -102,6 +102,9 @@ public class IcebergScanNode extends HdfsScanNode {
     if (((FeIcebergTable)tblRef.getTable()).isPartitioned()) {
       // Let's order the file descriptors for better scheduling.
       // See IMPALA-12765 for details.
+      // Create a clone of the original file descriptor list to avoid getting
+      // ConcurrentModificationException when sorting.
+      fileDescs_ = new ArrayList<>(fileDescs_);
       Collections.sort(fileDescs_);
       filesAreSorted_ = true;
     }
