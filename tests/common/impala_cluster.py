@@ -401,7 +401,7 @@ class Process(object):
     """Gets the PIDs of the process. In some circumstances, a process can run multiple
     times, e.g. when it forks in the Breakpad crash handler. Returns an empty list if no
     PIDs can be determined."""
-    pids = self.__get_pids()
+    pids = [proc['pid'] for proc in self.__get_procs()]
     if pids:
       LOG.info("Found PIDs %s for %s" % (", ".join(map(str, pids)), " ".join(self.cmd)))
     else:
@@ -409,37 +409,53 @@ class Process(object):
                " ".join(self.cmd))
     return pids
 
-  def __get_pid(self):
-    pids = self.__get_pids()
-    assert len(pids) < 2, "Expected single pid but found %s" % ", ".join(map(str, pids))
-    return len(pids) == 1 and pids[0] or None
+  def __procs_str(self, procs):
+    return "\n".join([str(proc) for proc in procs])
 
-  def __get_pids(self):
+  def __get_pid(self):
+    procs = self.__get_procs()
+    # Return early for containerized environments
+    if len(procs) == 1:
+      return procs[0]['pid']
+
+    result = None
+    # In some circumstances - notably ubsan tests - child processes can be slow to exit.
+    # Only return the original process, i.e. one who's parent has a different cmd.
+    pids = [proc['pid'] for proc in procs]
+    for process in procs:
+      if process['ppid'] not in pids:
+        assert result is None,\
+            "Multiple non-child processes:\n%s" % self.__procs_str(procs)
+        result = process['pid']
+      else:
+        LOG.info("Child process active:\n%s" % self.__procs_str(procs))
+
+    return result
+
+  def __get_procs(self):
+    """
+    Returns a list of dicts containing {pid, ppid, cmdline} for related processes.
+    """
     if self.container_id is not None:
       container_info = get_container_info(self.container_id)
       if container_info["State"]["Status"] != "running":
         return []
-      return [container_info["State"]["Pid"]]
+      return [{'pid': container_info["State"]["Pid"], 'ppid': 0, 'cmdline': self.cmd}]
 
     # In non-containerised case, search for process based on matching command lines.
-    pids = []
-    for pid in psutil.pids():
-      try:
-        process = psutil.Process(pid)
-        if set(self.cmd) == set(process.cmdline()):
-          pids.append(pid)
-      except psutil.NoSuchProcess:
-        # A process from psutil.pids() no longer exists, continue. We don't log this
-        # error since it can refer to arbitrary processes outside of our testing code.
-        pass
-    return pids
+    procs = []
+    for process in psutil.process_iter(['pid', 'ppid', 'cmdline']):
+      # Use info because it won't throw NoSuchProcess exceptions.
+      if set(self.cmd) == set(process.info['cmdline']):
+        procs.append(process.info)
+    return procs
 
   def kill(self, signal=SIGKILL):
     """
     Kills the given processes.
     """
     if self.container_id is None:
-      pid = self.__get_pid()
+      pid = self.get_pid()
       assert pid is not None, "No processes for %s" % self
       LOG.info('Killing %s with signal %s' % (self, signal))
       exec_process("kill -%d %d" % (signal, pid))
