@@ -206,6 +206,14 @@ public class HdfsScanNode extends ScanNode {
           .add(HdfsFileFormat.ICEBERG)
           .build();
 
+  // Coefficients for estimating scan CPU processing cost. Derived from benchmarking.
+  // Cost per byte materialized for columnar or per byte scanned for non-columnar.
+  private static final double COST_COEFFICIENT_COLUMNAR_BYTES_MATERIALIZED = 0.0144;
+  private static final double COST_COEFFICIENT_NONCOLUMNAR_BYTES_SCANNED = 0.0354;
+  // Cost per predicate per row
+  private static final double COST_COEFFICIENT_COLUMNAR_PREDICATE_EVAL = 0.0281;
+  private static final double COST_COEFFICIENT_NONCOLUMNAR_PREDICATE_EVAL = 0.0549;
+
   //An estimate of the width of a row when the information is not available.
   private double DEFAULT_ROW_WIDTH_ESTIMATE = 1.0;
 
@@ -2196,6 +2204,45 @@ public class HdfsScanNode extends ScanNode {
   public void computeProcessingCost(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(scanRangeSpecs_);
     processingCost_ = computeScanProcessingCost(queryOptions);
+  }
+
+  /**
+   *  Estimate CPU processing cost for the scan.  Based on benchmarking, the cost can be
+   *  estimated as a function of the number of bytes materialized (for columnar scans) or
+   *  bytes read (for non-columnar) plus an additional per row cost for each predicate
+   * evaluated.
+   */
+  @Override
+  protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
+    Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
+
+    long inputCardinality = getFilteredInputCardinality();
+    long estBytes = 0L;
+    double bytesCostCoefficient = 0.0;
+    double predicateCostCoefficient = 0.0;
+
+    if (inputCardinality >= 0) {
+      if (allColumnarFormat_) {
+        float avgRowDataSize = getAvgRowSizeWithoutPad();
+        estBytes = (long) Math.ceil(avgRowDataSize * (double) inputCardinality);
+        bytesCostCoefficient = COST_COEFFICIENT_COLUMNAR_BYTES_MATERIALIZED;
+        predicateCostCoefficient = COST_COEFFICIENT_COLUMNAR_PREDICATE_EVAL;
+      } else {
+        estBytes = sumValues(totalBytesPerFs_);
+        bytesCostCoefficient = COST_COEFFICIENT_NONCOLUMNAR_BYTES_SCANNED;
+        predicateCostCoefficient = COST_COEFFICIENT_NONCOLUMNAR_PREDICATE_EVAL;
+      }
+      double totalCost = (estBytes * bytesCostCoefficient)
+          + (inputCardinality * getConjuncts().size() * predicateCostCoefficient);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Scan CPU cost estimate: " + totalCost + ", All Columnar: "
+            + allColumnarFormat_ + ", Input Cardinality: " + inputCardinality
+            + ", Bytes: " + estBytes + ", Pred Count: " + getConjuncts().size());
+      }
+      return ProcessingCost.basicCost(getDisplayLabel(), totalCost);
+    } else {
+      return super.computeScanProcessingCost(queryOptions);
+    }
   }
 
   @Override

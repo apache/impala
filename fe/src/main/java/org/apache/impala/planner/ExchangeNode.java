@@ -33,6 +33,8 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
 import org.apache.impala.util.ExprUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -49,14 +51,29 @@ import com.google.common.base.Preconditions;
  * inputs are also sorted individually on the same SortInfo parameter.
  */
 public class ExchangeNode extends PlanNode {
+  private static final Logger LOG = LoggerFactory.getLogger(ExchangeNode.class);
+
   // The serialization overhead per tuple in bytes when sent over an exchange.
   // Currently it accounts only for the tuple_offset entry per tuple (4B) in a
   // BE TRowBatch. If we modify the RowBatch serialization, then we need to
   // update this constant as well.
   private static final double PER_TUPLE_SERIALIZATION_OVERHEAD = 4.0;
 
+  // The overhead in bytes per tuple for a deserialized row batch
+  // TODO: The per-row sizes calculated from profile counters suggest we
+  // may actually have an overhead of 9 bytes per tuple. Investigate this
+  // further.
+  private static final double PER_TUPLE_DESERIALIZED_OVERHEAD = 8.0;
+
   // Empirically derived minimum estimate (in bytes) for the exchange node.
   private static final int MIN_ESTIMATE_BYTES = 16 * 1024;
+
+  // Coefficients for estimating exchange receiver CPU costs.  Derived from benchmarking.
+  private static final double COST_COEFFICIENT_MERGING_XCHG_RCVR_ROWS = 0.2369;
+  private static final double COST_COEFFICIENT_MERGING_XCHG_RCVR_BYTES = 0.0020;
+  private static final double COST_COEFFICIENT_BCAST_XCHG_RCVR_ROWS = 0.1329;
+  private static final double COST_COEFFICIENT_PART_XCHG_RCVR_ROWS = 0.0743;
+  private static final double COST_COEFFICIENT_PART_XCHG_RCVR_BYTES = 0.0046;
 
   // The parameters based on which sorted input streams are merged by this
   // exchange node. Null if this exchange does not merge sorted streams
@@ -66,9 +83,7 @@ public class ExchangeNode extends PlanNode {
   // only if mergeInfo_ is non-null, i.e. this is a merging exchange node.
   private long offset_;
 
-  private boolean isMergingExchange() {
-    return mergeInfo_ != null;
-  }
+  protected boolean isMergingExchange() { return mergeInfo_ != null; }
 
   protected boolean isBroadcastExchange() {
     // If the output of the sink is not partitioned but the target fragment is
@@ -202,11 +217,19 @@ public class ExchangeNode extends PlanNode {
 
   /**
    * Returns the average size of rows produced by 'exchInput' when serialized for
-   * being sent through an exchange.
+   * being sent through an exchange. Static method because we call this in some
+   * cases where we can't be 100% sure the PlanNode is actually an ExchangeNode.
    */
   public static double getAvgSerializedRowSize(PlanNode exchInput) {
-    return exchInput.getAvgRowSize() +
-        (exchInput.getTupleIds().size() * PER_TUPLE_SERIALIZATION_OVERHEAD);
+    return exchInput.getAvgRowSize()
+        + (exchInput.getTupleIds().size() * PER_TUPLE_SERIALIZATION_OVERHEAD);
+  }
+
+  /**
+   * Returns the average size of rows produced by 'exchInput' after deserialization.
+   */
+  public double getAvgDeserializedRowSize() {
+    return getAvgRowSize() + (getTupleIds().size() * PER_TUPLE_DESERIALIZED_OVERHEAD);
   }
 
   // Return the number of sending instances of this exchange.
@@ -230,11 +253,35 @@ public class ExchangeNode extends PlanNode {
     //      bottom sending fragment;
     //   2. The receiving processing cost in the top receiving fragment which is computed
     //      here.
-    // Assume serialization and deserialization costs per row are equal.
-    float conjunctsCost = ExprUtil.computeExprsTotalCost(conjuncts_);
-    float materializationCost = estimateSerializationCostPerRow();
-    processingCost_ = ProcessingCost.basicCost(getDisplayLabel() + "(receiving)",
-        getChild(0).getFilteredCardinality(), conjunctsCost, materializationCost);
+    long inputCardinality = getChild(0).getFilteredCardinality();
+
+    // It's not obvious whether the per-byte CPU costs are more accurately estimated
+    // using the serialized or deserialized sizes, but the coefficients were determined
+    // using deserialized sizes since those are more readily available in query profiles.
+    // So for consistency we used deserialized size to calculate costs here.
+    long inputSize = (long) (getAvgDeserializedRowSize() * inputCardinality);
+    double totalCost = 0.0;
+    String exchType;
+
+    if (isMergingExchange()) {
+      exchType = "MERGING";
+      totalCost = (inputCardinality * COST_COEFFICIENT_MERGING_XCHG_RCVR_ROWS)
+          + (inputSize * COST_COEFFICIENT_MERGING_XCHG_RCVR_BYTES);
+    } else if (isBroadcastExchange()) {
+      exchType = "BROADCAST";
+      totalCost = inputCardinality * COST_COEFFICIENT_BCAST_XCHG_RCVR_ROWS;
+    } else {
+      exchType = isDirectedExchange() ? "DIRECTED" : "PARTITIONED";
+      // Use the partitioned exchange costing for all other cases incuding DIRECTED.
+      // TODO: Add specific costing for DIRECTED exchange based on benchmarks.
+      totalCost = (inputCardinality * COST_COEFFICIENT_PART_XCHG_RCVR_ROWS)
+          + (inputSize * COST_COEFFICIENT_PART_XCHG_RCVR_BYTES);
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Total CPU cost estimate: " + totalCost + ", ExchangeType: " + exchType
+          + ", Input Card: " + inputCardinality + ", Input Size: " + inputSize);
+    }
+    processingCost_ = ProcessingCost.basicCost(getDisplayLabel(), totalCost);
 
     if (isBroadcastExchange()) {
       processingCost_ = ProcessingCost.broadcastCost(processingCost_,
@@ -270,13 +317,6 @@ public class ExchangeNode extends PlanNode {
     nodeResourceProfile_ = ResourceProfile.noReservation(estimatedMem);
   }
 
-  /**
-   * Estimate per-row serialization/deserialization cost as 1 per 1KB.
-   */
-  protected float estimateSerializationCostPerRow() {
-    return (float) getAvgSerializedRowSize(this) / 1024;
-  }
-
   // Returns the estimated size of the deferred batch queue (in bytes) by
   // assuming that at least one row batch rpc payload per sender is queued.
   private long estimateDeferredRPCQueueSize(TQueryOptions queryOptions,
@@ -284,9 +324,9 @@ public class ExchangeNode extends PlanNode {
     long rowBatchSize = getRowBatchSize(queryOptions);
     // Set an upper limit based on estimated cardinality.
     if (getCardinality() > 0) rowBatchSize = Math.min(rowBatchSize, getCardinality());
-    long avgRowBatchByteSize = Math.min(
-        (long) Math.ceil(rowBatchSize * getAvgSerializedRowSize(this)),
-        ROWBATCH_MAX_MEM_USAGE);
+    long avgRowBatchByteSize =
+        Math.min((long) Math.ceil(rowBatchSize * getAvgSerializedRowSize(this)),
+            ROWBATCH_MAX_MEM_USAGE);
     long deferredBatchQueueSize = avgRowBatchByteSize * numSenders;
     return deferredBatchQueueSize;
   }

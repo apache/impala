@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.math.LongMath;
 
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.TQueryOptions;
 
 import java.math.RoundingMode;
 import java.util.List;
@@ -81,6 +80,10 @@ public abstract class ProcessingCost implements Cloneable {
         Math.max(0, cardinality), exprsCost, materializationCost);
   }
 
+  private static ProcessingCost computeValidBaseCost(double totalCost) {
+    return new BaseProcessingCost(totalCost);
+  }
+
   public static ProcessingCost basicCost(
       String label, long cardinality, float exprsCost, float materializationCost) {
     ProcessingCost processingCost =
@@ -92,6 +95,12 @@ public abstract class ProcessingCost implements Cloneable {
   public static ProcessingCost basicCost(
       String label, long cardinality, float exprsCost) {
     ProcessingCost processingCost = computeValidBaseCost(cardinality, exprsCost, 0);
+    processingCost.setLabel(label);
+    return processingCost;
+  }
+
+  public static ProcessingCost basicCost(String label, double totalCost) {
+    ProcessingCost processingCost = computeValidBaseCost(totalCost);
     processingCost.setLabel(label);
     return processingCost;
   }

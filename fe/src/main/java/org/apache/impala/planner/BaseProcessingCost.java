@@ -25,45 +25,57 @@ public class BaseProcessingCost extends ProcessingCost {
   private final long cardinality_;
   private final float exprsCost_;
   private final float materializationCost_;
+  private final double totalCost_;
 
   public BaseProcessingCost(
       long cardinality, float exprsCost, float materializationCost) {
-    // TODO: materializationCost accommodate ProcessingCost where row width should be
-    // factor in. Currently, ProcessingCost of ScanNode, ExchangeNode, and DataStreamSink
-    // has row width factored in through materialization parameter here. Investigate if
-    // other operator need to have its row width factored in as well and whether we should
-    // have specific 'rowWidth' parameter here.
+    // TODO: materializationCost accommodates ProcessingCost where row width should
+    // factor in. Currently, ProcessingCost of base class ScanNode (not HdfsScanNode),
+    // has row width factored in through materialization parameter here.
+    // If we convert the remaining non-Hdfs scan node types to use benchmark-based
+    // cost coefficients we should remove or simplify this constructor at that time.
     cardinality_ = cardinality;
     exprsCost_ = exprsCost;
     materializationCost_ = materializationCost;
+    totalCost_ =
+        Math.ceil(Math.max(cardinality_, 0) * (exprsCost_ + materializationCost_));
   }
 
-  private float costFactor() { return exprsCost_ + materializationCost_; }
+  public BaseProcessingCost(double totalCost) {
+    cardinality_ = 0L;
+    exprsCost_ = 0.0F;
+    materializationCost_ = 0.0F;
+    totalCost_ = totalCost;
+  }
+
+  // private float costFactor() { return exprsCost_ + materializationCost_; }
 
   @Override
   public long getTotalCost() {
     // Total cost must be non-negative.
-    return (long) Math.ceil(Math.max(cardinality_, 0) * costFactor());
+    return (long) totalCost_;
   }
 
   @Override
   public boolean isValid() {
-    return cardinality_ >= 0;
+    return totalCost_ >= 0.0;
   }
 
   @Override
   public ProcessingCost clone() {
-    return new BaseProcessingCost(cardinality_, exprsCost_, materializationCost_);
+    if (cardinality_ != 0L) {
+      return new BaseProcessingCost(cardinality_, exprsCost_, materializationCost_);
+    } else {
+      return new BaseProcessingCost(totalCost_);
+    }
   }
 
   @Override
   public String getDetails() {
     StringBuilder output = new StringBuilder();
     output.append(super.getDetails());
-    output.append(" cardinality=")
-        .append(cardinality_)
-        .append(" cost-factor=")
-        .append(costFactor());
+    output.append(" total-cost=").append(totalCost_);
+    if (cardinality_ != 0L) { output.append(" cardinality=").append(cardinality_); }
     return output.toString();
   }
 }

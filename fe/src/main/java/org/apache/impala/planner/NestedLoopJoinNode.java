@@ -32,6 +32,8 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.ExprUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
@@ -50,6 +52,12 @@ import com.google.common.base.Preconditions;
  * right input.
  */
 public class NestedLoopJoinNode extends JoinNode {
+  private static final Logger LOG = LoggerFactory.getLogger(NestedLoopJoinNode.class);
+
+  // Coefficients for estimating NL join CPU processing cost.  Derived from benchmarking.
+  private static final double COST_COEFFICIENT_NLJ_TINY_RHS = 0.2049;
+  private static final double COST_COEFFICIENT_NLJ = 0.1559;
+
   public NestedLoopJoinNode(PlanNode outer, PlanNode inner, boolean isStraightJoin,
       DistributionMode distrMode, JoinOperator joinOp, List<Expr> otherJoinConjuncts) {
     super(outer, inner, isStraightJoin, distrMode, joinOp,
@@ -97,48 +105,30 @@ public class NestedLoopJoinNode extends JoinNode {
 
   @Override
   public Pair<ProcessingCost, ProcessingCost> computeJoinProcessingCost() {
-    // TODO: Make this general regardless of SingularRowSrcNode exist or not.
-    // TODO: The cost should consider conjuncts_ as well.
-    ProcessingCost probeProcessingCost = ProcessingCost.zero();
-    ProcessingCost buildProcessingCost = ProcessingCost.zero();
+    // Benchmarked cost is generally a linear function of the product of the input
+    // and output cardinalities, but the coefficients are slightly different for
+    // very small RHS (< 5 rows per fragment instance) vs larger RHS so we compute
+    // different costs here based on that RHS threshold.
+    // We return the full cost in the first element of the Pair.
     long probeCardinality = getProbeCardinalityForCosting();
     long buildCardinality = getChild(1).getCardinality();
-    if (getChild(1) instanceof SingularRowSrcNode) {
-      // Compute the processing cost for lhs.
-      probeProcessingCost = ProcessingCost.basicCost(
-          getDisplayLabel() + "(c0, singularRowSrc) Probe side", probeCardinality, 0);
-
-      // Compute the processing cost for rhs.
-      buildProcessingCost = ProcessingCost.basicCost(
-          getDisplayLabel() + "(c0, singularRowSrc) Build side per probe",
-          buildCardinality, 0);
-      // Multiply by the number of probes
-      buildProcessingCost =
-          ProcessingCost.scaleCost(buildProcessingCost, Math.max(0, probeCardinality));
+    long cardProduct = checkedMultiply(probeCardinality, buildCardinality);
+    long perInstanceBuildCardinality =
+        (long) Math.ceil(buildCardinality / fragment_.getNumInstancesForCosting());
+    double totalCost = 0.0F;
+    if (perInstanceBuildCardinality < 5) {
+      totalCost = cardProduct * COST_COEFFICIENT_NLJ_TINY_RHS;
     } else {
-      // Assume 'eqJoinConjuncts_' will be applied to all rows from lhs side,
-      // and 'otherJoinConjuncts_' to the resultant rows.
-      float eqJoinPredicateEvalCost = ExprUtil.computeExprsTotalCost(eqJoinConjuncts_);
-      float otherJoinPredicateEvalCost =
-          ExprUtil.computeExprsTotalCost(otherJoinConjuncts_);
-
-      // Compute the processing cost for lhs.
-      probeProcessingCost = ProcessingCost.basicCost(
-          getDisplayLabel() + "(c0, non-singularRowSrc, eqJoinConjuncts_) Probe side",
-          probeCardinality, eqJoinPredicateEvalCost);
-
-      probeProcessingCost = ProcessingCost.sumCost(probeProcessingCost,
-          ProcessingCost.basicCost(getDisplayLabel()
-                  + "(c0, non-singularRowSrc, otherJoinConjuncts_) Probe side",
-              getFilteredCardinality(), otherJoinPredicateEvalCost));
-
-      // Compute the processing cost for rhs, assuming 'eqJoinConjuncts_' will be applied
-      // to all rows from rhs side.
-      buildProcessingCost = ProcessingCost.basicCost(
-          getDisplayLabel() + "(c0, non-singularRowSrc) Build side", buildCardinality,
-          eqJoinPredicateEvalCost);
+      totalCost = cardProduct * COST_COEFFICIENT_NLJ;
     }
-    return Pair.create(probeProcessingCost, buildProcessingCost);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Probe CPU cost estimate: " + totalCost
+          + ", Probe Card: " + probeCardinality + ", Build Card: " + buildCardinality
+          + ", Build Card Per Instance: " + perInstanceBuildCardinality);
+    }
+    ProcessingCost processingCost =
+        ProcessingCost.basicCost(getDisplayLabel(), totalCost);
+    return Pair.create(processingCost, ProcessingCost.zero());
   }
 
   @Override

@@ -53,6 +53,10 @@ import com.google.common.base.Preconditions;
 public class UnionNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(UnionNode.class);
 
+  // Coefficiencts for estimating Union processing cost. Derived from benchmarking
+  private static final double COST_COEFFICIENT_BYTES_MATERIALIZED = 0.00317;
+  private static final double COST_COEFFICIENT_ROWS_MATERIALIZED = 0.0257;
+
   // List of union result exprs of the originating SetOperationStmt. Used for
   // determining passthrough-compatibility of children.
   protected List<Expr> unionResultExprs_;
@@ -154,15 +158,26 @@ public class UnionNode extends PlanNode {
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
-    // Compute the cost for materializing child rows and use that to figure out
-    // the total data processed. Assume the costs of processing pass-through rows are 0.
-    float totalMaterializeCost = 0;
+    // Assume the costs of processing pass-through rows are 0.
+    long totalMaterializedCardinality = 0;
     for (int i = firstMaterializedChildIdx_; i < resultExprLists_.size(); i++) {
-      totalMaterializeCost += ExprUtil.computeExprsTotalCost(resultExprLists_.get(i));
+      PlanNode child = children_.get(i);
+      if (child.cardinality_ >= 0) {
+        totalMaterializedCardinality =
+            checkedAdd(totalMaterializedCardinality, child.cardinality_);
+      }
     }
-
-    processingCost_ =
-        ProcessingCost.basicCost(getDisplayLabel(), cardinality_, totalMaterializeCost);
+    long estBytesMaterialized =
+        (long) Math.ceil(getAvgRowSize() * (double) totalMaterializedCardinality);
+    double totalCost = (estBytesMaterialized * COST_COEFFICIENT_BYTES_MATERIALIZED)
+        + (totalMaterializedCardinality * COST_COEFFICIENT_ROWS_MATERIALIZED);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Union CPU cost estimate: " + totalCost
+          + ", estBytesMaterialized: " + estBytesMaterialized
+          + ", totalMaterializedCardinality: " + totalMaterializedCardinality
+          + ", expr list size: " + resultExprLists_.size());
+    }
+    processingCost_ = ProcessingCost.basicCost(getDisplayLabel(), totalCost);
   }
 
   @Override

@@ -25,6 +25,8 @@ import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TDataStreamSink;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -32,6 +34,14 @@ import com.google.common.base.Preconditions;
  * Data sink that forwards data to an exchange node.
  */
 public class DataStreamSink extends DataSink {
+  private static final Logger LOG = LoggerFactory.getLogger(DataStreamSink.class);
+
+  // Coefficients for estimating exchange receiver CPU costs.  Derived from benchmarking.
+  private static final double COST_COEFFICIENT_MERGING_XCHG_SNDR_ROWS = 0.1047;
+  private static final double COST_COEFFICIENT_MERGING_XCHG_SNDR_BYTES = 0.0262;
+  private static final double COST_COEFFICIENT_BCAST_XCHG_SNDR_BYTES = 0.0027;
+  private static final double COST_COEFFICIENT_PART_XCHG_SNDR_BYTES = 0.0644;
+
   private final ExchangeNode exchNode_;
   private final DataPartition outputPartition_;
 
@@ -89,10 +99,31 @@ public class DataStreamSink extends DataSink {
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
     // The sending part of the processing cost for the exchange node.
-    processingCost_ =
-        ProcessingCost.basicCost(getLabel() + "(" + exchNode_.getDisplayLabel() + ")",
-            exchNode_.getFilteredCardinality(), 0,
-            exchNode_.estimateSerializationCostPerRow());
+
+    long outputCardinality = exchNode_.getFilteredCardinality();
+    long outputSize = (long) (exchNode_.getAvgDeserializedRowSize() * outputCardinality);
+    double totalCost = 0.0;
+    String exchType;
+
+    if (exchNode_.isMergingExchange()) {
+      exchType = "MERGING";
+      totalCost = (outputCardinality * COST_COEFFICIENT_MERGING_XCHG_SNDR_ROWS)
+          + (outputSize * COST_COEFFICIENT_MERGING_XCHG_SNDR_BYTES);
+    } else if (exchNode_.isBroadcastExchange()) {
+      exchType = "BROADCAST";
+      totalCost = outputSize * COST_COEFFICIENT_BCAST_XCHG_SNDR_BYTES;
+    } else {
+      exchType = exchNode_.isDirectedExchange() ? "DIRECTED" : "PARTITIONED";
+      // Use the partitioned exchange costing for all other cases incuding DIRECTED.
+      // TODO: Add specific costing for DIRECTED exchange based on benchmarks.
+      totalCost = outputSize * COST_COEFFICIENT_PART_XCHG_SNDR_BYTES;
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Total CPU cost estimate: " + totalCost + ", Exchange Type: " + exchType
+          + ", Output Card: " + outputCardinality + ", Output Size: " + outputSize);
+    }
+    processingCost_ = ProcessingCost.basicCost(
+        getLabel() + "(" + exchNode_.getDisplayLabel() + ")", totalCost);
   }
 
   @Override

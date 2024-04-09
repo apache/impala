@@ -475,8 +475,8 @@ public class Planner {
    * Only valid after {@link PlanFragment#computeCostingSegment(TQueryOptions)}
    * has been called for all plan fragments in the list.
    */
-  private static void computeEffectiveParallelism(
-      List<PlanFragment> postOrderFragments, int minThreadPerNode, int maxThreadPerNode) {
+  private static void computeEffectiveParallelism(List<PlanFragment> postOrderFragments,
+      int minThreadPerNode, int maxThreadPerNode, TQueryOptions queryOptions) {
     Preconditions.checkArgument(minThreadPerNode > 0);
     Preconditions.checkArgument(maxThreadPerNode >= minThreadPerNode);
     Preconditions.checkArgument(
@@ -485,7 +485,8 @@ public class Planner {
       if (!(fragment.getSink() instanceof JoinBuildSink)) {
         // Only adjust parallelism of non-join build fragment.
         // Join build fragment will be adjusted later by fragment hosting the join node.
-        fragment.traverseEffectiveParallelism(minThreadPerNode, maxThreadPerNode, null);
+        fragment.traverseEffectiveParallelism(
+            minThreadPerNode, maxThreadPerNode, null, queryOptions);
       }
     }
 
@@ -498,8 +499,8 @@ public class Planner {
    * This method returns the effective CPU requirement of a query when considering
    * processing cost rate and blocking operator.
    * <p>
-   * Only valid after {@link #computeEffectiveParallelism(List, int, int)} has
-   * been called over the plan fragment list.
+   * Only valid after {@link #computeEffectiveParallelism(List, int, int, TQueryOptions)}
+   * has been called over the plan fragment list.
    */
   private static CoreCount computeBlockingAwareCores(
       List<PlanFragment> postOrderFragments, boolean findUnboundedCount) {
@@ -568,7 +569,8 @@ public class Planner {
     }
 
     computeEffectiveParallelism(postOrderFragments,
-        rootAnalyzer.getMinParallelismPerNode(), rootAnalyzer.getMaxParallelismPerNode());
+        rootAnalyzer.getMinParallelismPerNode(), rootAnalyzer.getMaxParallelismPerNode(),
+        rootAnalyzer.getQueryOptions());
 
     // Count bounded core count. This is taken from final instance count from previous
     // step.

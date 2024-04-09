@@ -75,6 +75,16 @@ public class HdfsTableSink extends TableSink {
   // column stats.
   protected final long DEFAULT_NUM_PARTITIONS = 10;
 
+  // Coefficiencts for estimating insert CPU processing cost. Derived from benchmarking.
+  // Cost per byte for Parquet inserts
+  private static final double COST_COEFFICIENT_PARQUET_BYTES_INSERTED = 0.1170;
+  // Fixed cost for Parquet inserts
+  private static final double PARQUET_FIXED_INSERT_COST = 3954235.0;
+  // Cost per byte for non-Parquet inserts (benchmarks used TEXT format)
+  private static final double COST_COEFFICIENT_DEFAULT_BYTES_INSERTED = 0.2916;
+  // Fixed cost for non-Parquet inserts (benchmarks used TEXT format)
+  private static final double DEFAULT_FIXED_INSERT_COST = 3621898.0;
+
   // Exprs for computing the output partition(s).
   protected final List<Expr> partitionKeyExprs_;
 
@@ -147,8 +157,33 @@ public class HdfsTableSink extends TableSink {
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
-    // The processing cost to export rows.
-    processingCost_ = computeDefaultProcessingCost();
+    PlanNode inputNode = fragment_.getPlanRoot();
+    long cardinality = inputNode.getCardinality();
+    float avgRowDataSize = inputNode.getAvgRowSizeWithoutPad();
+    long estBytesInserted = (long) Math.ceil(avgRowDataSize * (double) cardinality);
+    double totalCost = 0.0F;
+    FeFsTable table = (FeFsTable) targetTable_;
+    String fileFormat;
+    Set<HdfsFileFormat> formats = table.getFileFormats();
+    if (formats.contains(HdfsFileFormat.PARQUET)
+        || formats.contains(HdfsFileFormat.ICEBERG)) {
+      fileFormat = "PARQUET";
+      // Use cost coefficients measured for Parquet format.
+      totalCost = (estBytesInserted * COST_COEFFICIENT_PARQUET_BYTES_INSERTED)
+          + PARQUET_FIXED_INSERT_COST;
+    } else {
+      fileFormat = "NON-PARQUET";
+      // Use default cost coefficients measured with TEXT format.
+      // TODO: Improve estimates for other formats
+      totalCost = (estBytesInserted * COST_COEFFICIENT_DEFAULT_BYTES_INSERTED)
+          + DEFAULT_FIXED_INSERT_COST;
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("HdfsTableSink insert CPU cost estimate: " + totalCost
+          + ", File Format: " + fileFormat + ", Cardinality: " + cardinality
+          + ", Estimated Bytes Inserted: " + estBytesInserted);
+    }
+    processingCost_ = ProcessingCost.basicCost(getLabel(), totalCost);
   }
 
   @Override
