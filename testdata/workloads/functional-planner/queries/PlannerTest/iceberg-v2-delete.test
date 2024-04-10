@@ -183,10 +183,6 @@ delete from iceberg_v2_partitioned_position_deletes where id = 20;
 ---- PLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
-03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=1
-|
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=40B cardinality=1
 |
@@ -202,10 +198,6 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position
    row-size=40B cardinality=2
 ---- DISTRIBUTEDPLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
-|
-05:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=1
 |
 04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
 |
@@ -229,10 +221,6 @@ delete from iceberg_v2_partitioned_position_deletes where action = 'click';
 ---- PLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
-03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=3
-|
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=36B cardinality=3
 |
@@ -248,10 +236,6 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position
    row-size=36B cardinality=6
 ---- DISTRIBUTEDPLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
-|
-04:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=36B cardinality=3
@@ -273,10 +257,6 @@ delete from iceberg_v2_partitioned_position_deletes where user like 'A%';
 ---- PLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
-03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=1
-|
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=48B cardinality=1
 |
@@ -292,10 +272,6 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position
    row-size=48B cardinality=2
 ---- DISTRIBUTEDPLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
-|
-05:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=1
 |
 04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
 |
@@ -319,10 +295,6 @@ delete from iceberg_v2_partitioned_position_deletes
 where id = (select max(id) from iceberg_v2_delete_positional);
 ---- PLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
-|
-08:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=10
 |
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = max(id)
@@ -361,10 +333,6 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position
    row-size=40B cardinality=20
 ---- DISTRIBUTEDPLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
-|
-14:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=10
 |
 13:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
 |
@@ -420,10 +388,6 @@ DELETE FROM iceberg_v2_partitioned_position_deletes WHERE FILE__POSITION = id
 ---- PLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
-03:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=1
-|
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=40B cardinality=1
 |
@@ -439,10 +403,6 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position
    row-size=40B cardinality=2
 ---- DISTRIBUTEDPLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
-|
-05:SORT
-|  order by: partition__spec__id ASC NULLS LAST, iceberg__partition__serialized ASC NULLS LAST
-|  row-size=36B cardinality=1
 |
 04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
 |

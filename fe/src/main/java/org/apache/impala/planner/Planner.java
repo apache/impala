@@ -29,6 +29,7 @@ import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
 import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
+import org.apache.impala.analysis.DeleteStmt;
 import org.apache.impala.analysis.DmlStatementBase;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -279,7 +280,12 @@ public class Planner {
       rootFragment = distributedPlanner.createDmlFragment(
           rootFragment, stmt, ctx_.getRootAnalyzer(), fragments);
     }
-    createPreDmlSort(stmt, rootFragment, ctx_.getRootAnalyzer());
+    // We don't need to add a SORT node for DELETE operations as we are using the
+    // IcebergBufferedDeleteSink. UPDATE/MERGE statements will still require to
+    // sort their data records.
+    if (!(stmt instanceof DeleteStmt)) {
+      createPreDmlSort(stmt, rootFragment, ctx_.getRootAnalyzer());
+    }
     return rootFragment;
   }
 
