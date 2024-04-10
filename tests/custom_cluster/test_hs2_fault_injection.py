@@ -312,13 +312,13 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
     query_handle = self.custom_hs2_http_client.execute_query(dml, {})
     self.custom_hs2_http_client.wait_to_finish(query_handle)
     self.transport.enable_fault(502, "Injected Fault", 0.50)
-    (num_rows, num_row_errors) = None, None
+    exception = None
     try:
-      (num_rows, num_row_errors) = self.custom_hs2_http_client.close_dml(query_handle)
+      self.custom_hs2_http_client.close_dml(query_handle)
     except Exception as e:
-      assert str(e) == 'HTTP code 502: Injected Fault'
-    assert num_rows is None
-    assert num_row_errors is None
+      exception = e
+    assert exception is not None
+    assert str(exception) == 'HTTP code 502: Injected Fault'
     output = capsys.readouterr()[1].splitlines()
     assert output[1] == self.__expect_msg_no_retry("CloseImpalaOperation")
 
