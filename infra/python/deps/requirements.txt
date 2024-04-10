@@ -27,7 +27,7 @@ hdfs == 2.0.2
   docopt == 0.6.2
   execnet == 1.4.0
     apipkg == 1.4
-impyla == 0.18.0
+impyla == 0.21a1
   bitarray == 2.3.0
   pure-sasl == 0.6.2
   # six == 1.14.0 (specified separately)
