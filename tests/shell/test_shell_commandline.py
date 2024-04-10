@@ -915,42 +915,59 @@ class TestImpalaShell(ImpalaTestSuite):
     else:
       assert "Modified 1 row(s)" in results.stderr
 
-  def _validate_dml_stmt(self, vector, stmt, expected_rows_modified, expected_row_errors):
-    results = run_impala_shell_cmd(vector, ['--query=%s' % stmt])
-    expected_output = "Modified %d row(s), %d row error(s)" %\
-        (expected_rows_modified, expected_row_errors)
-    assert expected_output in results.stderr, results.stderr
-
   def test_kudu_dml_reporting(self, vector, unique_database):
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Kudu not supported in strict hs2 mode.")
-    db = unique_database
-    run_impala_shell_cmd(vector, [
-        '--query=create table %s.dml_test (id int primary key, '
-        'age int null) partition by hash(id) partitions 2 stored as kudu' % db])
+    create_sql = 'create table %s (id int primary key, age int null)' \
+        'partition by hash(id) partitions 2 stored as kudu'
+    self._test_dml_reporting(vector, create_sql, unique_database, True)
 
-    self._validate_dml_stmt(
-        vector, "insert into %s.dml_test (id) values (7), (7)" % db, 1, 1)
-    self._validate_dml_stmt(vector, "insert into %s.dml_test (id) values (7)" % db, 0, 1)
-    self._validate_dml_stmt(
-        vector, "upsert into %s.dml_test (id) values (7), (7)" % db, 2, 0)
-    self._validate_dml_stmt(
-        vector, "update %s.dml_test set age = 1 where id = 7" % db, 1, 0)
-    self._validate_dml_stmt(vector, "delete from %s.dml_test where id = 7" % db, 1, 0)
+  def test_iceberg_dml_reporting(self, vector, unique_database):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("DML results are not completely supported in strict hs2 mode.")
+    create_sql = 'create table %s (id int, age int) ' \
+        'stored as iceberg tblproperties("format-version"="2")'
+    self._test_dml_reporting(vector, create_sql, unique_database, False)
 
-    # UPDATE/DELETE where there are no matching rows; there are no errors because the
-    # scan produced no rows.
-    self._validate_dml_stmt(
-        vector, "update %s.dml_test set age = 1 where id = 8" % db, 0, 0)
-    self._validate_dml_stmt(vector, "delete from %s.dml_test where id = 7" % db, 0, 0)
+  def _test_dml_reporting(self, vector, create_sql, db, is_kudu):
+    """ Runs DMLs on Kudu or Iceberg tables and verifies that modifed / deleted row
+        count and number of row errors in Kudu are reported correctly. Kudu and Iceberg
+        can have different results when adding rows with the same primary key as this
+        leads to row errors in Kudu.
+    """
+    tbl = db + ".dml_test"
+    run_impala_shell_cmd(vector, ['--query=' + create_sql % tbl])
+
+    def validate(stmt, expected_rows_modified_iceberg, expected_rows_modified_kudu,
+                 expected_row_errors_kudu, is_delete=False):
+      results = run_impala_shell_cmd(vector, ['--query=' + stmt % tbl])
+      expected = ""
+      if is_kudu:
+        expected = "Modified %d row(s), %d row error(s)" \
+            % (expected_rows_modified_kudu, expected_row_errors_kudu)
+      elif is_delete and expected_rows_modified_iceberg > 0:
+        expected = "Deleted %d row(s)" % expected_rows_modified_iceberg
+      else:
+        expected = "Modified %d row(s)" % expected_rows_modified_iceberg
+      assert expected in results.stderr, results.stderr
+
+    validate("insert into %s (id) values (7), (7)", 2, 1, 1)
+    validate("insert into %s (id) values (7)", 1, 0, 1)
+    if is_kudu:
+      validate("upsert into %s (id) values (7), (7)", -1, 2, 0)
+    validate("update %s set age = 1 where id = 7", 3, 1, 0)
+    validate("delete from %s where id = 7", 3, 1, 0, is_delete=True)
+
+    # UPDATE/DELETE where there are no matching rows; there are no errors in Kudu because
+    # the scan produced no rows.
+    validate("update %s set age = 1 where id = 8", 0, 0, 0)
+    validate("delete from %s where id = 7", 0, 0, 0, is_delete=True)
 
     # WITH clauses, only apply to INSERT and UPSERT
-    self._validate_dml_stmt(vector,
-        "with y as (values(7)) insert into %s.dml_test (id) select * from y" % db, 1, 0)
-    self._validate_dml_stmt(vector,
-        "with y as (values(7)) insert into %s.dml_test (id) select * from y" % db, 0, 1)
-    self._validate_dml_stmt(vector,
-        "with y as (values(7)) upsert into %s.dml_test (id) select * from y" % db, 1, 0)
+    validate("with y as (values(7)) insert into %s (id) select * from y", 1, 1, 0)
+    validate("with y as (values(7)) insert into %s (id) select * from y", 1, 0, 1)
+    if is_kudu:
+      validate("with y as (values(7)) upsert into %s (id) select * from y", -1, 1, 0)
 
   def test_missing_query_file(self, vector):
     result = run_impala_shell_cmd(vector, ['-f', 'nonexistent.sql'], expect_success=False)

@@ -1343,6 +1343,31 @@ class ImpalaShell(cmd.Cmd, object):
                                              "Est. #Rows", "Peak Mem",
                                              "Est. Peak Mem", "Detail"])
 
+  def _format_num_rows_report(self, time_elapsed, num_fetched_rows=None, dml_result=None):
+    num_rows = None
+    verb = None
+    error_report = ""
+    if dml_result is not None:
+      (num_modified_rows, num_deleted_rows, num_row_errors) = dml_result
+      if num_modified_rows == 0 and num_deleted_rows is not None and num_deleted_rows > 0:
+        verb = "Deleted"
+        num_rows = num_deleted_rows
+      elif num_modified_rows is not None:
+        verb = "Modified"
+        num_rows = num_modified_rows
+      # Add the number of row errors if this DML and the operation supports it.
+      # num_row_errors is None if the DML operation doesn't return it.
+      if num_row_errors is not None:
+        error_report = ", %d row error(s)" % (num_row_errors)
+    elif num_fetched_rows is not None:
+      verb = "Fetched"
+      num_rows = num_fetched_rows
+
+    if verb is not None:
+      return "%s %d row(s)%s in %2.2fs" % (verb, num_rows, error_report, time_elapsed)
+    else:
+      return "Time elapsed: %2.2fs" % time_elapsed
+
   def _execute_stmt(self, query_str, is_dml=False, print_web_link=False):
     """Executes 'query_str' with options self.set_query_options on the Impala server.
     The query is run to completion and close with any results, warnings, errors or
@@ -1381,8 +1406,7 @@ class ImpalaShell(cmd.Cmd, object):
       if is_dml:
         # retrieve the error log
         warning_log = self.imp_client.get_warning_log(self.last_query_handle)
-        (num_rows, num_deleted_rows, num_row_errors) = self.imp_client.close_dml(
-            self.last_query_handle)
+        dml_result = self.imp_client.close_dml(self.last_query_handle)
       else:
         # impalad does not support the fetching of metadata for certain types of queries.
         if not self.imp_client.expect_result_metadata(query_str, self.last_query_handle):
@@ -1414,27 +1438,14 @@ class ImpalaShell(cmd.Cmd, object):
 
       if warning_log:
         self._print_if_verbose(warning_log)
-      # print 'Modified' when is_dml is true (i.e. 1), or 'Fetched' otherwise.
-      verb = ["Fetched", "Modified"][is_dml]
+
       time_elapsed = end_time - start_time
-
-      # Add the number of row errors if this DML and the operation supports it.
-      # num_row_errors is None if the DML operation doesn't return it.
-      if is_dml and num_row_errors is not None:
-        error_report = ", %d row error(s)" % (num_row_errors)
+      row_report = ""
+      if is_dml:
+        row_report = self._format_num_rows_report(time_elapsed, dml_result=dml_result)
       else:
-        error_report = ""
-
-      if is_dml and num_rows == 0 and num_deleted_rows > 0:
-        verb = "Deleted"
-        self._print_if_verbose("%s %d row(s)%s in %2.2fs" %
-            (verb, num_deleted_rows, error_report, time_elapsed))
-      elif num_rows is not None:
-        self._print_if_verbose("%s %d row(s)%s in %2.2fs" %
-            (verb, num_rows, error_report, time_elapsed))
-      else:
-        self._print_if_verbose("Time elapsed: %2.2fs" %
-            (time_elapsed))
+        row_report = self._format_num_rows_report(time_elapsed, num_fetched_rows=num_rows)
+      self._print_if_verbose(row_report)
 
       if not is_dml:
         self.imp_client.close_query(self.last_query_handle)

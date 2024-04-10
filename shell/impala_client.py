@@ -311,9 +311,10 @@ class ImpalaClient(object):
   # differentiate between DML and non-DML.
   def close_dml(self, last_query_handle):
     """Fetches the results of a DML query. Returns a tuple containing the
-       number of rows modified and the number of row errors, in that order. If the DML
-       operation doesn't return 'num_row_errors', then the second element in the tuple
-       is None. Returns None if the query was not closed successfully. Not idempotent."""
+       number of rows modified, the number of rows deleted, and the number of row errors,
+       in that order. If the DML operation doesn't return 'rows_deleted' or
+       'num_row_errors', then the respective element in the tuple is None.
+       Returns None if the query was not closed successfully. Not idempotent."""
     raise NotImplementedError()
 
   def close_query(self, last_query_handle):
@@ -661,6 +662,13 @@ class ImpalaClient(object):
     # to add arbitrary http headers.
     return None
 
+  def _process_dml_result(self, dml_result):
+    num_rows = sum([int(k) for k in dml_result.rows_modified.values()])
+    num_deleted_rows = None
+    if dml_result.rows_deleted:
+      num_deleted_rows = sum([int(k) for k in dml_result.rows_deleted.values()])
+    return (num_rows, num_deleted_rows, dml_result.num_row_errors)
+
 
 class ImpalaHS2Client(ImpalaClient):
   """Impala client. Uses the HS2 protocol plus Impala-specific extensions."""
@@ -972,14 +980,8 @@ class ImpalaHS2Client(ImpalaClient):
       self._check_hs2_rpc_status(resp.status)
       if not resp.dml_result:
         raise RPCException("Impala DML operation did not return DML statistics.")
-
-      num_rows = sum([int(k) for k in resp.dml_result.rows_modified.values()])
-      if resp.dml_result.rows_deleted:
-        num_deleted_rows = sum([int(k) for k in resp.dml_result.rows_deleted.values()])
-      else:
-        num_deleted_rows = None
       last_query_handle.is_closed = True
-      return (num_rows, num_deleted_rows, resp.dml_result.num_row_errors)
+      return self._process_dml_result(resp.dml_result)
     finally:
       self._clear_current_query_handle()
 
@@ -1449,17 +1451,12 @@ class ImpalaBeeswaxClient(ImpalaClient):
         return
 
   def close_dml(self, last_query_handle):
-    insert_result, rpc_status = self._do_beeswax_rpc(
+    dml_result, rpc_status = self._do_beeswax_rpc(
         lambda: self.imp_service.CloseInsert(last_query_handle))
     if rpc_status != RpcStatus.OK:
        raise RPCException()
-    num_rows = sum([int(k) for k in insert_result.rows_modified.values()])
-    if insert_result.rows_deleted:
-      num_deleted_rows = sum([int(k) for k in insert_result.rows_deleted.values()])
-    else:
-      num_deleted_rows = None
     last_query_handle.is_closed = True
-    return (num_rows, num_deleted_rows, insert_result.num_row_errors)
+    return self._process_dml_result(dml_result)
 
   def close_query(self, last_query_handle):
     # Set a member in the handle to make sure that it is idempotent
