@@ -367,7 +367,8 @@ class ImpylaHS2Connection(ImpalaConnection):
                                         http_path=self.__http_path,
                                         use_ssl=self.__use_ssl, **conn_kwargs)
     # Get the default query options for the session before any modifications are made.
-    self.__cursor = self.__impyla_conn.cursor(convert_types=False)
+    self.__cursor = \
+        self.__impyla_conn.cursor(convert_types=False, close_finished_queries=False)
     self.__default_query_options = {}
     if not self._is_hive:
       self.__cursor.execute("set all")
