@@ -17,7 +17,7 @@
 
 package org.apache.impala.extdatasource.jdbc;
 
-
+import java.sql.Connection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,11 +68,6 @@ public class JdbcDataSource implements ExternalDataSource {
 
   private final static Logger LOG = LoggerFactory.getLogger(JdbcDataSource.class);
 
-  /**
-   * @see org.apache.impala.extdatasource.ExternalDataSourceExecutor
-   */
-  private final static String CACHE_CLASS_PREFIX = "CACHE_CLASS::";
-
   private static final TStatus STATUS_OK =
           new TStatus(TErrorCode.OK, Lists.newArrayList());
 
@@ -85,10 +80,10 @@ public class JdbcDataSource implements ExternalDataSource {
   // In getNext() and close() APIs, compare this value with the handle value passed in
   // input parameters to make sure the object is valid.
   private String scanHandle_;
-  // Set to true if initString started with "CACHE_CLASS::".
+  // Set as value of query option 'clean_dbcp_ds_cache'.
   // It is passed to DatabaseAccessor::close() to indicate if dataSourceCache should be
-  // cleaned when DatabaseAccessor object is closed.
-  private boolean cacheClass_ = false;
+  // cleaned when its reference count equals 0.
+  private boolean cleanDbcpDSCache_ = true;
 
   // Properties of external jdbc table, converted from initString which is specified in
   // create table statement.
@@ -145,6 +140,9 @@ public class JdbcDataSource implements ExternalDataSource {
     state_ = DataSourceState.OPENED;
     batchSize_ = params.getBatch_size();
     schema_ = params.getRow_schema();
+    if (params.isSetClean_dbcp_ds_cache()) {
+      cleanDbcpDSCache_ = params.isClean_dbcp_ds_cache();
+    }
     // 1. Check init string again because the call in prepare() was from
     // the frontend and used a different instance of this JdbcDataSource class.
     if (!convertInitStringToConfiguration(params.getInit_string())) {
@@ -158,6 +156,10 @@ public class JdbcDataSource implements ExternalDataSource {
       dbAccessor_ = DatabaseAccessorFactory.getAccessor(tableConfig_);
       buildQueryAndExecute(params);
     } catch (JdbcDatabaseAccessException e) {
+      if (dbAccessor_ != null) {
+        dbAccessor_.close(null, cleanDbcpDSCache_);
+        dbAccessor_ = null;
+      }
       return new TOpenResult(
           new TStatus(TErrorCode.RUNTIME_ERROR, Lists.newArrayList(e.getMessage())));
     }
@@ -190,6 +192,21 @@ public class JdbcDataSource implements ExternalDataSource {
           ++numRows;
         }
       } catch (UnsupportedOperationException e) {
+        try {
+          Connection connToBeClosed = null;
+          if (iterator_ != null) {
+            Preconditions.checkNotNull(dbAccessor_);
+            connToBeClosed = iterator_.getConnection();
+            iterator_.close();
+          }
+          if (dbAccessor_ != null) {
+            dbAccessor_.close(connToBeClosed, cleanDbcpDSCache_);
+          }
+          iterator_ = null;
+          dbAccessor_ = null;
+        } catch (JdbcDatabaseAccessException e2) {
+          LOG.warn("Failed to close connection or DataSource", e2);
+        }
         return new TGetNextResult(new TStatus(
             TErrorCode.JDBC_CONFIGURATION_ERROR, Lists.newArrayList(e.getMessage())));
       } catch (Exception e) {
@@ -211,8 +228,20 @@ public class JdbcDataSource implements ExternalDataSource {
     Preconditions.checkState(state_ == DataSourceState.OPENED);
     Preconditions.checkArgument(params.getScan_handle().equals(scanHandle_));
     try {
-      if (iterator_ != null) iterator_.close();
-      if (dbAccessor_ != null) dbAccessor_.close(!cacheClass_);
+      // JdbcRecordIterator.close() call java.sql.Connection.close() to close connection.
+      // But that API does not effectively add closed connection back to connection pool.
+      // We should call GenericJdbcDatabaseAccessor.close() to close a connection since
+      // the function call BasicDataSource.invalidateConnection() to close connection
+      // which is more efficient than java.sql.Connection.close().
+      Connection connToBeClosed = null;
+      if (iterator_ != null) {
+        Preconditions.checkNotNull(dbAccessor_);
+        connToBeClosed = iterator_.getConnection();
+        iterator_.close();
+      }
+      if (dbAccessor_ != null) {
+        dbAccessor_.close(connToBeClosed, cleanDbcpDSCache_);
+      }
       state_ = DataSourceState.CLOSED;
       return new TCloseResult(STATUS_OK);
     } catch (Exception e) {
@@ -228,10 +257,6 @@ public class JdbcDataSource implements ExternalDataSource {
         TypeReference<HashMap<String, String>> typeRef
             = new TypeReference<HashMap<String, String>>() {
         };
-        if (initString.startsWith(CACHE_CLASS_PREFIX)) {
-          initString = initString.substring(CACHE_CLASS_PREFIX.length());
-          cacheClass_ = true;
-        }
         // Replace '\n' with single space character so that one property setting in
         // initString can be broken into multiple lines for better readability.
         initString = initString.replace('\n', ' ');

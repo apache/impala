@@ -21,7 +21,12 @@ from builtins import range
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.skip import SkipIfDockerizedCluster
+from tests.common.test_dimensions import (
+    add_mandatory_exec_option,
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
+
 
 class TestTpchQuery(ImpalaTestSuite):
   @classmethod
@@ -48,3 +53,25 @@ class TestTpchQuery(ImpalaTestSuite):
   def test_tpch(self, vector, query):
     self.run_test_case('tpch-q{0}'.format(query), vector)
 
+
+@SkipIfDockerizedCluster.insufficient_mem_limit
+class TestTpchQueryForJdbcTables(ImpalaTestSuite):
+  """TPCH query tests for external jdbc tables."""
+
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTpchQueryForJdbcTables, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+    add_mandatory_exec_option(cls, 'clean_dbcp_ds_cache', 'false')
+
+  def idfn(val):
+    return "TPC-H: Q{0}".format(val)
+
+  @pytest.mark.parametrize("query", range(1, 23), ids=idfn)
+  def test_tpch(self, vector, query):
+    self.run_test_case('tpch-q{0}'.format(query), vector, use_db='tpch_jdbc')

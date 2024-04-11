@@ -17,6 +17,7 @@
 
 package org.apache.impala.extdatasource.jdbc.dao;
 
+import java.sql.Connection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.impala.extdatasource.jdbc.exception.JdbcDatabaseAccessException;
@@ -29,7 +30,7 @@ public interface DatabaseAccessor {
   JdbcRecordIterator getRecordIterator(Configuration conf, int limit, int offset)
       throws JdbcDatabaseAccessException;
 
-  void close(boolean cleanCache);
+  void close(Connection connToBeClosed, boolean cleanDbcpDSCache);
 
   String getCaseSensitiveName(String name);
 

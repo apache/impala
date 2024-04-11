@@ -298,4 +298,10 @@ struct TBackendGflags {
   133: required string default_skipped_hms_event_types
 
   134: required string common_hms_event_types
+
+  135: required i32 dbcp_max_conn_pool_size
+
+  136: required i32 dbcp_max_wait_millis_for_conn
+
+  137: required i32 dbcp_data_source_idle_timeout
 }
