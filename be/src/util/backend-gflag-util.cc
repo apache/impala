@@ -125,6 +125,9 @@ DECLARE_bool(enable_workload_mgmt);
 DECLARE_string(query_log_table_name);
 DECLARE_string(default_skipped_hms_event_types);
 DECLARE_string(common_hms_event_types);
+DECLARE_int32(dbcp_max_conn_pool_size);
+DECLARE_int32(dbcp_max_wait_millis_for_conn);
+DECLARE_int32(dbcp_data_source_idle_timeout_s);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -480,6 +483,9 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_query_cpu_root_factor(FLAGS_query_cpu_root_factor);
   cfg.__set_default_skipped_hms_event_types(FLAGS_default_skipped_hms_event_types);
   cfg.__set_common_hms_event_types(FLAGS_common_hms_event_types);
+  cfg.__set_dbcp_max_conn_pool_size(FLAGS_dbcp_max_conn_pool_size);
+  cfg.__set_dbcp_max_wait_millis_for_conn(FLAGS_dbcp_max_wait_millis_for_conn);
+  cfg.__set_dbcp_data_source_idle_timeout(FLAGS_dbcp_data_source_idle_timeout_s);
   return Status::OK();
 }
 

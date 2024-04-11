@@ -506,4 +506,16 @@ public class BackendConfig {
   public String getCommonHmsEventTypes() {
     return backendCfg_.common_hms_event_types;
   }
+
+  public int getDbcpMaxConnPoolSize() {
+    return backendCfg_.dbcp_max_conn_pool_size;
+  }
+
+  public int getDbcpMaxWaitMillisForConn() {
+    return backendCfg_.dbcp_max_wait_millis_for_conn;
+  }
+
+  public int getDbcpDataSourceIdleTimeoutInSeconds() {
+    return backendCfg_.dbcp_data_source_idle_timeout;
+  }
 }

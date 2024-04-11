@@ -127,6 +127,7 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
   params.__set_row_schema(row_schema);
   params.__set_batch_size(FLAGS_data_source_batch_size);
   params.__set_predicates(data_src_node_.accepted_predicates);
+  params.__set_clean_dbcp_ds_cache(state->query_options().clean_dbcp_ds_cache);
   TOpenResult result;
   RETURN_IF_ERROR(data_source_executor_->Open(params, &result));
   RETURN_IF_ERROR(Status(result.status));

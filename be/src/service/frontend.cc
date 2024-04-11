@@ -96,6 +96,19 @@ DEFINE_bool(allow_catalog_cache_op_from_masked_users, false, "Whether to allow t
     "operations are blocked since such users are considered read-only users. Note that "
     "checking column masking policies requires loading column info of the table, which "
     "could slow down simple commands like INVALIDATE METADATA <table>");
+DEFINE_int32(dbcp_max_conn_pool_size, 8,
+    "The maximum number of active connections that can be allocated from a DBCP "
+    "connection pool at the same time, or -1 for no limit. DBCP connection pools are "
+    "created when accessing remote RDBMS for external JDBC tables. This setting applies "
+    "to all DBCP connection pools created on the coordinator.");
+DEFINE_int32(dbcp_max_wait_millis_for_conn, -1,
+    "The maximum number of milliseconds that DBCP connection pool will wait (when "
+    "there are no available connections) for a connection to be returned before "
+    "throwing an exception, or -1 to wait indefinitely. 0 means immediately throwing "
+    "exception if there are no available connections in the pool.");
+DEFINE_int32(dbcp_data_source_idle_timeout_s, 300,
+    "Timeout value in seconds for idle DBCP DataSource objects in cache. It only takes "
+    "effect when query option 'clean_dbcp_ds_cache' is set as false.");
 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {

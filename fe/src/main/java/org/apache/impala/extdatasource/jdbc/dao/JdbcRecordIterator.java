@@ -82,6 +82,8 @@ public class JdbcRecordIterator {
     LOGGER.debug("Iterator ColumnNames = {}", jdbcColumnNames);
   }
 
+  public Connection getConnection() { return conn; }
+
   public boolean hasNext() throws JdbcDatabaseAccessException {
     try {
       return rs.next();
@@ -189,7 +191,7 @@ public class JdbcRecordIterator {
     try {
       rs.close();
       ps.close();
-      conn.close();
+      // Connection is closed in GenericJdbcDatabaseAccessor.close().
     } catch (Exception e) {
       LOGGER.warn("Caught exception while trying to close database objects", e);
       throw new JdbcDatabaseAccessException(

@@ -935,6 +935,11 @@ enum TImpalaQueryOptions {
   // Default to number of instances of largest query fragment (LARGEST_FRAGMENT).
   // See TSlotCountStrategy in Query.thrift for documentation of its possible values.
   SLOT_COUNT_STRATEGY = 177
+
+  // Indicate if external JDBC table handler should clean DBCP DataSource object from
+  // cache when its reference count equals 0. By caching DBCP DataSource objects, we can
+  // avoid to reload JDBC driver.
+  CLEAN_DBCP_DS_CACHE = 178
 }
 
 // The summary of a DML statement.

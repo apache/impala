@@ -99,7 +99,7 @@ public class JdbcStorageConfigManager {
 
     try {
       String dbTypeName = props.get(JdbcStorageConfig.DATABASE_TYPE.getPropertyName());
-      DatabaseType.valueOf(dbTypeName);
+      DatabaseType.valueOf(dbTypeName.toUpperCase());
     } catch (Exception e) {
       throw new IllegalArgumentException("Unknown database type.", e);
     }

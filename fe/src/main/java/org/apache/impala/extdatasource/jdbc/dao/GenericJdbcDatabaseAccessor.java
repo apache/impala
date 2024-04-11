@@ -17,10 +17,7 @@
 
 package org.apache.impala.extdatasource.jdbc.dao;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -39,13 +36,11 @@ import java.util.regex.Pattern;
 import javax.sql.DataSource;
 
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.commons.dbcp2.BasicDataSourceFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfig;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfigManager;
 import org.apache.impala.extdatasource.jdbc.exception.JdbcDatabaseAccessException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCacheJarResult;
 import org.apache.impala.thrift.TErrorCode;
@@ -55,9 +50,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
 
 /**
  * A data accessor that should in theory work with all JDBC compliant database drivers.
@@ -69,30 +61,14 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
 
   protected static final String DBCP_CONFIG_PREFIX = "dbcp";
   protected static final int DEFAULT_FETCH_SIZE = 1000;
-  protected static final int CACHE_EXPIRE_TIMEOUT_S = 1800;
-  protected static final int CACHE_SIZE = 100;
-  protected String jdbcDriverLocalPath = null;
   protected static final long MILLI_SECONDS_PER_DAY = 86400000;
 
   protected DataSource dbcpDataSource = null;
+  protected String dataSourceCacheKey = null;
+
   // Cache datasource for sharing
-  protected static final Cache<String, DataSource> dataSourceCache = CacheBuilder
-      .newBuilder()
-      .removalListener((RemovalListener<String, DataSource>) notification -> {
-        DataSource ds = notification.getValue();
-        if (ds instanceof BasicDataSource) {
-          BasicDataSource dbcpDs = (BasicDataSource) ds;
-          try {
-            dbcpDs.close();
-            LOG.info("Close datasource for '{}'.", notification.getKey());
-          } catch (SQLException e) {
-            LOG.warn("Caught exception during datasource cleanup.", e);
-          }
-        }
-      })
-      .expireAfterAccess(CACHE_EXPIRE_TIMEOUT_S, TimeUnit.SECONDS)
-      .maximumSize(CACHE_SIZE)
-      .build();
+  private static final DataSourceObjectCache dataSourceCache =
+      new DataSourceObjectCache();
 
   @Override
   public int getTotalNumberOfRecords(Configuration conf)
@@ -162,17 +138,14 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
 
 
   @Override
-  public void close(boolean cleanCache) {
+  public void close(Connection connToBeClosed, boolean cleanDbcpDSCache) {
+    if (connToBeClosed != null) {
+      Preconditions.checkNotNull(dbcpDataSource);
+      invalidateConnection(connToBeClosed);
+    }
+    Preconditions.checkNotNull(dataSourceCache);
+    dataSourceCache.remove(dataSourceCacheKey, cleanDbcpDSCache);
     dbcpDataSource = null;
-    if (cleanCache) {
-      Preconditions.checkNotNull(dataSourceCache);
-      dataSourceCache.invalidateAll();
-    }
-    if (jdbcDriverLocalPath != null) {
-      // Delete the jar file of jdbc driver.
-      Path localJarPath = new Path("file://" + jdbcDriverLocalPath);
-      FileSystemUtil.deleteIfExists(localJarPath);
-    }
   }
 
   @Override
@@ -269,53 +242,39 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
       LOG.warn("Caught exception during statement cleanup.", e);
     }
 
+    if (conn != null) {
+      Preconditions.checkNotNull(dbcpDataSource);
+      // Call BasicDataSource.invalidateConnection() to close a connection since this API
+      // is more effective than Connection.close().
+      invalidateConnection(conn);
+    }
+  }
+
+  /*
+   * Manually invalidates a connection, effectively requesting the pool to try to close
+   * it, and reclaim pool capacity.
+   */
+  private void invalidateConnection(Connection conn) {
     try {
-      if (conn != null) {
-        conn.close();
-      }
-    } catch (SQLException e) {
+      Preconditions.checkState(dbcpDataSource instanceof BasicDataSource);
+      BasicDataSource basicDataSource = (BasicDataSource) dbcpDataSource;
+      basicDataSource.invalidateConnection(conn);
+    } catch (Exception e) {
       LOG.warn("Caught exception during connection cleanup.", e);
     }
   }
 
   protected void initializeDatabaseSource(Configuration conf)
-      throws ExecutionException {
+      throws JdbcDatabaseAccessException {
     if (dbcpDataSource == null) {
       synchronized (this) {
         if (dbcpDataSource == null) {
           Properties props = getConnectionPoolProperties(conf);
           String jdbcUrl = props.getProperty("url");
           String username = props.getProperty("username", "-");
-          String cacheMapKey = String.format("%s.%s", jdbcUrl, username);
+          dataSourceCacheKey = String.format("%s.%s", jdbcUrl, username);
           Preconditions.checkNotNull(dataSourceCache);
-          dbcpDataSource = dataSourceCache.get(cacheMapKey,
-              () -> {
-                LOG.info("Datasource for '{}' was not cached. "
-                    + "Loading now.", cacheMapKey);
-                BasicDataSource basicDataSource =
-                    BasicDataSourceFactory.createDataSource(props);
-                // Put jdbc driver to cache
-                String driverUrl = props.getProperty("driverUrl");
-                String driverLocalPath;
-                try {
-                  driverLocalPath =
-                    FileSystemUtil.copyFileFromUriToLocal(driverUrl);
-                } catch (IOException e) {
-                  throw new JdbcDatabaseAccessException(String.format(
-                      "Unable to fetch jdbc driver jar from location '%s'. ",
-                      driverUrl));
-                }
-                // Create class loader for jdbc driver and set it for the
-                // BasicDataSource object so that the driver class could be loaded
-                // from jar file without searching classpath.
-                jdbcDriverLocalPath = driverLocalPath;
-                URL driverJarUrl = new File(driverLocalPath).toURI().toURL();
-                URLClassLoader driverLoader =
-                    URLClassLoader.newInstance( new URL[] { driverJarUrl },
-                        getClass().getClassLoader());
-                basicDataSource.setDriverClassLoader(driverLoader);
-                return basicDataSource;
-              });
+          dbcpDataSource = dataSourceCache.get(dataSourceCacheKey, props);
         }
       }
     }
@@ -372,10 +331,15 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
     // BasicDataSourceFactory.createDataSource() before the class loader is set
     // by calling BasicDataSource.setDriverClassLoader.
     // props.put("initialSize", "1");
-    props.put("maxActive", "3");
-    props.put("maxIdle", "0");
-    props.put("maxWait", "10000");
-    props.put("timeBetweenEvictionRunsMillis", "30000");
+    // 'maxActive' and 'maxWait' properties are renamed as 'maxTotal' and 'maxWaitMillis'
+    // respectively in org.apache.commons.dbcp2.
+    props.put("maxTotal",
+        String.valueOf(BackendConfig.INSTANCE.getDbcpMaxConnPoolSize()));
+    props.put("maxIdle",
+        String.valueOf(BackendConfig.INSTANCE.getDbcpMaxConnPoolSize()));
+    props.put("minIdle", "0");
+    props.put("maxWaitMillis",
+        String.valueOf(BackendConfig.INSTANCE.getDbcpMaxWaitMillisForConn()));
     return props;
   }
 

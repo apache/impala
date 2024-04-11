@@ -491,7 +491,12 @@ function copy-and-load-ext-data-source {
   ${IMPALA_HOME}/testdata/bin/load-ext-data-sources.sh
   # Create data sources table.
   ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -f\
-    ${IMPALA_HOME}/testdata/bin/create-ext-data-source-table.sql
+      ${IMPALA_HOME}/testdata/bin/create-ext-data-source-table.sql
+  # Create external JDBC tables for TPCH/TPCDS queries.
+  ${IMPALA_HOME}/testdata/bin/create-tpc-jdbc-tables.py --jdbc_db_name=tpch_jdbc \
+      --workload=tpch --database_type=impala --clean
+  ${IMPALA_HOME}/testdata/bin/create-tpc-jdbc-tables.py --jdbc_db_name=tpcds_jdbc \
+      --workload=tpcds --database_type=impala --clean
 }
 
 function check-hdfs-health {

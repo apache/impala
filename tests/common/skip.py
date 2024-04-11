@@ -161,6 +161,8 @@ class SkipIfNotHdfsMinicluster:
              "with no EC")
 
 class SkipIfBuildType:
+  dev_build = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_dev(),
+      reason="Test takes too much time on debug build.")
   not_dev_build = pytest.mark.skipif(not IMPALA_TEST_CLUSTER_PROPERTIES.is_dev(),
       reason="Test depends on debug build startup option.")
   remote = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),

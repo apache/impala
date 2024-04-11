@@ -1289,6 +1289,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_slot_count_strategy(enum_type);
         break;
       }
+      case TImpalaQueryOptions::CLEAN_DBCP_DS_CACHE: {
+        query_options->__set_clean_dbcp_ds_cache(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {
