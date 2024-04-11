@@ -878,6 +878,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     sqls["/*mycomment*/ show functions"] = False
     sqls["/*mycomment*/ show data sources"] = False
     sqls["/*mycomment*/ show views"] = False
+    sqls["show metadata tables in {0}".format(self.QUERY_TBL)] = False
 
     sqls["describe database default"] = False
     sqls["/*mycomment*/ describe database default"] = False
