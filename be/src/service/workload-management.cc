@@ -228,6 +228,7 @@ void ImpalaServer::EnqueueCompletedQuery(const QueryHandle& query_handle,
       case TCatalogOpType::SHOW_FILES:
       case TCatalogOpType::SHOW_CREATE_FUNCTION:
       case TCatalogOpType::SHOW_VIEWS:
+      case TCatalogOpType::SHOW_METADATA_TABLES:
       case TCatalogOpType::DESCRIBE_TABLE:
       case TCatalogOpType::DESCRIBE_DB:
       case TCatalogOpType::DESCRIBE_HISTORY:
