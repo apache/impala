@@ -85,6 +85,8 @@ class IcebergRowReader {
   /// into the target slot.
   Status WriteBooleanSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
       WARN_UNUSED_RESULT;
+  Status WriteDateSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
+      WARN_UNUSED_RESULT;
   Status WriteIntSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
       WARN_UNUSED_RESULT;
   Status WriteLongSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
@@ -112,6 +114,11 @@ class IcebergRowReader {
   Status WriteMapKeyAndValue(JNIEnv* env, const jobject& collection_scanner,
       const TupleDescriptor* item_tuple_desc, Tuple* tuple,
       MemPool* tuple_data_pool_collection, RuntimeState* state) WARN_UNUSED_RESULT;
+
+  /// Extracts an int32_t from a Java integer object and writes it into 'res'. 'jinteger'
+  /// must not be null and of type java.lang.Integer.
+  Status ExtractJavaInteger(JNIEnv* env, const jobject &jinteger, int32_t* res)
+      WARN_UNUSED_RESULT;
 
   /// Helper method that gives back the Iceberg Java class for a ColumnType. It is
   /// specified in this class, to avoid defining all the Java type classes in other

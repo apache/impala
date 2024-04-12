@@ -94,6 +94,9 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
     case TYPE_BOOLEAN: { // java.lang.Boolean
       RETURN_IF_ERROR(WriteBooleanSlot(env, accessed_value, slot));
       break;
+    } case TYPE_DATE: { // java.lang.Integer
+      RETURN_IF_ERROR(WriteDateSlot(env, accessed_value, slot));
+      break;
     } case TYPE_INT: { // java.lang.Integer
       RETURN_IF_ERROR(WriteIntSlot(env, accessed_value, slot));
       break;
@@ -143,13 +146,30 @@ Status IcebergRowReader::WriteBooleanSlot(JNIEnv* env, const jobject &accessed_v
   return Status::OK();
 }
 
+Status IcebergRowReader::WriteDateSlot(JNIEnv* env, const jobject &accessed_value,
+    void* slot) {
+  int32_t days_since_epoch;
+  RETURN_IF_ERROR(ExtractJavaInteger(env, accessed_value, &days_since_epoch));
+
+  // This will set the value to DateValue::INVALID_DAYS_SINCE_EPOCH if it is out of range.
+  DateValue result(days_since_epoch);
+  *reinterpret_cast<int32_t*>(slot) = result.Value();
+  return Status::OK();
+}
+
 Status IcebergRowReader::WriteIntSlot(JNIEnv* env, const jobject &accessed_value,
     void* slot) {
-  DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, integer_cl_) == JNI_TRUE);
-  jint result = env->CallIntMethod(accessed_value, integer_value_);
+  return ExtractJavaInteger(env, accessed_value, reinterpret_cast<int32_t*>(slot));
+}
+
+Status IcebergRowReader::ExtractJavaInteger(JNIEnv* env, const jobject& jinteger,
+    int32_t* res) {
+  DCHECK(jinteger != nullptr);
+  DCHECK(env->IsInstanceOf(jinteger, integer_cl_) == JNI_TRUE);
+  jint result = env->CallIntMethod(jinteger, integer_value_);
   RETURN_ERROR_IF_EXC(env);
-  *reinterpret_cast<int32_t*>(slot) = reinterpret_cast<int32_t>(result);
+
+  *res = reinterpret_cast<int32_t>(result);
   return Status::OK();
 }
 
@@ -321,7 +341,8 @@ jclass IcebergRowReader::JavaClassFromImpalaType(const ColumnType type) {
   switch (type.type) {
     case TYPE_BOOLEAN: {     // java.lang.Boolean
       return boolean_cl_;
-    } case TYPE_INT: {       // java.lang.Integer
+    } case TYPE_DATE:
+      case TYPE_INT: {       // java.lang.Integer
       return integer_cl_;
     } case TYPE_BIGINT:      // java.lang.Long
       case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
