@@ -32,6 +32,14 @@ under the License.
     {{?is_executor}}Executor{{/is_executor}}</h2>
   {{/impala_server_mode}}
 
+  {{?catalogd_active_status}}
+  <h2> Catalog Status: {{catalogd_active_status}} </h2>
+  {{/catalogd_active_status}}
+
+  {{?statestore_active_status}}
+  <h2> Statestore Status: {{statestore_active_status}} </h2>
+  {{/statestore_active_status}}
+
   <h2>Vers<span id="v">i</span>on</h2>
   <pre id="version_pre">{{version}}
 Build Flags: {{#build_flags}}{{flag_name}}={{flag_value}}  {{/build_flags}}</pre>
