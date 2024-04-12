@@ -17,14 +17,15 @@
 
 #include "util/default-path-handlers.h"
 
-#include <sstream>
 #include <fstream>
-#include <sys/stat.h>
+#include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 #include <gnu/libc-version.h>
+#include <sys/stat.h>
 
+#include "common/daemon-env.h"
 #include "common/logging.h"
 #include "kudu/util/flags.h"
 #include "rpc/jni-thrift-util.h"
@@ -220,7 +221,56 @@ void AddBuildFlag(const std::string& flag_name, const std::string& flag_value,
 
 namespace impala {
 
-void RootHandler(const Webserver::WebRequest& req, Document* document) {
+// Add active or standby status for catalog or statestore.
+void AddActiveStatus(Document* document, MetricGroup* metric_group) {
+  DaemonEnv* d_env = DaemonEnv::GetInstance();
+  bool is_statestore = false;
+  bool is_catalog = false;
+  if (d_env != nullptr) {
+    if (d_env->name() == "statestore") {
+      is_statestore = true;
+    } else if (d_env->name() == "catalog") {
+      is_catalog = true;
+    } else {
+      // Only deal with the status of catalog or statestore.
+      return;
+    }
+    document->AddMember("is_statestore", is_statestore, document->GetAllocator());
+    document->AddMember("is_catalog", is_catalog, document->GetAllocator());
+  }
+
+  if (metric_group != nullptr) {
+    if (is_catalog) {
+      BooleanProperty* metric = metric_group->FindMetricForTesting<BooleanProperty>(
+          "catalog-server.active-status");
+      if (metric != nullptr) {
+        if (metric->GetValue()) {
+          document->AddMember(
+              "catalogd_active_status", "Active", document->GetAllocator());
+        } else {
+          document->AddMember(
+              "catalogd_active_status", "Standby", document->GetAllocator());
+        }
+      }
+    }
+    if (is_statestore) {
+      BooleanProperty* metric =
+          metric_group->FindMetricForTesting<BooleanProperty>("statestore.active-status");
+      if (metric != nullptr) {
+        if (metric->GetValue()) {
+          document->AddMember(
+              "statestore_active_status", "Active", document->GetAllocator());
+        } else {
+          document->AddMember(
+              "statestore_active_status", "Standby", document->GetAllocator());
+        }
+      }
+    }
+  }
+}
+
+void RootHandler(
+    const Webserver::WebRequest& req, Document* document, MetricGroup* metric_group) {
   Value version(GetVersionString().c_str(), document->GetAllocator());
   document->AddMember("version", version, document->GetAllocator());
 
@@ -263,6 +313,8 @@ void RootHandler(const Webserver::WebRequest& req, Document* document) {
     document->AddMember(
         "process_start_time", process_start_time, document->GetAllocator());
   }
+
+  AddActiveStatus(document, metric_group);
 
   ExecEnv* env = ExecEnv::GetInstance();
   if (env == nullptr || env->impala_server() == nullptr) return;
@@ -307,10 +359,9 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group,
   }
 #endif
 
-  auto root_handler =
-    [](const Webserver::WebRequest& req, Document* doc) {
-      RootHandler(req, doc);
-    };
+  auto root_handler = [metric_group](const Webserver::WebRequest& req, Document* doc) {
+    RootHandler(req, doc, metric_group);
+  };
   webserver->RegisterUrlCallback("/", "root.tmpl", root_handler, true);
 }
 

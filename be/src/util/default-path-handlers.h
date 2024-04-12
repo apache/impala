@@ -36,7 +36,8 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group = NU
 
 /// Registered to handle "/"
 /// Populates document with various system-wide information.
-void RootHandler(const Webserver::WebRequest& req, rapidjson::Document* document);
+void RootHandler(const Webserver::WebRequest& req, rapidjson::Document* document,
+    MetricGroup* metric_group);
 }
 
 #endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H

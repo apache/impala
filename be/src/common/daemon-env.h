@@ -46,6 +46,7 @@ class DaemonEnv {
   MetricGroup* metrics() { return metrics_.get(); }
   Webserver* webserver() { return webserver_.get(); }
   Webserver* metrics_webserver() { return metrics_webserver_.get(); }
+  std::string name() { return name_; }
 
  private:
   static DaemonEnv* daemon_env_;
