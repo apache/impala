@@ -36,8 +36,20 @@
 # Specify JVM options.
 export JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:-}
 
-# Specify default pidfile directories.
+# Specify default pidfile.
 : ${IMPALAD_PIDFILE:="/tmp/impalad.pid"}
 : ${CATALOGD_PIDFILE:="/tmp/catalogd.pid"}
 : ${ADMISSIOND_PIDFILE:="/tmp/admissiond.pid"}
 : ${STATESTORED_PIDFILE:="/tmp/statestored.pid"}
+
+# Specify default stdout file.
+: ${IMPALAD_OUTFILE:="/tmp/impalad.out"}
+: ${CATALOGD_OUTFILE:="/tmp/catalogd.out"}
+: ${ADMISSIOND_OUTFILE:="/tmp/admissiond.out"}
+: ${STATESTORED_OUTFILE:="/tmp/statestored.out"}
+
+# Specify default stderr file.
+: ${IMPALAD_ERRFILE:="/tmp/impalad.err"}
+: ${CATALOGD_ERRFILE:="/tmp/catalogd.err"}
+: ${ADMISSIOND_ERRFILE:="/tmp/admissiond.err"}
+: ${STATESTORED_ERRFILE:="/tmp/statestored.err"}

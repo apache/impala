@@ -42,6 +42,8 @@ CMakeDoxygenDefaults.cmake
 CPackConfig.cmake
 CPackSourceConfig.cmake
 _CPack_Packages
+install_manifest.txt
+package/build/
 
 # Build timestamp files
 .*timestamp

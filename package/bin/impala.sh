@@ -49,13 +49,14 @@ status() {
   while [[ $# -gt 0 ]]; do
     case ${1} in
       impalad|catalogd|admissiond|statestored) service=${1} && shift && break ;;
-      *) usage && exit 1 ;;
+      *) >&2 usage && exit 1 ;;
     esac
   done
+  [[ ${service} != "" ]] || (>&2 usage && exit 1)
   local service_pidfile_key=${service^^}_PIDFILE
   local service_pidfile=${!service_pidfile_key}
   if [[ ! -f ${service_pidfile} ]]; then
-    echo "${service} is stopped."
+    >&2 echo "${service} is stopped."
     return 1
   fi
   local pid=$(cat ${service_pidfile})
@@ -63,15 +64,15 @@ status() {
     echo "${service} is running with PID ${pid}."
     return 0
   fi
-  echo "${service} is stopped."
+  >&2 echo "${service} is stopped."
   return 1
 }
 
 # Return 0 if service is stopped in expected time, else otherwise.
 stop_await() {
   local service=${1} service_pidfile=${2} counts=${3} period=${4}
-  [[ "${counts}" == "0" ]] && exit 0
-  for ((i=1; i<=${counts}; i++)); do
+  [[ "${counts}" == "0" ]] && return 0
+  for ((i=1; ${counts} == -1 || i<=${counts}; i++)); do
     [[ ${i} -gt 1 ]] && sleep ${period}
     if ! kill -0 ${pid} &> /dev/null; then
       rm ${service_pidfile} && echo "(${i}/${counts}) ${service} is stopped." && return 0
@@ -82,36 +83,54 @@ stop_await() {
   return 1
 }
 
-#TODO: Add graceful shutdown for impalads
 stop() {
-  local service= counts=20 period=2
+  local service= counts=20 period=2 signal=SIGTERM force=false grace=false
   while [[ $# -gt 0 ]]; do
     case ${1} in
       -c) counts=${2} && shift 2 ;;
       -p) period=${2} && shift 2 ;;
+      -f) signal=SIGKILL && force=true && shift 1 ;;
+      -g) signal=SIGRTMIN && grace=true && shift 1 ;;
       impalad|catalogd|admissiond|statestored) service=${1} && shift && break ;;
-      *) usage && exit 1 ;;
+      *) >&2 usage && exit 1 ;;
     esac
   done
   check_counts ${counts} ${period}
+  [[ ${service} != "" ]] || (>&2 usage && exit 1)
+  # Disable graceful shutdown timeout.
+  [[ ${grace} == true ]] && counts=-1 || true
+  if [[ ${grace} == true && ${force} == true ]]; then
+    echo "Cannot use '-g' and '-f' together."
+    exit 1
+  fi
+  if [[ ${grace} == true && ${service} != impalad ]]; then
+    echo "Warning: Cannot apply '-g' to ${service} service."
+    signal=SIGTERM
+  fi
   local service_pidfile_key=${service^^}_PIDFILE
   local service_pidfile=${!service_pidfile_key}
   if [[ ! -f ${service_pidfile} ]]; then
     echo "Already stopped: PID file '${service_pidfile}' not found."
-    exit 0
+    return 0
   fi
   local pid=$(cat ${service_pidfile})
   if ! ps -p ${pid} -o comm=|grep ${service} &> /dev/null ; then
     rm ${service_pidfile}
     echo "Already stopped: ${service} is not running with PID ${pid}." \
     "Removed stale file '${service_pidfile}'."
-    exit 0
+    return 0
   fi
   echo "Killing ${service} with PID ${pid}."
-  kill ${pid}
+  kill -${signal} ${pid}
   if ! stop_await ${service} ${service_pidfile} ${counts} ${period}; then
-    echo "Timed out waiting ${service} to stop, check logs for more details."
-    exit 1
+    if [[ ${grace} == true ]]; then
+      kill -SIGKILL ${pid}
+      echo "Timed out waiting ${service} to graceful shutdown."
+      return 0
+    else
+      echo "Timed out waiting ${service} to stop, check logs for more details."
+      return 1
+    fi
   fi
 }
 
@@ -147,20 +166,29 @@ start() {
     case ${1} in
       -c) counts=${2} && shift 2 ;;
       -p) period=${2} && shift 2 ;;
+      # Ignore the '-f' and '-g' parameter to support the restart command.
+      -f|-g) shift 1 ;;
       impalad|catalogd|admissiond|statestored) service=${1} && shift && break ;;
-      *) usage && exit 1 ;;
+      *) >&2 usage && exit 1 ;;
     esac
   done
   check_counts ${counts} ${period}
-  status ${service} && exit 0
+  [[ ${service} != "" ]] || (>&2 usage && exit 1)
+  status ${service} 2> /dev/null && return 0
   local service_flagfile=${IMPALA_HOME}/conf/${service}_flags
+  local service_stdout_key=${service^^}_OUTFILE
+  local service_stderr_key=${service^^}_ERRFILE
   local service_pidfile_key=${service^^}_PIDFILE
+  local service_stdout=${!service_stdout_key}
+  local service_stderr=${!service_stderr_key}
   local service_pidfile=${!service_pidfile_key}
   mkdir -p $(dirname ${service_pidfile})
+  echo "Service stdout is redirected to '${service_stdout}'."
+  echo "Service stderr is redirected to '${service_stderr}'."
   # User can override '--flagfile' in the following commandline arguments.
   ${IMPALA_HOME}/sbin/${service} \
     --flagfile=${service_flagfile} \
-    ${@} &
+    ${@} >> ${service_stdout} 2>> ${service_stderr} &
   local pid=$!
   echo ${pid} > ${service_pidfile}
   # Sleep 1s so the glog output won't be messed up with waiting messages.
@@ -173,18 +201,19 @@ restart() {
 }
 
 health() {
-  local service= counts=20 period=2
+  local service= counts=20 period=2 code=
   while [[ $# -gt 0 ]]; do
     case ${1} in
       -c) counts=${2} && shift 2 ;;
       -p) period=${2} && shift 2 ;;
       impalad|catalogd|admissiond|statestored) service=${1} && shift ;;
-      *) usage && exit 1 ;;
+      *) >&2 usage && exit 1 ;;
     esac
   done
   check_counts ${counts} ${period}
   [[ "${counts}" == "0" ]] && exit 0
-  status ${service} || exit 1
+  [[ ${service} != "" ]] || (>&2 usage && exit 1)
+  status ${service} > /dev/null || exit 1
   # Determine Web Server port
   local service_flagfile=${IMPALA_HOME}/conf/${service}_flags
   local service_pidfile_key=${service^^}_PIDFILE
@@ -207,8 +236,8 @@ health() {
   # Request healthz code
   for ((i=1; i<=${counts}; i++)); do
     [[ ${i} -gt 1 ]] && sleep ${period} || true
-    local code=$(curl -s http://localhost:${port}/healthz)
-    if [[ $? != 0 ]]; then
+    if ! code=$(curl -s http://localhost:${port}/healthz); then
+      status ${service} > /dev/null || exit 1
       echo "(${i}/${counts}) ${service} on port ${port} is not ready."
     elif [[ "${code}" != "OK" ]]; then
       echo "(${i}/${counts}) Waiting for ${service} to be ready."
@@ -237,10 +266,16 @@ usage() {
   echo "  stop: stop an Impala daemon service, wait until service is stopped."
   echo "    options:"
   echo "      -c: maximum count of checks, defaults to 20."
+  echo "      -f: force kill a daemon service."
+  echo "      -g: graceful shutdown the impalad service."
   echo "      -p: seconds of period between checks, defaults to 2."
   echo
   echo "  restart: restart an Impala daemon service."
-  echo "    options: same as start command."
+  echo "    options:"
+  echo "      -c: maximum count of checks, defaults to 20."
+  echo "      -f: force kill a daemon service."
+  echo "      -g: graceful shutdown the impalad service."
+  echo "      -p: seconds of period between checks, defaults to 2."
   echo
   echo "  status: check the process status of an Impala daemon service."
   echo
@@ -261,11 +296,11 @@ version() {
 main() {
   [[ $# -ge 1 && ${1} == "--help" ]] && usage && exit 0
   [[ $# -ge 1 && ${1} == "--version" ]] && version && exit 0
-  [[ $# -lt 2 ]] && usage && exit 1
+  [[ $# -lt 2 ]] && >&2 usage && exit 1
   local command=${1}
   case ${command} in
-    start|stop|restart|status|health) shift && init && ${command} $@ ;;
-    *) usage && exit 1 ;;
+    start|stop|restart|status|health) shift && init && ${command} ${@} ;;
+    *) >&2 usage && exit 1 ;;
   esac
 }
 
