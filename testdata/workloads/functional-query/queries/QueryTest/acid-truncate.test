@@ -43,8 +43,8 @@ STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 show create table tt;
----- RESULTS
-row_regex: (?!.*COLUMN_STATS_ACCURATE)
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex: .*COLUMN_STATS_ACCURATE.*
 ====
 ---- QUERY
 truncate table tt;

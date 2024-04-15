@@ -30,8 +30,8 @@ row_regex: .*COLUMN_STATS_ACCURATE.*
 invalidate metadata insertonly_nopart_colstatschg;
 insert into insertonly_nopart_colstatschg values (2);
 show create table insertonly_nopart_colstatschg;
----- RESULTS
-row_regex: (?!.*COLUMN_STATS_ACCURATE)
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex: .*COLUMN_STATS_ACCURATE.*
 ====
 ---- QUERY
 select x from insertonly_nopart_colstatschg;
