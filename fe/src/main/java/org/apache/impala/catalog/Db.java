@@ -133,13 +133,6 @@ public class Db extends CatalogObjectImpl implements FeDb {
     setMetastoreDb(name, msDb);
     tableCache_ = new CatalogObjectCache<>();
     functions_ = new HashMap<>();
-
-    // This constructor is called from a static initializer in tests.
-    if (BackendConfig.INSTANCE != null && BackendConfig.INSTANCE.enableWorkloadMgmt() &&
-        name.equalsIgnoreCase(SYS)) {
-      // Add built-in tables.
-      addTable(SystemTable.CreateQueryLiveTable(this, getOwnerUser()));
-    }
   }
 
   public long getCreateEventId() { return createEventId_; }

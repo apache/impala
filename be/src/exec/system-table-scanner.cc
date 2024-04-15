@@ -54,7 +54,7 @@ static constexpr double NANOS_TO_MILLIS = 1000000;
 Status SystemTableScanner::CreateScanner(RuntimeState* state, RuntimeProfile* profile,
     TSystemTableName::type table_name, std::unique_ptr<SystemTableScanner>* scanner) {
   switch (table_name) {
-    case TSystemTableName::QUERY_LIVE:
+    case TSystemTableName::IMPALA_QUERY_LIVE:
       *scanner = make_unique<QueryScanner>(state, profile);
       break;
     default:
@@ -174,6 +174,8 @@ Status QueryScanner::MaterializeNextTuple(
   const QueryStateExpanded& query = *query_records_.front();
   const QueryStateRecord& record = *query.base_state;
   ExecEnv* exec_env = ExecEnv::GetInstance();
+  // Verify there are no clustering columns (partitions) to offset col_pos.
+  DCHECK_EQ(0, tuple_desc->table_desc()->num_clustering_cols());
   for (const SlotDescriptor* slot_desc : tuple_desc->slots()) {
     void* slot = tuple->GetSlot(slot_desc->tuple_offset());
 

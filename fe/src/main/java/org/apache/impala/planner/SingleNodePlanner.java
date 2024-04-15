@@ -67,10 +67,10 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.catalog.FeSystemTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.ScalarType;
-import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
@@ -1902,7 +1902,7 @@ public class SingleNodePlanner {
       return scanNode;
     } else if (table instanceof IcebergMetadataTable) {
       return createIcebergMetadataScanNode(tblRef, conjuncts, analyzer);
-    } else if (table instanceof SystemTable) {
+    } else if (table instanceof FeSystemTable) {
       scanNode = new SystemTableScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
       scanNode.addConjuncts(conjuncts);
       scanNode.init(analyzer);

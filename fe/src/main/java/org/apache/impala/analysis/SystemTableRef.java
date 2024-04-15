@@ -15,23 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.catalog;
+package org.apache.impala.analysis;
 
-import org.apache.impala.common.FrontendTestBase;
-import org.apache.impala.thrift.TSystemTableName;
-import org.junit.Test;
+import org.apache.impala.catalog.FeSystemTable;
 
-import static org.junit.Assert.assertEquals;
+import com.google.common.base.Preconditions;
 
 /**
- * Tests for the SystemTable class
+ * TableRef class for system tables.
+ *
+ * Represents a table that is registered as a normal table in HMS, but content is
+ * constructed in-memory. Currently COMPUTE STATS does not work on these tables, and
+ * write operations are not allowed.
  */
-public class SystemTableTest extends FrontendTestBase {
-  @Test
-  public void testSystemTableNames() {
-    Db sysDb = feFixture_.addTestDb(Db.SYS, "system db");
-    SystemTable queryLiveTable = new SystemTable(
-        null, sysDb, "impala_query_live", "impala");
-    assertEquals(TSystemTableName.IMPALA_QUERY_LIVE, queryLiveTable.getSystemTableName());
+public class SystemTableRef extends BaseTableRef {
+
+  public SystemTableRef(TableRef tableRef, Path resolvedPath) {
+    super(tableRef, resolvedPath);
+    Preconditions.checkState(resolvedPath.getRootTable() instanceof FeSystemTable);
   }
 }

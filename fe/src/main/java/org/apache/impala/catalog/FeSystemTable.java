@@ -17,21 +17,18 @@
 
 package org.apache.impala.catalog;
 
-import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TSystemTableName;
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
 
 /**
- * Tests for the SystemTable class
+ * Represents a system table backed by internal memory.
  */
-public class SystemTableTest extends FrontendTestBase {
-  @Test
-  public void testSystemTableNames() {
-    Db sysDb = feFixture_.addTestDb(Db.SYS, "system db");
-    SystemTable queryLiveTable = new SystemTable(
-        null, sysDb, "impala_query_live", "impala");
-    assertEquals(TSystemTableName.IMPALA_QUERY_LIVE, queryLiveTable.getSystemTableName());
-  }
+public interface FeSystemTable extends FeTable {
+  // Gets the system table identifier.
+  TSystemTableName getSystemTableName();
+
+  // TODO(todd): it seems like all FeTables implement this, perhaps
+  // this should just be a method on FeTable and simplify the code
+  // in Frontend.getTableStats?
+  TResultSet getTableStats();
 }

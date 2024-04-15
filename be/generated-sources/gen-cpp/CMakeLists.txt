@@ -75,6 +75,7 @@ set(SRC_FILES
   StatestoreService_types.cpp
   StatestoreSubscriber.cpp
   Status_types.cpp
+  SystemTables_types.cpp
   Types_types.cpp
   Zip_types.cpp
 )

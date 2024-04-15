@@ -120,6 +120,7 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.catalog.FeSystemTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
@@ -129,7 +130,6 @@ import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
@@ -1665,8 +1665,8 @@ public class Frontend {
       }
     } else if (table instanceof MaterializedViewHdfsTable) {
       return ((MaterializedViewHdfsTable) table).getTableStats();
-    } else if (table instanceof SystemTable) {
-      return ((SystemTable) table).getTableStats();
+    } else if (table instanceof FeSystemTable) {
+      return ((FeSystemTable) table).getTableStats();
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());
     }

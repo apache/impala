@@ -110,6 +110,62 @@ class TestQueryLive(CustomClusterTestSuite):
     assert result5.data[0] == \
         "functional.alltypes,functional.alltypestiny,functional.alltypessmall"
 
+    # describe query
+    describe_result = self.execute_query('describe sys.impala_query_live')
+    assert len(describe_result.data) == 49
+
+    describe_ext_result = self.execute_query('describe extended sys.impala_query_live')
+    assert len(describe_ext_result.data) == 82
+
+    # show create table
+    show_create_tbl = self.execute_query('show create table sys.impala_query_live')
+    assert len(show_create_tbl.data) == 1
+    assert 'CREATE EXTERNAL TABLE sys.impala_query_live' in show_create_tbl.data[0]
+    assert "'__IMPALA_SYSTEM_TABLE'='true'" in show_create_tbl.data[0]
+
+    # cannot compute stats or perform write operations
+    compute_stats_result = self.execute_query_expect_failure(self.client,
+        'compute stats sys.impala_query_live')
+    assert 'AnalysisException: COMPUTE STATS not supported for system table: '\
+        'sys.impala_query_live' in str(compute_stats_result)
+
+    create_result = self.execute_query_expect_failure(self.client,
+        'create table sys.impala_query_live (i int)')
+    assert 'AnalysisException: Table already exists: sys.impala_query_live'\
+        in str(create_result)
+
+    insert_result = self.execute_query_expect_failure(self.client,
+        'insert into sys.impala_query_live select * from sys.impala_query_live limit 1')
+    assert 'UnsupportedOperationException: Cannot create data sink into table of type: '\
+        'org.apache.impala.catalog.SystemTable' in str(insert_result)
+
+    update_result = self.execute_query_expect_failure(self.client,
+        'update sys.impala_query_live set query_id = ""')
+    assert 'AnalysisException: Impala only supports modifying Kudu and Iceberg tables, '\
+        'but the following table is neither: sys.impala_query_live'\
+        in str(update_result)
+
+    delete_result = self.execute_query_expect_failure(self.client,
+        'delete from sys.impala_query_live')
+    assert 'AnalysisException: Impala only supports modifying Kudu and Iceberg tables, '\
+        'but the following table is neither: sys.impala_query_live'\
+        in str(delete_result)
+
+    # Drop table at the end, it's only recreated on impalad startup.
+    self.execute_query_expect_success(self.client, 'drop table sys.impala_query_live')
+
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+                                                 "--cluster_id=test_query_live "
+                                                 "--use_local_catalog=true",
+                                    catalogd_args="--enable_workload_mgmt "
+                                                  "--catalog_topic_mode=minimal")
+  def test_local_catalog(self):
+    """Asserts the query live table works with local catalog mode."""
+    result = self.client.execute("select * from functional.alltypes",
+        fetch_profile_after_close=True)
+    assert_query('sys.impala_query_live', self.client, 'test_query_live',
+                 result.runtime_profile)
+
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",
