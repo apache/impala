@@ -46,6 +46,7 @@ import org.apache.impala.catalog.SideloadTableStats;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
@@ -131,6 +132,8 @@ abstract class LocalTable implements FeTable {
       t = LocalIcebergTable.loadIcebergTableViaMetaProvider(db, msTbl, ref);
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       t = LocalDataSourceTable.load(db, msTbl, ref);
+    } else if (SystemTable.isSystemTable(msTbl)) {
+      t = LocalSystemTable.load(db, msTbl, ref);
     } else if (HdfsFileFormat.isHdfsInputFormatClass(
         msTbl.getSd().getInputFormat())) {
       t = LocalFsTable.load(db, msTbl, ref);

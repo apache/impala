@@ -19,6 +19,7 @@ namespace cpp impala
 namespace java org.apache.impala.thrift
 
 # Must be kept in-sync with workload-management-fields.cc
+# Used as column names, so do not change existing enums.
 enum TQueryTableColumn {
     CLUSTER_ID
     QUERY_ID

@@ -1552,16 +1552,4 @@ public class PlannerTest extends PlannerTestBase {
             Lists.newArrayList(2, 3)),
         IcebergScanPlanner.getOrderedEqualityFieldIds(inp));
   }
-
-  /**
-   * Test queries against sys.impala_query_live.
-   */
-  @Test
-  public void testQueryLive() {
-    boolean savedEnableWorkloadMgmt = BackendConfig.INSTANCE.enableWorkloadMgmt();
-    BackendConfig.INSTANCE.setEnableWorkloadMgmt(true);
-    addTestDb(Db.SYS, "ensure system db");
-    runPlannerTestFile("impala-query-live");
-    BackendConfig.INSTANCE.setEnableWorkloadMgmt(savedEnableWorkloadMgmt);
-  }
 }

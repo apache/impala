@@ -22,7 +22,7 @@ import java.util.List;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.TupleDescriptor;
-import org.apache.impala.catalog.SystemTable;
+import org.apache.impala.catalog.FeSystemTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.FeSupport;
@@ -43,10 +43,10 @@ import com.google.common.collect.Lists;
 public class SystemTableScanNode extends ScanNode {
   public SystemTableScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc, "SCAN SYSTEM_TABLE");
-    table_ = (SystemTable) desc_.getTable();
+    table_ = (FeSystemTable) desc_.getTable();
   }
 
-  private final SystemTable table_;
+  private final FeSystemTable table_;
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {

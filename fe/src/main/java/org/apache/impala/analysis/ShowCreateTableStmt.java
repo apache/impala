@@ -22,7 +22,6 @@ import java.util.List;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableName;
@@ -77,8 +76,6 @@ public class ShowCreateTableStmt extends StatementBase {
       // statement references a column by its implicitly defined column names.
       viewAnalyzer.setUseHiveColLabels(true);
       viewQuery.analyze(viewAnalyzer);
-    } else if (table instanceof SystemTable) {
-      throw new AnalysisException("Not supported on system tables.");
     }
   }
 

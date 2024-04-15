@@ -17,24 +17,17 @@
 
 package org.apache.impala.catalog;
 
-import static org.apache.impala.analysis.Analyzer.ACCESSTYPE_READ;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.CatalogObjectsConstants;
+import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
-import org.apache.impala.thrift.TQueryTableColumn;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TSystemTable;
@@ -44,95 +37,37 @@ import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.TResultRowBuilder;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.base.Preconditions;
 
 /**
  * Represents a system table reflecting backend internal state.
  */
-public final class SystemTable extends Table {
-  public static final String QUERY_LIVE = "impala_query_live";
-  private static final Map<String, TSystemTableName> SYSTEM_TABLE_NAME_MAP =
-      ImmutableMap.of(QUERY_LIVE, TSystemTableName.QUERY_LIVE);
-
-  // Constants declaring how durations measured in milliseconds will be stored in the db.
-  // Must match constants with the same name declared in workload-management-fields.cc.
-  private static final int DURATION_DECIMAL_PRECISION = 18;
-  private static final int DURATION_DECIMAL_SCALE = 3;
-
-  private SystemTable(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
+public final class SystemTable extends Table implements FeSystemTable {
+  protected SystemTable(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     super(msTable, db, name, owner);
+    // System Tables are read-only.
+    accessLevel_ = TAccessLevel.READ_ONLY;
   }
 
-  // Get Type for a TQueryTableColumn
-  private static Type getColumnType(TQueryTableColumn column) {
-    switch (column) {
-      case START_TIME_UTC:
-        return Type.TIMESTAMP;
-      case PER_HOST_MEM_ESTIMATE:
-      case DEDICATED_COORD_MEM_ESTIMATE:
-      case CLUSTER_MEMORY_ADMITTED:
-      case NUM_ROWS_FETCHED:
-      case ROW_MATERIALIZATION_ROWS_PER_SEC:
-      case COMPRESSED_BYTES_SPILLED:
-      case BYTES_READ_CACHE_TOTAL:
-      case BYTES_READ_TOTAL:
-      case PERNODE_PEAK_MEM_MIN:
-      case PERNODE_PEAK_MEM_MAX:
-      case PERNODE_PEAK_MEM_MEAN:
-        return Type.BIGINT;
-      case BACKENDS_COUNT:
-        return Type.INT;
-      case TOTAL_TIME_MS:
-      case ROW_MATERIALIZATION_TIME_MS:
-      case EVENT_PLANNING_FINISHED:
-      case EVENT_SUBMIT_FOR_ADMISSION:
-      case EVENT_COMPLETED_ADMISSION:
-      case EVENT_ALL_BACKENDS_STARTED:
-      case EVENT_ROWS_AVAILABLE:
-      case EVENT_FIRST_ROW_FETCHED:
-      case EVENT_LAST_ROW_FETCHED:
-      case EVENT_UNREGISTER_QUERY:
-      case READ_IO_WAIT_TOTAL_MS:
-      case READ_IO_WAIT_MEAN_MS:
-        return ScalarType.createDecimalType(
-            DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE);
-      default:
-        return Type.STRING;
-    }
-  }
-
-  public static SystemTable CreateQueryLiveTable(Db db, String owner) {
-    List<FieldSchema> fsList = new ArrayList<FieldSchema>();
-    for (TQueryTableColumn column : TQueryTableColumn.values()) {
-      // The type string must be lowercase for Hive to read the column metadata properly.
-      String typeSql = getColumnType(column).toSql().toLowerCase();
-      FieldSchema fs = new FieldSchema(column.name().toLowerCase(), typeSql, "");
-      fsList.add(fs);
-    }
-    org.apache.hadoop.hive.metastore.api.Table msTable =
-        createMetastoreTable(db.getName(), QUERY_LIVE, owner, fsList);
-
-    SystemTable table = new SystemTable(msTable, db, QUERY_LIVE, owner);
-    for (TQueryTableColumn column : TQueryTableColumn.values()) {
-      table.addColumn(new Column(
-          column.name().toLowerCase(), getColumnType(column), column.ordinal()));
-    }
-    return table;
-  }
-
+  @Override // FeSystemTable
   public TSystemTableName getSystemTableName() {
-    return SYSTEM_TABLE_NAME_MAP.get(getName());
+    return TSystemTableName.valueOf(getName().toUpperCase());
+  }
+
+  public static boolean isSystemTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    String value = msTbl.getParameters().get(
+      CatalogObjectsConstants.TBL_PROP_SYSTEM_TABLE);
+    return value != null && BooleanUtils.toBoolean(value);
   }
 
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
     // Create thrift descriptors to send to the BE.
-    TTableDescriptor tableDescriptor =
-        new TTableDescriptor(tableId, TTableType.SYSTEM_TABLE, getTColumnDescriptors(),
-            numClusteringCols_, name_, db_.getName());
+    TTableDescriptor tableDescriptor = new TTableDescriptor(tableId,
+        TTableType.SYSTEM_TABLE, getTColumnDescriptors(),
+        getNumClusteringCols(), getName(), getDb().getName());
     tableDescriptor.setSystemTable(getTSystemTable());
     return tableDescriptor;
   }
@@ -164,8 +99,13 @@ public final class SystemTable extends Table {
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
       EventSequence catalogTimeline) throws TableLoadingException {
-    // Table is always loaded.
-    Preconditions.checkState(false);
+    int pos = colsByPos_.size();
+    // Should be no partition columns.
+    Preconditions.checkState(pos == 0);
+    for (FieldSchema s: msTbl.getSd().getCols()) {
+      Type type = FeCatalogUtils.parseColumnType(s, getName());
+      addColumn(new Column(s.getName(), type, s.getComment(), pos++));
+    }
   }
 
   /**
@@ -184,6 +124,7 @@ public final class SystemTable extends Table {
    * TABLE STATS statement. The schema of the returned TResultSet is set inside
    * this method.
    */
+  @Override // FeSystemTable
   public TResultSet getTableStats() {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
@@ -193,33 +134,5 @@ public final class SystemTable extends Table {
     rowBuilder.add(getNumRows());
     result.addToRows(rowBuilder.get());
     return result;
-  }
-
-  private static org.apache.hadoop.hive.metastore.api.Table
-      createMetastoreTable(String dbName, String tableName, String owner,
-          List<FieldSchema> columns) {
-    // Based on CatalogOpExecutor#createMetaStoreTable
-    org.apache.hadoop.hive.metastore.api.Table tbl =
-        new org.apache.hadoop.hive.metastore.api.Table();
-    tbl.setDbName(dbName);
-    tbl.setTableName(tableName);
-    tbl.setOwner(owner);
-    tbl.setParameters(new HashMap<String, String>());
-    tbl.setTableType(TableType.MANAGED_TABLE.toString());
-    tbl.setPartitionKeys(new ArrayList<FieldSchema>());
-    if (MetastoreShim.getMajorVersion() > 2) {
-      MetastoreShim.setTableAccessType(tbl, ACCESSTYPE_READ);
-    }
-
-    StorageDescriptor sd = new StorageDescriptor();
-    sd.setSerdeInfo(new org.apache.hadoop.hive.metastore.api.SerDeInfo());
-    sd.getSerdeInfo().setParameters(new HashMap<>());
-    sd.setCompressed(false);
-    sd.setBucketCols(new ArrayList<>(0));
-    sd.setSortCols(new ArrayList<>(0));
-    sd.setCols(columns);
-    tbl.setSd(sd);
-
-    return tbl;
   }
 }

@@ -17,13 +17,14 @@
 
 #pragma once
 
-#include <list>
+#include <array>
 #include <memory>
 #include <string>
 #include <utility>
 
 #include <gflags/gflags.h>
 
+#include "gen-cpp/SystemTables_types.h"
 #include "gen-cpp/Types_types.h"
 #include "service/query-state-record.h"
 #include "util/string-util.h"
@@ -50,24 +51,27 @@ using FieldParser = void (*)(FieldParserContext&);
 /// Contains all necessary information for the definition and parsing of a single field
 /// in workload management.
 struct FieldDefinition {
-  const std::string db_column_name;
+  const TQueryTableColumn::type db_column;
   const TPrimitiveType::type db_column_type;
   const FieldParser parser;
   const int16_t precision;
   const int16_t scale;
 
-  FieldDefinition(const std::string db_col_name, const TPrimitiveType::type db_col_type,
-      const FieldParser fp, const int16_t precision = 0,
-      const int16_t scale = 0) : db_column_name(std::move(db_col_name)),
-      db_column_type(std::move(db_col_type)), parser(std::move(fp)),
-      precision(precision), scale(scale) {}
+  FieldDefinition(const TQueryTableColumn::type db_col,
+      const TPrimitiveType::type db_col_type, const FieldParser fp,
+      const int16_t precision = 0, const int16_t scale = 0) :
+      db_column(std::move(db_col)), db_column_type(std::move(db_col_type)),
+      parser(std::move(fp)), precision(precision), scale(scale) {}
 }; // struct FieldDefinition
+
+/// Number of query table columns
+constexpr size_t NumQueryTableColumns = TQueryTableColumn::TABLES_QUERIED + 1;
 
 /// This list is the main data structure for workload management. Each list entry
 /// contains the name of a column in the completed queries table, the type of that column,
 /// and an implementation of a FieldParser for generating the value of that column from a
 /// `QueryStateExpanded` object.
-extern const std::list<FieldDefinition> FIELD_DEFINITIONS;
+extern const std::array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS;
 
 /// Track the state of the thread that processes the completed queries queue. Access to
 /// the ThreadState variable must only happen after taking a lock on the associated mutex.

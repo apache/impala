@@ -26,6 +26,7 @@
 #include <thread>
 #include <utility>
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <gutil/strings/strcat.h>
@@ -33,8 +34,10 @@
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "common/status.h"
+#include "gen-cpp/CatalogObjects_constants.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Query_types.h"
+#include "gen-cpp/SystemTables_types.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/query-driver.h"
 #include "service/client-request-state.h"
@@ -93,20 +96,33 @@ static inline bool MaxRecordsExceeded(size_t record_count) noexcept {
   return FLAGS_query_log_max_queued > 0 && record_count > FLAGS_query_log_max_queued;
 } // function MaxRecordsExceeded
 
-/// Sets up the completed queries database and table by generating and executing the
-/// necessary DML statements.
-static const Status SetupDbTable(InternalServer* server, const string& table_name) {
+/// Sets up the sys database generating and executing the necessary DML statements.
+static const Status SetupDb(InternalServer* server) {
   insert_query_opts.__set_sync_ddl(true);
-
   RETURN_IF_ERROR(server->ExecuteIgnoreResults(FLAGS_workload_mgmt_user,
-      StrCat("create database if not exists ", DB, " comment "
+      StrCat("CREATE DATABASE IF NOT EXISTS ", DB, " COMMENT "
       "'System database for Impala introspection'"), insert_query_opts, false));
+  insert_query_opts.__set_sync_ddl(false);
+  return Status::OK();
+} // function SetupDb
+
+/// Returns column name as lower-case to match common SQL style.
+static string GetColumnName(const FieldDefinition& field) {
+  std::string column_name = to_string(field.db_column);
+  boost::algorithm::to_lower(column_name);
+  return column_name;
+}
+
+/// Sets up the query table by generating and executing the necessary DML statements.
+static const Status SetupTable(InternalServer* server, const string& table_name,
+    bool is_system_table = false) {
+  insert_query_opts.__set_sync_ddl(true);
 
   StringStreamPop create_table_sql;
   create_table_sql << "CREATE TABLE IF NOT EXISTS " << table_name << "(";
 
   for (const auto& field : FIELD_DEFINITIONS) {
-    create_table_sql << field.db_column_name << " " << field.db_column_type;
+    create_table_sql << GetColumnName(field) << " " << field.db_column_type;
 
     if (field.db_column_type == TPrimitiveType::DECIMAL) {
       create_table_sql << "(" << field.precision << "," << field.scale << ")";
@@ -116,16 +132,23 @@ static const Status SetupDbTable(InternalServer* server, const string& table_nam
   }
   create_table_sql.move_back();
 
-  create_table_sql << ") PARTITIONED BY SPEC(identity(cluster_id), HOUR(start_time_utc)) "
-      << "STORED AS iceberg ";
+  create_table_sql << ") ";
 
-  if (!FLAGS_query_log_table_location.empty()) {
-    create_table_sql << "LOCATION '" << FLAGS_query_log_table_location << "' ";
+  if (!is_system_table) {
+    create_table_sql << "PARTITIONED BY SPEC(identity(cluster_id), HOUR(start_time_utc)) "
+        << "STORED AS iceberg ";
+
+    if (!FLAGS_query_log_table_location.empty()) {
+      create_table_sql << "LOCATION '" << FLAGS_query_log_table_location << "' ";
+    }
   }
 
   create_table_sql << "TBLPROPERTIES ('schema_version'='1.0.0','format-version'='2'";
 
-  if (!FLAGS_query_log_table_props.empty()) {
+  if (is_system_table) {
+    create_table_sql << ",'"
+                     << g_CatalogObjects_constants.TBL_PROP_SYSTEM_TABLE <<"'='true'";
+  } else if (!FLAGS_query_log_table_props.empty()) {
     create_table_sql << "," << FLAGS_query_log_table_props;
   }
 
@@ -136,12 +159,11 @@ static const Status SetupDbTable(InternalServer* server, const string& table_nam
 
   insert_query_opts.__set_sync_ddl(false);
 
-  LOG(INFO) << "Completed query log initialization. storage_type=\""
-      << FLAGS_enable_workload_mgmt  << "\" write_interval=\"" <<
+  LOG(INFO) << "Completed " << table_name << " initialization. write_interval=\"" <<
       FLAGS_query_log_write_interval_s << "s\"";
 
   return Status::OK();
-} // function SetupDbTable
+} // function SetupTable
 
 /// Iterates through the list of field in `FIELDS_PARSERS` executing each parser for the
 /// given `QueryStateExpanded` object. This function builds the `FieldParserContext`
@@ -179,6 +201,13 @@ size_t ImpalaServer::NumLiveQueries() {
 }
 
 Status ImpalaServer::InitWorkloadManagement() {
+  // Verify FIELD_DEFINITIONS includes all QueryTableColumns.
+  DCHECK_EQ(_TQueryTableColumn_VALUES_TO_NAMES.size(), FIELD_DEFINITIONS.size());
+  for (const auto& field : FIELD_DEFINITIONS) {
+    // Verify all fields match their column position.
+    DCHECK_EQ(FIELD_DEFINITIONS[field.db_column].db_column, field.db_column);
+  }
+
   if (FLAGS_enable_workload_mgmt) {
     return Thread::Create("impala-server", "completed-queries",
       bind<void>(&ImpalaServer::CompletedQueriesThread, this),
@@ -273,6 +302,17 @@ void ImpalaServer::EnqueueCompletedQuery(const QueryHandle& query_handle,
       PrintId(query_handle->query_id()) << "'";
 } // ImpalaServer::EnqueueCompletedQuery
 
+static string get_insert_prefix(const string& table_name) {
+  StringStreamPop fields;
+  fields << "INSERT INTO " << table_name << "(";
+  for (const auto& field : FIELD_DEFINITIONS) {
+    fields << GetColumnName(field) << ",";
+  }
+  fields.move_back();
+  fields << ") VALUES ";
+  return fields.str();
+}
+
 void ImpalaServer::CompletedQueriesThread() {
   {
     lock_guard<mutex> l(completed_queries_threadstate_mu_);
@@ -288,21 +328,19 @@ void ImpalaServer::CompletedQueriesThread() {
   }
 
   // Fully qualified table name based on startup flags.
-  const string table_name = StrCat(DB, ".", FLAGS_query_log_table_name);
+  const string log_table_name = StrCat(DB, ".", FLAGS_query_log_table_name);
 
   // Non-values portion of the completed queries insert dml. Does not change across
   // queries.
-  StringStreamPop fields;
-  fields << "INSERT INTO " << table_name << "(";
-  for (const auto& field : FIELD_DEFINITIONS) {
-    fields << field.db_column_name << ",";
-  }
-  fields.move_back();
-  fields << ") VALUES ";
-  _insert_dml = fields.str();
+  _insert_dml = get_insert_prefix(log_table_name);
 
   // The initialization code only works when run in a separate thread for reasons unknown.
-  ABORT_IF_ERROR(SetupDbTable(internal_server_.get(), table_name));
+  ABORT_IF_ERROR(SetupDb(internal_server_.get()));
+  ABORT_IF_ERROR(SetupTable(internal_server_.get(), log_table_name));
+  std::string live_table_name = to_string(TSystemTableName::IMPALA_QUERY_LIVE);
+  boost::algorithm::to_lower(live_table_name);
+  ABORT_IF_ERROR(SetupTable(internal_server_.get(),
+      StrCat(DB, ".", live_table_name), true));
 
   {
     lock_guard<mutex> l(completed_queries_threadstate_mu_);
@@ -373,7 +411,7 @@ void ImpalaServer::CompletedQueriesThread() {
       for (auto iter = queries_to_insert.begin(); iter != queries_to_insert.end();
           iter++) {
         if (iter->insert_attempts_count >= FLAGS_query_log_max_insert_attempts) {
-          LOG(ERROR) << "could not write completed query table=\"" << table_name <<
+          LOG(ERROR) << "could not write completed query table=\"" << log_table_name <<
               "\" query_id=\"" << PrintId(iter->query->base_state->id) << "\"";
           iter = queries_to_insert.erase(iter);
           ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(-1);
@@ -424,7 +462,7 @@ void ImpalaServer::CompletedQueriesThread() {
             &tmp_query_id);
 
         if (ret_status.ok()) {
-          LOG(INFO) << "wrote completed queries table=\"" << table_name << "\" "
+          LOG(INFO) << "wrote completed queries table=\"" << log_table_name << "\" "
               "record_count=\"" << queries_to_insert.size() << "\"";
           ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(
               queries_to_insert.size() * -1);
@@ -432,8 +470,8 @@ void ImpalaServer::CompletedQueriesThread() {
           ImpaladMetrics::COMPLETED_QUERIES_WRITTEN->Increment(
               queries_to_insert.size());
         } else {
-          LOG(WARNING) << "failed to write completed queries table=\"" << table_name <<
-              "\" record_count=\"" << queries_to_insert.size() << "\"";
+          LOG(WARNING) << "failed to write completed queries table=\"" <<
+              log_table_name << "\" record_count=\"" << queries_to_insert.size() << "\"";
           LOG(WARNING) << ret_status.GetDetail();
           ImpaladMetrics::COMPLETED_QUERIES_FAIL->Increment(queries_to_insert.size());
           completed_queries_lock_.lock();

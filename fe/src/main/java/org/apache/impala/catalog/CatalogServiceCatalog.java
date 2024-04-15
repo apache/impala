@@ -126,6 +126,7 @@ import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TResetMetadataRequest;
+import org.apache.impala.thrift.TSystemTableName;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableType;
@@ -392,7 +393,8 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkState(topicUpdateTblLockMaxWaitTimeMs_ >= 0,
         "topic_update_tbl_max_wait_time_ms must be positive");
     impalaSysTables = Arrays.asList(
-        BackendConfig.INSTANCE.queryLogTableName(), SystemTable.QUERY_LIVE);
+        BackendConfig.INSTANCE.queryLogTableName(),
+        TSystemTableName.IMPALA_QUERY_LIVE.toString().toLowerCase());
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
     try {

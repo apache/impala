@@ -146,6 +146,9 @@ enum TTablePropertyType {
   SERDE_PROPERTY = 1
 }
 
+// Table properties used by Impala
+const string TBL_PROP_SYSTEM_TABLE = "__IMPALA_SYSTEM_TABLE"
+
 // The access level that is available to Impala on the Catalog object.
 enum TAccessLevel {
   NONE = 0
@@ -669,10 +672,10 @@ struct TIcebergTable {
   10: optional map<string, TIcebergPartitionStats> partition_stats;
 }
 
-// Describes the purpose of a particular system table.
-// Table names can be found in SystemTable.java
+// System Table identifiers.
+// These are used as the table name, so should not be changed.
 enum TSystemTableName {
-  QUERY_LIVE = 0
+  IMPALA_QUERY_LIVE = 0
 }
 
 // Represents a System Table

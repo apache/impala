@@ -549,6 +549,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       // have a special table property to indicate that Impala should use an external
       // data source.
       table = new DataSourceTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (SystemTable.isSystemTable(msTbl)) {
+      table = new SystemTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
       table = new HdfsTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     }
