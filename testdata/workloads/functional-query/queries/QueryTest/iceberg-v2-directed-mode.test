@@ -11,7 +11,7 @@ select count(1) from iceberg_v2_partitioned_position_deletes;
 bigint
 ---- RUNTIME_PROFILE
 aggregation(SUM, BuildRows): 30
-row_regex: (?!.*F03:JOIN BUILD.*)
+!row_regex: .*F03:JOIN BUILD.*
 ====
 ---- QUERY
 # Same as above but here there is a separate fragment for the join build.

@@ -24,8 +24,8 @@ row_regex: .*COLUMN_STATS_ACCURATE.*
 invalidate metadata ext_nopart_colstatschg;
 insert into ext_nopart_colstatschg values (2);
 show create table ext_nopart_colstatschg;
----- RESULTS
-row_regex: (?!.*COLUMN_STATS_ACCURATE)
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex: .*COLUMN_STATS_ACCURATE.*
 ====
 ---- QUERY
 select x from ext_nopart_colstatschg;
