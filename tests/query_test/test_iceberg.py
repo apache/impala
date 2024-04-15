@@ -1463,6 +1463,11 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_read_position_deletes(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes', vector)
 
+  @SkipIfFS.hive
+  def test_read_mixed_format_position_deletes(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-mixed-format-position-deletes',
+        vector, unique_database)
+
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
   def test_read_null_delete_records(self, vector):

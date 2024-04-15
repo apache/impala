@@ -33,6 +33,7 @@ import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.AvroSchemaConverter;
 
 /**
  * Base class for the virtual table implementations for Iceberg deletes, like position or
@@ -83,6 +84,10 @@ public abstract class IcebergDeleteTable extends VirtualTable implements FeIcebe
       TTableDescriptor desc =
           baseTable_.toThriftDescriptor(tableId, referencedPartitions);
       desc.setColumnDescriptors(FeCatalogUtils.getTColumnDescriptors(this));
+      if (desc.hdfsTable.isSetAvroSchema()) {
+        desc.hdfsTable.setAvroSchema(AvroSchemaConverter.convertColumns(getColumns(),
+            getFullName().replaceAll("-", "_")).toString());
+      }
       return desc;
     }
 
