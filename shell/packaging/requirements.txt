@@ -5,6 +5,6 @@ prettytable==0.7.2
 sasl==0.3.1
 setuptools>=36.8.0
 six==1.14.0
-sqlparse==0.3.1
+sqlparse==0.5.0
 thrift==0.16.0
 thrift_sasl==0.4.3
