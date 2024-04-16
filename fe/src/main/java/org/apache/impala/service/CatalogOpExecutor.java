@@ -445,6 +445,7 @@ public class CatalogOpExecutor {
     TDdlType ddlType = ddlRequest.ddl_type;
     try {
       boolean syncDdl = ddlRequest.getQuery_options().isSync_ddl();
+      String debugAction = ddlRequest.getQuery_options().getDebug_action();
       switch (ddlType) {
         case ALTER_DATABASE:
           TAlterDbParams alter_db_params = ddlRequest.getAlter_db_params();
@@ -456,8 +457,8 @@ public class CatalogOpExecutor {
           TAlterTableParams alter_table_params = ddlRequest.getAlter_table_params();
           tTableName = Optional.of(alter_table_params.getTable_name());
           catalogOpTracker_.increment(ddlRequest, tTableName);
-          alterTable(alter_table_params, ddlRequest.getQuery_options().getDebug_action(),
-              wantMinimalResult, response, catalogTimeline);
+          alterTable(alter_table_params, debugAction, wantMinimalResult, response,
+              catalogTimeline);
           break;
         case ALTER_VIEW:
           TCreateOrAlterViewParams alter_view_params = ddlRequest.getAlter_view_params();
@@ -478,14 +479,14 @@ public class CatalogOpExecutor {
           tTableName = Optional.of(create_table_as_select_params.getTable_name());
           catalogOpTracker_.increment(ddlRequest, tTableName);
           response.setNew_table_created(createTable(create_table_as_select_params,
-              response, catalogTimeline, syncDdl, wantMinimalResult));
+              response, catalogTimeline, syncDdl, wantMinimalResult, debugAction));
           break;
         case CREATE_TABLE:
           TCreateTableParams create_table_params = ddlRequest.getCreate_table_params();
           tTableName = Optional.of((create_table_params.getTable_name()));
           catalogOpTracker_.increment(ddlRequest, tTableName);
           createTable(ddlRequest.getCreate_table_params(), response, catalogTimeline,
-              syncDdl, wantMinimalResult);
+              syncDdl, wantMinimalResult, debugAction);
           break;
         case CREATE_TABLE_LIKE:
           TCreateTableLikeParams create_table_like_params =
@@ -493,7 +494,7 @@ public class CatalogOpExecutor {
           tTableName = Optional.of(create_table_like_params.getTable_name());
           catalogOpTracker_.increment(ddlRequest, tTableName);
           createTableLike(create_table_like_params, response, catalogTimeline, syncDdl,
-              wantMinimalResult);
+              wantMinimalResult, debugAction);
           break;
         case CREATE_VIEW:
           TCreateOrAlterViewParams create_view_params =
@@ -3511,8 +3512,8 @@ public class CatalogOpExecutor {
    * otherwise.
    */
   private boolean createTable(TCreateTableParams params, TDdlExecResponse response,
-      EventSequence catalogTimeline, boolean syncDdl, boolean wantMinimalResult)
-      throws ImpalaException {
+      EventSequence catalogTimeline, boolean syncDdl, boolean wantMinimalResult,
+      @Nullable String debugAction) throws ImpalaException {
     Preconditions.checkNotNull(params);
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
@@ -3561,7 +3562,7 @@ public class CatalogOpExecutor {
       return createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,
           params.if_not_exists, params.getColumns(), params.getPartition_spec(),
           params.getPrimary_key_column_names(), params.getTable_properties(),
-          params.getComment());
+          params.getComment(), debugAction);
     }
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
@@ -3936,7 +3937,7 @@ public class CatalogOpExecutor {
       boolean wantMinimalResult, TDdlExecResponse response, EventSequence catalogTimeline,
       boolean ifNotExists, List<TColumn> columns, TIcebergPartitionSpec partitionSpec,
       List<String> primaryKeyColumnNames, Map<String, String> tableProperties,
-      String tblComment) throws ImpalaException {
+      String tblComment, @Nullable String debugAction) throws ImpalaException {
     Preconditions.checkState(IcebergTable.isIcebergTable(newTable));
 
     acquireMetastoreDdlLock(catalogTimeline);
@@ -3968,6 +3969,9 @@ public class CatalogOpExecutor {
                     msClient.getHiveClient().getDatabase(newTable.getDbName()),
                     newTable);
               }
+            }
+            if (debugAction != null) {
+              DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_CREATE);
             }
             String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
                 IcebergUtil.getIcebergTableIdentifier(newTable), location, columns,
@@ -4042,7 +4046,8 @@ public class CatalogOpExecutor {
           newTbl.getFullName(), createEventId);
       addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
     } catch (Exception e) {
-      if (e instanceof AlreadyExistsException && ifNotExists) {
+      if (ifNotExists && (e instanceof AlreadyExistsException ||
+          e instanceof org.apache.iceberg.exceptions.AlreadyExistsException)) {
         addSummary(response, "Table already exists.");
         return false;
       }
@@ -4064,8 +4069,8 @@ public class CatalogOpExecutor {
    * @param  syncDdl tells is SYNC_DDL is enabled for this DDL request.
    */
   private void createTableLike(TCreateTableLikeParams params, TDdlExecResponse response,
-      EventSequence catalogTimeline, boolean syncDdl, boolean wantMinimalResult)
-      throws ImpalaException {
+      EventSequence catalogTimeline, boolean syncDdl, boolean wantMinimalResult,
+      @Nullable String debugAction) throws ImpalaException {
     Preconditions.checkNotNull(params);
     THdfsFileFormat fileFormat =
         params.isSetFile_format() ? params.getFile_format() : null;
@@ -4201,7 +4206,7 @@ public class CatalogOpExecutor {
       createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,
           params.if_not_exists, columns, partitionSpec,
           Lists.newArrayList(srcIceTable.getIcebergSchema().identifierFieldNames()),
-          tableProperties, params.getComment());
+          tableProperties, params.getComment(), debugAction);
     } else if (srcTable instanceof KuduTable && KuduTable.isKuduTable(tbl)) {
       TCreateTableParams createTableParams =
           extractKuduCreateTableParams(params, tblName, (KuduTable) srcTable, tbl);

@@ -59,6 +59,9 @@ public class DebugUtils {
   // debug action label for Iceberg transaction commit.
   public static final String ICEBERG_COMMIT = "catalogd_iceberg_commit";
 
+  // debug action label for Iceberg create table.
+  public static final String ICEBERG_CREATE = "catalogd_iceberg_create";
+
   // debug action label for throwing an exception during loadFileMetadataForPartitions.
   public static final String LOAD_FILE_METADATA_THROW_EXCEPTION =
       "catalogd_load_file_metadata_throw_exception";
@@ -172,6 +175,10 @@ public class DebugUtils {
           switch (exceptionClazz.toLowerCase()) {
             case "commitfailedexception":
               exceptionToThrow = new CommitFailedException(param);
+              break;
+            case "icebergalreadyexistsexception":
+              exceptionToThrow = new org.apache.iceberg.exceptions.
+                  AlreadyExistsException("Table already exists");
               break;
             default:
               LOG.error("Debug action exception class {} is not implemented",
