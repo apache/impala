@@ -234,6 +234,7 @@ public abstract class Type {
         || isScalarType(PrimitiveType.TIMESTAMP);
   }
 
+  public boolean isIntegerOrDateType() { return isIntegerType() || isDate(); }
   public boolean isComplexType() { return isStructType() || isCollectionType(); }
   public boolean isCollectionType() { return isMapType() || isArrayType(); }
   public boolean isMapType() { return this instanceof MapType; }

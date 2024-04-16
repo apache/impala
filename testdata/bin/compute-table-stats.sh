@@ -36,6 +36,8 @@ ${COMPUTE_STATS_SCRIPT} --db_names=functional\
     alltypessmall,alltypestiny,jointbl,dimtbl,stringpartitionkey,nulltable,nullrows,
     date_tbl,chars_medium,part_strings_with_quotes,alltypes_date_partition,
     alltypes_date_partition_2,mv1_alltypes_jointbl,binary_tbl,binary_tbl_big"
+${COMPUTE_STATS_SCRIPT} --db_names=functional_parquet \
+    --table_names="unique_with_nulls"
 
 # We cannot load HBase on s3 and isilon yet.
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then

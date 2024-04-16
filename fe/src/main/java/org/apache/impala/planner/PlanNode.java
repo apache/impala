@@ -21,18 +21,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.analysis.TupleDescriptor;
@@ -751,19 +755,59 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * 1. The individual selectivities of conjuncts may be unknown.
    * 2. Two selectivities, whether known or unknown, could be correlated. Assuming
    *    independence can lead to significant underestimation.
+   * 3. Two BinaryPredicate may be derived from single BetweenPredicate that have
+   *    lower selectivity if analyzed as a pair.
    *
    * The first issue is addressed by using a single default selectivity that is
    * representative of all conjuncts with unknown selectivities.
    * The second issue is addressed by an exponential backoff when multiplying each
    * additional selectivity into the final result.
+   * The third issue is addressed by checking BinaryPredicate.derivedFromBetween()
+   * property. If it is True, calculate the expression selectivity from
+   * BinaryPredicate.getBetweenSelectivity(). Both of the BinaryPredicates should have
+   * the same getBetweenSelectivity() value, thus it is OK to inspect just from one of
+   * them.
+   * TODO: Fix the third issue with more general solution when there are multiple range
+   * predicates involved, even if some of them are not derived from BetweenPredicate.
    */
   static protected double computeCombinedSelectivity(List<Expr> conjuncts) {
     // Collect all estimated selectivities.
     List<Double> selectivities = new ArrayList<>();
+    // Map between a slot id and the lowest between selectivity targeting that slot.
+    Map<SlotId, Double> perSlotBetweenSelectivities = new HashMap<>();
+
+    int conjunctSize = 0;
     for (Expr e: conjuncts) {
-      if (e.hasSelectivity()) selectivities.add(e.getSelectivity());
+      if (e instanceof BinaryPredicate && ((BinaryPredicate) e).derivedFromBetween()) {
+        // This is one of two BinaryPredicate that derived from a BetweenPredicate.
+        // A pair of BetweenPredicate must have been assigned and pushed down to the same
+        // 'targetSlotId', or one of them maybe removed by Expr.removeDuplicates()
+        // somewhere by Analyzer. But it is enough to get the selectivity from one of
+        // them. Analyzer.getBoundPredicates() ensure that BinaryPredicate derived from
+        // BetweenPredicate gets priority over regular BinaryPredicate.
+        // If multiple BetweenPredicate target the same 'targetSlotId', pick the least
+        // selectivity.
+        BinaryPredicate pred = (BinaryPredicate) e;
+        insertBetweenSelectivity(pred, perSlotBetweenSelectivities);
+      } else if (e instanceof CompoundPredicate
+          && ((CompoundPredicate) e).derivedFromBetween()
+          && (((CompoundPredicate) e).getChild(0) instanceof BinaryPredicate)) {
+        BinaryPredicate pred = (BinaryPredicate) ((CompoundPredicate) e).getChild(0);
+        insertBetweenSelectivity(pred, perSlotBetweenSelectivities);
+      } else {
+        // For everything else.
+        if (e.hasSelectivity()) selectivities.add(e.getSelectivity());
+        conjunctSize++;
+      }
     }
-    if (selectivities.size() != conjuncts.size()) {
+
+    // Add all values from perSlotBetweenSelectivities to selectivities.
+    if (!perSlotBetweenSelectivities.isEmpty()) {
+      selectivities.addAll(perSlotBetweenSelectivities.values());
+      conjunctSize += perSlotBetweenSelectivities.size();
+    }
+
+    if (selectivities.size() != conjunctSize) {
       // Some conjuncts have no estimated selectivity. Use a single default
       // representative selectivity for all those conjuncts.
       selectivities.add(Expr.DEFAULT_SELECTIVITY);
@@ -779,6 +823,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
     // Bound result in [0, 1]
     return Math.max(0.0, Math.min(1.0, result));
+  }
+
+  static private void insertBetweenSelectivity(
+      BinaryPredicate pred, Map<SlotId, Double> perSlotBetweenSelectivities) {
+    Preconditions.checkNotNull(pred.getBoundSlot());
+    Preconditions.checkState(pred.getBetweenSelectivity() >= 0.0);
+    SlotId targetSlotId = pred.getBoundSlot().getSlotId();
+    double sel = pred.getBetweenSelectivity();
+    perSlotBetweenSelectivities.merge(targetSlotId, sel, (v1, v2) -> Math.min(v1, v2));
   }
 
   protected double computeSelectivity() {

@@ -46,6 +46,9 @@ public class BinaryPredicate extends Predicate {
   // true if this BinaryPredicate is inferred from slot equivalences, false otherwise.
   private boolean isInferred_ = false;
 
+  private ExprId betweenExprId_ = null;
+  private double betweenSelectivity_ = -1;
+
   public enum Operator {
     EQ("=", "eq", TComparisonOp.EQ),
     NE("!=", "ne", TComparisonOp.NE),
@@ -155,6 +158,8 @@ public class BinaryPredicate extends Predicate {
     super(other);
     op_ = other.op_;
     isInferred_ = other.isInferred_;
+    betweenExprId_ = other.betweenExprId_;
+    betweenSelectivity_ = other.betweenSelectivity_;
   }
 
   public boolean isNullMatchingEq() { return op_ == Operator.NULL_MATCHING_EQ; }
@@ -193,6 +198,10 @@ public class BinaryPredicate extends Predicate {
     toStrHelper.add("op", op_).addValue(super.debugString());
     if (isAuxExpr()) toStrHelper.add("isAux", true);
     if (isInferred_) toStrHelper.add("isInferred", true);
+    if (derivedFromBetween()) {
+      toStrHelper.add("betweenExprId", betweenExprId_);
+      toStrHelper.add("betweenSelectivity", betweenSelectivity_);
+    }
     return toStrHelper.toString();
   }
 
@@ -415,4 +424,13 @@ public class BinaryPredicate extends Predicate {
 
   @Override
   public Expr clone() { return new BinaryPredicate(this); }
+
+  public void setBetweenSelectivity(ExprId betweenExprId, double betweenSelectivity) {
+    betweenExprId_ = betweenExprId;
+    betweenSelectivity_ = betweenSelectivity;
+  }
+
+  public boolean derivedFromBetween() { return betweenExprId_ != null; }
+  public ExprId getBetweenExprId() { return betweenExprId_; }
+  public double getBetweenSelectivity() { return betweenSelectivity_; }
 }

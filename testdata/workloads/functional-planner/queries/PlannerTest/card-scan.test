@@ -2,6 +2,9 @@
 # In this file, "inequality" means not equals. It is a general
 # term for <, <=, >, >=. The term "not equals" is used for the
 # != (AKA <>) operator.
+# tpch.customer.c_custkey is a unique column with value range
+# [1..150000].
+#
 # No predicate at all. Establishes cardinality baseline.
 select * from tpch.customer
 ---- PLAN
@@ -242,12 +245,8 @@ PLAN-ROOT SINK
    predicates: c.c_custkey < 1234, c.c_nationkey < 100
    row-size=218B cardinality=15.00K
 ====
-# Between. No useful stats. Should assume, say 0.16
-# But, gets rewritten before computing selectivity,
-# So same as AND'ed inequalities
-# sel = 0.1, but Ramakrishnan and Gherke suggest 1/4
-# Bug: IMPALA-8037
-# Bug: Expected cardinality ~28.5K
+# Between over unique BIGINT column.
+# sel = 1112/150000
 select *
 from tpch.customer c
 where c.c_custkey between 1234 and 2345
@@ -257,7 +256,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.customer c]
    HDFS partitions=1/1 files=1 size=23.08MB
    predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
-   row-size=218B cardinality=15.00K
+   row-size=218B cardinality=1.11K
 ====
 # Compound inequality (< and >) that is the same as BETWEEN.
 # Gets compouted as AND of inequalities.
@@ -280,8 +279,33 @@ PLAN-ROOT SINK
    predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
    row-size=218B cardinality=15.00K
 ====
-# Between and redundant inequality
-# Bug: expected cardinality ~15K
+# Between with wrong min and max bound value.
+# Default to 0.1 selectivity.
+select *
+from tpch.customer c
+where c.c_custkey between 2345 and 1234
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 1234, c.c_custkey >= 2345
+   row-size=218B cardinality=15.00K
+====
+# Between where both min and max bound exceed max value.
+# Bug: cardinality should be 0. Revisit this with compute_column_minmax_stats=true option.
+select *
+from tpch.customer c
+where c.c_custkey between 150001 and 151111
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 151111, c.c_custkey >= 150001
+   row-size=218B cardinality=1.11K
+====
+# Between and redundant inequality.
 select *
 from tpch.customer c
 where c.c_custkey between 1234 and 2345
@@ -292,7 +316,135 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.customer c]
    HDFS partitions=1/1 files=1 size=23.08MB
    predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
-   row-size=218B cardinality=15.00K
+   row-size=218B cardinality=1.11K
+====
+# Between and two redundant inequality
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey <= 2345 and c.c_custkey >= 1234
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
+   row-size=218B cardinality=1.11K
+====
+# Multiple between predicates.
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey between 1233 and 3446
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey <= 3446, c.c_custkey >= 1233, c.c_custkey >= 1234
+   row-size=218B cardinality=1.11K
+====
+# Redundant between predicates, where one of the bounding value overlap.
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey between 1234 and 3456
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey <= 3456, c.c_custkey >= 1234
+   row-size=218B cardinality=1.11K
+====
+# Redundant between predicates, where both of the bounding value overlap.
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey between 1234 and 2345
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234
+   row-size=218B cardinality=1.11K
+====
+# Between and not between predicates that negate each other.
+# Bug: expected cardinality 0
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey not between 1234 and 2345
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234, c.c_custkey < 1234 OR c.c_custkey > 2345
+   row-size=218B cardinality=352
+====
+# Between and not between predicates only yield 2 valid values.
+# Bug: expected cardinality 2
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey not between 1235 and 2344
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234, c.c_custkey < 1235 OR c.c_custkey > 2344
+   row-size=218B cardinality=352
+====
+# Between and not between predicates where the latter has lower selectivity.
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey not between 1000 and 150000
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234, c.c_custkey < 1000 OR c.c_custkey > 150000
+   row-size=218B cardinality=999
+====
+# Between and not between predicates where the former has lower selectivity.
+select *
+from tpch.customer c
+where c.c_custkey between 1234 and 2345
+  and c.c_custkey not between 2000 and 150000
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.customer c]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   predicates: c.c_custkey <= 2345, c.c_custkey >= 1234, c.c_custkey < 2000 OR c.c_custkey > 150000
+   row-size=218B cardinality=1.11K
+====
+# BETWEEN should have low selectivity on unique INT column with many nulls.
+select * from functional_parquet.unique_with_nulls
+where int_col between 50 and 52
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.unique_with_nulls]
+   HDFS partitions=1/1 files=3 size=3.49KB
+   predicates: int_col <= 52, int_col >= 50
+   row-size=12B cardinality=3
+====
+# BETWEEN should have low selectivity on unique DATE column with many nulls.
+select * from functional_parquet.unique_with_nulls
+where date_col between DATE '2024-02-19' and DATE '2024-02-21'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_parquet.unique_with_nulls]
+   HDFS partitions=1/1 files=3 size=3.49KB
+   predicates: date_col <= DATE '2024-02-21', date_col >= DATE '2024-02-19'
+   row-size=12B cardinality=3
 ====
 # Partitioned scan.
 # |table| = 11K

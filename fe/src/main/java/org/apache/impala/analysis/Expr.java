@@ -1851,9 +1851,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Analyzes and evaluates expression to an integral value, returned as a long.
    * Throws if the expression cannot be evaluated or if the value evaluates to null.
    * The 'name' parameter is used in exception messages, e.g. "LIMIT expression
-   * evaluates to NULL".
+   * evaluates to NULL". If 'acceptDate' is true, treat Date expression as integral
+   * expression as well.
    */
-  public long evalToInteger(Analyzer analyzer, String name) throws AnalysisException {
+  public long evalToInteger(Analyzer analyzer, String name, boolean acceptDate)
+      throws AnalysisException {
     // Check for slotrefs and subqueries before analysis so we can provide a more
     // helpful error message.
     if (contains(SlotRef.class) || contains(Subquery.class)) {
@@ -1865,7 +1867,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       throw new AnalysisException(name + " expression must be a constant expression: " +
           toSql());
     }
-    if (!getType().isIntegerType()) {
+    if (!getType().isIntegerType() && !(acceptDate && getType().isDate())) {
       throw new AnalysisException(name + " expression must be an integer type but is '" +
           getType() + "': " + toSql());
     }
@@ -1875,6 +1877,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     } catch (InternalException e) {
       throw new AnalysisException("Failed to evaluate expr: " + toSql(), e);
     }
+
+    try {
+      return evalToInteger(val, acceptDate);
+    } catch (AnalysisException e) {
+      throw new AnalysisException(name + " expression evaluates to NULL: " + toSql());
+    }
+  }
+
+  public static long evalToInteger(TColumnValue val, boolean acceptDate)
+      throws AnalysisException {
     long value;
     if (val.isSetLong_val()) {
       value = val.getLong_val();
@@ -1884,10 +1896,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       value = val.getShort_val();
     } else if (val.isSetByte_val()) {
       value = val.getByte_val();
+    } else if (acceptDate && val.isSetDate_val()) {
+      value = val.getDate_val();
     } else {
-      throw new AnalysisException(name + " expression evaluates to NULL: " + toSql());
+      throw new AnalysisException("TColumnValue evaluates to NULL: " + val);
     }
     return value;
+  }
+
+  public long evalToInteger(Analyzer analyzer, String name) throws AnalysisException {
+    return evalToInteger(analyzer, name, false);
   }
 
   /**

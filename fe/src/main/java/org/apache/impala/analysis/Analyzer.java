@@ -2460,6 +2460,8 @@ public class Analyzer {
    */
   public List<Expr> getBoundPredicates(TupleId destTid, Set<SlotId> ignoreSlots,
       boolean markAssigned) {
+    // Map that tracks BinaryPredicates that derived from the same BetweenPredicate.
+    Map<ExprId, List<BinaryPredicate>> betweenPredicates = new HashMap<>();
     List<Expr> result = new ArrayList<>();
     for (ExprId srcConjunctId: globalState_.singleTidConjuncts) {
       Expr srcConjunct = globalState_.conjuncts.get(srcConjunctId);
@@ -2610,9 +2612,31 @@ public class Analyzer {
           }
         }
 
-        // check if we already created this predicate
-        if (!result.contains(p)) result.add(p);
+        if ((p instanceof BinaryPredicate)
+            && ((BinaryPredicate) p).derivedFromBetween()) {
+          BinaryPredicate b = (BinaryPredicate) p;
+          betweenPredicates.computeIfAbsent(b.getBetweenExprId(), k -> new ArrayList<>());
+          betweenPredicates.get(b.getBetweenExprId()).add(b);
+        } else {
+          // check if we already created this predicate
+          if (!result.contains(p)) result.add(p);
+        }
       }
+    }
+
+    if (!betweenPredicates.isEmpty()) {
+      // Prioritize members of 'betweenPredicates' ahead of 'result'.
+      // BinaryPredicates that derived from BetweenPredicates may have lower selectivity
+      // estimate from BetweenToCompoundRule. Placing them in-front will ensure that
+      // they are retained over other matching BinaryPredicates that do not come from
+      // BetweenPredicates when passed through Expr.removeDuplicates().
+      List<Expr> prioritizedExprs = new ArrayList<>();
+      for (List<BinaryPredicate> predicates : betweenPredicates.values()) {
+        prioritizedExprs.addAll(predicates);
+      }
+      prioritizedExprs.addAll(result);
+      Expr.removeDuplicates(prioritizedExprs);
+      result = prioritizedExprs;
     }
     return result;
   }

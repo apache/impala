@@ -219,14 +219,18 @@ public class ExprCardinalityTest {
     verifySelectCol("manynulls", "id", -1, -1);
   }
 
-  public void verifySelectExpr(String table, String exprSql,
-      long expectedNdv, double expectedSel) throws ImpalaException {
-    SelectFixture select = new SelectFixture(session_)
-        .table("functional." + table)
-        .exprSql(exprSql);
+  public void verifySelectExpr(String db, String table, String exprSql, long expectedNdv,
+      double expectedSel) throws ImpalaException {
+    SelectFixture select =
+        new SelectFixture(session_).table(db + "." + table).exprSql(exprSql);
     Expr expr = select.analyzeExpr();
     assertEquals(expectedNdv, expr.getNumDistinctValues());
     assertEquals(expectedSel, expr.getSelectivity(), 0.00001);
+  }
+
+  public void verifySelectExpr(String table, String exprSql, long expectedNdv,
+      double expectedSel) throws ImpalaException {
+    verifySelectExpr("functional", table, exprSql, expectedNdv, expectedSel);
   }
 
   /**
@@ -535,19 +539,30 @@ public class ExprCardinalityTest {
   /**
    * Test col BETWEEN x and y. Rewritten to
    * col >= x AND col <= y. Inequality should have an estimate. Since
-   * the expression is an AND, we multipley the two estimates.
+   * the expression is an AND, we multiply the two estimates.
    * So, regardless of NDV and null count, selectivity should be
    * something like 0.33^2.
+   * However, for a sufficiently unique column, selectivity can be approximated as ratio
+   * of values that fall in that range over NDV
+   * (see BetweenToCompoundRule.computeBetweenSelectivity()).
    */
   @Test
   public void testBetweenSelectivity() throws ImpalaException {
     // Bug: NO selectivity for Between because it is rewritten to
-    // use inequalities, and there no selectivities for those
-    // See IMPALA-8042
-    //verifySelectExpr("alltypes", "id between 30 and 60", 3, 0.33 * 0.33);
-    verifySelectExpr("alltypes", "id between 30 and 60", 3, -1);
+    // use inequalities, and there no selectivities for those, except for Between
+    // predicate over a sufficiently unique column. See IMPALA-8042
+    // verifySelectExpr("alltypes", "id between 30 and 60", 3, 0.33 * 0.33);
+    verifySelectExpr("alltypes", "id between 30 and 60", 3, 31.0 / 7300.0);
+    // Fallback to -1 if selectivity is too high.
+    verifySelectExpr("alltypes", "id between 1 and 7298", 3, -1);
     //verifySelectExpr("alltypes", "int_col between 30 and 60", 3, 0.33 * 0.33);
     verifySelectExpr("alltypes", "int_col between 30 and 60", 3, -1);
+
+    // Should work over date column.
+    // TODO: Add new unique date column in functional.date_tbl and use it here.
+    verifySelectExpr("tpcds_partitioned_parquet_snap", "date_dim",
+        "d_date between DATE '2001-03-13' and (DATE '2001-03-13' + interval 90 days)", 3,
+        91.0 / 73049.0);
 
     // Should not matter that there are no stats
     //verifySelectExpr("manynulls", "id between 30 and 60", 3, 0.33 * 0.33);
@@ -561,10 +576,19 @@ public class ExprCardinalityTest {
   public void testNotBetweenSelectivity() throws ImpalaException {
     // Bug: NO selectivity for Not Between because it is rewritten to
     // use inequalities, and there no selectivities for those
-    //verifySelectExpr("alltypes", "id not between 30 and 60", 3, 1 - 0.33 * 0.33);
+    // verifySelectExpr("alltypes", "id not between 30 and 60", 3, 1 - 0.33 * 0.33);
+    // Fallback to -1 if selectivity is too high.
     verifySelectExpr("alltypes", "id not between 30 and 60", 3, -1);
+    // only 2 value not in between.
+    verifySelectExpr("alltypes", "id not between 1 and 7298", 3, 2.0 / 7300.0);
     //verifySelectExpr("alltypes", "int_col not between 30 and 60", 3, 1 - 0.33 * 0.33);
     verifySelectExpr("alltypes", "int_col not between 30 and 60", 3, -1);
+
+    // Should work over date column. Fallback to -1 if selectivity is too high.
+    // TODO: Add new unique date column in functional.date_tbl and use it here.
+    verifySelectExpr("tpcds_partitioned_parquet_snap", "date_dim",
+        "d_date not between DATE '2001-03-13' and (DATE '2001-03-13' + interval 90 days)",
+        3, -1);
 
     // Should not matter that there are no stats
     //verifySelectExpr("manynulls", "id not between 30 and 60", 3, 1 - 0.33 * 0.33);
