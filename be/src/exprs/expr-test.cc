@@ -11336,12 +11336,12 @@ TEST_P(ExprTest, AiFunctionsTest) {
       << "\"total_tokens\": 73"
       << "},"
       << "\"system_fingerprint\": null}";
-  std::string_view res = AiFunctions::AiGenerateTextParseOpenAiResponse(response.str());
+  std::string res = AiFunctions::AiGenerateTextParseOpenAiResponse(response.str());
   string from_null("(\'\\\\0\')");
   string to_null("(\'\\0\')");
   size_t pos = content.find(from_null);
   content.replace(pos, from_null.length(), to_null);
-  EXPECT_EQ(string(res), content);
+  EXPECT_EQ(res, content);
 
   // resource cleanup
   pool.FreeAll();

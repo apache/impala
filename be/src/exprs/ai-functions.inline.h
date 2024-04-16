@@ -103,9 +103,12 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
       payload_allocator);
   message_array.PushBack(message, payload_allocator);
   payload.AddMember("messages", message_array, payload_allocator);
-  // Override additional params
+  // Override additional params.
+  // Caution: 'payload' might reference data owned by 'overrides'.
+  // To ensure valid access, place 'overrides' outside the 'if'
+  // statement before using 'payload'.
+  Document overrides;
   if (!fastpath && params.ptr != nullptr && params.len != 0) {
-    Document overrides;
     overrides.Parse(reinterpret_cast<char*>(params.ptr), params.len);
     if (overrides.HasParseError()) {
       LOG(WARNING) << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": error code "
@@ -172,7 +175,7 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
         ctx, reinterpret_cast<const uint8_t*>(msg.c_str()), msg.size());
   }
   // Parse the JSON response string
-  std::string_view response = AiGenerateTextParseOpenAiResponse(
+  std::string response = AiGenerateTextParseOpenAiResponse(
       std::string_view(reinterpret_cast<char*>(resp.data()), resp.size()));
   VLOG(2) << "AI Generate Text: \nresponse: " << response;
   StringVal result(ctx, response.length());
