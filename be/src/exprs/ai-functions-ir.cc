@@ -85,7 +85,7 @@ bool AiFunctions::is_api_endpoint_supported(const std::string_view& endpoint) {
       gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size()) != nullptr);
 }
 
-std::string_view AiFunctions::AiGenerateTextParseOpenAiResponse(
+string AiFunctions::AiGenerateTextParseOpenAiResponse(
     const std::string_view& response) {
   rapidjson::Document document;
   document.Parse(response.data(), response.size());
@@ -120,8 +120,7 @@ std::string_view AiFunctions::AiGenerateTextParseOpenAiResponse(
     return AI_GENERATE_TXT_JSON_PARSE_ERROR;
   }
 
-  const rapidjson::Value& result = message[OPEN_AI_RESPONSE_FIELD_CONTENT];
-  return std::string_view(result.GetString(), result.GetStringLength());
+  return message[OPEN_AI_RESPONSE_FIELD_CONTENT].GetString();
 }
 
 StringVal AiFunctions::AiGenerateText(FunctionContext* ctx, const StringVal& endpoint,

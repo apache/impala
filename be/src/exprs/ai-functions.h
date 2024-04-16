@@ -64,7 +64,7 @@ class AiFunctions {
       const StringVal& api_key_jceks_secret, const StringVal& params, const bool dry_run);
   /// Internal helper function for parsing OPEN AI's API response. Input parameter is the
   /// json representation of the OPEN AI's API response.
-  static std::string_view AiGenerateTextParseOpenAiResponse(
+  static std::string AiGenerateTextParseOpenAiResponse(
       const std::string_view& reponse);
 
   friend class ExprTest_AiFunctionsTest_Test;
