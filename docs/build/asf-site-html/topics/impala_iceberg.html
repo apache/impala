@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_iceberg"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Using Impala with Iceberg Tables</title></head><body id="impala_iceberg"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_iceberg"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Using Impala with Iceberg Tables</title></head><body id="impala_iceberg"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -456,9 +456,37 @@ DELETE FROM ice_t where i = 3;
   <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="impala_iceberg__iceberg_update">
     <h2 class="title topictitle2" id="ariaid-title11">Updating data int Iceberg tables</h2>
     <div class="body conbody">
+      <div class="p">
+        Since <span class="keyword">Impala 4.4</span> Impala is able to run <code class="ph codeph">UPDATE</code> statements against
+        Iceberg V2 tables. E.g.:
+        <pre class="pre codeblock"><code>
+UPDATE ice_t SET val = val + 1;
+UPDATE ice_t SET k = 4 WHERE i = 5;
+UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where ice_t.id = o.id;
+        </code></pre>
+      </div>
       <p class="p">
-        Impala does not yet support the UPDATE statement. One can mimic its behaviour by calling
-        DELETE + INSERT statements one after the other, but please note that this creates two transactions.
+        The UPDATE FROM statement can be used to update a target Iceberg table based on a source table (or view) that doesn't need
+        to be an Iceberg table. If there are multiple matches on the JOIN condition, Impala will raise an error.
+      </p>
+      <div class="p">
+        Limitations:
+        <ul class="ul">
+          <li class="li">Only the merge-on-read update mode is supported.</li>
+          <li class="li">Only writes position delete files, i.e. no support for writing equality deletes.</li>
+          <li class="li">Cannot update tables with complex types.</li>
+          <li class="li">
+            Can only write data and delete files in Parquet format. This means if table properties 'write.format.default'
+            and 'write.delete.format.default' are set, their values must be PARQUET.
+          </li>
+          <li class="li">
+            Updating partitioning column with non-constant expression via the UPDATE FROM statement is not allowed.
+            The upcoming MERGE statement will not have this limitation.
+          </li>
+        </ul>
+      </div>
+      <p class="p">
+        More information about the <code class="ph codeph">UPDATE</code> statement can be found at <a class="xref" href="impala_update.html#update">UPDATE Statement (Impala 2.8 or higher only)</a>.
       </p>
     </div>
   </article>
@@ -481,8 +509,55 @@ DELETE FROM ice_t where i = 3;
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title13" id="impala_iceberg__iceberg_time_travel">
-    <h2 class="title topictitle2" id="ariaid-title13">Time travel for Iceberg tables</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title13" id="impala_iceberg__iceberg_optimize_table">
+    <h2 class="title topictitle2" id="ariaid-title13">Optimizing (Compacting) Iceberg tables</h2>
+    <div class="body conbody">
+      <div class="p">
+        Frequent updates and row-level modifications on Iceberg tables can write many small
+        data files and delete files, which have to be merged-on-read.
+        This causes read performance to degrade over time.
+        The following statement can be used to compact the table and optimize it for reading.
+        <pre class="pre codeblock"><code>
+OPTIMIZE TABLE [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>;
+        </code></pre>
+      </div>
+
+      <div class="p">
+        The current implementation of the <code class="ph codeph">OPTIMIZE TABLE</code> statement rewrites
+        the entire table, executing the following tasks:
+        <ul class="ul">
+          <li class="li">compact small files</li>
+          <li class="li">merge delete and update deltas</li>
+          <li class="li">rewrite all files, converting them to the latest table schema</li>
+          <li class="li">rewrite all partitions according to the latest partition spec</li>
+        </ul>
+      </div>
+
+      <div class="p">
+        To execute table optimization:
+        <ul class="ul">
+          <li class="li">The user needs ALL privileges on the table.</li>
+          <li class="li">The table can conatin any file formats that Impala can read, but <code class="ph codeph">write.format.default</code>
+          has to be <code class="ph codeph">parquet</code>.</li>
+          <li class="li">The table cannot contain complex types.</li>
+        </ul>
+      </div>
+
+      <p class="p">
+        When a table is optimized, a new snapshot is created. The old table state is still
+        accessible by time travel to previous snapshots, because the rewritten data and
+        delete files are not removed physically.
+      </p>
+      <p class="p">
+        Note that the current implementation of <code class="ph codeph">OPTIMIZE TABLE</code> rewrites
+        the entire table, therefore this operation can take a long time to complete
+        depending on the size of the table.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title14" id="impala_iceberg__iceberg_time_travel">
+    <h2 class="title topictitle2" id="ariaid-title14">Time travel for Iceberg tables</h2>
     <div class="body conbody">
 
       <p class="p">
@@ -539,8 +614,8 @@ DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title14" id="impala_iceberg__iceberg_execute_rollback">
-    <h2 class="title topictitle2" id="ariaid-title14">Rolling Iceberg tables back to a previous state</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title15" id="impala_iceberg__iceberg_execute_rollback">
+    <h2 class="title topictitle2" id="ariaid-title15">Rolling Iceberg tables back to a previous state</h2>
     <div class="body conbody">
       <p class="p">
         Iceberg table modifications cause new table snapshots to be created;
@@ -572,8 +647,8 @@ ALTER TABLE ice_tbl EXECUTE ROLLBACK('2022-01-04 10:00:00');
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title15" id="impala_iceberg__iceberg_expire_snapshots">
-    <h2 class="title topictitle2" id="ariaid-title15">Expiring snapshots</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title16" id="impala_iceberg__iceberg_expire_snapshots">
+    <h2 class="title topictitle2" id="ariaid-title16">Expiring snapshots</h2>
     <div class="body conbody">
       <div class="p">
         Iceberg snapshots accumulate until they are deleted by a user action. Snapshots
@@ -604,8 +679,8 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title16" id="impala_iceberg__iceberg_table_cloning">
-    <h2 class="title topictitle2" id="ariaid-title16">Cloning Iceberg tables (LIKE clause)</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title17" id="impala_iceberg__iceberg_table_cloning">
+    <h2 class="title topictitle2" id="ariaid-title17">Cloning Iceberg tables (LIKE clause)</h2>
     <div class="body conbody">
       <div class="p">
         Use <code class="ph codeph">CREATE TABLE ... LIKE ...</code> to create an empty Iceberg table
@@ -622,8 +697,8 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title17" id="impala_iceberg__iceberg_table_properties">
-    <h2 class="title topictitle2" id="ariaid-title17">Iceberg table properties</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title18" id="impala_iceberg__iceberg_table_properties">
+    <h2 class="title topictitle2" id="ariaid-title18">Iceberg table properties</h2>
     <div class="body conbody">
       <div class="p">
         We can set the following table properties for Iceberg tables:
@@ -671,8 +746,8 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title18" id="impala_iceberg__iceberg_manifest_caching">
-    <h2 class="title topictitle2" id="ariaid-title18">Iceberg manifest caching</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title19" id="impala_iceberg__iceberg_manifest_caching">
+    <h2 class="title topictitle2" id="ariaid-title19">Iceberg manifest caching</h2>
     <div class="body conbody">
       <div class="p">
         Starting from version 1.1.0, Apache Iceberg provides a mechanism to cache the

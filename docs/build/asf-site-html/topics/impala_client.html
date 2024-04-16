@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_odbc.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_jdbc.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_results_spooling.html"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="intro_client"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Impala Client Access</title></head><body id="intro_client"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_odbc.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_jdbc.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_results_spooling.html"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="intro_client"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Impala Client Access</title></head><body id="intro_client"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -230,7 +230,7 @@ Toolkit code.
         
 
           <dt class="dt dlterm">
-            --idle_client_poll_time_s
+            --idle_client_poll_period_s
           </dt>
 
           <dd class="dd">
@@ -238,11 +238,11 @@ Toolkit code.
             connection is idle and closes it if the connection is idle. A client connection is
             idle if all sessions associated with the client connection are idle.
             <p class="p">
-              By default, <code class="ph codeph">--idle_client_poll_time_s</code> is set to 30 seconds.
+              By default, <code class="ph codeph">--idle_client_poll_period_s</code> is set to 30 seconds.
             </p>
 
             <p class="p">
-              If <code class="ph codeph">--idle_client_poll_time_s</code> is set to 0, idle client connections
+              If <code class="ph codeph">--idle_client_poll_period_s</code> is set to 0, idle client connections
               stay open until explicitly closed by the clients.
             </p>
 

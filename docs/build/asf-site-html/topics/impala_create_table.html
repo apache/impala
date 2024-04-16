@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="create_table"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>CREATE TABLE Statement</title></head><body class="impala sql_statement" id="create_table"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="create_table"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>CREATE TABLE Statement</title></head><body class="impala sql_statement" id="create_table"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -428,11 +428,18 @@ AS
 
     <p class="p">
       The optional <code class="ph codeph">SORT BY</code> clause lets you specify zero or more columns that
-      are sorted in the data files created by each Impala <code class="ph codeph">INSERT</code> or
-      <code class="ph codeph">CREATE TABLE AS SELECT</code> operation. Creating data files that are sorted is
-      most useful for Parquet tables, where the metadata stored inside each file includes the
-      minimum and maximum values for each column in the file. (The statistics apply to each row
-      group within the file; for simplicity, Impala writes a single row group in each file.)
+      are sorted in ascending order in the data files created by each Impala <code class="ph codeph">INSERT</code>
+      or <code class="ph codeph">CREATE TABLE AS SELECT</code> operation. There are two orderings to chose
+      from: <code class="ph codeph">LEXICAL</code> and <code class="ph codeph">ZORDER</code>. The default ordering is
+      <code class="ph codeph">LEXICAL</code>, which can be used for any number of sort columns.
+      <code class="ph codeph">ZORDER</code> can only be used to sort more than one column.
+    </p>
+
+    <p class="p">
+      Creating data files that are sorted is most useful for Parquet tables, where the
+      metadata stored inside each file includes the minimum and maximum values for each
+      column in the file. (The statistics apply to each row group within the file;
+      for simplicity, Impala writes a single row group in each file.)
       Grouping data values together in relatively narrow ranges within each data file makes it
       possible for Impala to quickly skip over data files that do not contain value ranges
       indicated in the <code class="ph codeph">WHERE</code> clause of a query, and can improve the
@@ -474,7 +481,7 @@ AS
     </p>
 
 <pre class="pre codeblock"><code>CREATE TABLE census_data (last_name STRING, first_name STRING, state STRING, address STRING)
-  SORT BY (last_name, state)
+  SORT BY LEXICAL (last_name, state)
   STORED AS PARQUET;
 </code></pre>
 

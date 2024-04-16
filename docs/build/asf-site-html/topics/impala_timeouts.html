@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="timeouts"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Setting Timeout Periods for Daemons, Queries, and Sessions</title></head><body id="timeouts"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="timeouts"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Setting Timeout Periods for Daemons, Queries, and Sessions</title></head><body id="timeouts"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -127,8 +127,10 @@ Trying to re-register with state-store</code></pre>
               <code class="ph codeph">--idle_query_timeout</code> disables query timeouts.
           </p>
           <p class="p">
-            Cancelled queries remain in the open state but use only the
-            minimal resources.
+            Cancelled queries are closed, but the client can still fetch their exception
+            details. If the query was in a good state when cancelled, it will present an
+            error like "Query 6f49e509bfa5b347:207d8ef900000000 expired due to client
+            inactivity", otherwise it will show the relevant error.
           </p>
         </li>
 

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2023" />
-<meta name="DC.rights.owner" content="(C) Copyright 2023" />
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Setting Timeout Periods for Daemons, Queries, and Sessions" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
@@ -157,8 +157,10 @@ Trying to re-register with state-store</code></pre>
           </p>
 
           <p class="p">
-            Cancelled queries remain in the open state but use only the
-            minimal resources.
+            Cancelled queries are closed, but the client can still fetch their exception
+            details. If the query was in a good state when cancelled, it will present an
+            error like "Query 6f49e509bfa5b347:207d8ef900000000 expired due to client
+            inactivity", otherwise it will show the relevant error.
           </p>
 
         </li>

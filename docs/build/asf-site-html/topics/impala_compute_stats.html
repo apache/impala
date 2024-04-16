@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="compute_stats"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>COMPUTE STATS Statement</title></head><body id="compute_stats"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="compute_stats"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>COMPUTE STATS Statement</title></head><body id="compute_stats"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -40,7 +40,7 @@ Toolkit code.
 
 <var class="keyword varname">column_list</var> ::= <var class="keyword varname">column_name</var> [ , <var class="keyword varname">column_name</var>, ... ]
 
-COMPUTE INCREMENTAL STATS [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> [PARTITION (<var class="keyword varname">partition_spec</var>)]
+COMPUTE INCREMENTAL STATS [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> [PARTITION (<var class="keyword varname">partition_spec</var>)] [ ( <var class="keyword varname">column_list</var> ) ]
 
 <var class="keyword varname">partition_spec</var> ::= <var class="keyword varname">simple_partition_spec</var> | <span class="ph"><var class="keyword varname">complex_partition_spec</var></span>
 

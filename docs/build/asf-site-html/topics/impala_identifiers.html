@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="identifiers"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Overview of Impala Identifiers</title></head><body id="identifiers"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="identifiers"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Overview of Impala Identifiers</title></head><body id="identifiers"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -35,20 +35,22 @@ Toolkit code.
 
       <li class="li">
         <p class="p">
-        The maximum length of an identifier is currently 128 characters, enforced by the metastore database.
+        The maximum length of an identifier is currently 128 characters except for column names which
+        can contain 767 characters, enforced by the metastore database.
         </p>
       </li>
 
       <li class="li">
         <p class="p">
-        An identifier must start with an alphanumeric or underscore character. Quoting the identifier with
-        backticks has no effect on the allowed characters in the name.
+        An identifier must start with an alphanumeric or underscore character except for column names which
+        can start with any unicode characters. Quoting the identifier with backticks has no effect on the allowed
+        characters in the name.
         </p>
       </li>
 
       <li class="li">
         <p class="p">
-        An identifier can contain only ASCII characters.
+        An identifier can contain only ASCII characters except for column names which can contain unicode characters.
         </p>
       </li>
 

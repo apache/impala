@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2023" />
-<meta name="DC.rights.owner" content="(C) Copyright 2023" />
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala String Functions" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
@@ -195,12 +195,17 @@
 
 
       <li class="li">
-        <a class="xref" href="#string_functions__ltrim">LTRI </a>
+        <a class="xref" href="#string_functions__ltrim">LTRIM</a>
       </li>
 
 
       <li class="li">
         <a class="xref" href="#string_functions__parse_url">PARSE_URL</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#string_functions__prettyprint_bytes">PRETTYPRINT_BYTES</a>
       </li>
 
 
@@ -1616,6 +1621,41 @@ from length_demo;
 
         </dd>
 
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__prettyprint_bytes">
+          PRETTYPRINT_BYTES(TINYINT / SMALLINT / INT / BIGINT bytes)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Formats numeric bytes in a human readable manner.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Examples:</strong>
+          </p>
+
+
+          <div class="p">
+<pre class="pre codeblock"><code>
+select prettyprint_bytes(1), prettyprint_bytes(12345678), prettyprint_bytes(1234567890), prettyprint_bytes(1234567890123);
+
++-----------------------+------------------------------+--------------------------------+-------------------------------+
+| prettyprint_bytes(1) | prettyprint_bytes(12345678) | prettyprint_bytes(1234567890) | prettyprint_bytes(1234567890123) |
++----------------------+-----------------------------+-------------------------------+----------------------------------+
+| 1.00 B               | 11.77 MB                    | 1.15 GB                       | 1149.78 GB                       |
++----------------------+-----------------------------+-------------------------------+----------------------------------+
+</code></pre>
+          </div>
+
+        </dd>
 
       
 

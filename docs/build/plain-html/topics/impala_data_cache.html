@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2023" />
-<meta name="DC.rights.owner" content="(C) Copyright 2023" />
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Data Cache for Remote Reads" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
@@ -107,6 +107,11 @@
 <pre class="pre codeblock"><code>--data_cache_eviction_policy=<var class="keyword varname">policy</var>
 </code></pre>
     </div>
+
+    <div class="note note"><span class="notetitle">Note:</span> The cache item will not expire as long as the same file metadata is used in the query.
+      This is because the cache key consists of the filename, mtime (last modified time of the
+      file), and file offset. If the mtime in the file metadata remains unchanged, the scan request
+      will consistently access the cache (provided that there is enough capacity).</div>
 
   </div>
 

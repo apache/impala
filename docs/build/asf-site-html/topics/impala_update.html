@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2023"><meta name="DC.rights.owner" content="(C) Copyright 2023"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="update"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>UPDATE Statement (Impala 2.8 or higher only)</title></head><body id="update"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="update"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>UPDATE Statement (Impala 2.8 or higher only)</title></head><body id="update"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -22,8 +22,8 @@ Toolkit code.
 
     <p class="p">
       
-      Updates an arbitrary number of rows in a Kudu table.
-      This statement only works for Impala tables that use the Kudu storage engine.
+      This statement only works for Kudu and Iceberg tables.
+      Updates an arbitrary number of rows in a target table.
     </p>
 
     <p class="p">
@@ -55,6 +55,23 @@ UPDATE [<var class="keyword varname">database_name</var>.]<var class="keyword va
       If the <code class="ph codeph">WHERE</code> clause is omitted, all rows in the table are updated.
     </p>
 
+    <p class="p">
+      The number of affected rows is reported in an <span class="keyword cmdname">impala-shell</span> message
+      and in the query profile.
+    </p>
+
+    <p class="p">
+      The optional <code class="ph codeph">FROM</code> clause lets you restrict the
+      updates to only the rows in the specified table that are part
+      of the result set for a join query. The join clauses can include
+      tables with any format, but the table from which the rows are deleted
+      must be a Kudu or Iceberg table.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Kudu considerations</strong>
+    </p>
     <p class="p">
       The conditions in the <code class="ph codeph">WHERE</code> clause can refer to
       any combination of primary key columns or other columns. Referring to
@@ -89,19 +106,6 @@ UPDATE [<var class="keyword varname">database_name</var>.]<var class="keyword va
     </ul>
 
     <p class="p">
-      The number of affected rows is reported in an <span class="keyword cmdname">impala-shell</span> message
-      and in the query profile.
-    </p>
-
-    <p class="p">
-      The optional <code class="ph codeph">FROM</code> clause lets you restrict the
-      updates to only the rows in the specified table that are part
-      of the result set for a join query. The join clauses can include
-      non-Kudu tables, but the table from which the rows are deleted
-      must be a Kudu table.
-    </p>
-
-    <p class="p">
         <strong class="ph b">Statement type:</strong> DML
       </p>
 
@@ -128,16 +132,16 @@ UPDATE [<var class="keyword varname">database_name</var>.]<var class="keyword va
 -- Set all rows to the same value for column c3.
 -- In this case, c1 and c2 are primary key columns
 -- and so cannot be updated.
-UPDATE kudu_table SET c3 = 'not applicable';
+UPDATE target_table SET c3 = 'not applicable';
 
 -- Update only the rows that match the condition.
-UPDATE kudu_table SET c3 = NULL WHERE c1 &gt; 100 AND c3 IS NULL;
+UPDATE target_table SET c3 = NULL WHERE c1 &gt; 100 AND c3 IS NULL;
 
 -- Does not update any rows, because the WHERE condition is always false.
-UPDATE kudu_table SET c3 = 'impossible' WHERE 1 = 0;
+UPDATE target_table SET c3 = 'impossible' WHERE 1 = 0;
 
 -- Change the values of multiple columns in a single UPDATE statement.
-UPDATE kudu_table SET c3 = upper(c3), c4 = FALSE, c5 = 0 WHERE c6 = TRUE;
+UPDATE target_table SET c3 = upper(c3), c4 = FALSE, c5 = 0 WHERE c6 = TRUE;
 </code></pre>
 
     <p class="p">
@@ -148,22 +152,22 @@ UPDATE kudu_table SET c3 = upper(c3), c4 = FALSE, c5 = 0 WHERE c6 = TRUE;
 <pre class="pre codeblock"><code>
 -- Uppercase a column value, only for rows that have
 -- an ID that matches the value from another table.
-UPDATE kudu_table SET c3 = upper(c3)
-  FROM kudu_table JOIN non_kudu_table
-  ON kudu_table.id = non_kudu_table.id;
+UPDATE target_table SET c3 = upper(c3)
+  FROM target_table JOIN other_table
+  ON target_table.id = other_table.id;
 
 -- Same effect as previous statement.
 -- Assign table aliases in FROM clause, then refer to
 -- short names elsewhere in the statement.
 UPDATE t1 SET c3 = upper(c3)
-  FROM kudu_table t1 JOIN non_kudu_table t2
+  FROM target_table t1 JOIN other_table t2
   ON t1.id = t2.id;
 
 -- Same effect as previous statements, but more efficient.
 -- Use WHERE clause to skip updating values that are
 -- already uppercase.
 UPDATE t1 SET c3 = upper(c3)
-  FROM kudu_table t1 JOIN non_kudu_table t2
+  FROM target_table t1 JOIN other_table t2
   ON t1.id = t2.id
   WHERE c3 != upper(c3);
 </code></pre>

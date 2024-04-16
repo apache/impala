@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2023" />
-<meta name="DC.rights.owner" content="(C) Copyright 2023" />
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="ALTER TABLE Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -575,6 +575,31 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET SERDEPROPERTIES ('
 
 
     <p class="p">
+      <strong class="ph b">To specify a sort order for new records that are added to the table:</strong>
+    </p>
+
+
+<pre class="pre codeblock"><code>ALTER TABLE <var class="keyword varname">table_name</var> SORT BY [LEXICAL|ZORDER](<var class="keyword varname">column_name1</var>[, <var class="keyword varname">column_name2</var> ...]);</code></pre>
+
+    <p class="p">
+      Specifying the sort order is optional. The default sort order is <code class="ph codeph">LEXICAL</code>.
+      Setting the <code class="ph codeph">SORT BY</code> property will not rewrite existing data files,
+      but subsequent inserts will be ordered. Sorting is always ascending.
+    </p>
+
+
+    <p class="p">
+      Use the <code class="ph codeph">DESCRIBE FORMATTED</code> statement to see the current sort
+      properties ('<code class="ph codeph">sort.columns</code>' and '<code class="ph codeph">sort.order</code>')
+      for an existing table. They can also be set using <code class="ph codeph">SET TBLPROPERTIES</code>.
+    </p>
+
+    <p class="p">
+      For details about sort order see <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>.
+    </p>
+
+
+    <p class="p">
       <strong class="ph b">To manually set or update table or column statistics:</strong>
     </p>
 
@@ -849,7 +874,7 @@ optional int32 x [i:1 d:1 r:0]
     <p class="p">
       Use an <code class="ph codeph">ALTER TABLE ... SET FILEFORMAT</code> clause. You can include an optional
       <code class="ph codeph">PARTITION (<var class="keyword varname">col1</var>=<var class="keyword varname">val1</var>,
-      <var class="keyword varname">col2</var>=<var class="keyword varname">val2</var>, ...</code> clause so that the file
+      <var class="keyword varname">col2</var>=<var class="keyword varname">val2</var>, ...</code>) clause so that the file
       format is changed for a specific partition rather than the entire table.
     </p>
 
