@@ -66,7 +66,8 @@ class TestFetch(ImpalaTestSuite):
       materialization_timer = re.search("RowMaterializationTimer: (.*)", runtime_profile)
       assert materialization_timer and len(materialization_timer.groups()) == 1 and \
           parse_duration_string_ms(materialization_timer.group(1)) > 1000
-      assert re.search("RPCCount: [5-9]", runtime_profile)
+      rpc_count = int(re.search("RPCCount: ([0-9]+)", runtime_profile).group(1))
+      assert rpc_count >= 5 and rpc_count <= 9
 
       rpc_read_timer = re.search("RPCReadTimer: (.*)", runtime_profile)
       assert rpc_read_timer and len(rpc_read_timer.groups()) == 1
