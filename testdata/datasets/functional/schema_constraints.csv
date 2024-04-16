@@ -423,3 +423,7 @@ table_name:empty_stream_tbl, constraint:restrict_to, table_format:orc/def/block
 # DST changes in the 'America/Los_Angeles' time zone.
 table_name:timestamp_at_dst_changes, constraint:restrict_to, table_format:text/none/none
 table_name:timestamp_at_dst_changes, constraint:restrict_to, table_format:kudu/none/none
+
+# Table where all column values are unique but have some NULLs.
+# Depends on functional.alltypessmall.
+table_name:unique_with_nulls, constraint:restrict_to, table_format:parquet/none/none

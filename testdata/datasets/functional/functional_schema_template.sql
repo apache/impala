@@ -4623,3 +4623,18 @@ PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+unique_with_nulls
+---- COLUMNS
+id int
+int_col int
+date_col date
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id,
+  case when id % 2 = 0 then id else null end,
+  case when id % 2 = 0 then date_add(DATE '2023-12-31', interval id days) else null end
+FROM functional.alltypessmall order by id;
+====
