@@ -1342,6 +1342,20 @@ class TestIcebergTable(IcebergTestSuite):
       self.run_test_case('QueryTest/iceberg-migrate-from-external-hdfs-tables',
                          vector, unique_database)
 
+  def test_table_exists(self, unique_database):
+    """Test that iceberg AlreadyExistsException are correctly handled."""
+    tbl_name = unique_database + ".create_iceberg_exists"
+    # Attempt to create an iceberg table, simulating AlreadyExistsException
+    iceberg_created_options = {'debug_action': 'CATALOGD_ICEBERG_CREATE:EXCEPTION@'
+        'IcebergAlreadyExistsException@Table was created concurrently'}
+    err = self.execute_query_expect_failure(self.client,
+        "create table {0} (i int) stored as iceberg".format(tbl_name),
+        query_options=iceberg_created_options)
+    assert "AlreadyExistsException: Table already exists" in str(err)
+    self.execute_query_expect_success(self.client,
+        "create table if not exists {0} (i int) stored as iceberg".format(tbl_name),
+        query_options=iceberg_created_options)
+
   def test_abort_transaction(self, unique_database):
     """Test that iceberg operations fail correctly when an Iceberg transaction commit
     fails, and that the effects of the failed operation are not visible."""
