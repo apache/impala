@@ -130,7 +130,7 @@ class DatabaseTest {
       TUniqueId query_id;
       EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", StrCat("create database ",
           database_name_, " comment 'Temporary database created and managed by "
-          "internal-server-test'"), TQueryOptions(), false, &query_id));
+          "internal-server-test'"), {}, false, &query_id));
       assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
       if (create_table) {
@@ -138,7 +138,7 @@ class DatabaseTest {
         EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", StrCat("create table ",
             table_name_, "(id INT, name STRING, first_sold TIMESTAMP, "
             "last_sold TIMESTAMP, price DECIMAL(30, 2)) partitioned by (category INT)"),
-            TQueryOptions(), false, &query_id));
+            {}, false, &query_id));
         assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
         // Insert some products that have a last_sold time.
@@ -162,7 +162,7 @@ class DatabaseTest {
           }
         }
 
-        EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", sql1, TQueryOptions(),
+        EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", sql1, {},
             false, &query_id));
         assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
@@ -183,7 +183,7 @@ class DatabaseTest {
           }
         }
 
-        EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", sql2, TQueryOptions(),
+        EXPECT_OK(impala_server_->ExecuteIgnoreResults("impala", sql2, {},
             false, &query_id));
         assertQueryState(query_id, QUERY_STATE_SUCCESS);
       }
@@ -221,13 +221,11 @@ TEST(InternalServerTest, QueryTimeout) {
   DatabaseTest db_test = DatabaseTest(impala_server_, "query_timeout", true, 5);
   InternalServer* fixture = impala_server_.get();
 
-  TQueryOptions query_opts;
-  query_opts.__set_fetch_rows_timeout_ms(1);
-
   TUniqueId session_id;
   TUniqueId query_id;
 
-  ASSERT_OK(fixture->OpenSession("impala", session_id, query_opts));
+  ASSERT_OK(fixture->OpenSession("impala", session_id,
+      {{TImpalaQueryOptions::FETCH_ROWS_TIMEOUT_MS, "1"}}));
 
   // Run a query that will execute for longer than the configured exec timeout.
   ASSERT_OK(fixture->SubmitQuery(StrCat("select * from ", db_test.GetTableName(),
@@ -249,12 +247,10 @@ TEST(InternalServerTest, QueryTimeout) {
 // Asserts the expected error is returned when a query option is set to an invalid value.
 TEST(InternalServerTest, InvalidQueryOption) {
   InternalServer* fixture = impala_server_.get();
-  TQueryOptions query_opts;
-
-  query_opts.__set_mem_limit_executors(-2);
 
   TUniqueId session_id;
-  Status stat = fixture->OpenSession("impala", session_id, query_opts);
+  Status stat = fixture->OpenSession("impala", session_id,
+      {{TImpalaQueryOptions::MEM_LIMIT_EXECUTORS, "-2"}});
 
   ASSERT_FALSE(stat.ok());
   ASSERT_EQ("Failed to parse query option 'MEM_LIMIT_EXECUTORS': -2", stat.msg().msg());
@@ -281,7 +277,7 @@ TEST(InternalServerTest, MultipleQueriesMultipleSessions) {
   // Insert a record into the test table using a new session.
   ASSERT_OK(fixture->ExecuteIgnoreResults("impala", StrCat("insert into ",
       test_table_name, "(id,first_name,last_name) VALUES (1,'test','person1')"),
-      TQueryOptions(), false, &query_id));
+      {}, false, &query_id));
   assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
   // Select a record from the test table using a new session.
@@ -317,10 +313,8 @@ TEST(InternalServerTest, RetryFailedQuery) {
       StrCat("IMPALA_SERVICE_POOL:127.0.0.1:",FLAGS_krpc_port,
       ":ExecQueryFInstances:FAIL"));
 
-  TQueryOptions query_opts;
-  query_opts.__set_retry_failed_queries(true);
-
-  ASSERT_OK(fixture->OpenSession("impala", session_id, query_opts));
+  ASSERT_OK(fixture->OpenSession("impala", session_id,
+      {{TImpalaQueryOptions::RETRY_FAILED_QUERIES, "true"}}));
 
   // Run a query that will fail and get automatically retried.
   ASSERT_OK(fixture->SubmitQuery("select 1", session_id, query_id));
@@ -415,7 +409,7 @@ TEST(InternalServerTest, MissingClosingQuote) {
 
   const string expected_msg = "ParseException: Unmatched string literal";
   res = fixture->ExecuteIgnoreResults("impala",StrCat( "select * from ",
-      db_test.GetTableName(), " where name = 'foo"), TQueryOptions(), false, &query_id);
+      db_test.GetTableName(), " where name = 'foo"), {}, false, &query_id);
   EXPECT_EQ(TErrorCode::GENERAL, res.code());
   EXPECT_EQ(expected_msg, res.msg().msg().substr(0, expected_msg.length()));
   EXPECT_EQ(TUniqueId(), query_id);
@@ -429,7 +423,7 @@ TEST(InternalServerTest, SyntaxError) {
 
   const string expected_msg = "ParseException: Syntax error in line 1";
   res = fixture->ExecuteIgnoreResults("impala", StrCat("select * from ",
-      db_test.GetTableName(), "; select"), TQueryOptions(), false, &query_id);
+      db_test.GetTableName(), "; select"), {}, false, &query_id);
   EXPECT_EQ(TErrorCode::GENERAL, res.code());
   EXPECT_EQ(expected_msg, res.msg().msg().substr(0, expected_msg.length()));
   EXPECT_EQ(TUniqueId(), query_id);
@@ -441,7 +435,7 @@ TEST(InternalServerTest, UnclosedComment) {
   Status res;
 
   const string expected_msg = "ParseException: Syntax error in line 1";
-  res = fixture->ExecuteIgnoreResults("impala", "select 1 /*foo", TQueryOptions(), false,
+  res = fixture->ExecuteIgnoreResults("impala", "select 1 /*foo", {}, false,
       &query_id);
   EXPECT_EQ(TErrorCode::GENERAL, res.code());
   EXPECT_EQ(expected_msg, res.msg().msg().substr(0, expected_msg.length()));
@@ -459,7 +453,7 @@ TEST(InternalServerTest, TableNotExist) {
       ASSERT_OK(fixture->ExecuteIgnoreResults("impala", StrCat("drop table ",
       db_test.GetTableName(), " purge")));
   res = fixture->ExecuteIgnoreResults("impala", StrCat("select * from ",
-      db_test.GetTableName()), TQueryOptions(), false, &query_id);
+      db_test.GetTableName()), {}, false, &query_id);
   EXPECT_EQ(TErrorCode::GENERAL, res.code());
   EXPECT_EQ(expected_msg, res.msg().msg().substr(0, expected_msg.length()));
   EXPECT_EQ(TUniqueId(), query_id);

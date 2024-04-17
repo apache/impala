@@ -45,8 +45,11 @@
 #include "service/internal-server.h"
 #include "service/query-state-record.h"
 #include "util/debug-util.h"
+#include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
+#include "util/pretty-printer.h"
+#include "util/stopwatch.h"
 #include "util/string-util.h"
 #include "util/thread.h"
 #include "util/ticker.h"
@@ -78,7 +81,7 @@ static const string DB = "sys";
 /// Default query options that will be provided on all queries that insert rows into the
 /// completed queries table. See the initialization code in the
 /// ImpalaServer::CompletedQueriesThread function for details on which options are set.
-static TQueryOptions insert_query_opts;
+static InternalServer::QueryOptionMap insert_query_opts;
 
 /// Non-values portion of the sql DML to insert records into the completed queries table.
 /// Generates the first portion of the DML that inserts records into the completed queries
@@ -98,11 +101,11 @@ static inline bool MaxRecordsExceeded(size_t record_count) noexcept {
 
 /// Sets up the sys database generating and executing the necessary DML statements.
 static const Status SetupDb(InternalServer* server) {
-  insert_query_opts.__set_sync_ddl(true);
+  insert_query_opts[TImpalaQueryOptions::SYNC_DDL] = "true";
   RETURN_IF_ERROR(server->ExecuteIgnoreResults(FLAGS_workload_mgmt_user,
       StrCat("CREATE DATABASE IF NOT EXISTS ", DB, " COMMENT "
       "'System database for Impala introspection'"), insert_query_opts, false));
-  insert_query_opts.__set_sync_ddl(false);
+  insert_query_opts[TImpalaQueryOptions::SYNC_DDL] = "false";
   return Status::OK();
 } // function SetupDb
 
@@ -116,7 +119,7 @@ static string GetColumnName(const FieldDefinition& field) {
 /// Sets up the query table by generating and executing the necessary DML statements.
 static const Status SetupTable(InternalServer* server, const string& table_name,
     bool is_system_table = false) {
-  insert_query_opts.__set_sync_ddl(true);
+  insert_query_opts[TImpalaQueryOptions::SYNC_DDL] = "true";
 
   StringStreamPop create_table_sql;
   create_table_sql << "CREATE TABLE IF NOT EXISTS " << table_name << "(";
@@ -157,7 +160,7 @@ static const Status SetupTable(InternalServer* server, const string& table_name,
   RETURN_IF_ERROR(server->ExecuteIgnoreResults(FLAGS_workload_mgmt_user,
       create_table_sql.str(), insert_query_opts, false));
 
-  insert_query_opts.__set_sync_ddl(false);
+  insert_query_opts[TImpalaQueryOptions::SYNC_DDL] = "false";
 
   LOG(INFO) << "Completed " << table_name << " initialization. write_interval=\"" <<
       FLAGS_query_log_write_interval_s << "s\"";
@@ -320,11 +323,12 @@ void ImpalaServer::CompletedQueriesThread() {
   }
 
   // Setup default query options.
-  insert_query_opts.__set_timezone("UTC");
-  insert_query_opts.__set_query_timeout_s((FLAGS_query_log_write_timeout_s < 1 ?
-      FLAGS_query_log_write_interval_s : FLAGS_query_log_write_timeout_s));
+  insert_query_opts[TImpalaQueryOptions::TIMEZONE] = "UTC";
+  insert_query_opts[TImpalaQueryOptions::QUERY_TIMEOUT_S] = std::to_string(
+      FLAGS_query_log_write_timeout_s < 1 ?
+      FLAGS_query_log_write_interval_s : FLAGS_query_log_write_timeout_s);
   if (!FLAGS_query_log_request_pool.empty()) {
-    insert_query_opts.__set_request_pool(FLAGS_query_log_request_pool);
+    insert_query_opts[TImpalaQueryOptions::REQUEST_POOL] = FLAGS_query_log_request_pool;
   }
 
   // Fully qualified table name based on startup flags.
@@ -388,15 +392,15 @@ void ImpalaServer::CompletedQueriesThread() {
         });
     completed_queries_ticker_->ResetWakeupGuard();
 
-    // transfer all currently queued completed queries to another list for processing
-    // so that the completed queries queue is not blocked while creating and executing the
-    // DML to insert into the query log table
     if (!completed_queries_.empty()) {
       if (MaxRecordsExceeded(completed_queries_.size())) {
         ImpaladMetrics::COMPLETED_QUERIES_MAX_RECORDS_WRITES->Increment(1L);
       } else {
         ImpaladMetrics::COMPLETED_QUERIES_SCHEDULED_WRITES->Increment(1L);
       }
+
+      MonotonicStopWatch timer;
+      timer.Start();
 
       // Copy all completed queries to a temporary list so that inserts to the
       // completed_queries list are not blocked while generating and running an insert
@@ -440,10 +444,11 @@ void ImpalaServer::CompletedQueriesThread() {
         sql.pop_back();
         const size_t final_sql_len = _insert_dml.size() + sql.size();
 
+        uint64_t gather_time = timer.Reset();
         TUniqueId tmp_query_id;
 
         // Build query options to ensure the query is not rejected.
-        TQueryOptions opts = insert_query_opts;
+        InternalServer::QueryOptionMap opts = insert_query_opts;
 
         if (UNLIKELY(final_sql_len > numeric_limits<int32_t>::max())) {
           LOG(ERROR) << "Completed queries table insert sql statement of length '" <<
@@ -452,26 +457,40 @@ void ImpalaServer::CompletedQueriesThread() {
           continue; // NOTE: early loop continuation
         }
 
-        opts.__set_max_statement_length_bytes(final_sql_len < 1024 ? 1024 :
-            final_sql_len);
-        opts.__set_max_row_size(max_row_size);
+        // Set max_statement_length_bytes based on actual query, and at least the minimum.
+        opts[TImpalaQueryOptions::MAX_STATEMENT_LENGTH_BYTES] = std::to_string(
+            max<size_t>(MIN_MAX_STATEMENT_LENGTH_BYTES, final_sql_len));
+        // Set statement_expression_limit based on actual query, and at least the minimum.
+        opts[TImpalaQueryOptions::STATEMENT_EXPRESSION_LIMIT] = std::to_string(
+            max<size_t>(MIN_STATEMENT_EXPRESSION_LIMIT,
+                queries_to_insert.size() * _TQueryTableColumn_VALUES_TO_NAMES.size()));
+        opts[TImpalaQueryOptions::MAX_ROW_SIZE] = std::to_string(max_row_size);
 
         // Execute the insert dml.
         const Status ret_status = internal_server_->ExecuteIgnoreResults(
             FLAGS_workload_mgmt_user, StrCat(_insert_dml, sql), opts, false,
             &tmp_query_id);
 
+        uint64_t exec_time = timer.ElapsedTime();
+        ImpaladMetrics::COMPLETED_QUERIES_WRITE_DURATIONS->Update(
+            gather_time + exec_time);
         if (ret_status.ok()) {
           LOG(INFO) << "wrote completed queries table=\"" << log_table_name << "\" "
-              "record_count=\"" << queries_to_insert.size() << "\"";
+              "record_count=" << queries_to_insert.size() << " "
+              "bytes=" << PrettyPrinter::PrintBytes(sql.size()) << " "
+              "gather_time=" << PrettyPrinter::Print(gather_time, TUnit::TIME_NS) << " "
+              "exec_time=" << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
           ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(
               queries_to_insert.size() * -1);
           DCHECK(ImpaladMetrics::COMPLETED_QUERIES_QUEUED->GetValue() >= 0);
           ImpaladMetrics::COMPLETED_QUERIES_WRITTEN->Increment(
               queries_to_insert.size());
         } else {
-          LOG(WARNING) << "failed to write completed queries table=\"" <<
-              log_table_name << "\" record_count=\"" << queries_to_insert.size() << "\"";
+          LOG(WARNING) << "failed to write completed queries table=\"" << log_table_name
+              << "\" record_count=" << queries_to_insert.size() << " "
+              "bytes=" << PrettyPrinter::PrintBytes(sql.size()) << " "
+              "gather_time=" << PrettyPrinter::Print(gather_time, TUnit::TIME_NS) << " "
+              "exec_time=" << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
           LOG(WARNING) << ret_status.GetDetail();
           ImpaladMetrics::COMPLETED_QUERIES_FAIL->Increment(queries_to_insert.size());
           completed_queries_lock_.lock();

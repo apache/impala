@@ -3899,9 +3899,19 @@
     "contexts": [
       "IMPALAD"
     ],
-    "label": "Max Records Hit",
+    "label": "Completed Queries Max Records Hit",
     "units": "NONE",
     "kind": "COUNTER",
     "key": "impala-server.completed-queries.max-records-writes"
+  },
+  {
+    "description": "Time spent writing completed queries to the query log table.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Completed Queries Write Duration Distribution",
+    "units": "TIME_NS",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.completed-queries.write-durations"
   }
 ]

@@ -410,18 +410,17 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// InternalServer methods, see internal-server.h for details
   virtual Status OpenSession(const std::string& user_name, TUniqueId& new_session_id,
-      const TQueryOptions& query_opts = TQueryOptions());
+      const QueryOptionMap& query_opts = {});
   virtual bool CloseSession(const impala::TUniqueId& session_id);
   virtual Status ExecuteIgnoreResults(const std::string& user_name,
-      const std::string& sql, const TQueryOptions& query_opts = TQueryOptions(),
+      const std::string& sql, const QueryOptionMap& query_opts = {},
       const bool persist_in_db = true, TUniqueId* query_id = nullptr);
   virtual Status ExecuteAndFetchAllText(const std::string& user_name,
       const std::string& sql, query_results& results, results_columns* columns = nullptr,
       TUniqueId* query_id = nullptr);
   virtual Status SubmitAndWait(const std::string& user_name, const std::string& sql,
       TUniqueId& new_session_id, TUniqueId& new_query_id,
-      const TQueryOptions& query_opts = TQueryOptions(),
-      const bool persist_in_db = true);
+      const QueryOptionMap& query_opts = {}, const bool persist_in_db = true);
   virtual Status WaitForResults(TUniqueId& query_id);
   virtual Status SubmitQuery(const std::string& sql, const impala::TUniqueId& session_id,
       TUniqueId& new_query_id, const bool persist_in_db = true);

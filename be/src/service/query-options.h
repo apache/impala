@@ -371,6 +371,12 @@ void OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMask& mask,
 Status SetQueryOption(const std::string& key, const std::string& value,
     TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask);
 
+/// Set the key/value pair in TQueryOptions. It will override existing setting in
+/// query_options. The bit corresponding to query option 'key' in set_query_options_mask
+/// is set. An empty string value will reset the key to its default value.
+Status SetQueryOption(TImpalaQueryOptions::type option, const std::string& value,
+    TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask);
+
 /// Validates the query options after they have all been set. Returns a Status indicating
 /// the results of running the validation rules. The majority of the query options
 /// validation is done in SetQueryOption. However, more complex validations rules (e.g.

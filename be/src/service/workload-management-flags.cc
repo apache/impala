@@ -79,7 +79,7 @@ DEFINE_int32_hidden(query_log_write_timeout_s, 0, "Specifies the query timeout i
     "seconds for inserts to the query log table. A value less than 1 indicates to use "
     "the same value as the query_log_write_interval_s flag.");
 
-DEFINE_int32(query_log_max_queued, 10000, "Maximum number of records that can be queued "
+DEFINE_int32(query_log_max_queued, 5000, "Maximum number of records that can be queued "
     "before they are written to the impala query log table. This flag operates "
     "independently of the 'query_log_write_interval_s' flag. If the number of queued "
     "records reaches this value, the records will be written to the query log table no "

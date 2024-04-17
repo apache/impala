@@ -20,6 +20,8 @@ namespace java org.apache.impala.thrift
 
 # Must be kept in-sync with workload-management-fields.cc
 # Used as column names, so do not change existing enums.
+# When adding new columns, review the default for query_log_max_queued to maintain
+#   query_log_max_queued * len(TQueryTableColumn) < statement_expression_limit(250k)
 enum TQueryTableColumn {
     CLUSTER_ID
     QUERY_ID

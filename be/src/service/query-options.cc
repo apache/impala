@@ -231,9 +231,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
   if (option_int < 0) {
     return Status(Substitute("Invalid query option: $0", key));
   }
+  return SetQueryOption(static_cast<TImpalaQueryOptions::type>(option_int),
+      value, query_options, set_query_options_mask);
+}
 
+Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& value,
+    TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask) {
   QueryConstants qc;
-  TImpalaQueryOptions::type option = static_cast<TImpalaQueryOptions::type>(option_int);
 
   if (value.empty()) {
     ResetQueryOption(option, query_options);
@@ -1286,6 +1290,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       default:
+        string key = to_string(option);
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
           return Status::OK();
