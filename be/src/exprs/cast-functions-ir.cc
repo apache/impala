@@ -59,6 +59,27 @@ const int MAX_BOOLEAN_CHARS = 1;
 
 namespace {
 
+template <class T>
+constexpr const char* TypeToName() {
+  if constexpr (std::is_same_v<T, int8_t>) {
+    return "TINYINT";
+  } else if constexpr (std::is_same_v<T, int16_t>) {
+    return "SMALLINT";
+  } else if constexpr (std::is_same_v<T, int32_t>) {
+    return "INT";
+  } else if constexpr (std::is_same_v<T, int64_t>) {
+    return "BIGINT";
+  } else if constexpr (std::is_same_v<T, float>) {
+    return "FLOAT";
+  } else if constexpr (std::is_same_v<T, double>) {
+    return "DOUBLE";
+  } else {
+    // This function doesn't support other types.
+    static_assert(!std::is_same_v<T, T>);
+    return nullptr;
+  }
+}
+
 // This struct is used as a helper in the validation of casts. For a cast from 'FROM_TYPE'
 // to 'TO_TYPE' it provides compile time constants about what type of conversion it is.
 // These constants are used in the template specifications of the 'Validate()' function to
@@ -158,14 +179,20 @@ bool Validate(FROM_TYPE from, FunctionContext* ctx) {
   }
 
   if (UNLIKELY(!is_ok)) {
+    constexpr const char* FROM_TYPE_NAME = TypeToName<FROM_TYPE>();
+    constexpr const char* TO_TYPE_NAME = TypeToName<TO_TYPE>();
+    string err;
     if (std::isnan(from)) {
-      ctx->SetError("NaN value cannot be converted to integer type.");
+      err = Substitute("NaN value of type $0 cannot be converted to $1.",
+          FROM_TYPE_NAME, TO_TYPE_NAME);
     } else if (!std::isfinite(from)) {
-      ctx->SetError("Non-finite value cannot be converted to integer type.");
+      err = Substitute("Non-finite value of type $0 cannot be converted to $1.",
+          FROM_TYPE_NAME, TO_TYPE_NAME);
     } else {
-      ctx->SetError("Out-of-range floating point value cannot be converted to "
-          "integer type.");
+      err = Substitute("Converting value $0 of type $1 to $2 failed, "
+          "value out of range for destination type.", from, FROM_TYPE_NAME, TO_TYPE_NAME);
     }
+    ctx->SetError(err.c_str());
   }
 
   return is_ok;
@@ -194,8 +221,10 @@ bool Validate(FROM_TYPE from, FunctionContext* ctx) {
   const bool is_ok = in_range || std::isnan(from) || !std::isfinite(from);
 
   if (UNLIKELY(!is_ok)) {
-      ctx->SetError(
-          "Out-of-range double value cannot be converted to float.");
+    const string err = Substitute("Converting value $0 of type $1 to $2 failed, "
+        "value out of range for destination type.", from, TypeToName<FROM_TYPE>(),
+        TypeToName<TO_TYPE>());
+    ctx->SetError(err.c_str());
   }
 
   return is_ok;

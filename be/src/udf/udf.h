@@ -162,8 +162,10 @@ class FunctionContext {
   /// Returns the query_id for the current query.
   UniqueId query_id() const;
 
-  /// Sets an error for this UDF. If this is called, this will trigger the
-  /// query to fail.
+  /// Sets an error for this UDF. The error message is copied and the copy is owned by
+  /// this object.
+  ///
+  /// If this is called, this will trigger the query to fail.
   void SetError(const char* error_msg);
 
   /// Adds a warning that is returned to the user. This can include things like

@@ -704,9 +704,9 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 
   template <class T>
   void TestValueOrError(const string& expr, PrimitiveType expr_type,
-      const T& expected_result, bool expect_error) {
+      const T& expected_result, bool expect_error, const std::string& error) {
     if (expect_error) {
-      TestError(expr);
+      TestErrorString(expr, error);
     } else {
       TestValue(expr, expr_type, expected_result);
     }
@@ -1220,17 +1220,22 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
 
     TestValueOrError("cast(" + stmt + " as tinyint)", TYPE_TINYINT,
-        static_cast<int8_t>(val), min_integer_size > sizeof(int8_t));
+        static_cast<int8_t>(val), min_integer_size > sizeof(int8_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as smallint)", TYPE_SMALLINT,
-        static_cast<int16_t>(val), min_integer_size > sizeof(int16_t));
+        static_cast<int16_t>(val), min_integer_size > sizeof(int16_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as int)", TYPE_INT,
-        static_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+        static_cast<int32_t>(val), min_integer_size > sizeof(int32_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as integer)", TYPE_INT,
-        static_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+        static_cast<int32_t>(val), min_integer_size > sizeof(int32_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as bigint)", TYPE_BIGINT,
-        static_cast<int64_t>(val), min_integer_size > sizeof(int64_t));
-    TestValueOrError("cast(" + stmt + " as float)", TYPE_FLOAT,
-        static_cast<float>(val), float_out_of_range);
+        static_cast<int64_t>(val), min_integer_size > sizeof(int64_t),
+        " value out of range for destination type.\n");
+    TestValueOrError("cast(" + stmt + " as float)", TYPE_FLOAT, static_cast<float>(val),
+        float_out_of_range, "value out of range for destination type.\n");
     if (!timestamp_out_of_range) {
       TestTimestampValue("cast(" + stmt + " as timestamp)", CreateTestTimestamp(val));
     } else {
@@ -1287,17 +1292,22 @@ void ExprTest::TestCast(const string& stmt, const char* val, int min_integer_siz
     TestValue(stmt + " as boolean)", TYPE_BOOLEAN, lexical_cast<bool>(val));
 #endif
     TestValueOrError("cast(" + stmt + " as tinyint)", TYPE_TINYINT,
-        val8, min_integer_size > sizeof(int8_t));
+        val8, min_integer_size > sizeof(int8_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as smallint)", TYPE_SMALLINT,
-        lexical_cast<int16_t>(val), min_integer_size > sizeof(int16_t));
+        lexical_cast<int16_t>(val), min_integer_size > sizeof(int16_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as int)", TYPE_INT,
-        lexical_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+        lexical_cast<int32_t>(val), min_integer_size > sizeof(int32_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as integer)", TYPE_INT,
-        lexical_cast<int32_t>(val), min_integer_size > sizeof(int32_t));
+        lexical_cast<int32_t>(val), min_integer_size > sizeof(int32_t),
+        "value out of range for destination type.\n");
     TestValueOrError("cast(" + stmt + " as bigint)", TYPE_BIGINT,
-        lexical_cast<int64_t>(val), min_integer_size > sizeof(int64_t));
-    TestValueOrError("cast(" + stmt + " as float)", TYPE_FLOAT,
-        lexical_cast<float>(val), float_out_of_range);
+        lexical_cast<int64_t>(val), min_integer_size > sizeof(int64_t),
+        "value out of range for destination type.\n");
+    TestValueOrError("cast(" + stmt + " as float)", TYPE_FLOAT, lexical_cast<float>(val),
+        float_out_of_range, "value out of range for destination type.\n");
 
     TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE, lexical_cast<double>(val));
     TestValue("cast(" + stmt + " as real)", TYPE_DOUBLE, lexical_cast<double>(val));
@@ -3502,6 +3512,26 @@ TEST_P(ExprTest, CastExprs) {
   // 2^70 + 1
   TestIsNull("cast(cast(1180591620717411303425 as decimal(38, 0)) as timestamp)",
       TYPE_TIMESTAMP);
+
+  // Explicitly test the error message of an out-of-range double-to-integer conversion.
+  TestErrorString("cast(cast(500 as DOUBLE) as TINYINT)",
+      "Converting value 500 of type DOUBLE to TINYINT failed, "
+      "value out of range for destination type.\n");
+
+  // Explicitly test the error message of an out-of-range double-to-float conversion.
+  TestErrorString("cast(1e40 as FLOAT)",
+      "Converting value 1e+40 of type DOUBLE to FLOAT failed, "
+      "value out of range for destination type.\n");
+
+  // Nan and non-finite floating-point values converted to int.
+  TestErrorString("cast(cast((1/0) as FLOAT) as INT)",
+      "Non-finite value of type FLOAT cannot be converted to INT.\n");
+  TestErrorString("cast((1/0) as INT)",
+      "Non-finite value of type DOUBLE cannot be converted to INT.\n");
+  TestErrorString("cast(cast((0/0) as FLOAT) as INT)",
+      "NaN value of type FLOAT cannot be converted to INT.\n");
+  TestErrorString("cast((0/0) as INT)",
+      "NaN value of type DOUBLE cannot be converted to INT.\n");
 
   // Out of range String <--> Timestamp - invalid boundary cases.
   TestIsNull("cast('1399-12-31 23:59:59' as timestamp)", TYPE_TIMESTAMP);
