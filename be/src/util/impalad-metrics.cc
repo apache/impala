@@ -176,6 +176,8 @@ const char* ImpaladMetricKeys::COMPLETED_QUERIES_SCHEDULED_WRITES =
     "impala-server.completed-queries.scheduled-writes";
 const char* ImpaladMetricKeys::COMPLETED_QUERIES_MAX_RECORDS_WRITES =
     "impala-server.completed-queries.max-records-writes";
+const char* ImpaladMetricKeys::COMPLETED_QUERIES_WRITE_DURATIONS =
+    "impala-server.completed-queries.write-durations";
 const char* ImpaladMetricKeys::DEBUG_ACTION_NUM_FAIL = "impala.debug_action.fail";
 const char* ImpaladMetricKeys::QUERY_LOG_EST_TOTAL_BYTES =
     "impala-server.query-log-est-total-bytes";
@@ -272,6 +274,7 @@ StringProperty* ImpaladMetrics::ACTIVE_CATALOGD_ADDRESS = nullptr;
 // Histograms
 HistogramMetric* ImpaladMetrics::QUERY_DURATIONS = nullptr;
 HistogramMetric* ImpaladMetrics::DDL_DURATIONS = nullptr;
+HistogramMetric* ImpaladMetrics::COMPLETED_QUERIES_WRITE_DURATIONS = nullptr;
 
 // Other
 StatsMetric<uint64_t, StatsType::MEAN>*
@@ -459,6 +462,9 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       MetricDefs::Get(ImpaladMetricKeys::QUERY_DURATIONS), FIVE_HOURS_IN_MS, 3));
   DDL_DURATIONS = m->RegisterMetric(new HistogramMetric(
       MetricDefs::Get(ImpaladMetricKeys::DDL_DURATIONS), FIVE_HOURS_IN_MS, 3));
+  COMPLETED_QUERIES_WRITE_DURATIONS = m->RegisterMetric(new HistogramMetric(
+      MetricDefs::Get(ImpaladMetricKeys::COMPLETED_QUERIES_WRITE_DURATIONS),
+      FIVE_HOURS_IN_MS, 3));
 
   // Initialize Hedged read metrics
   HEDGED_READ_OPS = m->AddCounter(ImpaladMetricKeys::HEDGED_READ_OPS, 0);

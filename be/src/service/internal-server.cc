@@ -34,7 +34,7 @@ using namespace std;
 namespace impala {
 
 Status ImpalaServer::OpenSession(const string& user_name, TUniqueId& new_session_id,
-    const TQueryOptions& query_opts) {
+    const QueryOptionMap& query_opts) {
   shared_ptr<ThriftServer::ConnectionContext> conn_ctx =
       make_shared<ThriftServer::ConnectionContext>();
   conn_ctx->connection_id = RandomUniqueID();
@@ -58,14 +58,11 @@ Status ImpalaServer::OpenSession(const string& user_name, TUniqueId& new_session
   {
     lock_guard<mutex> l(session_state_map_lock_);
     session_state = session_state_map_[new_session_id];
-    std::map<string, string> query_opts_map;
-    TQueryOptionsToMap(query_opts, &query_opts_map);
-    for (auto iter=query_opts_map.cbegin(); iter!=query_opts_map.cend(); iter++) {
-      if (!iter->second.empty()) {
-        RETURN_IF_ERROR(SetQueryOption(iter->first, iter->second,
+  }
+
+  for (const auto& iter : query_opts) {
+    RETURN_IF_ERROR(SetQueryOption(iter.first, iter.second,
         &session_state->set_query_options, &session_state->set_query_options_mask));
-      }
-    }
   }
 
   MarkSessionActive(session_state);
@@ -102,7 +99,7 @@ bool ImpalaServer::CloseSession(const TUniqueId& session_id) {
 } // ImpalaServer::CloseSession
 
 Status ImpalaServer::ExecuteIgnoreResults(const string& user_name, const string& sql,
-    const TQueryOptions& query_opts, const bool persist_in_db, TUniqueId* query_id) {
+    const QueryOptionMap& query_opts, const bool persist_in_db, TUniqueId* query_id) {
   TUniqueId session_id;
   TUniqueId internal_query_id;
   Status result;
@@ -130,7 +127,7 @@ Status ImpalaServer::ExecuteAndFetchAllText(const std::string& user_name,
   TUniqueId internal_query_id;
   Status result;
 
-  result = SubmitAndWait(user_name, sql, session_id, internal_query_id, TQueryOptions());
+  result = SubmitAndWait(user_name, sql, session_id, internal_query_id);
 
   if (query_id != nullptr) {
     *query_id = internal_query_id;
@@ -150,7 +147,7 @@ Status ImpalaServer::ExecuteAndFetchAllText(const std::string& user_name,
 } // ImpalaServer::ExecuteAndFetchAllText
 
 Status ImpalaServer::SubmitAndWait(const string& user_name, const string& sql,
-    TUniqueId& new_session_id, TUniqueId& new_query_id, const TQueryOptions& query_opts,
+    TUniqueId& new_session_id, TUniqueId& new_query_id, const QueryOptionMap& query_opts,
     const bool persist_in_db) {
 
   RETURN_IF_ERROR(OpenSession(user_name, new_session_id, query_opts));
@@ -200,11 +197,8 @@ Status ImpalaServer::SubmitQuery(const string& sql, const TUniqueId& session_id,
 
   session_state->ToThrift(session_state->session_id, &query_context.session);
 
-  QueryOptionsMask set_query_options_mask;
   query_context.client_request.query_options = session_state->QueryOptions();
-  set_query_options_mask = session_state->set_query_options_mask;
-
-  AddPoolConfiguration(&query_context, ~set_query_options_mask);
+  AddPoolConfiguration(&query_context, ~session_state->set_query_options_mask);
 
   QueryHandle query_handle;
   RETURN_IF_ERROR(Execute(&query_context, session_state, &query_handle, nullptr,

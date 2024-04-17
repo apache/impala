@@ -284,6 +284,9 @@ class ImpaladMetricKeys {
   /// Number of writes to the query log table that happened because the max queued
   /// completed queries records was reached.
   static const char* COMPLETED_QUERIES_MAX_RECORDS_WRITES;
+
+  /// Time spent writing completed queries to the query log table.
+  static const char* COMPLETED_QUERIES_WRITE_DURATIONS;
 };
 
 /// Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -383,6 +386,7 @@ class ImpaladMetrics {
   // Histograms
   static HistogramMetric* QUERY_DURATIONS;
   static HistogramMetric* DDL_DURATIONS;
+  static HistogramMetric* COMPLETED_QUERIES_WRITE_DURATIONS;
 
   // Other
   static StatsMetric<uint64_t, StatsType::MEAN>* IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO;

@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -59,6 +60,8 @@ namespace impala {
     public:
       virtual ~InternalServer() {}
 
+      using QueryOptionMap = std::map<TImpalaQueryOptions::type, string>;
+
       /// Creates and registers a new connection and session.
       ///
       /// Parameters:
@@ -72,7 +75,7 @@ namespace impala {
       /// Return:
       ///   `impala::Status` Indicates the result of opening the new session.
       virtual Status OpenSession(const std::string& user_name, TUniqueId& new_session_id,
-          const TQueryOptions& query_opts = TQueryOptions()) = 0;
+          const QueryOptionMap& query_opts = {}) = 0;
 
       /// Closes a given session cleaning up all associated resources.
       ///
@@ -105,7 +108,7 @@ namespace impala {
       ///   `impala::Status` Indicates the result of submitting the query and waiting for
       ///                    it to return.
       virtual Status ExecuteIgnoreResults(const std::string& user_name,
-          const std::string& sql, const TQueryOptions& query_opts = TQueryOptions(),
+          const std::string& sql, const QueryOptionMap& query_opts = {},
           const bool persist_in_db = true, TUniqueId* query_id = nullptr) = 0;
 
       /// Creates a new session under the specified user and submits a query under that
@@ -162,8 +165,7 @@ namespace impala {
       ///   `impala::Status` Indicates the result of submitting and waiting for the query.
       virtual Status SubmitAndWait(const std::string& user_name, const std::string& sql,
           TUniqueId& new_session_id, TUniqueId& new_query_id,
-          const TQueryOptions& query_opts = TQueryOptions(),
-          const bool persist_in_db = true) = 0;
+          const QueryOptionMap& query_opts = {}, const bool persist_in_db = true) = 0;
 
       /// Waits until the given query has results available.
       ///

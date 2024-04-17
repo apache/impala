@@ -18,7 +18,6 @@
 from __future__ import absolute_import, division, print_function
 
 import os
-import pytest
 import string
 import tempfile
 
@@ -94,7 +93,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
   MAX_SQL_PLAN_LEN = 2000
   LOG_DIR_MAX_WRITES = tempfile.mkdtemp(prefix="max_writes")
   FLUSH_MAX_RECORDS_CLUSTER_ID = "test_query_log_max_records_" + str(int(time()))
-  FLUSH_MAX_RECORDS_QUERY_COUNT = 2
+  FLUSH_MAX_RECORDS_QUERY_COUNT = 30
   OTHER_TBL = "completed_queries_table_{0}".format(int(time()))
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
@@ -310,10 +309,13 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                                  .format(FLUSH_MAX_RECORDS_QUERY_COUNT,
                                                  FLUSH_MAX_RECORDS_CLUSTER_ID),
                                     catalogd_args="--enable_workload_mgmt",
+                                    default_query_options=[
+                                      ('statement_expression_limit', 1024)],
                                     impalad_graceful_shutdown=True)
   def test_query_log_flush_max_records(self, vector):
     """Asserts that queries that have completed are written to the query log table when
-       the maximum number of queued records it reached."""
+       the maximum number of queued records it reached. Also verifies that writing
+       completed queries is not limited by default statement_expression_limit."""
 
     impalad = self.cluster.get_first_impalad()
     client = self.get_client(vector.get_value('protocol'))
@@ -341,7 +343,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     impalad.service.wait_for_metric_value(
         "impala-server.completed-queries.max-records-writes", 1, 60)
     self.cluster.get_first_impalad().service.wait_for_metric_value(
-        "impala-server.completed-queries.written", 3, 60)
+        "impala-server.completed-queries.written",
+        self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1, 60)
 
     # Force Impala to process the inserts to the completed queries table.
     client.execute("refresh " + self.QUERY_TBL)
@@ -352,7 +355,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
         .format(self.QUERY_TBL, rand_str))
     assert res.success
     assert 1 == len(res.data)
-    assert "3" == res.data[0]
+    assert str(self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1) == res.data[0]
     impalad.service.wait_for_metric_value(
         "impala-server.completed-queries.queued", 2, 60)
 
