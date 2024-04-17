@@ -546,6 +546,53 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
     </conbody>
   </concept>
 
+  <concept id="iceberg_optimize_table">
+    <title>Optimizing (Compacting) Iceberg tables</title>
+    <conbody>
+      <p>
+        Frequent updates and row-level modifications on Iceberg tables can write many small
+        data files and delete files, which have to be merged-on-read.
+        This causes read performance to degrade over time.
+        The following statement can be used to compact the table and optimize it for reading.
+        <codeblock>
+OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname>;
+        </codeblock>
+      </p>
+
+      <p>
+        The current implementation of the <codeph>OPTIMIZE TABLE</codeph> statement rewrites
+        the entire table, executing the following tasks:
+        <ul>
+          <li>compact small files</li>
+          <li>merge delete and update deltas</li>
+          <li>rewrite all files, converting them to the latest table schema</li>
+          <li>rewrite all partitions according to the latest partition spec</li>
+        </ul>
+      </p>
+
+      <p>
+        To execute table optimization:
+        <ul>
+          <li>The user needs ALL privileges on the table.</li>
+          <li>The table can conatin any file formats that Impala can read, but <codeph>write.format.default</codeph>
+          has to be <codeph>parquet</codeph>.</li>
+          <li>The table cannot contain complex types.</li>
+        </ul>
+      </p>
+
+      <p>
+        When a table is optimized, a new snapshot is created. The old table state is still
+        accessible by time travel to previous snapshots, because the rewritten data and
+        delete files are not removed physically.
+      </p>
+      <p>
+        Note that the current implementation of <codeph>OPTIMIZE TABLE</codeph> rewrites
+        the entire table, therefore this operation can take a long time to complete
+        depending on the size of the table.
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_time_travel">
     <title>Time travel for Iceberg tables</title>
     <conbody>
