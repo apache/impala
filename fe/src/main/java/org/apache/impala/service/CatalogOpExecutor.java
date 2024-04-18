@@ -5526,6 +5526,8 @@ public class CatalogOpExecutor {
         try {
           msClient.getHiveClient().dropPartition(tableName.getDb(), tableName.getTbl(),
               part.getPartitionValuesAsStrings(true), dropOptions);
+          LOG.info("Dropped partition {}.{}:{} in Metastore",
+              tableName.getDb(), tableName.getTbl(), part.getPartitionName());
           ++numTargetedPartitions;
         } catch (NoSuchObjectException e) {
           if (!ifExists) {

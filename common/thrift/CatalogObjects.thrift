@@ -518,6 +518,10 @@ struct THdfsTable {
 
   // Bucket information for HDFS tables
   16: optional TBucketInfo bucket_info
+
+  // Recently dropped partitions that are not yet synced to the catalog topic.
+  // Only used in catalogd.
+  17: optional list<THdfsPartition> dropped_partitions
 }
 
 struct THBaseTable {

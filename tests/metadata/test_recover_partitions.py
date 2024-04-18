@@ -457,10 +457,6 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s RECOVER PARTITIONS failed to handle "\
         "invalid partition key values." % fq_tbl_name
 
-  def has_value(self, value, lines):
-    """Check if lines contain value."""
-    return any([line.find(value) != -1 for line in lines])
-
   def count_partition(self, lines):
     """Count the number of partitions in the lines."""
     return self.count_value(WAREHOUSE, lines)
