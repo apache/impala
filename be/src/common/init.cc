@@ -407,6 +407,7 @@ static Status JavaAddOpens(bool useSizeOf) {
       "--add-opens=java.base/jdk.internal.module=ALL-UNNAMED",
       "--add-opens=java.base/jdk.internal.perf=ALL-UNNAMED",
       "--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED",
+      "--add-opens=java.base/jdk.internal.platform.cgroupv1=ALL-UNNAMED",
       "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
       "--add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED",
       "--add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED",

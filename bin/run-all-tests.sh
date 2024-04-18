@@ -293,6 +293,7 @@ do
       JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.module=ALL-UNNAMED"
       JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.perf=ALL-UNNAMED"
       JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.platform=ALL-UNNAMED"
+      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.platform.cgroupv1=ALL-UNNAMED"
       JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"
       JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED"
       JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED"
