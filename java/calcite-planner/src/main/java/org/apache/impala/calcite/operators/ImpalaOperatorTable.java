@@ -25,15 +25,11 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.util.ReflectiveSqlOperatorTable;
-import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Db;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +62,13 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
   public void lookupOperatorOverloads(SqlIdentifier opName, SqlFunctionCategory category,
       SqlSyntax syntax, List<SqlOperator> operatorList, SqlNameMatcher nameMatcher) {
 
+
+    ImpalaCustomOperatorTable.instance().lookupOperatorOverloads(opName, category, syntax,
+        operatorList, nameMatcher);
+
+    if (operatorList.size() == 1) {
+      return;
+    }
 
     // Check Calcite operator table for existence.
     SqlStdOperatorTable.instance().lookupOperatorOverloads(opName, category, syntax,

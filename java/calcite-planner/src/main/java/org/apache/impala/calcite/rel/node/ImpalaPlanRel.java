@@ -17,6 +17,15 @@
 
 package org.apache.impala.calcite.rel.node;
 
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.Sort;
+import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.Union;
+import org.apache.calcite.rel.core.Values;
 import org.apache.impala.common.ImpalaException;
 
 /**
@@ -53,4 +62,32 @@ public interface ImpalaPlanRel {
    * Return the RelNodeType enum of the implementing class of ImpalaPlanRel.
    */
   public RelNodeType relNodeType();
+
+  public static RelNodeType getRelNodeType(RelNode relNode) {
+    if (relNode instanceof Aggregate) {
+      return RelNodeType.AGGREGATE;
+    }
+    if (relNode instanceof Filter) {
+      return RelNodeType.FILTER;
+    }
+    if (relNode instanceof TableScan) {
+      return RelNodeType.HDFSSCAN;
+    }
+    if (relNode instanceof Join) {
+      return RelNodeType.JOIN;
+    }
+    if (relNode instanceof Project) {
+      return RelNodeType.PROJECT;
+    }
+    if (relNode instanceof Sort) {
+      return RelNodeType.SORT;
+    }
+    if (relNode instanceof Union) {
+      return RelNodeType.UNION;
+    }
+    if (relNode instanceof Values) {
+      return RelNodeType.VALUES;
+    }
+    throw new RuntimeException("Unknown RelNode: " +  relNode);
+  }
 }

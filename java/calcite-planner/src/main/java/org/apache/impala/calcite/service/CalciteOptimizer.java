@@ -30,6 +30,7 @@ import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.impala.calcite.coercenodes.CoerceNodes;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.common.ImpalaException;
@@ -101,6 +102,9 @@ public class CalciteOptimizer implements CompilerStep {
   public ImpalaPlanRel runImpalaConvertProgram(RelBuilder relBuilder,
       RelNode plan) throws ImpalaException {
 
+    RelNode preConversionNode =
+        CoerceNodes.coerceNodes(plan, plan.getCluster().getRexBuilder());
+
     HepProgramBuilder builder = new HepProgramBuilder();
 
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
@@ -115,7 +119,7 @@ public class CalciteOptimizer implements CompilerStep {
         new ConvertToImpalaRelRules.ImpalaValuesRule()
         ));
 
-    return (ImpalaPlanRel) runProgram(plan, builder.build());
+    return (ImpalaPlanRel) runProgram(preConversionNode, builder.build());
   }
 
   private RelNode runProgram(RelNode currentNode, HepProgram program) {
@@ -138,6 +142,6 @@ public class CalciteOptimizer implements CompilerStep {
       LOG.debug("Finished optimizer step, but unknown result: " + resultObject);
       return;
     }
-    LOG.debug(getDebugString(resultObject));
+    LOG.info(getDebugString(resultObject));
   }
 }

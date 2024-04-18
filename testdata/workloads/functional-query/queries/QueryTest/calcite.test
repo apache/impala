@@ -174,10 +174,11 @@ select abs(cast(-8 as bigint));
 bigint
 ====
 ---- QUERY
-# TODO: Char types are not yet supported, see comment in ImpalaValuesRel for details.
 select 'hello'
----- CATCH
-Char type values are not yet supported.
+---- RESULTS
+'hello'
+---- TYPES
+string
 ====
 ---- QUERY
 # Union test
@@ -186,10 +187,7 @@ select 3 union select 4;
 3
 4
 ---- TYPES
-# IMPALA-13022: Calcite always casts literal numbers as INT. To avoid backward compatibility
-# issues, the return type should be TINYINT here. There are many tests in the Impala
-# test suite which will have this problem.
-int
+tinyint
 ====
 ---- QUERY
 select * from (values (1)) union (values (2), (3));
@@ -198,10 +196,7 @@ select * from (values (1)) union (values (2), (3));
 2
 3
 ---- TYPES
-# IMPALA-13022: Calcite always casts literal numbers as INT. To avoid backward compatibility
-# issues, the return type should be TINYINT here. There are many tests in the Impala
-# test suite which will have this problem.
-int
+tinyint
 ====
 ---- QUERY
 # sort test
@@ -486,4 +481,290 @@ order by a.id
 19,90,NULL
 ---- TYPES
 int, bigint, bigint
+====
+---- QUERY
+select bigint_col + bigint_col, int_col + int_col, smallint_col + smallint_col,
+tinyint_col + tinyint_col, smallint_col + tinyint_col
+from functional.alltypestiny;
+---- RESULTS
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+20,2,2,2,2
+20,2,2,2,2
+20,2,2,2,2
+20,2,2,2,2
+---- TYPES
+bigint, bigint, int, smallint, int
+====
+---- QUERY
+select float_col + int_col, float_col + 3.0, 3.0 + 3.0
+from functional.alltypestiny;
+---- RESULTS
+0.0,3.00000000,6.0
+2.10000002384,4.10000002,6.0
+0.0,3.00000000,6.0
+2.10000002384,4.10000002,6.0
+0.0,3.00000000,6.0
+2.10000002384,4.10000002,6.0
+0.0,3.00000000,6.0
+2.10000002384,4.10000002,6.0
+---- TYPES
+double, decimal, decimal
+====
+---- QUERY
+select bigint_col - bigint_col, int_col - int_col, smallint_col - smallint_col,
+tinyint_col - tinyint_col, smallint_col - tinyint_col
+from functional.alltypestiny;
+---- RESULTS
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+0,0,0,0,0
+---- TYPES
+bigint, bigint, int, smallint, int
+====
+---- QUERY
+select float_col - int_col, float_col - 3.0, 3.0 - 1.8
+from functional.alltypestiny;
+---- RESULTS
+0.0,-3.00000000,1.2
+0.1000000238418579,-1.89999998,1.2
+0.0,-3.00000000,1.2
+0.1000000238418579,-1.89999998,1.2
+0.0,-3.00000000,1.2
+0.1000000238418579,-1.89999998,1.2
+0.0,-3.00000000,1.2
+0.1000000238418579,-1.89999998,1.2
+---- TYPES
+double, decimal, decimal
+====
+---- QUERY
+select bigint_col * bigint_col, int_col * int_col, smallint_col * smallint_col,
+tinyint_col * tinyint_col, smallint_col * tinyint_col
+from functional.alltypestiny;
+---- RESULTS
+0,0,0,0,0
+100,1,1,1,1
+0,0,0,0,0
+100,1,1,1,1
+0,0,0,0,0
+100,1,1,1,1
+0,0,0,0,0
+100,1,1,1,1
+---- TYPES
+bigint, bigint, int, smallint, int
+====
+---- QUERY
+select float_col * int_col, float_col * 3.0, 3.0 * 2.0
+from functional.alltypestiny;
+---- RESULTS
+0,0,6.00
+1.100000023841858,3.300000071525574,6.00
+0,0,6.00
+1.100000023841858,3.300000071525574,6.00
+0,0,6.00
+1.100000023841858,3.300000071525574,6.00
+0,0,6.00
+1.100000023841858,3.300000071525574,6.00
+---- TYPES
+double, double, decimal
+====
+---- QUERY
+select bigint_col / bigint_col, int_col / int_col, smallint_col / smallint_col,
+tinyint_col / tinyint_col
+from functional.alltypestiny;
+---- RESULTS
+1,1,1,1
+NaN,NaN,NaN,NaN
+1,1,1,1
+NaN,NaN,NaN,NaN
+1,1,1,1
+NaN,NaN,NaN,NaN
+1,1,1,1
+NaN,NaN,NaN,NaN
+---- TYPES
+double, double, double, double
+====
+---- QUERY
+select float_col / int_col, float_col / 3.0, 3.0 / 2.0
+from functional.alltypestiny;
+---- RESULTS
+1.100000023841858,0.36666667,1.500000
+NaN,0.00000000,1.500000
+1.100000023841858,0.36666667,1.500000
+NaN,0.00000000,1.500000
+1.100000023841858,0.36666667,1.500000
+NaN,0.00000000,1.500000
+1.100000023841858,0.36666667,1.500000
+NaN,0.00000000,1.500000
+---- TYPES
+double, decimal, decimal
+====
+---- QUERY
+select bigint_col % bigint_col, int_col % int_col, smallint_col % smallint_col,
+tinyint_col % tinyint_col, smallint_col % tinyint_col
+from functional.alltypestiny;
+---- RESULTS
+0,0,0,0,0
+NULL,NULL,NULL,NULL,NULL
+0,0,0,0,0
+NULL,NULL,NULL,NULL,NULL
+0,0,0,0,0
+NULL,NULL,NULL,NULL,NULL
+0,0,0,0,0
+NULL,NULL,NULL,NULL,NULL
+---- TYPES
+bigint, int, smallint, tinyint, smallint
+====
+---- QUERY
+select float_col % 3.0, 3.0 % 2.0
+from functional.alltypestiny;
+---- RESULTS
+0.000000000,1.0
+1.100000024,1.0
+0.000000000,1.0
+1.100000024,1.0
+0.000000000,1.0
+1.100000024,1.0
+0.000000000,1.0
+1.100000024,1.0
+---- TYPES
+decimal, decimal
+====
+---- QUERY
+# Union test
+select 3 union select 458;
+---- RESULTS
+3
+458
+---- TYPES
+smallint
+====
+---- QUERY
+# Union test
+select 3 union select 458;
+---- RESULTS
+3
+458
+---- TYPES
+smallint
+====
+---- QUERY
+# case test
+select tinyint_col, case tinyint_col when 1 then 5 else 458 end from functional.alltypestiny;
+---- RESULTS
+0,458
+0,458
+0,458
+0,458
+1,5
+1,5
+1,5
+1,5
+---- TYPES
+tinyint,smallint
+====
+---- QUERY
+# case test
+select tinyint_col, case tinyint_col when 1 then 5 when 2 then 7 else 458 end from functional.alltypestiny;
+---- RESULTS
+0,458
+0,458
+0,458
+0,458
+1,5
+1,5
+1,5
+1,5
+---- TYPES
+tinyint,smallint
+====
+---- QUERY
+# case test
+select tinyint_col, case tinyint_col when 0 then 458 else 5 end from functional.alltypestiny;
+---- RESULTS
+0,458
+0,458
+0,458
+0,458
+1,5
+1,5
+1,5
+1,5
+---- TYPES
+tinyint,smallint
+====
+---- QUERY
+# case test
+select tinyint_col, case tinyint_col when 0 then 458 end from functional.alltypestiny;
+---- RESULTS
+0,458
+0,458
+0,458
+0,458
+1,NULL
+1,NULL
+1,NULL
+1,NULL
+---- TYPES
+tinyint,smallint
+====
+---- QUERY
+# case test other format (the calcite rexnode should be the same)
+select tinyint_col, case when tinyint_col=00 then 458 else 5 end from functional.alltypestiny;
+---- RESULTS
+0,458
+0,458
+0,458
+0,458
+1,5
+1,5
+1,5
+1,5
+---- TYPES
+tinyint,smallint
+====
+---- QUERY
+# or test
+select (tinyint_col = 459) or (tinyint_col = 458) or (tinyint_col = 1) from functional.alltypestiny;
+---- RESULTS
+false
+false
+false
+false
+true
+true
+true
+true
+---- TYPES
+boolean
+====
+---- QUERY
+# and test
+select (tinyint_col != 459) and (tinyint_col != 458) and (tinyint_col = 1) from functional.alltypestiny;
+---- RESULTS
+false
+false
+false
+false
+true
+true
+true
+true
+---- TYPES
+boolean
+====
+---- QUERY
+# sum cast tinyint agg test
+select sum(tinyint_col) from functional.alltypestiny;
+---- RESULTS
+4
+---- TYPES
+bigint
 ====

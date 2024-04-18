@@ -19,7 +19,6 @@ package org.apache.impala.calcite.operators;
 
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang.StringUtils;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
@@ -33,18 +32,13 @@ import org.apache.calcite.sql.SqlOperandCountRange;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
-import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
-import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,9 +71,7 @@ public class ImpalaOperator extends SqlFunction {
     RelDataTypeFactory factory = rexBuilder.getTypeFactory();
 
     // Resolve Impala function through Impala method.
-    // TODO: IMPALA-13022: Right now, CompareMode is INDISTINGUISHABLE because this
-    // commit only deals with exact matches.  This will change in a future commit.
-    Function fn = FunctionResolver.getFunction(getName(), operandTypes);
+    Function fn = FunctionResolver.getSupertypeFunction(getName(), operandTypes);
 
     if (fn == null) {
       throw new IllegalArgumentException("Cannot infer return type for "

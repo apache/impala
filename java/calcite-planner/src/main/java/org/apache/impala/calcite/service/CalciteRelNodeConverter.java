@@ -30,7 +30,7 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.apache.impala.calcite.operators.ImpalaConvertletTable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +66,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
         validator_.getSqlValidator(),
         validator_.getCatalogReader(),
         cluster_,
-        StandardConvertletTable.INSTANCE,
+        ImpalaConvertletTable.INSTANCE,
         SqlToRelConverter.config());
 
     // Convert the valid AST into a logical plan

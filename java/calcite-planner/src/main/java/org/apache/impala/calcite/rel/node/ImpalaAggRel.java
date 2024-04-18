@@ -299,7 +299,7 @@ public class ImpalaAggRel extends Aggregate
       RelDataType relDataType = input.getRowType().getFieldList().get(i).getType();
       operandTypes.add(relDataType);
     }
-    return FunctionResolver.getFunction(aggFunction.getName(), aggFunction.getKind(),
+    return FunctionResolver.getExactFunction(aggFunction.getName(), aggFunction.getKind(),
         operandTypes);
   }
 

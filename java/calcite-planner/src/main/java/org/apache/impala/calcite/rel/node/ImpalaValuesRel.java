@@ -20,11 +20,11 @@ import com.google.common.base.Preconditions;
 import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.sql.type.SqlTypeName;
 
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
-import org.apache.impala.common.AnalysisException;
+import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.PlanNodeId;
@@ -32,6 +32,8 @@ import org.apache.impala.planner.PlanNodeId;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  * ImpalaValuesRel handles the Values RelNode in Calcite.
  *
@@ -46,6 +48,8 @@ import java.util.List;
 public class ImpalaValuesRel extends Values
     implements ImpalaPlanRel {
 
+  protected static final Logger LOG =
+      LoggerFactory.getLogger(ImpalaValuesRel.class.getName());
   public ImpalaValuesRel(Values values) {
     super(values.getCluster(), values.getRowType(), values.getTuples(),
         values.getTraitSet());
@@ -61,7 +65,8 @@ public class ImpalaValuesRel extends Values
 
     PlanNodeId nodeId = context.ctx_.getNextNodeId();
 
-    RelDataType rowType = getRowType();
+    RelDataType rowType =
+        context.parentRowType_ != null ? context.parentRowType_ : getRowType();
 
     List<NodeWithExprs> nodeWithExprsList = getValuesExprs(context);
 
@@ -89,24 +94,22 @@ public class ImpalaValuesRel extends Values
     PlanNode retNode = null;
 
     List<Expr> outputExprs = new ArrayList<>();
+    int i = 0;
     for (RexLiteral literal : literals) {
-      // TODO: IMPALA-13022: Char types are currently disabled. The problem is a bit
-      // complex. Impala expects string literals to be of type STRING. Calcite does not
-      // have a type STRING and instead creates literals of type CHAR<x>, where <x> is
-      // the size of the char literal. This causes a couple of problems:
-      // 1) If there is a Union on top of a Values (e.g. select 'hello' union select
-      // 'goodbye') there will be a type mismatch (e.g. char(5) and char(7)) which will
-      // cause an impalad crash. The server crash is the main reason for disabling this
-      // 2) The return type of the root expression should be "string". While this really
-      // only will matter once CTAS support is enabled, it still is something that should
-      // be flagged as not working right now.
-      if (literal.getType().getSqlTypeName().equals(SqlTypeName.CHAR)) {
-        throw new AnalysisException("Char type values are not yet supported.");
-      }
       ExprConjunctsConverter converter = new ExprConjunctsConverter(literal,
           new ArrayList<>(), getCluster().getRexBuilder(),
           context.ctx_.getRootAnalyzer());
-      outputExprs.addAll(converter.getImpalaConjuncts());
+
+      if (context.parentRowType_ != null) {
+        LiteralExpr e = (LiteralExpr) converter.getImpalaConjuncts().get(0);
+        LiteralExpr f = LiteralExpr.createFromUnescapedStr(e.getStringValue(),
+            ImpalaTypeConverter.createImpalaType(
+                context.parentRowType_.getFieldList().get(i).getType()));
+        outputExprs.add(f);
+      } else {
+        outputExprs.addAll(converter.getImpalaConjuncts());
+      }
+      i++;
     }
 
     return new NodeWithExprs(retNode, outputExprs);

@@ -74,10 +74,6 @@ public class RexLiteralConverter {
         ScalarType charType = rexLiteral.getType().getSqlTypeName() == SqlTypeName.VARCHAR
             ? Type.STRING
             : ScalarType.createCharType(rexLiteral.getValueAs(String.class).length());
-        if (charType.getPrimitiveType() == PrimitiveType.CHAR) {
-          // ensure no wildcards or char length 0 which will crash impalad
-          Preconditions.checkState(charType.getLength() > 0);
-        }
         Expr charExpr = new StringLiteral(rexLiteral.getValueAs(String.class),
             charType, false);
         return charExpr;
@@ -109,7 +105,7 @@ public class RexLiteralConverter {
     String timestamp = rexLiteral.getValueAs(TimestampString.class).toString();
     List<Expr> argList =
         Lists.newArrayList(new StringLiteral(timestamp, Type.STRING, false));
-    Function castFunc = FunctionResolver.getFunction("casttotimestamp", typeNames);
+    Function castFunc = FunctionResolver.getExactFunction("casttotimestamp", typeNames);
     return new AnalyzedFunctionCallExpr(castFunc, argList, Type.TIMESTAMP);
   }
 }

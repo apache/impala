@@ -17,6 +17,8 @@
 
 package org.apache.impala.calcite.type;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
@@ -24,10 +26,13 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.thrift.TPrimitiveType;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -340,5 +345,63 @@ public class ImpalaTypeConverter {
   // helper function to handle translation of lists.
   public static List<RelDataType> getRelDataTypesForArgs(List<Type> impalaTypes) {
     return Lists.transform(impalaTypes, ImpalaTypeConverter::getRelDataType);
+  }
+
+  // Converts Calcite Integer literal type into an appropriate exact type for Impala,
+  // e.g. TINYINT, SMALLINT, INT, or BIGINT
+  public static RelDataType getLiteralDataType(BigDecimal bd, RelDataType rdt) {
+    RexBuilder rexBuilder =
+        new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
+    RelDataTypeFactory factory = rexBuilder.getTypeFactory();
+
+    // If value is null, just use smallest value
+    if (bd == null) {
+      return getRelDataType(Type.TINYINT);
+    }
+
+    // If it has a scale, it has to be a decimal, so leave it as a decimal.
+    if (bd.scale() > 0) {
+      return rdt;
+    }
+
+    if (NumericLiteral.fitsInTinyInt(bd)) {
+      rdt = getRelDataType(Type.TINYINT);
+    } else if (NumericLiteral.fitsInSmallInt(bd)) {
+      rdt = getRelDataType(Type.SMALLINT);
+    } else if (NumericLiteral.fitsInInt(bd)) {
+      rdt = getRelDataType(Type.INT);
+    } else {
+      rdt = getRelDataType(Type.BIGINT);
+    }
+    return factory.createTypeWithNullability(rdt, false);
+  }
+
+  public static RelDataType getCompatibleType(List<RelDataType> dataTypes,
+      RelDataTypeFactory factory) {
+    Preconditions.checkState(dataTypes.size() > 0);
+    if (dataTypes.size() == 1) {
+      return dataTypes.get(0);
+    }
+    RelDataType commonType = dataTypes.get(0);
+    for (int i = 1; i < dataTypes.size(); ++i) {
+      commonType = getCompatibleType(commonType, dataTypes.get(i), factory);
+    }
+    return commonType;
+  }
+
+  public static RelDataType getCompatibleType(
+      RelDataType type1, RelDataType type2, RelDataTypeFactory factory) {
+    // can't handle nulls, but let caller handle this.
+    if (type1 == null || type2 == null) {
+      return null;
+    }
+
+    Type impalaType1 = createImpalaType(type1);
+    Type impalaType2 = createImpalaType(type2);
+
+    Type retType = ScalarType.getAssignmentCompatibleType(impalaType1, impalaType2,
+        TypeCompatibility.DEFAULT);
+
+    return createRelDataType(factory, retType);
   }
 }

@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.rel.node;
 
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.planner.PlannerContext;
@@ -40,6 +41,8 @@ public class ParentPlanRelContext {
   // type of parent RelNode
   public final ImpalaPlanRel.RelNodeType parentType_;
 
+  public final RelDataType parentRowType_;
+
   /**
    * Constructor meant for root node.
    */
@@ -48,6 +51,7 @@ public class ParentPlanRelContext {
     this.filterCondition_ = null;
     this.inputRefs_ = null;
     this.parentType_ = null;
+    this.parentRowType_ = null;
   }
 
   private ParentPlanRelContext(Builder builder) {
@@ -55,6 +59,7 @@ public class ParentPlanRelContext {
     this.filterCondition_ = builder.filterCondition_;
     this.inputRefs_ = builder.inputRefs_;
     this.parentType_ = builder.parentType_;
+    this.parentRowType_ = builder.parentRowType_;
   }
 
   public static class Builder {
@@ -62,6 +67,7 @@ public class ParentPlanRelContext {
     private RexNode filterCondition_;
     private ImmutableBitSet inputRefs_;
     private ImpalaPlanRel.RelNodeType parentType_;
+    private RelDataType  parentRowType_;
 
     /**
      * Should only be called from root level.
@@ -83,6 +89,14 @@ public class ParentPlanRelContext {
 
     public void setInputRefs(ImmutableBitSet inputRefs) {
       this.inputRefs_ = inputRefs;
+    }
+
+    public void setParentRowType(RelDataType parentRowType) {
+      this.parentRowType_ = parentRowType;
+    }
+
+    public void setParentType(ImpalaPlanRel.RelNodeType parentType) {
+      this.parentType_ = parentType;
     }
 
     public ParentPlanRelContext build() {

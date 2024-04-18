@@ -233,7 +233,7 @@ public class ImpalaJoinRel extends Join
     tmpArgs.add(nullLiteral);
     tmpArgs.add(expr);
     List<Type> typeNames = ImmutableList.of(Type.BOOLEAN, expr.getType(), expr.getType());
-    Function conditionalFunc = FunctionResolver.getFunction("if",
+    Function conditionalFunc = FunctionResolver.getExactFunction("if",
         ImpalaTypeConverter.getRelDataTypesForArgs(typeNames));
     Preconditions.checkNotNull(conditionalFunc,
         "Could not create IF function for arg types %s and return type %s",

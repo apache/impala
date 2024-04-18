@@ -20,9 +20,7 @@ package org.apache.impala.calcite.type;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystemImpl;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.impala.analysis.ArithmeticExpr;
 import org.apache.impala.analysis.TypesUtil;
 import org.apache.impala.catalog.ScalarType;
@@ -30,7 +28,6 @@ import org.apache.impala.catalog.Type;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 
 /**
  * ImpalaTypeSystemImpl contains constants that are specific
@@ -181,5 +178,116 @@ public class ImpalaTypeSystemImpl extends RelDataTypeSystemImpl {
   @Override
   public boolean isSchemaCaseSensitive() {
     return false;
+  }
+
+  @Override
+  public RelDataType deriveSumType(RelDataTypeFactory typeFactory,
+      RelDataType argumentType) {
+    // When adding two decimals, Impala sets the precision to 38
+    RelDataType rdt = null;
+    switch (argumentType.getSqlTypeName()) {
+      case DECIMAL:
+        if (argumentType.getPrecision() == ScalarType.MAX_PRECISION) {
+          return argumentType;
+        }
+        rdt = typeFactory.createSqlType(
+            SqlTypeName.DECIMAL,
+            ScalarType.MAX_PRECISION,
+            argumentType.getScale());
+        break;
+      case FLOAT:
+      case DOUBLE:
+        rdt = typeFactory.createSqlType(SqlTypeName.DOUBLE);
+        break;
+      default:
+        rdt = typeFactory.createSqlType(SqlTypeName.BIGINT);
+        break;
+    }
+    return typeFactory.createTypeWithNullability(rdt, true);
+  }
+
+  public static RelDataType deriveArithmeticType(RelDataTypeFactory typeFactory,
+      RelDataType type1, RelDataType type2, ArithmeticExpr.Operator op) {
+    try {
+      Type t1 = ImpalaTypeConverter.createImpalaType(type1);
+      Type t2 = ImpalaTypeConverter.createImpalaType(type2);
+      // Call out to Impala code to get the correct derived precision on
+      // arithmetic operations.
+      if (t1.equals(Type.TIMESTAMP) || t2.equals(Type.TIMESTAMP)) {
+        return ImpalaTypeConverter.getRelDataType(Type.TIMESTAMP);
+      }
+      if (SqlTypeName.INTERVAL_TYPES.contains(type1.getSqlTypeName())) {
+        return type1;
+      }
+      if (SqlTypeName.INTERVAL_TYPES.contains(type2.getSqlTypeName())) {
+        return type2;
+      }
+
+      Type retType = TypesUtil.getArithmeticResultType(t1, t2, op, true);
+      SqlTypeName sqlTypeName =
+          ImpalaTypeConverter.getRelDataType(retType).getSqlTypeName();
+      RelDataType preNullableType =
+          (sqlTypeName == SqlTypeName.DECIMAL)
+              ? typeFactory.createSqlType(sqlTypeName,
+                  retType.getPrecision(), retType.getDecimalDigits())
+              : typeFactory.createSqlType(sqlTypeName);
+      boolean nullable = type1.isNullable() && type2.isNullable();
+      return typeFactory.createTypeWithNullability(preNullableType, nullable);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public RelDataType deriveDecimalPlusType(RelDataTypeFactory typeFactory,
+      RelDataType type1, RelDataType type2) {
+    return deriveArithmeticType(typeFactory, type1, type2,  ArithmeticExpr.Operator.ADD);
+  }
+
+  @Override
+  public RelDataType deriveDecimalMultiplyType(RelDataTypeFactory typeFactory,
+      RelDataType type1, RelDataType type2) {
+    return deriveArithmeticType(typeFactory, type1, type2,
+        ArithmeticExpr.Operator.MULTIPLY);
+  }
+
+  @Override
+  public RelDataType deriveDecimalDivideType(RelDataTypeFactory typeFactory,
+      RelDataType type1, RelDataType type2) {
+    return deriveArithmeticType(typeFactory, type1, type2,
+        ArithmeticExpr.Operator.DIVIDE);
+  }
+
+  @Override
+  public RelDataType deriveDecimalModType(RelDataTypeFactory typeFactory,
+      RelDataType type1, RelDataType type2) {
+    return deriveArithmeticType(typeFactory, type1, type2, ArithmeticExpr.Operator.MOD);
+  }
+
+  @Override
+  public RelDataType deriveAvgAggType(RelDataTypeFactory typeFactory,
+      RelDataType argumentType) {
+    try {
+      switch (argumentType.getSqlTypeName()) {
+        case DECIMAL: {
+          // This code is similar to code in Impala's FunctionCallExpr
+          ScalarType t1 = (ScalarType) ImpalaTypeConverter.createImpalaType(argumentType);
+          int digitsBefore = t1.decimalPrecision() - t1.decimalScale();
+          int digitsAfter = t1.decimalScale();
+          int resultScale = Math.max(ScalarType.MIN_ADJUSTED_SCALE, digitsAfter);
+          int resultPrecision = digitsBefore + resultScale;
+          return typeFactory.createSqlType(SqlTypeName.DECIMAL, resultPrecision,
+              resultScale);
+        }
+        case TIMESTAMP: {
+          return argumentType;
+        }
+        default: {
+          return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+        }
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

@@ -78,7 +78,7 @@ public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
   @Override
   protected float computeEvalCost() {
     // TODO: IMPALA-13098: need to implement
-    return UNKNOWN_COST;
+    return 1;
   }
 
   @Override
