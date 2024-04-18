@@ -18,17 +18,31 @@ under the License.
 -->
 {{> www/common-header.tmpl }}
 
-<table class='table table-hover table-bordered'>
-<tr>
-  <th>Config</th>
-  <th>Value</th>
-</tr>
-{{#configs}}
-<tr>
-  <td>{{key}}</td>
-  <td>{{value}}</td>
-</tr>
-{{/configs}}
+<table id="configs" class='table table-hover table-bordered'
+       style='table-layout:fixed; word-wrap: break-word'>
+  <thead>
+    <tr>
+      <th>Configuration</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#configs}}
+    <tr {{?value_changed}}class="active"{{/value_changed}}>
+      <td><samp>{{key}}</samp></td>
+      <td>{{value}}</td>
+    </tr>
+    {{/configs}}
+  </tbody>
 </table>
+
+<script>
+    $(document).ready(function() {
+        $('#configs').DataTable({
+            "aaSorting": [[ 0, "asc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
 
 {{> www/common-footer.tmpl }}
