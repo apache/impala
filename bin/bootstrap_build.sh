@@ -48,12 +48,12 @@ sudo apt-get --yes install openjdk-${JDK_VERSION}-jdk openjdk-${JDK_VERSION}-sou
 export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
 
 # Download Maven since the packaged version is pretty old.
-if [ ! -d /usr/local/apache-maven-3.9.2 ]; then
+if [ ! -d /usr/local/apache-maven-3.9.6 ]; then
   sudo wget -nv \
-    https://archive.apache.org/dist/maven/maven-3/3.9.2/binaries/apache-maven-3.9.2-bin.tar.gz
-  sha512sum -c - <<< '900bdeeeae550d2d2b3920fe0e00e41b0069f32c019d566465015bdd1b3866395cbe016e22d95d25d51d3a5e614af2c83ec9b282d73309f644859bbad08b63db  apache-maven-3.9.2-bin.tar.gz'
-  sudo tar -C /usr/local -xzf apache-maven-3.9.2-bin.tar.gz
-  sudo ln -s /usr/local/apache-maven-3.9.2/bin/mvn /usr/local/bin
+    https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
+  sha512sum -c - <<< '706f01b20dec0305a822ab614d51f32b07ee11d0218175e55450242e49d2156386483b506b3a4e8a03ac8611bae96395fd5eec15f50d3013d5deed6d1ee18224  apache-maven-3.9.6-bin.tar.gz'
+  sudo tar -C /usr/local -xzf apache-maven-3.9.6-bin.tar.gz
+  sudo ln -s /usr/local/apache-maven-3.9.6/bin/mvn /usr/local/bin
 fi
 
 # Try to prepopulate the m2 directory to save time
