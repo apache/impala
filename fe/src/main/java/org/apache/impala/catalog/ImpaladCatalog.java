@@ -516,12 +516,17 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         }
       }
       // Apply incremental updates.
+      List<String> stalePartitionNames = new ArrayList<>();
       for (THdfsPartition tPart : newPartitions) {
         // TODO: remove this after IMPALA-9937. It's only illegal in statestore updates,
         //  which indicates a leak of partitions in the catalog topic - a stale partition
         //  should already have a corresponding deletion so won't get here.
-        Preconditions.checkState(tHdfsTable.partitions.containsKey(tPart.id),
-            "Received stale partition in a statestore update: " + tPart);
+        if (!tHdfsTable.partitions.containsKey(tPart.id)) {
+          stalePartitionNames.add(tPart.partition_name);
+          LOG.warn("Stale partition: {}.{}:{} id={}", tPart.db_name, tPart.tbl_name,
+              tPart.partition_name, tPart.id);
+          continue;
+        }
         // The existing table could have a newer version than the last sent table version
         // in catalogd, so some partition instances may already exist here. This happens
         // when we have executed DDL/DMLs on this table on this coordinator since the last
@@ -540,6 +545,13 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         LOG.trace("Added partition (id:{}, name:{}) to table {}",
             tPart.id, tPart.partition_name, newHdfsTable.getFullName());
         numNewParts++;
+      }
+      if (!stalePartitionNames.isEmpty()) {
+        LOG.warn("Received {} stale partitions of table {}.{} in the statestore update:" +
+                " {}. There are possible leaks in the catalog topic values. To resolve " +
+                "the leak, add them back and then drop them again.",
+            stalePartitionNames.size(), thriftTable.db_name, thriftTable.tbl_name,
+            String.join(",", stalePartitionNames));
       }
       // Validate that all partitions are set.
       ((HdfsTable) newTable).validatePartitions(tHdfsTable.partitions.keySet());

@@ -1063,38 +1063,7 @@ public class CatalogServiceCatalog extends Catalog {
           Catalog.toCatalogObjectKey(removedObject))) {
         ctx.addCatalogObject(removedObject, true);
       }
-      // If this is a HdfsTable and incremental metadata updates are enabled, make sure we
-      // send deletes for removed partitions. So we won't leak partition topic entries in
-      // the statestored catalog topic. Partitions are only included as objects in topic
-      // updates if incremental metadata updates are enabled. Don't need this if
-      // incremental metadata updates are disabled, because in this case the table
-      // snapshot will be sent as a complete object. See more details in
-      // addTableToCatalogDeltaHelper().
-      if (BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()
-          && removedObject.type == TCatalogObjectType.TABLE
-          && removedObject.getTable().getTable_type() == TTableType.HDFS_TABLE) {
-        THdfsTable hdfsTable = removedObject.getTable().getHdfs_table();
-        Preconditions.checkState(
-            !hdfsTable.has_full_partitions && hdfsTable.has_partition_names,
-            /*errorMessage*/hdfsTable);
-        String tblName = removedObject.getTable().db_name + "."
-            + removedObject.getTable().tbl_name;
-        PartitionMetaSummary deleteSummary = createPartitionMetaSummary(tblName);
-        for (THdfsPartition part : hdfsTable.partitions.values()) {
-          Preconditions.checkState(part.id >= HdfsPartition.INITIAL_PARTITION_ID
-              && part.db_name != null
-              && part.tbl_name != null
-              && part.partition_name != null, /*errorMessage*/part);
-          TCatalogObject removedPart = new TCatalogObject(HDFS_PARTITION,
-              removedObject.getCatalog_version());
-          removedPart.setHdfs_partition(part);
-          if (!ctx.updatedCatalogObjects.contains(
-              Catalog.toCatalogObjectKey(removedPart))) {
-            ctx.addCatalogObject(removedPart, true, deleteSummary);
-          }
-        }
-        if (deleteSummary.hasUpdates()) LOG.info(deleteSummary.toString());
-      }
+      collectPartitionDeletion(ctx, removedObject);
     }
     // Each topic update should contain a single "TCatalog" object which is used to
     // pass overall state on the catalog, such as the current version and the
@@ -1120,6 +1089,80 @@ public class CatalogServiceCatalog extends Catalog {
     numTables_ = ctx.numTables;
     numFunctions_ = ctx.numFunctions;
     return ctx.toVersion;
+  }
+
+  /**
+   * Collects partition deletion from removed HdfsTable objects.
+   */
+  private void collectPartitionDeletion(GetCatalogDeltaContext ctx,
+      TCatalogObject removedObject) throws TException {
+    // If this is a HdfsTable and incremental metadata updates are enabled, make sure we
+    // send deletes for removed partitions. So we won't leak partition topic entries in
+    // the statestored catalog topic. Partitions are only included as objects in topic
+    // updates if incremental metadata updates are enabled. Don't need this if
+    // incremental metadata updates are disabled, because in this case the table
+    // snapshot will be sent as a complete object. See more details in
+    // addTableToCatalogDeltaHelper().
+    if (!BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()
+        || removedObject.type != TCatalogObjectType.TABLE
+        || removedObject.getTable().getTable_type() != TTableType.HDFS_TABLE) {
+      return;
+    }
+    THdfsTable hdfsTable = removedObject.getTable().getHdfs_table();
+    Preconditions.checkState(
+        !hdfsTable.has_full_partitions && hdfsTable.has_partition_names,
+        /*errorMessage*/hdfsTable);
+    String tblName = removedObject.getTable().db_name + "."
+        + removedObject.getTable().tbl_name;
+    PartitionMetaSummary deleteSummary = createPartitionMetaSummary(tblName);
+    Set<String> collectedPartNames = new HashSet<>();
+    for (THdfsPartition part : hdfsTable.partitions.values()) {
+      Preconditions.checkState(part.id >= HdfsPartition.INITIAL_PARTITION_ID
+          && part.db_name != null
+          && part.tbl_name != null
+          && part.partition_name != null, /*errorMessage*/part);
+      TCatalogObject removedPart = new TCatalogObject(HDFS_PARTITION,
+          removedObject.getCatalog_version());
+      removedPart.setHdfs_partition(part);
+      String partObjKey = Catalog.toCatalogObjectKey(removedPart);
+      boolean collected = false;
+      if (!ctx.updatedCatalogObjects.contains(partObjKey)) {
+        ctx.addCatalogObject(removedPart, true, deleteSummary);
+        collectedPartNames.add(part.partition_name);
+        collected = true;
+      }
+      LOG.trace("{} deletion of {} id={} from the active partition set " +
+              "of a removed/invalidated table (version={})",
+          collected ? "Collected" : "Skipped", partObjKey, part.id,
+          removedObject.getCatalog_version());
+    }
+    // Adds the recently dropped partitions that are not yet synced to the catalog
+    // topic.
+    if (hdfsTable.isSetDropped_partitions()) {
+      for (THdfsPartition part : hdfsTable.dropped_partitions) {
+        // If a partition is dropped and then re-added, the old instance is added to
+        // droppedPartitions and the new instance is in partitionMap of HdfsTable.
+        // So partitions collected in the above loop could have the same name here.
+        if (collectedPartNames.contains(part.partition_name)) continue;
+        TCatalogObject removedPart = new TCatalogObject(HDFS_PARTITION,
+            removedObject.getCatalog_version());
+        removedPart.setHdfs_partition(part);
+        String partObjKey = Catalog.toCatalogObjectKey(removedPart);
+        // Skip if there is an update of the partition collected. It could be
+        // collected from a new version of the HdfsTable and this comes from an
+        // invalidated HdfsTable.
+        boolean collected = false;
+        if (!ctx.updatedCatalogObjects.contains(partObjKey)) {
+          ctx.addCatalogObject(removedPart, true, deleteSummary);
+          collected = true;
+        }
+        LOG.trace("{} deletion of {} id={} from the dropped partition set " +
+                "of a removed/invalidated table (version={})",
+            collected ? "Collected" : "Skipped", partObjKey, part.id,
+            removedObject.getCatalog_version());
+      }
+    }
+    if (deleteSummary.hasUpdates()) LOG.info(deleteSummary.toString());
   }
 
   /**

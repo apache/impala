@@ -1201,6 +1201,11 @@ class ImpalaTestSuite(BaseTestSuite):
     else:
       return "UNIDENTIFIED"
 
+  @classmethod
+  def has_value(cls, value, lines):
+    """Check if lines contain value."""
+    return any([line.find(value) != -1 for line in lines])
+
   def wait_for_db_to_appear(self, db_name, timeout_s):
     """Wait until the database with 'db_name' is present in the impalad's local catalog.
     Fail after timeout_s if the doesn't appear."""
@@ -1263,22 +1268,24 @@ class ImpalaTestSuite(BaseTestSuite):
         "Check failed to return True after {0} tries and {1} seconds{2}".format(
           count, timeout_s, error_msg_str))
 
-  def assert_impalad_log_contains(self, level, line_regex, expected_count=1, timeout_s=6):
+  def assert_impalad_log_contains(self, level, line_regex, expected_count=1, timeout_s=6,
+      dry_run=False):
     """
     Convenience wrapper around assert_log_contains for impalad logs.
     """
     return self.assert_log_contains(
-        "impalad", level, line_regex, expected_count, timeout_s)
+        "impalad", level, line_regex, expected_count, timeout_s, dry_run)
 
   def assert_catalogd_log_contains(self, level, line_regex, expected_count=1,
-      timeout_s=6):
+      timeout_s=6, dry_run=False):
     """
     Convenience wrapper around assert_log_contains for catalogd logs.
     """
     return self.assert_log_contains(
-        "catalogd", level, line_regex, expected_count, timeout_s)
+        "catalogd", level, line_regex, expected_count, timeout_s, dry_run)
 
-  def assert_log_contains(self, daemon, level, line_regex, expected_count=1, timeout_s=6):
+  def assert_log_contains(self, daemon, level, line_regex, expected_count=1, timeout_s=6,
+      dry_run=False):
     """
     Assert that the daemon log with specified level (e.g. ERROR, WARNING, INFO) contains
     expected_count lines with a substring matching the regex. When expected_count is -1,
@@ -1312,14 +1319,15 @@ class ImpalaTestSuite(BaseTestSuite):
             if re_result:
               found += 1
               last_re_result = re_result
-        if expected_count == -1:
-          assert found > 0, "Expected at least one line in file %s matching regex '%s'"\
-            ", but found none." % (log_file_path, line_regex)
-        else:
-          assert found == expected_count, \
-            "Expected %d lines in file %s matching regex '%s', but found %d lines. "\
-            "Last line was: \n%s" %\
-            (expected_count, log_file_path, line_regex, found, line)
+        if not dry_run:
+          if expected_count == -1:
+            assert found > 0, "Expected at least one line in file %s matching regex '%s'"\
+              ", but found none." % (log_file_path, line_regex)
+          else:
+            assert found == expected_count, \
+              "Expected %d lines in file %s matching regex '%s', but found %d lines. "\
+              "Last line was: \n%s" %\
+              (expected_count, log_file_path, line_regex, found, line)
         return last_re_result
       except AssertionError as e:
         # Re-throw the exception to the caller only when the timeout is expired. Otherwise

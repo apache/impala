@@ -2079,10 +2079,14 @@ public class HdfsTable extends Table implements FeFsTable {
   public void validatePartitions(Set<Long> expectedPartitionIds)
       throws TableLoadingException {
     if (!partitionMap_.keySet().equals(expectedPartitionIds)) {
+      Set<Long> missingIds = new HashSet<>(expectedPartitionIds);
+      missingIds.removeAll(partitionMap_.keySet());
+      Set<Long> staleIds = new HashSet<>(partitionMap_.keySet());
+      staleIds.removeAll(expectedPartitionIds);
       throw new TableLoadingException(String.format("Error applying incremental updates" +
-              " on table %s: missing partition ids %s, stale partition ids %s",
-          getFullName(), expectedPartitionIds.removeAll(partitionMap_.keySet()),
-          partitionMap_.keySet().removeAll(expectedPartitionIds)));
+              " on table %s. Missing partition ids: %s. Stale partition ids: %s. Total " +
+              "partitions: %d.",
+          getFullName(), missingIds, staleIds, partitionMap_.size()));
     }
   }
 
@@ -2187,6 +2191,11 @@ public class HdfsTable extends Table implements FeFsTable {
           /*prototypePartition=*/ FAKE_THDFS_PARTITION);
       for (HdfsPartition part : partitionMap_.values()) {
         hdfsTable.partitions.put(part.getId(), part.toMinimalTHdfsPartition());
+      }
+      // Adds the recently dropped partitions that are not yet synced to the catalog
+      // topic.
+      for (HdfsPartition part : droppedPartitions_) {
+        hdfsTable.addToDropped_partitions(part.toMinimalTHdfsPartition());
       }
       hdfsTable.setHas_full_partitions(false);
       // The minimal catalog object of partitions contain the partition names.
