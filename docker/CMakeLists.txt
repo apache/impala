@@ -101,13 +101,13 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       VERBATIM
     )
   endfunction()
-  add_base_image(release "" "")
-  add_base_image(release_java11 "" "--java 11")
-  add_base_image(release_java17 "" "--java 17")
-  # Debug images include debug tools
-  add_base_image(debug "--debug-build" "--install-debug-tools")
-  add_base_image(debug_java11 "--debug-build" "--install-debug-tools --java 11")
-  add_base_image(debug_java17 "--debug-build" "--install-debug-tools --java 17")
+  add_base_image(release "" "--install-debug-tools basic")
+  add_base_image(release_java11 "" "--install-debug-tools basic --java 11")
+  add_base_image(release_java17 "" "--install-debug-tools basic --java 17")
+  # Debug images include full debug tools
+  add_base_image(debug "--debug-build" "--install-debug-tools full")
+  add_base_image(debug_java11 "--debug-build" "--install-debug-tools full --java 11")
+  add_base_image(debug_java17 "--debug-build" "--install-debug-tools full --java 17")
 
   # Target to build all docker images. Dependencies are added for each docker image
   # instantiated below.

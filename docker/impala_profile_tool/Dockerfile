@@ -19,8 +19,8 @@
 ARG BASE_IMAGE=REPLACED_WITH_BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-# If set to "--install-debug-tools", then extra utilities will be installed
-ARG INSTALL_OS_PACKAGES_ARGS="--install-debug-tools"
+# If set to "--install-debug-tools full", then extra utilities will be installed.
+ARG INSTALL_OS_PACKAGES_ARGS="--install-debug-tools full"
 
 # Install dependencies required for Impala utility binaries to run, plus
 # some useful utilities.

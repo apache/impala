@@ -23,7 +23,9 @@
 
 set -euo pipefail
 
-INSTALL_DEBUG_TOOLS=false
+# Default level of extra debugging tools, controlled by the --install-debug-tools flag.
+INSTALL_DEBUG_TOOLS=none
+
 JAVA_VERSION=8
 DRY_RUN=false
 PKG_LIST=""
@@ -31,7 +33,8 @@ NON_PKG_NAMES=(apt-get yum install update)
 
 function print_usage {
     echo "install_os_packages.sh - Helper script to install OS dependencies"
-    echo "[--install-debug-tools] : Also install debug tools like curl, iproute, etc"
+    echo "[--install-debug-tools <none|basic|full>] : set the level of debug tools"\
+         "to install"
     echo "[--java <version>] : Use specified Java version rather than the default Java 8."
     echo "[--dry-run] : Print the list of packages to install."
 }
@@ -61,7 +64,8 @@ while [ -n "$*" ]
 do
   case "$1" in
     --install-debug-tools)
-      INSTALL_DEBUG_TOOLS=true
+      INSTALL_DEBUG_TOOLS="${2-}"
+      shift;
       ;;
     --java)
       JAVA_VERSION="${2-}"
@@ -81,6 +85,18 @@ done
 echo "INSTALL_DEBUG_TOOLS=${INSTALL_DEBUG_TOOLS}"
 echo "JAVA_VERSION=${JAVA_VERSION}"
 echo "DRY_RUN=${DRY_RUN}"
+
+case "$INSTALL_DEBUG_TOOLS" in
+  none | basic | full)
+    # These are valid.
+    ;;
+  "" | *)
+    # The argument to --install-debug-tools is either missing, or is not a recognized
+    # value.
+    print_usage
+    exit 1
+    ;;
+esac
 
 # This can get more detailed if there are specific steps
 # for specific versions, but at the moment the distribution
@@ -124,8 +140,11 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
       libsasl2-modules-gssapi-mit \
       openjdk-${JAVA_VERSION}-jre-headless \
       tzdata
-  if $INSTALL_DEBUG_TOOLS ; then
-    echo "Installing extra debug tools"
+
+  # On Ubuntu there are no extra tools installed for $INSTALL_DEBUG_TOOLS == basic
+
+  if [[ $INSTALL_DEBUG_TOOLS == full ]]; then
+    echo "Installing full debug tools"
     wrap apt-get install -y \
         curl \
         dnsutils \
@@ -159,8 +178,15 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
           langpacks-en
   fi
 
-  if $INSTALL_DEBUG_TOOLS ; then
-    echo "Installing extra debug tools"
+  if [[ $INSTALL_DEBUG_TOOLS == basic || $INSTALL_DEBUG_TOOLS == full ]]; then
+    echo "Installing basic debug tools"
+    wrap yum install -y --disableplugin=subscription-manager \
+        java-${JAVA_VERSION}-openjdk-devel \
+        gdb
+  fi
+
+  if [[ $INSTALL_DEBUG_TOOLS == full ]]; then
+    echo "Installing full debug tools"
     wrap yum install -y --disableplugin=subscription-manager \
         bind-utils \
         curl \

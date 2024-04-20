@@ -19,8 +19,8 @@
 ARG BASE_IMAGE=REPLACED_WITH_BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-# If set to "--install-debug-tools", then extra utilities will be installed.
-ARG INSTALL_OS_PACKAGES_ARGS=""
+# The level of debugging tools to install is set by the argument to  "--install-debug-tools".
+ARG INSTALL_OS_PACKAGES_ARGS="--install-debug-tools none"
 
 # Install minimal dependencies required for Impala services to run.
 ADD helper/install_os_packages.sh /root
