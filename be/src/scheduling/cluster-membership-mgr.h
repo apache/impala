@@ -78,6 +78,9 @@ class ClusterMembershipMgr {
   /// Maps executor group names to executor groups.
   typedef std::unordered_map<std::string, ExecutorGroup> ExecutorGroups;
 
+  /// Empty group name when query use coordinator only.
+  static const std::string EMPTY_GROUP_NAME;
+
   // A snapshot of the current cluster membership. The ClusterMembershipMgr maintains a
   // consistent copy of this and updates it atomically when the membership changes.
   // Clients can obtain an immutable copy. Class instances can be created through the

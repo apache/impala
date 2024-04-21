@@ -78,15 +78,14 @@ DEFINE_bool(disable_pool_max_requests, false, "Disables all per-pool limits on t
     "maximum number of running requests.");
 
 
-// Pool name used when the configuration files are not specified.
-static const string DEFAULT_POOL_NAME = "default-pool";
-
 static const string RESOLVE_POOL_METRIC_NAME = "request-pool-service.resolve-pool-duration-ms";
 
 static const string ERROR_USER_NOT_ALLOWED_IN_POOL = "Request from user '$0' with "
     "requested pool '$1' denied access to assigned pool '$2'";
 static const string ERROR_USER_NOT_SPECIFIED = "User must be specified because "
     "-require_username=true.";
+
+const string RequestPoolService::DEFAULT_POOL_NAME = "default-pool";
 
 RequestPoolService::RequestPoolService(MetricGroup* metrics) :
     resolve_pool_ms_metric_(NULL) {

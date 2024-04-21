@@ -44,6 +44,9 @@ CPU_TEST_QUERY = "select * from tpcds_parquet.store_sales where ss_item_sk = 1 l
 GROUPING_TEST_QUERY = ("select ss_item_sk from tpcds_parquet.store_sales"
     " group by (ss_item_sk) order by ss_item_sk limit 10")
 
+# A scan query that is recognized as trivial and scheduled to run at coordinator only.
+SINGLE_NODE_SCAN_QUERY = "select * from functional.alltypestiny"
+
 # TPC-DS Q1 to test slightly more complex query.
 TPCDS_Q1 = """
 with customer_total_return as (
@@ -71,6 +74,8 @@ limit 100
 """
 
 DEFAULT_RESOURCE_POOL = "default-pool"
+
+DEBUG_ACTION_DELAY_SCAN = "HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@1000"
 
 
 class TestExecutorGroups(CustomClusterTestSuite):
@@ -393,19 +398,48 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-admission_control_slots=1")
-  def test_coordinator_concurrency(self):
-    """Tests that the command line flag to limit the coordinator concurrency works as
-    expected."""
-    QUERY = "select sleep(1000)"
+  def test_coordinator_concurrency_default(self):
+    """Tests that concurrent coordinator-only queries ignore slot based admission
+    in non multiple executor group set setup."""
     # Add group with more slots than coordinator
     self._add_executor_group("group2", 2, admission_control_slots=3)
-    # Try to run two queries and observe that one gets queued
+    # Try to run two queries and observe that the second one is admitted immediately.
     client = self.client
-    q1 = client.execute_async(QUERY)
+    client.set_configuration_option('debug_action', DEBUG_ACTION_DELAY_SCAN)
+    q1 = client.execute_async(SINGLE_NODE_SCAN_QUERY)
     client.wait_for_admission_control(q1)
-    q2 = client.execute_async(QUERY)
-    self._assert_eventually_in_profile(q2, "Initial admission queue reason")
+    q2 = client.execute_async(SINGLE_NODE_SCAN_QUERY)
+    self._assert_eventually_in_profile(q2, "Admitted immediately")
+    # Assert other info strings in query profiles.
+    self._assert_eventually_in_profile(q1, "Admitted immediately")
+    self._assert_eventually_in_profile(q1, "empty group (using coordinator only)")
     client.cancel(q1)
+    self._assert_eventually_in_profile(q2, "empty group (using coordinator only)")
+    client.cancel(q2)
+
+  @pytest.mark.execute_serially
+  def test_coordinator_concurrency_two_exec_group_cluster(self):
+    """Tests that concurrent coordinator-only queries respect slot based admission
+    in multiple executor group set setup."""
+    coordinator_test_args = "-admission_control_slots=1"
+    self._setup_two_coordinator_two_exec_group_cluster(coordinator_test_args)
+    # Create fresh clients
+    self.create_impala_clients()
+    # Try to run two queries and observe that the second one gets queued.
+    client = self.client
+    client.set_configuration_option('debug_action', DEBUG_ACTION_DELAY_SCAN)
+    q1 = client.execute_async(SINGLE_NODE_SCAN_QUERY)
+    client.wait_for_admission_control(q1)
+    q2 = client.execute_async(SINGLE_NODE_SCAN_QUERY)
+    self._assert_eventually_in_profile(q2,
+        "Not enough admission control slots available")
+    # Assert other info strings in query profiles.
+    self._assert_eventually_in_profile(q1, "Admitted immediately")
+    self._assert_eventually_in_profile(q1, "empty group (using coordinator only)")
+    # Cancel q1 so that q2 is then admitted and has 'Executor Group' info string.
+    client.cancel(q1)
+    self._assert_eventually_in_profile(q2, "Admitted (queued)")
+    self._assert_eventually_in_profile(q2, "empty group (using coordinator only)")
     client.cancel(q2)
 
   @pytest.mark.execute_serially
