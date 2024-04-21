@@ -35,6 +35,9 @@ namespace impala {
 /// RequestPoolService, called via JNI.
 class RequestPoolService {
  public:
+  // Pool name used when the configuration files are not specified.
+  static const std::string DEFAULT_POOL_NAME;
+
   /// Initializes the JNI method stubs if configuration files are specified. If any
   /// method can't be found, or if there is any further error, the constructor will
   /// terminate the process.

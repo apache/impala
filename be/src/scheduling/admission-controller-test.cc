@@ -541,6 +541,13 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
     SetHostsInScheduleState(
         *schedule, 2, false, MEGABYTE, 200L * MEGABYTE, slots_per_query, slots_per_host);
   }
+
+  // Coordinator only schedule at EMPTY_GROUP_NAME.
+  ScheduleState* coordinator_only_schedule = MakeScheduleState(QUEUE_D, config_d,
+      host_count, 30L * MEGABYTE, ClusterMembershipMgr::EMPTY_GROUP_NAME);
+  SetHostsInScheduleState(*coordinator_only_schedule, 1, true, MEGABYTE, 200L * MEGABYTE,
+      slots_per_query, slots_per_host);
+
   vector<NetworkAddressPB> host_addrs = GetHostAddrs(*default_group_schedule);
   string not_admitted_reason;
   bool coordinator_resource_limited = false;
@@ -571,6 +578,63 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough admission control slots available on host host1:25000. Needed 4 "
       "slots but 15/16 are already in use.");
+  ASSERT_FALSE(coordinator_resource_limited);
+  // Assert that coordinator-only schedule also not admitted.
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*coordinator_only_schedule, config_d,
+      true, &not_admitted_reason, nullptr, coordinator_resource_limited));
+  EXPECT_STR_CONTAINS(not_admitted_reason,
+      "Not enough admission control slots available on host host0:25000. Needed 4 "
+      "slots but 15/16 are already in use.");
+  ASSERT_TRUE(coordinator_resource_limited);
+}
+
+/// Test CanAdmitRequest() ignore slots mechanism in default pool setup.
+TEST_F(AdmissionControllerTest, CanAdmitRequestSlotsDefault) {
+  // Pass the paths of the configuration files as command line flags.
+  FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-empty.xml");
+  FLAGS_llama_site_path = GetResourceFile("llama-site-empty.xml");
+
+  AdmissionController* admission_controller = MakeAdmissionController();
+  RequestPoolService* request_pool_service = admission_controller->request_pool_service_;
+
+  // Get the PoolConfig for "default-pool".
+  TPoolConfig pool_config;
+  ASSERT_OK(request_pool_service->GetPoolConfig(
+      RequestPoolService::DEFAULT_POOL_NAME, &pool_config));
+
+  // Create ScheduleStates to run on "default-pool" on 12 hosts.
+  // Running both distributed and coordinator-only schedule.
+  int64_t host_count = 12;
+  int64_t slots_per_host = 16;
+  int64_t slots_per_query = 4;
+  // Distributed query schedule.
+  ScheduleState* default_pool_schedule = MakeScheduleState(
+      RequestPoolService::DEFAULT_POOL_NAME, pool_config, host_count, 30L * MEGABYTE);
+  SetHostsInScheduleState(*default_pool_schedule, 2, false, MEGABYTE, 200L * MEGABYTE,
+      slots_per_query, slots_per_host);
+  // Coordinator only schedule at EMPTY_GROUP_NAME.
+  ScheduleState* coordinator_only_schedule =
+      MakeScheduleState(RequestPoolService::DEFAULT_POOL_NAME, pool_config, host_count,
+          30L * MEGABYTE, ClusterMembershipMgr::EMPTY_GROUP_NAME);
+  SetHostsInScheduleState(*coordinator_only_schedule, 1, true, MEGABYTE, 200L * MEGABYTE,
+      slots_per_query, slots_per_host);
+
+  vector<NetworkAddressPB> host_addrs = GetHostAddrs(*default_pool_schedule);
+  string not_admitted_reason;
+  bool coordinator_resource_limited = false;
+
+  // Simulate that all slots are being used.
+  // All schedules should be admitted.
+  SetSlotsInUse(admission_controller, host_addrs, slots_per_host);
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*default_pool_schedule, pool_config,
+      true, &not_admitted_reason, nullptr, coordinator_resource_limited))
+      << not_admitted_reason;
+  ASSERT_FALSE(coordinator_resource_limited);
+  ASSERT_EQ(coordinator_only_schedule->executor_group(),
+      ClusterMembershipMgr::EMPTY_GROUP_NAME);
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*coordinator_only_schedule,
+      pool_config, true, &not_admitted_reason, nullptr, coordinator_resource_limited))
+      << not_admitted_reason;
   ASSERT_FALSE(coordinator_resource_limited);
 }
 

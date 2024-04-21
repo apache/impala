@@ -69,8 +69,6 @@ void RemoveExecutorAndGroup(const BackendDescriptorPB& be_desc,
 
 namespace impala {
 
-static const string EMPTY_GROUP_NAME("empty group (using coordinator only)");
-
 static const string LIVE_EXEC_GROUP_KEY("cluster-membership.executor-groups.total");
 static const string HEALTHY_EXEC_GROUP_KEY(
     "cluster-membership.executor-groups.total-healthy");
@@ -82,6 +80,9 @@ static const string HEALTHY_EXEC_GROUP_KEY_FORMAT(
     "cluster-membership.group-set.executor-groups.total-healthy.$0");
 static const string TOTAL_BACKENDS_KEY_FORMAT(
     "cluster-membership.group-set.backends.total.$0");
+
+const string ClusterMembershipMgr::EMPTY_GROUP_NAME(
+    "empty group (using coordinator only)");
 
 ClusterMembershipMgr::ClusterMembershipMgr(
     string local_backend_id, StatestoreSubscriber* subscriber, MetricGroup* metrics)

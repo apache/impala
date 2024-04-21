@@ -64,6 +64,7 @@ def log_sql_stmt(sql_stmt):
       LOG.info("-- {0}".format(line))
     LOG.info("-- [...]")
 
+
 # Common wrapper around the internal types of HS2/Beeswax operation/query handles.
 class OperationHandle(object):
   def __init__(self, handle, sql_stmt):
@@ -88,7 +89,7 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
 
   @abc.abstractmethod
   def set_configuration_option(self, name, value):
-    """Sets a configuraiton option name to the given value"""
+    """Sets a configuration option name to the given value"""
     pass
 
   def set_configuration(self, config_option_dict):
@@ -258,7 +259,7 @@ class BeeswaxConnection(ImpalaConnection):
     LOG.info("-- getting log for operation: %s" % operation_handle)
     return self.__beeswax_client.get_log(operation_handle.get_handle().log_context)
 
-  def fetch(self, sql_stmt, operation_handle, max_rows = -1):
+  def fetch(self, sql_stmt, operation_handle, max_rows=-1):
     LOG.info("-- fetching results from: %s" % operation_handle)
     return self.__beeswax_client.fetch_results(
         sql_stmt, operation_handle.get_handle(), max_rows)
@@ -531,6 +532,7 @@ def create_connection(host_port, use_kerberos=False, protocol='beeswax',
   if hasattr(tests.common, "current_node") and not is_hive:
     c.set_configuration_option("client_identifier", tests.common.current_node)
   return c
+
 
 def create_ldap_connection(host_port, user, password, use_ssl=False):
   return BeeswaxConnection(host_port=host_port, user=user, password=password,

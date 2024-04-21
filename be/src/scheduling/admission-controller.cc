@@ -998,13 +998,16 @@ bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
   // Can't admit if:
   //  (a) There are already queued requests (and this is not admitting from the queue).
   //  (b) The resource pool is already at the maximum number of requests.
-  //  (c) One of the executors in 'schedule' is already at its maximum number of requests
-  //      (when not using the default executor group).
+  //  (c) One of the executors or coordinator in 'schedule' is already at its maximum
+  //      admission slots (when not using the default executor group).
   //  (d) There are not enough memory resources available for the query.
   const int64_t max_requests = GetMaxRequestsForPool(pool_cfg);
   PoolStats* pool_stats = GetPoolStats(state);
   bool default_group =
       state.executor_group() == ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
+  bool default_coordinator_only =
+      state.executor_group() == ClusterMembershipMgr::EMPTY_GROUP_NAME
+      && state.request_pool() == RequestPoolService::DEFAULT_POOL_NAME;
   if (!admit_from_queue && pool_stats->local_stats().num_queued > 0) {
     *not_admitted_reason = Substitute(QUEUED_QUEUE_NOT_EMPTY,
         pool_stats->local_stats().num_queued, GetStalenessDetailLocked(" "));
@@ -1017,7 +1020,7 @@ bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
         max_requests, GetStalenessDetailLocked(" "));
     return false;
   }
-  if (!default_group
+  if (!default_group && !default_coordinator_only
       && !HasAvailableSlots(
           state, pool_cfg, not_admitted_reason, coordinator_resource_limited)) {
     // All non-default executor groups are also limited by the number of running queries
