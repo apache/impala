@@ -546,6 +546,16 @@ function warm-up-hive {
   $HIVE_CMD -e "insert overwrite table hive_warm_up_tbl values (1);"
 }
 
+# IMPALA-13015, IMPALA-13026: This should be called during serial phase of data load.
+function create-hadoop-credential {
+  rm -f ${IMPALA_HOME}/testdata/jceks/test.jceks
+  hadoop credential create "openai-api-key-secret" -value "secret" -provider \
+    "localjceks://file/${IMPALA_HOME}/testdata/jceks/test.jceks"
+}
+
+run-step "Creating hadoop credential" create-hadoop-credential.log \
+    create-hadoop-credential
+
 # For kerberized clusters, use kerberos
 if ${CLUSTER_DIR}/admin is_kerberized; then
   LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
