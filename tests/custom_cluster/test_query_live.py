@@ -339,8 +339,11 @@ class TestQueryLive(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1 "
+                                                 "--shutdown_grace_period_s=10 "
+                                                 "--shutdown_deadline_s=60 "
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",
+                                    impalad_graceful_shutdown=True,
                                     cluster_size=3,
                                     num_exclusive_coordinators=2)
   def test_multi_table_union(self):

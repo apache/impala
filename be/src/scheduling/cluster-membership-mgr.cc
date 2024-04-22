@@ -393,14 +393,18 @@ void ClusterMembershipMgr::UpdateMembership(
   if (NeedsLocalBackendUpdate(*new_state, local_be_desc)) {
     // We need to update both the new membership state and the statestore
     (*new_backend_map)[local_backend_id_] = *local_be_desc;
-    for (const auto& group : local_be_desc->executor_groups()) {
-      if (local_be_desc->is_quiescing()) {
-        VLOG(1) << "Removing local backend from group " << group.DebugString();
-        RemoveExecutorAndGroup(*local_be_desc, group, new_executor_groups);
-      } else if (local_be_desc->is_executor()) {
-        VLOG(1) << "Adding local backend to group " << group.DebugString();
-        FindOrInsertExecutorGroup(
-            group, new_executor_groups)->AddExecutor(*local_be_desc);
+    // Could be a coordinator and/or executor, but only executors add the local backend.
+    DCHECK(local_be_desc->is_coordinator() || local_be_desc->is_executor());
+    if (local_be_desc->is_executor()) {
+      for (const auto& group : local_be_desc->executor_groups()) {
+        if (local_be_desc->is_quiescing()) {
+          VLOG(1) << "Removing local backend from group " << group.DebugString();
+          RemoveExecutorAndGroup(*local_be_desc, group, new_executor_groups);
+        } else {
+          VLOG(1) << "Adding local backend to group " << group.DebugString();
+          FindOrInsertExecutorGroup(
+              group, new_executor_groups)->AddExecutor(*local_be_desc);
+        }
       }
     }
     AddLocalBackendToStatestore(*local_be_desc, subscriber_topic_updates);

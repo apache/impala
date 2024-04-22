@@ -407,7 +407,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=False)
+                                    impalad_graceful_shutdown=True)
   def test_query_log_table_query_select_dedicate_coordinator(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile when dedicated coordinators are used."""
@@ -436,7 +436,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=False)
+                                    impalad_graceful_shutdown=True)
   def test_query_log_table_query_select_mt_dop(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile when dedicated coordinators are used along with an MT_DOP setting
@@ -694,13 +694,13 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=9999 "
-                                                 "--shutdown_grace_period_s=30 "
+                                                 "--shutdown_grace_period_s=1 "
                                                  "--shutdown_deadline_s=30",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=False)
+                                    catalogd_args="--enable_workload_mgmt")
   def test_query_log_table_flush_on_shutdown(self, vector):
     """Asserts that queries that have completed but are not yet written to the query
-       log table are flushed to the table before the coordinator exits."""
+       log table are flushed to the table before the coordinator exits. Graceful shutdown
+       for 2nd coordinator not needed because query_log_write_interval_s is very long."""
 
     impalad = self.cluster.get_first_impalad()
     client = self.get_client(vector.get_value('protocol'))
