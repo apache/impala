@@ -69,6 +69,20 @@ public class JwtHttpTest {
       + "bZd0GbD_MQQ8x7WRE4nluU-5Fl4N2Wo8T9fNTuxALPiuVeIczO25b5n4fryfKasSgaZfmk0C"
       + "oOJzqbtmQxqiK9QNSJAiH2kaqMwLNgAdgn8fbd-lB1RAEGeyPH8Px8ipqcKsPk0bg";
 
+  String jwtTokenX5c_ = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImtpZF94NWMiLCJ0eXAiOiJKV1Q"
+      + "ifQ.eyJleHAiOjI1ODk4MzQ2NzUsImlhdCI6MTcxNTYzMjM1MSwiaXNzIjoiYXV0aDAiLCJ"
+      + "qdGkiOiJ4OEpoSDZVd21XQUZfSGZ2cnR0aEREbWYzREwzTVRzWSIsInN1YiI6Imp3dC1jcH"
+      + "AuZXhhbXBsZS5sb2NhbGhvc3QifQ.JZxb9GPuhtlbxWT6_XWX0uZ9EN7PP4frfHNxjquDIl"
+      + "gv7At8sEFw21mVWKoafDHKRPzt35zhRlRO9saXQOyVFxSzHHv23RSS47bgUqcpkHQQltP6P"
+      + "9SRbJDT7GB13Kusx5Pzl-kJosNR-ZpiQY_nkJEUPHj9vIYAc6B5eGudGEoyWAvjtNE2uBCr"
+      + "t5UodEO1RqcZOwjZivTjIIjCOgu3ibz2lmJfhEGwSHOm5uld7sdjjnAviVvVSRASoHP4e2Y"
+      + "u4aFevvNaW-CNNlNLXq1QlLE9ClB-IgecZUFOexGZaLSNGiKuAvAqzN6ks_gUJKgtqBeQGe"
+      + "DVqCNPE8JuNTfIG0W7Ywb3U9zFBeZ3CtI4RwQsKOYncuy54AC841iGAWkAChsWtBkgTjupS"
+      + "ExjvUsKTu3MK5ffbh4LARrj3fTOZlmOqRCM884WG2KoN695dqxcmQKf5QiYMTrFXEVUCM-Y"
+      + "4smZqHsTQI3PxfcU6neYnwDDMS-FUNePX8yLX_3E2FpBTIuBitwInO1Bk6SsbZvZRmG-2Cw"
+      + "EWlclIr9hMxSeProDSamS5mI89VuShDLYUXaDISSKXoKriFdOxICL2uTdbQLsb_6Z5GbYW4"
+      + "2CcUSgG9lJmImtMKH9bS2wwSOmUBi03XBLrraODdI69_EFWFgCG9WjcWJo0R74GJbHAi3cyLM";
+
   /*
    * Create JWKS file in the root directory of WebServer if it's set as true.
    */
@@ -539,6 +553,47 @@ public class JwtHttpTest {
     serverKeyWriter.close();
 
     return certDir.toString();
+  }
+
+  /**
+   * Tests if sessions are authenticated by verifying the JWT token for connections
+   * to the HTTP hiveserver2 endpoint. The JWKS contains x5c certificate which is used
+   * for for JWT verification. The JWKS is specified as HTTP URL to the statestore Web
+   * server.
+   */
+  @Test
+  public void testJwtAuthWithJwksX5cHttpUrl() throws Exception {
+    createJWKSForWebServer_ = false;
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_x5c_rs256.json").getPath();
+    String impaladJwtArgs = String.format("--jwt_token_auth=true "
+            + "--jwt_validate_signature=true --jwks_file_path=%s "
+            + "--jwt_custom_claim_username=sub "
+            + "--jwt_allow_without_tls=true", jwksFilename);
+    setUp(impaladJwtArgs);
+
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    // Authenticate with valid JWT Token in HTTP header.
+    headers.put("Authorization", "Bearer " + jwtTokenX5c_);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'jwt-cpp.example.localhost' from JWT token
+    // and use it as login user.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyJwtAuthMetrics(1, 0);
+    // Running a query should succeed.
+    TOperationHandle operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()",
+          "jwt-cpp.example.localhost");
+    // Two more successful authentications - for the Exec() and the Fetch().
+     verifyJwtAuthMetrics(3, 0);
   }
 
   /**

@@ -29,7 +29,10 @@
 #include <openssl/ec.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/rand.h>
 #include <openssl/rsa.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 #include <rapidjson/filereadstream.h>
@@ -46,6 +49,12 @@
 
 DECLARE_int32(jwks_update_frequency_s);
 DECLARE_int32(jwks_pulling_timeout_s);
+
+// Support only a single x5c certificate.
+// Update MAX_X5C_CERTIFICATES when we can
+// support more than one.
+#define MAX_X5C_CERTIFICATES 1
+static const char* ARRAY_TYPE = "Array";
 
 namespace impala {
 
@@ -136,11 +145,23 @@ class JWKSetParser {
   // Parse a public key and populate JWKS's internal map.
   Status ParseKey(const Value& json_key) {
     std::unordered_map<std::string, std::string> kv_map;
-    string k, v;
     for (Value::ConstMemberIterator member = json_key.MemberBegin();
          member != json_key.MemberEnd(); ++member) {
+      string k, v, values[MAX_X5C_CERTIFICATES];
       k = string(member->name.GetString());
-      RETURN_IF_ERROR(ReadKeyProperty(k.c_str(), json_key, &v, /*required*/ false));
+      const Value& json_value = json_key[k.c_str()];
+      if (NameOfTypeOfJsonValue(json_value) == ARRAY_TYPE) {
+        RETURN_IF_ERROR(ReadKeyArrayProperty(k.c_str(), json_key, values,
+            /*required*/ false));
+        // If x5c certificate is present, pick up the first element
+        if (!values[0].empty()) {
+          v = values[0];
+        } else {
+          return Status(Substitute("$0 property must be a non-empty array", k));
+        }
+      } else {
+        RETURN_IF_ERROR(ReadKeyProperty(k.c_str(), json_key, &v, /*required*/ false));
+      }
       if (kv_map.find(k) == kv_map.end()) {
         kv_map.insert(make_pair(k, v));
       } else {
@@ -193,6 +214,22 @@ class JWKSetParser {
     return ValidateTypeAndExtractValue(name, json_value, value);
   }
 
+  // Reads a key property of type array of the given name and assigns the property
+  // value to the out parameter. A true return value indicates success.
+  template <typename T>
+  Status ReadKeyArrayProperty(
+      const string& name, const Value& json_key, T* value, bool required = true) {
+    const Value& json_value = json_key[name.c_str()];
+    if (json_value.IsNull()) {
+      if (required) {
+        return Status(Substitute("'$0' property is required and cannot be null", name));
+      } else {
+        return Status::OK();
+      }
+    }
+    return ValidateTypeAndExtractArrayValue(name, json_value, value);
+  }
+
 // Extract a value stored in a rapidjson::Value and assign it to the out parameter.
 // The type will be validated before extraction. A true return value indicates success.
 // The name parameter is only used to generate an error message upon failure.
@@ -208,7 +245,26 @@ class JWKSetParser {
     return Status::OK();                                                               \
   }
 
+// Extract a value stored in a rapidjson::Value and assign it to the out parameter.
+// The type will be validated before extraction. Upon success, status is returned as OK.
+// The name parameter is only used to generate an error message upon failure.
+#define EXTRACT_ARRAY_VALUE(json_type, cpp_type)                                       \
+  Status ValidateTypeAndExtractArrayValue(                                             \
+      const string& name, const Value& json_value, cpp_type* value) {                  \
+    if (!json_value.Is##json_type()) {                                                 \
+      return Status(                                                                   \
+          Substitute("'$0' property must be of type " #json_type " but is a $1", name, \
+              NameOfTypeOfJsonValue(json_value)));                                     \
+    }                                                                                  \
+                                                                                       \
+    for (size_t i = 0; i < json_value.Size() && i < MAX_X5C_CERTIFICATES; i++)  {      \
+      value[i] = json_value[i].GetString();                                            \
+    }                                                                                  \
+    return Status::OK();                                                               \
+  }                                                                                    \
+
   EXTRACT_VALUE(String, string)
+  EXTRACT_ARRAY_VALUE(Array, string)
   // EXTRACT_VALUE(Bool, bool)
 };
 
@@ -296,13 +352,7 @@ Status RSAJWTPublicKeyBuilder::CreateJWKPublicKey(
   //   "e":"AQAB",
   //   "kid":"Id that can be uniquely Identified"
   // }
-  auto it_alg = kv_map.find("alg");
-  if (it_alg == kv_map.end()) return Status("'alg' property is required");
-  string algorithm = boost::algorithm::to_lower_copy(it_alg->second);
-  if (algorithm.empty()) {
-    return Status(Substitute("'alg' property must be a non-empty string"));
-  }
-
+  string pub_key_str, algorithm;
   auto it_n = kv_map.find("n");
   auto it_e = kv_map.find("e");
   if (it_n == kv_map.end() || it_e == kv_map.end()) {
@@ -317,21 +367,69 @@ Status RSAJWTPublicKeyBuilder::CreateJWKPublicKey(
         Substitute("Invalid public key 'n':'$0', 'e':'$1'", it_n->second, it_e->second));
   }
 
+  // if jwk contains "x5c", then use it instead of "n" and "e"
+  // to construct the public key
+  auto it_x5c = kv_map.find("x5c");
+  if (it_x5c != kv_map.end()) {
+    pub_key_str = jwt::helper::convert_base64_der_to_pem(it_x5c->second);
+    // if "x5c" is present but "alg" is not present, extract it from x5c certificate.
+    auto it_alg = kv_map.find("alg");
+    if (it_alg == kv_map.end()) {
+      const char *data = pub_key_str.c_str();
+      BIO *bio = BIO_new(BIO_s_mem());
+      if (!bio) {
+        return Status(Substitute("Failed to allocate memory for BIO"));
+      }
+      BIO_puts(bio, data);
+      X509 *cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+      if (!cert) {
+        BIO_free(bio);
+        return Status(Substitute("Invalid x5c certificate"));
+      }
+      auto alg = X509_get0_tbs_sigalg(cert);
+      int pkey_nid = OBJ_obj2nid(alg->algorithm);
+      std::string sigalg(OBJ_nid2ln(pkey_nid));
+      if (sigalg == "sha256WithRSAEncryption") {
+        algorithm = "rs256";
+      } else if (sigalg == "sha384WithRSAEncryption") {
+        algorithm = "rs384";
+      } else if (sigalg == "sha512WithRSAEncryption") {
+        algorithm = "rs512";
+      } else {
+        BIO_free(bio);
+        return Status(Substitute("Unsupported alg $0 in signature", sigalg));
+      }
+      BIO_free(bio);
+      X509_free(cert);
+    } else {
+      algorithm = boost::algorithm::to_lower_copy(it_alg->second);
+    }
+  } else {
+    // if "x5c" is not present "alg" must be present.
+    pub_key_str = pub_key;
+    auto it_alg = kv_map.find("alg");
+    if (it_alg == kv_map.end()) return Status("'alg' property is required");
+    algorithm = boost::algorithm::to_lower_copy(it_alg->second);
+  }
+
+  if (algorithm.empty()) {
+    return Status(Substitute("'alg' property must be a non-empty string"));
+  }
   Status status;
   JWTPublicKey* jwt_pub_key = nullptr;
   try {
     if (algorithm == "rs256") {
-      jwt_pub_key = new RS256JWTPublicKey(algorithm, pub_key);
+      jwt_pub_key = new RS256JWTPublicKey(algorithm, pub_key_str);
     } else if (algorithm == "rs384") {
-      jwt_pub_key = new RS384JWTPublicKey(algorithm, pub_key);
+      jwt_pub_key = new RS384JWTPublicKey(algorithm, pub_key_str);
     } else if (algorithm == "rs512") {
-      jwt_pub_key = new RS512JWTPublicKey(algorithm, pub_key);
+      jwt_pub_key = new RS512JWTPublicKey(algorithm, pub_key_str);
     } else if (algorithm == "ps256") {
-      jwt_pub_key = new PS256JWTPublicKey(algorithm, pub_key);
+      jwt_pub_key = new PS256JWTPublicKey(algorithm, pub_key_str);
     } else if (algorithm == "ps384") {
-      jwt_pub_key = new PS384JWTPublicKey(algorithm, pub_key);
+      jwt_pub_key = new PS384JWTPublicKey(algorithm, pub_key_str);
     } else if (algorithm == "ps512") {
-      jwt_pub_key = new PS512JWTPublicKey(algorithm, pub_key);
+      jwt_pub_key = new PS512JWTPublicKey(algorithm, pub_key_str);
     } else {
       return Status(Substitute("Invalid 'alg' property value: '$0'", algorithm));
     }
