@@ -749,6 +749,14 @@ Status TmpDirLocal::VerifyAndCreate(MetricGroup* metrics,
   return Status::OK();
 }
 
+void TmpDirLocal::LogScratchLocalDirectoryInfo(bool is_local_buffer_dir, int disk_id) {
+  LOG(INFO) << (is_local_buffer_dir ? "Using local buffer directory for scratch space " :
+                                      "Using scratch directory ")
+            << path_ << " on "
+            << "disk " << disk_id << " limit: " << PrettyPrinter::PrintBytes(bytes_limit_)
+            << ", priority: " << priority_;
+}
+
 Status TmpDirLocal::CreateLocalDirectory(MetricGroup* metrics,
     vector<bool>* is_tmp_dir_on_disk, bool need_local_buffer_dir, int disk_id,
     TmpFileMgr* tmp_mgr) {
@@ -771,13 +779,11 @@ Status TmpDirLocal::CreateLocalDirectory(MetricGroup* metrics,
       }
       bytes_used_metric_ =
           metrics->AddGauge(LOCAL_BUFF_BYTES_USED_FORMAT, 0, Substitute("$0", 0));
+      LogScratchLocalDirectoryInfo(true /*is_local_buffer_dir*/, disk_id);
       return Status::OK();
     }
     if (disk_id >= 0) (*is_tmp_dir_on_disk)[disk_id] = true;
-    LOG(INFO) << "Using scratch directory " << path_ << " on "
-              << "disk " << disk_id
-              << " limit: " << PrettyPrinter::PrintBytes(bytes_limit_)
-              << ", priority: " << priority_;
+    LogScratchLocalDirectoryInfo(false /*is_local_buffer_dir*/, disk_id);
     bytes_used_metric_ = metrics->AddGauge(
         SCRATCH_DIR_BYTES_USED_FORMAT, 0, Substitute("$0", tmp_mgr->tmp_dirs_.size()));
   } else {

@@ -465,6 +465,10 @@ class TmpDirLocal : public TmpDir {
   Status CreateLocalDirectory(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
       bool need_local_buffer_dir, int disk_id, TmpFileMgr* tmp_mgr);
 
+  /// A helper function for CreateLocalDirectory() to log the configured local directory
+  /// for scratch space.
+  void LogScratchLocalDirectoryInfo(bool is_local_buffer_dir, int disk_id);
+
   Status ParsePathTokens(std::vector<string>& tokens) override;
 };
 
