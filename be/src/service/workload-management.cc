@@ -395,113 +395,113 @@ void ImpalaServer::CompletedQueriesThread() {
         });
     completed_queries_ticker_->ResetWakeupGuard();
 
-    if (!completed_queries_.empty()) {
-      if (MaxRecordsExceeded(completed_queries_.size())) {
-        ImpaladMetrics::COMPLETED_QUERIES_MAX_RECORDS_WRITES->Increment(1L);
-      } else {
-        ImpaladMetrics::COMPLETED_QUERIES_SCHEDULED_WRITES->Increment(1L);
+    if (completed_queries_.empty()) continue;
+
+    if (MaxRecordsExceeded(completed_queries_.size())) {
+      ImpaladMetrics::COMPLETED_QUERIES_MAX_RECORDS_WRITES->Increment(1L);
+    } else {
+      ImpaladMetrics::COMPLETED_QUERIES_SCHEDULED_WRITES->Increment(1L);
+    }
+
+    MonotonicStopWatch timer;
+    timer.Start();
+
+    // Copy all completed queries to a temporary list so that inserts to the
+    // completed_queries list are not blocked while generating and running an insert
+    // SQL statement for the completed queries.
+    list<CompletedQuery> queries_to_insert;
+    queries_to_insert.splice(queries_to_insert.cend(), completed_queries_);
+    completed_queries_lock_.unlock();
+
+    string sql;
+    uint32_t max_row_size = 0;
+
+    for (auto iter = queries_to_insert.begin(); iter != queries_to_insert.end();
+        iter++) {
+      if (iter->insert_attempts_count >= FLAGS_query_log_max_insert_attempts) {
+        LOG(ERROR) << "could not write completed query table=\"" << log_table_name <<
+            "\" query_id=\"" << PrintId(iter->query->base_state->id) << "\"";
+        iter = queries_to_insert.erase(iter);
+        ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(-1);
+        continue;
       }
 
-      MonotonicStopWatch timer;
-      timer.Start();
+      // Increment the count of attempts to insert this query into the completed
+      // queries table.
+      iter->insert_attempts_count += 1;
 
-      // Copy all completed queries to a temporary list so that inserts to the
-      // completed_queries list are not blocked while generating and running an insert
-      // SQL statement for the completed queries.
-      list<CompletedQuery> queries_to_insert;
-      queries_to_insert.splice(queries_to_insert.cend(), completed_queries_);
-      completed_queries_lock_.unlock();
-
-      string sql;
-      uint32_t max_row_size = 0;
-
-      for (auto iter = queries_to_insert.begin(); iter != queries_to_insert.end();
-          iter++) {
-        if (iter->insert_attempts_count >= FLAGS_query_log_max_insert_attempts) {
-          LOG(ERROR) << "could not write completed query table=\"" << log_table_name <<
-              "\" query_id=\"" << PrintId(iter->query->base_state->id) << "\"";
-          iter = queries_to_insert.erase(iter);
-          ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(-1);
-          continue;
-        }
-
-        // Increment the count of attempts to insert this query into the completed
-        // queries table.
-        iter->insert_attempts_count += 1;
-
-        const string row = QueryStateToSql(iter->query.get());
-        if (row.size() > max_row_size) {
-          max_row_size = row.size();
-        }
-
-        StrAppend(&sql, move(row), ",");
+      const string row = QueryStateToSql(iter->query.get());
+      if (row.size() > max_row_size) {
+        max_row_size = row.size();
       }
 
-      DCHECK(ImpaladMetrics::COMPLETED_QUERIES_QUEUED->GetValue() >=
+      StrAppend(&sql, move(row), ",");
+    }
+
+    DCHECK(ImpaladMetrics::COMPLETED_QUERIES_QUEUED->GetValue() >=
+        queries_to_insert.size());
+
+    // In the case where queries_to_insert only contains records that have exceeded
+    // the max insert attempts, sql will be empty.
+    if (UNLIKELY(sql.empty())) continue;
+
+    // Remove the last comma and determine the final sql statement length.
+    sql.pop_back();
+    const size_t final_sql_len = _insert_dml.size() + sql.size();
+
+    uint64_t gather_time = timer.Reset();
+    TUniqueId tmp_query_id;
+
+    // Build query options to ensure the query is not rejected.
+    InternalServer::QueryOptionMap opts = insert_query_opts;
+
+    if (UNLIKELY(final_sql_len > numeric_limits<int32_t>::max())) {
+      LOG(ERROR) << "Completed queries table insert sql statement of length '" <<
+          final_sql_len << "' was longer than the maximum of '" <<
+          numeric_limits<int32_t>::max() << "', skipping";
+      continue; // NOTE: early loop continuation
+    }
+
+    // Set max_statement_length_bytes based on actual query, and at least the minimum.
+    opts[TImpalaQueryOptions::MAX_STATEMENT_LENGTH_BYTES] = std::to_string(
+        max<size_t>(MIN_MAX_STATEMENT_LENGTH_BYTES, final_sql_len));
+    // Set statement_expression_limit based on actual query, and at least the minimum.
+    opts[TImpalaQueryOptions::STATEMENT_EXPRESSION_LIMIT] = std::to_string(
+        max<size_t>(MIN_STATEMENT_EXPRESSION_LIMIT,
+            queries_to_insert.size() * _TQueryTableColumn_VALUES_TO_NAMES.size()));
+    opts[TImpalaQueryOptions::MAX_ROW_SIZE] = std::to_string(max_row_size);
+
+    // Execute the insert dml.
+    const Status ret_status = internal_server_->ExecuteIgnoreResults(
+        FLAGS_workload_mgmt_user, StrCat(_insert_dml, sql), opts, false,
+        &tmp_query_id);
+
+    uint64_t exec_time = timer.ElapsedTime();
+    ImpaladMetrics::COMPLETED_QUERIES_WRITE_DURATIONS->Update(
+        gather_time + exec_time);
+    if (ret_status.ok()) {
+      LOG(INFO) << "wrote completed queries table=\"" << log_table_name << "\" "
+          "record_count=" << queries_to_insert.size() << " "
+          "bytes=" << PrettyPrinter::PrintBytes(sql.size()) << " "
+          "gather_time=" << PrettyPrinter::Print(gather_time, TUnit::TIME_NS) << " "
+          "exec_time=" << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
+      ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(
+          queries_to_insert.size() * -1);
+      DCHECK(ImpaladMetrics::COMPLETED_QUERIES_QUEUED->GetValue() >= 0);
+      ImpaladMetrics::COMPLETED_QUERIES_WRITTEN->Increment(
           queries_to_insert.size());
-
-      // In the case where queries_to_insert only contains records that have exceeded
-      // the max insert attempts, sql will be empty.
-      if (LIKELY(!sql.empty())) {
-        // Remove the last comma and determine the final sql statement length.
-        sql.pop_back();
-        const size_t final_sql_len = _insert_dml.size() + sql.size();
-
-        uint64_t gather_time = timer.Reset();
-        TUniqueId tmp_query_id;
-
-        // Build query options to ensure the query is not rejected.
-        InternalServer::QueryOptionMap opts = insert_query_opts;
-
-        if (UNLIKELY(final_sql_len > numeric_limits<int32_t>::max())) {
-          LOG(ERROR) << "Completed queries table insert sql statement of length '" <<
-              final_sql_len << "' was longer than the maximum of '" <<
-              numeric_limits<int32_t>::max() << "', skipping";
-          continue; // NOTE: early loop continuation
-        }
-
-        // Set max_statement_length_bytes based on actual query, and at least the minimum.
-        opts[TImpalaQueryOptions::MAX_STATEMENT_LENGTH_BYTES] = std::to_string(
-            max<size_t>(MIN_MAX_STATEMENT_LENGTH_BYTES, final_sql_len));
-        // Set statement_expression_limit based on actual query, and at least the minimum.
-        opts[TImpalaQueryOptions::STATEMENT_EXPRESSION_LIMIT] = std::to_string(
-            max<size_t>(MIN_STATEMENT_EXPRESSION_LIMIT,
-                queries_to_insert.size() * _TQueryTableColumn_VALUES_TO_NAMES.size()));
-        opts[TImpalaQueryOptions::MAX_ROW_SIZE] = std::to_string(max_row_size);
-
-        // Execute the insert dml.
-        const Status ret_status = internal_server_->ExecuteIgnoreResults(
-            FLAGS_workload_mgmt_user, StrCat(_insert_dml, sql), opts, false,
-            &tmp_query_id);
-
-        uint64_t exec_time = timer.ElapsedTime();
-        ImpaladMetrics::COMPLETED_QUERIES_WRITE_DURATIONS->Update(
-            gather_time + exec_time);
-        if (ret_status.ok()) {
-          LOG(INFO) << "wrote completed queries table=\"" << log_table_name << "\" "
-              "record_count=" << queries_to_insert.size() << " "
-              "bytes=" << PrettyPrinter::PrintBytes(sql.size()) << " "
-              "gather_time=" << PrettyPrinter::Print(gather_time, TUnit::TIME_NS) << " "
-              "exec_time=" << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
-          ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(
-              queries_to_insert.size() * -1);
-          DCHECK(ImpaladMetrics::COMPLETED_QUERIES_QUEUED->GetValue() >= 0);
-          ImpaladMetrics::COMPLETED_QUERIES_WRITTEN->Increment(
-              queries_to_insert.size());
-        } else {
-          LOG(WARNING) << "failed to write completed queries table=\"" << log_table_name
-              << "\" record_count=" << queries_to_insert.size() << " "
-              "bytes=" << PrettyPrinter::PrintBytes(sql.size()) << " "
-              "gather_time=" << PrettyPrinter::Print(gather_time, TUnit::TIME_NS) << " "
-              "exec_time=" << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
-          LOG(WARNING) << ret_status.GetDetail();
-          ImpaladMetrics::COMPLETED_QUERIES_FAIL->Increment(queries_to_insert.size());
-          completed_queries_lock_.lock();
-          completed_queries_.splice(
-              completed_queries_.cend(), queries_to_insert);
-          completed_queries_lock_.unlock();
-        }
-      }
+    } else {
+      LOG(WARNING) << "failed to write completed queries table=\"" << log_table_name
+          << "\" record_count=" << queries_to_insert.size() << " "
+          "bytes=" << PrettyPrinter::PrintBytes(sql.size()) << " "
+          "gather_time=" << PrettyPrinter::Print(gather_time, TUnit::TIME_NS) << " "
+          "exec_time=" << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
+      LOG(WARNING) << ret_status.GetDetail();
+      ImpaladMetrics::COMPLETED_QUERIES_FAIL->Increment(queries_to_insert.size());
+      completed_queries_lock_.lock();
+      completed_queries_.splice(
+          completed_queries_.cend(), queries_to_insert);
+      completed_queries_lock_.unlock();
     }
   }
 } // ImpalaServer::CompletedQueriesThread

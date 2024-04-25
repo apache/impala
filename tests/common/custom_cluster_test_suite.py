@@ -157,6 +157,13 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   def setup_method(self, method):
     cluster_args = list()
+    if method.__dict__.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
+      # IMPALA-13051: Add faster default graceful shutdown options before processing
+      # explicit args. Impala doesn't start graceful shutdown until the grace period has
+      # passed, and most tests that use graceful shutdown are testing flushing the query
+      # log, which doesn't start until after the grace period has passed.
+      cluster_args.append(
+          "--impalad=--shutdown_grace_period_s=0 --shutdown_deadline_s=15")
     for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS, JVM_ARGS]:
       if arg in method.__dict__:
         cluster_args.append("--%s=%s " % (arg, method.__dict__[arg]))
@@ -218,7 +225,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):
-    if method is not None and method.__dict__.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
+    if method.__dict__.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
       for impalad in self.cluster.impalads:
         impalad.kill(SIGRTMIN)
       for impalad in self.cluster.impalads:

@@ -31,6 +31,10 @@ from time import sleep
 class TestQueryLive(CustomClusterTestSuite):
   """Tests to assert the query live table is correctly populated."""
 
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
   def setup_method(self, method):
     super(TestQueryLive, self).setup_method(method)
     create_match = self.assert_impalad_log_contains("INFO", r'\]\s+(\w+:\w+)\]\s+'
@@ -73,6 +77,13 @@ class TestQueryLive(CustomClusterTestSuite):
       else:
         assert False, "did not find host {}".format(host)
     assert len(actual_hosts) == 0, "did not find all expected hosts"
+
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+                                                 "--cluster_id=test_query_live",
+                                    catalogd_args="--enable_workload_mgmt")
+  def test_table_structure(self, vector):
+    """Asserts that the live table has the expected columns."""
+    self.run_test_case('QueryTest/workload-management-live', vector)
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
@@ -371,8 +382,6 @@ class TestQueryLive(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1 "
-                                                 "--shutdown_grace_period_s=10 "
-                                                 "--shutdown_deadline_s=60 "
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",
                                     impalad_graceful_shutdown=True,
