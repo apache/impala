@@ -3612,7 +3612,7 @@ public class Analyzer {
    */
   public FeTable getTable(TableName tblName, boolean mustExist)
       throws AnalysisException, TableLoadingException {
-    if (IcebergMetadataTable.isIcebergMetadataTable(tblName.toPath())) {
+    if (IcebergMetadataTable.isIcebergMetadataTable(tblName.toPath(), this)) {
       return getMetadataVirtualTable(tblName.toPath());
     }
     FeTable table = globalState_.stmtTableCache.tables.get(tblName);
@@ -3664,7 +3664,8 @@ public class Analyzer {
    */
   public FeTable getMetadataVirtualTable(List<String> tblRefPath)
       throws AnalysisException {
-    Preconditions.checkArgument(IcebergMetadataTable.isIcebergMetadataTable(tblRefPath));
+    Preconditions.checkArgument(
+        IcebergMetadataTable.canBeIcebergMetadataTable(tblRefPath));
     try {
       TableName catalogTableName = new TableName(tblRefPath.get(0),
           tblRefPath.get(1));
@@ -3676,8 +3677,10 @@ public class Analyzer {
       if (catalogTable instanceof IcebergMetadataTable || catalogTable == null) {
         return catalogTable;
       }
+      Preconditions.checkState(catalogTable instanceof FeIcebergTable);
+      FeIcebergTable catalogIceTable = (FeIcebergTable) catalogTable;
       IcebergMetadataTable virtualTable =
-          new IcebergMetadataTable(catalogTable, tblRefPath.get(2));
+          new IcebergMetadataTable(catalogIceTable, tblRefPath.get(2));
       getStmtTableCache().tables.put(catalogTableName, catalogTable);
       getStmtTableCache().tables.put(virtualTableName, virtualTable);
       return virtualTable;

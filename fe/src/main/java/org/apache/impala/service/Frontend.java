@@ -1803,8 +1803,8 @@ public class Frontend {
           return DescribeResultFactory.buildIcebergDescribeMinimalResult(filteredColumns);
         } else {
           Preconditions.checkArgument(vTableName != null);
-          return DescribeResultFactory.buildIcebergMetadataDescribeMinimalResult(table,
-              vTableName);
+          return DescribeResultFactory.buildIcebergMetadataDescribeMinimalResult(
+              (FeIcebergTable) table, vTableName);
         }
       } else {
         return DescribeResultFactory.buildDescribeMinimalResult(
