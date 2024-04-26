@@ -362,8 +362,8 @@ public class DescribeResultFactory {
    * it is simpler to re-create this object than to extract those from a new
    * org.apache.iceberg.Table object or to send it over.
    */
-  public static TDescribeResult buildIcebergMetadataDescribeMinimalResult(FeTable table,
-      String vTableName) throws ImpalaRuntimeException {
+  public static TDescribeResult buildIcebergMetadataDescribeMinimalResult(
+      FeIcebergTable table, String vTableName) throws ImpalaRuntimeException {
     IcebergMetadataTable metadataTable = new IcebergMetadataTable(table, vTableName);
     return buildIcebergDescribeMinimalResult(metadataTable.getColumns());
   }

@@ -173,7 +173,7 @@ select * from $DATABASE.empty_ice_tbl.entries;
 INT,BIGINT,BIGINT,BIGINT,STRING,STRING
 
 ####
-# Test 2 : Test select list
+# Test select list
 ####
 ====
 ---- QUERY
@@ -401,7 +401,7 @@ AnalysisException: FOR SYSTEM_VERSION AS OF clause is only supported for Iceberg
 ====
 
 ####
-# Test 9 : Use-cases
+# Use-cases
 ####
 ====
 ---- QUERY
@@ -431,10 +431,19 @@ row_regex:[1-9]\d*|0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/i
 INT,STRING,BIGINT
 
 ####
+# Test querying a metadata table of a non-Iceberg table.
+####
+====
+---- QUERY
+select * from functional_parquet.alltypes.`files`;
+---- CATCH
+AnalysisException: Could not resolve table reference: 'functional_parquet.alltypes.files'
+====
+
+####
 # Invalid operations
 # In most cases the parser catches the table reference.
 ####
-====
 ---- QUERY
 describe formatted functional_parquet.iceberg_query_metadata.snapshots;
 ---- CATCH

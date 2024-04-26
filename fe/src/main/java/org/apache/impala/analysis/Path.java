@@ -350,7 +350,7 @@ public class Path {
       String dbName = (tblNameIdx == 0) ? sessionDb : path.get(0);
       String tblName = path.get(tblNameIdx);
       String vTblName = null;
-      if (IcebergMetadataTable.isIcebergMetadataTable(path)) {
+      if (IcebergMetadataTable.canBeIcebergMetadataTable(path)) {
         vTblName = path.get(2);
       }
       result.add(new TableName(dbName, tblName, vTblName));
