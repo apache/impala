@@ -105,7 +105,7 @@ DECLARE_bool(enable_sync_to_latest_event_on_ddls);
 DECLARE_bool(pull_table_types_and_comments);
 DECLARE_bool(enable_reload_events);
 DECLARE_string(geospatial_library);
-DECLARE_int32(thrift_rpc_max_message_size);
+DECLARE_int64(thrift_rpc_max_message_size);
 DECLARE_string(file_metadata_reload_properties);
 DECLARE_string(java_weigher);
 DECLARE_int32(iceberg_reload_new_files_threshold);

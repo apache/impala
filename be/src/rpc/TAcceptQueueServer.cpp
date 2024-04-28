@@ -43,8 +43,6 @@ DEFINE_int32(accepted_cnxn_setup_thread_pool_size, 2,
     "post-accept, pre-setup connection queue in each thrift server set up to service "
     "Impala internal and external connections.");
 
-DECLARE_int32(thrift_rpc_max_message_size);
-
 namespace apache {
 namespace thrift {
 namespace server {
@@ -89,9 +87,18 @@ class TAcceptQueueServer::Task : public Runnable {
         }
       }
     } catch (const TTransportException& ttx) {
-      if (ttx.getType() != TTransportException::END_OF_FILE) {
+      // IMPALA-13020: Thrift throws an END_OF_FILE exception when it hits the
+      // max message size. That is always interesting to us, so we specifically
+      // detect "MaxMessageSize" and print it along with advice on how to address it.
+      bool hit_max_message_size =
+          std::string(ttx.what()).find("MaxMessageSize") != std::string::npos;
+      if (ttx.getType() != TTransportException::END_OF_FILE || hit_max_message_size) {
         string errStr = string("TAcceptQueueServer client died: ") + ttx.what();
         GlobalOutput(errStr.c_str());
+        if (hit_max_message_size) {
+          GlobalOutput("MaxMessageSize errors can be addressed by increasing "
+              "thrift_rpc_max_message_size on the receiving nodes.");
+        }
       }
     } catch (const std::exception& x) {
       GlobalOutput.printf(

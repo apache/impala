@@ -251,7 +251,7 @@ struct TBackendGflags {
 
   110: required bool skip_resource_checking_on_last_executor_group_set
 
-  111: required i32 thrift_rpc_max_message_size
+  111: required i64 thrift_rpc_max_message_size
 
   112: required string file_metadata_reload_properties
 

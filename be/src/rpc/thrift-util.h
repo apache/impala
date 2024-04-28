@@ -39,12 +39,12 @@ class TNetworkAddress;
 class ThriftServer;
 
 /// Default max message size from Thrift library.
-inline int ThriftDefaultMaxMessageSize() {
+inline int64_t ThriftDefaultMaxMessageSize() {
   return apache::thrift::TConfiguration::DEFAULT_MAX_MESSAGE_SIZE;
 }
 
 /// Return the effective max message size based on 'thrift_rpc_max_message_size' flag.
-int ThriftRpcMaxMessageSize();
+int64_t ThriftRpcMaxMessageSize();
 
 /// Return the default Thrift's TConfiguration based on given backend config flags.
 std::shared_ptr<apache::thrift::TConfiguration> DefaultTConfiguration();
