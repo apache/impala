@@ -405,7 +405,10 @@ public class BackendConfig {
   }
 
   public int getThriftRpcMaxMessageSize() {
-    return backendCfg_.thrift_rpc_max_message_size;
+    // With IMPALA-13020, the C++ max message size is a 64-bit integer,
+    // but the Java max message size is still 32-bit. Cap the Java value
+    // at Integer.MAX_VALUE;
+    return (int) Math.min(backendCfg_.thrift_rpc_max_message_size, Integer.MAX_VALUE);
   }
 
   public String getFileMetadataReloadProperties() {

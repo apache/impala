@@ -83,7 +83,7 @@ DECLARE_string(re2_mem_limit);
 DECLARE_string(reserved_words_version);
 DECLARE_bool(symbolize_stacktrace);
 DECLARE_string(debug_actions);
-DECLARE_int32(thrift_rpc_max_message_size);
+DECLARE_int64(thrift_rpc_max_message_size);
 
 DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");

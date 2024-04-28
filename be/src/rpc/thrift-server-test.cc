@@ -47,7 +47,7 @@ DECLARE_int32(state_store_port);
 
 DECLARE_int32(beeswax_port);
 
-DECLARE_int32(thrift_rpc_max_message_size);
+DECLARE_int64(thrift_rpc_max_message_size);
 
 static string IMPALA_HOME(getenv("IMPALA_HOME"));
 static const string& SERVER_CERT =

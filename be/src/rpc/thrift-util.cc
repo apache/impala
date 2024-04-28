@@ -58,7 +58,7 @@
 
 #include "common/names.h"
 
-DEFINE_int32(thrift_rpc_max_message_size, std::numeric_limits<int32_t>::max(),
+DEFINE_int64(thrift_rpc_max_message_size, std::numeric_limits<int32_t>::max(),
     "The maximum size of a message for any RPC that the server will accept. "
     "Default to the upper limit of 2147483647 bytes (~2GB). "
     "Setting 0 or negative value will use the default defined in Thrift.");
@@ -280,7 +280,7 @@ bool IsConnResetTException(const TTransportException& e) {
              strstr(e.what(), "SSL_read: Connection reset by peer") != nullptr);
 }
 
-int ThriftRpcMaxMessageSize() {
+int64_t ThriftRpcMaxMessageSize() {
   return FLAGS_thrift_rpc_max_message_size <= 0 ? ThriftDefaultMaxMessageSize() :
                                                   FLAGS_thrift_rpc_max_message_size;
 }
