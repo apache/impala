@@ -413,6 +413,12 @@ under the License.
       <artifactId>apacheds-test-framework</artifactId>
       <version>2.0.0.AM25</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcprov-jdk15on</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -490,6 +496,10 @@ under the License.
         </exclusion>
         <exclusion>
           <groupId>com.cloudera</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
@@ -599,19 +609,23 @@ under the License.
           <groupId>org.springframework</groupId>
           <artifactId>spring-jcl</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcprov-jdk15on</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcpkix-jdk15on</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <version>1.72</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.72</version>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -886,6 +900,10 @@ under the License.
                     <exclude>org.apache.avro:*</exclude>
                     <exclude>org.apache.orc:*</exclude>
                     <exclude>org.jdom:jdom</exclude>
+                    <exclude>org.bouncycastle:bcprov-jdk15on:*</exclude>
+                    <exclude>org.bouncycastle:bcprov-jdk15to18:*</exclude>
+                    <exclude>org.bouncycastle:bcprov-jdk15on:*</exclude>
+                    <exclude>org.bouncycastle:bcpkix-jdk15to18:*</exclude>
                   </excludes>
                   <includes>
                     <!-- ranger-plugins-audit depends on jetty-client, which in turn pulls in jetty-http and jetty-io. -->
