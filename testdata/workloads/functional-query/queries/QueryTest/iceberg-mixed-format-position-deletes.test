@@ -5,13 +5,11 @@ CREATE TABLE ice_mixed_formats(i int, j int)
 STORED BY ICEBERG
 STORED AS PARQUET
 TBLPROPERTIES ('format-version'='2');
-INSERT INTO ice_mixed_formats VALUES (1, 1);
+INSERT INTO ice_mixed_formats VALUES (1, 1), (10, 10);
 DELETE FROM ice_mixed_formats WHERE i = 1;
 ALTER TABLE ice_mixed_formats SET TBLPROPERTIES ('write.format.default'='orc');
-INSERT INTO ice_mixed_formats VALUES (2, 2);
+INSERT INTO ice_mixed_formats VALUES (2, 2), (3, 3);
 DELETE FROM ice_mixed_formats WHERE i = 2;
-INSERT INTO ice_mixed_formats VALUES (3, 3);
-INSERT INTO ice_mixed_formats VALUES (10, 10);
 ALTER TABLE ice_mixed_formats SET TBLPROPERTIES ('write.format.default'='avro');
 DELETE FROM ice_mixed_formats WHERE i = 3;
 ====
@@ -71,13 +69,11 @@ PARTITIONED BY SPEC (truncate(2, j))
 STORED BY ICEBERG
 STORED AS PARQUET
 TBLPROPERTIES ('format-version'='2');
-INSERT INTO ice_mixed_formats_partitioned VALUES (1, 1);
+INSERT INTO ice_mixed_formats_partitioned VALUES (1, 1), (10, 1);
 DELETE FROM ice_mixed_formats_partitioned WHERE i = 1;
 ALTER TABLE ice_mixed_formats_partitioned SET TBLPROPERTIES ('write.format.default'='orc');
-INSERT INTO ice_mixed_formats_partitioned VALUES (2, 2);
+INSERT INTO ice_mixed_formats_partitioned VALUES (2, 2), (3, 2);
 DELETE FROM ice_mixed_formats_partitioned WHERE i = 2;
-INSERT INTO ice_mixed_formats_partitioned VALUES (3, 3);
-INSERT INTO ice_mixed_formats_partitioned VALUES (10, 10);
 ALTER TABLE ice_mixed_formats_partitioned SET TBLPROPERTIES ('write.format.default'='avro');
 DELETE FROM ice_mixed_formats_partitioned WHERE i = 3;
 ====
@@ -91,7 +87,6 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/d
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=0/.*-delete-.*parquet','.*B','','.*'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-data-.*.orc','.*B','','.*'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-delete-.*orc','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=10/.*-data-.*.orc','.*B','','.*'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-delete-.*.avro','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
@@ -99,7 +94,7 @@ STRING, STRING, STRING, STRING
 ---- QUERY
 select * from ice_mixed_formats_partitioned;
 ---- RESULTS
-10,10
+10,1
 ---- TYPES
 INT,INT
 ====
@@ -113,7 +108,7 @@ BIGINT
 ---- QUERY
 select * from ice_mixed_formats_partitioned where i > 1;
 ---- RESULTS
-10,10
+10,1
 ---- TYPES
 INT,INT
 ====
