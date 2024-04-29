@@ -31,6 +31,13 @@ from time import sleep
 class TestQueryLive(CustomClusterTestSuite):
   """Tests to assert the query live table is correctly populated."""
 
+  def setup_method(self, method):
+    super(TestQueryLive, self).setup_method(method)
+    create_match = self.assert_impalad_log_contains("INFO", r'\]\s+(\w+:\w+)\]\s+'
+        r'Analyzing query: CREATE TABLE IF NOT EXISTS sys.impala_query_live')
+    self.assert_impalad_log_contains("INFO", r'Query successfully unregistered: '
+        r'query_id={}'.format(create_match.group(1)))
+
   def assert_impalads(self, profile, present=[0, 1, 2], absent=[]):
     for port_idx in present:
       assert ":" + str(DEFAULT_KRPC_PORT + port_idx) + ":" in profile
