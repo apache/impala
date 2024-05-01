@@ -841,6 +841,11 @@ bool QueryState::codegen_cache_enabled() const {
       && ExecEnv::GetInstance()->codegen_cache_enabled();
 }
 
+bool QueryState::is_initialized() {
+  std::lock_guard<std::mutex> l(init_lock_);
+  return is_initialized_;
+}
+
 bool QueryState::StartFInstances() {
   VLOG(2) << "StartFInstances(): query_id=" << PrintId(query_id())
           << " #instances=" << fragment_info_.fragment_instance_ctxs.size();

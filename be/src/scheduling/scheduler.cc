@@ -56,6 +56,10 @@ using namespace apache::thrift;
 using namespace org::apache::impala::fb;
 using namespace strings;
 
+DEFINE_bool_hidden(sort_runtime_filter_aggregator_candidates, false,
+    "Control whether to sort intermediate runtime filter aggregator candidates based on "
+    "their KRPC address. Only used for testing.");
+
 namespace impala {
 
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
@@ -334,7 +338,18 @@ void Scheduler::ComputeRandomKrpcForAggregation(const ExecutorConfig& executor_c
   int num_agg = (int)ceil((double)num_non_coordinator_host / num_filters_per_host);
   DCHECK_GT(num_agg, 0);
 
-  std::shuffle(instance_groups.begin(), instance_groups.end(), *state->rng());
+  if (UNLIKELY(FLAGS_sort_runtime_filter_aggregator_candidates)) {
+    sort(instance_groups.begin(), instance_groups.end(),
+        [src_state](InstanceToAggPairs a, InstanceToAggPairs b) {
+          int idx_a = a[0].first;
+          int idx_b = b[0].first;
+          return CompareNetworkAddressPB(src_state->instance_states[idx_a].krpc_host,
+                     src_state->instance_states[idx_b].krpc_host)
+              < 0;
+        });
+  } else {
+    std::shuffle(instance_groups.begin(), instance_groups.end(), *state->rng());
+  }
   if (coordinator_instances.size() > 0) {
     // Put coordinator group behind so that coordinator won't be selected as intermediate
     // aggregator.

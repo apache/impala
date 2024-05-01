@@ -41,6 +41,12 @@ TEST(NetworkUtil, NetAddrCompHostnameDiff) {
 
   ASSERT_TRUE(fixture(first, second));
   ASSERT_FALSE(fixture(second, first));
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(first), FromTNetworkAddress(second))
+      < 0);
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(second), FromTNetworkAddress(first))
+      > 0);
 }
 
 // Assert where host fields are equal but port is different.
@@ -59,6 +65,12 @@ TEST(NetworkUtil, NetAddrCompPortDiff) {
 
   ASSERT_TRUE(fixture(first, second));
   ASSERT_FALSE(fixture(second, first));
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(first), FromTNetworkAddress(second))
+      < 0);
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(second), FromTNetworkAddress(first))
+      > 0);
 }
 
 // Assert where host and port fields are equal but uds address is different.
@@ -77,6 +89,12 @@ TEST(NetworkUtil, NetAddrCompUDSAddrDiff) {
 
   ASSERT_TRUE(fixture(first, second));
   ASSERT_FALSE(fixture(second, first));
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(first), FromTNetworkAddress(second))
+      < 0);
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(second), FromTNetworkAddress(first))
+      > 0);
 }
 
 // Assert where all three comparison fields are equal.
@@ -95,6 +113,81 @@ TEST(NetworkUtil, NetAddrUDSAddrSame) {
 
   ASSERT_FALSE(fixture(first, second));
   ASSERT_FALSE(fixture(second, first));
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(first), FromTNetworkAddress(second))
+      == 0);
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(second), FromTNetworkAddress(first))
+      == 0);
+}
+
+// Assert where host and port fields are equal first address does not have
+// uds address set.
+TEST(NetworkUtil, NetAddrOneMissUDSAddr) {
+  TNetworkAddressComparator fixture;
+  TNetworkAddress first;
+  TNetworkAddress second;
+
+  first.__set_hostname("host");
+  first.__set_port(0);
+
+  second.__set_hostname("host");
+  second.__set_port(0);
+  second.__set_uds_address("");
+
+  ASSERT_TRUE(fixture(first, second));
+  ASSERT_FALSE(fixture(second, first));
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(first), FromTNetworkAddress(second))
+      < 0);
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(second), FromTNetworkAddress(first))
+      > 0);
+}
+
+// Assert where host and port fields are equal and both address does not have
+// uds address set.
+TEST(NetworkUtil, NetAddrAllMissUDSAddr) {
+  TNetworkAddressComparator fixture;
+  TNetworkAddress first;
+  TNetworkAddress second;
+
+  first.__set_hostname("host");
+  first.__set_port(0);
+
+  second.__set_hostname("host");
+  second.__set_port(0);
+
+  ASSERT_FALSE(fixture(first, second));
+  ASSERT_FALSE(fixture(second, first));
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(first), FromTNetworkAddress(second))
+      == 0);
+  ASSERT_TRUE(
+      CompareNetworkAddressPB(FromTNetworkAddress(second), FromTNetworkAddress(first))
+      == 0);
+}
+
+void CheckTranslation(TNetworkAddress thrift_address) {
+  NetworkAddressPB proto_address = FromTNetworkAddress(thrift_address);
+  TNetworkAddress thrift_address2 = FromNetworkAddressPB(proto_address);
+  NetworkAddressPB proto_address2 = FromTNetworkAddress(thrift_address2);
+
+  TNetworkAddressComparator fixture;
+  ASSERT_FALSE(fixture(thrift_address, thrift_address2));
+  ASSERT_FALSE(fixture(thrift_address2, thrift_address));
+  ASSERT_TRUE(CompareNetworkAddressPB(proto_address, proto_address2) == 0);
+  ASSERT_TRUE(CompareNetworkAddressPB(proto_address2, proto_address) == 0);
+}
+
+// Assert consistent translation between TNetworkAddress and NetworkAddressPB.
+TEST(NetworkUtil, NetAddrTranslation) {
+  TNetworkAddress addr;
+  addr.__set_hostname("host");
+  addr.__set_port(0);
+  CheckTranslation(addr);
+  addr.__set_uds_address("uds");
+  CheckTranslation(addr);
 }
 
 } // namespace impala

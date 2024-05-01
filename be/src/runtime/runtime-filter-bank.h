@@ -373,6 +373,8 @@ class RuntimeFilterBank {
   /// Disable a bloom filter by replacing it with an ALWAYS_TRUE_FILTER.
   /// Return a pointer to the new runtime filter.
   RuntimeFilter* DisableBloomFilter(std::unique_ptr<RuntimeFilter>& bloom_filter);
+
+  int32_t GetRuntimeFilterWaitTime() const;
 };
 
 }
