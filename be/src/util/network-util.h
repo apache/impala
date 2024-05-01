@@ -109,10 +109,29 @@ struct TNetworkAddressComparator {
 /// a free ephemeral port can't be found after 100 tries.
 int FindUnusedEphemeralPort();
 
+/// Compare function for two NetworkAddressPB.
+/// The order is decided first by hostname, then by port, then by uds address.
+inline int CompareNetworkAddressPB(
+    const NetworkAddressPB& lhs, const NetworkAddressPB& rhs) {
+  int comp = lhs.hostname().compare(rhs.hostname());
+  if (comp == 0) comp = lhs.port() - rhs.port();
+  if (comp == 0) {
+    if (lhs.has_uds_address()) {
+      if (rhs.has_uds_address()) {
+        comp = lhs.uds_address().compare(rhs.uds_address());
+      } else {
+        comp = 1; // lhs preceed rhs
+      }
+    } else if (rhs.has_uds_address()) {
+      comp = -1; // rhs preceed lhs
+    }
+  }
+  return comp;
+}
+
 /// Return true if two NetworkAddressPB are match.
 inline bool KrpcAddressEqual(const NetworkAddressPB& lhs, const NetworkAddressPB& rhs) {
-  return lhs.hostname() == rhs.hostname() && lhs.port() == rhs.port()
-      && lhs.uds_address() == rhs.uds_address();
+  return CompareNetworkAddressPB(lhs, rhs) == 0;
 }
 
 extern const std::string LOCALHOST_IP_STR;

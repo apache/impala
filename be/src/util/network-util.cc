@@ -240,7 +240,7 @@ TNetworkAddress FromNetworkAddressPB(const NetworkAddressPB& address) {
   TNetworkAddress t_address;
   t_address.__set_hostname(address.hostname());
   t_address.__set_port(address.port());
-  t_address.__set_uds_address(address.uds_address());
+  if (address.has_uds_address()) t_address.__set_uds_address(address.uds_address());
   return t_address;
 }
 
@@ -248,7 +248,7 @@ NetworkAddressPB FromTNetworkAddress(const TNetworkAddress& address) {
   NetworkAddressPB address_pb;
   address_pb.set_hostname(address.hostname);
   address_pb.set_port(address.port);
-  address_pb.set_uds_address(address.uds_address);
+  if (address.__isset.uds_address) address_pb.set_uds_address(address.uds_address);
   return address_pb;
 }
 
@@ -270,7 +270,16 @@ bool TNetworkAddressComparator::operator()(const TNetworkAddress& a,
     }
 
     // Hostnames and ports were the same, compare on uds address.
-    return a.uds_address.compare(b.uds_address) < 0;
+    if (a.__isset.uds_address) {
+      if (b.__isset.uds_address) {
+        return a.uds_address.compare(b.uds_address) < 0;
+      } else {
+        return false;
+      }
+    } else if (b.__isset.uds_address) {
+      return true;
+    }
+    return false;
 }
 
 /// Pick a random port in the range of ephemeral ports

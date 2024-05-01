@@ -124,6 +124,9 @@ message UpdateFilterParamsPB {
   optional MinMaxFilterPB min_max_filter = 4;
 
   optional InListFilterPB in_list_filter = 5;
+
+  // Remaining filter wait time as understood by sender.
+  optional int32 remaining_filter_wait_time_ms = 6;
 }
 
 message UpdateFilterResultPB {

@@ -168,6 +168,7 @@ class QueryState {
     return query_ctx_.client_request.query_options;
   }
   bool codegen_cache_enabled() const;
+  bool is_initialized();
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
   RuntimeProfile* host_profile() const { return host_profile_; }
   const NodeToFileSchedulings* node_to_file_schedulings() const {
@@ -318,6 +319,16 @@ class QueryState {
 
   const std::unordered_map<TFragmentIdx, FragmentState*>& FragmentStateMap() {
     return fragment_state_map_;
+  }
+
+  /// Returns true if the query has reached a terminal state.
+  bool IsTerminalState() const {
+    // Read into local variable to protect against concurrent modification
+    // of backend_exec_state_.
+    BackendExecState exec_state = backend_exec_state_;
+    return exec_state == BackendExecState::FINISHED
+        || exec_state == BackendExecState::CANCELLED
+        || exec_state == BackendExecState::ERROR;
   }
 
  private:
@@ -546,13 +557,6 @@ class QueryState {
   /// Returns true if the overall backend status is already set with an error.
   bool HasErrorStatus() const {
     return !overall_status_.ok() && !overall_status_.IsCancelled();
-  }
-
-  /// Returns true if the query has reached a terminal state.
-  bool IsTerminalState() const {
-    return backend_exec_state_ == BackendExecState::FINISHED
-        || backend_exec_state_ == BackendExecState::CANCELLED
-        || backend_exec_state_ == BackendExecState::ERROR;
   }
 
   /// Updates the BackendExecState based on 'overall_status_'. Should only be called when

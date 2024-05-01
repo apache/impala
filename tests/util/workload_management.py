@@ -359,8 +359,10 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
     perhost_frags = re.search(r'\n\s+Per Host Number of Fragment Instances:\s+(.*?)\n',
         profile_text)
     assert perhost_frags is not None
-    assert data[index] == ",".join(sorted(perhost_frags.group(1).replace("(", "=")
-        .replace(")", "").split(" "))), "per-host fragment instances incorrect"
+    expected = ",".join(sorted(perhost_frags.group(1).replace("(", "=")
+        .replace(")", "").split(" ")))
+    assert data[index] == expected, ('per-host fragment instances incorrect.'
+        ' expected="{0}" actual="{1}"').format(expected, data[index])
 
   # Backends Count
   index += 1

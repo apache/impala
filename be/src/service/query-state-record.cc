@@ -221,10 +221,7 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
     // Per-Host Metrics
     for (int i =0; i < exec_state.schedule()->backend_exec_params_size(); i++) {
       const BackendExecParamsPB& b = exec_state.schedule()->backend_exec_params(i);
-      TNetworkAddress host;
-      host.hostname = b.address().hostname();
-      host.uds_address = b.address().uds_address();
-      host.port = b.address().port();
+      TNetworkAddress host = FromNetworkAddressPB(b.address());
 
       PerHostState state;
       state.fragment_instance_count = b.instance_params_size();

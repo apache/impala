@@ -557,6 +557,10 @@ void RuntimeFilterBank::DistributeCompleteFilter(
       ++num_inflight_rpcs_;
     }
 
+    int32_t remaining_wait_time_ms =
+        max(0, GetRuntimeFilterWaitTime() - complete_filter->TimeSinceRegistrationMs());
+    params.set_remaining_filter_wait_time_ms(remaining_wait_time_ms);
+
     if (to_coordinator) {
       proxy->UpdateFilterAsync(params, res, controller,
           boost::bind(
@@ -743,10 +747,7 @@ vector<unique_lock<SpinLock>> RuntimeFilterBank::LockAllFilters() {
 }
 
 void RuntimeFilterBank::SendIncompleteFilters() {
-  int32_t wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
-  if (query_state_->query_options().runtime_filter_wait_time_ms > 0) {
-    wait_time_ms = query_state_->query_options().runtime_filter_wait_time_ms;
-  }
+  int32_t wait_time_ms = GetRuntimeFilterWaitTime();
 
   bool try_wait_aggregation = !cancelled_;
   for (auto& entry : filters_) {
@@ -843,6 +844,14 @@ void RuntimeFilterBank::Close() {
   }
   DCHECK_EQ(filter_mem_tracker_->consumption(), 0);
   filter_mem_tracker_->Close();
+}
+
+int32_t RuntimeFilterBank::GetRuntimeFilterWaitTime() const {
+  int32_t wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
+  if (query_state_->query_options().runtime_filter_wait_time_ms > 0) {
+    wait_time_ms = query_state_->query_options().runtime_filter_wait_time_ms;
+  }
+  return wait_time_ms;
 }
 
 RuntimeFilterBank::ProducedFilter::ProducedFilter(
