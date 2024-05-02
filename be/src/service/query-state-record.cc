@@ -184,6 +184,14 @@ int64_t EstimateSize(const QueryStateRecord* record) {
   return size;
 }
 
+static bool find_instance(RuntimeProfileBase* prof) {
+  return boost::algorithm::istarts_with(prof->name(), "Instance");
+}
+
+static bool find_averaged(RuntimeProfileBase* prof) {
+  return boost::algorithm::istarts_with(prof->name(), "Averaged Fragment");
+}
+
 QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
     const std::shared_ptr<QueryStateRecord> base) :
     base_state(base ? move(base) : make_shared<QueryStateRecord>(exec_state)) {
@@ -253,9 +261,7 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
     map<string, int64_t> bytes_read_cache;
     vector<RuntimeProfileBase*> prof_stack;
 
-    using boost::algorithm::iequals;
-
-   // Lambda function to recursively walk through a profile.
+    // Lambda function to recursively walk through a profile.
     std::function<void(RuntimeProfileBase*)> process_exec_profile = [
         &process_exec_profile, &host_scratch_bytes, &scanner_io_wait, &prof_stack,
         &bytes_read_cache, this](RuntimeProfileBase* profile) {
@@ -266,20 +272,26 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
       }
 
       // Metrics from HDFS_SCAN_NODE entries.
-      if (prof_stack.size() >= 3) {
-        if (iequals(prof_stack[1]->name().substr(0, 8), "instance") &&
-            iequals(prof_stack[2]->name().substr(0, 14), "hdfs_scan_node")) {
+      if (const string& scan = prof_stack.back()->name();
+          boost::algorithm::istarts_with(scan, "HDFS_SCAN_NODE")) {
+        // Find a parent instance. If none found, assume in Averaged Fragment.
+        if (auto it = find_if(prof_stack.begin()+1, prof_stack.end()-1, find_instance);
+            it != prof_stack.end()-1) {
+          DCHECK(find_if(prof_stack.begin(), prof_stack.end(), find_averaged)
+              == prof_stack.end());
+          const string& inst = (*it)->name();
           if (const auto& cntr = profile->GetCounter("ScannerIoWaitTime");
               cntr != nullptr) {
-            scanner_io_wait.emplace(StrCat(
-                prof_stack[1]->name(), "::", prof_stack[2]->name()), cntr->value());
+            scanner_io_wait.emplace(StrCat(inst, "::", scan), cntr->value());
           }
 
           if (const auto& cntr = profile->GetCounter("DataCacheHitBytes");
               cntr != nullptr) {
-            bytes_read_cache.emplace(StrCat(
-                prof_stack[1]->name(), "::", prof_stack[2]->name()), cntr->value());
+            bytes_read_cache.emplace(StrCat(inst, "::", scan), cntr->value());
           }
+        } else {
+          DCHECK(find_if(prof_stack.begin(), prof_stack.end(), find_averaged)
+              != prof_stack.end());
         }
       }
 
@@ -290,7 +302,7 @@ QueryStateExpanded::QueryStateExpanded(const ClientRequestState& exec_state,
 
       // Recursively walk down through all child nodes.
       vector<RuntimeProfileBase*> children;
-      profile->GetAllChildren(&children);
+      profile->GetChildren(&children);
       for (const auto& child : children) {
         process_exec_profile(child);
       }
