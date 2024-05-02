@@ -848,7 +848,6 @@ class TestMaxNestingDepth(ImpalaTestSuite):
   # Should be kept in sync with the FE's Type.MAX_NESTING_DEPTH
   MAX_NESTING_DEPTH = 100
   TABLES = ['struct', 'int_array', 'struct_array', 'int_map', 'struct_map']
-  TEMP_TABLE_SUFFIX = '_parquet'
 
   @classmethod
   def get_workload(self):
@@ -866,41 +865,35 @@ class TestMaxNestingDepth(ImpalaTestSuite):
     """Tests that Impala can scan Parquet and ORC files having complex types of
     the maximum nesting depth."""
     file_format = vector.get_value('table_format').file_format
-    if file_format == 'orc' and not IS_HDFS:
-      pytest.skip('Orc table loading needs Hive and thus only works with HDFS.')
-
     if file_format == 'parquet':
       self.__create_parquet_tables(unique_database)
     elif file_format == 'orc':
       self.__create_orc_tables(unique_database)
     self.run_test_case('QueryTest/max-nesting-depth', vector, unique_database)
 
-  def __create_parquet_tables(self, unique_database, as_target=True):
-    """Create Parquet tables from files. If 'as_target' is False, the Parquet tables will
-     be used to create ORC tables, so we add a suffix in the table names."""
+  def __create_parquet_tables(self, unique_database):
+    """Create Parquet tables from files."""
     self.filesystem_client.copy_from_local(
-      "%s/testdata/max_nesting_depth" % os.environ['IMPALA_HOME'],
+      "%s/testdata/max_nesting_depth/parquet" % os.environ['IMPALA_HOME'],
       "%s/%s.db/" % (WAREHOUSE, unique_database))
-    tbl_suffix = '' if as_target else self.TEMP_TABLE_SUFFIX
     for tbl in self.TABLES:
-      tbl_name = "%s.%s_tbl%s" % (unique_database, tbl, tbl_suffix)
-      tbl_location = "%s/%s.db/max_nesting_depth/%s/" % (WAREHOUSE, unique_database, tbl)
+      tbl_name = "%s.%s_tbl" % (unique_database, tbl)
+      tbl_location = "%s/%s.db/parquet/%s/" % (WAREHOUSE, unique_database, tbl)
       create_table = "CREATE EXTERNAL TABLE %s LIKE PARQUET '%s' STORED AS PARQUET" \
           " location '%s'" % (tbl_name, tbl_location + 'file.parq', tbl_location)
       self.client.execute(create_table)
 
   def __create_orc_tables(self, unique_database):
-    # Creating ORC tables from ORC files (IMPALA-8046) has not been supported.
-    # We create the Parquet tables first and then transform them into ORC tables.
-    self.__create_parquet_tables(unique_database, False)
+    """Create ORC tables from files."""
+    self.filesystem_client.copy_from_local(
+      "%s/testdata/max_nesting_depth/orc" % os.environ['IMPALA_HOME'],
+      "%s/%s.db/" % (WAREHOUSE, unique_database))
     for tbl in self.TABLES:
       tbl_name = "%s.%s_tbl" % (unique_database, tbl)
-      from_tbl_name = tbl_name + self.TEMP_TABLE_SUFFIX
-      create_table = "CREATE TABLE %s LIKE %s STORED AS ORC" % (tbl_name, from_tbl_name)
-      insert_table = "INSERT INTO %s SELECT * FROM %s" % (tbl_name, from_tbl_name)
-      self.run_stmt_in_hive(create_table)
-      self.run_stmt_in_hive(insert_table)
-      self.client.execute("INVALIDATE METADATA %s" % tbl_name)
+      tbl_location = "%s/%s.db/orc/%s/" % (WAREHOUSE, unique_database, tbl)
+      create_table = "CREATE EXTERNAL TABLE %s LIKE ORC '%s' STORED AS ORC" \
+          " location '%s'" % (tbl_name, tbl_location + 'file.orc', tbl_location)
+      self.client.execute(create_table)
 
   @SkipIfFS.hive
   def test_load_hive_table(self, vector, unique_database):

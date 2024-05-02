@@ -1,7 +1,7 @@
-This folder contains Parquet files for testing the maximum nesting depth
-of complex types. The maximum nesting depth Types.MAX_NESTING_DEPTH (100).
-All Parquet files contain the integer 42 as the only data value in a single
-Parquet column.
+This folder contains Parquet and ORC files for testing the maximum nesting
+depth of complex types. The maximum nesting depth Types.MAX_NESTING_DEPTH
+(100). All files contain the integer 42 as the only data value in a single
+column.
 
 The folders contain files for the following complex types with nesting
 depth of exactly 100.
