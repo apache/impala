@@ -716,6 +716,78 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
     </conbody>
   </concept>
 
+  <concept id="iceberg_metadata_tables">
+    <title>Iceberg metadata tables</title>
+    <conbody>
+      <p>
+        Iceberg stores extensive metadata for each table (e.g. snapshots, manifests, data
+        and delete files etc.), which is accessible in Impala in the form of virtual
+        tables called metadata tables.
+      </p>
+      <p>
+        Metadata tables can be queried just like regular tables, including filtering,
+        aggregation and joining with other metadata and regular tables. On the other hand,
+        they are read-only, so it is not possible to change, add or remove records from
+        them, they cannot be dropped and new metadata tables cannot be created. Metadata
+        changes made in other ways (not through metadata tables) are reflected in the
+        tables.
+      </p>
+      <p>
+        To list the metadata tables available for an Iceberg table, use the <codeph>SHOW
+        METADATA TABLES</codeph> command:
+
+        <codeblock>
+SHOW METADATA TABLES IN [db.]tbl [[LIKE] “pattern”]
+        </codeblock>
+
+        It is possible to filter the result using <codeph>pattern</codeph>. All Iceberg
+        tables have the same metadata tables, so this command is mostly for convenience.
+        Using <codeph>SHOW METADATA TABLES</codeph> on a non-Iceberg table results in an
+        error.
+      </p>
+      <p>
+        Just like regular tables, metadata tables have schemas that can be queried with
+        the <codeph>DESCRIBE</codeph> command. Note, however, that <codeph>DESCRIBE
+        FORMATTED|EXTENDED</codeph> are not available for metadata tables.
+      </p>
+      <p>
+        Example:
+        <codeblock>
+DESCRIBE functional_parquet.iceberg_alltypes_part.history;
+        </codeblock>
+      </p>
+      <p>
+        To retrieve information from metadata tables, use the usual
+        <codeph>SELECT</codeph> statement. You can select any subset of the columns or all
+        of them using ‘*’. Note that in contrast to regular tables, <codeph>SELECT
+        *</codeph> on metadata tables always includes complex-typed columns in the result.
+        Therefore, the query option <codeph>EXPAND_COMPLEX_TYPES</codeph> only applies to
+        regular tables. This holds also in queries that mix metadata tables and regular
+        tables: for <codeph>SELECT *</codeph> expressions from metadata tables, complex
+        types will always be included, and for <codeph>SELECT *</codeph> expressions from
+        regular tables, complex types will be included if and only if
+        <codeph>EXPAND_COMPLEX_TYPES</codeph> is true.
+      </p>
+      <p>
+        Note that unnesting collections from metadata tables is not supported.
+      </p>
+      <p>
+        Example:
+        <codeblock>
+SELECT
+    s.operation,
+    h.is_current_ancestor,
+    s.summary
+FROM functional_parquet.iceberg_alltypes_part.history h
+JOIN functional_parquet.iceberg_alltypes_part.snapshots s
+  ON h.snapshot_id = s.snapshot_id
+WHERE s.operation = 'append'
+ORDER BY made_current_at;
+        </codeblock>
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_table_cloning">
     <title>Cloning Iceberg tables (LIKE clause)</title>
     <conbody>
