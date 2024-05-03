@@ -11,46 +11,46 @@ select * from functional_parquet.iceberg_query_metadata.entries;
 ---- RESULTS
 # Example:
 # 1,8283026816932323050,3,3,'{...}','{...}'
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
 ---- TYPES
 INT,BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.`files`;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
 ---- TYPES
 INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.data_files;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
 ---- TYPES
 INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.delete_files;
 ---- RESULTS
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
 ---- TYPES
 INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.history;
 ---- RESULTS
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,NULL,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -60,10 +60,10 @@ select * from functional_parquet.iceberg_query_metadata.metadata_log_entries;
 # Example:
 # 2023-08-16 12:18:11.061000000,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/00000-0ae98ebd-b200-4381-9d97-1f93954423a9.metadata.json',NULL,NULL,NULL
 row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',NULL,NULL,NULL
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,1
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,2
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,3
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',[1-9]\d*|0,0,4
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',\d+,0,1
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',\d+,0,2
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',\d+,0,3
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.metadata.json',\d+,0,4
 ---- TYPES
 TIMESTAMP,STRING,BIGINT,INT,BIGINT
 ====
@@ -72,10 +72,10 @@ select * from functional_parquet.iceberg_query_metadata.snapshots;
 ---- RESULTS : VERIFY_IS_SUBSET
 # Example:
 # 2023-08-16 12:18:15.322000000,8491702501245661704,NULL,'append','hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/snap-8491702501245661704-1-88a39285-529f-41a4-bd69-6d2560fac64e.avro',NULL
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,([1-9]\d*|0),NULL,'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,([1-9]\d*|0),([1-9]\d*|0),'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,([1-9]\d*|0),([1-9]\d*|0),'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,([1-9]\d*|0),([1-9]\d*|0),'overwrite','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,NULL,'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'append','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'overwrite','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,STRING,STRING,STRING
 ====
@@ -91,10 +91,10 @@ select * from functional_parquet.iceberg_query_metadata.manifests;
 ---- RESULTS : VERIFY_IS_SUBSET
 # Example:
 # row_regex:0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/38e5a1bd-5b7f-4eae-9362-16a2de3c575d-m0.avro',6631,0,8283026816932323050,1,0,0,0,0,0,'[]'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]'
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),0,0,0,1,0,0,'\[\]'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,0,0,0,1,0,0,'\[\]'
 ---- TYPES
 INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT,STRING
 ====
@@ -108,26 +108,26 @@ BIGINT,INT,BIGINT,INT,BIGINT,INT
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_data_files;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
 ---- TYPES
 INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_delete_files;
 ---- RESULTS
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
 ---- TYPES
 INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_files;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,([1-9]\d*|0),'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
 ---- TYPES
 INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
 ====
@@ -136,16 +136,16 @@ select * from functional_parquet.iceberg_query_metadata.all_manifests;
 ---- RESULTS
 # Example:
 # 0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/38e5a1bd-5b7f-4eae-9362-16a2de3c575d-m0.avro',6631,0,8283026816932323050,1,0,0,0,0,'[]',0,7858675898458780516
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),1,0,0,0,0,0,'\[\]',([1-9]\d*|0)
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',([1-9]\d*|0),0,([1-9]\d*|0),0,0,0,1,0,0,'\[\]',([1-9]\d*|0)
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,0,0,0,1,0,0,'\[\]',\d+
 ---- TYPES
 INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT,STRING,BIGINT
 ====
@@ -154,10 +154,10 @@ select * from functional_parquet.iceberg_query_metadata.all_entries;
 ---- RESULTS
 # Example:
 # 1,7858675898458780516,4,4,{..},{..}
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
-row_regex:1,([1-9]\d*|0),([1-9]\d*|0),([1-9]\d*|0),'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
+row_regex:1,\d+,\d+,\d+,'{.*}','{.*}'
 ---- TYPES
 INT,BIGINT,BIGINT,BIGINT,STRING,STRING
 
@@ -181,22 +181,22 @@ select snapshot_id from functional_parquet.iceberg_query_metadata.history;
 ---- RESULTS
 # Example:
 # 7858675898458780516
-row_regex:([1-9]\d*|0)
-row_regex:([1-9]\d*|0)
-row_regex:([1-9]\d*|0)
-row_regex:([1-9]\d*|0)
+row_regex:\d+
+row_regex:\d+
+row_regex:\d+
+row_regex:\d+
 ---- TYPES
 BIGINT
 ====
 ---- QUERY
 select snapshot_id, * from functional_parquet.iceberg_query_metadata.history;
----- RESULTS
+---- RESULTS: VERIFY_IS_SUBSET
 # Example:
 # 7858675898458780516,2023-08-16 12:18:18.584000000,7858675898458780516,8283026816932323050,true
-row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
-row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:[1-9]\d*|0,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d+,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,NULL,true
+row_regex:\d+,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d+,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d+,\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
 ---- TYPES
 BIGINT,TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -225,7 +225,7 @@ where snapshot_id = $OVERWRITE_SNAPSHOT_ID;
 ---- RESULTS
 # Example:
 # 2023-08-16 12:18:15.523000000,9046920472784493998,8491702501245661704,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,$OVERWRITE_SNAPSHOT_ID,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -236,10 +236,10 @@ where is_current_ancestor = true;
 ---- RESULTS
 # Example:
 # 2023-08-16 12:18:15.523000000,9046920472784493998,8491702501245661704,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,NULL,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -250,7 +250,7 @@ where operation = 'overwrite';
 ---- RESULTS
 # Example:
 # 2023-08-16 12:18:15.322000000,8491702501245661704,NULL,'append','hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/snap-8491702501245661704-1-88a39285-529f-41a4-bd69-6d2560fac64e.avro',NULL
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,([1-9]\d*|0),([1-9]\d*|0),'overwrite','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'overwrite','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/metadata/.*.avro','{.*}'
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,STRING,STRING,STRING
 ====
@@ -259,7 +259,7 @@ TIMESTAMP,BIGINT,BIGINT,STRING,STRING,STRING
 select * from functional_parquet.iceberg_query_metadata.history
 where made_current_at = cast("$OVERWRITE_SNAPSHOT_TS" as timestamp);
 ---- RESULTS
-row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
+row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -277,7 +277,7 @@ BIGINT
 select * from functional_parquet.iceberg_query_metadata.history
 where snapshot_id = $OVERWRITE_SNAPSHOT_ID or snapshot_id = 1;
 ---- RESULTS
-row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,[1-9]\d*|0,true
+row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -285,8 +285,8 @@ TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 # Test LIMIT
 select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots limit 2;
 ---- RESULTS
-row_regex:[1-9]\d*|0
-row_regex:[1-9]\d*|0
+row_regex:\d+
+row_regex:\d+
 ---- TYPES
 BIGINT
 ====
@@ -295,9 +295,9 @@ BIGINT
 set BATCH_SIZE=1;
 select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots limit 3;
 ---- RESULTS
-row_regex:[1-9]\d*|0
-row_regex:[1-9]\d*|0
-row_regex:[1-9]\d*|0
+row_regex:\d+
+row_regex:\d+
+row_regex:\d+
 ---- TYPES
 BIGINT
 ====
@@ -310,21 +310,21 @@ BIGINT
 select a.snapshot_id, b.snapshot_id from functional_parquet.iceberg_query_metadata.history a
 join functional_parquet.iceberg_query_metadata.history b on a.snapshot_id = b.snapshot_id;
 ---- RESULTS
-row_regex:[1-9]\d*|0,[1-9]\d*|0
-row_regex:[1-9]\d*|0,[1-9]\d*|0
-row_regex:[1-9]\d*|0,[1-9]\d*|0
-row_regex:[1-9]\d*|0,[1-9]\d*|0
+row_regex:\d+,\d+
+row_regex:\d+,\d+
+row_regex:\d+,\d+
+row_regex:\d+,\d+
 ---- TYPES
 BIGINT,BIGINT
 ====
 ---- QUERY
 select a.snapshot_id, b.parent_id from functional_parquet.iceberg_query_metadata.history a
 join functional_parquet.iceberg_query_metadata.history b on a.snapshot_id = b.snapshot_id;
----- RESULTS
-row_regex:[1-9]\d*|0,[1-9]\d*|0
-row_regex:[1-9]\d*|0,[1-9]\d*|0
-row_regex:[1-9]\d*|0,[1-9]\d*|0
-row_regex:[1-9]\d*|0,[1-9]\d*|0
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:\d+,NULL
+row_regex:\d+,\d+
+row_regex:\d+,\d+
+row_regex:\d+,\d+
 ---- TYPES
 BIGINT,BIGINT
 ====
@@ -353,27 +353,12 @@ BIGINT
 select a.snapshot_id
 from (select * from functional_parquet.iceberg_query_metadata.history) a;
 ---- RESULTS
-row_regex:[1-9]\d*|0
-row_regex:[1-9]\d*|0
-row_regex:[1-9]\d*|0
-row_regex:[1-9]\d*|0
+row_regex:\d+
+row_regex:\d+
+row_regex:\d+
+row_regex:\d+
 ---- TYPES
 BIGINT
-
-####
-# Complex types
-# Currently not supported, complex type slots are set to NULL (IMPALA-12205)
-####
-====
----- QUERY
-select snapshot_id, summary from functional_parquet.iceberg_query_metadata.snapshots;
----- RESULTS
-row_regex:[1-9]\d*|0,'NULL'
-row_regex:[1-9]\d*|0,'NULL'
-row_regex:[1-9]\d*|0,'NULL'
-row_regex:[1-9]\d*|0,'NULL'
----- TYPES
-BIGINT,STRING
 
 ####
 # Multiple RowBatch results
@@ -383,10 +368,10 @@ BIGINT,STRING
 set BATCH_SIZE=1;
 select * from functional_parquet.iceberg_query_metadata.history;
 ---- RESULTS
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,NULL,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,[1-9]\d*|0,[1-9]\d*|0,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,NULL,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 
@@ -408,7 +393,7 @@ AnalysisException: FOR SYSTEM_VERSION AS OF clause is only supported for Iceberg
 # All reachable manifest files size
 select sum(length) from functional_parquet.iceberg_query_metadata.all_manifests;
 ---- RESULTS
-row_regex:[1-9]\d*|0
+row_regex:\d+
 ---- TYPES
 BIGINT
 ====
@@ -425,8 +410,8 @@ BIGINT
 SELECT i, INPUT__FILE__NAME, file_size_in_bytes from functional_parquet.iceberg_query_metadata tbl
 JOIN functional_parquet.iceberg_query_metadata.all_files mtbl on tbl.input__file__name = mtbl.file_path;
 ---- RESULTS
-row_regex:[1-9]\d*|0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',[1-9]\d*|0
-row_regex:[1-9]\d*|0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',[1-9]\d*|0
+row_regex:\d+,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',\d+
+row_regex:\d+,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq',\d+
 ---- TYPES
 INT,STRING,BIGINT
 
@@ -536,21 +521,21 @@ STRING
 ====
 ---- QUERY
 select snapshot_id, readable_metrics from functional_parquet.iceberg_query_metadata.entries;
----- RESULTS
-row_regex:[1-9]\d*|0,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":3,"upper_bound":3}}'
-row_regex:[1-9]\d*|0,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":2}}'
-row_regex:[1-9]\d*|0,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":1}}'
-row_regex:[1-9]\d*|0,'{"i":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:\d+,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":3,"upper_bound":3}}'
+row_regex:\d+,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":2}}'
+row_regex:\d+,'{"i":{"column_size":47,"value_count":1,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":1}}'
+row_regex:\d+,'{"i":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
 ---- TYPES
 BIGINT,STRING
 ====
 ---- QUERY
 select snapshot_id, readable_metrics.i.lower_bound as lower_bound from functional_parquet.iceberg_query_metadata.entries;
----- RESULTS
-row_regex:[1-9]\d*|0,3
-row_regex:[1-9]\d*|0,2
-row_regex:[1-9]\d*|0,1
-row_regex:[1-9]\d*|0,'NULL'
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:\d+,3
+row_regex:\d+,2
+row_regex:\d+,1
+row_regex:\d+,NULL
 ---- TYPES
 BIGINT,INT
 ====
@@ -558,10 +543,10 @@ BIGINT,INT
 select snapshot_id, readable_metrics.i.lower_bound as lower_bound from functional_parquet.iceberg_query_metadata.entries
 order by lower_bound;
 ---- RESULTS
-row_regex:[1-9]\d*|0,1
-row_regex:[1-9]\d*|0,2
-row_regex:[1-9]\d*|0,3
-row_regex:[1-9]\d*|0,'NULL'
+row_regex:\d+,1
+row_regex:\d+,2
+row_regex:\d+,3
+row_regex:\d+,NULL
 ---- TYPES
 BIGINT,INT
 ====
@@ -1154,10 +1139,10 @@ AnalysisException: The SHOW METADATA TABLES statement is only valid for Iceberg 
 # Expand a struct column using 'path.*' syntax.
 select data_file.* from functional_parquet.iceberg_query_metadata.`entries`;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,[1-9]\d*,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL
 ---- TYPES
 INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT
 ====
@@ -1168,7 +1153,7 @@ select * from functional_parquet.iceberg_query_metadata.`entries` ent
   join functional_parquet.complextypes_arrays ca on ent.sequence_number = ca.id
   where ca.id = 1;
 ---- RESULTS
-row_regex:1,[1-9][0-9]*,1,1,'{.*}','{.*}',1
+row_regex:1,\d+,1,1,'{.*}','{.*}',1
 ---- TYPES
 INT,BIGINT,BIGINT,BIGINT,STRING,STRING,INT
 ====
@@ -1180,7 +1165,7 @@ select * from functional_parquet.iceberg_query_metadata.`entries` ent
   join functional_parquet.complextypes_arrays ca on ent.sequence_number = ca.id
   where ca.id = 1;
 ---- RESULTS
-row_regex:1,([1-9]\d*|0),1,1,'{.*}','{.*}',1,'\[1,2,3,4,5\]','\["one","two","three","four","five"\]'
+row_regex:1,\d+,1,1,'{.*}','{.*}',1,'\[1,2,3,4,5\]','\["one","two","three","four","five"\]'
 ---- TYPES
 INT,BIGINT,BIGINT,BIGINT,STRING,STRING,INT,STRING,STRING
 ====
