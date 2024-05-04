@@ -31,6 +31,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
@@ -326,8 +327,13 @@ public class SlotRef extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature");
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg, ThriftSerializationCtx serialCtx) {
     msg.node_type = TExprNodeType.SLOT_REF;
-    msg.slot_ref = new TSlotRef(desc_.getId().asInt());
+    msg.slot_ref = new TSlotRef(serialCtx.translateSlotId(desc_.getId()).asInt());
     // we shouldn't be sending exprs over non-materialized slots
     Preconditions.checkState(desc_.isMaterialized(), String.format(
         "Illegal reference to non-materialized slot: tid=%s sid=%s",

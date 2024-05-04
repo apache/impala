@@ -46,27 +46,43 @@ public class TupleCacheTest extends PlannerTestBase {
    * Test some basic cases for tuple cache keys
    */
   @Test
-  public void testTupleCacheKeys() {
+  public void testBasicCacheKeys() {
     verifyIdenticalCacheKeys("select id from functional.alltypes",
         "select id from functional.alltypes");
+    // Different table
     verifyDifferentCacheKeys("select id from functional.alltypes",
         "select id from functional.alltypestiny");
-    // TODO: incorporate column information into the key
-    // verifyDifferentCacheKeys("select id from functional.alltypes",
-    //     "select int_col from functional.alltypes");
     verifyDifferentCacheKeys("select id from functional.alltypes",
         "select id from functional_parquet.alltypes");
+    // Different column
+    verifyDifferentCacheKeys("select id from functional.alltypes",
+        "select int_col from functional.alltypes");
+    // Extra filter
     verifyDifferentCacheKeys("select id from functional.alltypes",
         "select id from functional.alltypes where id = 1");
+    // Different filter
     verifyDifferentCacheKeys("select id from functional.alltypes where id = 1",
         "select id from functional.alltypes where id = 2");
+  }
 
-    // TODO: mask out the table alias so it doesn't result in different cache keys
-    // verifyIdenticalCacheKeys("select id from functional.alltypes",
-    //     "select id from functional.alltypes a");
+  /**
+   * Test cases that rely on masking out unnecessary data to have cache hits.
+   */
+  @Test
+  public void testCacheKeyMasking() {
+    // The table alias is masked out and doesn't result in a different cache key
+    verifyIdenticalCacheKeys("select id from functional.alltypes",
+        "select id from functional.alltypes a");
+    // The column alias doesn't impact the cache key
     verifyIdenticalCacheKeys("select id from functional.alltypes",
         "select id as a from functional.alltypes");
+  }
 
+  /**
+   * Test cases where a statement should be cache ineligible
+   */
+  @Test
+  public void testIneligibility() {
     // Tuple caching not implemented for Kudu or HBase
     verifyCacheIneligible("select id from functional_kudu.alltypes");
     verifyCacheIneligible("select id from functional_hbase.alltypes");
@@ -86,6 +102,53 @@ public class TupleCacheTest extends PlannerTestBase {
     //     "select timestamp_col from functional.alltypes where timestamp_col < now()");
     // verifyCacheIneligible(
     //     "select date_col from functional.date_tbl where date_col < current_date()");
+  }
+
+  /**
+   * Test cases to verify that pieces of different queries can match
+   * An important piece of this is translation of tuple/slot IDs so that other parts of
+   * the plan tree don't influence the cache key.
+   */
+  @Test
+  public void testCacheKeyGenerality() {
+    // Build side is the same. Probe side has a different table
+    // (alltypes vs alltypestiny).
+    verifyOverlappingCacheKeys(
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id",
+        "select straight_join probe.id from functional.alltypestiny probe, " +
+        "functional.alltypes build where probe.id = build.id");
+
+    // Build side is the same. Probe side has an extra int_col = 100 filter.
+    verifyOverlappingCacheKeys(
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id",
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id and probe.int_col=100");
+
+    // Build side is the same. Probe side has an extra int_col = 100 filter.
+    // Note that this test requires id translation, because the probe side's reference
+    // to int_col takes up a slot id and shifts the slot ids of the build side.
+    // Id translation fixes the build side's int_col slot id so that the probe side
+    // doesn't influence it.
+    verifyOverlappingCacheKeys(
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id and build.int_col = 100",
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id and probe.int_col = 100 " +
+        "and build.int_col = 100");
+
+    // This has one build side that is the same, but one query has an extra join feeding
+    // the probe side. The extra join takes up an extra tuple id, shifting the tuple id
+    // for the overlapping build. This test requires translation of the tuple ids to
+    // work. It also relies on masking out the node ids, because the node id will also be
+    // different.
+    verifyOverlappingCacheKeys(
+        "select straight_join probe1.id from functional.alltypes probe1, " +
+        "functional.alltypes probe2, functional.alltypes build " +
+        "where probe1.id = probe2.id and probe2.id = build.id",
+        "select straight_join probe1.id from functional.alltypes probe1, " +
+        "functional.alltypes build where probe1.id = build.id");
   }
 
   protected List<PlanNode> getCacheEligibleNodes(String query) {

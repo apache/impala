@@ -60,5 +60,5 @@ set ENABLE_TUPLE_CACHE=TRUE;
 explain select count(*) from tpch.region
 ---- RESULTS: VERIFY_IS_SUBSET
 row_regex:.* cache key: [0-9a-f][0-9a-f]*.*
-row_regex:.*\[TPlanNode\(.*\]
+row_regex:.*\[.*TPlanNode\(.*\]
 ====

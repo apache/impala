@@ -30,6 +30,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TSlotDescriptor;
 import org.apache.impala.thrift.TVirtualColumnType;
 import org.slf4j.Logger;
@@ -445,11 +446,12 @@ public class SlotDescriptor {
     return true;
   }
 
-  public TSlotDescriptor toThrift() {
+  public TSlotDescriptor toThrift(ThriftSerializationCtx serialCtx) {
     Preconditions.checkState(isMaterialized_);
     List<Integer> materializedPath = getMaterializedPath();
     TSlotDescriptor result = new TSlotDescriptor(
-        id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
+        serialCtx.translateSlotId(id_).asInt(),
+        serialCtx.translateTupleId(parent_.getId()).asInt(), type_.toThrift(),
         materializedPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
         slotIdx_, getVirtualColumnType());
     if (itemTupleDesc_ != null) {
@@ -460,7 +462,7 @@ public class SlotDescriptor {
       // have such a guarantee.
       Preconditions.checkState(!isScanSlot() ||
           itemTupleDesc_.getId().asInt() > parent_.getId().asInt());
-      result.setItemTupleId(itemTupleDesc_.getId().asInt());
+      result.setItemTupleId(serialCtx.translateTupleId(itemTupleDesc_.getId()).asInt());
     }
     return result;
   }

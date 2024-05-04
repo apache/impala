@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TTupleIsNullPredicate;
@@ -77,6 +78,11 @@ public class TupleIsNullPredicate extends Predicate {
 
   @Override
   protected void toThrift(TExprNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature");
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg, ThriftSerializationCtx serialCtx) {
     msg.node_type = TExprNodeType.TUPLE_IS_NULL_PRED;
     msg.tuple_is_null_pred = new TTupleIsNullPredicate();
     Preconditions.checkNotNull(analyzer_);
@@ -86,7 +92,7 @@ public class TupleIsNullPredicate extends Predicate {
       Preconditions.checkNotNull(tupleDesc, "Unknown tuple id: " + tid.toString());
       Preconditions.checkState(tupleDesc.isMaterialized(),
           String.format("Illegal reference to non-materialized tuple: tid=%s", tid));
-      msg.tuple_is_null_pred.addToTuple_ids(tid.asInt());
+      msg.tuple_is_null_pred.addToTuple_ids(serialCtx.translateTupleId(tid).asInt());
     }
   }
 

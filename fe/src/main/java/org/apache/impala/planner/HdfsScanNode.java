@@ -70,6 +70,7 @@ import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.service.BackendConfig;
@@ -1922,7 +1923,15 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    msg.hdfs_scan_node = new THdfsScanNode(desc_.getId().asInt(), new HashSet<>());
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
+    msg.hdfs_scan_node = new THdfsScanNode(serialCtx.translateTupleId(
+        desc_.getId()).asInt(), new HashSet<>());
+    // Register the table for this scan node so tuple caching knows about it.
+    serialCtx.registerTable(desc_.getTable());
     if (replicaPreference_ != null) {
       msg.hdfs_scan_node.setReplica_preference(replicaPreference_);
     }
@@ -1932,8 +1941,9 @@ public class HdfsScanNode extends ScanNode {
       Map<Integer, List<TExpr>> tcollectionConjuncts = new LinkedHashMap<>();
       for (Map.Entry<TupleDescriptor, List<Expr>> entry:
         collectionConjuncts_.entrySet()) {
-        tcollectionConjuncts.put(entry.getKey().getId().asInt(),
-            Expr.treesToThrift(entry.getValue()));
+        tcollectionConjuncts.put(
+            serialCtx.translateTupleId(entry.getKey().getId()).asInt(),
+            Expr.treesToThrift(entry.getValue(), serialCtx));
       }
       msg.hdfs_scan_node.setCollection_conjuncts(tcollectionConjuncts);
     }
@@ -1945,22 +1955,26 @@ public class HdfsScanNode extends ScanNode {
     if (countStarSlot_ != null) {
       msg.hdfs_scan_node.setCount_star_slot_offset(countStarSlot_.getByteOffset());
     }
-    if (!statsConjuncts_.isEmpty()) {
-      for (Expr e: statsConjuncts_) {
-        msg.hdfs_scan_node.addToStats_conjuncts(e.treeToThrift());
+    // Stats/dictionary filter conjuncts do not change the logical set that would be
+    // returned, so they can be skipped for tuple caching.
+    if (!serialCtx.isTupleCache()) {
+      if (!statsConjuncts_.isEmpty()) {
+        for (Expr e: statsConjuncts_) {
+          msg.hdfs_scan_node.addToStats_conjuncts(e.treeToThrift());
+        }
       }
-    }
 
-    if (statsTuple_ != null) {
-      msg.hdfs_scan_node.setStats_tuple_id(statsTuple_.getId().asInt());
-    }
+      if (statsTuple_ != null) {
+        msg.hdfs_scan_node.setStats_tuple_id(statsTuple_.getId().asInt());
+      }
 
-    Map<Integer, List<Integer>> dictMap = new LinkedHashMap<>();
-    for (Map.Entry<SlotDescriptor, List<Integer>> entry :
-      dictionaryFilterConjuncts_.entrySet()) {
-      dictMap.put(entry.getKey().getId().asInt(), entry.getValue());
+      Map<Integer, List<Integer>> dictMap = new LinkedHashMap<>();
+      for (Map.Entry<SlotDescriptor, List<Integer>> entry :
+        dictionaryFilterConjuncts_.entrySet()) {
+        dictMap.put(entry.getKey().getId().asInt(), entry.getValue());
+      }
+      msg.hdfs_scan_node.setDictionary_filter_conjuncts(dictMap);
     }
-    msg.hdfs_scan_node.setDictionary_filter_conjuncts(dictMap);
     msg.hdfs_scan_node.setIs_partition_key_scan(isPartitionKeyScan_);
 
     for (HdfsFileFormat format : fileFormats_) {

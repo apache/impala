@@ -39,6 +39,7 @@ import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.SqlCastException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.FeSupport;
@@ -861,23 +862,29 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   protected String toSqlImpl() { return toSqlImpl(DEFAULT); };
 
-  // Convert this expr, including all children, to its Thrift representation.
+  // For locations that don't need to handle tuple caching yet, keep the
+  // old signature with a default ThriftSerializationCtx.
   public TExpr treeToThrift() {
+    return treeToThrift(new ThriftSerializationCtx());
+  }
+
+  // Convert this expr, including all children, to its Thrift representation.
+  public TExpr treeToThrift(ThriftSerializationCtx serialCtx) {
     if (type_.isNull()) {
       // Hack to ensure BE never sees TYPE_NULL. If an expr makes it this far without
       // being cast to a non-NULL type, the type doesn't matter and we can cast it
       // arbitrarily.
       Preconditions.checkState(IS_NULL_LITERAL.apply(this) ||
           this instanceof SlotRef);
-      return NullLiteral.create(ScalarType.BOOLEAN).treeToThrift();
+      return NullLiteral.create(ScalarType.BOOLEAN).treeToThrift(serialCtx);
     }
     TExpr result = new TExpr();
-    treeToThriftHelper(result);
+    treeToThriftHelper(result, serialCtx);
     return result;
   }
 
   // Append a flattened version of this expr, including all children, to 'container'.
-  protected void treeToThriftHelper(TExpr container) {
+  protected void treeToThriftHelper(TExpr container, ThriftSerializationCtx serialCtx) {
     Preconditions.checkState(isAnalyzed_,
         "Must be analyzed before serializing to thrift. %s", this);
     Preconditions.checkState(!type_.isWildcardDecimal());
@@ -894,16 +901,24 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       msg.setFn(thriftFn);
       if (fn_.hasVarArgs()) msg.setVararg_start_idx(fn_.getNumArgs() - 1);
     }
-    toThrift(msg);
+    toThrift(msg, serialCtx);
     container.addToNodes(msg);
     for (Expr child: children_) {
-      child.treeToThriftHelper(container);
+      child.treeToThriftHelper(container, serialCtx);
     }
   }
 
   // Convert this expr into msg (excluding children), which requires setting
   // msg.op as well as the expr-specific field.
   protected abstract void toThrift(TExprNode msg);
+
+  // Exprs should override this signature of toThrift() if they need access to
+  // the ThriftSerializationContext. That is necessary if the Expr is non-deterministic
+  // or uses SlotIds/TupleIds. Everything else can simply keep using the old signature
+  // for toThrift().
+  protected void toThrift(TExprNode msg, ThriftSerializationCtx serialCtx) {
+    toThrift(msg);
+  }
 
   /**
    * Returns the product of the given exprs' number of distinct values or -1 if any of
@@ -924,12 +939,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return numDistinctValues;
   }
 
-  public static List<TExpr> treesToThrift(List<? extends Expr> exprs) {
+  public static List<TExpr> treesToThrift(List<? extends Expr> exprs,
+      ThriftSerializationCtx serialCtx) {
     List<TExpr> result = new ArrayList<>();
     for (Expr expr: exprs) {
-      result.add(expr.treeToThrift());
+      result.add(expr.treeToThrift(serialCtx));
     }
     return result;
+  }
+
+  public static List<TExpr> treesToThrift(List<? extends Expr> exprs) {
+    return treesToThrift(exprs, new ThriftSerializationCtx());
   }
 
   public boolean isAggregate() {
