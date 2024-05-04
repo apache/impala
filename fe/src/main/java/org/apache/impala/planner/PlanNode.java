@@ -32,6 +32,7 @@ import java.util.Stack;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CompoundPredicate;
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -510,26 +511,33 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * This is called before calling toThrift().
    */
   private void initThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
-    msg.node_id = id_.asInt();
     msg.limit = limit_;
 
-    TExecStats estimatedStats = new TExecStats();
-    estimatedStats.setCardinality(
-        filteredCardinality_ > -1 ? filteredCardinality_ : cardinality_);
-    estimatedStats.setMemory_used(nodeResourceProfile_.getMemEstimateBytes());
-    msg.setLabel(getDisplayLabel());
-    msg.setLabel_detail(getDisplayLabelDetail());
-    msg.setEstimated_stats(estimatedStats);
+    if (!serialCtx.isTupleCache()) {
+      msg.node_id = id_.asInt();
+      TExecStats estimatedStats = new TExecStats();
+      estimatedStats.setCardinality(
+          filteredCardinality_ > -1 ? filteredCardinality_ : cardinality_);
+      estimatedStats.setMemory_used(nodeResourceProfile_.getMemEstimateBytes());
+      msg.setLabel(getDisplayLabel());
+      msg.setLabel_detail(getDisplayLabelDetail());
+      msg.setEstimated_stats(estimatedStats);
+    } else {
+      // Do not set node_id for tuple caching, as it is a global index that is impacted
+      // by the shape of the rest of the query.
+      msg.node_id = 0;
+    }
 
     Preconditions.checkState(tupleIds_.size() > 0);
     msg.setRow_tuples(Lists.<Integer>newArrayListWithCapacity(tupleIds_.size()));
     msg.setNullable_tuples(Lists.<Boolean>newArrayListWithCapacity(tupleIds_.size()));
     for (TupleId tid: tupleIds_) {
-      msg.addToRow_tuples(tid.asInt());
+      serialCtx.registerTuple(tid);
+      msg.addToRow_tuples(serialCtx.translateTupleId(tid).asInt());
       msg.addToNullable_tuples(nullableTupleIds_.contains(tid));
     }
     for (Expr e: conjuncts_) {
-      msg.addToConjuncts(e.treeToThrift());
+      msg.addToConjuncts(e.treeToThrift(serialCtx));
     }
     // Serialize any runtime filters
     for (RuntimeFilter filter : runtimeFilters_) {
@@ -559,7 +567,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     TPlanNode msg = new TPlanNode();
     ThriftSerializationCtx serialCtx = new ThriftSerializationCtx();
     initThrift(msg, serialCtx);
-    toThrift(msg);
+    toThrift(msg, serialCtx);
     container.addToNodes(msg);
     // For the purpose of the BE consider cross-fragment children (i.e.
     // ExchangeNodes and separated join builds) to have no children.
@@ -850,6 +858,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // IMPALA-8647: don't round cardinality down to zero for safety.
     if (cardinality == 0 && preConjunctCardinality > 0) return 1;
     return cardinality;
+  }
+
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
+    // This should only be used for PlanNodes that don't support tuple
+    // caching. Any PlanNode that supports tuple caching must override
+    // this method with its own implementation.
+    Preconditions.checkState(!isTupleCachingImplemented());
+    toThrift(msg);
   }
 
   // Convert this plan node into msg (excluding children), which requires setting
@@ -1298,12 +1314,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * This computes the cache key by hashing Thrift structures, but it only computes
    * the key if the node is eligible to avoid overhead.
    */
-  public void computeTupleCacheInfo() {
-    tupleCacheInfo_ = new TupleCacheInfo();
+  public void computeTupleCacheInfo(DescriptorTable descTbl) {
+    tupleCacheInfo_ = new TupleCacheInfo(descTbl);
     // computing the tuple cache information is a bottom-up tree traversal,
     // so visit and merge the children before processing this node's contents
     for (int i = 0; i < getChildCount(); i++) {
-      getChild(i).computeTupleCacheInfo();
+      getChild(i).computeTupleCacheInfo(descTbl);
       tupleCacheInfo_.mergeChild(getChild(i).getTupleCacheInfo());
     }
 
@@ -1323,7 +1339,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     TPlanNode msg = new TPlanNode();
     ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(tupleCacheInfo_);
     initThrift(msg, serialCtx);
-    toThrift(msg);
+    toThrift(msg, serialCtx);
     tupleCacheInfo_.hashThrift(msg);
     tupleCacheInfo_.finalize();
   }

@@ -27,6 +27,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TCastExpr;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
@@ -262,12 +263,12 @@ public class CastExpr extends Expr {
   }
 
   @Override
-  protected void treeToThriftHelper(TExpr container) {
+  protected void treeToThriftHelper(TExpr container, ThriftSerializationCtx serialCtx) {
     if (noOp_) {
-      getChild(0).treeToThriftHelper(container);
+      getChild(0).treeToThriftHelper(container, serialCtx);
       return;
     }
-    super.treeToThriftHelper(container);
+    super.treeToThriftHelper(container, serialCtx);
   }
 
   @Override

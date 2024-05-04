@@ -37,6 +37,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -260,8 +261,8 @@ public class IcebergScanNode extends HdfsScanNode {
   }
 
   @Override
-  protected void toThrift(TPlanNode msg) {
-    super.toThrift(msg);
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
+    super.toThrift(msg, serialCtx);
     Preconditions.checkNotNull(msg.hdfs_scan_node);
     if (deleteFileScanNodeId != null) {
       msg.hdfs_scan_node.setDeleteFileScanNodeId(deleteFileScanNodeId.asInt());

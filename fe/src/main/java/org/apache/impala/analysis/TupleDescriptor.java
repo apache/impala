@@ -32,6 +32,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TTupleDescriptor;
 
 import com.google.common.base.Joiner;
@@ -306,9 +307,10 @@ public class TupleDescriptor {
     for (SlotDescriptor slot: getSlotsRecursively()) slot.setIsMaterialized(true);
   }
 
-  public TTupleDescriptor toThrift(Integer tableId) {
+  public TTupleDescriptor toThrift(Integer tableId, ThriftSerializationCtx serialCtx) {
     TTupleDescriptor ttupleDesc =
-        new TTupleDescriptor(id_.asInt(), byteSize_, numNullBytes_);
+        new TTupleDescriptor(serialCtx.translateTupleId(id_).asInt(), byteSize_,
+            numNullBytes_);
     if (tableId == null) return ttupleDesc;
     ttupleDesc.setTableId(tableId);
     Preconditions.checkNotNull(path_);

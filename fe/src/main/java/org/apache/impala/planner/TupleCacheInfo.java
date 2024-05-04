@@ -18,15 +18,30 @@
 package org.apache.impala.planner;
 
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
 
+import org.apache.impala.analysis.DescriptorTable;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotId;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
+import org.apache.impala.common.IdGenerator;
+import org.apache.impala.common.ThriftSerializationCtx;
+import org.apache.impala.thrift.TSlotDescriptor;
+import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTupleDescriptor;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 
+import com.google.common.base.Preconditions;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.google.common.base.Preconditions;
 
 /**
  * TupleCacheInfo stores the eligibility and cache key information for a PlanNode.
@@ -41,8 +56,29 @@ import com.google.common.base.Preconditions;
  * To support this, it provides a function to incorporate any Thrift structure's
  * contents into the hash.
  *
+ * One critical piece of making the Thrift structures more general is id translation.
+ * Since TupleIds and SlotIds are global to the query, the value of any id will be
+ * influenced by the rest of the query unless we translate it to a local id.
+ * Plan nodes register their tuples via registerTuple(). This allows the tuple / slot
+ * information to be incorporated into the hash (by accessing the DescriptorTable),
+ * but it also allocates a local id and adds an entry to the translation map. Exprs
+ * and other structures can use translateSlotId() and translateTupleId() to adjust
+ * global ids to local ids. When TupleCacheInfos are merged, they merge the translations
+ * so there are no conflicts. Translation always goes in the global to local direction.
+ *
+ * There are a few reason that we don't try to maintain local ids earlier in planning:
+ * 1. Only tuple caching needs local ids. The extra modifications introduce risk and
+ *    don't dramatically improve the outcome.
+ * 2. The plan shape can change across the various phases of planning. In particular,
+ *    runtime filters add edges to the PlanNode graph. It is hard to produce a stable
+ *    local id until the plan is stable.
+ * 3. There is ongoing work to add a Calcite planner, and we will want to support tuple
+ *    caching for that planner. Any logic in analysis/planning that produces local ids
+ *    will need to also work for Calcite analyzer/planner.
+ *
  * For debuggability, this keeps a human-readable trace of what has been incorporated
  * into the cache key. This will help track down why two cache keys are different.
+ * Anything hashed will have a representation incorporated into the trace.
  *
  * This accumulates information from various sources, then it is finalized and cannot
  * be modified further. The hash key and hash trace cannot be accessed until finalize()
@@ -57,6 +93,21 @@ public class TupleCacheInfo {
   }
   private EnumSet<IneligibilityReason> ineligibilityReasons_;
 
+  // read-only reference to the query's descriptor table
+  // used for incorporating tuple/slot/table information
+  private DescriptorTable descriptorTable_;
+
+  // The tuple translation uses a tree map because we need a deterministic order
+  // for visting elements when merging two translation maps.
+  private final Map<TupleId, TupleId> tupleTranslationMap_ = new TreeMap<>();
+  // The slot translation does not need to be a deterministic order, so it
+  // can use a HashMap.
+  private final Map<SlotId, SlotId> slotTranslationMap_ = new HashMap<>();
+  private final IdGenerator<TupleId> translatedTupleIdGenerator_ =
+      TupleId.createGenerator();
+  private final IdGenerator<SlotId> translatedSlotIdGenerator_ =
+      SlotId.createGenerator();
+
   // These fields accumulate partial results until finalize() is called.
   private Hasher hasher_ = Hashing.murmur3_128().newHasher();
 
@@ -69,8 +120,9 @@ public class TupleCacheInfo {
   private String finalizedHashTrace_ = null;
   private String finalizedHashString_ = null;
 
-  public TupleCacheInfo() {
+  public TupleCacheInfo(DescriptorTable descTbl) {
     ineligibilityReasons_ = EnumSet.noneOf(IneligibilityReason.class);
+    descriptorTable_ = descTbl;
   }
 
   public void setIneligible(IneligibilityReason reason) {
@@ -129,6 +181,15 @@ public class TupleCacheInfo {
       // node. We could display each node's hash trace in explain plan,
       // and each contribution would be clear.
       hashTraceBuilder_.append(child.getHashTrace());
+
+      // Incorporate the child's tuple references. This is creating a new translation
+      // of TupleIds, because it will be incorporating multiple children.
+      for (TupleId id : child.tupleTranslationMap_.keySet()) {
+        // Register the tuples, but don't incorporate their content into the hash.
+        // The content was already hashed by the children, so we only need the
+        // id translation maps.
+        registerTupleHelper(id, false);
+      }
     }
   }
 
@@ -153,5 +214,96 @@ public class TupleCacheInfo {
     String thriftString = thriftObj.toString();
     Preconditions.checkState(thriftString != null);
     hashTraceBuilder_.append(thriftString);
+  }
+
+  /**
+   * registerTuple() does two things:
+   * 1. It incorporates a tuple's layout (and slot information) into the cache key.
+   * 2. It establishes a mapping from the global TupleIds/SlotIds to local
+   *    TupleIds/SlotIds. See explanation above about id translation.
+   * It should be called for any tuple that is referenced from a PlanNode that supports
+   * tuple caching. It is usually called via the ThriftSerializationCtx. If the tuple has
+   * already been registered, this immediately returns.
+   */
+  public void registerTuple(TupleId id) {
+    registerTupleHelper(id, true);
+  }
+
+  private void registerTupleHelper(TupleId id, boolean incorporateIntoHash) {
+    Preconditions.checkState(!finalized_,
+        "TupleCacheInfo is finalized and can't be modified");
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(this);
+    // If we haven't seen this tuple before:
+    // - assign an index for the tuple
+    // - assign indexes for the tuple's slots
+    // - incorporate the tuple and slots into the hash / hash trace
+    if (!tupleTranslationMap_.containsKey(id)) {
+      // Assign a translated tuple id and add it to the map
+      tupleTranslationMap_.put(id, translatedTupleIdGenerator_.getNextId());
+
+      TupleDescriptor tupleDesc = descriptorTable_.getTupleDesc(id);
+      if (incorporateIntoHash) {
+        // Incorporate the tupleDescriptor into the hash
+        boolean needs_table_id =
+            (tupleDesc.getTable() != null && !(tupleDesc.getTable() instanceof FeView));
+        TTupleDescriptor thriftTupleDesc =
+            tupleDesc.toThrift(needs_table_id ? new Integer(1) : null, serialCtx);
+        hashThrift(thriftTupleDesc);
+      }
+
+      // Go through the tuple's slots and add them
+      for (SlotDescriptor slotDesc : tupleDesc.getSlots()) {
+        // Assign a translated slot id and it to the map
+        slotTranslationMap_.put(slotDesc.getId(), translatedSlotIdGenerator_.getNextId());
+
+        if (incorporateIntoHash) {
+           // Incorporate the SlotDescriptor into the hash
+          TSlotDescriptor thriftSlotDesc = slotDesc.toThrift(serialCtx);
+          hashThrift(thriftSlotDesc);
+        }
+        // Slots can have nested tuples, so this can recurse. The depth is limited.
+        TupleDescriptor nestedTupleDesc = slotDesc.getItemTupleDesc();
+        if (nestedTupleDesc != null) {
+          registerTupleHelper(nestedTupleDesc.getId(), incorporateIntoHash);
+        }
+      }
+    }
+  }
+
+  /**
+   * registerTable() incorporates a table's information into the cache key. This is
+   * designed to be called by scan nodes via the ThriftSerializationCtx. In future,
+   * this will store information about the table's scan ranges.
+   */
+  public void registerTable(FeTable tbl) {
+    Preconditions.checkState(!(tbl instanceof FeView),
+        "registerTable() only applies to base tables");
+    Preconditions.checkState(tbl != null, "Invalid null argument to registerTable()");
+
+    // Right now, we only hash the database / table name.
+    TTableName tblName = tbl.getTableName().toThrift();
+    hashThrift(tblName);
+  }
+
+  /**
+   * getLocalTupleId() converts a global TupleId to a local TupleId (i.e an id that is
+   * not influenced by the structure of the rest of the query). Most users should access
+   * this via the ThriftSerializationCtx's translateTupleId().
+   */
+  public TupleId getLocalTupleId(TupleId globalId) {
+    // The tuple must have been registered before this reference happens
+    Preconditions.checkState(tupleTranslationMap_.containsKey(globalId));
+    return tupleTranslationMap_.get(globalId);
+  }
+
+  /**
+   * getLocalSlotId() converts a global TupleId to a local TupleId (i.e an id that is
+   * not influenced by the structure of the rest of the query). Most users should access
+   * this via the ThriftSerializationCtx's translateSlotId().
+   */
+  public SlotId getLocalSlotId(SlotId globalId) {
+    // The slot must have been registered before this reference happens
+    Preconditions.checkState(slotTranslationMap_.containsKey(globalId));
+    return slotTranslationMap_.get(globalId);
   }
 }

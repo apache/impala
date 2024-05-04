@@ -34,6 +34,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TDescriptorTableSerialized;
@@ -183,6 +184,7 @@ public class DescriptorTable {
    */
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx();
     // Maps from base table to its table id used in the backend.
     Map<FeTable, Integer> tableIdMap = new HashMap<>();
     // Used to check table level consistency
@@ -220,10 +222,10 @@ public class DescriptorTable {
       // currently are several situations in which we send materialized tuples without
       // a mem layout to the BE, e.g., when unnesting unions or when replacing plan
       // trees with an EmptySetNode.
-      result.addToTupleDescriptors(tupleDesc.toThrift(tableId));
+      result.addToTupleDescriptors(tupleDesc.toThrift(tableId, serialCtx));
       // Only serialize materialized slots
       for (SlotDescriptor slotD: tupleDesc.getMaterializedSlots()) {
-        result.addToSlotDescriptors(slotD.toThrift());
+        result.addToSlotDescriptors(slotD.toThrift(serialCtx));
       }
     }
     for (FeTable tbl: tableIdMap.keySet()) {
