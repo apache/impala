@@ -25,7 +25,7 @@ under the License.
 {{> www/query_detail_tabs.tmpl }}
 
 <br/>
-<div>
+<div id="profile_download_section">
     <h4>Download Profile (Available Formats):
         <a style="font-size:16px;" class="btn btn-primary profile-download"
             href="{{ __common__.host-url }}/query_profile_encoded?query_id={{query_id}}"
@@ -39,13 +39,83 @@ under the License.
     </h4>
 </div>
 
-<pre>{{profile}}</pre>
+<pre id="plain_text_profile_field">{{profile}}</pre>
 
 <script>
 $("#profile-tab").addClass("active");
+
+var dbOpenReq = indexedDB.open("imported_queries");
+var db;
+
+var supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
+
+function profileToString(profile, indent="") {
+  let info_strings = "";
+  if (profile.info_strings) {
+    profile.info_strings.forEach(info => {
+      info_strings = `${info_strings}${indent}  ${info.key}: ${info.value}\n`;
+    });
+  }
+  let event_sequences = "";
+  if (profile.event_sequences && profile.event_sequences.length > 0) {
+    event_sequences = `${event_sequences}${indent}  Event Sequences:\n`;
+    profile.event_sequences.forEach(eventSeq => {
+      event_sequences = `${event_sequences}${indent}    Offset: ${eventSeq.offset}\n`;
+      event_sequences = `${event_sequences}${indent}    Events:\n`;
+      eventSeq.events.forEach(event => {
+        event_sequences = `${event_sequences}${indent}      ${event.label}: ${new Date(event.timestamp).toISOString()}\n`;
+      });
+    });
+  }
+  let child_profiles = "";
+  if (profile.child_profiles) {
+    profile.child_profiles.forEach(childProfile => {
+      child_profiles = `${child_profiles}${profileToString(childProfile, indent + "  ")}`;
+    });
+  }
+  let counters = "";
+  if (profile.counters && profile.counters.length > 0) {
+    counters = `${counters}${indent}  Counters:\n`;
+      profile.counters.forEach(counter => {
+        counters = `${counters}${indent}    ${counter.counter_name}: ${counter.value} ${counter.unit}\n`;
+    });
+  }
+  return `${indent}${profile.profile_name}:\n${info_strings}${event_sequences}${child_profiles}${counters}`;
+}
+
 document.querySelectorAll('.profile-download').forEach(function (profile_link) {
   profile_link.download = profile_link.download.replace(/\W/g,'_');
 });
+
+if (window.location.search.includes("imported")) {
+  profile_download_section.remove();
+  var alertMessage = document.getElementsByClassName("alert alert-danger")[0];
+  if (alertMessage) {
+    alertMessage.remove();
+  }
+  var nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  nav_links = nav_links.getElementsByClassName("nav-link");
+  for (var i = 0; i < nav_links.length;) {
+    if (supported_tabs.includes(nav_links[i].textContent)) {
+      nav_links[i].href = `${nav_links[i].href}&imported=true`;
+      i++;
+    } else {
+      nav_links[i].parentElement.remove();
+    }
+  }
+
+  dbOpenReq.onsuccess = (e) => {
+    db = e.target.result;
+    db.onerror = (e) => {
+      console.log("IndexedDB error");
+      console.log(e);
+    }
+    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
+    profileStore.get(getQueryID()).onsuccess = (e) => {
+      plain_text_profile_field.textContent = profileToString(e.target.result.profile);
+    };
+  };
+}
 </script>
 {{> www/common-footer.tmpl }}
 

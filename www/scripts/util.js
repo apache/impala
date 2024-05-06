@@ -95,3 +95,15 @@ function renderTime(data, type, row) {
     }
     return data;
 }
+
+/*
+  * Useful to retrieve "query_id" from location string
+  * The search string format is "?query_id=<query_id>&imported=true&other_params"
+  * Query ID always starts from index 10 in above format
+*/
+function getQueryID() {
+  let query_id = window.location.search.split("query_id=")[1];
+  if (query_id) {
+    return query_id.substring(0, query_id.indexOf("&"));
+  }
+}

@@ -310,6 +310,9 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
     return;
   }
 
+  Value query_id_val(PrintId(unique_id).c_str(), document->GetAllocator());
+  document->AddMember("query_id", query_id_val, document->GetAllocator());
+
   ImpalaServer::RuntimeProfileOutput runtime_profile;
   stringstream ss;
   runtime_profile.string_output = &ss;
@@ -323,9 +326,6 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
 
   Value profile(ss.str().c_str(), document->GetAllocator());
   document->AddMember("profile", profile, document->GetAllocator());
-  const auto& args = req.parsed_args;
-  Value query_id(args.find("query_id")->second.c_str(), document->GetAllocator());
-  document->AddMember("query_id", query_id, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
