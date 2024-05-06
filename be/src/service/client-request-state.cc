@@ -112,6 +112,16 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
     start_time_us_(UnixMicros()),
     fetch_rows_timeout_us_(MICROS_PER_MILLI * query_options().fetch_rows_timeout_ms),
     parent_driver_(query_driver) {
+  bool is_external_fe = session_type() == TSessionType::EXTERNAL_FRONTEND;
+  // "Impala Backend Timeline" was specifically chosen to exploit the lexicographical
+  // ordering defined by the underlying std::map holding the timelines displayed in
+  // the web UI. This helps ensure that "Frontend Timeline" is displayed before
+  // "Impala Backend Timeline".
+  query_events_ = summary_profile_->AddEventSequence(
+      is_external_fe ? "Impala Backend Timeline" : "Query Timeline");
+  query_events_->Start();
+  profile_->AddChild(summary_profile_);
+
 #ifndef NDEBUG
   profile_->AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
       "DEBUG build of Impala. Use RELEASE builds to measure query performance.");
@@ -130,15 +140,6 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   rpc_read_timer_ = ADD_TIMER(server_profile_, "RPCReadTimer");
   rpc_write_timer_ = ADD_TIMER(server_profile_, "RPCWriteTimer");
   rpc_count_ = ADD_COUNTER(server_profile_, "RPCCount", TUnit::UNIT);
-  bool is_external_fe = session_type() == TSessionType::EXTERNAL_FRONTEND;
-  // "Impala Backend Timeline" was specifically chosen to exploit the lexicographical
-  // ordering defined by the underlying std::map holding the timelines displayed in
-  // the web UI. This helps ensure that "Frontend Timeline" is displayed before
-  // "Impala Backend Timeline".
-  query_events_ = summary_profile_->AddEventSequence(
-      is_external_fe ? "Impala Backend Timeline" : "Query Timeline");
-  query_events_->Start();
-  profile_->AddChild(summary_profile_);
 
   profile_->set_name("Query (id=" + PrintId(query_id()) + ")");
   summary_profile_->AddInfoString("Session ID", PrintId(session_id()));
