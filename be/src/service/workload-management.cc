@@ -122,7 +122,10 @@ static const Status SetupTable(InternalServer* server, const string& table_name,
   insert_query_opts[TImpalaQueryOptions::SYNC_DDL] = "true";
 
   StringStreamPop create_table_sql;
-  create_table_sql << "CREATE TABLE IF NOT EXISTS " << table_name << "(";
+  create_table_sql << "CREATE ";
+  // System tables do not have anything to purge, and must not be managed tables.
+  if (is_system_table) create_table_sql << "EXTERNAL ";
+  create_table_sql << "TABLE IF NOT EXISTS " << table_name << "(";
 
   for (const auto& field : FIELD_DEFINITIONS) {
     create_table_sql << GetColumnName(field) << " " << field.db_column_type;

@@ -34,9 +34,19 @@ class TestQueryLive(CustomClusterTestSuite):
   def setup_method(self, method):
     super(TestQueryLive, self).setup_method(method)
     create_match = self.assert_impalad_log_contains("INFO", r'\]\s+(\w+:\w+)\]\s+'
-        r'Analyzing query: CREATE TABLE IF NOT EXISTS sys.impala_query_live')
+        r'Analyzing query: CREATE EXTERNAL TABLE IF NOT EXISTS sys.impala_query_live')
     self.assert_impalad_log_contains("INFO", r'Query successfully unregistered: '
         r'query_id={}'.format(create_match.group(1)))
+
+  def assert_describe_extended(self):
+    describe_ext_result = self.execute_query('describe extended sys.impala_query_live')
+    assert len(describe_ext_result.data) == 80
+    system_table_re = re.compile(r'__IMPALA_SYSTEM_TABLE\s+true')
+    assert list(filter(system_table_re.search, describe_ext_result.data))
+    external_re = re.compile(r'EXTERNAL\s+TRUE')
+    assert list(filter(external_re.search, describe_ext_result.data))
+    external_table_re = re.compile(r'Table Type:\s+EXTERNAL_TABLE')
+    assert list(filter(external_table_re.search, describe_ext_result.data))
 
   def assert_impalads(self, profile, present=[0, 1, 2], absent=[]):
     for port_idx in present:
@@ -120,9 +130,7 @@ class TestQueryLive(CustomClusterTestSuite):
     # describe query
     describe_result = self.execute_query('describe sys.impala_query_live')
     assert len(describe_result.data) == 49
-
-    describe_ext_result = self.execute_query('describe extended sys.impala_query_live')
-    assert len(describe_ext_result.data) == 82
+    self.assert_describe_extended()
 
     # show create table
     show_create_tbl = self.execute_query('show create table sys.impala_query_live')
@@ -160,6 +168,23 @@ class TestQueryLive(CustomClusterTestSuite):
 
     # Drop table at the end, it's only recreated on impalad startup.
     self.execute_query_expect_success(self.client, 'drop table sys.impala_query_live')
+
+  # Must come directly after "drop table sys.impala_query_live"
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+                                                 "--cluster_id=test_query_live "
+                                                 "--use_local_catalog=true",
+                                    catalogd_args="--enable_workload_mgmt "
+                                                  "--catalog_topic_mode=minimal",
+                                    default_query_options=[
+                                      ('default_transactional_type', 'insert_only')])
+  def test_default_transactional(self):
+    """Asserts the query live table works when impala is started with
+    default_transactional_type=insert_only."""
+    result = self.client.execute("select * from functional.alltypes",
+        fetch_profile_after_close=True)
+    assert_query('sys.impala_query_live', self.client, 'test_query_live',
+                 result.runtime_profile)
+    self.assert_describe_extended()
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live "
