@@ -76,7 +76,9 @@ class Coordinator::FilterState {
   std::vector<FilterTarget>* targets() { return &targets_; }
   const std::vector<FilterTarget>& targets() const { return targets_; }
   int64_t first_arrival_time() const { return first_arrival_time_; }
+  bool has_first_arrival_time() const { return first_arrival_time_ > -1; }
   int64_t completion_time() const { return completion_time_; }
+  bool has_completion_time() const { return completion_time_ > -1; }
   const TRuntimeFilterDesc& desc() const { return desc_; }
   bool is_bloom_filter() const { return desc_.type == TRuntimeFilterType::BLOOM; }
   bool is_min_max_filter() const { return desc_.type == TRuntimeFilterType::MIN_MAX; }
@@ -158,10 +160,10 @@ class Coordinator::FilterState {
   InListFilterPB in_list_filter_;
 
   /// Time at which first local filter arrived.
-  int64_t first_arrival_time_ = 0L;
+  int64_t first_arrival_time_ = -1L;
 
   /// Time at which all local filters arrived.
-  int64_t completion_time_ = 0L;
+  int64_t completion_time_ = -1L;
 
   /// Per-object lock so that we can avoid holding the global routing table
   /// lock for every filter update.

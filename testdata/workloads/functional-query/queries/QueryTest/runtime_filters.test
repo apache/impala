@@ -195,10 +195,10 @@ select STRAIGHT_JOIN count(*) from alltypes a
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, FiltersReceived): $NUM_FILTER_UPDATES
-row_regex: .*REMOTE.*ms.*ms.*true
+row_regex: .*REMOTE.*.s .*.s .*true
 ---- RUNTIME_PROFILE: table_format=kudu
 aggregation(SUM, FiltersReceived): 3
-row_regex: .*REMOTE.*ms.*ms.*true
+row_regex: .*REMOTE.*.s .*.s .*true
 ====
 
 

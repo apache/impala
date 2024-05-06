@@ -670,14 +670,14 @@ string Coordinator::FilterDebugString() {
     row.push_back(join(partition_filter, ", "));
 
     if (filter_mode_ == TRuntimeFilterMode::GLOBAL) {
-      int pending_count = state.completion_time() != 0L ? 0 : state.pending_count();
+      int pending_count = state.has_completion_time() ? 0 : state.pending_count();
       row.push_back(Substitute("$0 ($1)", pending_count, state.num_producers()));
-      if (state.first_arrival_time() == 0L) {
+      if (!state.has_first_arrival_time()) {
         row.push_back("N/A");
       } else {
         row.push_back(PrettyPrinter::Print(state.first_arrival_time(), TUnit::TIME_NS));
       }
-      if (state.completion_time() == 0L) {
+      if (!state.has_completion_time()) {
         row.push_back("N/A");
       } else {
         row.push_back(PrettyPrinter::Print(state.completion_time(), TUnit::TIME_NS));
@@ -1630,8 +1630,8 @@ void Coordinator::FilterState::ApplyUpdate(
     const UpdateFilterParamsPB& params, Coordinator* coord, RpcContext* context) {
   DCHECK(enabled());
   DCHECK_GT(pending_count_, 0);
-  DCHECK_EQ(completion_time_, 0L);
-  if (first_arrival_time_ == 0L) {
+  DCHECK(!has_completion_time());
+  if (!has_first_arrival_time()) {
     first_arrival_time_ = coord->query_events_->ElapsedTime();
   }
 
