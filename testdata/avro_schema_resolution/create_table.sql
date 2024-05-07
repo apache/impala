@@ -166,6 +166,10 @@ TBLPROPERTIES ('avro.schema.literal'='{
 -- any preexisting data files, which in turn will fail the query.
 MSCK REPAIR TABLE avro_coldef;
 
+-- Disable the restriction of HIVE-24157, otherwise casting TIMESTAMP to BIGINT is
+-- prohibited. Note that type of timestamp_col is long in 'avro.schema.literal'.
+SET hive.strict.timestamp.conversion=false;
+
 INSERT OVERWRITE TABLE avro_coldef PARTITION(year=2014, month=1)
 SELECT bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
