@@ -636,7 +636,7 @@ select * from functional.alltypes_datasource where id = 1 limit 7
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
-data source predicates: id = 1
+   data source predicates: id = 1
    limit: 7
    row-size=116B cardinality=7
 ====

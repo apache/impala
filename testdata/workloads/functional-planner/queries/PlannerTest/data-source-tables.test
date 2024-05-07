@@ -8,8 +8,8 @@ where tinyint_col < 256 and
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
-data source predicates: tinyint_col < 256
-predicates: float_col != 0, CAST(int_col AS BIGINT) < 10
+   data source predicates: tinyint_col < 256
+   predicates: float_col != 0, CAST(int_col AS BIGINT) < 10
    row-size=116B cardinality=500
 ====
 # The first four predicates are in a form that can be offered to the data source
@@ -28,8 +28,8 @@ where 10 > int_col and
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
-data source predicates: int_col < 10, string_col != 'Foo'
-predicates: double_col < 5, NOT bool_col = TRUE, NOT double_col = 5.0, string_col != 'Bar'
+   data source predicates: int_col < 10, string_col != 'Foo'
+   predicates: double_col < 5, NOT bool_col = TRUE, NOT double_col = 5.0, string_col != 'Bar'
    row-size=116B cardinality=500
 ====
 # The 3rd predicate is not in a form that can be offered to the data source so
@@ -43,8 +43,8 @@ where int_col < 10 and
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
-data source predicates: int_col < 10, bool_col != FALSE
-predicates: double_col > 5, string_col IN ('Foo', 'Bar')
+   data source predicates: int_col < 10, bool_col != FALSE
+   predicates: double_col > 5, string_col IN ('Foo', 'Bar')
    row-size=116B cardinality=500
 ====
 # Tests that all predicates from the On-clause are applied (IMPALA-805)
@@ -66,11 +66,11 @@ PLAN-ROOT SINK
 |  row-size=35B cardinality=500
 |
 |--01:SCAN DATA SOURCE [functional.alltypes_datasource b]
-|--predicates: b.id = b.int_col, b.id = b.bigint_col
+|     predicates: b.id = b.int_col, b.id = b.bigint_col
 |     row-size=0B cardinality=500
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource a]
-predicates: a.id = a.int_col, a.id = a.tinyint_col, a.int_col = a.bigint_col, a.tinyint_col = a.smallint_col
+   predicates: a.id = a.int_col, a.id = a.tinyint_col, a.int_col = a.bigint_col, a.tinyint_col = a.smallint_col
    row-size=0B cardinality=500
 ====
 # Tests that <=>, IS DISTINCT FROM, and IS NOT DISTINCT FROM all can be offered to the
@@ -86,8 +86,8 @@ and bigint_col is not distinct from 5
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
-data source predicates: id IS NOT DISTINCT FROM 1, tinyint_col IS DISTINCT FROM 2, int_col IS NOT DISTINCT FROM 4
-predicates: bigint_col IS NOT DISTINCT FROM 5, bool_col IS NOT DISTINCT FROM TRUE, smallint_col IS DISTINCT FROM 3
+   data source predicates: id IS NOT DISTINCT FROM 1, tinyint_col IS DISTINCT FROM 2, int_col IS NOT DISTINCT FROM 4
+   predicates: bigint_col IS NOT DISTINCT FROM 5, bool_col IS NOT DISTINCT FROM TRUE, smallint_col IS DISTINCT FROM 3
    row-size=116B cardinality=500
 ====
 # EmptySet datasource
@@ -104,32 +104,275 @@ PLAN-ROOT SINK
 00:EMPTYSET
 ====
 # IMPALA-12815: Support timestamp as external datasource scan predicates
+# Date type of predicate can be offered to jdbc data source.
 select * from functional.alltypes_jdbc_datasource where date_col > DATE '2009-01-02'
 and timestamp_col > '2009-01-02 00:12:00' limit 15
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.alltypes_jdbc_datasource]
-data source predicates: date_col > DATE '2009-01-02', timestamp_col > TIMESTAMP '2009-01-02 00:12:00'
+   data source predicates: date_col > DATE '2009-01-02', timestamp_col > TIMESTAMP '2009-01-02 00:12:00'
    limit: 15
    row-size=64B cardinality=1
 ====
 # IMPALA-12815: use timestamp with cast() and to_timestamp()
+# Timestamp type of predicate can be offered to jdbc data source.
 select * from functional.alltypes_jdbc_datasource where timestamp_col between
 date_add(cast('2009-01-01' as timestamp), interval 1 day) and to_timestamp('Jan 04, 2009', 'MMM dd, yyyy') limit 15;
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.alltypes_jdbc_datasource]
-data source predicates: timestamp_col >= TIMESTAMP '2009-01-02 00:00:00', timestamp_col <= TIMESTAMP '2009-01-04 00:00:00'
+   data source predicates: timestamp_col >= TIMESTAMP '2009-01-02 00:00:00', timestamp_col <= TIMESTAMP '2009-01-04 00:00:00'
    limit: 15
    row-size=64B cardinality=1
 ====
+# Decimal type of predicate can be offered to jdbc data source.
 select * from functional.jdbc_decimal_tbl where d3 > 123.456 and d5 < 10.0
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN DATA SOURCE [functional.jdbc_decimal_tbl]
-data source predicates: d3 > 123.456, d5 < 10.0
+   data source predicates: d3 > 123.456, d5 < 10.0
    row-size=52B cardinality=1
+====
+# Implicit casting date_dim.d_date to date cannot be offered to jdbc data source.
+select s_store_id as store_id,
+       sum(ss_ext_sales_price) as sales,
+       sum(coalesce(sr_return_amt, 0)) as return_amt,
+       sum(ss_net_profit - coalesce(sr_net_loss, 0)) as profit
+  from tpcds_jdbc.store_sales left outer join tpcds_jdbc.store_returns on
+         (ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number),
+       tpcds_jdbc.date_dim,
+       tpcds_jdbc.store,
+       tpcds_jdbc.item,
+       tpcds_jdbc.promotion
+ where ss_sold_date_sk = d_date_sk
+       and d_date between cast('2000-08-23' as date)
+           and (cast('2000-08-23' as date) + interval 30 days)
+       and ss_store_sk = s_store_sk
+       and ss_item_sk = i_item_sk
+       and i_current_price > 50
+       and ss_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+ group by s_store_id;
+---- PLAN
+PLAN-ROOT SINK
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum(ss_ext_sales_price), sum(coalesce(sr_return_amt, 0)), sum(ss_net_profit - coalesce(sr_net_loss, 0))
+|  group by: s_store_id
+|  row-size=60B cardinality=1
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_promo_sk = p_promo_sk
+|  row-size=104B cardinality=1
+|
+|--05:SCAN DATA SOURCE [tpcds_jdbc.promotion]
+|     data source predicates: p_channel_tv = 'N'
+|     row-size=0B cardinality=1
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  row-size=100B cardinality=1
+|
+|--04:SCAN DATA SOURCE [tpcds_jdbc.item]
+|     data source predicates: i_current_price > 50
+|     row-size=0B cardinality=1
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  row-size=92B cardinality=1
+|
+|--03:SCAN DATA SOURCE [tpcds_jdbc.store]
+|     row-size=0B cardinality=1
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  row-size=76B cardinality=1
+|
+|--02:SCAN DATA SOURCE [tpcds_jdbc.date_dim]
+|     predicates: d_date <= DATE '2000-09-22', d_date >= DATE '2000-08-23'
+|     row-size=0B cardinality=1
+|
+06:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  row-size=60B cardinality=1
+|
+|--01:SCAN DATA SOURCE [tpcds_jdbc.store_returns]
+|     row-size=0B cardinality=1
+|
+00:SCAN DATA SOURCE [tpcds_jdbc.store_sales]
+   row-size=0B cardinality=1
+====
+# Explicit casting date_dim.d_date to timestamp cannot be offered to jdbc data source.
+select s_store_id as store_id,
+       sum(ss_ext_sales_price) as sales,
+       sum(coalesce(sr_return_amt, 0)) as return_amt,
+       sum(ss_net_profit - coalesce(sr_net_loss, 0)) as profit
+  from tpcds_jdbc.store_sales left outer join tpcds_jdbc.store_returns on
+         (ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number),
+       tpcds_jdbc.date_dim,
+       tpcds_jdbc.store,
+       tpcds_jdbc.item,
+       tpcds_jdbc.promotion
+ where ss_sold_date_sk = d_date_sk
+       and cast(d_date as timestamp) between cast('2000-08-23' as timestamp)
+           and (cast('2000-08-23' as timestamp) + interval 30 days)
+       and ss_store_sk = s_store_sk
+       and ss_item_sk = i_item_sk
+       and i_current_price > 50
+       and ss_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+ group by s_store_id;
+---- PLAN
+PLAN-ROOT SINK
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum(ss_ext_sales_price), sum(coalesce(sr_return_amt, 0)), sum(ss_net_profit - coalesce(sr_net_loss, 0))
+|  group by: s_store_id
+|  row-size=60B cardinality=1
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_promo_sk = p_promo_sk
+|  row-size=104B cardinality=1
+|
+|--05:SCAN DATA SOURCE [tpcds_jdbc.promotion]
+|     data source predicates: p_channel_tv = 'N'
+|     row-size=0B cardinality=1
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  row-size=100B cardinality=1
+|
+|--04:SCAN DATA SOURCE [tpcds_jdbc.item]
+|     data source predicates: i_current_price > 50
+|     row-size=0B cardinality=1
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  row-size=92B cardinality=1
+|
+|--03:SCAN DATA SOURCE [tpcds_jdbc.store]
+|     row-size=0B cardinality=1
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  row-size=76B cardinality=1
+|
+|--02:SCAN DATA SOURCE [tpcds_jdbc.date_dim]
+|     predicates: CAST(d_date AS TIMESTAMP) <= TIMESTAMP '2000-09-22 00:00:00', CAST(d_date AS TIMESTAMP) >= TIMESTAMP '2000-08-23 00:00:00'
+|     row-size=0B cardinality=1
+|
+06:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  row-size=60B cardinality=1
+|
+|--01:SCAN DATA SOURCE [tpcds_jdbc.store_returns]
+|     row-size=0B cardinality=1
+|
+00:SCAN DATA SOURCE [tpcds_jdbc.store_sales]
+   row-size=0B cardinality=1
+====
+# Implicit casting date_dim.d_date to timestamp cannot be offered to jdbc data source.
+select s_store_id as store_id,
+       sum(ss_ext_sales_price) as sales,
+       sum(coalesce(sr_return_amt, 0)) as return_amt,
+       sum(ss_net_profit - coalesce(sr_net_loss, 0)) as profit
+  from tpcds_jdbc.store_sales left outer join tpcds_jdbc.store_returns on
+         (ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number),
+       tpcds_jdbc.date_dim,
+       tpcds_jdbc.store,
+       tpcds_jdbc.item,
+       tpcds_jdbc.promotion
+ where ss_sold_date_sk = d_date_sk
+       and d_date between cast('2000-08-23' as timestamp)
+           and (cast('2000-08-23' as timestamp) + interval 30 days)
+       and ss_store_sk = s_store_sk
+       and ss_item_sk = i_item_sk
+       and i_current_price > 50
+       and ss_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+ group by s_store_id;
+---- PLAN
+PLAN-ROOT SINK
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum(ss_ext_sales_price), sum(coalesce(sr_return_amt, 0)), sum(ss_net_profit - coalesce(sr_net_loss, 0))
+|  group by: s_store_id
+|  row-size=60B cardinality=1
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_promo_sk = p_promo_sk
+|  row-size=104B cardinality=1
+|
+|--05:SCAN DATA SOURCE [tpcds_jdbc.promotion]
+|     data source predicates: p_channel_tv = 'N'
+|     row-size=0B cardinality=1
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  row-size=100B cardinality=1
+|
+|--04:SCAN DATA SOURCE [tpcds_jdbc.item]
+|     data source predicates: i_current_price > 50
+|     row-size=0B cardinality=1
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  row-size=92B cardinality=1
+|
+|--03:SCAN DATA SOURCE [tpcds_jdbc.store]
+|     row-size=0B cardinality=1
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  row-size=76B cardinality=1
+|
+|--02:SCAN DATA SOURCE [tpcds_jdbc.date_dim]
+|     predicates: d_date <= TIMESTAMP '2000-09-22 00:00:00', d_date >= TIMESTAMP '2000-08-23 00:00:00'
+|     row-size=0B cardinality=1
+|
+06:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  row-size=60B cardinality=1
+|
+|--01:SCAN DATA SOURCE [tpcds_jdbc.store_returns]
+|     row-size=0B cardinality=1
+|
+00:SCAN DATA SOURCE [tpcds_jdbc.store_sales]
+   row-size=0B cardinality=1
+====
+# Arithmetic expression cannot be offered to jdbc data source.
+select d_year from tpcds_jdbc.date_dim where (d_date_sk + 2) < 2515030;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN DATA SOURCE [tpcds_jdbc.date_dim]
+   predicates: (d_date_sk + 2) < 2515030
+   row-size=8B cardinality=1
+====
+# Built-in function cannot be offered to jdbc data source.
+select d_year from tpcds_jdbc.date_dim where length(d_date_id) <= 16;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN DATA SOURCE [tpcds_jdbc.date_dim]
+   predicates: length(d_date_id) <= 16
+   row-size=16B cardinality=1
+====
+# Explicit casting int_col cannot be offered to jdbc data source,
+# implicit casting float_col and double_col can be offered to jdbc data source.
+select * from functional.alltypes_jdbc_datasource
+where tinyint_col < 256 and
+      float_col != cast(0 as double) and
+      double_col > cast(5 as float) and
+      cast(int_col as bigint) < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN DATA SOURCE [functional.alltypes_jdbc_datasource]
+   data source predicates: tinyint_col < 256, float_col != 0, double_col > 5
+   predicates: CAST(int_col AS BIGINT) < 10
+   row-size=64B cardinality=1
 ====

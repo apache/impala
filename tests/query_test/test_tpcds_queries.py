@@ -1078,9 +1078,8 @@ class TestTpcdsQueryForJdbcTables(ImpalaTestSuite):
   def test_tpcds_q80(self, vector):
     self.run_test_case('tpcds-decimal_v2-q80', vector, use_db='tpcds_jdbc')
 
-  # TODO: IMPALA-13018 fix unmatched results for external JDBC tables.
-  # def test_tpcds_q80a(self, vector):
-  #   self.run_test_case('tpcds-decimal_v2-q80a', vector, use_db='tpcds_jdbc')
+  def test_tpcds_q80a(self, vector):
+    self.run_test_case('tpcds-decimal_v2-q80a', vector, use_db='tpcds_jdbc')
 
   def test_tpcds_q81(self, vector):
     self.run_test_case('tpcds-decimal_v2-q81', vector, use_db='tpcds_jdbc')
