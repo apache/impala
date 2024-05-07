@@ -2906,6 +2906,12 @@ public class CatalogServiceCatalog extends Catalog {
     return hdfsTable;
   }
 
+  public TCatalogObject invalidateTable(TTableName tableName,
+      Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded,
+      EventSequence catalogTimeline) {
+    return invalidateTable(tableName, tblWasRemoved, dbWasAdded, catalogTimeline, -1L);
+  }
+
   /**
    * Invalidates the table in the catalog cache, potentially adding/removing the table
    * from the cache based on whether it exists in the Hive Metastore.
@@ -2927,7 +2933,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TCatalogObject invalidateTable(TTableName tableName,
       Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded,
-      EventSequence catalogTimeline) {
+      EventSequence catalogTimeline, long eventId) {
     tblWasRemoved.setRef(false);
     dbWasAdded.setRef(false);
     String dbName = tableName.getDb_name();
@@ -2943,13 +2949,11 @@ public class CatalogServiceCatalog extends Catalog {
     // 2) Empty - Table does not exist in metastore.
     // 3) unknown (null) - There was exception thrown by the metastore client.
     List<TableMeta> metaRes = null;
-    org.apache.hadoop.hive.metastore.api.Table msTbl = null;
     Db db = null;
     try (MetaStoreClient msClient = getMetaStoreClient(catalogTimeline)) {
       org.apache.hadoop.hive.metastore.api.Database msDb = null;
       try {
         metaRes = getTableMetaFromHive(msClient, dbName, tblName);
-        msTbl = msClient.getHiveClient().getTable(dbName, tblName);
         catalogTimeline.markEvent(FETCHED_HMS_TABLE);
       } catch (UnknownDBException | NoSuchObjectException e) {
         // The parent database does not exist in the metastore. Treat this the same
@@ -3002,10 +3006,9 @@ public class CatalogServiceCatalog extends Catalog {
     // Add a new uninitialized table to the table cache, effectively invalidating
     // any existing entry. The metadata for the table will be loaded lazily, on the
     // on the next access to the table.
-    Preconditions.checkNotNull(msTbl);
     Table newTable = addIncompleteTable(dbName, tblName,
         MetastoreShim.mapToInternalTableType(tblMeta.getTableType()),
-        tblMeta.getComments());
+        tblMeta.getComments(), eventId);
     Preconditions.checkNotNull(newTable);
     if (loadInBackground_) {
       tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),

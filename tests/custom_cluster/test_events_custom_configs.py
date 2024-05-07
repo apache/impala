@@ -1261,6 +1261,21 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       results = self.client.execute("select i from " + fq_tbl)
       assert results.data == ["1", "2", "3"]
 
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=5")
+  def test_invalidate_better_create_event_id(self, unique_database):
+    """This test should set better create event id for invalidate table"""
+    test_tbl = "test_invalidate_table"
+    self.client.execute("create table {}.{} (i int)".format(unique_database, test_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    tables_removed_before = EventProcessorUtils.get_int_metric("tables-removed")
+    self.client.execute("drop table {}.{}".format(unique_database, test_tbl))
+    self.run_stmt_in_hive(
+        "create table {}.{} (i int, j int)".format(unique_database, test_tbl))
+    self.client.execute("invalidate metadata {}.{}".format(unique_database, test_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    tables_removed_after = EventProcessorUtils.get_int_metric("tables-removed")
+    assert tables_removed_after == tables_removed_before
+
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
