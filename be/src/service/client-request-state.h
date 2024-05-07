@@ -28,6 +28,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "util/condition-variable.h"
 #include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 
@@ -494,6 +495,17 @@ class ClientRequestState {
   void UnRegisterRemainingRPCs();
   // Copy pending RPCs for a retried query
   void CopyRPCs(ClientRequestState& from_request);
+
+  // Update the profile counter 'GetInFlightProfileTimeStats' which is the summary stats
+  // of time spent in dumping the profile before the query is archived.
+  void UpdateGetInFlightProfileTime(int64_t elapsed_time_ns) {
+    get_inflight_profile_time_stats_->UpdateCounter(elapsed_time_ns);
+  }
+  // Update the profile counter 'ClientFetchLockWaitTimer' which is the cumulative time
+  // that client fetch requests waiting for locks.
+  void AddClientFetchLockWaitTime(int64_t lock_wait_time_ns) {
+    client_fetch_lock_wait_timer_->Add(lock_wait_time_ns);
+  }
  protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
   /// when this function is called for the first time, calling it multiple times does not
@@ -652,6 +664,11 @@ class ClientRequestState {
   /// Timer to track idle time for the above counter.
   MonotonicStopWatch client_wait_sw_;
   int64_t last_client_wait_time_ = 0;
+
+  // Tracks time spent in dumping the profile before the query is archived.
+  RuntimeProfile::SummaryStatsCounter* get_inflight_profile_time_stats_;
+  // Tracks time client fetch requests waiting for locks.
+  RuntimeProfile::Counter* client_fetch_lock_wait_timer_;
 
   // Tracks time spent by client calls reading RPC arguments
   RuntimeProfile::Counter* rpc_read_timer_;

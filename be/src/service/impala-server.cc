@@ -389,6 +389,9 @@ DEFINE_int32(wait_for_new_catalog_service_id_max_iterations, 10,
     "this case it will wait indefinitely if "
     "'--wait_for_new_catalog_service_id_timeout_sec' is not set.");
 
+DEFINE_int64(slow_profile_dump_warning_threshold_ms, 500,
+    "(Advanced) Threshold for considering dumping a profile to be unusually slow.");
+
 // Flags for JWT token based authentication.
 DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);
@@ -734,6 +737,7 @@ Status ImpalaServer::GetRuntimeProfileOutput(const string& user,
     return Status::Expected("Query plan is not ready.");
   }
   lock_guard<mutex> l(*query_handle->lock());
+  int64_t start_time_ns = MonotonicNanos();
   RETURN_IF_ERROR(CheckProfileAccess(
       user, query_handle->effective_user(), query_handle->user_has_profile_access()));
   if (query_handle->GetCoordinator() != nullptr) {
@@ -750,6 +754,15 @@ Status ImpalaServer::GetRuntimeProfileOutput(const string& user,
     DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
     query_handle->profile()->PrettyPrint(profile->string_output);
   }
+  int64_t elapsed_time_ns = MonotonicNanos() - start_time_ns;
+  if (elapsed_time_ns > FLAGS_slow_profile_dump_warning_threshold_ms * 1000 * 1000) {
+    LOG(WARNING) << "Slow in dumping " << format << " profile of "
+        << PrintId(query_handle->query_id()) << ". User " << user
+        << " held the lock for " << PrettyPrinter::Print(elapsed_time_ns, TUnit::TIME_NS)
+        << " (" << elapsed_time_ns << "ns). This might block client in fetching query "
+        << "results.";
+  }
+  query_handle->UpdateGetInFlightProfileTime(elapsed_time_ns);
   return Status::OK();
 }
 
@@ -1730,15 +1743,11 @@ Status ImpalaServer::GetQueryHandle(
   DCHECK(query_handle != nullptr);
   shared_ptr<QueryDriver> query_driver = GetQueryDriver(query_id, return_unregistered);
   if (UNLIKELY(query_driver == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    VLOG(1) << err.GetDetail();
-    return err;
+    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
   }
   ClientRequestState* request_state = query_driver->GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    VLOG(1) << err.GetDetail();
-    return err;
+    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
   }
   query_handle->SetHandle(query_driver, request_state);
   return Status::OK();

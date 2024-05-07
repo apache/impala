@@ -1174,6 +1174,8 @@ void ImpalaHttpHandler::QueryBackendsHandler(
       return;
     }
     query_handle->GetCoordinator()->BackendsToJson(document);
+  } else {
+    VLOG(1) << "Failed to get backends of the query: " << status.GetDetail();
   }
 }
 
@@ -1197,6 +1199,8 @@ void ImpalaHttpHandler::QueryFInstancesHandler(
       return;
     }
     query_handle->GetCoordinator()->FInstanceStatsToJson(document);
+  } else {
+    VLOG(1) << "Failed to get fragment instances of the query: " << status.GetDetail();
   }
 }
 
