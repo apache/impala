@@ -347,8 +347,11 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
 
   if (query_handle->IsRetriedQuery()) {
     QueryHandle original_query_handle;
-    RAISE_IF_ERROR(GetQueryHandle(query_id, &original_query_handle),
-        SQLSTATE_GENERAL_ERROR);
+    Status status = GetQueryHandle(query_id, &original_query_handle);
+    if (UNLIKELY(!status.ok())) {
+      VLOG(1) << "Error in get_log, could not get query handle: " << status.GetDetail();
+      RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+    }
     DCHECK(!original_query_handle->query_status().ok());
     error_log_ss << Substitute(GET_LOG_QUERY_RETRY_INFO_FORMAT,
         original_query_handle->query_status().GetDetail(),
@@ -597,8 +600,11 @@ Status ImpalaServer::FetchInternal(TUniqueId query_id, const bool start_over,
     return Status::OK();
   }
 
+  int64_t start_time_ns = MonotonicNanos();
   lock_guard<mutex> frl(*query_handle->fetch_rows_lock());
   lock_guard<mutex> l(*query_handle->lock());
+  int64_t lock_wait_time_ns = MonotonicNanos() - start_time_ns;
+  query_handle->AddClientFetchLockWaitTime(lock_wait_time_ns);
 
   if (query_handle->num_rows_fetched() == 0) {
     query_handle->set_fetched_rows();

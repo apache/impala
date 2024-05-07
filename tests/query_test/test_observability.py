@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 from datetime import datetime
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.util.filesystem_utils import IS_EC, WAREHOUSE
@@ -961,6 +962,31 @@ class TestObservability(ImpalaTestSuite):
     assert scan['detail'] == 'tpch_parquet.lineitem'
     runtime_profile = result.runtime_profile
     assert "cardinality=575.77K(filtered from 6.00M)" in runtime_profile
+
+  def test_query_profile_contains_get_inflight_profile_counter(self):
+    """Test that counter for getting inflight profiles appears in the profile"""
+    # This query runs 15s
+    query = "select count(*) from functional.alltypes where bool_col = sleep(50)"
+    handle = self.execute_query_async(query)
+    query_id = handle.get_handle().id
+
+    cluster = ImpalaCluster.get_e2e_test_cluster()
+    impalad = cluster.get_first_impalad()
+    profile_urls = [
+      "query_profile?query_id=",
+      "query_profile_encoded?query_id=",
+      "query_profile_json?query_id=",
+      "query_profile_plain_text?query_id=",
+    ]
+    for url in profile_urls:
+      impalad.service.read_debug_webpage(url + query_id)
+    profile = self.client.get_runtime_profile(handle)
+    assert "GetInFlightProfileTimeStats:" in profile
+    assert "ClientFetchLockWaitTimer:" in profile
+    # Make sure the counter actually records the requests
+    samples_search = re.search(r"GetInFlightProfileTimeStats:.*samples: (\d+)", profile)
+    num_samples = int(samples_search.group(1))
+    assert num_samples > 0
 
 
 class TestQueryStates(ImpalaTestSuite):

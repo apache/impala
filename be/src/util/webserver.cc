@@ -149,6 +149,9 @@ DEFINE_bool(disable_content_security_policy_header, false,
     "If true then the webserver will not add the Content-Security-Policy "
     "HTTP header to HTTP responses");
 
+DEFINE_int64(slow_http_response_warning_threshold_ms, 500,
+    "(Advanced) Threshold for considering a HTTP response to be unusually slow.");
+
 DECLARE_bool(enable_ldap_auth);
 DECLARE_string(hostname);
 DECLARE_bool(is_coordinator);
@@ -938,9 +941,16 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
         connection, req, *url_handler, &output, &content_type, cookie_rand_value);
   }
 
-  VLOG(3) << "Rendering page " << request_info->uri << " took "
-          << PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
-
+  uint64_t elapsed_time_ns = sw.ElapsedTime();
+  if (elapsed_time_ns > FLAGS_slow_http_response_warning_threshold_ms * 1000 * 1000) {
+    LOG(WARNING) << "Rendering page " << request_info->uri << " took "
+        << PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS)
+        << ". User: " << req.source_user << ". Address: " << req.source_socket
+        << ". Args: " << req.query_string;
+  } else {
+    VLOG(3) << "Rendering page " << request_info->uri << " took "
+            << PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
+  }
   SendResponse(connection, HttpStatusCodeToString(response),
       Webserver::GetMimeType(content_type), output.str(), response_headers);
 

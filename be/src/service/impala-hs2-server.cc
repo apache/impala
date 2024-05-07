@@ -203,8 +203,11 @@ Status ImpalaServer::FetchInternal(TUniqueId query_id, SessionState* session,
     return Status::OK();
   }
 
+  int64_t start_time_ns = MonotonicNanos();
   lock_guard<mutex> frl(*query_handle->fetch_rows_lock());
   lock_guard<mutex> l(*query_handle->lock());
+  int64_t lock_wait_time_ns = MonotonicNanos() - start_time_ns;
+  query_handle->AddClientFetchLockWaitTime(lock_wait_time_ns);
 
   // Check for cancellation or an error.
   RETURN_IF_ERROR(query_handle->query_status());
@@ -1091,8 +1094,12 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   // Report the query status, if the query failed or has been retried.
   if (query_handle->IsRetriedQuery()) {
     QueryHandle original_query_handle;
-    HS2_RETURN_IF_ERROR(return_val, GetQueryHandle(query_id, &original_query_handle),
-        SQLSTATE_GENERAL_ERROR);
+    Status status = GetQueryHandle(query_id, &original_query_handle);
+    if (UNLIKELY(!status.ok())) {
+      VLOG(1) << "Error in GetLog, could not get query handle: " << status.GetDetail();
+      HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+      return;
+    }
     DCHECK(!original_query_handle->query_status().ok());
     ss << Substitute(GET_LOG_QUERY_RETRY_INFO_FORMAT,
         original_query_handle->query_status().GetDetail(),
