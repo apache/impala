@@ -116,8 +116,8 @@ PLAN-ROOT SINK
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
-data source predicates: CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE), int_col < CAST(2 AS INT)
-predicates: float_col != CAST(0 AS FLOAT)
+   data source predicates: CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE), int_col < CAST(2 AS INT)
+   predicates: float_col != CAST(0 AS FLOAT)
    mem-estimate=1.00GB mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=116B cardinality=500
    in pipelines: 00(GETNEXT)

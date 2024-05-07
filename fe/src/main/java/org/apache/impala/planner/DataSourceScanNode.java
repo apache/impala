@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.Expr;
@@ -273,23 +274,42 @@ public class DataSourceScanNode extends ScanNode {
       List<TBinaryPredicate> predicates) {
     if (conjunct instanceof BinaryPredicate) {
       if (conjunct.getChildren().size() != 2) return false;
+      Expr colExpr = null;
       SlotRef slotRef = null;
       LiteralExpr literalExpr = null;
       TComparisonOp op = null;
       if ((conjunct.getChild(0).unwrapSlotRef(true) instanceof SlotRef) &&
           (conjunct.getChild(1) instanceof LiteralExpr)) {
-        slotRef = conjunct.getChild(0).unwrapSlotRef(true);
+        colExpr = conjunct.getChild(0);
+        slotRef = colExpr.unwrapSlotRef(true);
         literalExpr = (LiteralExpr) conjunct.getChild(1);
         op = ((BinaryPredicate) conjunct).getOp().getThriftOp();
       } else if ((conjunct.getChild(1).unwrapSlotRef(true) instanceof SlotRef) &&
                  (conjunct.getChild(0) instanceof LiteralExpr)) {
-        slotRef = conjunct.getChild(1).unwrapSlotRef(true);
+        colExpr = conjunct.getChild(1);
+        slotRef = colExpr.unwrapSlotRef(true);
         literalExpr = (LiteralExpr) conjunct.getChild(0);
         op = ((BinaryPredicate) conjunct).getOp().converse().getThriftOp();
       } else {
+        // Other binary predicate scenarios are not accepted, including:
+        // both operands are slot references, one or both of the operands is an
+        // expression using SlotRef such as explicit CAST, built-in functions,
+        // arithmetic expressions, etc.
         return false;
       }
 
+      if (colExpr instanceof CastExpr) {
+        CastExpr castExpr = (CastExpr)colExpr;
+        Preconditions.checkNotNull(castExpr.getType());
+        if (castExpr.getType().isDateOrTimeType()
+            || castExpr.getCompatibility().isUnsafe()) {
+          // Unsafe casting or casting to Date/Timestamp for a column cannot be pushed
+          // down to JDBC table since TBinaryPredicate does not have column Expr.
+          // Return false here to avoid the conjunct to be added to offered predicate
+          // list.
+          return false;
+        }
+      }
       TColumnValue val = literalToColumnValue(literalExpr);
       if (val == null) return false; // false if unsupported type, e.g.
 
@@ -408,12 +428,12 @@ public class DataSourceScanNode extends ScanNode {
     output.append(String.format("%s%s:%s [%s%s]\n", prefix, id_.toString(),
         displayName_, table_.getFullName(), aliasStr));
 
-    if (!acceptedConjuncts_.isEmpty()) {
-      output.append(prefix + "data source predicates: "
+    if (acceptedConjuncts_ != null && !acceptedConjuncts_.isEmpty()) {
+      output.append(detailPrefix + "data source predicates: "
           + Expr.getExplainString(acceptedConjuncts_, detailLevel) + "\n");
     }
-    if (!conjuncts_.isEmpty()) {
-      output.append(prefix + "predicates: " +
+    if (conjuncts_ != null && !conjuncts_.isEmpty()) {
+      output.append(detailPrefix + "predicates: " +
             Expr.getExplainString(conjuncts_, detailLevel) + "\n");
     }
 
