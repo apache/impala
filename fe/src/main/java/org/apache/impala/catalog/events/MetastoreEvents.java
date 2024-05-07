@@ -1856,8 +1856,8 @@ public class MetastoreEvents {
       } else if (tbl instanceof IncompleteTable) {
         // No-Op
       } else if (getEventId() > tbl.getCreateEventId()) {
-        catalog_.invalidateTable(tbl.getTableName().toThrift(),
-            new Reference<>(), new Reference<>(), NoOpEventSequence.INSTANCE);
+        catalog_.invalidateTable(tbl.getTableName().toThrift(), new Reference<>(),
+            new Reference<>(), NoOpEventSequence.INSTANCE, getEventId());
         LOG.info("Table " + tbl.getFullName() + " is invalidated from catalog cache" +
             " since eventSync is turned on for this table.");
       } else {
@@ -3146,7 +3146,7 @@ public class MetastoreEvents {
         return ;
       }
       catalog_.invalidateTable(tbl.getTableName().toThrift(),
-          tblWasRemoved, dbWasAdded, NoOpEventSequence.INSTANCE);
+          tblWasRemoved, dbWasAdded, NoOpEventSequence.INSTANCE, getEventId());
       LOG.info("Table " + tbl.getFullName() + " is invalidated from catalog cache");
     }
   }
