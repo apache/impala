@@ -201,10 +201,12 @@ TAcceptQueueServer::TAcceptQueueServer(const shared_ptr<TProcessor>& processor,
     const shared_ptr<TTransportFactory>& transportFactory,
     const shared_ptr<TProtocolFactory>& protocolFactory,
     const shared_ptr<ThreadFactory>& threadFactory, const string& name,
-    int32_t maxTasks, int64_t queue_timeout_ms, int64_t idle_poll_period_ms)
+    int32_t maxTasks, int64_t queue_timeout_ms, int64_t idle_poll_period_ms,
+    bool is_external_facing)
     : TServer(processor, serverTransport, transportFactory, protocolFactory),
       threadFactory_(threadFactory), name_(name), maxTasks_(maxTasks),
-      queue_timeout_ms_(queue_timeout_ms), idle_poll_period_ms_(idle_poll_period_ms) {
+      queue_timeout_ms_(queue_timeout_ms), idle_poll_period_ms_(idle_poll_period_ms),
+      is_external_facing_(is_external_facing) {
   init();
 }
 
@@ -230,7 +232,9 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
   if (metrics_enabled_) queue_size_metric_->Increment(-1);
   shared_ptr<TTransport> io_transport;
   shared_ptr<TTransport> client = entry->client_;
-  SetMaxMessageSize(client.get());
+  int64_t max_message_size = is_external_facing_ ? ThriftExternalRpcMaxMessageSize() :
+      ThriftInternalRpcMaxMessageSize();
+  SetMaxMessageSize(client.get(), max_message_size);
   const string& socket_info = reinterpret_cast<TSocket*>(client.get())->getSocketInfo();
   VLOG(2) << Substitute("TAcceptQueueServer: $0 started connection setup for client $1",
       name_, socket_info);
@@ -252,7 +256,9 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
     // TSaslServerTransport::Factory is not required anymore.
     DCHECK(inputTransportFactory_ == outputTransportFactory_);
     io_transport = inputTransportFactory_->getTransport(client);
-    SetMaxMessageSize(io_transport.get());
+    DCHECK_EQ(io_transport->getConfiguration()->getMaxMessageSize(),
+        client->getConfiguration()->getMaxMessageSize());
+    DCHECK_EQ(max_message_size, io_transport->getConfiguration()->getMaxMessageSize());
 
     shared_ptr<TProtocol> inputProtocol =
         inputProtocolFactory_->getProtocol(io_transport);

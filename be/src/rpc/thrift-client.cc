@@ -139,7 +139,11 @@ Status ThriftClientImpl::CreateSocket() {
       return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED, e.what());
     }
   }
-  if (socket_ != nullptr) SetMaxMessageSize(socket_.get());
+  if (socket_ != nullptr) {
+    // ThriftClient is used for internal cluster communication, so we use
+    // ThriftInternalRpcMaxMessageSize().
+    SetMaxMessageSize(socket_.get(), ThriftInternalRpcMaxMessageSize());
+  }
 
   return Status::OK();
 }

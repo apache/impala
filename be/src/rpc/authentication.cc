@@ -1345,7 +1345,8 @@ Status SecureAuthProvider::WrapClientTransport(const string& hostname,
     return Status(e.what());
   }
   wrapped_transport->reset(new TSaslClientTransport(sasl_client, raw_transport));
-  SetMaxMessageSize(wrapped_transport->get());
+  // Verify that the wrapped transport inherits the max message size properly.
+  VerifyMaxMessageSizeInheritance(raw_transport.get(), wrapped_transport->get());
 
   // This function is called immediately prior to sasl_client_start(), and so
   // can be used to log an "I'm beginning authentication for this principal"

@@ -22,6 +22,7 @@
 #include "gutil/strings/substitute.h"
 #include "kudu/util/flag_tags.h"
 #include "rpc/jni-thrift-util.h"
+#include "rpc/thrift-util.h"
 #include "util/backend-gflag-util.h"
 #include "util/logging-support.h"
 #include "util/os-util.h"
@@ -105,7 +106,6 @@ DECLARE_bool(enable_sync_to_latest_event_on_ddls);
 DECLARE_bool(pull_table_types_and_comments);
 DECLARE_bool(enable_reload_events);
 DECLARE_string(geospatial_library);
-DECLARE_int64(thrift_rpc_max_message_size);
 DECLARE_string(file_metadata_reload_properties);
 DECLARE_string(java_weigher);
 DECLARE_int32(iceberg_reload_new_files_threshold);
@@ -455,7 +455,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_skip_resource_checking_on_last_executor_group_set(
       FLAGS_skip_resource_checking_on_last_executor_group_set);
   cfg.__set_file_metadata_reload_properties(FLAGS_file_metadata_reload_properties);
-  cfg.__set_thrift_rpc_max_message_size(FLAGS_thrift_rpc_max_message_size);
+  cfg.__set_thrift_rpc_max_message_size(ThriftInternalRpcMaxMessageSize());
   cfg.__set_scan_range_cost_factor(FLAGS_scan_range_cost_factor);
   cfg.__set_use_jamm_weigher(FLAGS_java_weigher == "jamm");
   cfg.__set_iceberg_reload_new_files_threshold(FLAGS_iceberg_reload_new_files_threshold);

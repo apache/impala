@@ -84,6 +84,8 @@ int CatalogdMain(int argc, char** argv) {
 
   ThriftServer* server;
   ThriftServerBuilder builder("CatalogService", processor, FLAGS_catalog_service_port);
+  // Mark this as an internal service to use a more permissive Thrift max message size
+  builder.is_external_facing(false);
 
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;

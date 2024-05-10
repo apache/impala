@@ -1002,9 +1002,9 @@ very_very_very_very_very_long_string_column_name998 string,
 very_very_very_very_very_long_string_column_name999 string,
 very_very_very_very_very_long_string_column_name1000 string
 ) partitioned by (
-p0 string,
 p1 string,
-p2 string
+p2 string,
+p3 string
 )
 row format delimited fields terminated by '|'
 stored as textfile

@@ -768,6 +768,8 @@ Status Statestore::Init(int32_t state_store_port) {
       new RpcEventHandler("statestore", metrics_));
   processor->setEventHandler(event_handler);
   ThriftServerBuilder builder("StatestoreService", processor, state_store_port);
+  // Mark this as an internal service to use a more permissive Thrift max message size
+  builder.is_external_facing(false);
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     RETURN_IF_ERROR(
@@ -1801,6 +1803,8 @@ Status Statestore::InitStatestoreHa(
       new RpcEventHandler("StatestoreHa", metrics_));
   processor->setEventHandler(event_handler);
   ThriftServerBuilder builder("StatestoreHaService", processor, statestore_ha_port);
+  // Mark this as an internal service to use a more permissive Thrift max message size
+  builder.is_external_facing(false);
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     RETURN_IF_ERROR(

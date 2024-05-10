@@ -269,7 +269,8 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* context,
 ThriftServer::ThriftServer(const string& name,
     const std::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
     MetricGroup* metrics, int max_concurrent_connections, int64_t queue_timeout_ms,
-    int64_t idle_poll_period_ms, TransportType transport_type)
+    int64_t idle_poll_period_ms, TransportType transport_type,
+    bool is_external_facing)
   : started_(false),
     port_(port),
     ssl_enabled_(false),
@@ -283,7 +284,8 @@ ThriftServer::ThriftServer(const string& name,
     connection_handler_(NULL),
     metrics_(NULL),
     auth_provider_(auth_provider),
-    transport_type_(transport_type) {
+    transport_type_(transport_type),
+    is_external_facing_(is_external_facing) {
   if (auth_provider_ == NULL) {
     auth_provider_ = AuthManager::GetInstance()->GetInternalAuthProvider();
   }
@@ -403,7 +405,7 @@ Status ThriftServer::Start() {
 
   server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
       protocol_factory, thread_factory, name_, max_concurrent_connections_,
-      queue_timeout_ms_, idle_poll_period_ms_));
+      queue_timeout_ms_, idle_poll_period_ms_, is_external_facing_));
   if (metrics_ != NULL) {
     (static_cast<TAcceptQueueServer*>(server_.get()))
         ->InitMetrics(metrics_, metrics_name_);

@@ -38,9 +38,9 @@ const int32_t DEFAULT_MEM_BUF_SIZE = 32 * 1024;
 namespace apache { namespace thrift { namespace transport {
 
   TSaslTransport::TSaslTransport(std::shared_ptr<TTransport> transport)
-      : TVirtualTransport(impala::DefaultTConfiguration()),
+      : TVirtualTransport(transport->getConfiguration()),
         transport_(transport),
-        memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE, impala::DefaultTConfiguration())),
+        memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE, transport->getConfiguration())),
         sasl_(NULL),
         shouldWrap_(false),
         isClient_(false) {
@@ -48,9 +48,9 @@ namespace apache { namespace thrift { namespace transport {
 
   TSaslTransport::TSaslTransport(std::shared_ptr<sasl::TSasl> saslClient,
                                  std::shared_ptr<TTransport> transport)
-      : TVirtualTransport(impala::DefaultTConfiguration()),
+    : TVirtualTransport(transport->getConfiguration()),
         transport_(transport),
-        memBuf_(new TMemoryBuffer(impala::DefaultTConfiguration())),
+        memBuf_(new TMemoryBuffer(transport->getConfiguration())),
         sasl_(saslClient),
         shouldWrap_(false),
         isClient_(true) {

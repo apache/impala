@@ -75,7 +75,7 @@ bool DeserializeThriftMsg(
   // Deserialize msg bytes into c++ thrift msg using memory transport.
   std::shared_ptr<TMemoryBuffer> tmem_transport(new TMemoryBuffer(buf, *len,
       apache::thrift::transport::TMemoryBuffer::MemoryPolicy::OBSERVE,
-      impala::DefaultTConfiguration()));
+      impala::DefaultExternalTConfiguration()));
   std::shared_ptr<TProtocol> tproto =
       CreateDeserializeProtocol(tmem_transport, compact);
   try {

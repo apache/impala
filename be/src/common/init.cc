@@ -84,6 +84,7 @@ DECLARE_string(reserved_words_version);
 DECLARE_bool(symbolize_stacktrace);
 DECLARE_string(debug_actions);
 DECLARE_int64(thrift_rpc_max_message_size);
+DECLARE_int64(thrift_external_rpc_max_message_size);
 
 DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");
@@ -537,10 +538,24 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
         FLAGS_reserved_words_version));
   }
 
+  // Enforce a minimum value for thrift_max_message_size, as configuring the limit to
+  // a small value is very unlikely to work.
   if (!impala::TestInfo::is_test() && FLAGS_thrift_rpc_max_message_size > 0
       && FLAGS_thrift_rpc_max_message_size < ThriftDefaultMaxMessageSize()) {
-    CLEAN_EXIT_WITH_ERROR(Substitute("thrift_rpc_max_message_size must be >= $0 or <= 0.",
-        ThriftDefaultMaxMessageSize()));
+    CLEAN_EXIT_WITH_ERROR(
+        Substitute("Invalid $0: $1 is less than the minimum value of $2.",
+            "thrift_rpc_max_message_size", FLAGS_thrift_rpc_max_message_size,
+            ThriftDefaultMaxMessageSize()));
+  }
+
+  // Enforce a minimum value for thrift_external_max_message_size, as configuring the
+  // limit to a small value is very unlikely to work.
+  if (!impala::TestInfo::is_test() && FLAGS_thrift_external_rpc_max_message_size > 0
+      && FLAGS_thrift_external_rpc_max_message_size < ThriftDefaultMaxMessageSize()) {
+    CLEAN_EXIT_WITH_ERROR(
+        Substitute("Invalid $0: $1 is less than the minimum value of $2.",
+            "thrift_external_rpc_max_message_size",
+            FLAGS_thrift_external_rpc_max_message_size, ThriftDefaultMaxMessageSize()));
   }
 
   impala::InitGoogleLoggingSafe(argv[0]);
