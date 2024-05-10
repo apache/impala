@@ -47,7 +47,7 @@ DECLARE_int32(state_store_port);
 
 DECLARE_int32(beeswax_port);
 
-DECLARE_int64(thrift_rpc_max_message_size);
+DECLARE_int64(thrift_external_rpc_max_message_size);
 
 static string IMPALA_HOME(getenv("IMPALA_HOME"));
 static const string& SERVER_CERT =
@@ -154,10 +154,13 @@ TEST(ThriftTestBase, Connectivity) {
   ASSERT_OK(wrong_port_client.Open());
 }
 
-void TestMaxMessageSize(std::string subscriber_id, bool expect_throw) {
+void TestMaxMessageSize(std::string subscriber_id, bool expect_throw,
+    bool is_external_facing = true) {
   int port = GetServerPort();
   ThriftServer* server;
-  EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port).Build(&server));
+  ThriftServerBuilder server_builder("DummyStatestore", MakeProcessor(), port);
+  server_builder.is_external_facing(is_external_facing);
+  EXPECT_OK(server_builder.Build(&server));
   ASSERT_OK(server->Start());
 
   ThriftClient<StatestoreServiceClientWrapper> client(
@@ -183,6 +186,11 @@ TEST(ThriftTestBase, MaxMessageSizeFit) {
 TEST(ThriftTestBase, MaxMessageSizeExceeded) {
   std::string long_id(256 * 1024, 'a');
   TestMaxMessageSize(long_id, true);
+}
+
+TEST(ThriftTestBase, InternalMaxMessageSizeFit) {
+  std::string long_id(256 * 1024, 'a');
+  TestMaxMessageSize(long_id, /* expect_throw */ false, /* is_external_facing */ false);
 }
 
 TEST_P(ThriftKerberizedParamsTest, SslConnectivity) {
@@ -754,7 +762,7 @@ TEST(NoPasswordPemFile, BadServerCertificate) {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
-  FLAGS_thrift_rpc_max_message_size = 128 * 1024;
+  FLAGS_thrift_external_rpc_max_message_size = 128 * 1024;
 
   int port = impala::FindUnusedEphemeralPort();
   std::unique_ptr<impala::MiniKdcWrapper> kdc;

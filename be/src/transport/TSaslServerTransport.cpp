@@ -134,13 +134,11 @@ std::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   // to be the same so that the authentication state is identical for communication in
   // both directions. In order to do this, we share the same TTransport object for both
   // input and output set in TAcceptQueueServer::SetupConnection.
-  DCHECK_EQ(
-      impala::ThriftRpcMaxMessageSize(), trans->getConfiguration()->getMaxMessageSize());
   std::shared_ptr<TBufferedTransport> ret_transport;
   std::shared_ptr<TTransport> wrapped(
       new TSaslServerTransport(serverDefinitionMap_, trans));
-  DCHECK_EQ(impala::ThriftRpcMaxMessageSize(),
-      wrapped->getConfiguration()->getMaxMessageSize());
+  // Verify the max message size is inherited properly
+  impala::VerifyMaxMessageSizeInheritance(trans.get(), wrapped.get());
   // Set socket timeouts to prevent TSaslServerTransport->open from blocking the server
   // from accepting new connections if a read/write blocks during the handshake
   TSocket* socket = static_cast<TSocket*>(trans.get());
@@ -148,7 +146,8 @@ std::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   socket->setSendTimeout(FLAGS_sasl_connect_tcp_timeout_ms);
   ret_transport.reset(new TBufferedTransport(wrapped,
       impala::ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
-      impala::DefaultTConfiguration()));
+          wrapped->getConfiguration()));
+  impala::VerifyMaxMessageSizeInheritance(wrapped.get(), ret_transport.get());
   ret_transport.get()->open();
   // Reset socket timeout back to zero, so idle clients do not timeout
   socket->setRecvTimeout(0);

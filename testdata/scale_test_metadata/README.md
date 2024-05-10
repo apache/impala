@@ -86,7 +86,7 @@ test that coordinator-to-catalogd RPC works well. The steps are follow:
    ```
 
 7. Run the same EXPLAIN query again. This should run successfully, because the default
-   `thrift_rpc_max_message_size` is 1GB.
+   `thrift_rpc_max_message_size` is 64GB (see IMPALA-13020).
    ```
    impala-shell.sh -q 'EXPLAIN SELECT id FROM 1k_col_tbl'
    ```

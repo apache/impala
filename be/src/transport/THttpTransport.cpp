@@ -35,7 +35,7 @@ const char* THttpTransport::CRLF = "\r\n";
 const int THttpTransport::CRLF_LEN = 2;
 
 THttpTransport::THttpTransport(std::shared_ptr<TTransport> transport)
-  : TVirtualTransport(impala::DefaultTConfiguration()),
+  : TVirtualTransport(transport->getConfiguration()),
     transport_(transport),
     origin_(""),
     readHeaders_(true),

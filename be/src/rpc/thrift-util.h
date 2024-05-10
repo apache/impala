@@ -44,14 +44,36 @@ inline int64_t ThriftDefaultMaxMessageSize() {
 }
 
 /// Return the effective max message size based on 'thrift_rpc_max_message_size' flag.
-int64_t ThriftRpcMaxMessageSize();
+/// This is for trusted internal communication between cluster components such as
+/// as statestore/catalog/HMS. Because messages are coming from trusted sources, a
+/// higher limit does not introduce security issues.
+int64_t ThriftInternalRpcMaxMessageSize();
 
-/// Return the default Thrift's TConfiguration based on given backend config flags.
-std::shared_ptr<apache::thrift::TConfiguration> DefaultTConfiguration();
+/// Return the effective max message size based on 'thrift_external_rpc_max_message_size'
+/// flag. This is for untrusted communication with clients. Using a lower limit protects
+/// against malicious messages.
+int64_t ThriftExternalRpcMaxMessageSize();
 
-/// Set the max message size of a given TTransport with the effective value based on
-/// 'thrift_rpc_max_message_size' flag.
-void SetMaxMessageSize(apache::thrift::transport::TTransport* transport);
+/// Return the default Thrift TConfiguration using the limit for trusted internal
+/// communication.
+std::shared_ptr<apache::thrift::TConfiguration> DefaultInternalTConfiguration();
+
+/// Return the default Thrift TConfiguration using the limit for untrusted external
+/// communication.
+std::shared_ptr<apache::thrift::TConfiguration> DefaultExternalTConfiguration();
+
+/// Set the max message size of a given TTransport to the specified value.
+/// The value should be either ThriftInternalRpcMaxMessageSize() or
+/// ThriftExternalRpcMaxMessageSize().
+void SetMaxMessageSize(apache::thrift::transport::TTransport* transport,
+    int64_t max_message_size);
+
+/// Verify that the max message size has been inherited properly. The source transport
+/// (i.e. the one being wrapped) must already have the max message size set to either the
+/// internal limit or the external limit. The destination transport (i.e. the wrapping
+/// transport) must have that same limit. This DCHECKs if these conditions do not hold.
+void VerifyMaxMessageSizeInheritance(apache::thrift::transport::TTransport* source,
+    apache::thrift::transport::TTransport* dest);
 
 /// Utility class to serialize thrift objects to a binary format.  This object
 /// should be reused if possible to reuse the underlying memory.
@@ -126,10 +148,14 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   /// Deserialize msg bytes into c++ thrift msg using memory
   /// transport. TMemoryBuffer is not const-safe, although we use it in
   /// a const-safe way, so we have to explicitly cast away the const.
+  ///
+  /// This uses the external max message size limit, because this is often used
+  /// for small data structures that don't need a higher limit. It is used for a
+  /// few untrusted data structures like Parquet headers.
   std::shared_ptr<apache::thrift::transport::TMemoryBuffer> tmem_transport(
       new apache::thrift::transport::TMemoryBuffer(const_cast<uint8_t*>(buf), *len,
           apache::thrift::transport::TMemoryBuffer::MemoryPolicy::OBSERVE,
-          DefaultTConfiguration()));
+          DefaultExternalTConfiguration()));
   std::shared_ptr<apache::thrift::protocol::TProtocol> tproto =
       CreateDeserializeProtocol(tmem_transport, compact);
   try {

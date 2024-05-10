@@ -58,10 +58,17 @@
 
 #include "common/names.h"
 
-DEFINE_int64(thrift_rpc_max_message_size, std::numeric_limits<int32_t>::max(),
-    "The maximum size of a message for any RPC that the server will accept. "
-    "Default to the upper limit of 2147483647 bytes (~2GB). "
-    "Setting 0 or negative value will use the default defined in Thrift.");
+DEFINE_int64(thrift_rpc_max_message_size, 64L * 1024 * 1024 * 1024,
+    "The maximum size of a message for intra-cluster RPC communication between Impala "
+    "components. Default to a high limit of 64GB. "
+    "This must be set to at least the default defined in Thrift (100MB). "
+    "Setting 0 or a negative value will use the default defined in Thrift.");
+
+DEFINE_int64(thrift_external_rpc_max_message_size, 2L * 1024 * 1024 * 1024,
+    "The maximum size of a message for external client RPC communication. "
+    "This defaults to 2GB to limit the impact of untrusted payloads. "
+    "This must be set to at least the default defined in Thrift (100MB). "
+    "Setting 0 or a negative value will use the default defined in Thrift.");
 
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
@@ -85,8 +92,10 @@ static_assert(PACKAGE_VERSION[6] == '\0', NEW_THRIFT_VERSION_MSG);
 
 namespace impala {
 
+// The ThriftSerializer uses the DefaultInternalTConfiguration() with the higher limit,
+// because this is used on our internal Thrift structures.
 ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size)
-  : mem_buffer_(new TMemoryBuffer(initial_buffer_size, DefaultTConfiguration())) {
+  : mem_buffer_(new TMemoryBuffer(initial_buffer_size, DefaultInternalTConfiguration())) {
   if (compact) {
     TCompactProtocolFactoryT<TMemoryBuffer> factory;
     protocol_ = factory.getProtocol(mem_buffer_);
@@ -280,19 +289,38 @@ bool IsConnResetTException(const TTransportException& e) {
              strstr(e.what(), "SSL_read: Connection reset by peer") != nullptr);
 }
 
-int64_t ThriftRpcMaxMessageSize() {
+int64_t ThriftInternalRpcMaxMessageSize() {
   return FLAGS_thrift_rpc_max_message_size <= 0 ? ThriftDefaultMaxMessageSize() :
                                                   FLAGS_thrift_rpc_max_message_size;
 }
 
-shared_ptr<TConfiguration> DefaultTConfiguration() {
-  return make_shared<TConfiguration>(ThriftRpcMaxMessageSize());
+int64_t ThriftExternalRpcMaxMessageSize() {
+  return FLAGS_thrift_external_rpc_max_message_size <= 0 ?
+      ThriftDefaultMaxMessageSize() : FLAGS_thrift_external_rpc_max_message_size;
 }
 
-void SetMaxMessageSize(TTransport* transport) {
+shared_ptr<TConfiguration> DefaultInternalTConfiguration() {
+  return make_shared<TConfiguration>(ThriftInternalRpcMaxMessageSize());
+}
+
+shared_ptr<TConfiguration> DefaultExternalTConfiguration() {
+  return make_shared<TConfiguration>(ThriftExternalRpcMaxMessageSize());
+}
+
+void SetMaxMessageSize(TTransport* transport, int64_t max_message_size) {
   // TODO: Find way to assign TConfiguration through TTransportFactory instead.
-  transport->getConfiguration()->setMaxMessageSize(ThriftRpcMaxMessageSize());
+  transport->getConfiguration()->setMaxMessageSize(max_message_size);
   transport->updateKnownMessageSize(-1);
-  EXPECT_NO_THROW(transport->checkReadBytesAvailable(ThriftRpcMaxMessageSize()));
+  EXPECT_NO_THROW(transport->checkReadBytesAvailable(max_message_size));
+}
+
+void VerifyMaxMessageSizeInheritance(TTransport* source, TTransport* dest) {
+  // Verify that the source has the max message size set to either the internal
+  // limit or the external limit
+  int64_t source_max_message_size = source->getConfiguration()->getMaxMessageSize();
+  DCHECK(source_max_message_size == ThriftInternalRpcMaxMessageSize() ||
+      source_max_message_size == ThriftExternalRpcMaxMessageSize());
+  // Verify that the destination transport has the same limit as the source
+  DCHECK_EQ(source_max_message_size, dest->getConfiguration()->getMaxMessageSize());
 }
 }

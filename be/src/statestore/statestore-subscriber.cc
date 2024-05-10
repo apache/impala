@@ -303,6 +303,8 @@ Status StatestoreSubscriber::Start() {
 
   ThriftServerBuilder builder(
       "StatestoreSubscriber", processor, heartbeat_address_.port);
+  // Mark this as an internal service to use a more permissive Thrift max message size
+  builder.is_external_facing(false);
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     RETURN_IF_ERROR(

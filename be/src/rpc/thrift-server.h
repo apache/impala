@@ -75,15 +75,15 @@ class ThriftServer {
 
     virtual std::shared_ptr<apache::thrift::transport::TTransport> getTransport(
         std::shared_ptr<apache::thrift::transport::TTransport> trans) {
-      DCHECK_EQ(ThriftRpcMaxMessageSize(),
-          trans->getConfiguration()->getMaxMessageSize());
       std::shared_ptr<apache::thrift::transport::TTransport> wrapped =
           wrapped_factory_->getTransport(trans);
-      SetMaxMessageSize(wrapped.get());
+      // Make sure the max message size got inherited properly.
+      VerifyMaxMessageSizeInheritance(trans.get(), wrapped.get());
       std::shared_ptr<apache::thrift::transport::TTransport> buffered_wrapped =
           std::shared_ptr<apache::thrift::transport::TTransport>(
               new apache::thrift::transport::TBufferedTransport(
-                  wrapped, buffer_size_, DefaultTConfiguration()));
+                  wrapped, buffer_size_, wrapped->getConfiguration()));
+      VerifyMaxMessageSizeInheritance(wrapped.get(), buffered_wrapped.get());
       return buffered_wrapped;
     }
    private:
@@ -273,12 +273,19 @@ class ThriftServer {
   ///  - idle_poll_period_ms: Amount of time, in milliseconds, of client's inactivity
   ///    before the service thread wakes up to check if the connection should be closed
   ///    due to inactivity. If 0, no polling happens.
+  ///  - is_external_facing: Whether this ThriftServer interacts with untrusted/external
+  ///    clients. This impacts the max message size used for Thrift, as untrusted
+  ///    communication uses a more restrictive limit to protect against malicious
+  ///    messages. When set to false, this uses a less restrictive max message size as
+  ///    messages are constructed by other Impala cluster components. This defaults to
+  ///    true to be safe by default.
   ThriftServer(const std::string& name,
       const std::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
       int max_concurrent_connections = 0, int64_t queue_timeout_ms = 0,
       int64_t idle_poll_period_ms = 0,
-      TransportType server_transport = TransportType::BINARY);
+      TransportType server_transport = TransportType::BINARY,
+      bool is_external_facing = true);
 
   /// Enables secure access over SSL. Must be called before Start(). The first three
   /// arguments are the minimum SSL/TLS version, and paths to certificate and private key
@@ -391,6 +398,8 @@ class ThriftServer {
 
   /// Underlying transport type used by this thrift server.
   TransportType transport_type_;
+
+  bool is_external_facing_;
 };
 
 /// Helper class to build new ThriftServer instances.
@@ -479,6 +488,14 @@ class ThriftServerBuilder {
     return *this;
   }
 
+  /// Sets whether the Thrift server will interact with external non-Impala clients.
+  /// If set to true, this uses ThriftExternalRpcMaxMessageSize(). If set to false,
+  /// this uses ThriftInternalRpcMaxMessageSize().
+  ThriftServerBuilder& is_external_facing(bool is_external_facing) {
+    is_external_facing_ = is_external_facing;
+    return *this;
+  }
+
   /// Constructs a new ThriftServer and puts it in 'server', if construction was
   /// successful, returns an error otherwise. In the error case, 'server' will not have
   /// been set and will not need to be freed, otherwise the caller assumes ownership of
@@ -487,7 +504,7 @@ class ThriftServerBuilder {
     std::unique_ptr<ThriftServer> ptr(
         new ThriftServer(name_, processor_, port_, auth_provider_, metrics_,
             max_concurrent_connections_, queue_timeout_ms_, idle_poll_period_ms_,
-            server_transport_type_));
+            server_transport_type_, is_external_facing_));
     if (enable_ssl_) {
       RETURN_IF_ERROR(ptr->EnableSsl(
           version_, certificate_, private_key_, pem_password_cmd_, cipher_list_,
@@ -520,6 +537,7 @@ class ThriftServerBuilder {
   std::string tls_ciphersuites_ =
       kudu::security::SecurityDefaults::kDefaultTlsCipherSuites;
   bool disable_tls12_ = false;
+  bool is_external_facing_ = true;
 };
 
 /// Contains a map from string for --ssl_minimum_version to Thrift's SSLProtocol.
