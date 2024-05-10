@@ -282,8 +282,9 @@ command line parameter.</p>
   }
 
   function clearProfiles() {
-    db.transaction("profiles", "readwrite").objectStore("profiles").clear();
-    setScrollReload();
+    db.transaction("profiles", "readwrite").objectStore("profiles").clear().onsuccess = () => {
+      setScrollReload();
+    }
   }
 
   function uploadProfile() {
@@ -330,7 +331,7 @@ command line parameter.</p>
           profileStore.put(query).onsuccess = () => {
             uploadCount++;
             if (uploadCount == json_profile_chooser.files.length) {
-              setScrollReload();
+              setTimeout(setScrollReload, 1000);
             }
           };
         } catch (err) {
