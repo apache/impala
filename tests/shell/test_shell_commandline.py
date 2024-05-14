@@ -54,6 +54,19 @@ QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 RUSSIAN_CHARS = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
                  u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
 
+"""IMPALA-12216 implemented timestamp to be printed in case of any error/warning
+  during query execution, below is an example :
+
+   2024-07-15 12:49:27 [Exception] type=<class 'socket.error'> in FetchResults.
+   2024-07-15 12:49:27 [Warning]  Cancelling Query
+   2024-07-15 12:49:27 [Warning] close session RPC failed: <class 'shell_exceptions.
+   QueryCancelledByShellException'>
+
+  To avoid test flakiness due to timestamp, we would be ignoring timestamp in actual
+  result before asserting with expected result, (YYYY-MM-DD hh:mm:ss ) is of length 20
+"""
+TS_LEN = 20
+
 
 def find_query_option(key, string, strip_brackets=True):
   """
@@ -1407,16 +1420,17 @@ class TestImpalaShell(ImpalaTestSuite):
     # assign requested address" for both Python 2 and Python 3.
     # Tolerate all three of these variants.
     error_template = (
-      "Caught exception [Errno {0}] {1}, type=<class '{2}'> in OpenSession. "
-      "Num remaining tries: 3")
+      "[Exception] type=<class '{0}'> in OpenSession. Num remaining tries: 3 "
+      "[Errno {1}] {2}")
     expected_err_py2 = \
-        error_template.format(115, "Operation now in progress", "socket.error")
+        error_template.format("socket.error", 115, "Operation now in progress")
     expected_err_py3 = \
-        error_template.format(115, "Operation now in progress", "BlockingIOError")
+        error_template.format("BlockingIOError", 115, "Operation now in progress")
     expected_err_docker = \
-        error_template.format(99, "Cannot assign requested address", "OSError")
+        error_template.format("OSError", 99, "Cannot assign requested address")
     actual_err = result.stderr.splitlines()[0]
-    assert actual_err in [expected_err_py2, expected_err_py3, expected_err_docker]
+    assert actual_err[TS_LEN:] in [expected_err_py2, expected_err_py3,
+                                   expected_err_docker]
 
     # Test http_socket_timeout_s=-1, expect errors
     result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=-1'],

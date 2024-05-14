@@ -41,7 +41,7 @@ import time
 import traceback
 
 from impala_client import ImpalaHS2Client, StrictHS2Client, \
-    ImpalaBeeswaxClient, QueryOptionLevels
+    ImpalaBeeswaxClient, QueryOptionLevels, log_exception_with_timestamp, log_timestamp
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
 from shell_output import (DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter,
@@ -1116,8 +1116,8 @@ class ImpalaShell(cmd.Cmd, object):
       if self.use_ssl and sys.version_info < (2,7,9) \
           and "EOF occurred in violation of protocol" in str(e):
         print("Warning: TLSv1.2 is not supported for Python < 2.7.9", file=sys.stderr)
-      print("%s: %s, %s" %
-          (self.ERROR_CONNECTING_MESSAGE, type(e).__name__, e), file=sys.stderr)
+      log_exception_with_timestamp(e, "Exception",
+          self.ERROR_CONNECTING_MESSAGE + type(e).__name__)
       # A secure connection may still be open. So we explicitly close it.
       self.close_connection()
       # If a connection to another impalad failed while already connected
@@ -1467,10 +1467,11 @@ class ImpalaShell(cmd.Cmd, object):
         if self.show_profiles: raise e
       return CmdStatus.SUCCESS
     except QueryCancelledByShellException as e:
+      log_exception_with_timestamp(e, "Warning", "Query Interrupted")
       return CmdStatus.SUCCESS
     except RPCException as e:
       # could not complete the rpc successfully
-      print(e, file=sys.stderr)
+      log_exception_with_timestamp(e)
     except UnicodeDecodeError as e:
       # An error occoured possibly during the fetching.
       # Depending of which protocol is at use it can come from different places.
@@ -1478,8 +1479,8 @@ class ImpalaShell(cmd.Cmd, object):
       # undecodable elements.
       if self.last_query_handle is not None:
         self.imp_client.close_query(self.last_query_handle)
-      print('UnicodeDecodeError : %s \nPlease check for columns containing binary data '
-          'to find the possible source of the error.' % (e,), file=sys.stderr)
+      log_exception_with_timestamp(e, "UnicodeDecodeError", "Please check for"
+         "columns containing binary data to find the possible source of the error")
     except QueryStateException as e:
       # an exception occurred while executing the query
       if self.last_query_handle is not None:
@@ -1490,25 +1491,26 @@ class ImpalaShell(cmd.Cmd, object):
       # Here we use 'utf-8' to explicitly convert 'msg' to str if it's in unicode type.
       if sys.version_info.major == 2 and isinstance(msg, unicode):
         msg = msg.encode('utf-8')
-      print(msg, file=sys.stderr)
+      log_exception_with_timestamp(msg)
     except DisconnectedException as e:
       # the client has lost the connection
-      print(e, file=sys.stderr)
+      log_exception_with_timestamp(e)
       self.imp_client.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     except socket.error as e:
       # if the socket was interrupted, reconnect the connection with the client
       if e.errno == errno.EINTR:
-        print(ImpalaShell.CANCELLATION_MESSAGE)
+        log_timestamp("Warning", ImpalaShell.CANCELLATION_MESSAGE)
         self._reconnect_cancellation()
       else:
-        print("%s %s: %s" % (self.SOCKET_ERROR_MESSAGE, e.errno, e), file=sys.stderr)
+        log_exception_with_timestamp(e, "Exception", self.SOCKET_ERROR_MESSAGE
+          + str(e.errno))
         self.prompt = self.DISCONNECTED_PROMPT
         self.imp_client.connected = False
     except Exception as e:
       # if the exception is unknown, there was possibly an issue with the connection
       # set the shell as disconnected
-      print('Unknown Exception : %s' % (e,), file=sys.stderr)
+      log_exception_with_timestamp(e, "Exception", "Unknown Exception")
       # Print the stack trace for the exception.
       traceback.print_exc()
       self.close_connection()

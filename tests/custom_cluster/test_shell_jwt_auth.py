@@ -128,7 +128,7 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
     self.assert_impalad_log_contains("ERROR", expected_string, expected_count=-1)
 
     # Ensure the shell login failed.
-    assert "Error connecting: HttpError" in result.stderr
+    assert "HttpError" in result.stderr
     assert "HTTP code 401: Unauthorized" in result.stderr
     assert "Not connected to Impala, could not execute queries." in result.stderr
 
@@ -167,7 +167,7 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
     self.assert_impalad_log_contains("ERROR", expected_string, expected_count=-1)
 
     # Ensure the shell login failed.
-    assert "Error connecting: HttpError" in result.stderr
+    assert "HttpError" in result.stderr
     assert "HTTP code 401: Unauthorized" in result.stderr
     assert "Not connected to Impala, could not execute queries." in result.stderr
 

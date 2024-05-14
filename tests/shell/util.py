@@ -404,5 +404,5 @@ def get_impala_shell_executable(vector):
 
 def stderr_get_first_error_msg(stderr):
   """Seek to the begining of the first error message in stderr of impala-shell."""
-  PROMPT = "\nERROR: "
+  PROMPT = "ERROR: "
   return stderr[(stderr.index(PROMPT) + len(PROMPT)):]

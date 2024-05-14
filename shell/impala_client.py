@@ -770,7 +770,8 @@ class ImpalaHS2Client(ImpalaClient):
         resp = self._do_hs2_rpc(CloseSession, req)
         self._check_hs2_rpc_status(resp.status)
       except Exception as e:
-        print("Warning: close session RPC failed: {0}, {1}".format(str(e), type(e)))
+        log_exception_with_timestamp(e, "Warning",
+           "close session RPC failed: {0}".format(type(e)), stderr_flag=False)
       self.session_handle = None
     self._close_transport()
 
@@ -801,13 +802,13 @@ class ImpalaHS2Client(ImpalaClient):
         if (r.exception_type == RPC_EXCEPTION_TAPPLICATION or
           r.exception_type == RPC_EXCEPTION_SERVER):
           raise
-        print('Caught exception {0}, type={1} when listing query options. {2}'
-          .format(str(r), type(r), retry_msg), file=sys.stderr)
+        log_exception_with_timestamp(r, "Exception",
+           "type={0} when listing query options. {1}".format(type(r), retry_msg))
         if raise_error:
           raise
       except Exception as e:
-        print('Caught exception {0}, type={1} when listing query options. {2}'
-          .format(str(e), type(e), retry_msg), file=sys.stderr)
+        log_exception_with_timestamp(e, "Exception",
+           "type={0} when listing query options. {1}".format(type(e), retry_msg))
         if raise_error:
           raise
       finally:
@@ -1161,8 +1162,8 @@ class ImpalaHS2Client(ImpalaClient):
         if isinstance(e.inner, socket.error):
           e = e.inner
         # issue with the connection with the impalad
-        print('Caught exception {0}, type={1} in {2}. {3}'
-          .format(str(e), type(e), rpc.__name__, retry_msg), file=sys.stderr)
+        log_exception_with_timestamp(e, "Exception",
+           "type={0} in {1}. {2}".format(type(e), rpc.__name__, retry_msg))
         self._print_rpc_end(rpc, None, start_time, "Error - TTransportException")
         if raise_error:
           if isinstance(e, TTransportException):
@@ -1186,18 +1187,18 @@ class ImpalaHS2Client(ImpalaClient):
             except ValueError:
               retry_secs = None
         if retry_secs:
-          print('Caught exception {0}, type={1} in {2}. {3}, retry after {4} secs'
-                .format(str(h), type(h), rpc.__name__, retry_msg, retry_secs),
-                file=sys.stderr)
+          log_exception_with_timestamp(h, "Exception",
+              "type={0} in {1}. {2}, retry after {3} secs"
+              .format(type(h), rpc.__name__, retry_msg, retry_secs))
         else:
-          print('Caught exception {0}, type={1} in {2}. {3}'
-                .format(str(h), type(h), rpc.__name__, retry_msg), file=sys.stderr)
+          log_exception_with_timestamp(h, "Exception", "type={0} in {1}. {2}"
+                .format(type(h), rpc.__name__, retry_msg))
         self._print_rpc_end(rpc, None, start_time, "Error - HttpError")
         if raise_error:
           raise
       except Exception as e:
-        print('Caught exception {0}, type={1} in {2}. {3}'
-          .format(str(e), type(e), rpc.__name__, retry_msg), file=sys.stderr)
+        log_exception_with_timestamp(e, "Exception", "type={0} in {1}. {2}"
+          .format(type(e), rpc.__name__, retry_msg))
         self._print_rpc_end(rpc, None, start_time, "Error")
         if raise_error:
           raise
@@ -1613,6 +1614,24 @@ class ImpalaBeeswaxClient(ImpalaClient):
         if "QueryNotFoundException" in str(e):
           raise QueryStateException('Error: Stale query handle')
         # Print more details for other kinds of exceptions
-        print('Caught exception {0}, type={1}'.format(str(e), type(e)), file=sys.stderr)
+        log_exception_with_timestamp(e, "Exception", "type={0}".format(type(e)))
         traceback.print_exc()
         raise Exception("Encountered unknown exception")
+
+
+def log_exception_with_timestamp(e, type="Exception", msg="", stderr_flag=True):
+  # method log_exception_with_timestamp prints timestamp with exception trace
+  # and accepts custom message before timestamp. stderr_flag controls print statement
+  # to be logged in stderr, by default it is true.
+  if(stderr_flag):
+      print("%s [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), type,
+      msg), e, file=sys.stderr)
+  else:
+      print("%s [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), type,
+       msg), e)
+
+
+def log_timestamp(type="Exception", msg=""):
+  # method log_timestamp prints timestamp with custom message
+  print("%s [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), type, msg),
+      file=sys.stderr)
