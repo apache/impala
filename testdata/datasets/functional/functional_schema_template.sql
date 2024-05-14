@@ -3893,6 +3893,73 @@ SELECT * FROM  {db_name}{db_suffix}.iceberg_query_metadata;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_metadata_alltypes
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  b boolean,
+  i int,
+  l bigint,
+  f float,
+  d double,
+  ts timestamp,
+  dt date,
+  s string,
+  bn binary,
+  -- TODO IMPALA-13080: Add decimal.
+  strct struct<i: int>,
+  arr array<double>,
+  mp map<int, float>
+)
+STORED BY ICEBERG
+LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_metadata_alltypes'
+TBLPROPERTIES('format-version'='2');
+---- DEPENDENT_LOAD_HIVE
+INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (
+  false,
+  1,
+  -10,
+  2e-10,
+  -2e-100,
+  to_utc_timestamp("2024-05-14 14:51:12", "UTC"),
+  to_date("2024-05-14"),
+  "Some string",
+  "bin1",
+  named_struct("i", 10),
+  array(cast(10.0 as double), cast(20.0 as double)),
+  map(10, cast(10.0 as float), 100, cast(100.0 as float))
+),
+(
+  NULL,
+  5,
+  150,
+  2e15,
+  double('NaN'),
+  to_utc_timestamp("2025-06-15 18:51:12", "UTC"),
+  to_date("2025-06-15"),
+  "A string",
+  NULL,
+  named_struct("i", -150),
+  array(cast(-10.0 as double), cast(-2e100 as double)),
+  map(10, cast(0.5 as float), 101, cast(1e3 as float))
+),
+(
+  true,
+  5,
+  150,
+  float('NaN'),
+  2e100,
+  NULL,
+  NULL,
+  NULL,
+  "bin2",
+  named_struct("i", -150),
+  array(cast(-12.0 as double), cast(-2e100 as double)),
+  map(10, cast(0.5 as float), 101, cast(1e3 as float))
+);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 iceberg_with_key_metadata
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}

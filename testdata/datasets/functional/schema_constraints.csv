@@ -110,6 +110,7 @@ table_name:iceberg_lineitem_sixblocks, constraint:restrict_to, table_format:parq
 table_name:iceberg_spark_compaction_with_dangling_delete, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_v2_equality_delete_schema_evolution, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_query_metadata, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_metadata_alltypes, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_view, constraint:restrict_to, table_format:parquet/none/none
 
 # TODO: Support Avro. Data loading currently fails for Avro because complex types

@@ -57,6 +57,8 @@ class IcebergRowReader {
   inline static jclass boolean_cl_ = nullptr;
   inline static jclass integer_cl_ = nullptr;
   inline static jclass long_cl_ = nullptr;
+  inline static jclass float_cl_ = nullptr;
+  inline static jclass double_cl_ = nullptr;
   inline static jclass char_sequence_cl_ = nullptr;
   inline static jclass byte_buffer_cl_ = nullptr;
 
@@ -66,6 +68,8 @@ class IcebergRowReader {
   inline static jmethodID boolean_value_ = nullptr;
   inline static jmethodID integer_value_ = nullptr;
   inline static jmethodID long_value_ = nullptr;
+  inline static jmethodID float_value_ = nullptr;
+  inline static jmethodID double_value_ = nullptr;
   inline static jmethodID char_sequence_to_string_ = nullptr;
 
   /// The scan node that started this row reader.
@@ -90,6 +94,10 @@ class IcebergRowReader {
   Status WriteIntSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
       WARN_UNUSED_RESULT;
   Status WriteLongSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
+      WARN_UNUSED_RESULT;
+  Status WriteFloatSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
+      WARN_UNUSED_RESULT;
+  Status WriteDoubleSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
       WARN_UNUSED_RESULT;
   /// Iceberg TimeStamp is parsed into TimestampValue.
   Status WriteTimeStampSlot(JNIEnv* env, const jobject &accessed_value, void* slot)

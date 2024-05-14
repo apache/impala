@@ -46,6 +46,8 @@ Status IcebergRowReader::InitJNI() {
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Boolean", &boolean_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Integer", &integer_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Long", &long_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Float", &float_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Double", &double_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/CharSequence",
       &char_sequence_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/nio/ByteBuffer",
@@ -60,6 +62,10 @@ Status IcebergRowReader::InitJNI() {
       &integer_value_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, long_cl_, "longValue", "()J",
       &long_value_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, long_cl_, "floatValue", "()F",
+      &float_value_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, long_cl_, "doubleValue", "()D",
+      &double_value_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, char_sequence_cl_, "toString",
       "()Ljava/lang/String;", &char_sequence_to_string_));
   return Status::OK();
@@ -107,6 +113,12 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
       break;
     } case TYPE_BIGINT: { // java.lang.Long
       RETURN_IF_ERROR(WriteLongSlot(env, accessed_value, slot));
+      break;
+    } case TYPE_FLOAT: { // java.lang.Float
+      RETURN_IF_ERROR(WriteFloatSlot(env, accessed_value, slot));
+      break;
+    } case TYPE_DOUBLE: { // java.lang.Double
+      RETURN_IF_ERROR(WriteDoubleSlot(env, accessed_value, slot));
       break;
     } case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
       RETURN_IF_ERROR(WriteTimeStampSlot(env, accessed_value, slot));
@@ -185,6 +197,26 @@ Status IcebergRowReader::WriteLongSlot(JNIEnv* env, const jobject &accessed_valu
   jlong result = env->CallLongMethod(accessed_value, long_value_);
   RETURN_ERROR_IF_EXC(env);
   *reinterpret_cast<int64_t*>(slot) = reinterpret_cast<int64_t>(result);
+  return Status::OK();
+}
+
+Status IcebergRowReader::WriteFloatSlot(JNIEnv* env, const jobject &accessed_value,
+    void* slot) {
+  DCHECK(accessed_value != nullptr);
+  DCHECK(env->IsInstanceOf(accessed_value, float_cl_) == JNI_TRUE);
+  jfloat result = env->CallFloatMethod(accessed_value, float_value_);
+  RETURN_ERROR_IF_EXC(env);
+  *reinterpret_cast<float*>(slot) = result;
+  return Status::OK();
+}
+
+Status IcebergRowReader::WriteDoubleSlot(JNIEnv* env, const jobject &accessed_value,
+    void* slot) {
+  DCHECK(accessed_value != nullptr);
+  DCHECK(env->IsInstanceOf(accessed_value, double_cl_) == JNI_TRUE);
+  jdouble result = env->CallDoubleMethod(accessed_value, double_value_);
+  RETURN_ERROR_IF_EXC(env);
+  *reinterpret_cast<double*>(slot) = result;
   return Status::OK();
 }
 
