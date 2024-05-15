@@ -145,6 +145,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogOperationTracker;
@@ -1270,7 +1271,7 @@ public class CatalogOpExecutor {
             format = params.getSet_file_format_params().file_format;
           }
           alterTableAddPartitions(tbl, params.getAdd_partition_params(), format,
-              catalogTimeline, modification);
+              catalogTimeline, modification, debugAction);
           reloadMetadata = false;
           responseSummaryMsg = "New partition has been added to the table.";
           break;
@@ -4600,8 +4601,8 @@ public class CatalogOpExecutor {
    */
   private void alterTableAddPartitions(Table tbl,
       TAlterTableAddPartitionParams addPartParams, THdfsFileFormat fileFormat,
-      EventSequence catalogTimeline, InProgressTableModification modification)
-      throws ImpalaException {
+      EventSequence catalogTimeline, InProgressTableModification modification,
+      String debugAction) throws ImpalaException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
 
     TableName tableName = tbl.getTableName();
@@ -4639,10 +4640,10 @@ public class CatalogOpExecutor {
 
     List<Partition> difference = null;
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
-      Map<String, Long> partitionToEventId = catalog_.isEventProcessingActive() ?
-          Maps.newHashMap() : null;
+      Map<String, Long> partitionToEventId = Maps.newHashMap();
       List<Partition> addedHmsPartitions = addHmsPartitionsInTransaction(msClient,
-          tbl, allHmsPartitionsToAdd, partitionToEventId, ifNotExists, catalogTimeline);
+          tbl, allHmsPartitionsToAdd, partitionToEventId, ifNotExists, catalogTimeline,
+          debugAction);
       // Handle HDFS cache. This is done in a separate round bacause we have to apply
       // caching only to newly added partitions.
       alterTableCachePartitions(msTbl, msClient, tableName, addedHmsPartitions,
@@ -5299,7 +5300,7 @@ public class CatalogOpExecutor {
    */
   private List<Partition> addHmsPartitions(MetaStoreClient msClient,
       Table tbl, List<Partition> allHmsPartitionsToAdd,
-      @Nullable Map<String, Long> partitionToEventId, boolean ifNotExists,
+      Map<String, Long> partitionToEventId, boolean ifNotExists,
       EventSequence catalogTimeline) throws ImpalaRuntimeException, CatalogException {
     long eventId = getCurrentEventId(msClient, catalogTimeline);
     List<Partition> addedHmsPartitions = Lists
@@ -5332,7 +5333,6 @@ public class CatalogOpExecutor {
           // add_partitions call above.
           addedHmsPartitions.addAll(addedPartitions);
         } else {
-          Preconditions.checkNotNull(partitionToEventId);
           addedHmsPartitions.addAll(partitionToEventSubMap.keySet());
           // we cannot keep a mapping of Partition to event ids because the
           // partition objects are changed later in the cachePartitions code path.
@@ -5361,8 +5361,12 @@ public class CatalogOpExecutor {
    */
   private List<Partition> addHmsPartitionsInTransaction(MetaStoreClient msClient,
       Table tbl, List<Partition> partitions, Map<String, Long> partitionToEventId,
-      boolean ifNotExists, EventSequence catalogTimeline) throws ImpalaException {
+      boolean ifNotExists, EventSequence catalogTimeline, String debugAction)
+      throws ImpalaException {
     if (!AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())) {
+      if (DebugUtils.hasDebugAction(debugAction, DebugUtils.ENABLE_EVENT_PROCESSOR)) {
+        catalog_.startEventsProcessor();
+      }
       return addHmsPartitions(msClient, tbl, partitions, partitionToEventId,
           ifNotExists, catalogTimeline);
     }
@@ -6302,10 +6306,12 @@ public class CatalogOpExecutor {
     }
 
     // Add partitions to metastore.
-    Map<String, Long> partitionToEventId = catalog_.isEventProcessingActive() ?
-        Maps.newHashMap() : null;
+    Map<String, Long> partitionToEventId = Maps.newHashMap();
     String annotation = String.format("Recovering %d partitions for %s",
         hmsPartitions.size(), tbl.getFullName());
+    if (DebugUtils.hasDebugAction(debugAction, DebugUtils.ENABLE_EVENT_PROCESSOR)) {
+      catalog_.startEventsProcessor();
+    }
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation);
         MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
       List<Partition> addedPartitions = addHmsPartitions(msClient, tbl, hmsPartitions,

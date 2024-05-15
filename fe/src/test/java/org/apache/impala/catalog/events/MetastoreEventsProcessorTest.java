@@ -3962,6 +3962,40 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  @Test
+  public void testAlterTableWithEpDisabled() throws Exception {
+    try {
+      createDatabaseFromImpala(TEST_DB_NAME, null);
+      String testTable = "testAlterTableNoError";
+      createTableFromImpala(TEST_DB_NAME, testTable, true);
+      eventsProcessor_.processEvents();
+      // set EP to paused state and execute Alter table add partition query
+      eventsProcessor_.pause();
+      long numberOfSelfEventsBefore =
+          eventsProcessor_.getMetrics()
+              .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
+      TPartitionDef partitionDef = new TPartitionDef();
+      partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "100"));
+      partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "200"));
+      alterTableAddPartition(TEST_DB_NAME, testTable, partitionDef,
+          "enable_event_processor");
+      eventsProcessor_.processEvents();
+      assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+      long numberOfSelfEventsAfter =
+          eventsProcessor_.getMetrics()
+              .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
+      // expect ADD_PARTITION event to be skipped as self-event
+      assertEquals("Unexpected self events skipped: ", numberOfSelfEventsAfter,
+          numberOfSelfEventsBefore + 1);
+    } catch (NullPointerException ex) {
+      throw new CatalogException("Exception occured while applying AlterTableEvent", ex);
+    } finally {
+      if (eventsProcessor_.getStatus() != EventProcessorStatus.ACTIVE) {
+        eventsProcessor_.start();
+      }
+    }
+  }
+
   private void createDatabase(String catName, String dbName,
       Map<String, String> params) throws TException {
     try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -4259,8 +4293,17 @@ public class MetastoreEventsProcessorTest {
    */
   private void alterTableAddPartition(
       String dbName, String tblName, TPartitionDef partitionDef) throws ImpalaException {
+    alterTableAddPartition(dbName, tblName,partitionDef, null);
+  }
+
+  private void alterTableAddPartition(String dbName, String tblName,
+      TPartitionDef partitionDef, String debugActions) throws ImpalaException {
     TDdlExecRequest req = new TDdlExecRequest();
-    req.setQuery_options(new TDdlQueryOptions());
+    TDdlQueryOptions queryOptions = new TDdlQueryOptions();
+    if (debugActions != null) {
+      queryOptions.setDebug_action(debugActions);
+    }
+    req.setQuery_options(queryOptions);
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(new TTableName(dbName, tblName));
