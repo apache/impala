@@ -83,6 +83,9 @@ public class DebugUtils {
   // debug action label for introducing delay in loading table metadata.
   public static final String LOAD_TABLES_DELAY = "impalad_load_tables_delay";
 
+  // debug action to enable eventProcessor
+  public static final String ENABLE_EVENT_PROCESSOR = "enable_event_processor";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */
