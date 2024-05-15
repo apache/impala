@@ -33,7 +33,8 @@ namespace impala {
 IcebergRowReader::IcebergRowReader(ScanNode* scan_node,
     IcebergMetadataScanner* metadata_scanner)
   : scan_node_(scan_node),
-    metadata_scanner_(metadata_scanner) {}
+    metadata_scanner_(metadata_scanner),
+    unsupported_decimal_warning_emitted_(false) {}
 
 Status IcebergRowReader::InitJNI() {
   DCHECK(list_cl_ == nullptr) << "InitJNI() already called!";
@@ -120,7 +121,10 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
     } case TYPE_DOUBLE: { // java.lang.Double
       RETURN_IF_ERROR(WriteDoubleSlot(env, accessed_value, slot));
       break;
-    } case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
+    } case TYPE_DECIMAL: {
+      RETURN_IF_ERROR(WriteDecimalSlot(slot_desc, tuple, state));
+      break;
+    }case TYPE_TIMESTAMP: { // org.apache.iceberg.types.TimestampType
       RETURN_IF_ERROR(WriteTimeStampSlot(env, accessed_value, slot));
       break;
     } case TYPE_STRING: {
@@ -217,6 +221,20 @@ Status IcebergRowReader::WriteDoubleSlot(JNIEnv* env, const jobject &accessed_va
   jdouble result = env->CallDoubleMethod(accessed_value, double_value_);
   RETURN_ERROR_IF_EXC(env);
   *reinterpret_cast<double*>(slot) = result;
+  return Status::OK();
+}
+
+Status IcebergRowReader::WriteDecimalSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
+    RuntimeState* state) {
+  // TODO IMPALA-13080: Handle DECIMALs without NULLing them out.
+  constexpr const char* warning = "DECIMAL values from Iceberg metadata tables "
+    "are displayed as NULL. See IMPALA-13080.";
+  if (!unsupported_decimal_warning_emitted_) {
+    unsupported_decimal_warning_emitted_ = true;
+    LOG(WARNING) << warning;
+    state->LogError(ErrorMsg(TErrorCode::NOT_IMPLEMENTED_ERROR, warning));
+  }
+  tuple->SetNull(slot_desc->null_indicator_offset());
   return Status::OK();
 }
 

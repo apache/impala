@@ -78,6 +78,10 @@ class IcebergRowReader {
   /// IcebergMetadataScanner class, used to get and access values inside java objects.
   IcebergMetadataScanner* metadata_scanner_;
 
+  /// We want to emit a warning about DECIMAL values being NULLed out at most once. This
+  /// member keeps track of whether the warning has already been emitted.
+  bool unsupported_decimal_warning_emitted_;
+
   // Writes a Java value into the target tuple. 'struct_like_row' is only used for struct
   // types. It is needed because struct children reside directly in the parent tuple of
   // the struct.
@@ -99,6 +103,8 @@ class IcebergRowReader {
       WARN_UNUSED_RESULT;
   Status WriteDoubleSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
       WARN_UNUSED_RESULT;
+  Status WriteDecimalSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
+      RuntimeState* state) WARN_UNUSED_RESULT;
   /// Iceberg TimeStamp is parsed into TimestampValue.
   Status WriteTimeStampSlot(JNIEnv* env, const jobject &accessed_value, void* slot)
       WARN_UNUSED_RESULT;

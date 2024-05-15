@@ -3905,7 +3905,7 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   dt date,
   s string,
   bn binary,
-  -- TODO IMPALA-13080: Add decimal.
+  dc decimal,
   strct struct<i: int>,
   arr array<double>,
   mp map<int, float>
@@ -3924,6 +3924,7 @@ INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (
   to_date("2024-05-14"),
   "Some string",
   "bin1",
+  15.48,
   named_struct("i", 10),
   array(cast(10.0 as double), cast(20.0 as double)),
   map(10, cast(10.0 as float), 100, cast(100.0 as float))
@@ -3938,6 +3939,7 @@ INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (
   to_date("2025-06-15"),
   "A string",
   NULL,
+  5.8,
   named_struct("i", -150),
   array(cast(-10.0 as double), cast(-2e100 as double)),
   map(10, cast(0.5 as float), 101, cast(1e3 as float))
@@ -3952,6 +3954,7 @@ INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (
   NULL,
   NULL,
   "bin2",
+  NULL,
   named_struct("i", -150),
   array(cast(-12.0 as double), cast(-2e100 as double)),
   map(10, cast(0.5 as float), 101, cast(1e3 as float))
