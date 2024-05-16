@@ -386,8 +386,14 @@ Status RSAJWTPublicKeyBuilder::CreateJWKPublicKey(
         BIO_free(bio);
         return Status(Substitute("Invalid x5c certificate"));
       }
-      auto alg = X509_get0_tbs_sigalg(cert);
-      int pkey_nid = OBJ_obj2nid(alg->algorithm);
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+      int pkey_nid = X509_get_signature_nid(cert);
+#else
+      // Older version of OpenSSL appear not to have a public way to get the
+      // signature digest method from a certificate. Instead, we reach into the
+      // 'private' internals.
+      int pkey_nid = OBJ_obj2nid(cert->sig_alg->algorithm);
+#endif
       std::string sigalg(OBJ_nid2ln(pkey_nid));
       if (sigalg == "sha256WithRSAEncryption") {
         algorithm = "rs256";
