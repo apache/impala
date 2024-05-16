@@ -201,15 +201,15 @@ const string REASON_INVALID_POOL_CONFIG_MIN_LIMIT_MAX_LIMIT =
     "max_query_mem_limit ($0 > $1)";
 const string REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION =
     "minimum memory reservation is greater than memory available to the query for buffer "
-    "reservations. Memory reservation needed given the current plan: $0. Adjust either "
-    "the mem_limit or the pool config (max-query-mem-limit, min-query-mem-limit) for the "
-    "query to allow the query memory limit to be at least $1. Note that changing the "
-    "mem_limit may also change the plan. See the query profile for more information "
-    "about the per-node memory requirements.";
+    "reservations. Memory reservation needed given the current plan: $0. Adjust the $1 "
+    "for the query to allow the query memory limit to be at least $2. Note that changing "
+    "the memory limit may also change the plan. See '$3' in the "
+    "query profile for more information about the per-node memory requirements.";
 const string REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION =
     "minimum memory reservation on backend '$0' is greater than memory available to the "
-    "query for buffer reservations. Increase the buffer_pool_limit to $1. See the query "
-    "profile for more information about the per-node memory requirements.";
+    "query for buffer reservations. Increase the buffer_pool_limit to $1. "
+    "See '$2' in the query profile for more information about "
+    "the per-node memory requirements.";
 const string REASON_NOT_ENOUGH_SLOTS_ON_BACKEND =
     "number of admission control slots needed ($0) on backend '$1' is greater than total "
     "slots available $2. Reduce MT_DOP or MAX_FRAGMENT_INSTANCES_PER_NODE to less than "
@@ -217,8 +217,8 @@ const string REASON_NOT_ENOUGH_SLOTS_ON_BACKEND =
 const string REASON_MIN_RESERVATION_OVER_POOL_MEM =
     "minimum memory reservation needed is greater than pool max mem resources. Pool "
     "max mem resources: $0. Cluster-wide memory reservation needed: $1. Increase the "
-    "pool max mem resources. See the query profile for more information about the "
-    "per-node memory requirements.";
+    "pool max mem resources. See '$2' in the query profile "
+    "for more information about the per-node memory requirements.";
 const string REASON_DISABLED_MAX_MEM_RESOURCES =
     "disabled by pool max mem resources set to 0";
 const string REASON_DISABLED_REQUESTS_LIMIT = "disabled by requests limit set to 0";
@@ -842,29 +842,78 @@ void AdmissionController::UpdateHostStats(const NetworkAddressPB& host_addr,
 // Helper method used by CanAccommodateMaxInitialReservation(). Returns true if the given
 // 'mem_limit' can accommodate 'buffer_reservation'. If not, returns false and the
 // details about the memory shortage in 'mem_unavailable_reason'.
-static bool CanMemLimitAccommodateReservation(
-    int64_t mem_limit, int64_t buffer_reservation, string* mem_unavailable_reason) {
+static bool CanMemLimitAccommodateReservation(const int64_t mem_limit,
+    const MemLimitSourcePB mem_limit_source, const int64_t buffer_reservation,
+    const string& request_pool, string* mem_unavailable_reason) {
   if (mem_limit <= 0) return true; // No mem limit.
   const int64_t max_reservation =
       ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
   if (buffer_reservation <= max_reservation) return true;
   const int64_t required_mem_limit =
       ReservationUtil::GetMinMemLimitFromReservation(buffer_reservation);
+  string config_name = "<config_name>";
+  switch (mem_limit_source) {
+    case MemLimitSourcePB::NO_LIMIT:
+      DCHECK(false) << "MemLimitSourcePB::NO_LIMIT only valid for mem_limit <= 0";
+      break;
+    case MemLimitSourcePB::QUERY_OPTION_MEM_LIMIT:
+    case MemLimitSourcePB::QUERY_PLAN_PER_HOST_MEM_ESTIMATE:
+    case MemLimitSourcePB::ADJUSTED_PER_HOST_MEM_ESTIMATE:
+    case MemLimitSourcePB::QUERY_PLAN_DEDICATED_COORDINATOR_MEM_ESTIMATE:
+    case MemLimitSourcePB::ADJUSTED_DEDICATED_COORDINATOR_MEM_ESTIMATE:
+      config_name = to_string(TImpalaQueryOptions::MEM_LIMIT) + " option";
+      break;
+    case MemLimitSourcePB::QUERY_OPTION_MEM_LIMIT_EXECUTORS:
+      config_name = to_string(TImpalaQueryOptions::MEM_LIMIT_EXECUTORS) + " option";
+      break;
+    case MemLimitSourcePB::QUERY_OPTION_MEM_LIMIT_COORDINATORS:
+      config_name = to_string(TImpalaQueryOptions::MEM_LIMIT_COORDINATORS) + " option";
+      break;
+    case MemLimitSourcePB::POOL_CONFIG_MIN_QUERY_MEM_LIMIT:
+      config_name =
+          Substitute("impala.admission-control.min-query-mem-limit of request pool '$0'",
+              request_pool);
+      break;
+    case MemLimitSourcePB::POOL_CONFIG_MAX_QUERY_MEM_LIMIT:
+      config_name =
+          Substitute("impala.admission-control.max-query-mem-limit of request pool '$0'",
+              request_pool);
+      break;
+    case MemLimitSourcePB::HOST_MEM_TRACKER_LIMIT:
+      config_name = "system memory or the CGroup memory limit";
+      break;
+    case MemLimitSourcePB::COORDINATOR_ONLY_OPTIMIZATION:
+      DCHECK(false) << "Coordinator only query should have mem_limit == 0";
+      break;
+    default:
+      DCHECK(false) << "Unknown MemLimitSourcePB enum: " << mem_limit_source;
+  }
   *mem_unavailable_reason = Substitute(REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION,
-      PrintBytes(buffer_reservation), PrintBytes(required_mem_limit));
+      PrintBytes(buffer_reservation), config_name, PrintBytes(required_mem_limit),
+      Scheduler::PROFILE_INFO_KEY_PER_HOST_MIN_MEMORY_RESERVATION);
   return false;
 }
 
 bool AdmissionController::CanAccommodateMaxInitialReservation(const ScheduleState& state,
     const TPoolConfig& pool_cfg, string* mem_unavailable_reason) {
+  // Executors mem_limit.
   const int64_t executor_mem_limit = state.per_backend_mem_limit();
   const int64_t executor_min_reservation = state.largest_min_reservation();
+  if (executor_mem_limit > 0) {
+    DCHECK_EQ(executor_mem_limit, state.per_backend_mem_to_admit());
+  }
+  // Coordinator mem_limit.
   const int64_t coord_mem_limit = state.coord_backend_mem_limit();
   const int64_t coord_min_reservation = state.coord_min_reservation();
-  return CanMemLimitAccommodateReservation(
-             executor_mem_limit, executor_min_reservation, mem_unavailable_reason)
-      && CanMemLimitAccommodateReservation(
-             coord_mem_limit, coord_min_reservation, mem_unavailable_reason);
+  if (coord_mem_limit > 0) {
+    DCHECK_EQ(coord_mem_limit, state.coord_backend_mem_to_admit());
+  }
+  return CanMemLimitAccommodateReservation(executor_mem_limit,
+             state.per_backend_mem_to_admit_source(), executor_min_reservation,
+             state.request_pool(), mem_unavailable_reason)
+      && CanMemLimitAccommodateReservation(coord_mem_limit,
+          state.coord_backend_mem_to_admit_source(), coord_min_reservation,
+          state.request_pool(), mem_unavailable_reason);
 }
 
 bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
@@ -1135,7 +1184,8 @@ bool AdmissionController::RejectForSchedule(
     if (largest_min_mem_reservation.second > query_opts.buffer_pool_limit) {
       *rejection_reason = Substitute(REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION,
           NetworkAddressPBToString(*largest_min_mem_reservation.first),
-          PrintBytes(largest_min_mem_reservation.second));
+          PrintBytes(largest_min_mem_reservation.second),
+          Scheduler::PROFILE_INFO_KEY_PER_HOST_MIN_MEMORY_RESERVATION);
       return true;
     }
   } else if (!CanAccommodateMaxInitialReservation(state, pool_cfg, rejection_reason)) {
@@ -1172,7 +1222,8 @@ bool AdmissionController::RejectForSchedule(
   if (max_mem > 0) {
     if (cluster_min_mem_reservation_bytes > max_mem) {
       *rejection_reason = Substitute(REASON_MIN_RESERVATION_OVER_POOL_MEM,
-          PrintBytes(max_mem), PrintBytes(cluster_min_mem_reservation_bytes));
+          PrintBytes(max_mem), PrintBytes(cluster_min_mem_reservation_bytes),
+          Scheduler::PROFILE_INFO_KEY_PER_HOST_MIN_MEMORY_RESERVATION);
       return true;
     }
     int64_t cluster_mem_to_admit = state.GetClusterMemoryToAdmit();

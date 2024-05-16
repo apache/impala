@@ -32,11 +32,11 @@ select * from functional_parquet.alltypes limit 1;
 ---- CATCH
 Rejected query from pool root.poolLowMaxLimit: minimum memory reservation is greater than
  memory available to the query for buffer reservations. Memory reservation needed given
- the current plan: 88.00 KB. Adjust either the mem_limit or the pool config
- (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
- memory limit to be at least 32.09 MB. Note that changing the mem_limit may also change
- the plan. See the query profile for more information about the per-node memory
- requirements.
+ the current plan: 88.00 KB. Adjust the impala.admission-control.max-query-mem-limit of
+ request pool 'root.poolLowMaxLimit' for the query to allow the query memory limit to be
+ at least 32.09 MB. Note that changing the memory limit may also change the plan. See
+ 'Per Host Min Memory Reservation' in the query profile for more information about the
+ per-node memory requirements.
 ====
 ---- QUERY
 # No mem_limit set
@@ -92,11 +92,10 @@ select * from functional_parquet.alltypes limit 1;
 ---- CATCH
 Rejected query from pool root.poolLowMinLimit: minimum memory reservation is greater than
  memory available to the query for buffer reservations. Memory reservation needed given
- the current plan: 88.00 KB. Adjust either the mem_limit or the pool config
- (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
- memory limit to be at least 32.09 MB. Note that changing the mem_limit may also change
- the plan. See the query profile for more information about the per-node memory
- requirements.
+ the current plan: 88.00 KB. Adjust the MEM_LIMIT option for the query to allow the query
+ memory limit to be at least 32.09 MB. Note that changing the memory limit may also
+ change the plan. See 'Per Host Min Memory Reservation' in the query profile for more
+ information about the per-node memory requirements.
 ====
 ---- QUERY
 # mem_limit is set and pool.clamp_mem_limit_query_option is true

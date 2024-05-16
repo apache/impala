@@ -32,7 +32,8 @@ select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
 ---- CATCH
 row_regex:.*minimum memory reservation on backend '.*' is greater than memory available to
  the query for buffer reservations\. Increase the buffer_pool_limit to 294.17 MB\. See
- the query profile for more information about the per-node memory requirements\.
+ 'Per Host Min Memory Reservation' in the query profile for more information about the
+ per-node memory requirements\.
 ====
 ---- QUERY
 # Confirm that with broadcast join, memory limit is not hit.
@@ -66,7 +67,8 @@ select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
 ---- CATCH
 row_regex:.*minimum memory reservation on backend '.*' is greater than memory available to
  the query for buffer reservations\. Increase the buffer_pool_limit to 390.11 MB\. See
- the query profile for more information about the per-node memory requirements\.
+ 'Per Host Min Memory Reservation' in the query profile for more information about the
+ per-node memory requirements\.
 ====
 ---- QUERY
 # Confirm that with broadcast join, memory limit is not hit.

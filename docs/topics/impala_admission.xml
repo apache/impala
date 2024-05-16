@@ -221,7 +221,12 @@ under the License.
         <dlentry>
           <dt>Minimum Query Memory Limit and Maximum Query Memory Limit</dt>
           <dd>
-            <p>These two options determine the minimum and maximum per-host
+            <p>These are
+              <codeph>impala.admission-control.min-query-mem-limit.*</codeph>
+              and <codeph>impala.admission-control.max-query-mem-limit.*</codeph>
+              configurations in <filepath>llama-site.xml</filepath> (See
+              <xref href="impala_admission_config.xml#concept_cz4_vxz_jgb"/>).
+              They determine the minimum and maximum per-host
               memory limit that will be chosen by Impala Admission control for
               queries in this resource pool. If set, Impala Admission Control
               will choose a memory limit between the minimum and maximum values
@@ -275,13 +280,16 @@ under the License.
       <dl>
         <dlentry>
           <dt> Clamp MEM_LIMIT Query Option</dt>
-          <dd>If this field is not selected, the <codeph>MEM_LIMIT</codeph>
-            query option will not be bounded by the <b>Maximum Query Memory
-              Limit</b> and the <b>Minimum Query Memory Limit</b> values
-            specified for this resource pool. By default, this field is selected
-            in Impala 3.1 and higher. The field is disabled if both <b>Minimum
-              Query Memory Limit</b> and <b>Maximum Query Memory Limit</b> are
-            not set.</dd>
+          <dd>This is
+            <codeph>impala.admission-control.clamp-mem-limit-query-option.*</codeph>
+            configuration in <filepath>llama-site.xml</filepath>.
+            If this configuration is set to <codeph>false</codeph>,
+            the <codeph>MEM_LIMIT</codeph> query option will not be bounded by the
+            <b>Maximum Query Memory Limit</b> and the <b>Minimum Query Memory Limit</b>
+            values specified for this resource pool. By default, this configuration is
+            set to <codeph>true</codeph> in Impala 3.1 and higher. This configuration
+            is ignored if both <b>Minimum Query Memory Limit</b> and
+            <b>Maximum Query Memory Limit</b> are not set.</dd>
         </dlentry>
       </dl>
       <p
@@ -298,7 +306,7 @@ under the License.
     <title>Setting Per-query Memory Limits</title>
     <conbody>
       <p>Use per-query memory limits to prevent queries from consuming excessive
-        memory resources that impact other queries. We recommends that you set
+        memory resources that impact other queries. We recommend that you set
         the query memory limits whenever possible.</p>
       <p>If you set the <b>Max Memory</b> for a resource pool, Impala attempts
         to throttle queries if there is not enough memory to run them within the
@@ -312,6 +320,51 @@ under the License.
         your business case, memory-based admission control works well. The
         potential downside is that queries that attempt to use more memory might
         perform poorly or even be cancelled.</p>
+    </conbody>
+  </concept>
+  <concept id="examples_of_query_rejection_by_admission_control">
+    <title>Examples of Query Rejection by Admission Control</title>
+    <conbody>
+      <dl>
+        <dlentry>
+          <dt>The minimum memory to start a query is not satisfied</dt>
+          <dd>
+            <p>Impala will attempt to start a query as long as the minimum memory
+              requirement to run that query can be satisfied by all executor nodes.
+              In the event where Admission Control determines that the minimum memory
+              requirement can not be satisfied by existing memory limit configurations
+              (<codeph>MEM_LIMIT</codeph> query option or other memory limit
+              configurations at request pool) or available system memory in one or more
+              executor nodes, it will reject the query and the query will not execute
+              at all. Admission Control will return an error message describing what is
+              happening and recommend which configuration to adjust so that the query
+              can pass Admission Control. Take a look at the last query examples from
+              <xref href="impala_mem_limit.xml"/></p>
+<codeblock rev="">
+[localhost:21000] > set mem_limit=15mb;
+MEM_LIMIT set to 15mb
+[localhost:21000] > select count(distinct c_name) from customer;
+Query: select count(distinct c_name) from customer
+ERROR:
+Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query
+for buffer reservations. Memory reservation needed given the current plan: 38.00 MB. Adjust MEM_LIMIT option
+for the query to allow the query memory limit to be at least 70.00 MB. Note that changing the memory limit may
+also change the plan. See 'Per Host Min Memory Reservation' in the query profile for more information about the
+per-node memory requirements.</codeblock>
+            <p>Admission Control rejects this query because <codeph>MEM_LIMIT</codeph>
+              is set too low such that it is insufficient to start the query, which
+              requires 70.00 MB (38.00 MB + 32.00 MB overhead) at minimum for one or more
+              executor nodes. The error message contains recommendations on what
+              configuration to adjust depending on which limitation causes rejection.
+              In this case, Admission Controller recommends raising query option
+              <codeph>MEM_LIMIT</codeph> &gt;= 70mb so that the minimum memory
+              requirement is satisfied to start the query.
+              Users can also inspect 'Per Host Min Memory Reservation' info at the query
+              profile to check which executor node(s) require 38.00 MB minimum memory
+              reservation.</p>
+          </dd>
+        </dlentry>
+      </dl>
     </conbody>
   </concept>
 

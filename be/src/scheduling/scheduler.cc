@@ -82,6 +82,9 @@ static const vector<TPlanNodeType::type> SCAN_NODE_TYPES{TPlanNodeType::HDFS_SCA
 // candidates. See GetRemoteExecutorCandidates() for a deeper description.
 static const int MAX_ITERATIONS_PER_EXECUTOR_CANDIDATE = 8;
 
+const string Scheduler::PROFILE_INFO_KEY_PER_HOST_MIN_MEMORY_RESERVATION =
+    "Per Host Min Memory Reservation";
+
 Scheduler::Scheduler(MetricGroup* metrics, RequestPoolService* request_pool_service)
   : metrics_(metrics->GetOrCreateChildGroup("scheduler")),
     request_pool_service_(request_pool_service) {
@@ -1280,7 +1283,7 @@ void Scheduler::ComputeBackendExecParams(
                               << ") ";
   }
   state->summary_profile()->AddInfoString(
-      "Per Host Min Memory Reservation", min_mem_reservation_ss.str());
+      PROFILE_INFO_KEY_PER_HOST_MIN_MEMORY_RESERVATION, min_mem_reservation_ss.str());
   state->summary_profile()->AddInfoString(
       "Per Host Number of Fragment Instances", num_fragment_instances_ss.str());
 }

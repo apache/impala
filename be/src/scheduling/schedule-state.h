@@ -254,6 +254,12 @@ class ScheduleState {
   }
 
   /// Must call UpdateMemoryRequirements() at least once before calling this.
+  MemLimitSourcePB per_backend_mem_to_admit_source() const {
+    DCHECK(query_schedule_pb_->has_per_backend_mem_to_admit_source());
+    return query_schedule_pb_->per_backend_mem_to_admit_source();
+  }
+
+  /// Must call UpdateMemoryRequirements() at least once before calling this.
   int64_t coord_backend_mem_limit() const {
     return query_schedule_pb_->coord_backend_mem_limit();
   }
@@ -262,6 +268,12 @@ class ScheduleState {
   int64_t coord_backend_mem_to_admit() const {
     DCHECK_GT(query_schedule_pb_->coord_backend_mem_to_admit(), 0);
     return query_schedule_pb_->coord_backend_mem_to_admit();
+  }
+
+  /// Must call UpdateMemoryRequirements() at least once before calling this.
+  MemLimitSourcePB coord_backend_mem_to_admit_source() const {
+    DCHECK(query_schedule_pb_->has_coord_backend_mem_to_admit_source());
+    return query_schedule_pb_->coord_backend_mem_to_admit_source();
   }
 
   void set_largest_min_reservation(const int64_t largest_min_reservation) {
@@ -359,6 +371,19 @@ class ScheduleState {
   bool RequiresCoordinatorFragment() const {
     return request_.stmt_type == TStmtType::QUERY;
   }
+
+  /// Helper functions to update either
+  /// 'query_schedule_pb_->per_backend_mem_to_admit' or
+  /// 'query_schedule_pb_->coord_backend_mem_to_admit' along with the limiting reason
+  /// 'source' if the 'new_limit' is less or more than the current value.
+  void CompareMaxBackendMemToAdmit(
+      const int64_t new_limit, const MemLimitSourcePB source);
+  void CompareMinBackendMemToAdmit(
+      const int64_t new_limit, const MemLimitSourcePB source);
+  void CompareMaxCoordinatorMemToAdmit(
+      const int64_t new_limit, const MemLimitSourcePB source);
+  void CompareMinCoordinatorMemToAdmit(
+      const int64_t new_limit, const MemLimitSourcePB source);
 };
 
 } // namespace impala

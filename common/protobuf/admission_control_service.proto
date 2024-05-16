@@ -143,6 +143,23 @@ message FragmentExecParamsPB {
   optional RuntimeFilterAggregatorInfoPB filter_agg_info = 6;
 }
 
+// Enum describing the initialization source of per_backend_mem_to_admit
+// and coord_backend_mem_to_admit of QuerySchedulePB.
+enum MemLimitSourcePB {
+  NO_LIMIT = 0;
+  QUERY_OPTION_MEM_LIMIT = 1;
+  QUERY_PLAN_PER_HOST_MEM_ESTIMATE = 2;
+  ADJUSTED_PER_HOST_MEM_ESTIMATE = 3;
+  QUERY_PLAN_DEDICATED_COORDINATOR_MEM_ESTIMATE = 4;
+  ADJUSTED_DEDICATED_COORDINATOR_MEM_ESTIMATE = 5;
+  QUERY_OPTION_MEM_LIMIT_EXECUTORS = 6;
+  QUERY_OPTION_MEM_LIMIT_COORDINATORS = 7;
+  COORDINATOR_ONLY_OPTIMIZATION = 8;
+  POOL_CONFIG_MIN_QUERY_MEM_LIMIT = 9;
+  POOL_CONFIG_MAX_QUERY_MEM_LIMIT = 10;
+  HOST_MEM_TRACKER_LIMIT = 11;
+}
+
 // Contains the output from scheduling and admission control that is used by the
 // coordinator to start query execution.
 message QuerySchedulePB {
@@ -183,6 +200,12 @@ message QuerySchedulePB {
 
   // Mapping to store which data file is read on which hosts, grouped by scan node ID.
   map<int32, FilepathToHostsMapPB> by_node_filepath_to_hosts = 10;
+
+  // Source of per_backend_mem_to_admit.
+  optional MemLimitSourcePB per_backend_mem_to_admit_source = 11;
+
+  // Source of coord_backend_mem_to_admit.
+  optional MemLimitSourcePB coord_backend_mem_to_admit_source = 12;
 }
 
 message AdmitQueryRequestPB {

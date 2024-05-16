@@ -205,10 +205,10 @@ MEM_LIMIT set to 15mb
 Query: select count(distinct c_name) from customer
 ERROR:
 Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query
-for buffer reservations. Memory reservation needed given the current plan: 38.00 MB. Adjust either the mem_limit
-or the pool config (max-query-mem-limit, min-query-mem-limit) for the query to allow the query memory limit to be
-at least 70.00 MB. Note that changing the mem_limit may also change the plan. See the query profile for more
-information about the per-node memory requirements.</codeblock>
+for buffer reservations. Memory reservation needed given the current plan: 38.00 MB. Adjust MEM_LIMIT option
+for the query to allow the query memory limit to be at least 70.00 MB. Note that changing the memory limit may
+also change the plan. See 'Per Host Min Memory Reservation' in the query profile for more information about the
+per-node memory requirements.</codeblock>
 </conbody>
 <concept id="mem_limit_executors">
   <title>MEM_LIMIT_EXECUTORS Query Option</title>

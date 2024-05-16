@@ -60,6 +60,8 @@ class SchedulerWrapper;
 ///           configuration.
 class Scheduler {
  public:
+  static const std::string PROFILE_INFO_KEY_PER_HOST_MIN_MEMORY_RESERVATION;
+
   Scheduler(MetricGroup* metrics, RequestPoolService* request_pool_service);
 
   /// Current snapshot of executors to be used for scheduling a scan.
