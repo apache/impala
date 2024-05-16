@@ -72,7 +72,7 @@ class TestLateQueryStateInit(CustomClusterTestSuite):
   """Test that distributed runtime filter aggregation still works
   when remote query state of intermediate aggregator node is late to initialize."""
   _wait_time = WAIT_TIME_MS // 20
-  _init_delay = [100, 3000]
+  _init_delay = [100, _wait_time]
 
   @classmethod
   def get_workload(cls):
