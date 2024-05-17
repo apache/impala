@@ -154,4 +154,10 @@ public abstract class VirtualTable implements FeTable {
 
   @Override
   public String getOwnerUser() { return owner_; }
+
+  @Override
+  public long getCatalogVersion() { return 0; }
+
+  @Override
+  public long getLastLoadedTimeMs() { return 0; }
 }

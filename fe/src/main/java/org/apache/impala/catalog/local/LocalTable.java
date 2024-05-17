@@ -354,6 +354,18 @@ abstract class LocalTable implements FeTable {
     return null;
   }
 
+  @Override
+  public long getCatalogVersion() {
+    if (ref_ == null) return 0;
+    return ref_.getCatalogVersion();
+  }
+
+  @Override
+  public long getLastLoadedTimeMs() {
+    if (ref_ == null) return 0;
+    return ref_.getLoadedTimeMs();
+  }
+
   protected void loadColumnStats() {
     try {
       List<ColumnStatisticsObj> stats = db_.getCatalog().getMetaProvider()

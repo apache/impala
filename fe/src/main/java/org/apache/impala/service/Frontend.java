@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -2580,6 +2581,15 @@ public class Frontend {
             .stream()
             .map(TableName::toString)
             .collect(Collectors.joining(", ")));
+
+    // Add the catalog versions and loaded timestamps.
+    FrontendProfile.getCurrent().addInfoString("Original Table Versions",
+        stmtTableCache.tables.values().stream()
+            .map(t -> String.join(", ", t.getFullName(),
+                Long.toString(t.getCatalogVersion()),
+                Long.toString(t.getLastLoadedTimeMs()),
+                new Date(t.getLastLoadedTimeMs()).toString()))
+            .collect(Collectors.joining("\n")));
 
     // Analyze and authorize stmt
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);

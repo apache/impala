@@ -929,4 +929,7 @@ struct TCatalogObject {
 
   // Set iff object type is HDFS_PARTITION
   12: optional THdfsPartition hdfs_partition
+
+  // Timestamp when the catalog version changes in catalogd
+  13: optional i64 last_modified_time_ms
 }

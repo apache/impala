@@ -529,6 +529,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
 
   public TCatalogObject toMinimalTCatalogObject() {
     TCatalogObject min = new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    min.setLast_modified_time_ms(getLastLoadedTimeMs());
     min.setDb(new TDatabase(getName()));
     return min;
   }
@@ -544,6 +545,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
 
     TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
     resp.setObject_version_number(getCatalogVersion());
+    resp.setObject_loaded_time_ms(getLastLoadedTimeMs());
     resp.db_info = new TPartialDbInfo();
     if (selector.want_hms_database) {
       // TODO(todd): we need to deep-copy here because 'addFunction' other DDLs

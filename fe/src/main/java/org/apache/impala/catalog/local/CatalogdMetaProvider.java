@@ -804,7 +804,7 @@ public class CatalogdMetaProvider implements MetaProvider {
                 new ArrayList<>() : resp.table_info.sql_constraints.getForeign_keys();
             return new TableMetaRefImpl(
                 dbName, tableName, resp.table_info.hms_table, resp.object_version_number,
-                new SqlConstraints(primaryKeys, foreignKeys),
+                resp.object_loaded_time_ms, new SqlConstraints(primaryKeys, foreignKeys),
                 resp.table_info.valid_write_ids, resp.table_info.is_marked_cached,
                 resp.table_info.partition_prefixes, resp.table_info.virtual_columns);
            }
@@ -1913,6 +1913,12 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final long catalogVersion_;
 
     /**
+     * The timestamp when the table is loaded in catalogd corresponding to the catalog
+     * version.
+     */
+    private final long loadedTimeMs_;
+
+    /**
      * Valid write id list of ACID tables.
      */
     private final TValidWriteIdList validWriteIds_;
@@ -1926,13 +1932,14 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final HdfsPartitionLocationCompressor partitionLocationCompressor_;
 
     public TableMetaRefImpl(String dbName, String tableName,
-        Table msTable, long catalogVersion, SqlConstraints sqlConstraints,
-        TValidWriteIdList validWriteIds, boolean isMarkedCached,
-        List<String> locationPrefixes, List<TColumn> tvirtCols) {
+        Table msTable, long catalogVersion, long loadedTimeMs,
+        SqlConstraints sqlConstraints, TValidWriteIdList validWriteIds,
+        boolean isMarkedCached, List<String> locationPrefixes, List<TColumn> tvirtCols) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
       this.catalogVersion_ = catalogVersion;
+      this.loadedTimeMs_ = loadedTimeMs;
       this.sqlConstraints_ = sqlConstraints;
       this.validWriteIds_ = validWriteIds;
       this.isMarkedCached_ = isMarkedCached;
@@ -1975,6 +1982,12 @@ public class CatalogdMetaProvider implements MetaProvider {
     public List<VirtualColumn> getVirtualColumns() {
       return virtualColumns_;
     }
+
+    @Override
+    public long getCatalogVersion() { return catalogVersion_; }
+
+    @Override
+    public long getLoadedTimeMs() { return loadedTimeMs_; }
   }
 
   /**

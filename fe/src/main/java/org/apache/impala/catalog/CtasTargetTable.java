@@ -168,4 +168,10 @@ public abstract class CtasTargetTable implements FeTable {
   public String getOwnerUser() {
     return owner_;
   }
+
+  @Override
+  public long getCatalogVersion() { return 0; }
+
+  @Override
+  public long getLastLoadedTimeMs() { return 0; }
 }

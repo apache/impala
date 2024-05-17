@@ -33,7 +33,7 @@ public interface CatalogObject extends HasName {
    * same topic update. "invalidation" form means only the name will be included. "none"
    * form means return nothing, i.e. null.
    */
-  static enum ThriftObjectType {
+  enum ThriftObjectType {
     FULL,
     DESCRIPTOR_ONLY,
     INVALIDATION,
@@ -41,21 +41,27 @@ public interface CatalogObject extends HasName {
   }
 
   // Returns the TCatalogObject type of this Catalog object.
-  public TCatalogObjectType getCatalogObjectType();
+  TCatalogObjectType getCatalogObjectType();
 
   // Returns the unqualified object name.
   @Override
-  public String getName();
+  String getName();
 
   // Returns the unique name of this catalog object.
-  public String getUniqueName();
+  String getUniqueName();
 
   // Returns the version of this catalog object.
-  public long getCatalogVersion();
+  long getCatalogVersion();
 
   // Sets the version of this catalog object.
-  public void setCatalogVersion(long newVersion);
+  void setCatalogVersion(long newVersion);
 
   // Returns true if this CatalogObject has had its metadata loaded, false otherwise.
-  public boolean isLoaded();
+  boolean isLoaded();
+
+  // Returns the timestamp when the object of the catalog version is loaded.
+  long getLastLoadedTimeMs();
+
+  // Sets the timestamp of the above. Only used in ImpaladCatalog.
+  void setLastLoadedTimeMs(long timeMs);
 }

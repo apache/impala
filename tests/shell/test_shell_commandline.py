@@ -414,11 +414,20 @@ class TestImpalaShell(ImpalaTestSuite):
     args = base_args + ['create table %s.shell_profile_test (id int)' % db]
     create = run_impala_shell_cmd(vector, args)
     assert "Referenced Tables: \n" in create.stdout
+    assert "Original Table Versions: \n" in create.stdout
 
+    TABLE_VERSION = re.compile(
+        r"Original Table Versions: (\w+\.\w+), (\d+), (\d+), ([^\n]*)\n")
     for statement in statements:
       args = base_args + [statement]
       result = run_impala_shell_cmd(vector, args)
       assert "Referenced Tables: %s.shell_profile_test" % unique_database in result.stdout
+      m = TABLE_VERSION.search(result.stdout)
+      assert m, "Original Table Versions not found in profile:\n" + result.stdout
+      assert m.group(1) == unique_database + ".shell_profile_test"
+      assert int(m.group(2)) > 0, "Invalid catalog version in " + m.group(0) + statement
+      assert int(m.group(3)) > 0, "Invalid loaded timestamp in " + m.group(0) + statement
+      assert len(m.group(4)) > 0, "Invalid timestamp string in " + m.group(0) + statement
 
   def test_runtime_profile_multiple_referenced_tables(self, vector, unique_database):
     if vector.get_value('strict_hs2_protocol'):
@@ -453,6 +462,16 @@ class TestImpalaShell(ImpalaTestSuite):
     assert len(referenced_tables) == 2
     for i in range(0, 2):
       assert "{db}.shell_profile_test{index}".format(db=db, index=i) in referenced_tables
+
+    TABLE_VERSIONS = re.compile(r"Original Table Versions: (\w+\.\w+), (\d+), (\d+), "
+                                r"([^\n]*)\n(\w+\.\w+), (\d+), (\d+), ([^\n]*)\n")
+    m = TABLE_VERSIONS.search(result.stdout)
+    assert m, "Original Table Versions not found in profile:\n" + result.stdout
+    for i in (0, 4):
+      assert db + ".shell_profile_test" in m.group(i + 1), "missing tables:" + m.group(0)
+      assert int(m.group(i + 2)) > 0, "Invalid catalog version: " + m.group(0)
+      assert int(m.group(i + 3)) > 0, "Invalid timestamp: " + m.group(0)
+      assert len(m.group(i + 4)) > 0, "Invalid timestamp string: " + m.group(0)
 
   def test_summary(self, vector):
     if vector.get_value('strict_hs2_protocol'):

@@ -942,6 +942,7 @@ public class CatalogServiceCatalog extends Catalog {
       Preconditions.checkState(topicMode_ == TopicMode.MINIMAL ||
           topicMode_ == TopicMode.MIXED);
       TCatalogObject min = new TCatalogObject(obj.type, obj.catalog_version);
+      min.setLast_modified_time_ms(obj.last_modified_time_ms);
       switch (obj.type) {
       case DATABASE:
         min.setDb(new TDatabase(obj.db.db_name));
@@ -1436,6 +1437,7 @@ public class CatalogServiceCatalog extends Catalog {
     if (dbVersion > ctx.fromVersion && dbVersion <= ctx.toVersion) {
       TCatalogObject catalogDb =
           new TCatalogObject(TCatalogObjectType.DATABASE, dbVersion);
+      catalogDb.setLast_modified_time_ms(db.getLastLoadedTimeMs());
       catalogDb.setDb(db.toThrift());
       ctx.addCatalogObject(catalogDb, false);
     }
@@ -1770,6 +1772,7 @@ public class CatalogServiceCatalog extends Catalog {
       return;
     }
     catalogTbl.setCatalog_version(tbl.getCatalogVersion());
+    catalogTbl.setLast_modified_time_ms(tbl.getLastLoadedTimeMs());
     ctx.addCatalogObject(catalogTbl, false);
   }
 
@@ -1812,6 +1815,7 @@ public class CatalogServiceCatalog extends Catalog {
     if (ctx.versionNotInRange(fnVersion)) return;
     TCatalogObject function =
         new TCatalogObject(TCatalogObjectType.FUNCTION, fnVersion);
+    function.setLast_modified_time_ms(fn.getLastLoadedTimeMs());
     function.setFn(fn.toThrift());
     ctx.addCatalogObject(function, false);
   }
@@ -1826,6 +1830,7 @@ public class CatalogServiceCatalog extends Catalog {
     if (ctx.versionNotInRange(dsVersion)) return;
     TCatalogObject catalogObj =
         new TCatalogObject(TCatalogObjectType.DATA_SOURCE, dsVersion);
+    catalogObj.setLast_modified_time_ms(dataSource.getLastLoadedTimeMs());
     catalogObj.setData_source(dataSource.toThrift());
     ctx.addCatalogObject(catalogObj, false);
   }
@@ -1840,6 +1845,7 @@ public class CatalogServiceCatalog extends Catalog {
     if (ctx.versionNotInRange(cpVersion)) return;
     TCatalogObject pool =
         new TCatalogObject(TCatalogObjectType.HDFS_CACHE_POOL, cpVersion);
+    pool.setLast_modified_time_ms(cachePool.getLastLoadedTimeMs());
     pool.setCache_pool(cachePool.toThrift());
     ctx.addCatalogObject(pool, false);
   }

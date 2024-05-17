@@ -548,6 +548,16 @@ class DirectMetaProvider implements MetaProvider {
       throw new UnsupportedOperationException("Virtual columns are not supported with " +
           "DirectMetaProvider implementation");
     }
+
+    @Override
+    public long getCatalogVersion() {
+      return 0;
+    }
+
+    @Override
+    public long getLoadedTimeMs() {
+      return 0;
+    }
   }
 
   @Override

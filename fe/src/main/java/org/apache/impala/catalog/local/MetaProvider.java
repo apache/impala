@@ -169,6 +169,8 @@ public interface MetaProvider {
     boolean isPartitioned();
     boolean isTransactional();
     List<VirtualColumn> getVirtualColumns();
+    long getCatalogVersion();
+    long getLoadedTimeMs();
   }
 
   /**

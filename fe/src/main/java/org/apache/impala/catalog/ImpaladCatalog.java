@@ -343,7 +343,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         TableName tblName = new TableName(table.getDb_name(), table.getTbl_name());
         addTable(table,
             newPartitions.getOrDefault(tblName, Collections.emptyList()),
-            catalogObject.getCatalog_version());
+            catalogObject.getCatalog_version(), catalogObject.getLast_modified_time_ms());
         break;
       case FUNCTION:
         // Remove the function first, in case there is an existing function with the same
@@ -474,7 +474,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   }
 
   private void addTable(TTable thriftTable, List<THdfsPartition> newPartitions,
-      long catalogVersion) throws TableLoadingException {
+      long catalogVersion, long lastLoadedTime) throws TableLoadingException {
     Db db = getDb(thriftTable.db_name);
     if (db == null) {
       if (LOG.isTraceEnabled()) {
@@ -488,6 +488,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
     Table existingTable = db.getTable(thriftTable.tbl_name);
     Table newTable = Table.fromThrift(db, thriftTable);
     newTable.setCatalogVersion(catalogVersion);
+    newTable.setLastLoadedTimeMs(lastLoadedTime);
     if (existingTable != null && existingTable.getCatalogVersion() >= catalogVersion) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Ignore stale update on table {}: currentVersion={}, updateVersion={}",

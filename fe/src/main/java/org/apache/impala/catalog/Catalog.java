@@ -564,6 +564,7 @@ public abstract class Catalog implements AutoCloseable {
         }
         result.setType(db.getCatalogObjectType());
         result.setCatalog_version(db.getCatalogVersion());
+        result.setLast_modified_time_ms(db.getLastLoadedTimeMs());
         result.setDb(db.toThrift());
         break;
       }
@@ -579,6 +580,7 @@ public abstract class Catalog implements AutoCloseable {
         try {
           result.setType(table.getCatalogObjectType());
           result.setCatalog_version(table.getCatalogVersion());
+          result.setLast_modified_time_ms(table.getLastLoadedTimeMs());
           result.setTable(
               isHumanReadable ? table.toHumanReadableThrift() : table.toThrift());
         } finally {
@@ -596,6 +598,7 @@ public abstract class Catalog implements AutoCloseable {
         }
         result.setType(fn.getCatalogObjectType());
         result.setCatalog_version(fn.getCatalogVersion());
+        result.setLast_modified_time_ms(fn.getLastLoadedTimeMs());
         result.setFn(fn.toThrift());
         break;
       }
@@ -607,6 +610,7 @@ public abstract class Catalog implements AutoCloseable {
         }
         result.setType(dataSrc.getCatalogObjectType());
         result.setCatalog_version(dataSrc.getCatalogVersion());
+        result.setLast_modified_time_ms(dataSrc.getLastLoadedTimeMs());
         result.setData_source(dataSrc.toThrift());
         break;
       }
@@ -618,6 +622,7 @@ public abstract class Catalog implements AutoCloseable {
         }
         result.setType(pool.getCatalogObjectType());
         result.setCatalog_version(pool.getCatalogVersion());
+        result.setLast_modified_time_ms(pool.getLastLoadedTimeMs());
         result.setCache_pool(pool.toThrift());
         break;
       }

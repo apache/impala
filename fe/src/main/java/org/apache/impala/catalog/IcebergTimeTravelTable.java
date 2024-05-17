@@ -599,4 +599,10 @@ class ForwardingFeIcebergTable implements FeIcebergTable {
   public String getOwnerUser() {
     return base.getOwnerUser();
   }
+
+  @Override
+  public long getCatalogVersion() { return 0; }
+
+  @Override
+  public long getLastLoadedTimeMs() { return 0; }
 }

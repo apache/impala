@@ -212,4 +212,13 @@ public interface FeTable {
    */
   String getOwnerUser();
 
+  /**
+   * @return the catalog version of this table assigned in catalogd.
+   */
+  long getCatalogVersion();
+
+  /**
+   * @return the timestamp when the table is last loaded or reloaded in catalogd.
+   */
+  long getLastLoadedTimeMs();
 }

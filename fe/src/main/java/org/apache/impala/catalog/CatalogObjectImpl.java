@@ -25,6 +25,8 @@ abstract public class CatalogObjectImpl implements CatalogObject {
   // Current catalog version of this object. Initialized to
   // Catalog.INITIAL_CATALOG_VERSION.
   private AtomicLong catalogVersion_ = new AtomicLong(Catalog.INITIAL_CATALOG_VERSION);
+  // Timestamp when the object is recently loaded/reloaded.
+  private long mTimeMs_ = 0;
 
   protected CatalogObjectImpl() {}
 
@@ -32,7 +34,18 @@ abstract public class CatalogObjectImpl implements CatalogObject {
   public long getCatalogVersion() { return catalogVersion_.get(); }
 
   @Override
-  public void setCatalogVersion(long newVersion) { catalogVersion_.set(newVersion); }
+  public void setCatalogVersion(long newVersion) {
+    catalogVersion_.set(newVersion);
+    mTimeMs_ = System.currentTimeMillis();
+  }
+
+  @Override
+  public long getLastLoadedTimeMs() { return mTimeMs_; }
+
+  @Override
+  public void setLastLoadedTimeMs(long timeMs) {
+    mTimeMs_ = timeMs;
+  }
 
   @Override
   public boolean isLoaded() { return true; }
@@ -48,6 +61,7 @@ abstract public class CatalogObjectImpl implements CatalogObject {
   public final TCatalogObject toTCatalogObject() {
     TCatalogObject catalogObject =
         new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    catalogObject.setLast_modified_time_ms(getLastLoadedTimeMs());
     setTCatalogObject(catalogObject);
     return catalogObject;
   }

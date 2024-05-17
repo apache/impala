@@ -637,6 +637,9 @@ struct TGetPartialCatalogObjectResponse {
   7: optional list<Types.TFunction> functions
   // DataSource objects are small enough that we return them wholesale.
   8: optional list<CatalogObjects.TDataSource> data_srcs
+
+  // Loaded time in catalogd corresponding to 'object_version_number'.
+  9: optional i64 object_loaded_time_ms
 }
 
 

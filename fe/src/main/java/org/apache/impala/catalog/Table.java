@@ -738,6 +738,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   private TCatalogObject toMinimalTCatalogObjectHelper() {
     TCatalogObject catalogObject =
         new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    catalogObject.setLast_modified_time_ms(getLastLoadedTimeMs());
     TTable table = new TTable(getDb().getName(), getName());
     table.setTbl_comment(getTableComment());
     catalogObject.setTable(table);
@@ -797,6 +798,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
     TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
     resp.setObject_version_number(getCatalogVersion());
+    resp.setObject_loaded_time_ms(getLastLoadedTimeMs());
     resp.table_info = new TPartialTableInfo();
     resp.table_info.setStorage_metadata_load_time_ns(storageMetadataLoadTime_);
     storageMetadataLoadTime_ = 0;
