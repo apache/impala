@@ -288,33 +288,38 @@ Benchmark* BenchmarkLike(bool codegen) {
   return suite;
 }
 
+// Machine Info: AMD EPYC 7K62 48-Core Processor
 // Cast:                      Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                          int_to_int                334      337      340         1X         1X         1X
-//                         int_to_bool                332      335      338     0.995X     0.994X     0.992X
-//                       int_to_double                700      707      711       2.1X       2.1X      2.09X
-//                       int_to_string                125      126      127     0.374X     0.375X     0.374X
-//                   double_to_boolean                155      156      157     0.464X     0.463X     0.463X
-//                    double_to_bigint                 90     90.6     90.8     0.269X     0.269X     0.267X
-//                    double_to_string                 68     68.8     69.3     0.204X     0.204X     0.204X
-//                       string_to_int                229      231      232     0.684X     0.685X     0.682X
-//                     string_to_float                103      104      105     0.309X     0.308X     0.308X
-//                 string_to_timestamp               39.9     40.1     40.5     0.119X     0.119X     0.119X
+//                          int_to_int                161      167      169         1X         1X         1X
+//                         int_to_bool                191      201      205      1.18X       1.2X      1.21X
+//                       int_to_double                506      522      529      3.14X      3.13X      3.13X
+//                       int_to_string               28.2     29.3     30.1     0.175X     0.176X     0.178X
+//                   double_to_boolean               67.6     69.7     71.4      0.42X     0.418X     0.422X
+//                    double_to_bigint               48.1       49     49.8     0.299X     0.294X     0.295X
+//                   decimal_to_string               22.4     22.8       23     0.139X     0.137X     0.136X
+//                    double_to_string               7.55     7.75     7.83    0.0468X    0.0464X    0.0463X
+//                     float_to_string               7.97     8.15     8.24    0.0495X    0.0489X    0.0488X
+//                       string_to_int                138      142      147     0.859X     0.854X      0.87X
+//                     string_to_float               57.7     59.3     60.2     0.358X     0.355X     0.356X
+//                 string_to_timestamp               22.4     23.2     23.5     0.139X     0.139X     0.139X
 //
 // CastCodegen:               Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                          int_to_int                824      830      837         1X         1X         1X
-//                         int_to_bool                815      821      828     0.989X     0.989X     0.989X
-//                       int_to_double                778      783      789     0.944X     0.943X     0.943X
-//                       int_to_string                167      169      171     0.203X     0.203X     0.204X
-//                   double_to_boolean                819      826      833     0.994X     0.994X     0.995X
-//                    double_to_bigint                777      783      792     0.943X     0.943X     0.946X
-//                    double_to_string                139      140      141     0.168X     0.168X     0.168X
-//                       string_to_int                369      372      375     0.448X     0.448X     0.448X
-//                     string_to_float                123      124      125      0.15X      0.15X      0.15X
-//                 string_to_timestamp               44.8     45.1     45.4    0.0544X    0.0543X    0.0542X
+//                          int_to_int                166      167      169         1X         1X         1X
+//                         int_to_bool                198      202      204      1.19X      1.21X      1.21X
+//                       int_to_double                521      526      531      3.14X      3.15X      3.14X
+//                       int_to_string               28.9     29.7     30.5     0.174X     0.178X      0.18X
+//                   double_to_boolean               68.7     70.1     71.4     0.414X     0.419X     0.422X
+//                    double_to_bigint               48.4     49.2     49.8     0.292X     0.294X     0.295X
+//                   decimal_to_string               22.5     22.8     23.2     0.136X     0.137X     0.137X
+//                    double_to_string               7.64     7.75     7.83     0.046X    0.0463X    0.0463X
+//                     float_to_string               8.02     8.15      8.3    0.0483X    0.0487X    0.0491X
+//                       string_to_int                140      145      147     0.847X     0.869X     0.868X
+//                     string_to_float               58.6     59.4     60.6     0.353X     0.355X     0.358X
+//                 string_to_timestamp                 23     23.3     23.7     0.138X     0.139X      0.14X
 Benchmark* BenchmarkCast(bool codegen) {
   Benchmark* suite = new Benchmark(BenchmarkName("Cast", codegen));
   BENCHMARK("int_to_int", "cast(1 as INT)");
@@ -323,7 +328,9 @@ Benchmark* BenchmarkCast(bool codegen) {
   BENCHMARK("int_to_string", "cast(1 as STRING)");
   BENCHMARK("double_to_boolean", "cast(3.14 as BOOLEAN)");
   BENCHMARK("double_to_bigint", "cast(3.14 as BIGINT)");
-  BENCHMARK("double_to_string", "cast(3.14 as STRING)");
+  BENCHMARK("decimal_to_string", "cast(3.14 as STRING)");
+  BENCHMARK("double_to_string", "cast(cast(3.14 as DOUBLE) as STRING)");
+  BENCHMARK("float_to_string", "cast(cast(3.14 as FLOAT) as STRING)");
   BENCHMARK("string_to_int", "cast('1234' as INT)");
   BENCHMARK("string_to_float", "cast('1234.5678' as FLOAT)");
   BENCHMARK("string_to_timestamp", "cast('2011-10-22 09:10:11' as TIMESTAMP)");

@@ -1211,13 +1211,16 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   // signed integer expected to be able to hold the value. 'float_out_of_range' should be
   // set to true if the value does not fit in a single precision float. The expected
   // result is 'val' for the types that can hold the value and error for other types.
-  template<typename T>
-  void TestCast(const string& stmt, T val, int min_integer_size = 1,
-      bool float_out_of_range = false, bool timestamp_out_of_range = false) {
+  template <typename T>
+  void TestCast(const string& stmt, T val, bool convert_lose_precision = false,
+      int min_integer_size = 1, bool float_out_of_range = false,
+      bool timestamp_out_of_range = false) {
     TestValue("cast(" + stmt + " as boolean)", TYPE_BOOLEAN, static_cast<bool>(val));
     TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE, static_cast<double>(val));
     TestValue("cast(" + stmt + " as real)", TYPE_DOUBLE, static_cast<double>(val));
-    TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
+    if (!convert_lose_precision) {
+      TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
+    }
 
     TestValueOrError("cast(" + stmt + " as tinyint)", TYPE_TINYINT,
         static_cast<int8_t>(val), min_integer_size > sizeof(int8_t),
@@ -1282,9 +1285,9 @@ TimestampValue ExprTest::CreateTestTimestamp(int64_t val) {
 
 // Test casting 'stmt' to each of the native types. See the general template definition
 // for more information.
-template<>
-void ExprTest::TestCast(const string& stmt, const char* val, int min_integer_size,
-    bool float_out_of_range, bool timestamp_out_of_range) {
+template <>
+void ExprTest::TestCast(const string& stmt, const char* val, bool convert_lose_precision,
+    int min_integer_size, bool float_out_of_range, bool timestamp_out_of_range) {
   try {
     int8_t val8 = static_cast<int8_t>(lexical_cast<int16_t>(val));
 #if 0
@@ -3266,23 +3269,28 @@ TEST_P(ExprTest, CastExprs) {
   TestCast("cast(0.0 as float)", 0.0f);
   TestCast("cast(5.0 as float)", 5.0f);
   TestCast("cast(-5.0 as float)", -5.0f);
-  TestCast("cast(0.1234567890123 as float)", 0.1234567890123f);
-  TestCast("cast(0.1234567890123 as float)", 0.123456791f); // same as above
-  TestCast("cast(0.00000000001234567890123 as float)", 0.00000000001234567890123f);
-  TestCast("cast(123456 as float)", 123456.0f, 4, false, false);
+  TestCast("cast(0.1234567890123 as float)", 0.1234567890123f, true);
+  TestCast("cast(0.1234567890123 as float)", 0.123456791f, true); // same as above
+  TestStringValue("cast(cast(0.1234567890123 as float) as string)", "0.12345679");
+  TestCast("cast(0.00000000001234567890123 as float)", 0.00000000001234567890123f, true);
+  TestStringValue(
+      "cast(cast(0.00000000001234567890123 as float) as string)", "1.2345679e-11");
+  TestCast("cast(123456 as float)", 123456.0f, false, 4, false, false);
 
   // From http://en.wikipedia.org/wiki/Single-precision_floating-point_format
   // Min positive normal value
-  TestCast("cast(1.1754944e-38 as float)", 1.1754944e-38f);
+  TestCast("cast(1.1754944e-38 as float)", 1.1754944e-38f, true);
+  TestStringValue("cast(cast(1.1754944e-38 as float) as string)", "1.1754944e-38");
   // Max representable value
-  TestCast("cast(3.4028234e38 as float)", 3.4028234e38f, 32, false, true);
+  TestCast("cast(3.4028234e38 as float)", 3.4028234e38f, true, 32, false, true);
+  TestStringValue("cast(cast(3.4028234e38 as float) as string)", "3.4028235e+38");
 
   // From Double
   TestCast("cast(0.0 as double)", 0.0);
   TestCast("cast(5.0 as double)", 5.0);
   TestCast("cast(-5.0 as double)", -5.0);
-  TestCast("cast(0.123e10 as double)", 0.123e10, 4, false, false);
-  TestCast("cast(123.123e10 as double)", 123.123e10, 8, false, true);
+  TestCast("cast(0.123e10 as double)", 0.123e10, false, 4, false, false);
+  TestCast("cast(123.123e10 as double)", 123.123e10, false, 8, false, true);
   TestCast("cast(1.01234567890123456789 as double)", 1.01234567890123456789);
   TestCast("cast(1.01234567890123456789 as double)", 1.0123456789012346); // same as above
   TestCast("cast(0.01234567890123456789 as double)", 0.01234567890123456789);
@@ -3291,14 +3299,18 @@ TEST_P(ExprTest, CastExprs) {
   // casting string to double
   TestCast("cast('0.43149576573887316' as double)", 0.43149576573887316);
   TestCast("cast('-0.43149576573887316' as double)", -0.43149576573887316);
-  TestCast("cast('0.123e10' as double)", 0.123e10, 4, false, false);
-  TestCast("cast('123.123e10' as double)", 123.123e10, 8, false, true);
+  TestCast("cast('0.123e10' as double)", 0.123e10, false, 4, false, false);
+  TestCast("cast('123.123e10' as double)", 123.123e10, false, 8, false, true);
   TestCast("cast('1.01234567890123456789' as double)", 1.01234567890123456789);
 
   // From http://en.wikipedia.org/wiki/Double-precision_floating-point_format
   // Min subnormal positive double
-  TestCast("cast(4.9406564584124654e-324 as double)", 4.9406564584124654e-324);
-  TestCast("cast('4.9406564584124654e-324' as double)", 4.9406564584124654e-324);
+  TestCast("cast(4.9406564584124654e-324 as double)", 4.9406564584124654e-324, true);
+  TestStringValue(
+      "cast(cast(4.9406564584124654e-324 as double) as string)", "4.94065645841247e-324");
+  TestCast("cast('4.9406564584124654e-324' as double)", 4.9406564584124654e-324, true);
+  TestStringValue("cast(cast('4.9406564584124654e-324' as double) as string)",
+      "4.94065645841247e-324");
   // Max subnormal double
   TestCast("cast(2.2250738585072009e-308 as double)", 2.2250738585072009e-308);
   TestCast("cast('2.2250738585072009e-308' as double)", 2.2250738585072009e-308);
@@ -3306,9 +3318,9 @@ TEST_P(ExprTest, CastExprs) {
   TestCast("cast(2.2250738585072014e-308 as double)", 2.2250738585072014e-308);
   TestCast("cast('2.2250738585072014e-308' as double)", 2.2250738585072014e-308);
   // Max Double
-  TestCast("cast(1.7976931348623157e+308 as double)", 1.7976931348623157e308,
-      128, true, true);
-  TestCast("cast('1.7976931348623157e+308' as double)", 1.7976931348623157e308,
+  TestCast("cast(1.7976931348623157e+308 as double)", 1.7976931348623157e308, false, 128,
+      true, true);
+  TestCast("cast('1.7976931348623157e+308' as double)", 1.7976931348623157e308, false,
       128, true, true);
 
   // From String
@@ -7301,7 +7313,8 @@ TEST_P(ExprTest, TimestampFunctions) {
       "as bigint)", TYPE_BIGINT, 1293872461);
   // We have some rounding errors going backend to front, so do it as a string.
   TestStringValue("cast(cast (to_utc_timestamp(cast('2011-01-01 01:01:01' "
-      "as timestamp), 'PST') as float) as string)", "1.29387251e+09");
+                  "as timestamp), 'PST') as float) as string)",
+      "1.2938725e+09");
   TestValue("cast(to_utc_timestamp(cast('2011-01-01 01:01:01' as timestamp), 'PST') "
       "as double)", TYPE_DOUBLE, 1.293872461E9);
   TestValue("cast(to_utc_timestamp(cast('2011-01-01 01:01:01.1' as timestamp), 'PST') "
@@ -7334,7 +7347,8 @@ TEST_P(ExprTest, TimestampFunctions) {
         1293872461);
     // We have some rounding errors going backend to front, so do it as a string.
     TestStringValue("cast(cast(cast('2011-01-01 01:01:01' as timestamp) as float)"
-        " as string)", "1.29387251e+09");
+                    " as string)",
+        "1.2938725e+09");
     TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as double)", TYPE_DOUBLE,
         1.293872461E9);
     TestValue("cast(cast('2011-01-01 01:01:01.1' as timestamp) as double)", TYPE_DOUBLE,

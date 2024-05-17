@@ -26,15 +26,15 @@
 #include <gutil/strings/numbers.h>
 #include <gutil/strings/substitute.h>
 
+#include "common/names.h"
 #include "exprs/anyval-util.h"
 #include "exprs/cast-format-expr.h"
 #include "exprs/decimal-functions.h"
+#include "gutil/strings/numbers.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "util/string-parser.h"
-
-#include "common/names.h"
 
 using namespace impala;
 using namespace impala_udf;
@@ -338,31 +338,28 @@ CAST_EXACT_NUMERIC_TO_STRING(SmallIntVal, MAX_SMALLINT_CHARS, FastInt32ToBufferL
 CAST_EXACT_NUMERIC_TO_STRING(IntVal, MAX_INT_CHARS, FastInt32ToBufferLeft);
 CAST_EXACT_NUMERIC_TO_STRING(BigIntVal, MAX_BIGINT_CHARS, FastInt64ToBufferLeft);
 
-
-#define CAST_FLOAT_TO_STRING(float_type, format) \
-  StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const float_type& val) { \
-    if (val.is_null) return StringVal::null(); \
-    /* val.val could be -nan, return "nan" instead */ \
-    if (std::isnan(val.val)) return StringVal("nan"); \
-    /* Add 1 to MAX_FLOAT_CHARS since snprintf adds a trailing '\0' */ \
-    StringVal sv(ctx, MAX_FLOAT_CHARS + 1); \
-    if (UNLIKELY(sv.is_null)) { \
-      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok()); \
-      return sv; \
-    } \
-    sv.len = snprintf(reinterpret_cast<char*>(sv.ptr), sv.len, format, val.val); \
-    DCHECK_GT(sv.len, 0); \
-    DCHECK_LE(sv.len, MAX_FLOAT_CHARS); \
-    AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv); \
-    return sv; \
+#define CAST_FLOAT_TO_STRING(float_type, convert_method, buffer_size)          \
+  StringVal CastFunctions::CastToStringVal(                                    \
+      FunctionContext* ctx, const float_type& val) {                           \
+    if (val.is_null) return StringVal::null();                                 \
+    /* val.val could be -nan, return "nan" instead */                          \
+    if (std::isnan(val.val)) return StringVal("nan");                          \
+    StringVal sv(ctx, buffer_size);                                            \
+    if (UNLIKELY(sv.is_null)) {                                                \
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());                    \
+      return sv;                                                               \
+    }                                                                          \
+    sv.len = strlen(convert_method(val.val, reinterpret_cast<char*>(sv.ptr))); \
+    DCHECK_GT(sv.len, 0);                                                      \
+    DCHECK_LE(sv.len, MAX_FLOAT_CHARS);                                        \
+    AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);                \
+    return sv;                                                                 \
   }
 
-// Floats have up to 9 significant digits, doubles up to 17
-// (see http://en.wikipedia.org/wiki/Single-precision_floating-point_format
-// and http://en.wikipedia.org/wiki/Double-precision_floating-point_format)
-CAST_FLOAT_TO_STRING(FloatVal, "%.9g");
-CAST_FLOAT_TO_STRING(DoubleVal, "%.17g");
-
+// Convert a double or float to a string and produce the exact same original precision.
+// See gutil/strings/numbers.h and gutil/strings/numbers.cc for more details.
+CAST_FLOAT_TO_STRING(FloatVal, FloatToBuffer, kFloatToBufferSize);
+CAST_FLOAT_TO_STRING(DoubleVal, DoubleToBuffer, kDoubleToBufferSize);
 
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TimestampVal& val) {
   DCHECK(ctx != nullptr);

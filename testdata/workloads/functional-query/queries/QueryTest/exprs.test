@@ -3295,3 +3295,87 @@ NULL,NULL
 ---- TYPES
 BIGINT, DOUBLE
 ====
+---- QUERY: IMPALA-12562
+# Convert double to string
+select cast(round(cast(1.33 as double), 2) as string);
+---- RESULTS
+'1.33'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+# Convert double to string
+select cast(round(cast(1.33 as double), 1) as string);
+---- RESULTS
+'1.3'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+# Convert double to string
+select cast(round(cast(1.33 as double), 7) as string);
+---- RESULTS
+'1.33'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+# Convert float to string
+select cast(round(cast(1.33 as float), 2) as string);
+---- RESULTS
+'1.33'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+# Convert float to string
+select cast(round(cast(1.33 as float), 1) as string);
+---- RESULTS
+'1.3'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+# Convert float to string
+select cast(round(cast(1.33 as float), 7) as string);
+---- RESULTS
+'1.33'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+select cast(round(sum(double_col)/count(1),2) as string) from alltypes;
+---- RESULTS
+'45.45'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+select cast(round(1/3, 0) as string);
+---- RESULTS
+'0'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+select cast(round(1/3, 1) as string);
+---- RESULTS
+'0.3'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+select cast(round(1/3, 17) as string);
+---- RESULTS
+'0.33333333333333331'
+---- TYPES
+string
+====
+---- QUERY: IMPALA-12562
+# Doubles have up to 17 digits of precision
+select cast(round(1/3, 20) as string);
+---- RESULTS
+'0.33333333333333331'
+---- TYPES
+string
+====
