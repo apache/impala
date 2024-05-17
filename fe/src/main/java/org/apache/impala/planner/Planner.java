@@ -361,7 +361,8 @@ public class Planner {
     if (ctx_.getAnalysisResult().isExplainStmt() || RuntimeEnv.INSTANCE.isTestEnv()) {
       explainLevel = ctx_.getQueryOptions().getExplain_level();
     }
-    return getExplainString(fragments, request, explainLevel);
+    return getExplainString(fragments, request, explainLevel, ctx_.getQueryOptions(),
+        ctx_.getQueryStmt());
   }
 
   /**
@@ -369,8 +370,9 @@ public class Planner {
    * explicit explain level.
    * Includes the estimated resource requirements from the request if set.
    */
-  public String getExplainString(List<PlanFragment> fragments,
-      TQueryExecRequest request, TExplainLevel explainLevel) {
+  public static String getExplainString(List<PlanFragment> fragments,
+      TQueryExecRequest request, TExplainLevel explainLevel,
+      TQueryOptions options, QueryStmt queryStmt) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;
 
@@ -452,9 +454,10 @@ public class Planner {
       hasHeader = true;
     }
 
-    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() &&
+        queryStmt != null) {
       // In extended explain include the analyzed query text showing implicit casts
-      String queryText = ctx_.getQueryStmt().toSql(SHOW_IMPLICIT_CASTS);
+      String queryText = queryStmt.toSql(SHOW_IMPLICIT_CASTS);
       String wrappedText = PrintUtils.wrapString("Analyzed query: " + queryText, 80);
       str.append(wrappedText).append("\n");
       hasHeader = true;
@@ -467,12 +470,12 @@ public class Planner {
 
     if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {
       // Print the non-fragmented parallel plan.
-      str.append(fragments.get(0).getExplainString(ctx_.getQueryOptions(), explainLevel));
+      str.append(fragments.get(0).getExplainString(options, explainLevel));
     } else {
       // Print the fragmented parallel plan.
       for (int i = 0; i < fragments.size(); ++i) {
         PlanFragment fragment = fragments.get(i);
-        str.append(fragment.getExplainString(ctx_.getQueryOptions(), explainLevel));
+        str.append(fragment.getExplainString(options, explainLevel));
         if (i < fragments.size() - 1) str.append("\n");
       }
     }

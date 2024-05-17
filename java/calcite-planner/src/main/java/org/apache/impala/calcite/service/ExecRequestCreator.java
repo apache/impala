@@ -87,12 +87,15 @@ public class ExecRequestCreator implements CompilerStep {
   private final CalcitePhysPlanCreator physPlanCreator;
   private final CalciteJniFrontend.QueryContext queryCtx;
   private final CalciteMetadataHandler mdHandler;
+  private final boolean isExplain;
 
   public ExecRequestCreator(CalcitePhysPlanCreator physPlanCreator,
-      CalciteJniFrontend.QueryContext queryCtx, CalciteMetadataHandler mdHandler) {
+      CalciteJniFrontend.QueryContext queryCtx, CalciteMetadataHandler mdHandler,
+      boolean isExplain) {
     this.physPlanCreator = physPlanCreator;
     this.queryCtx = queryCtx;
     this.mdHandler = mdHandler;
+    this.isExplain = isExplain;
   }
 
   /**
@@ -146,17 +149,14 @@ public class ExecRequestCreator implements CompilerStep {
     List<PlanFragment> allFragments = planFragmentRoot.getNodesPreOrder();
     // to mimic the original planner behavior, use EXTENDED mode explain except for
     // EXPLAIN statements.
-    // TODO: support explain plans
-    // TExplainLevel explainLevel =
-    //     isExplain ? plannerContext.getQueryOptions().getExplain_level() :
-    //     TExplainLevel.EXTENDED;
-    TExplainLevel explainLevel = TExplainLevel.EXTENDED;
-    // if (isExplain) {
-    //   result.setStmt_type(TStmtType.EXPLAIN);
-    // }
+    TExplainLevel explainLevel =
+        isExplain ? plannerContext.getQueryOptions().getExplain_level() :
+        TExplainLevel.EXTENDED;
+    if (isExplain) {
+      result.setStmt_type(TStmtType.EXPLAIN);
+    }
     String explainString = getExplainString(allFragments, explainLevel, plannerContext);
     queryExecRequest.setQuery_plan(explainString);
-
 
     queryCtx.setDesc_tbl_serialized(
         plannerContext.getRootAnalyzer().getDescTbl().toSerializedThrift());
@@ -170,6 +170,9 @@ public class ExecRequestCreator implements CompilerStep {
     this.queryCtx.getFrontend().addPlannerToProfile("CalcitePlanner");
     result.setProfile(FrontendProfile.getCurrent().emitAsThrift());
     result.setProfile_children(FrontendProfile.getCurrent().emitChildrenAsThrift());
+    if (isExplain) {
+      this.queryCtx.getFrontend().createExplainRequest(explainString, result);
+    }
     return result;
   }
 

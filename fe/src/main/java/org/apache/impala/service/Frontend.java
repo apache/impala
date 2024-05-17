@@ -3017,7 +3017,7 @@ public class Frontend {
   /**
    * Attaches the explain result to the TExecRequest.
    */
-  private void createExplainRequest(String explainString, TExecRequest result) {
+  public static void createExplainRequest(String explainString, TExecRequest result) {
     // update the metadata - one string column
     TColumn colDesc = new TColumn("Explain String", Type.STRING.toThrift());
     TResultSetMetadata metadata = new TResultSetMetadata(Lists.newArrayList(colDesc));

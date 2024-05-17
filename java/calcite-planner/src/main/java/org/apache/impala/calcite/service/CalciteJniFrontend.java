@@ -22,7 +22,11 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.SelectStmt;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.rel.node.NodeWithExprs;
@@ -85,9 +89,6 @@ public class CalciteJniFrontend extends JniFrontend {
     Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
 
     QueryContext queryCtx = new QueryContext(thriftQueryContext, getFrontend());
-    if (!canStmtBePlannedThroughCalcite(queryCtx)) {
-      return runThroughOriginalPlanner(thriftQueryContext, queryCtx);
-    }
 
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
       LOG.info("Using Calcite Planner for the following query: " + queryCtx.getStmt());
@@ -104,6 +105,11 @@ public class CalciteJniFrontend extends JniFrontend {
           new CalciteMetadataHandler(parsedSqlNode, queryCtx);
       markEvent(mdHandler, null, queryCtx, "Loaded tables");
 
+      boolean isExplain = false;
+      if (parsedSqlNode instanceof SqlExplain) {
+        isExplain = true;
+        parsedSqlNode = ((SqlExplain) parsedSqlNode).getExplicandum();
+      }
       // Validate the parsed query
       CalciteValidator validator = new CalciteValidator(mdHandler, queryCtx);
       SqlNode validatedNode = validator.validate(parsedSqlNode);
@@ -127,7 +133,7 @@ public class CalciteJniFrontend extends JniFrontend {
 
       // Create exec request for the server
       ExecRequestCreator execRequestCreator =
-          new ExecRequestCreator(physPlanCreator, queryCtx, mdHandler);
+          new ExecRequestCreator(physPlanCreator, queryCtx, mdHandler, isExplain);
       TExecRequest execRequest = execRequestCreator.create(rootNode);
       markEvent(mdHandler, execRequest, queryCtx, "Created exec request");
 
@@ -136,6 +142,16 @@ public class CalciteJniFrontend extends JniFrontend {
       queryCtx.getTimeline().markEvent("Serialized request");
 
       return serializedRequest;
+    } catch (SqlParseException e) {
+      // do a quick parse just to make sure it's not a select stmt. If it is
+      // a select statement, we fail the query since all select statements
+      // should be run through the Calcite Planner.
+      if (Parser.parse(queryCtx.getStmt()) instanceof SelectStmt) {
+        throw new InternalException(e.getMessage());
+      }
+      LOG.info("Calcite planner failed to parse query: " + queryCtx.getStmt());
+      LOG.info("Going to use original Impala planner.");
+      return runThroughOriginalPlanner(thriftQueryContext, queryCtx);
     } catch (Exception e) {
       LOG.info("Calcite planner failed.");
       LOG.info("Exception: " + e);
@@ -145,36 +161,6 @@ public class CalciteJniFrontend extends JniFrontend {
       }
       throw new RuntimeException(e);
     }
-  }
-
-  /**
-   * Use information about the query syntax to see if this can be handled
-   * by Calcite
-   */
-  private boolean canStmtBePlannedThroughCalcite(QueryContext queryCtx) {
-    String stringWithFirstRealWord = queryCtx.getStmt();
-    String[] lines = stringWithFirstRealWord.split("\n");
-    // Get rid of comments and blank lines which start the query. We need to find
-    // the first real word.
-    // TODO: IMPALA-12976: need to make this more generic. Certain patterns aren't caught
-    // here like /* */
-    for (String line : lines) {
-      if (line.trim().startsWith("--") || line.trim().equals("")) {
-        stringWithFirstRealWord = stringWithFirstRealWord.replaceFirst(line + "\n", "");
-      } else {
-        break;
-      }
-    }
-    stringWithFirstRealWord = stringWithFirstRealWord.trim();
-    String beforeStripString;
-    do {
-      beforeStripString = stringWithFirstRealWord;
-      stringWithFirstRealWord = StringUtils.stripStart(stringWithFirstRealWord, "(");
-      stringWithFirstRealWord = StringUtils.stripStart(stringWithFirstRealWord, null);
-    } while (!stringWithFirstRealWord.equals(beforeStripString));
-    return StringUtils.startsWithIgnoreCase(stringWithFirstRealWord, "select") ||
-        StringUtils.startsWithIgnoreCase(stringWithFirstRealWord, "values") ||
-        StringUtils.startsWithIgnoreCase(stringWithFirstRealWord, "with");
   }
 
   /**

@@ -132,6 +132,8 @@ select bigint_col, abs(cast(-3 as bigint)), abs(-3000000000) from functional.all
 10,3,3000000000
 ---- TYPES
 bigint,bigint,bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # Tiny test for Calcite. At the point of this commit, very few functions work. This
@@ -150,6 +152,8 @@ select cast(cast('2005-12-13 08:00:00' as string)  AS TIMESTAMP) from functional
 2005-12-13 08:00:00
 ---- TYPES
 timestamp
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 select * from calcite_alltypes where bigint_col = 20;
@@ -157,6 +161,8 @@ select * from calcite_alltypes where bigint_col = 20;
 2,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2',2009-01-01 00:02:00.100000000,2009,1
 ---- TYPES
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 select tinyint_col from calcite_alltypes where bigint_col = 20;
@@ -164,6 +170,8 @@ select tinyint_col from calcite_alltypes where bigint_col = 20;
 2
 ---- TYPES
 tinyint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # Values test
@@ -172,6 +180,8 @@ select abs(cast(-8 as bigint));
 8
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 select 'hello'
@@ -179,6 +189,8 @@ select 'hello'
 'hello'
 ---- TYPES
 string
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # Union test
@@ -188,6 +200,8 @@ select 3 union select 4;
 4
 ---- TYPES
 tinyint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 select * from (values (1)) union (values (2), (3));
@@ -208,6 +222,8 @@ select id, abs(bigint_col) from functional.alltypestiny where id > 3 order by ab
 7,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sort test
@@ -220,6 +236,8 @@ select id, abs(bigint_col) from functional.alltypestiny where id >= 3 order by a
 7,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sort test
@@ -230,6 +248,8 @@ select id, abs(bigint_col) from functional.alltypestiny where id < 3 order by ab
 1,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sort test
@@ -241,6 +261,8 @@ select id, abs(bigint_col) from functional.alltypestiny where id <= 3 order by a
 3,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sort test
@@ -255,6 +277,8 @@ select id, abs(bigint_col) from functional.alltypestiny where id != 3 order by a
 7,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sort test
@@ -269,6 +293,8 @@ select id, abs(bigint_col) from functional.alltypestiny where id != 3 order by a
 6,0
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sort test
@@ -281,6 +307,8 @@ select group_str, some_nulls from functional.nullrows where group_str = 'a' orde
 'a','a'
 ---- TYPES
 string, string
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sort test
@@ -293,6 +321,8 @@ select group_str, some_nulls from functional.nullrows where group_str = 'a' orde
 'a','NULL'
 ---- TYPES
 string, string
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # limit test
@@ -312,6 +342,8 @@ select id, abs(bigint_col) from functional.alltypestiny where id > 2 order by ab
 3,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # aggregation test
@@ -320,6 +352,8 @@ select sum(bigint_col) from functional.alltypestiny;
 40
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # aggregation test
@@ -335,6 +369,8 @@ select id, sum(bigint_col) from functional.alltypestiny group by id order by id;
 7,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # aggregation test
@@ -347,6 +383,8 @@ having sum(bigint_col) > cast(5 as bigint)  order by id;
 7,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # aggregation test
@@ -375,6 +413,8 @@ NULL,0,0
 NULL,10,40
 ---- TYPES
 int, bigint, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # having test
@@ -386,6 +426,8 @@ select id, sum(bigint_col) from functional.alltypestiny group by id having sum(b
 7,10
 ---- TYPES
 int, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # join test
@@ -404,6 +446,8 @@ on (a.id = b.id) order by a.id;
 7,10,70
 ---- TYPES
 int, bigint, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # join inequality test
@@ -423,6 +467,8 @@ order by a.id;
 7,0,10,0
 ---- TYPES
 int, int, bigint,  bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # cross join test
@@ -449,6 +495,8 @@ order by a.id, b.id;
 7,1,10,10
 ---- TYPES
 int, int, bigint, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # left outer join test
@@ -481,6 +529,8 @@ order by a.id
 19,90,NULL
 ---- TYPES
 int, bigint, bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 select bigint_col + bigint_col, int_col + int_col, smallint_col + smallint_col,
@@ -497,6 +547,8 @@ from functional.alltypestiny;
 20,2,2,2,2
 ---- TYPES
 bigint, bigint, int, smallint, int
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 select float_col + int_col, float_col + 3.0, 3.0 + 3.0
@@ -512,6 +564,8 @@ from functional.alltypestiny;
 2.10000002384,4.10000002,6.0
 ---- TYPES
 double, decimal, decimal
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 select bigint_col - bigint_col, int_col - int_col, smallint_col - smallint_col,
@@ -654,6 +708,8 @@ select 3 union select 458;
 458
 ---- TYPES
 smallint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # case test
@@ -669,6 +725,8 @@ select tinyint_col, case tinyint_col when 1 then 5 else 458 end from functional.
 1,5
 ---- TYPES
 tinyint,smallint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # case test
@@ -684,6 +742,8 @@ select tinyint_col, case tinyint_col when 1 then 5 when 2 then 7 else 458 end fr
 1,5
 ---- TYPES
 tinyint,smallint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # case test
@@ -699,6 +759,8 @@ select tinyint_col, case tinyint_col when 0 then 458 else 5 end from functional.
 1,5
 ---- TYPES
 tinyint,smallint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # case test
@@ -714,6 +776,8 @@ select tinyint_col, case tinyint_col when 0 then 458 end from functional.alltype
 1,NULL
 ---- TYPES
 tinyint,smallint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # case test other format (the calcite rexnode should be the same)
@@ -729,6 +793,8 @@ select tinyint_col, case when tinyint_col=00 then 458 else 5 end from functional
 1,5
 ---- TYPES
 tinyint,smallint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # or test
@@ -744,6 +810,8 @@ true
 true
 ---- TYPES
 boolean
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # and test
@@ -759,6 +827,8 @@ true
 true
 ---- TYPES
 boolean
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # sum cast tinyint agg test
@@ -767,6 +837,8 @@ select sum(tinyint_col) from functional.alltypestiny;
 4
 ---- TYPES
 bigint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # duplicate test from analytics-fn.test, delete when it is activated.
@@ -801,6 +873,8 @@ order by date_part;
 9999-12-31,2,9999-12-01,9999-12-31
 ---- TYPES
 DATE, BIGINT, DATE, DATE
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
 # Test ROWS windows with start boundaries
@@ -846,3 +920,24 @@ select "1" as "hello";
 '1'
 ---- TYPES
 string
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====
+---- QUERY
+explain select * from functional.alltypestiny;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*01:EXCHANGE.*
+row_regex:.*00:SCAN HDFS.*
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====
+---- QUERY
+set explain_level=3;
+explain select * from functional.alltypestiny;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*01:EXCHANGE.*
+row_regex:.*00:SCAN HDFS.*
+row_regex:.*HDFS partitions=4/4.*
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====

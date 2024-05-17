@@ -1132,43 +1132,9 @@ SqlNode SqlStmt() :
 }
 {
     (
-<#-- Add methods to parse additional statements here -->
-<#list (parser.statementParserMethods!default.parser.statementParserMethods) as method>
-        LOOKAHEAD(2) stmt = ${method}
-    |
-</#list>
-        stmt = SqlSetOption(Span.of(), null)
-    |
-        stmt = SqlAlter()
-    |
-<#if (parser.createStatementParserMethods!default.parser.createStatementParserMethods)?size != 0>
-        stmt = SqlCreate()
-    |
-</#if>
-<#if (parser.dropStatementParserMethods!default.parser.dropStatementParserMethods)?size != 0>
-        stmt = SqlDrop()
-    |
-</#if>
-<#if (parser.truncateStatementParserMethods!default.parser.truncateStatementParserMethods)?size != 0>
-        LOOKAHEAD(2)
-        stmt = SqlTruncate()
-    |
-</#if>
         stmt = OrderedQueryOrExpr(ExprContext.ACCEPT_QUERY)
     |
         stmt = SqlExplain()
-    |
-        stmt = SqlDescribe()
-    |
-        stmt = SqlInsert()
-    |
-        stmt = SqlDelete()
-    |
-        stmt = SqlUpdate()
-    |
-        stmt = SqlMerge()
-    |
-        stmt = SqlProcedureCall()
     )
     {
         return stmt;
@@ -1395,26 +1361,13 @@ SqlNode SqlExplain() :
     final SqlExplainFormat format;
 }
 {
-    <EXPLAIN> <PLAN>
-    [ detailLevel = ExplainDetailLevel() ]
-    depth = ExplainDepth()
-    (
-        LOOKAHEAD(2)
-        <AS> <XML> { format = SqlExplainFormat.XML; }
-    |
-        LOOKAHEAD(2)
-        <AS> <JSON> { format = SqlExplainFormat.JSON; }
-    |
-        <AS> <DOT_FORMAT> { format = SqlExplainFormat.DOT; }
-    |
-        { format = SqlExplainFormat.TEXT; }
-    )
-    <FOR> stmt = SqlQueryOrDml() {
+    <EXPLAIN>
+    stmt = SqlQueryOrDml() {
         return new SqlExplain(getPos(),
             stmt,
-            detailLevel.symbol(SqlParserPos.ZERO),
-            depth.symbol(SqlParserPos.ZERO),
-            format.symbol(SqlParserPos.ZERO),
+            SqlExplainLevel.ALL_ATTRIBUTES.symbol(SqlParserPos.ZERO),
+            SqlExplain.Depth.PHYSICAL.symbol(SqlParserPos.ZERO),
+            SqlExplainFormat.TEXT.symbol(SqlParserPos.ZERO),
             nDynamicParams);
     }
 }
