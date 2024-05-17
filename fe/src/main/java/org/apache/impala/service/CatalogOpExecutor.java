@@ -119,6 +119,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.HdfsTableLoadParamsBuilder;
 import org.apache.impala.catalog.HiveStorageDescriptorFactory;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.KuduColumn;
@@ -7229,24 +7230,8 @@ public class CatalogOpExecutor {
       modification = new InProgressTableModification(catalog_, table);
       catalog_.getLock().writeLock().unlock();
 
-      TblTransaction tblTxn = null;
-      if (update.isSetTransaction_id()) {
-        long transactionId = update.getTransaction_id();
-        Preconditions.checkState(transactionId > 0);
-        try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
-          if (DebugUtils.hasDebugAction(update.getDebug_action(),
-              DebugUtils.UPDATE_CATALOG_ABORT_INSERT_TXN)) {
-            MetastoreShim.abortTransaction(msClient.getHiveClient(), transactionId);
-            LOG.info("Aborted txn due to the debug action.");
-          }
-          // Setup transactional parameters needed to do alter table/partitions later.
-          // TODO: Could be optimized to possibly save some RPCs, as these parameters are
-          //       not always needed + the writeId of the INSERT could be probably reused.
-          tblTxn = MetastoreShim.createTblTransaction(
-              msClient.getHiveClient(), table.getMetaStoreTable(), transactionId);
-          catalogTimeline.markEvent("Created Metastore transaction");
-        }
-      }
+      TblTransaction tblTxn = createTableTransactionIfApplicable(update,
+          catalogTimeline, table);
 
       // Collects the cache directive IDs of any cached table/partitions that were
       // targeted. A watch on these cache directives is submitted to the
@@ -7263,6 +7248,27 @@ public class CatalogOpExecutor {
       TableName tblName = new TableName(table.getDb().getName(), table.getName());
       List<String> errorMessages = Lists.newArrayList();
       HashSet<String> partsToLoadMetadata = null;
+      modification.addCatalogServiceIdentifiersToTable();
+      org.apache.hadoop.hive.metastore.api.Table msTbl =
+          table.getMetaStoreTable().deepCopy();
+      HashSet<String> partsToCreate = new HashSet<>();
+      if (table.getNumClusteringCols() > 0) {
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
+          partsToCreate = Sets.newHashSet(update.getUpdated_partitions().keySet());
+          ((HdfsTable) table).load(
+              new HdfsTableLoadParamsBuilder(msClient.getHiveClient(), msTbl)
+                  .reuseMetadata(true)
+                  .setLoadPartitionFileMetadata(false)
+                  .setLoadTableSchema(false)
+                  .setRefreshUpdatedPartitions(false)
+                  .setPartitionsToUpdate(partsToCreate)
+                  .setDebugAction(update.getDebug_action())
+                  .setReason("Preload for INSERT")
+                  .setIsPreLoadForInsert(true)
+                  .setCatalogTimeline(catalogTimeline)
+                  .build());
+        }
+      }
       Collection<? extends FeFsPartition> parts =
           FeCatalogUtils.loadAllPartitions((FeFsTable)table);
       List<FeFsPartition> affectedExistingPartitions = new ArrayList<>();
@@ -7277,129 +7283,22 @@ public class CatalogOpExecutor {
       // partitions in this map. This is used later on when table is reloaded to set
       // the createEventId for the partitions.
       Map<String, Long> partitionToEventId = new HashMap<>();
-      modification.addCatalogServiceIdentifiersToTable();
       if (table.getNumClusteringCols() > 0) {
         // Set of all partition names targeted by the insert that need to be created
         // in the Metastore (partitions that do not currently exist in the catalog).
         // In the BE, we don't currently distinguish between which targeted partitions
         // are new and which already exist, so initialize the set with all targeted
         // partition names and remove the ones that are found to exist.
-        HashSet<String> partsToCreate =
-            Sets.newHashSet(update.getUpdated_partitions().keySet());
         partsToLoadMetadata = Sets.newHashSet(partsToCreate);
         for (FeFsPartition partition: parts) {
-          String partName = partition.getPartitionName();
-          // Attempt to remove this partition name from partsToCreate. If remove
-          // returns true, it indicates the partition already exists.
-          if (partsToCreate.remove(partName)) {
-            affectedExistingPartitions.add(partition);
-            // For existing partitions, we need to unset column_stats_accurate to
-            // tell hive the statistics is not accurate any longer.
-            if (partition.getParameters() != null &&  partition.getParameters()
-                .containsKey(StatsSetupConst.COLUMN_STATS_ACCURATE)) {
-              org.apache.hadoop.hive.metastore.api.Partition hmsPartition =
-                  ((HdfsPartition) partition).toHmsPartition();
-              hmsPartition.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
-              hmsPartitionsStatsUnset.add(hmsPartition);
-            }
-            if (partition.isMarkedCached()) {
-              // The partition was targeted by the insert and is also cached. Since
-              // data was written to the partition, a watch needs to be placed on the
-              // cache directive so the TableLoadingMgr can perform an async
-              // refresh once all data becomes cached.
-              cacheDirIds.add(HdfsCachingUtil.getCacheDirectiveId(
-                  partition.getParameters()));
-            }
-          }
-          if (partsToCreate.size() == 0) break;
+          updatePartitionMetadataAndCacheStatus(partsToCreate,
+              affectedExistingPartitions, partition, hmsPartitionsStatsUnset,
+              cacheDirIds);
+          if (partsToCreate.isEmpty()) break;
         }
-
-        if (!partsToCreate.isEmpty()) {
-          try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
-            org.apache.hadoop.hive.metastore.api.Table msTbl =
-                table.getMetaStoreTable().deepCopy();
-            List<org.apache.hadoop.hive.metastore.api.Partition> hmsParts =
-                Lists.newArrayList();
-            HiveConf hiveConf = new HiveConf(this.getClass());
-            Warehouse warehouse = new Warehouse(hiveConf);
-            for (String partName: partsToCreate) {
-              org.apache.hadoop.hive.metastore.api.Partition partition =
-                  new org.apache.hadoop.hive.metastore.api.Partition();
-              hmsParts.add(partition);
-
-              partition.setDbName(tblName.getDb());
-              partition.setTableName(tblName.getTbl());
-              partition.setValues(MetaStoreUtil.getPartValsFromName(msTbl, partName));
-              partition.setSd(MetaStoreUtil.shallowCopyStorageDescriptor(msTbl.getSd()));
-              partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" + partName);
-              if (AcidUtils.isTransactionalTable(msTbl.getParameters())) {
-                // Self event detection is deprecated for non-transactional tables add
-                // partition. So we add catalog service identifiers only for
-                // transactional tables
-                addCatalogServiceIdentifiers(msTbl, partition);
-              }
-              MetastoreShim.updatePartitionStatsFast(partition, msTbl, warehouse);
-            }
-
-            // First add_partitions and then alter_partitions the successful ones with
-            // caching directives. The reason is that some partitions could have been
-            // added concurrently, and we want to avoid caching a partition twice and
-            // leaking a caching directive.
-            List<Partition> addedHmsParts = addHmsPartitions(
-                msClient, table, hmsParts, partitionToEventId, true, catalogTimeline);
-            for (Partition part: addedHmsParts) {
-              String part_name =
-                  FeCatalogUtils.getPartitionName((FeFsTable)table, part.getValues());
-              addedPartitionNames.put(part_name, part.getValues());
-            }
-            if (addedHmsParts.size() > 0) {
-              if (cachePoolName != null) {
-                List<org.apache.hadoop.hive.metastore.api.Partition> cachedHmsParts =
-                    Lists.newArrayList();
-                // Submit a new cache directive and update the partition metadata with
-                // the directive id.
-                for (org.apache.hadoop.hive.metastore.api.Partition part: addedHmsParts) {
-                  try {
-                    cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
-                        part, cachePoolName, cacheReplication));
-                    StatsSetupConst.setBasicStatsState(part.getParameters(), "false");
-                    cachedHmsParts.add(part);
-                  } catch (ImpalaRuntimeException e) {
-                    String msg = String.format("Partition %s.%s(%s): State: Not " +
-                        "cached. Action: Cache manully via 'ALTER TABLE'.",
-                        part.getDbName(), part.getTableName(), part.getValues());
-                    LOG.error(msg, e);
-                    errorMessages.add(msg);
-                  }
-                }
-                try {
-                  MetastoreShim.alterPartitions(msClient.getHiveClient(), tblName.getDb(),
-                      tblName.getTbl(), cachedHmsParts);
-                } catch (Exception e) {
-                  LOG.error("Failed in alter_partitions: ", e);
-                  // Try to uncache the partitions when the alteration in the HMS
-                  // failed.
-                  for (org.apache.hadoop.hive.metastore.api.Partition part:
-                      cachedHmsParts) {
-                    try {
-                      HdfsCachingUtil.removePartitionCacheDirective(part.getParameters());
-                    } catch (ImpalaException e1) {
-                      String msg = String.format(
-                          "Partition %s.%s(%s): State: Leaked caching directive. " +
-                          "Action: Manually uncache directory %s via hdfs " +
-                          "cacheAdmin.", part.getDbName(), part.getTableName(),
-                          part.getValues(), part.getSd().getLocation());
-                      LOG.error(msg, e);
-                      errorMessages.add(msg);
-                    }
-                  }
-                }
-              }
-            }
-          } catch (Exception e) {
-            throw new InternalException("Error adding partitions", e);
-          }
-        }
+        addPartitionNamesInMetastore(table, tblName, partsToCreate, addedPartitionNames,
+            cachePoolName, cacheReplication, catalogTimeline, partitionToEventId,
+            cacheDirIds, msTbl, errorMessages);
 
         // Unset COLUMN_STATS_ACCURATE by calling alter partition to hms.
         if (!hmsPartitionsStatsUnset.isEmpty()) {
@@ -7449,28 +7348,7 @@ public class CatalogOpExecutor {
       }
 
       if (table instanceof FeIcebergTable && update.isSetIceberg_operation()) {
-        FeIcebergTable iceTbl = (FeIcebergTable)table;
-        org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
-        IcebergCatalogOpExecutor.execute(iceTbl, iceTxn,
-            update.getIceberg_operation());
-        catalogTimeline.markEvent("Executed Iceberg operation " +
-            update.getIceberg_operation().getOperation());
-        if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
-          // Add catalog service id and the 'newCatalogVersion' to the table parameters.
-          // This way we can avoid reloading the table on self-events (Iceberg generates
-          // an ALTER TABLE statement to set the new metadata_location).
-          modification.registerInflightEvent();
-          IcebergCatalogOpExecutor.addCatalogVersionToTxn(
-              iceTxn, catalog_.getCatalogServiceId(), modification.newVersionNumber());
-          catalogTimeline.markEvent("Updated table properties");
-        }
-
-        if (update.isSetDebug_action()) {
-          String debugAction = update.getDebug_action();
-          DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_COMMIT);
-        }
-        iceTxn.commitTransaction();
-        modification.markInflightEventRegistrationComplete();
+        insertIntoIcebergTable(table, update, catalogTimeline, modification);
       }
 
       loadTableMetadata(table, modification.newVersionNumber(), true, false,
@@ -7503,6 +7381,183 @@ public class CatalogOpExecutor {
     profile.addToEvent_sequences(catalogTimeline.toThrift());
     response.setProfile(profile);
     return response;
+  }
+
+  private TblTransaction createTableTransactionIfApplicable(TUpdateCatalogRequest update,
+      EventSequence catalogTimeline, Table table) throws ImpalaException {
+    TblTransaction tblTxn = null;
+    if (update.isSetTransaction_id()) {
+      long transactionId = update.getTransaction_id();
+      Preconditions.checkState(transactionId > 0);
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
+        if (DebugUtils.hasDebugAction(update.getDebug_action(),
+            DebugUtils.UPDATE_CATALOG_ABORT_INSERT_TXN)) {
+          MetastoreShim.abortTransaction(msClient.getHiveClient(), transactionId);
+          LOG.info("Aborted txn due to the debug action.");
+        }
+        // Setup transactional parameters needed to do alter table/partitions later.
+        // TODO: Could be optimized to possibly save some RPCs, as these parameters are
+        //       not always needed + the writeId of the INSERT could be probably reused.
+        tblTxn = MetastoreShim.createTblTransaction(
+            msClient.getHiveClient(), table.getMetaStoreTable(), transactionId);
+        catalogTimeline.markEvent("Created Metastore transaction");
+      }
+    }
+    return tblTxn;
+  }
+
+  /**
+   * This process creates any missing partitions and clears a table property related to
+   * COLUMN_STATS_ACCURATE. It also gathers information about the cache directory
+   * IDs.
+   */
+  private void updatePartitionMetadataAndCacheStatus(
+      HashSet<String> pickupExistingPartitions,
+      List<FeFsPartition> affectedExistingPartitions, FeFsPartition partition,
+      List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset,
+      List<Long> cacheDirIds) throws ImpalaException {
+    String partName = partition.getPartitionName();
+    // Attempt to remove this partition name from pickupExistingPartitions. If remove
+    // returns true, it indicates the partition already exists.
+    if (pickupExistingPartitions.remove(partName)) {
+      affectedExistingPartitions.add(partition);
+      // For existing partitions, we need to unset column_stats_accurate to
+      // tell hive the statistics is not accurate any longer.
+      if (partition.getParameters() != null && partition.getParameters()
+          .containsKey(StatsSetupConst.COLUMN_STATS_ACCURATE)) {
+        org.apache.hadoop.hive.metastore.api.Partition hmsPartition =
+            ((HdfsPartition) partition).toHmsPartition();
+        hmsPartition.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+        hmsPartitionsStatsUnset.add(hmsPartition);
+      }
+      if (partition.isMarkedCached()) {
+        // The partition was targeted by the insert and is also cached. Since
+        // data was written to the partition, a watch needs to be placed on the
+        // cache directive so the TableLoadingMgr can perform an async
+        // refresh once all data becomes cached.
+        cacheDirIds.add(HdfsCachingUtil.getCacheDirectiveId(
+            partition.getParameters()));
+      }
+    }
+  }
+
+  private void addPartitionNamesInMetastore(Table table, TableName tblName,
+      HashSet<String> partsToCreate, Map<String, List<String>> addedPartitionNames,
+      String cachePoolName, Short cacheReplication, EventSequence catalogTimeline,
+      Map<String, Long> partitionToEventId, List<Long> cacheDirIds,
+      org.apache.hadoop.hive.metastore.api.Table msTbl, List<String> errorMessages)
+      throws ImpalaException {
+    if (!partsToCreate.isEmpty()) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
+        List<org.apache.hadoop.hive.metastore.api.Partition> hmsParts =
+            Lists.newArrayList();
+        HiveConf hiveConf = new HiveConf(this.getClass());
+        Warehouse warehouse = new Warehouse(hiveConf);
+        for (String partName: partsToCreate) {
+          org.apache.hadoop.hive.metastore.api.Partition partition =
+              new org.apache.hadoop.hive.metastore.api.Partition();
+          hmsParts.add(partition);
+
+          partition.setDbName(tblName.getDb());
+          partition.setTableName(tblName.getTbl());
+          partition.setValues(MetaStoreUtil.getPartValsFromName(msTbl, partName));
+          partition.setSd(MetaStoreUtil.shallowCopyStorageDescriptor(msTbl.getSd()));
+          partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" + partName);
+          if (AcidUtils.isTransactionalTable(msTbl.getParameters())) {
+            // Self event detection is deprecated for non-transactional tables add
+            // partition. So we add catalog service identifiers only for
+            // transactional tables
+            addCatalogServiceIdentifiers(msTbl, partition);
+          }
+          MetastoreShim.updatePartitionStatsFast(partition, msTbl, warehouse);
+        }
+
+        // First add_partitions and then alter_partitions the successful ones with
+        // caching directives. The reason is that some partitions could have been
+        // added concurrently, and we want to avoid caching a partition twice and
+        // leaking a caching directive.
+        List<Partition> addedHmsParts = addHmsPartitions(
+            msClient, table, hmsParts, partitionToEventId, true, catalogTimeline);
+        for (Partition part: addedHmsParts) {
+          String part_name =
+              FeCatalogUtils.getPartitionName((FeFsTable)table, part.getValues());
+          addedPartitionNames.put(part_name, part.getValues());
+        }
+        if (addedHmsParts.size() > 0) {
+          if (cachePoolName != null) {
+            List<org.apache.hadoop.hive.metastore.api.Partition> cachedHmsParts =
+                Lists.newArrayList();
+            // Submit a new cache directive and update the partition metadata with
+            // the directive id.
+            for (org.apache.hadoop.hive.metastore.api.Partition part: addedHmsParts) {
+              try {
+                cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
+                    part, cachePoolName, cacheReplication));
+                StatsSetupConst.setBasicStatsState(part.getParameters(), "false");
+                cachedHmsParts.add(part);
+              } catch (ImpalaRuntimeException e) {
+                String msg = String.format("Partition %s.%s(%s): State: Not " +
+                        "cached. Action: Cache manully via 'ALTER TABLE'.",
+                    part.getDbName(), part.getTableName(), part.getValues());
+                LOG.error(msg, e);
+                errorMessages.add(msg);
+              }
+            }
+            try {
+              MetastoreShim.alterPartitions(msClient.getHiveClient(), tblName.getDb(),
+                  tblName.getTbl(), cachedHmsParts);
+            } catch (Exception e) {
+              LOG.error("Failed in alter_partitions: ", e);
+              // Try to uncache the partitions when the alteration in the HMS
+              // failed.
+              for (org.apache.hadoop.hive.metastore.api.Partition part:
+                  cachedHmsParts) {
+                try {
+                  HdfsCachingUtil.removePartitionCacheDirective(part.getParameters());
+                } catch (ImpalaException e1) {
+                  String msg = String.format(
+                      "Partition %s.%s(%s): State: Leaked caching directive. " +
+                          "Action: Manually uncache directory %s via hdfs " +
+                          "cacheAdmin.", part.getDbName(), part.getTableName(),
+                      part.getValues(), part.getSd().getLocation());
+                  LOG.error(msg, e);
+                  errorMessages.add(msg);
+                }
+              }
+            }
+          }
+        }
+      } catch (Exception e) {
+        throw new InternalException("Error adding partitions", e);
+      }
+    }
+  }
+
+  private void insertIntoIcebergTable(Table table, TUpdateCatalogRequest update,
+      EventSequence catalogTimeline, InProgressTableModification modification)
+      throws ImpalaException {
+    FeIcebergTable iceTbl = (FeIcebergTable)table;
+    org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
+    IcebergCatalogOpExecutor.execute(iceTbl, iceTxn,
+        update.getIceberg_operation());
+    catalogTimeline.markEvent("Executed Iceberg operation " +
+        update.getIceberg_operation().getOperation());
+    if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
+      // Add catalog service id and the 'newCatalogVersion' to the table parameters.
+      // This way we can avoid reloading the table on self-events (Iceberg generates
+      // an ALTER TABLE statement to set the new metadata_location).
+      modification.registerInflightEvent();
+      IcebergCatalogOpExecutor.addCatalogVersionToTxn(
+          iceTxn, catalog_.getCatalogServiceId(), modification.newVersionNumber());
+      catalogTimeline.markEvent("Updated table properties");
+    }
+
+    if (update.isSetDebug_action()) {
+      String debugAction = update.getDebug_action();
+      DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_COMMIT);
+    }
+    iceTxn.commitTransaction();
+    modification.markInflightEventRegistrationComplete();
   }
 
   /**
