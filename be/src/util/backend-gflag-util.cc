@@ -486,6 +486,11 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_dbcp_max_conn_pool_size(FLAGS_dbcp_max_conn_pool_size);
   cfg.__set_dbcp_max_wait_millis_for_conn(FLAGS_dbcp_max_wait_millis_for_conn);
   cfg.__set_dbcp_data_source_idle_timeout(FLAGS_dbcp_data_source_idle_timeout_s);
+#ifdef NDEBUG
+  cfg.__set_is_release_build(true);
+#else
+  cfg.__set_is_release_build(false);
+#endif
   return Status::OK();
 }
 
