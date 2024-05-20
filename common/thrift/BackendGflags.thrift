@@ -304,4 +304,6 @@ struct TBackendGflags {
   136: required i32 dbcp_max_wait_millis_for_conn
 
   137: required i32 dbcp_data_source_idle_timeout
+
+  138: required bool is_release_build
 }

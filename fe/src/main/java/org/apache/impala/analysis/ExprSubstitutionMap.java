@@ -27,6 +27,8 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+import org.apache.impala.service.BackendConfig;
+
 /**
  * Map of expression substitutions: lhs[i] gets substituted with rhs[i].
  * To support expression substitution across query blocks, rhs exprs must already be
@@ -168,6 +170,9 @@ public final class ExprSubstitutionMap {
    * and that all rhs exprs are analyzed.
    */
   private void verify() {
+    // This is an O(n^2) algorithm, so skip this on release builds to avoid the overhead.
+    if (BackendConfig.INSTANCE.isReleaseBuild()) return;
+
     for (int i = 0; i < lhs_.size(); ++i) {
       for (int j = i + 1; j < lhs_.size(); ++j) {
         if (lhs_.get(i).equals(lhs_.get(j))) {

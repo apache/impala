@@ -521,4 +521,8 @@ public class BackendConfig {
   public int getDbcpDataSourceIdleTimeoutInSeconds() {
     return backendCfg_.dbcp_data_source_idle_timeout;
   }
+
+  public boolean isReleaseBuild() {
+    return backendCfg_.is_release_build;
+  }
 }
