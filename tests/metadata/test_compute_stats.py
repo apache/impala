@@ -18,7 +18,9 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import pytest
-from subprocess import check_call
+from hive_metastore.ttypes import (
+    ColumnStatistics, ColumnStatisticsDesc, ColumnStatisticsData,
+    ColumnStatisticsObj, StringColumnStatsData)
 
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
@@ -436,3 +438,44 @@ class TestParquetComputeColumnMinMax(ImpalaTestSuite):
 
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats-column-minmax', vector, unique_database)
+
+
+class TestInvalidStatsFromHms(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInvalidStatsFromHms, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'none')
+
+  def test_invalid_col_stats(self, unique_database):
+    """Test that invalid column stats, i.e. values < -1, are normalized in Impala"""
+    tbl = unique_database + ".tbl"
+    self.execute_query("create table {} as select 1 as id, 'aaa' as name".format(tbl))
+    # Add invalid stats in HMS
+    hms_client, _ = ImpalaTestSuite.create_hive_client(9083)
+    cs = ColumnStatistics()
+    cs.engine = "impala"
+    isTblLevel = True
+    cs.statsDesc = ColumnStatisticsDesc(isTblLevel, unique_database, "tbl")
+    cs_data = ColumnStatisticsData()
+    maxColLen = -100
+    avgColLen = -200
+    numNulls = -300
+    numDVs = -400
+    cs_data.stringStats = StringColumnStatsData(maxColLen, avgColLen, numNulls, numDVs)
+    cs_obj = ColumnStatisticsObj("name", "string", cs_data)
+    cs.statsObj = [cs_obj]
+    assert hms_client.update_table_column_statistics(cs)
+    # REFRESH to reload the stats
+    self.execute_query("refresh " + tbl)
+    # Verify the invalid stats are normalized to -1
+    res = self.execute_query("show column stats " + tbl)
+    assert res.data == [
+      'id\tTINYINT\t-1\t-1\t1\t1\t-1\t-1',
+      'name\tSTRING\t-1\t-1\t-1\t-1\t-1\t-1']

@@ -42,12 +42,12 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TColumnValue;
 
-import org.apache.log4j.Logger;
-
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.google.common.math.LongMath;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Statistics for a single column.
@@ -61,7 +61,7 @@ public class ColumnStats {
       PrimitiveType.VARCHAR, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
       PrimitiveType.TINYINT, PrimitiveType.DECIMAL);
 
-  private static final Logger LOG = Logger.getLogger(ColumnStats.class);
+  private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
 
   public enum StatsKey {
     NUM_DISTINCT_VALUES("numDVs"),
@@ -246,7 +246,7 @@ public class ColumnStats {
    */
   public String getTColumnValueAsString(TColumnValue value) {
     if (value==null) return "-1";
-    StringBuilder sb = new StringBuilder("");
+    StringBuilder sb = new StringBuilder();
 
     if (value.isSetBool_val()) {
       sb.append(value.bool_val);
@@ -336,7 +336,7 @@ public class ColumnStats {
       } else {
         BigDecimal value = literal.getValue();
         BigDecimal lValue = new BigDecimal(new String(lowValue_.getDecimal_val()));
-        if (value.compareTo(lValue) == -1) {
+        if (value.compareTo(lValue) < 0) {
           lowValue_.setDecimal_val(value.toString().getBytes());
         }
       }
@@ -380,7 +380,7 @@ public class ColumnStats {
       } else {
         BigDecimal value = literal.getValue();
         BigDecimal hValue = new BigDecimal(new String(highValue_.getDecimal_val()));
-        if (value.compareTo(hValue) == 1) {
+        if (value.compareTo(hValue) > 0) {
           highValue_.setDecimal_val(value.toString().getBytes());
         }
       }
@@ -435,56 +435,54 @@ public class ColumnStats {
     if (!longStats.isSetLowValue()) {
       lowValue_ = null;
     } else {
-      Long value = Long.valueOf(longStats.getLowValue());
+      long value = longStats.getLowValue();
       lowValue_ = new TColumnValue();
       switch (type) {
         case TINYINT:
-          lowValue_.setByte_val(value.byteValue());
+          lowValue_.setByte_val((byte) value);
           break;
         case SMALLINT:
-          lowValue_.setShort_val(value.shortValue());
+          lowValue_.setShort_val((short) value);
           break;
         case INT:
-          lowValue_.setInt_val(value.intValue());
+          lowValue_.setInt_val((int) value);
           break;
         case BIGINT:
-          lowValue_.setLong_val(value.longValue());
+          lowValue_.setLong_val(value);
           break;
         case TIMESTAMP:
-          Preconditions.checkState(
-              false, "TIMESTAMP columns are not supported by setLowAndHighValue()");
-          break;
+          throw new IllegalStateException(
+              "TIMESTAMP columns are not supported by setLowAndHighValue()");
         default:
-          Preconditions.checkState(
-              false, "Unsupported type encountered in setLowAndHighValue()");
+          throw new IllegalStateException(
+              "Unsupported type encountered in setLowAndHighValue()");
       }
     }
 
     if (!longStats.isSetHighValue()) {
       highValue_ = null;
     } else {
-      Long value = Long.valueOf(longStats.getHighValue());
+      long value = longStats.getHighValue();
       highValue_ = new TColumnValue();
       switch (type) {
         case TINYINT:
-          highValue_.setByte_val(value.byteValue());
+          highValue_.setByte_val((byte) value);
           break;
         case SMALLINT:
-          highValue_.setShort_val(value.shortValue());
+          highValue_.setShort_val((short) value);
           break;
         case INT:
-          highValue_.setInt_val(value.intValue());
+          highValue_.setInt_val((int) value);
           break;
         case BIGINT:
-          highValue_.setLong_val(value.longValue());
+          highValue_.setLong_val(value);
           break;
         case TIMESTAMP:
-          Preconditions.checkState(
-              false, "TIMESTAMP columns are not supported by setLowAndHighValue()");
-          break;
+          throw new IllegalStateException(
+              "TIMESTAMP columns are not supported by setLowAndHighValue()");
         default:
-          Preconditions.checkState(
-              false, "Unsupported type encountered in setLowAndHighValue()");
+          throw new IllegalStateException(
+              "Unsupported type encountered in setLowAndHighValue()");
       }
     }
   }
@@ -546,6 +544,22 @@ public class ColumnStats {
     }
   }
 
+  private long normalizeValue(String colName, StatsKey key, long value) {
+    if (value < -1) {
+      LOG.warn("Invalid {} of column {}: {}. Normalized to -1.", key, colName, value);
+      return -1;
+    }
+    return value;
+  }
+
+  private float normalizeAvgSize(String colName, float value) {
+    if (value < -1) {
+      LOG.warn("Invalid avgSize of column {}: {}. Normalized to -1.", colName, value);
+      return -1;
+    }
+    return value;
+  }
+
   /**
    * Updates the stats with the given ColumnStatisticsData. If the ColumnStatisticsData
    * is not compatible with the given colType, all stats are initialized based on
@@ -553,7 +567,7 @@ public class ColumnStats {
    * Returns false if the ColumnStatisticsData data was incompatible with the given
    * column type, otherwise returns true.
    */
-  public boolean update(Type colType, ColumnStatisticsData statsData) {
+  public boolean update(String colName, Type colType, ColumnStatisticsData statsData) {
     Preconditions.checkState(isSupportedColType(colType));
     initColStats(colType);
     boolean isCompatible = false;
@@ -572,7 +586,8 @@ public class ColumnStats {
         isCompatible = statsData.isSetBooleanStats();
         if (isCompatible) {
           BooleanColumnStatsData boolStats = statsData.getBooleanStats();
-          numNulls_ = boolStats.getNumNulls();
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              boolStats.getNumNulls());
           // If we have numNulls, we can infer NDV from that.
           if (numNulls_ > 0) {
             numDistinctValues_ = 3;
@@ -581,8 +596,10 @@ public class ColumnStats {
           } else {
             numDistinctValues_ = -1;
           }
-          numTrues_ = boolStats.getNumTrues();
-          numFalses_ = boolStats.getNumFalses();
+          numTrues_ = normalizeValue(colName, StatsKey.NUM_TRUES,
+              boolStats.getNumTrues());
+          numFalses_ = normalizeValue(colName, StatsKey.NUM_FALSES,
+              boolStats.getNumFalses());
         }
         break;
       case TINYINT:
@@ -593,8 +610,10 @@ public class ColumnStats {
         isCompatible = statsData.isSetLongStats();
         if (isCompatible) {
           LongColumnStatsData longStats = statsData.getLongStats();
-          numDistinctValues_ = longStats.getNumDVs();
-          numNulls_ = longStats.getNumNulls();
+          numDistinctValues_ = normalizeValue(colName, StatsKey.NUM_DISTINCT_VALUES,
+              longStats.getNumDVs());
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              longStats.getNumNulls());
           if (colType.getPrimitiveType() != PrimitiveType.TIMESTAMP) {
             // Low/high value handling is not yet implemented for timestamps.
             setLowAndHighValue(colType.getPrimitiveType(), longStats);
@@ -605,8 +624,10 @@ public class ColumnStats {
         isCompatible = statsData.isSetDateStats();
         if (isCompatible) {
           DateColumnStatsData dateStats = statsData.getDateStats();
-          numDistinctValues_ = dateStats.getNumDVs();
-          numNulls_ = dateStats.getNumNulls();
+          numDistinctValues_ = normalizeValue(colName, StatsKey.NUM_DISTINCT_VALUES,
+              dateStats.getNumDVs());
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              dateStats.getNumNulls());
           setLowAndHighValue(dateStats);
         }
         break;
@@ -615,8 +636,10 @@ public class ColumnStats {
         isCompatible = statsData.isSetDoubleStats();
         if (isCompatible) {
           DoubleColumnStatsData doubleStats = statsData.getDoubleStats();
-          numDistinctValues_ = doubleStats.getNumDVs();
-          numNulls_ = doubleStats.getNumNulls();
+          numDistinctValues_ = normalizeValue(colName, StatsKey.NUM_DISTINCT_VALUES,
+              doubleStats.getNumDVs());
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              doubleStats.getNumNulls());
           setLowAndHighValue(doubleStats);
         }
         break;
@@ -625,8 +648,10 @@ public class ColumnStats {
         isCompatible = statsData.isSetStringStats();
         if (isCompatible) {
           StringColumnStatsData stringStats = statsData.getStringStats();
-          numDistinctValues_ = stringStats.getNumDVs();
-          numNulls_ = stringStats.getNumNulls();
+          numDistinctValues_ = normalizeValue(colName, StatsKey.NUM_DISTINCT_VALUES,
+              stringStats.getNumDVs());
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              stringStats.getNumNulls());
         }
         break;
       case VARCHAR:
@@ -634,10 +659,14 @@ public class ColumnStats {
         isCompatible = statsData.isSetStringStats();
         if (isCompatible) {
           StringColumnStatsData stringStats = statsData.getStringStats();
-          numDistinctValues_ = stringStats.getNumDVs();
-          numNulls_ = stringStats.getNumNulls();
-          maxSize_ = stringStats.getMaxColLen();
-          avgSize_ = Double.valueOf(stringStats.getAvgColLen()).floatValue();
+          numDistinctValues_ = normalizeValue(colName, StatsKey.NUM_DISTINCT_VALUES,
+              stringStats.getNumDVs());
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              stringStats.getNumNulls());
+          maxSize_ = normalizeValue(colName, StatsKey.MAX_SIZE,
+              stringStats.getMaxColLen());
+          avgSize_ = normalizeAvgSize(colName,
+              Double.valueOf(stringStats.getAvgColLen()).floatValue());
           if (avgSize_ >= 0) {
             avgSerializedSize_ = avgSize_ + PrimitiveType.STRING.getSlotSize();
           } else {
@@ -649,9 +678,12 @@ public class ColumnStats {
         isCompatible = statsData.isSetBinaryStats();
         if (isCompatible) {
           BinaryColumnStatsData binaryStats = statsData.getBinaryStats();
-          numNulls_ = binaryStats.getNumNulls();
-          maxSize_ = binaryStats.getMaxColLen();
-          avgSize_ = Double.valueOf(binaryStats.getAvgColLen()).floatValue();
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              binaryStats.getNumNulls());
+          maxSize_ = normalizeValue(colName, StatsKey.MAX_SIZE,
+              binaryStats.getMaxColLen());
+          avgSize_ = normalizeAvgSize(colName,
+              Double.valueOf(binaryStats.getAvgColLen()).floatValue());
           if (avgSize_ >= 0) {
             avgSerializedSize_ = avgSize_ + PrimitiveType.BINARY.getSlotSize();
           } else {
@@ -663,15 +695,15 @@ public class ColumnStats {
         isCompatible = statsData.isSetDecimalStats();
         if (isCompatible) {
           DecimalColumnStatsData decimalStats = statsData.getDecimalStats();
-          numNulls_ = decimalStats.getNumNulls();
-          numDistinctValues_ = decimalStats.getNumDVs();
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              decimalStats.getNumNulls());
+          numDistinctValues_ = normalizeValue(colName, StatsKey.NUM_DISTINCT_VALUES,
+              decimalStats.getNumDVs());
           setLowAndHighValue(decimalStats);
         }
         break;
       default:
-        Preconditions.checkState(false,
-            "Unexpected column type: " + colType.toString());
-        break;
+        throw new IllegalStateException("Unexpected column type: " + colType);
     }
     validate(colType);
     return isCompatible;
@@ -683,12 +715,12 @@ public class ColumnStats {
   public static void updateLowAndHighForHiveColumnStatsData(
       Long low_value, Long high_value, LongColumnStatsData longColStatsData) {
     if (low_value != null) {
-      longColStatsData.setLowValue(low_value.longValue());
+      longColStatsData.setLowValue(low_value);
     } else {
       longColStatsData.unsetLowValue();
     }
     if (high_value != null) {
-      longColStatsData.setHighValue(high_value.longValue());
+      longColStatsData.setHighValue(high_value);
     } else {
       longColStatsData.unsetHighValue();
     }
@@ -700,12 +732,12 @@ public class ColumnStats {
   public static void updateLowAndHighForHiveColumnStatsData(
       Double low_value, Double high_value, DoubleColumnStatsData doubleColStatsData) {
     if (low_value != null) {
-      doubleColStatsData.setLowValue(low_value.doubleValue());
+      doubleColStatsData.setLowValue(low_value);
     } else {
       doubleColStatsData.unsetLowValue();
     }
     if (high_value != null) {
-      doubleColStatsData.setHighValue(high_value.doubleValue());
+      doubleColStatsData.setHighValue(high_value);
     } else {
       doubleColStatsData.unsetHighValue();
     }
@@ -747,7 +779,7 @@ public class ColumnStats {
 
   /**
    * Convert the statistics back into an HMS-compatible ColumnStatisticsData object.
-   * This is essentially the inverse of {@link #update(Type, ColumnStatisticsData)
+   * This is essentially the inverse of {@link #update(String, Type, ColumnStatisticsData)
    * above.
    *
    * Returns null if statistics for the specified type are not supported.
@@ -778,10 +810,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetByte_val()) {
-            lowValue = Long.valueOf(colStats.low_value.getByte_val());
+            lowValue = (long) colStats.low_value.getByte_val();
           }
           if (isHighValueSet && colStats.high_value.isSetByte_val()) {
-            highValue = Long.valueOf(colStats.high_value.getByte_val());
+            highValue = (long) colStats.high_value.getByte_val();
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
           colStatsData.setLongStats(longColStatsData);
@@ -795,10 +827,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetShort_val()) {
-            lowValue = Long.valueOf(colStats.low_value.getShort_val());
+            lowValue = (long) colStats.low_value.getShort_val();
           }
           if (isHighValueSet && colStats.high_value.isSetShort_val()) {
-            highValue = Long.valueOf(colStats.high_value.getShort_val());
+            highValue = (long) colStats.high_value.getShort_val();
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
 
@@ -813,10 +845,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetInt_val()) {
-            lowValue = Long.valueOf(colStats.low_value.getInt_val());
+            lowValue = (long) colStats.low_value.getInt_val();
           }
           if (isHighValueSet && colStats.high_value.isSetInt_val()) {
-            highValue = Long.valueOf(colStats.high_value.getInt_val());
+            highValue = (long) colStats.high_value.getInt_val();
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
 
@@ -832,10 +864,10 @@ public class ColumnStats {
           Date lowValue = null;
           Date highValue = null;
           if (isLowValueSet && colStats.low_value.isSetDate_val()) {
-            lowValue = new Date(Long.valueOf(colStats.low_value.getDate_val()));
+            lowValue = new Date(colStats.low_value.getDate_val());
           }
           if (isHighValueSet && colStats.high_value.isSetDate_val()) {
-            highValue = new Date(Long.valueOf(colStats.high_value.getDate_val()));
+            highValue = new Date(colStats.high_value.getDate_val());
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, dateColStatsData);
           colStatsData.setDateStats(dateColStatsData);
@@ -848,10 +880,10 @@ public class ColumnStats {
           Long lowValue = null;
           Long highValue = null;
           if (isLowValueSet && colStats.low_value.isSetLong_val()) {
-            lowValue = Long.valueOf(colStats.low_value.getLong_val());
+            lowValue = colStats.low_value.getLong_val();
           }
           if (isHighValueSet && colStats.high_value.isSetLong_val()) {
-            highValue = Long.valueOf(colStats.high_value.getLong_val());
+            highValue = colStats.high_value.getLong_val();
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
 
@@ -870,10 +902,10 @@ public class ColumnStats {
           Double lowValue = null;
           Double highValue = null;
           if (isLowValueSet && colStats.low_value.isSetDouble_val()) {
-            lowValue = Double.valueOf(colStats.low_value.getDouble_val());
+            lowValue = colStats.low_value.getDouble_val();
           }
           if (isHighValueSet && colStats.high_value.isSetDouble_val()) {
-            highValue = Double.valueOf(colStats.high_value.getDouble_val());
+            highValue = colStats.high_value.getDouble_val();
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, doubleColStatsData);
 
@@ -972,7 +1004,7 @@ public class ColumnStats {
         numFalses_ = (Long) value;
         break;
       }
-      default: Preconditions.checkState(false);
+      default: throw new IllegalStateException("Unknown StatsKey " + key);
     }
     validate(colType);
   }

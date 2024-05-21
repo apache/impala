@@ -186,7 +186,6 @@ public abstract class FeCatalogUtils {
             "incompatible with column type %s. Consider regenerating statistics " +
             "for %s.", table.getFullName(), col.getName(), col.getType(),
             table.getFullName()));
-        continue;
       }
     }
   }

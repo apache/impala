@@ -70,7 +70,7 @@ public class Column {
   public boolean isVirtual() { return false; }
 
   public boolean updateStats(ColumnStatisticsData statsData) {
-    boolean statsDataCompatibleWithColType = stats_.update(type_, statsData);
+    boolean statsDataCompatibleWithColType = stats_.update(name_, type_, statsData);
     if (LOG.isTraceEnabled()) {
       LOG.trace("col stats: " + name_ + " #distinct=" + stats_.getNumDistinctValues());
     }
