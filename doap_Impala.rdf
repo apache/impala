@@ -1,0 +1,156 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl"?>
+<rdf:RDF xml:lang="en"
+         xmlns="http://usefulinc.com/ns/doap#" 
+         xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" 
+         xmlns:asfext="http://projects.apache.org/ns/asfext#"
+         xmlns:foaf="http://xmlns.com/foaf/0.1/">
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one or more
+    contributor license agreements.  See the NOTICE file distributed with
+    this work for additional information regarding copyright ownership.
+    The ASF licenses this file to You under the Apache License, Version 2.0
+    (the "License"); you may not use this file except in compliance with
+    the License.  You may obtain a copy of the License at
+   
+         https://www.apache.org/licenses/LICENSE-2.0
+   
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+  <Project rdf:about="https://impala.apache.org">
+    <created>2024-05-22</created>
+    <license rdf:resource="https://spdx.org/licenses/Apache-2.0" />
+    <name>Apache Impala</name>
+    <homepage rdf:resource="https://impala.apache.org" />
+    <asfext:pmc rdf:resource="https://impala.apache.org" />
+    <shortdesc>A high-performance distributed SQL engine.</shortdesc>
+    <description>Apache Impala is the open source, native analytic database for open data and table formats.</description>
+    <bug-database rdf:resource="https://issues.apache.org/jira/projects/IMPALA/" />
+    <mailing-list rdf:resource="https://impala.apache.org/community.html" />
+    <download-page rdf:resource="https://impala.apache.org/downloads.html" />
+    <programming-language>C++,Java</programming-language>
+    <category rdf:resource="https://projects.apache.org/category/big-data" />
+    <release>
+      <Version>
+        <name>Apache Impala 4.4.0</name>
+        <created>2024-05-25</created>
+        <revision>4.4.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 4.3.0</name>
+        <created>2023-10-03</created>
+        <revision>4.3.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 4.1.2</name>
+        <created>2023-04-10</created>
+        <revision>4.1.2</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 4.2.0</name>
+        <created>2022-12-08</created>
+        <revision>4.2.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 4.1.1</name>
+        <created>2022-10-20</created>
+        <revision>4.1.1</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 4.1.0</name>
+        <created>2022-06-01</created>
+        <revision>4.1.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.4.1</name>
+        <created>2022-04-07</created>
+        <revision>3.4.1</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 4.0.0</name>
+        <created>2021-07-12</created>
+        <revision>4.0.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.4.0</name>
+        <created>2020-04-24</created>
+        <revision>3.4.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.3.0</name>
+        <created>2019-08-22</created>
+        <revision>3.3.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.2.0</name>
+        <created>2019-03-28</created>
+        <revision></revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.1.0</name>
+        <created>2018-12-06</created>
+        <revision>3.1.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.0.1</name>
+        <created>2018-10-24</created>
+        <revision>3.0.1</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.0.0</name>
+        <created>2018-05-07</created>
+        <revision>3.0.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 2.12.0</name>
+        <created>2018-04-24</created>
+        <revision>2.12.0</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 2.11.0</name>
+        <created>2017-12-28</created>
+        <revision>2.11.0</revision>
+      </Version>
+    </release>
+    <repository>
+      <GitRepository>
+        <location rdf:resource="https://gitbox.apache.org/repos/asf/impala.git"/>
+        <browse rdf:resource="https://github.com/apache/impala"/>
+      </GitRepository>
+    </repository>
+  </Project>
+</rdf:RDF>
