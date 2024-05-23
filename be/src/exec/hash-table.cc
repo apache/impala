@@ -366,13 +366,24 @@ Status HashTableCtx::ExprValuesCache::Init(RuntimeState* state, MemTracker* trac
     return Status::OK();
   }
   DCHECK_GT(expr_values_bytes_per_row_, 0);
-  // Compute the maximum number of cached rows which can fit in the memory budget.
+  // Compute the maximum number of cached rows which can fit in the memory budget,
+  // which is 256KB (MAX_EXPR_VALUES_CACHE_BYTES). 'sample_size' is 64 because MemUsage
+  // account for Bitmap::MemUsage as well, which cost 8 bytes per 64 entries.
   // TODO: Find the optimal prefetch batch size. This may be something
   // processor dependent so we may need calibration at Impala startup time.
-  capacity_ = std::max(1, std::min(state->batch_size(),
-      MAX_EXPR_VALUES_ARRAY_SIZE / expr_values_bytes_per_row_));
+  const int sample_size = 64;
+  double mem_per_row =
+      (double)MemUsage(sample_size, expr_values_bytes_per_row_, num_exprs_) / sample_size;
+  double max_capacity = (MAX_EXPR_VALUES_CACHE_BYTES - 8) / mem_per_row;
+  capacity_ = std::max(1, std::min(state->batch_size(), (int)max_capacity));
 
+  // TODO: Add 'mem_usage' into minimum reservation of PlanNode that use HashTableCtx?
   int mem_usage = MemUsage(capacity_, expr_values_bytes_per_row_, num_exprs_);
+  if (UNLIKELY(mem_usage > MAX_EXPR_VALUES_CACHE_BYTES)) {
+    LOG(WARNING) << "HashTableCtx::ExprValuesCache mem_usage (" << mem_usage
+                 << ") exceed MAX_EXPR_VALUES_CACHE_BYTES ("
+                 << MAX_EXPR_VALUES_CACHE_BYTES << "). capacity: " << capacity_;
+  }
   if (UNLIKELY(!tracker->TryConsume(mem_usage))) {
     capacity_ = 0;
     string details = Substitute("HashTableCtx::ExprValuesCache failed to allocate $0 bytes.",

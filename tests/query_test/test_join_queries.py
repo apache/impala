@@ -24,6 +24,11 @@ from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_dimensions import (
+    add_mandatory_exec_option,
+    create_single_exec_option_dimension,
+    create_table_format_dimension)
+
 
 class TestJoinQueries(ImpalaTestSuite):
   BATCH_SIZES = [0, 1]
@@ -217,3 +222,29 @@ class TestSpillingHashJoin(ImpalaTestSuite):
     self.run_test_case('QueryTest/create-tables-impala-13138', vector, unique_database)
     for i in range(0, 5):
       self.run_test_case('QueryTest/query-impala-13138', vector, unique_database)
+
+
+class TestExprValueCache(ImpalaTestSuite):
+  # Test that HashTableCtx::ExprValueCache memory usage stays under 256KB.
+  # Run TPC-DS Q97 with bare minimum memory limit, MT_DOP=1, and max BATCH_SIZE.
+  # Before IMPALA-13075, the test query will pass Planner and Admission Control,
+  # but later failed during backend execution due to memory limit exceeded.
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpcds_partitioned'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestExprValueCache, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_table_format_dimension(cls.get_workload(), 'parquet/snap/block'))
+    add_mandatory_exec_option(cls, 'runtime_filter_mode', 'OFF')
+    add_mandatory_exec_option(cls, 'mem_limit', '149mb')
+    add_mandatory_exec_option(cls, 'mt_dop', 1)
+    add_mandatory_exec_option(cls, 'batch_size', 65536)
+
+  def test_expr_value_cache_fits(self, vector):
+    self.run_test_case('tpcds-q97', vector)

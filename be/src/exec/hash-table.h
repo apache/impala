@@ -377,7 +377,7 @@ class HashTableCtx {
     }
 
     /// Max amount of memory in bytes for caching evaluated expression values.
-    static const int MAX_EXPR_VALUES_ARRAY_SIZE = 256 << 10;
+    static const int MAX_EXPR_VALUES_CACHE_BYTES = 256 << 10;
 
     /// Maximum number of rows of expressions evaluation states which this
     /// ExprValuesCache can cache.

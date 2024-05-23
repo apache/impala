@@ -45,6 +45,7 @@ FILE_FORMAT_TO_STORED_AS_MAP = {
   'json': "JSONFILE",
 }
 
+
 # Describes the configuration used to execute a single tests. Contains both the details
 # of what specific table format to target along with the exec options (num_nodes, etc)
 # to use when running the query.
@@ -116,39 +117,34 @@ class TableFormatInfo(object):
       return '_%s_%s' % (self.file_format, self.compression_codec)
 
 
-def create_uncompressed_text_dimension(workload):
+def create_table_format_dimension(workload, table_format_string):
   dataset = get_dataset_from_workload(workload)
   return ImpalaTestDimension('table_format',
-      TableFormatInfo.create_from_string(dataset, 'text/none'))
+      TableFormatInfo.create_from_string(dataset, table_format_string))
+
+
+def create_uncompressed_text_dimension(workload):
+  return create_table_format_dimension(workload, 'text/none')
 
 
 def create_uncompressed_json_dimension(workload):
-  dataset = get_dataset_from_workload(workload)
-  return ImpalaTestDimension('table_format',
-      TableFormatInfo.create_from_string(dataset, 'json/none'))
+  return create_table_format_dimension(workload, 'json/none')
 
 
 def create_parquet_dimension(workload):
-  dataset = get_dataset_from_workload(workload)
-  return ImpalaTestDimension('table_format',
-      TableFormatInfo.create_from_string(dataset, 'parquet/none'))
+  return create_table_format_dimension(workload, 'parquet/none')
 
 
 def create_orc_dimension(workload):
-  dataset = get_dataset_from_workload(workload)
-  return ImpalaTestDimension('table_format',
-      TableFormatInfo.create_from_string(dataset, 'orc/def'))
+  return create_table_format_dimension(workload, 'orc/def')
+
 
 def create_avro_snappy_dimension(workload):
-  dataset = get_dataset_from_workload(workload)
-  return ImpalaTestDimension('table_format',
-      TableFormatInfo.create_from_string(dataset, 'avro/snap/block'))
+  return create_table_format_dimension(workload, 'avro/snap/block')
 
 
 def create_kudu_dimension(workload):
-  dataset = get_dataset_from_workload(workload)
-  return ImpalaTestDimension('table_format',
-      TableFormatInfo.create_from_string(dataset, 'kudu/none'))
+  return create_table_format_dimension(workload, 'kudu/none')
 
 
 def create_client_protocol_dimension():
@@ -200,6 +196,7 @@ def orc_schema_resolution_constraint(v):
   orc_schema_resolution = v.get_value('orc_schema_resolution')
   return file_format == 'orc' or orc_schema_resolution == 0
 
+
 # Common sets of values for the exec option vectors
 ALL_BATCH_SIZES = [0]
 
@@ -209,6 +206,7 @@ ALL_CLUSTER_SIZES = [0, 1]
 SINGLE_NODE_ONLY = [1]
 ALL_NODES_ONLY = [0]
 ALL_DISABLE_CODEGEN_OPTIONS = [True, False]
+
 
 def create_single_exec_option_dimension(num_nodes=0, disable_codegen_rows_threshold=5000):
   """Creates an exec_option dimension that will produce a single test vector"""
@@ -242,6 +240,7 @@ def create_exec_option_dimension(cluster_sizes=ALL_NODES_ONLY,
   if debug_action_options is not None:
     exec_option_dimensions['debug_action'] = debug_action_options
   return create_exec_option_dimension_from_dict(exec_option_dimensions)
+
 
 def create_exec_option_dimension_from_dict(exec_option_dimensions):
   """
@@ -297,10 +296,12 @@ def extend_exec_option_dimension(test_suite, key, value):
   dim.extend(new_value)
   test_suite.ImpalaTestMatrix.add_dimension(dim)
 
+
 def get_dataset_from_workload(workload):
   # TODO: We need a better way to define the workload -> dataset mapping so we can
   # extract it without reading the actual test vector file
   return load_table_info_dimension(workload, 'exhaustive')[0].value.dataset
+
 
 def load_table_info_dimension(workload_name, exploration_strategy, file_formats=None,
                       compression_codecs=None):
@@ -319,7 +320,7 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
         continue
 
       # Extract each test vector and add them to a dictionary
-      vals = dict((key.strip(), value.strip()) for key, value in\
+      vals = dict((key.strip(), value.strip()) for key, value in
           (item.split(':') for item in line.split(',')))
 
       # If only loading specific file formats skip anything that doesn't match
@@ -331,6 +332,7 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
       vector_values.append(TableFormatInfo(**vals))
 
   return ImpalaTestDimension('table_format', *vector_values)
+
 
 def is_supported_insert_format(table_format):
   # Returns true if the given table_format is a supported Impala INSERT format
