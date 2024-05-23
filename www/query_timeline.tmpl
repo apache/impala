@@ -23,6 +23,7 @@ under the License.
 
 <script src="{{ __common__.host-url }}/www/d3.v5.min.js"></script>
 <script src="{{ __common__.host-url }}/www/c3/c3.v7.min.js"></script>
+<script src="{{ __common__.host-url }}/www/scripts/compression_util.js" type="module"></script>
 <link href="{{ __common__.host-url }}/www/c3/c3.v7.min.css" rel="stylesheet">
 
 <div class="container">
@@ -166,12 +167,13 @@ import {renderTimingDiagram, collectFragmentEventsFromProfile, ntics, set_ntics}
     "./www/scripts/query_timeline/fragment_diagram.js";
 import {collectUtilizationFromProfile, toogleUtilizationVisibility,
     destroyUtilizationChart}
-    from "/www/scripts/query_timeline/host_utilization_diagram.js";
+    from "./www/scripts/query_timeline/host_utilization_diagram.js";
 import {collectFragmentMetricsFromProfile, closeFragmentMetricsChart} from
-    "/www/scripts/query_timeline/fragment_metrics_diagram.js";
+    "./www/scripts/query_timeline/fragment_metrics_diagram.js";
 import {profile, set_profile, maxts, set_maxts, diagram_width, set_diagram_width,
     border_stroke_width, resizeHorizontalAll}
-    from "/www/scripts/query_timeline/global_members.js";
+    from "./www/scripts/query_timeline/global_members.js";
+import {inflateParseJSON} from "./www/scripts/compression_util.js";
 
 var chart_export_style;
 var last_maxts;
@@ -217,7 +219,7 @@ if (window.location.search.includes("imported")) {
     }
     var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
     profileStore.get(getQueryID()).onsuccess = (e) => {
-      set_profile(e.target.result.profile);
+      set_profile(inflateParseJSON(e.target.result.profile).contents);
       refreshView();
     };
   };

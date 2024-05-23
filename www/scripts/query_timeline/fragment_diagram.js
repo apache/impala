@@ -16,7 +16,7 @@
 // under the License.
 
 import {profile, set_maxts, maxts, decimals, set_decimals, diagram_width,
-    set_diagram_width, diagram_controls_height, diagram_min_height,
+    set_diagram_width, diagram_min_height,
     margin_header_footer, border_stroke_width, margin_chart_end, clearDOMChildren,
     resizeHorizontalAll} from "./global_members.js";
 import {host_utilization_chart, getUtilizationWrapperHeight}

@@ -16,7 +16,6 @@
 // under the License.
 
 import {maxts, set_maxts, clearDOMChildren} from "./global_members.js";
-import {name_width} from "./fragment_diagram.js";
 
 export var exportedForTest;
 // In the data array provided for c3's line chart,

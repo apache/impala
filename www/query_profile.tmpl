@@ -24,6 +24,8 @@ under the License.
 
 {{> www/query_detail_tabs.tmpl }}
 
+<script src="{{ __common__.host-url }}/www/scripts/compression_util.js" type="module"></script>
+
 <br/>
 <div id="profile_download_section">
     <h4>Download Profile (Available Formats):
@@ -41,8 +43,10 @@ under the License.
 
 <pre id="plain_text_profile_field">{{profile}}</pre>
 
-<script>
+<script type="module">
 $("#profile-tab").addClass("active");
+
+import {inflateParseJSON} from "./www/scripts/compression_util.js";
 
 var dbOpenReq = indexedDB.open("imported_queries");
 var db;
@@ -112,7 +116,8 @@ if (window.location.search.includes("imported")) {
     }
     var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
     profileStore.get(getQueryID()).onsuccess = (e) => {
-      plain_text_profile_field.textContent = profileToString(e.target.result.profile);
+      plain_text_profile_field.textContent = profileToString(
+          inflateParseJSON(e.target.result.profile).contents);
     };
   };
 }

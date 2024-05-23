@@ -28,12 +28,15 @@ under the License.
      statements -->
 <link rel="stylesheet" href="{{ __common__.host-url }}/www/highlight/styles/default.css">
 <script src="{{ __common__.host-url }}/www/highlight/highlight.pack.js"></script>
+<script src="{{ __common__.host-url }}/www/scripts/compression_util.js" type="module"></script>
 <script>hljs.initHighlightingOnLoad();</script>
 
 <span id="tab_body">{{?stmt}}<pre class="code"><code>{{stmt}}</code></pre>{{/stmt}}</span>
 
-<script>
+<script type="module">
 $("#stmt-tab").addClass("active");
+
+import {inflateParseJSON} from "./www/scripts/compression_util.js";
 
 var dbOpenReq = indexedDB.open("imported_queries");
 var db;
@@ -64,8 +67,8 @@ if (window.location.search.includes("imported")) {
     }
     var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
     profileStore.get(getQueryID()).onsuccess = (e) => {
-      var sql_query = e.target.result.profile.child_profiles[0].info_strings
-          .find(({key}) => key === "Sql Statement").value;
+      var sql_query = inflateParseJSON(e.target.result.profile).contents
+          .child_profiles[0].info_strings.find(({key}) => key === "Sql Statement").value;
       var sql_stmt_body = document.createElement("pre");
       sql_stmt_body.className = "code";
       var sql_code = sql_stmt_body.appendChild(document.createElement("code"))

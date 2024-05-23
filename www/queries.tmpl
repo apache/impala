@@ -234,11 +234,12 @@ command line parameter.</p>
 <h3 id="imported_queries_header">
   0 Imported Query Profiles
   <sup><a href='#' data-toggle="tooltip" title="These are locally stored queries parsed from JSON query profiles.">[?]</a></sup>
-  <input id="json_profile_chooser" type="file" accept=".json" onchange="uploadProfile();" multiple/>
+  <input id="json_profile_chooser" type="file" accept=".json" onchange="startProfilesUpload();" multiple/>
   <label for="json_profile_chooser">
     <span class="btn btn-primary">Import JSON Profile</span>
   </label>
   <input id="clear_profiles_button" type="button" class="btn btn-primary" title="Clear All" onclick="clearProfiles();" value="X"/>
+  <span id="error_message" class="alert-sm alert-danger" style="display: none;"></span>
 </h3>
 
 <table id="imported_queries_table" class='table table-hover table-border'>
@@ -282,6 +283,10 @@ command line parameter.</p>
   var dbOpenReq = indexedDB.open("imported_queries");
   var db;
 
+  const profileParseWorker = new Worker("{{ __common__.host-url }}"
+      + "/www/scripts/queries/profileParseWorker.js");
+  var query_processor_start_time, raw_total_size, compressed_total_size, upload_count;
+
   function insertRowVal(row, val) {
     row.insertCell().innerHTML = val;
   }
@@ -302,67 +307,59 @@ command line parameter.</p>
   function clearProfiles() {
     db.transaction("profiles", "readwrite").objectStore("profiles").clear().onsuccess = () => {
       setScrollReload();
-    }
+    };
+  }
+
+  function showImportedQueriesStatusMessage(status_message) {
+    error_message.style.display = "unset";
+    error_message.textContent = status_message;
+  }
+
+  function startProfilesUpload() {
+    raw_total_size = 0;
+    compressed_total_size = 0;
+    upload_count = 0;
+    query_processor_start_time = Date.now();
+    showImportedQueriesStatusMessage("Query profiles import in progress."
+        + " Do not close/refresh the page.");
+    uploadProfile();
   }
 
   function uploadProfile() {
-    var uploadCount = 0;
-    for (var i = 0; i < json_profile_chooser.files.length; i++) {
-      var fileReader = new FileReader();
-      fileReader.readAsText(json_profile_chooser.files[i]);
-      fileReader.onload = (e) => {
-        try {
-          var profile = JSON.parse(e.target.result).contents;
-          var val = profile.profile_name;
-          var query = {};
-          query.id = val.substring(val.indexOf("=") + 1, val.length - 1);
-          query.user = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "User").value;
-          query.default_db = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "Default Db").value;
-          query.type = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "Query Type").value;
-          query.start_time = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "Start Time").value;
-          query.end_time = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "End Time").value;
-          query.bytes_read = profile.child_profiles[2].counters
-              .find(({counter_name}) => counter_name === "TotalBytesRead").value;
-          query.bytes_read = getReadableSize(query.bytes_read, 2);
-          query.bytes_sent = profile.child_profiles[2].counters
-              .find(({counter_name}) => counter_name === "TotalBytesSent").value;
-          query.bytes_sent = getReadableSize(query.bytes_sent, 2);
-          query.state = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "Query State").value;
-          query.rows_fetched = profile.child_profiles[1].counters
-              .find(({counter_name}) => counter_name === "NumRowsFetched").value;
-          query.resource_pool = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "Request Pool").value;
-          query.statement = profile.child_profiles[0].info_strings
-              .find(({key}) => key === "Sql Statement").value;
-          if (query.statement.length > 250) {
-            query.statement = query.statement.substring(0, 250) + "...";
-          }
-          query.profile = profile;
-
-          var profileStore = db.transaction("profiles", "readwrite").objectStore("profiles");
-          profileStore.put(query).onsuccess = () => {
-            uploadCount++;
-            if (uploadCount == json_profile_chooser.files.length) {
-              setTimeout(setScrollReload, 1000);
-            }
-          };
-        } catch (err) {
-          var alertMessage = document.createElement("span");
-          alertMessage.className = "alert-sm alert-danger";
-          alertMessage.textContent = "Error parsing some JSON profiles";
-          setTimeout(setScrollReload, 1500);
-          imported_queries_header.appendChild(alertMessage);
-          console.log(err);
-        }
-      };
-    }
+    json_profile_chooser.disabled = true;
+    var fileReader = new FileReader();
+    fileReader.readAsText(json_profile_chooser.files[upload_count]);
+    fileReader.onload = (e) => {
+      profileParseWorker.postMessage(e.target.result);
+    };
   }
+
+  profileParseWorker.onmessage = (e) => {
+    if (e.data.error) {
+      showImportedQueriesStatusMessage("Error parsing some JSON profiles");
+      setTimeout(setScrollReload, 1500);
+      console.log(e.data.error);
+      return;
+    }
+    var profileStore = db.transaction("profiles", "readwrite").objectStore("profiles");
+    profileStore.put(e.data).onsuccess = () => {
+      raw_total_size += json_profile_chooser.files[upload_count].size;
+      compressed_total_size += e.data.profile.length;
+      upload_count++;
+      if (upload_count >= json_profile_chooser.files.length) {
+        console.log("Raw total size : " + getReadableSize(raw_total_size, 2));
+        console.log("Compressed total size : "
+            + getReadableSize(compressed_total_size, 2));
+        console.log("Query Profile(s) Processing time : " + getReadableTimeMS(Date.now()
+            - query_processor_start_time));
+        setTimeout(setScrollReload, 2000);
+      } else {
+        // Recursively call uploadProfile() until all selected JSON profiles
+        // are parsed and stored
+        uploadProfile();
+      }
+    };
+  };
 
   dbOpenReq.onupgradeneeded = (e) => {
     db = e.target.result;
