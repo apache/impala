@@ -150,7 +150,16 @@ void ControlService::ExecQueryFInstances(const ExecQueryFInstancesRequestPB* req
              << " coord=" << query_ctx.coord_hostname << ":"
              << query_ctx.coord_ip_address.port
              << " #instances=" << fragment_info.fragment_instance_ctxs.size();
-  Status resp_status = ExecEnv::GetInstance()->query_exec_mgr()->StartQuery(
+  Status resp_status;
+  if (UNLIKELY(fragment_info.fragments.size() == 0
+      || fragment_info.fragment_instance_ctxs.size() == 0)) {
+    resp_status = Status(Substitute("ExecQueryFInstances() failed: query_id=: $0, "
+        "no instance in TExecPlanFragmentInfo", PrintId(query_ctx.query_id)));
+    LOG(ERROR) << resp_status.msg().msg();
+    RespondAndReleaseRpc(resp_status, response, rpc_context);
+    return;
+  }
+  resp_status = ExecEnv::GetInstance()->query_exec_mgr()->StartQuery(
       request, query_ctx, fragment_info);
   if (!resp_status.ok()) {
     LOG(INFO) << "ExecQueryFInstances() failed: query_id=" << PrintId(query_ctx.query_id)
