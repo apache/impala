@@ -131,6 +131,7 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
   fragment_info->__isset.fragment_instance_ctxs = true;
   fragment_info->fragment_instance_ctxs.resize(
       backend_exec_params_.instance_params().size());
+  DCHECK_GT(fragment_info->fragment_instance_ctxs.size(), 0);
   for (int i = 0; i < backend_exec_params_.instance_params().size(); ++i) {
     TPlanFragmentInstanceCtx& instance_ctx = fragment_info->fragment_instance_ctxs[i];
     PlanFragmentInstanceCtxPB* instance_ctx_pb = request->add_fragment_instance_ctxs();
@@ -181,6 +182,10 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     // table construction.
     instance_ctx.__set_filters_produced(produced_it->second);
   }
+  DCHECK_GT(fragment_info->fragments.size(), 0);
+  DCHECK_EQ(fragment_info->fragments.size(), request->fragment_ctxs_size());
+  DCHECK_EQ(fragment_info->fragment_instance_ctxs.size(),
+      request->fragment_instance_ctxs_size());
 }
 
 void Coordinator::BackendState::SetExecError(
