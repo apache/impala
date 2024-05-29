@@ -18,7 +18,7 @@ you analyze, transform and combine data from a variety of data sources:
 * Support for the most commonly-used Hadoop file formats, including
   [Apache Parquet](https://parquet.apache.org/) and [Apache ORC](https://orc.apache.org).
 * Support for industry-standard security protocols, including Kerberos, LDAP and TLS.
-* Apache-licensed, 100% open source.
+* [Apache-licensed](LICENSE.txt), 100% open source.
 
 ## More about Impala
 
