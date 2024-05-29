@@ -237,8 +237,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   // rate of events received per unit time
   public static final String EVENTS_RECEIVED_METRIC = "events-received";
   // total number of events which are skipped because of the flag setting or
-  // in case of [CREATE|DROP] events on [DATABASE|TABLE|PARTITION] which were ignored
-  // because the [DATABASE|TABLE|PARTITION] was already [PRESENT|ABSENT] in the catalogd.
+  // in case of [CREATE|DROP|ALTER] events on [DATABASE|TABLE|PARTITION] which were
+  // ignored because the [DATABASE|TABLE|PARTITION] was already [PRESENT|ABSENT] in
+  // the catalogd.
   public static final String EVENTS_SKIPPED_METRIC = "events-skipped";
   // name of the event processor status metric
   public static final String STATUS_METRIC = "status";

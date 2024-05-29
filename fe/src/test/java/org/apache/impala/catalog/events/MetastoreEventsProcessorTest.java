@@ -1990,9 +1990,10 @@ public class MetastoreEventsProcessorTest {
     assertEquals(EventProcessorStatus.ACTIVE.toString(), response.getStatus());
     assertTrue("Atleast 5 events should have been received",
         response.getEvents_received() >= numEventsReceivedBefore + 5);
-    // two events on tbl which is skipped
-    assertTrue("Atleast 2 events should have been skipped",
-        response.getEvents_skipped() >= numEventsSkippedBefore + 2);
+    // The create table and add partition events of table tbl_should_skipped and
+    // the add partition event of table testEventProcessorMetrics are all skipped
+    assertTrue("3 events should be skipped",
+        response.getEvents_skipped() == numEventsSkippedBefore + 3);
     assertTrue("Event fetch duration should be greater than zero",
         response.getEvents_fetch_duration_mean() > 0);
     assertTrue("Event process duration should be greater than zero",
@@ -2003,6 +2004,74 @@ public class MetastoreEventsProcessorTest {
     assertTrue(response.getLast_synced_event_id() > lastEventSyncId);
   }
 
+  @Test
+  public void testEventProcessorMetricsForSkippedMetric() throws TException {
+    TEventProcessorMetrics responseBefore = eventsProcessor_.getEventProcessorMetrics();
+    long numEventsReceivedBefore = responseBefore.getEvents_received();
+    long numEventsSkippedBefore = responseBefore.getEvents_skipped();
+    long lastEventSyncId = responseBefore.getLast_synced_event_id();
+    final String testTblName1 = "testEventProcessorMetrics1";
+    final String testTblName2 = "testEventProcessorMetrics2";
+    // event 1
+    createDatabase(TEST_DB_NAME, null);
+    // event 2
+    createTable(null, TEST_DB_NAME, testTblName1, null, true, null);
+    List<List<String>> partitionVals = new ArrayList<>();
+    partitionVals.add(Arrays.asList("1"));
+    partitionVals.add(Arrays.asList("2"));
+    partitionVals.add(Arrays.asList("3"));
+    // event 3
+    addPartitions(TEST_DB_NAME, testTblName1, partitionVals);
+    eventsProcessor_.processEvents();
+    TEventProcessorMetrics response = eventsProcessor_.getEventProcessorMetrics();
+    assertEquals(EventProcessorStatus.ACTIVE.toString(), response.getStatus());
+    assertTrue("Atleast 3 events should have been received",
+            response.getEvents_received() >= numEventsReceivedBefore + 3);
+    assertTrue("we do not turn off disableHmsSync for table testTblName1",
+            response.getEvents_skipped() >= numEventsSkippedBefore);
+    TEventProcessorMetricsSummaryResponse summaryResponse =
+            catalog_.getEventProcessorSummary();
+    assertNotNull(summaryResponse);
+    assertTrue(response.getLast_synced_event_id() > lastEventSyncId);
+
+    // invalidate the table and the table will be IncompleteTable, then
+    // ALTER events will be skipped.
+    catalog_.invalidateTableIfExists(TEST_DB_NAME, testTblName1);
+    //event 4 alter table
+    alterTableAddCol(testTblName1, "newCol", "int", "no decription");
+    // event 5 alter partition
+    partitionVals.clear();
+    partitionVals.add(Arrays.asList("1"));
+    partitionVals.add(Arrays.asList("2"));
+    partitionVals.add(Arrays.asList("3"));
+    String newLocation = "/path/to/new_location/";
+    alterPartitions(testTblName1, partitionVals, newLocation);
+    eventsProcessor_.processEvents();
+    response = eventsProcessor_.getEventProcessorMetrics();
+    assertEquals(EventProcessorStatus.ACTIVE.toString(), response.getStatus());
+    assertTrue("two more events should have been received",
+            response.getEvents_received() >= numEventsReceivedBefore + 5);
+    assertTrue("we do not turn off disableHmsSync for table testTblName1",
+            response.getEvents_skipped() >= numEventsSkippedBefore);
+
+    // create with transaction table
+    //event 6
+    createTransactionalTable(TEST_DB_NAME, testTblName2, true);
+    partitionVals.clear();
+    partitionVals.add(Arrays.asList("1"));
+    partitionVals.add(Arrays.asList("2"));
+    partitionVals.add(Arrays.asList("3"));
+    String anotherNewLocation = "/path/to/another_new_location/";
+    //event 7
+    alterPartitions(testTblName1, partitionVals, anotherNewLocation);
+    eventsProcessor_.processEvents();
+    response = eventsProcessor_.getEventProcessorMetrics();
+    assertEquals(EventProcessorStatus.ACTIVE.toString(), response.getStatus());
+    assertTrue("two more events should have been received",
+            response.getEvents_received() >= numEventsReceivedBefore + 7);
+    assertTrue("we do not turn off disableHmsSync for table testTblName1",
+            response.getEvents_skipped() >= numEventsSkippedBefore);
+  }
   /**
    * Test makes sure that the event metrics are not set when event processor is not active
    */

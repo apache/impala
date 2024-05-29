@@ -5017,8 +5017,9 @@ public class CatalogOpExecutor {
    * @param partNames List of partition names from the events to be reloaded.
    * @param reason Reason for reloading the partitions for logging purposes.
    * @param fileMetadataLoadOpts describes how to reload file metadata for partsFromEvent
-   * @return the number of partitions which were reloaded. If the table does not exist,
-   * returns 0. Some partitions could be skipped if they don't exist anymore.
+   * @return the number of partitions which were reloaded. If the table does not exist, or
+   * if the table is IncompleteTable or if the table if already synced then returns -1.
+   * Some partitions could be skipped if they don't exist anymore.
    */
   public int reloadPartitionsFromNamesIfExists(long eventId, String eventType,
       String dbName, String tblName, List<String> partNames, String reason,
@@ -5031,7 +5032,7 @@ public class CatalogOpExecutor {
           .wasRemovedAfter(eventId, DeleteEventLog.getTblKey(dbName, tblName))) {
         LOG.info("EventId: {} EventType: {} Not reloading the partition of table {}.{} " +
             "since it was removed later in catalog", eventId, eventType, dbName, tblName);
-        return 0;
+        return -1;
       } else {
         throw new TableNotFoundException(
             "Table " + dbName + "." + tblName + " not found");
@@ -5104,7 +5105,8 @@ public class CatalogOpExecutor {
    *                       reloaded.
    * @param reason Reason for reloading the partitions for logging purposes.
    * @return the number of partitions which were reloaded. If the table does not exist,
-   * returns 0. Some partitions could be skipped if they don't exist anymore.
+   * or if the table is IncompleteTable or if the table is recreated then returns -1.
+   * Some partitions could be skipped if they don't exist anymore.
    */
   public int reloadPartitionsFromEvent(long eventId, String dbName, String tblName,
       List<Partition> partsFromEvent, String reason)
@@ -5118,7 +5120,10 @@ public class CatalogOpExecutor {
         LOG.info(
             "Not reloading the partition of table {} since it was removed "
                 + "later in catalog", new TableName(dbName, tblName));
-        return 0;
+        // as the numOfPartsReloaded can be 0 which means no partition is reloaded, so
+        // we just return -1, which means the event can be skipped and we do not execute
+        // hdfsTable's reloadPartitionsFromNames function.
+        return -1;
       } else {
         throw new TableNotFoundException(
             "Table " + dbName + "." + tblName + " not found");
@@ -5127,7 +5132,7 @@ public class CatalogOpExecutor {
     if (table instanceof IncompleteTable) {
       LOG.info("Table {} is not loaded. Skipping drop partition event {}",
           table.getFullName(), eventId);
-      return 0;
+      return -1;
     }
     if (!(table instanceof HdfsTable)) {
       throw new CatalogException("Partition event received on a non-hdfs table");
@@ -5135,7 +5140,7 @@ public class CatalogOpExecutor {
     if (eventId > 0 && eventId <= table.getCreateEventId()) {
       LOG.debug("Not reloading partitions of table {}.{} for event {} since it is " +
           "recreated at event {}.", dbName, tblName, eventId, table.getCreateEventId());
-      return 0;
+      return -1;
     }
     try {
       tryWriteLock(table, reason, NoOpEventSequence.INSTANCE);
@@ -5194,7 +5199,7 @@ public class CatalogOpExecutor {
     if (table instanceof IncompleteTable) {
       LOG.info("Table {} is not loaded. Skipping partition event {}",
           table.getFullName(), eventId);
-      return 0;
+      return -1;
     }
     if (!(table instanceof HdfsTable)) {
       throw new CatalogException("Partition event received on a non-hdfs table");
