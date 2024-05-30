@@ -19,14 +19,22 @@ package org.apache.impala.calcite.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multimap;
+
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptMaterialization;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelOptRules;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RuleEventLogger;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.calcite.rel.RelCommonExpressionSuggester;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
@@ -36,23 +44,38 @@ import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql2rel.RelFieldTrimmer;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.coercenodes.CoerceNodes;
 import org.apache.impala.calcite.operators.ImpalaRexBuilder;
 import org.apache.impala.calcite.operators.ImpalaRexSimplify;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
+import org.apache.impala.calcite.rel.node.ImpalaCTEConsumer;
+import org.apache.impala.calcite.rel.node.ImpalaCTEProducer;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
+import org.apache.impala.calcite.rel.node.ImpalaSequence;
+import org.apache.impala.calcite.rules.CTERuleConfig;
 import org.apache.impala.calcite.rules.IcebergCountStarOptimizer;
 import org.apache.impala.calcite.rules.ImpalaCoreRules;
 import org.apache.impala.calcite.rules.ImpalaFilterSimplifyRule;
 import org.apache.impala.calcite.rules.ImpalaProjectSimplifyRule;
 import org.apache.impala.calcite.rules.ImpalaMQContext;
 import org.apache.impala.calcite.rules.ImpalaRexExecutor;
+import org.apache.impala.calcite.rules.RemoveInfrequentCTERule;
 import org.apache.impala.calcite.schema.ImpalaCost;
 import org.apache.impala.calcite.util.LogUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.EventSequence;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,13 +99,16 @@ public class CalciteOptimizer implements CompilerStep {
 
   private final TQueryCtx queryCtx_;
 
+  private final TQueryOptions queryOptions_;
+
   public CalciteOptimizer(CalciteAnalysisResult analysisResult,
-      EventSequence timeline) {
+      EventSequence timeline, TQueryOptions queryOptions) {
     this.reader_ = analysisResult.getCatalogReader();
     this.validator_ = analysisResult.getSqlValidator();
     this.timeline_ = timeline;
     this.analyzer_ = analysisResult.getAnalyzer();
     this.queryCtx_ = analyzer_.getQueryCtx();
+    this.queryOptions_ = queryOptions;
   }
 
   public ImpalaPlanRel optimize(RelNode logPlan) throws ImpalaException {
@@ -151,10 +177,14 @@ public class CalciteOptimizer implements CompilerStep {
     LogUtil.logDebug(postOptimizedJoinPlan, "Optimized plan after a second pass of "
         + "rules applied after join optimization.");
 
+    RelNode optimizedCTEPlan = runCTEProgram(relBuilder, postOptimizedJoinPlan);
+    timeline_.markEvent("Created optimized CTE plan");
+    LogUtil.logDebug(optimizedCTEPlan, "Optimized plan after CTE substitution.");
+
     // Run some essential rules needed to create working RelNodes after
     // optimization
     RelNode preImpalaConvertPlan =
-        runPreImpalaConvertProgram(postOptimizedJoinPlan, simplifier);
+        runPreImpalaConvertProgram(optimizedCTEPlan, simplifier);
     LogUtil.logDebug(preImpalaConvertPlan, "Optimized plan after final "
         + "preparation done before conversion to physical nodes.");
 
@@ -323,6 +353,135 @@ public class CalciteOptimizer implements CompilerStep {
     if (simplifier != null) planner.setExecutor(simplifier.getRexExecutor());
 
     return planner.findBestExp();
+  }
+
+  public RelNode runCTEProgram(RelBuilder relBuilder,
+      RelNode plan) throws ImpalaException {
+    if (queryOptions_.num_nodes != 1) {
+      // CTEs currently only supported in SingleNodePlanner.
+      return plan;
+    }
+
+    final int referenceThreshold = queryOptions_.cte_threshold;
+    if (referenceThreshold <= 0) {
+      // Disable CTE planning.
+      return plan;
+    }
+
+    Configuration conf = new Configuration();
+    conf.setInt(CTESuggesterFactory.CTE_THRESHOLD, referenceThreshold);
+    conf.set(CTESuggesterFactory.CTE_SUGGESTER_CLASS,
+        BackendConfig.INSTANCE.getCTESuggesterClass());
+    RelCommonExpressionSuggester suggester = CTESuggesterFactory.create(conf);
+    Collection<RelNode> ctes = suggester.suggest(plan,
+        plan.getCluster().getPlanner().getContext());
+    if (ctes.isEmpty()) {
+      return plan;
+    }
+
+    List<RelOptMaterialization> cteMVs = new ArrayList<>();
+    int i = 0;
+    for (RelNode cte : ctes) {
+      final String name = "cte_suggestion_" + i++;
+      ImpalaCTEConsumer consumer = new ImpalaCTEConsumer(cte, name);
+      cteMVs.add(new RelOptMaterialization(
+          consumer, cte, null, consumer.getQualifiedName()));
+    }
+
+    final RelNode ctePlan = rewriteUsingViews(plan, cteMVs);
+
+    // Remove infrequent CTEs.
+    Map<List<String>, Integer> tableOccurrences =
+        findAll(ImpalaCTEConsumer.class, ctePlan)
+        .stream().map(ImpalaCTEConsumer::getQualifiedName)
+        .collect(Collectors.toMap(Function.identity(), v -> 1, Integer::sum));
+    CTERuleConfig cteConfig = CTERuleConfig.create(referenceThreshold, tableOccurrences);
+    HepProgram spoolProgram = HepProgram.builder()
+        .addRuleInstance(new RemoveInfrequentCTERule(cteConfig))
+        .build();
+    HepPlanner planner = new HepPlanner(spoolProgram,
+        ctePlan.getCluster().getPlanner().getContext(), true, null,
+        ImpalaCost.FACTORY);
+    cteMVs.forEach(planner::addMaterialization);
+    planner.setRoot(ctePlan);
+    final RelNode spoolPlan = planner.findBestExp();
+
+    // If no CTEs were added, or all were removed as infrequent, return the original.
+    Map<String, List<ImpalaCTEConsumer>> consumers = findAll(
+        ImpalaCTEConsumer.class, spoolPlan).stream()
+        .collect(Collectors.groupingBy(ImpalaCTEConsumer::getName));
+    if (consumers.isEmpty()) {
+      return plan;
+    }
+
+    // Add producers under a sequence node.
+    List<RelNode> inputs = new ArrayList<>();
+    inputs.add(spoolPlan);
+    for (Map.Entry<String, List<ImpalaCTEConsumer>> entry : consumers.entrySet()) {
+      ImpalaCTEConsumer one = entry.getValue().get(0);
+      ImpalaCTEProducer producer = new ImpalaCTEProducer(one.getCTE(), one.getName());
+      inputs.add(producer);
+    }
+    return new ImpalaSequence(inputs);
+  }
+
+  private RelNode rewriteUsingViews(RelNode basePlan,
+      List<RelOptMaterialization> materializations) {
+    final RelOptCluster optCluster = basePlan.getCluster();
+    RelOptPlanner planner = optCluster.getPlanner();
+    if (planner instanceof VolcanoPlanner) {
+      // Force calculating costs for logical RelNodes.
+      VolcanoPlanner vPlanner = (VolcanoPlanner) planner;
+      vPlanner.setNoneConventionHasInfiniteCost(false);
+    }
+
+    // We use Volcano planner as the decision on whether to use MVs or not and which MVs
+    // to use should be cost-based.
+    optCluster.invalidateMetadataQuery();
+
+    // Add materializations to planner.
+    for (RelOptMaterialization materialization : materializations) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Adding materialization {} to the planner; the plan is:\n{}",
+            materialization.qualifiedTableName,
+            RelOptUtil.toString(materialization.queryRel));
+      }
+      planner.addMaterialization(materialization);
+    }
+
+    // Add MaterializedView rewrite rules.
+    RelOptRules.MATERIALIZATION_RULES.forEach(planner::addRule);
+
+    // Optimize plan.
+    planner.setRoot(basePlan);
+    basePlan = planner.findBestExp();
+
+    // Remove view-based rewriting rules from planner.
+    planner.clear();
+    // Restore default cost model.
+    optCluster.invalidateMetadataQuery();
+
+    return basePlan;
+  }
+
+  private <N extends RelNode> List<N> findAll(Class<N> cls, RelNode rel) {
+    final Multimap<Class<? extends RelNode>, RelNode> nodes =
+        rel.getCluster().getMetadataQuery().getNodeTypes(rel);
+    final List<N> results = new ArrayList<>();
+    if (nodes == null) {
+      return results;
+    }
+    for (Map.Entry<Class<? extends RelNode>, Collection<RelNode>> e
+        : nodes.asMap().entrySet()) {
+      if (e.getKey().isAssignableFrom(cls)) {
+        for (RelNode node : e.getValue()) {
+          if (cls.isInstance(node)) {
+            results.add(cls.cast(node));
+          }
+        }
+      }
+    }
+    return results;
   }
 
   public String getDebugString(Object optimizedPlan, String planString) {

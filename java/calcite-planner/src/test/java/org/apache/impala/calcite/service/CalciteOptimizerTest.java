@@ -42,6 +42,7 @@ import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.NoOpEventSequence;
 import org.junit.Before;
 import org.junit.Test;
@@ -201,8 +202,8 @@ public class CalciteOptimizerTest extends FrontendTestBase {
         new CalciteRelNodeConverter(analysisResult);
     RelNode logicalPlan =
         relNodeConverter.convert(analysisResult.getValidatedNode());
-    CalciteOptimizer optimizer =
-        new CalciteOptimizer(analysisResult, NoOpEventSequence.INSTANCE);
+    CalciteOptimizer optimizer = new CalciteOptimizer(
+        analysisResult, NoOpEventSequence.INSTANCE, new TQueryOptions());
     ImmutableList<String> outputLabels = ImmutableList.copyOf(
         relNodeConverter.getFieldNames(analysisResult.getValidatedNode()));
     return new CalcitePlanInput(optimizer, logicalPlan, outputLabels);

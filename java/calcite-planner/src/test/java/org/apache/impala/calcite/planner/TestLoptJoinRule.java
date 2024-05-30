@@ -23,7 +23,6 @@ import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
-import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.core.TableScan;
@@ -39,6 +38,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.rules.ImpalaLoptOptimizeJoinRule;
+import org.apache.impala.calcite.rules.RelUtil;
 import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.schema.ImpalaCost;
@@ -186,14 +186,9 @@ public class TestLoptJoinRule extends PlannerTestBase {
   }
 
   private static TableScan getTableScan(RelNode relNode) {
-    if (relNode instanceof HepRelVertex) {
-      relNode = ((HepRelVertex) relNode).getCurrentRel();
-    }
+    relNode = RelUtil.unwrapRelNode(relNode);
     while (!(relNode instanceof TableScan)) {
-      relNode = relNode.getInputs().get(0);
-      if (relNode instanceof HepRelVertex) {
-        relNode = ((HepRelVertex) relNode).getCurrentRel();
-      }
+      relNode = RelUtil.unwrapRelNode(relNode.getInputs().get(0));
     }
     return (TableScan) relNode;
   }

@@ -20,6 +20,7 @@ package org.apache.impala.calcite.schema;
 import com.google.common.base.Preconditions;
 
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
@@ -31,6 +32,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.impala.calcite.rel.node.ImpalaCTEConsumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +49,17 @@ public class ImpalaRelMdDistinctRowCount extends RelMdDistinctRowCount {
   public static final RelMetadataProvider SOURCE = ReflectiveRelMetadataProvider
       .reflectiveSource(BuiltInMethod.DISTINCT_ROW_COUNT.method,
       new ImpalaRelMdDistinctRowCount());
+
+  @Override
+  public Double getDistinctRowCount(RelNode rel, RelMetadataQuery mq,
+      ImmutableBitSet groupKey, RexNode predicate) {
+    if (rel instanceof ImpalaCTEConsumer) {
+      // Use the distinct row count of the underlying CTE
+      return mq.getDistinctRowCount(
+          ((ImpalaCTEConsumer) rel).getCTE(), groupKey, predicate);
+    }
+    return super.getDistinctRowCount(rel, mq, groupKey, predicate);
+  }
 
   @Override
   public Double getDistinctRowCount(TableScan scan, RelMetadataQuery mq,

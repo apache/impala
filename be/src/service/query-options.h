@@ -51,7 +51,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // plus one. Thus, the second argument to the DCHECK has to be updated every
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 constexpr unsigned NUM_QUERY_OPTIONS =
-    TImpalaQueryOptions::AGGREGATED_PROFILE + 1;
+    TImpalaQueryOptions::CTE_THRESHOLD + 1;
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(), NUM_QUERY_OPTIONS);             \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
@@ -385,14 +385,16 @@ constexpr unsigned NUM_QUERY_OPTIONS =
       TUPLE_CACHE_REQUIRED_COST_REDUCTION_FACTOR, TQueryOptionLevel::ADVANCED)           \
   TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(tuple_cache_budget_bytes_per_executor,                 \
       TUPLE_CACHE_BUDGET_BYTES_PER_EXECUTOR, TQueryOptionLevel::ADVANCED)                \
-  QUERY_OPT_FN(show_create_table_partition_limit, SHOW_CREATE_TABLE_PARTITION_LIMIT, TQueryOptionLevel::REGULAR)             \
+  QUERY_OPT_FN(show_create_table_partition_limit, SHOW_CREATE_TABLE_PARTITION_LIMIT,     \
+      TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(planner, PLANNER, TQueryOptionLevel::ADVANCED)                            \
   QUERY_OPT_FN(fallback_planner, FALLBACK_PLANNER, TQueryOptionLevel::ADVANCED)          \
   QUERY_OPT_FN(                                                                          \
       enable_explain_calcite, ENABLE_EXPLAIN_CALCITE, TQueryOptionLevel::REGULAR)        \
   QUERY_OPT_FN(use_hbo_stats, USE_HBO_STATS, TQueryOptionLevel::REGULAR)                 \
   QUERY_OPT_FN(store_hbo_stats, STORE_HBO_STATS, TQueryOptionLevel::REGULAR)             \
-  QUERY_OPT_FN(aggregated_profile, AGGREGATED_PROFILE, TQueryOptionLevel::ADVANCED)
+  QUERY_OPT_FN(aggregated_profile, AGGREGATED_PROFILE, TQueryOptionLevel::ADVANCED)      \
+  QUERY_OPT_FN(cte_threshold, CTE_THRESHOLD, TQueryOptionLevel::ADVANCED)                \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.

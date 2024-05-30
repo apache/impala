@@ -47,6 +47,12 @@ class TestCalcitePlanner(ImpalaTestSuite):
   def test_semicolon(self, cursor):
     cursor.execute("select 4;")
 
+  def test_cte_plans(self, vector, unique_database):
+    # Force single node plans to focus on Calcite planner.
+    vector.get_value('exec_option')['num_nodes'] = 1
+    vector.get_value('exec_option')['cte_threshold'] = 1
+    self.run_test_case('QueryTest/cte', vector, use_db=unique_database)
+
 
 class TestFallbackPlanner(ImpalaTestSuite):
 

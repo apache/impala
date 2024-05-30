@@ -1,0 +1,90 @@
+====
+---- QUERY
+EXPLAIN WITH v1 AS (SELECT n_name, n_nationkey FROM tpch.nation WHERE n_regionkey = 0)
+SELECT v1.n_name, v1_next.n_name FROM v1, v1 v1_next WHERE v1.n_nationkey + 1 = v1_next.n_nationkey;
+---- RESULTS: VERIFY_IS_EQUAL
+'Max Per-Host Resource Reservation: Memory=19.95MB Threads=2'
+'Per-Host Resource Estimates: Memory=52MB'
+''
+'PLAN-ROOT SINK'
+'|'
+'00:SEQUENCE'
+'|  row-size=32B cardinality=5'
+'|'
+'|--01:CTE PRODUCER [cte_suggestion_0]'
+'|  |  row-size=23B cardinality=5'
+'|  |'
+'|  02:SCAN $FILESYSTEM_NAME [tpch.nation]'
+'|     $FILESYSTEM_NAME partitions=1/1 files=1 size=2.15KB'
+'|     predicates: tpch.nation.n_regionkey = 0, tpch.nation.n_nationkey IS NOT NULL'
+'|     row-size=23B cardinality=5'
+'|'
+'05:HASH JOIN [INNER JOIN]'
+'|  hash predicates: add(n_nationkey, 1) = n_nationkey'
+'|  row-size=32B cardinality=5'
+'|'
+'|--04:CTE CONSUMER [cte_suggestion_0]'
+'|     row-size=23B cardinality=5'
+'|'
+'03:CTE CONSUMER [cte_suggestion_0]'
+'   row-size=23B cardinality=5'
+====
+---- QUERY
+CREATE TABLE emps (empid INT, deptno INT, name STRING, salary DECIMAL(8, 2)) STORED AS TEXTFILE;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO emps VALUES
+    (1, 1, "Phil", 45000.0), (2, 1, "Maggie", 55000.0), (3, 2, "Alice", 120000.0);
+---- RESULTS
+====
+---- QUERY
+EXPLAIN SELECT name FROM emps e WHERE salary > 50000
+UNION SELECT name FROM emps e WHERE salary > 50000;
+---- RESULTS: VERIFY_IS_EQUAL
+'Max Per-Host Resource Reservation: Memory=52.01MB Threads=2'
+'Per-Host Resource Estimates: Memory=178MB'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'$DATABASE.emps'
+''
+'PLAN-ROOT SINK'
+'|'
+'00:SEQUENCE'
+'|  row-size=12B cardinality=2'
+'|'
+'|--01:CTE PRODUCER [cte_suggestion_0]'
+'|  |  row-size=16B cardinality=1'
+'|  |'
+'|  02:SCAN $FILESYSTEM_NAME [$DATABASE.emps]'
+'|     $FILESYSTEM_NAME partitions=1/1 files=1 size=58B'
+'|     predicates: $DATABASE.emps.salary > 50000.00'
+'|     row-size=16B cardinality=1'
+'|'
+'06:AGGREGATE [FINALIZE]'
+'|  group by: NAME'
+'|  row-size=12B cardinality=2'
+'|'
+'03:UNION'
+'|  pass-through-operands: all'
+'|  row-size=12B cardinality=2'
+'|'
+'|--05:CTE CONSUMER [cte_suggestion_0]'
+'|     row-size=16B cardinality=1'
+'|'
+'04:CTE CONSUMER [cte_suggestion_0]'
+'   row-size=16B cardinality=1'
+====
+---- QUERY
+# Example from "Optimization of Common Table Expressions in MPP Database Systems"
+CREATE TABLE item (i_current_price INT, i_color STRING);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+EXPLAIN with v as (select i_current_price p from item where i_color = 'red'),
+     w as (select v1.p from v as v1, v as v2 where v1.p < v2.p)
+select * from v as v3, w as w1, w as w2 where v3.p < w1.p + w2.p;
+---- RESULTS: VERIFY_IS_SUBSET
+'00:SEQUENCE'
+====

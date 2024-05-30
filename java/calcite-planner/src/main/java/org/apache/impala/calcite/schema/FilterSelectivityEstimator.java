@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
@@ -40,12 +41,10 @@ import org.apache.calcite.util.Sarg;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.calcite.rel.util.RexInputRefCollector;
+import org.apache.impala.calcite.rules.RelUtil;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
-
-import org.apache.calcite.plan.hep.HepRelVertex;
-import org.apache.calcite.rel.core.Join;
 
 import com.google.common.base.Preconditions;
 
@@ -67,9 +66,7 @@ public class FilterSelectivityEstimator {
 
   public FilterSelectivityEstimator(RelNode childRel, RelMetadataQuery mq) {
     this.mq_ = mq;
-    this.childRel_ = (childRel instanceof HepRelVertex)
-      ? ((HepRelVertex)childRel).getCurrentRel()
-      : childRel;
+    this.childRel_ = RelUtil.unwrapRelNode(childRel);
     this.childCardinality_ = mq.getRowCount(childRel);
   }
 
@@ -233,9 +230,7 @@ public class FilterSelectivityEstimator {
     }
     RexInputRef inputRef = (RexInputRef) column;
     int columnNum = inputRef.getIndex();
-    RelNode realRelNode = (relNode instanceof HepRelVertex)
-        ? ((HepRelVertex)relNode).getCurrentRel()
-        : relNode;
+    RelNode realRelNode = RelUtil.unwrapRelNode(relNode);
     switch (ImpalaPlanRel.getRelNodeType(realRelNode)) {
       case JOIN:
         Join join = (Join) realRelNode;

@@ -27,6 +27,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.planner.CTEConsumerNode;
 import org.apache.impala.planner.EmptySetNode;
 import org.apache.impala.planner.PlanNodeId;
 import org.apache.impala.planner.SelectNode;
@@ -104,6 +105,32 @@ public class NodeCreationUtils {
         .flatMap(n -> n.tblRefs_.stream())
         .collect(Collectors.toList());
     return new NodeWithExprs(unionNode, outputExprs, rowType.getFieldNames(), tblRefs);
+  }
+
+  public static NodeWithExprs createCTEConsumerPlanNode(ParentPlanRelContext context,
+      RelDataType rowType, String cteName) throws ImpalaException {
+    Analyzer analyzer = context.ctx_.getRootAnalyzer();
+    NodeWithExprs producer = context.cteProducers_.get(cteName);
+    TupleDescriptorFactory tupleDescFactory =
+        new TupleDescriptorFactory(cteName, rowType);
+    TupleDescriptor desc = tupleDescFactory.create(analyzer);
+    Preconditions.checkState(desc.getSlots().size() == producer.outputExprs_.size(),
+        "Number of slots in CTEConsumerNode tuple descriptor does not match " +
+        "number of output exprs from CTEProducerNode");
+    for (int i = 0; i < desc.getSlots().size(); ++i) {
+      SlotDescriptor slotDesc = desc.getSlots().get(i);
+      Expr producerExpr = producer.outputExprs_.get(i);
+      slotDesc.setSourceExpr(producerExpr);
+      slotDesc.setStats(ColumnStats.fromExpr(producerExpr));
+    }
+
+    PlanNodeId nodeId = context.ctx_.getNextNodeId();
+    CTEConsumerNode cteConsumer = new CTEConsumerNode(nodeId, desc, cteName,
+        producer.planNode_, producer.outputExprs_);
+    cteConsumer.init(analyzer);
+
+    return new NodeWithExprs(cteConsumer, createOutputExprs(desc.getSlots()),
+        rowType.getFieldNames(), producer.tblRefs_);
   }
 
   public static List<Expr> createOutputExprs(List<SlotDescriptor> slotDescs) {

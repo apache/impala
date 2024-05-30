@@ -1465,6 +1465,12 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_aggregated_profile(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::CTE_THRESHOLD: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::Parse<int32_t>(option, value, &int32_t_val));
+        query_options->__set_cte_threshold(int32_t_val);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

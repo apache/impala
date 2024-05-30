@@ -1101,6 +1101,10 @@ enum TImpalaQueryOptions {
 
   // When set, generate a new aggregated runtime profile layout
   AGGREGATED_PROFILE = 204
+
+  // Occurrence threshold for using CTEs. CTEs are only used if occurrences are greater
+  // than the threshold. Defaults to -1; negative values disable CTE planning.
+  CTE_THRESHOLD = 205
 }
 
 // The summary of a DML statement.

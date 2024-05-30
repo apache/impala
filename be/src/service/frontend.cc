@@ -91,6 +91,10 @@ DEFINE_string(jni_frontend_class, "org/apache/impala/service/JniFrontend", "By d
     "overridden class needs to contain all the methods in the methods[] variable, so "
     "most implementations should make their class a child of JniFrontend and "
     "override only relevant methods.");
+DEFINE_string(cte_suggester_class,
+    "org.apache.calcite.rel.RelCommonExpressionBasicSuggester",
+    "The RelCommonExpressionSuggester implementation to use when suggesting common table "
+    "expression (CTE) candidates.");
 DEFINE_bool(allow_catalog_cache_op_from_masked_users, true, "Whether to allow table "
     "level catalog-cache operations, i.e. REFRESH/INVALIDATE METADATA <table>, from users"
     " that have associate Ranger masking policies on the table. Such users are usually "

@@ -656,4 +656,8 @@ public class BackendConfig {
   public int getUnregistrationThreadPoolSize() {
     return backendCfg_.unregistration_thread_pool_size;
   }
+
+  public String getCTESuggesterClass() {
+    return backendCfg_.cte_suggester_class;
+  }
 }

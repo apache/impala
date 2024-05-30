@@ -154,6 +154,7 @@ DECLARE_double(hbo_similarity_threshold);
 DECLARE_int32(hbo_max_runs_per_key);
 DECLARE_int64(hbo_in_memory_backend_cache_size_bytes);
 DECLARE_int32(unregistration_thread_pool_size);
+DECLARE_string(cte_suggester_class);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -625,6 +626,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_hbo_in_memory_backend_cache_size_bytes(
       FLAGS_hbo_in_memory_backend_cache_size_bytes);
   cfg.__set_unregistration_thread_pool_size(FLAGS_unregistration_thread_pool_size);
+  cfg.__set_cte_suggester_class(FLAGS_cte_suggester_class);
   return Status::OK();
 }
 

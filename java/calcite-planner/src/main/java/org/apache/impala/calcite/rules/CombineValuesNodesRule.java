@@ -20,7 +20,6 @@ package org.apache.impala.calcite.rules;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
@@ -56,11 +55,7 @@ public class CombineValuesNodesRule extends RelOptRule {
         new ImmutableList.Builder();
     int numTuples = 0;
     for (RelNode input : union.getInputs()) {
-      // Calcite creates the HepRelVertex as an intermediary when doing optimizations, so
-      // the Values RelNode needs to be retrieved off of this.
-      RelNode realInput = input instanceof HepRelVertex
-          ? ((HepRelVertex) input).getCurrentRel()
-          : input;
+      RelNode realInput = RelUtil.unwrapRelNode(input);
       if (realInput instanceof LogicalValues) {
         rowBuilder.addAll(((LogicalValues) realInput).getTuples());
         numTuples++;

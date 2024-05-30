@@ -23,7 +23,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelRule;
-import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
@@ -2192,7 +2191,7 @@ public class ImpalaLoptOptimizeJoinRule
 
   public static String getJoinTableString(RelNode rel) {
     String currentString = "";
-    rel = unwrapHepRelVertex(rel);
+    rel = RelUtil.unwrapRelNode(rel);
     if (rel instanceof Join) {
       Join join = (Join) rel;
       return "(" + getJoinTableString(join.getLeft()) + ", " +
@@ -2215,12 +2214,6 @@ public class ImpalaLoptOptimizeJoinRule
       return getJoinTableString(rel.getInput(0));
     }
     return currentString;
-  }
-
-  public static RelNode unwrapHepRelVertex(RelNode relNode) {
-    return relNode instanceof HepRelVertex
-        ? ((HepRelVertex)relNode).getCurrentRel()
-        : relNode;
   }
 
   public static String getTableName(TableScan ts) {

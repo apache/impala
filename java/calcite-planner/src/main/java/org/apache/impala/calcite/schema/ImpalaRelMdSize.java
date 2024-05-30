@@ -19,6 +19,7 @@ package org.apache.impala.calcite.schema;
 
 import java.util.List;
 
+import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMdSize;
@@ -46,6 +47,14 @@ public class ImpalaRelMdSize extends RelMdSize {
                   BuiltInMethod.AVERAGE_ROW_SIZE.method);
 
   //~ Methods ----------------------------------------------------------------
+
+  // TODO: IMPALA-15156: implementing this for RelSubset doesn't seem like the right
+  // option. I think something is off about ImpalaRelMdNonCumulativeCost ignoring
+  // computeSelfCost, but not quite sure how to handle it.
+  public List<Double> averageColumnSizes(RelSubset subset, RelMetadataQuery mq) {
+    // Average column sizes for a subplan is the same as that of its original rel.
+    return mq.getAverageColumnSizes(subset.getBestOrOriginal());
+  }
 
   @Override
   public List<Double> averageColumnSizes(TableScan scan, RelMetadataQuery mq) {

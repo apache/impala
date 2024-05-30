@@ -18,7 +18,6 @@
 package org.apache.impala.calcite.rules;
 
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
@@ -87,10 +86,7 @@ public class ImpalaJoinProjectTransposeRule extends JoinProjectTransposeRule {
   // since a Project will ultimately be merged with the other Project
   // and the Filter will be merged with the Join with different rules.
   private boolean hasJoinChild(RelNode relNode) {
-    if (relNode instanceof HepRelVertex) {
-      relNode = ((HepRelVertex)relNode).getCurrentRel();
-    }
-
+    relNode = RelUtil.unwrapRelNode(relNode);
     if (relNode instanceof Join) {
       return true;
     }
