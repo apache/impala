@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
@@ -168,6 +169,11 @@ public class AnalyticWindow {
       return type_ == o.type_ && exprEqual;
     }
 
+    @Override
+    public int hashCode() {
+      return Objects.hash(getClass(), expr_, type_);
+    }
+
     public Boundary converse() {
       Boundary result = new Boundary(type_.converse(),
           (expr_ != null) ? expr_.clone() : null);
@@ -274,6 +280,11 @@ public class AnalyticWindow {
     return type_ == o.type_
         && leftBoundary_.equals(o.leftBoundary_)
         && rightBoundaryEqual;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getClass(), type_, leftBoundary_, rightBoundary_);
   }
 
   @Override

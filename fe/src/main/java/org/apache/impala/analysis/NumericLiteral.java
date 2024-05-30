@@ -221,7 +221,7 @@ public class NumericLiteral extends LiteralExpr {
   public Type getExplicitType() { return explicitType_; }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     // Analyzed Numeric literals of different types are distinct.
     if (!getType().equals(that.getType())) { return false; }

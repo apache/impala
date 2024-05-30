@@ -39,7 +39,6 @@ import org.apache.impala.thrift.TSlotRef;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class SlotRef extends Expr {
@@ -355,14 +354,19 @@ public class SlotRef extends Expr {
     return toStrHelper.toString();
   }
 
+  /**
+   * Overrides hashCode to ignore children, as done in
+   * {@link Expr#matches(Expr, Comparator)}.
+   */
   @Override
   public int hashCode() {
     if (desc_ != null) return desc_.getId().hashCode();
-    return Objects.hashCode(Joiner.on('.').join(rawPath_).toLowerCase());
+    if (label_ != null) return label_.toLowerCase().hashCode();
+    return super.localHash();
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     SlotRef other = (SlotRef) that;
     // check slot ids first; if they're both set we only need to compare those

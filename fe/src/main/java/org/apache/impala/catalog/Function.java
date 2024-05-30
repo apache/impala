@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.impala.analysis.FunctionName;
@@ -194,6 +195,12 @@ public class Function extends CatalogObjectImpl {
   public boolean equals(Object o) {
     if (!(o instanceof Function)) return false;
     return compare((Function)o, CompareMode.IS_IDENTICAL);
+  }
+
+  @Override
+  public int hashCode() {
+    // Use a rough hashing based on name to avoid dealing with different comparison modes.
+    return Objects.hash(name_);
   }
 
   // Compares this to 'other' for 'mode'.

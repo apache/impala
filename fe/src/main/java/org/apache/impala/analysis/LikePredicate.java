@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -98,8 +99,13 @@ public class LikePredicate extends Predicate {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     return super.localEquals(that) && ((LikePredicate) that).op_ == op_;
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), op_);
   }
 
   @Override

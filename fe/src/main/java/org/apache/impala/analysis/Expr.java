@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -1029,6 +1030,22 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Local hash code that ignores children.
+   */
+  protected int localHash() {
+    return Objects.hash(getClass(), fn_);
+  }
+
+  /**
+   * Returns a hash code based on the same keys used for equals.
+   */
+  @Override
+  public int hashCode() {
+    // CastExpr and SlotRef overload hashCode rather than mirroring 'matches'.
+    return Objects.hash(localHash(), children_);
+  }
+
+  /**
    * Return true if l1[i].equals(l2[i]) for all i.
    */
   public static <C extends Expr> boolean equalLists(List<C> l1, List<C> l2) {
@@ -1067,16 +1084,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       if (l2.contains(element)) result.add(element);
     }
     return result;
-  }
-
-  @Override
-  public int hashCode() {
-    if (id_ == null) {
-      throw new UnsupportedOperationException(
-          "Expr.hashCode() is not implemented in " + this.getClass().getName());
-    } else {
-      return id_.asInt();
-    }
   }
 
   /**

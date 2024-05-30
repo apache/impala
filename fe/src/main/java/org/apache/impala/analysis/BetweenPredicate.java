@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Objects;
+
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
@@ -104,9 +106,14 @@ public class BetweenPredicate extends Predicate {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     return super.localEquals(that) &&
         isNotBetween_ == ((BetweenPredicate)that).isNotBetween_;
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), isNotBetween_);
   }
 
   @Override

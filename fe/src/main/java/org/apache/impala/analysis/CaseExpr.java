@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.apache.impala.catalog.Db;
@@ -190,12 +191,17 @@ public class CaseExpr extends Expr {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     CaseExpr expr = (CaseExpr)that;
     return hasCaseExpr_ == expr.hasCaseExpr_
         && hasElseExpr_ == expr.hasElseExpr_
         && isDecode() == expr.isDecode();
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), hasCaseExpr_, hasElseExpr_, isDecode());
   }
 
   @Override

@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Objects;
+
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
@@ -447,11 +449,19 @@ public class CastExpr extends Expr {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     CastExpr other = (CastExpr) that;
     return isImplicit_ == other.isImplicit_
         && type_.equals(other.type_);
+  }
+
+  @Override
+  public int hashCode() {
+    if (isImplicit()) {
+      return children_.get(0).hashCode();
+    }
+    return Objects.hash(super.localHash(), type_, children_);
   }
 
   // Pass through since cast's are cheap.
