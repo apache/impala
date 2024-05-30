@@ -49,8 +49,9 @@ def get_fragment_instances():
                 # No valid thread_debug_info
                 if not tdi:
                     break
-                hi = int(tdi['instance_id_']['hi'])
-                lo = int(tdi['instance_id_']['lo'])
+                # ANDing with 0xFFFFFFFFFFFFFFFF forces the value to be unsigned
+                hi = int(tdi['instance_id_']['hi']) & 0xFFFFFFFFFFFFFFFF
+                lo = int(tdi['instance_id_']['lo']) & 0xFFFFFFFFFFFFFFFF
                 fi = "%lx:%lx" % (hi, lo)
                 if fi != "0:0":
                     fragment_instances[fi.strip('"')].append(thread.num)
@@ -91,7 +92,12 @@ class FindQueryIds(gdb.Command):
         query_ids = set()
         for fi in fragment_instances:
             qid_hi, qid_low = fi.split(':')
+            # The ANDing serves two purposes
+            # - It forces the value to be unsigned
+            # - For the low value, it masks out the fragment-specific bits to get
+            #   the query id
             qid_low = format(int(qid_low, 16) & 0xFFFFFFFFFFFF0000, 'x')
+            qid_hi = format(int(qid_hi, 16) & 0xFFFFFFFFFFFFFFFF, 'x')
             query_ids.add("{}:{}".format(qid_hi, qid_low))
         print('\n'.join(query_ids))
 
