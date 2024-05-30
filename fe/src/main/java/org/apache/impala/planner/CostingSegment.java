@@ -53,17 +53,28 @@ public class CostingSegment extends TreeNode<CostingSegment> {
 
   // The ProcessingCost of this fragment segment, which is the sum of the processing cost
   // of all nodes in nodes_ and sink_ (if set).
-  private ProcessingCost cost_ = ProcessingCost.zero();
+  // Initialized at constructor.
+  private ProcessingCost cost_;
 
   // DataSink associated with this segment.
   // Must not be null for output segment.
   private DataSink sink_ = null;
 
-  public CostingSegment(DataSink sink) { setSink(sink); }
+  public CostingSegment(DataSink sink) {
+    Preconditions.checkArgument(sink.getProcessingCost().isValid());
+    cost_ = sink.getProcessingCost();
+    sink_ = sink;
+  }
 
-  public CostingSegment(PlanNode node) { appendNode(node); }
+  public CostingSegment(PlanNode node) {
+    Preconditions.checkArgument(node.getProcessingCost().isValid());
+    cost_ = node.getProcessingCost();
+    nodes_.add(node);
+  }
 
-  private CostingSegment() {}
+  private CostingSegment() {
+    cost_ = ProcessingCost.zero();
+  }
 
   public ProcessingCost getProcessingCost() { return cost_; }
   public boolean isOutputSegment() { return sink_ != null; }

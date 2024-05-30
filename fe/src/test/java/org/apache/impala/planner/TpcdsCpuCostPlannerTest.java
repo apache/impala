@@ -630,4 +630,9 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
   public void testQ99() {
     runPlannerTestFile("tpcds_cpu_cost/tpcds-q99", testDb, options, testOptions);
   }
+
+  @Test
+  public void testQ43Verbose() {
+    runPlannerTestFile("tpcds_cpu_cost/tpcds-q43-verbose", testDb, options, testOptions);
+  }
 }
