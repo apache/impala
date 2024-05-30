@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -155,9 +156,14 @@ public class Subquery extends Expr {
    * TODO: Switch to a less restrictive implementation.
    */
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     return super.localEquals(that) &&
         stmt_.toSql().equals(((Subquery)that).stmt_.toSql());
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), stmt_.toSql());
   }
 
   @Override

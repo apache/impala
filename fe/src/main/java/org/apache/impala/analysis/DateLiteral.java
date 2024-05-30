@@ -78,7 +78,7 @@ public class DateLiteral extends LiteralExpr {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     return super.localEquals(that)
         && daysSinceEpoch_ == ((DateLiteral) that).daysSinceEpoch_;
   }

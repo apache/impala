@@ -1552,4 +1552,19 @@ public class PlannerTest extends PlannerTestBase {
             Lists.newArrayList(2, 3)),
         IcebergScanPlanner.getOrderedEqualityFieldIds(inp));
   }
+
+  /**
+   * Performance test of planning for a query with a large number of expressions,
+   * as commonly seen in auto-generated queries.
+   */
+  @Test
+  public void testManyExpressionPerformance() {
+    addTestDb("test_many_expressions", "Test DB for many-expression perf test.");
+    addTestTable("create table test_many_expressions.i6bd46c0a (i20868d03 bigint, " +
+        "i89d57f06 bigint, idc633f9e bigint, i9e32db9e bigint, ic02dc181 date, " +
+        "ia74a4bc0 string, i3ee20502 bigint, ic05c995e bigint, i49dcf5c5 string, " +
+        "i99bd997e string, i510ab56c string, i11be1ec1 bigint, i81012615 bigint) " +
+        "location '/'");
+    runPlannerTestFile("many-expression", "test_many_expressions");
+  }
 }

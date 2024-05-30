@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.apache.impala.catalog.Type;
@@ -74,11 +75,16 @@ public class ValidTupleIdExpr extends Expr {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     ValidTupleIdExpr other = (ValidTupleIdExpr) that;
     return other.tupleIds_.containsAll(tupleIds_)
         && tupleIds_.containsAll(other.tupleIds_);
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), tupleIds_);
   }
 
   @Override

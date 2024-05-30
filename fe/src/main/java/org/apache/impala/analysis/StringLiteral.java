@@ -65,7 +65,7 @@ public class StringLiteral extends LiteralExpr {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     StringLiteral other = (StringLiteral) that;
     return needsUnescaping_ == other.needsUnescaping_ && type_.equals(other.type_)

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.google.common.collect.Lists;
 
@@ -98,6 +99,11 @@ public class OrderByElement {
       nullsFirstEqual = nullsFirstParam_.equals(o.nullsFirstParam_);
     }
     return expr_.equals(o.expr_) && isAsc_ == o.isAsc_ && nullsFirstEqual;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getClass(), nullsFirstParam_, expr_, isAsc_);
   }
 
   @Override

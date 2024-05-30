@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.impala.authorization.Privilege;
@@ -72,6 +73,11 @@ public class FunctionName {
       if (!db_.equalsIgnoreCase(o.db_)) return false;
     }
     return fn_.equalsIgnoreCase(o.fn_);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getClass(), db_.toLowerCase(), fn_.toLowerCase());
   }
 
   public String getDb() { return db_; }

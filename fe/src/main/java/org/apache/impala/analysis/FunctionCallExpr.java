@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.Arrays;
 import java.util.List;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -241,13 +242,19 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     FunctionCallExpr o = (FunctionCallExpr)that;
     return fnName_.equals(o.fnName_) &&
         params_.isDistinct() == o.params_.isDistinct() &&
         params_.isIgnoreNulls() == o.params_.isIgnoreNulls() &&
         params_.isStar() == o.params_.isStar();
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(),
+        fnName_, params_.isDistinct(), params_.isIgnoreNulls(), params_.isStar());
   }
 
   @Override

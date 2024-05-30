@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.impala.analysis.AnalyticWindow.Boundary;
 import org.apache.impala.analysis.AnalyticWindow.BoundaryType;
@@ -126,7 +127,7 @@ public class AnalyticExpr extends Expr {
   public AnalyticWindow getWindow() { return window_; }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     if (!super.localEquals(that)) return false;
     AnalyticExpr o = (AnalyticExpr)that;
     if (!fnCall_.equals(o.getFnCall())) return false;
@@ -135,6 +136,11 @@ public class AnalyticExpr extends Expr {
       if (!window_.equals(o.window_)) return false;
     }
     return orderByElements_.equals(o.orderByElements_);
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), fnCall_, window_, orderByElements_);
   }
 
   /**

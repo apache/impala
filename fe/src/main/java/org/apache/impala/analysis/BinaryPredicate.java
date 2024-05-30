@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeTable;
@@ -418,8 +419,13 @@ public class BinaryPredicate extends Predicate {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     return super.localEquals(that) && op_.equals(((BinaryPredicate)that).op_);
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), op_);
   }
 
   @Override

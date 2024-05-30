@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function.CompareMode;
@@ -113,8 +114,13 @@ public class CompoundPredicate extends Predicate {
   public Operator getOp() { return op_; }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     return super.localEquals(that) && ((CompoundPredicate) that).op_ == op_;
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), op_);
   }
 
   @Override

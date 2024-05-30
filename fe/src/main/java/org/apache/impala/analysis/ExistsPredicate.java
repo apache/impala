@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Objects;
+
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 
@@ -65,8 +67,13 @@ public class ExistsPredicate extends Predicate {
   }
 
   @Override
-  public boolean localEquals(Expr that) {
+  protected boolean localEquals(Expr that) {
     return super.localEquals(that) && notExists_ == ((ExistsPredicate)that).notExists_;
+  }
+
+  @Override
+  protected int localHash() {
+    return Objects.hash(super.localHash(), notExists_);
   }
 
   @Override
