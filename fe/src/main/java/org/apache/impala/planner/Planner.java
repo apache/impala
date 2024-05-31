@@ -212,6 +212,7 @@ public class Planner {
 
     Collections.reverse(fragments);
     ctx_.getTimeline().markEvent("Distributed plan created");
+    ctx_.getRootAnalyzer().logCacheStats();
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {

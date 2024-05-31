@@ -1293,6 +1293,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_clean_dbcp_ds_cache(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::USE_NULL_SLOTS_CACHE: {
+        query_options->__set_use_null_slots_cache(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {
