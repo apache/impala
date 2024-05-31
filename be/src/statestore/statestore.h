@@ -292,6 +292,9 @@ class Statestore : public CacheLineAligned {
     return TNetworkAddressToString(peer_statestore_ha_addr_);
   }
 
+  // Update the subscriber's catalog information.
+  void UpdateSubscriberCatalogInfo(const SubscriberId& subscriber_id);
+
  private:
   /// A TopicEntry is a single entry in a topic, and logically is a <string, byte string>
   /// pair.
@@ -508,6 +511,10 @@ class Statestore : public CacheLineAligned {
     const TNetworkAddress& network_address() const { return network_address_; }
     const SubscriberId& id() const { return subscriber_id_; }
     const RegistrationId& registration_id() const { return registration_id_; }
+    TStatestoreSubscriberType::type subscriber_type() const { return subscriber_type_; }
+    int64_t catalogd_version() const { return catalogd_version_; }
+    const TNetworkAddress& catalogd_address() const { return catalogd_address_; }
+    int64_t last_update_catalogd_time() const { return last_update_catalogd_time_; }
 
     /// Returns the time elapsed (in seconds) since the last heartbeat.
     double SecondsSinceHeartbeat() const {
@@ -571,6 +578,10 @@ class Statestore : public CacheLineAligned {
       return subscribe_catalogd_change_;
     }
 
+    /// The subscriber updates the catalog information.
+    void UpdateCatalogInfo(
+        int64_t catalogd_version, const TNetworkAddress& catalogd_address);
+
    private:
     /// Unique human-readable identifier for this subscriber, set by the subscriber itself
     /// on a Register call.
@@ -610,6 +621,15 @@ class Statestore : public CacheLineAligned {
     /// True once DeleteAllTransientEntries() has been called during subscriber
     /// unregisteration. Protected by 'transient_entry_lock_'
     bool unregistered_ = false;
+
+    // Version of catalogd.
+    int64_t catalogd_version_ = 0L;
+
+    // Address of catalogd.
+    TNetworkAddress catalogd_address_;
+
+    // The last time to update the catalogd.
+    int64_t last_update_catalogd_time_ = 0L;
   };
 
   /// Unique identifier for this statestore instance.
@@ -1009,6 +1029,10 @@ class Statestore : public CacheLineAligned {
 
   // Return true if this statestore instance is in recovery mode.
   bool IsInRecoveryMode();
+
+  /// Json callback for /catalog_ha_info.
+  void CatalogHAInfoHandler(const Webserver::WebRequest& req,
+      rapidjson::Document* document);
 };
 
 } // namespace impala

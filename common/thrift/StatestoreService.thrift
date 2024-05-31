@@ -217,6 +217,9 @@ struct TCatalogRegistration {
 
   // True if the catalogd instance is started as active instance.
   4: optional bool force_catalogd_active;
+
+  // The registration time of the catalogd.
+  5: optional i64 registration_time;
 }
 
 struct TRegisterSubscriberRequest {

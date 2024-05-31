@@ -16,8 +16,10 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+import json
 import logging
 import re
+import requests
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
@@ -34,6 +36,12 @@ class TestCatalogdHA(CustomClusterTestSuite):
   The cluster will be launched with two catalogd instances as Active-Passive HA pair.
   statestored and catalogds are started with starting flag FLAGS_enable_catalogd_ha
   as true. """
+
+  VARZ_URL = "http://localhost:{0}/varz"
+  CATALOG_HA_INFO_URL = "http://localhost:{0}/catalog_ha_info"
+  JSON_METRICS_URL = "http://localhost:{0}/jsonmetrics"
+
+  SS_TEST_PORT = ["25010"]
 
   def get_workload(self):
     return 'functional-query'
@@ -461,3 +469,36 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
     self.execute_query_expect_success(
         self.client, "select %s.identity_tmp(10)" % unique_database)
+
+  def test_page_with_disable_ha(self):
+    self.__test_catalog_ha_info_page()
+
+  @CustomClusterTestSuite.with_args(start_args="--enable_catalogd_ha")
+  def test_page_with_enable_ha(self):
+    self.__test_catalog_ha_info_page()
+
+  def __test_catalog_ha_info_page(self):
+    for port in self.SS_TEST_PORT:
+      response = requests.get(self.VARZ_URL.format(port) + "?json")
+      assert response.status_code == requests.codes.ok
+      varz_json = json.loads(response.text)
+      ha_flags = [e for e in varz_json["flags"]
+              if e["name"] == "enable_catalogd_ha"]
+      assert len(ha_flags) == 1
+      assert ha_flags[0]["default"] == "false"
+
+      # High availability for the Catalog is enabled.
+      if ha_flags[0]["current"] == "true":
+        url = self.JSON_METRICS_URL.format(port) + "?json"
+        metrics = json.loads(requests.get(url).text)
+        if metrics["statestore.active-status"]:
+          url = self.CATALOG_HA_INFO_URL.format(port) + "?json"
+          catalog_ha_info = json.loads(requests.get(url).text)
+          assert catalog_ha_info["active_catalogd_address"]\
+                 == metrics["statestore.active-catalogd-address"]
+        else:
+          reponse = requests.get(self.CATALOG_HA_INFO_URL.format(port)).text
+          assert reponse.__contains__("The current statestored is inactive.")
+      else:
+        page = requests.get(self.CATALOG_HA_INFO_URL.format(port))
+        assert page.status_code == requests.codes.not_found

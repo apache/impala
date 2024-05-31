@@ -1,0 +1,84 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+{{> www/common-header.tmpl }}
+{{#is_active_statestored}}
+<h2>HA Info</h2>
+<pre>
+<b>has-active-catalogd:</b> {{has_active_catalogd}}
+<b>active-catalogd-version:</b> {{active_catalogd_version}}
+<b>active-catalogd-address:</b> {{active_catalogd_address}}
+<b>last-update-catalogd-time:</b> {{last_update_catalogd_time}}
+</pre>
+<h2>Active Catalogd Info</h2>
+<pre>
+<b>enable-catalogd-ha:</b> {{active_catalogd_enable_catalogd_ha}}
+<b>address:</b> {{active_catalogd_address}}
+<b>force-catalogd-active:</b> {{active_catalogd_force_catalogd_active}}
+<b>registration-time:</b> {{active_catalogd_registration_time}}
+</pre>
+<h2>Standby Catalogd Info</h2>
+<pre>
+<b>enable-catalogd-ha:</b> {{standby_catalogd_enable_catalogd_ha}}
+<b>address:</b> {{standby_catalogd_address}}
+<b>force-catalogd-active:</b> {{standby_catalogd_force_catalogd_active}}
+<b>registration-time:</b> {{standby_catalogd_registration_time}}
+</pre>
+<h2>Notified Subscribers ({{%notified_subscribers}} total)</h2>
+  <table id="notified-subscribers-tbl" class='table table-hover table-striped'>
+    <thead>
+      <tr>
+        <th>Id</th>
+        <th>Address</th>
+        <th>Registration ID</th>
+        <th>Subscriber Type</th>
+        <th>Catalogd Version</th>
+        <th>Catalogd Address</th>
+        <th>Last Update Catalogd Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#notified_subscribers}}
+      <tr>
+        <td>{{id}}</td>
+        <td>{{address}}</td>
+        <td>{{registration_id}}</td>
+        <td>{{subscriber_type}}</td>
+        <td>{{catalogd_version}}</td>
+        <td>{{catalogd_address}}</td>
+        <td>{{last_subscriber_update_catalogd_time}}</td>
+      </tr>
+      {{/notified_subscribers}}
+    </tbody>
+  </table>
+{{/is_active_statestored}}
+
+{{^is_active_statestored}}
+<h5>The current statestored is inactive. Please refer to the active
+statestored for the catalog's high availability information.</h5>
+{{/is_active_statestored}}
+<script>
+    $(document).ready(function() {
+        $('#notified-subscribers-tbl').DataTable({
+            "order": [[ 6, "asc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
+
+{{> www/common-footer.tmpl }}

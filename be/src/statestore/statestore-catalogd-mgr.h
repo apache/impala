@@ -45,7 +45,8 @@ class StatestoreCatalogdMgr {
       is_active_catalogd_assigned_(false),
       num_registered_catalogd_(0),
       first_catalogd_register_time_(0),
-      active_catalogd_version_(0L) {}
+      active_catalogd_version_(0L),
+      last_update_catalogd_time_(0L) {}
 
   /// Register one catalogd.
   /// Return true if new active catalogd is designated during this registration.
@@ -73,11 +74,17 @@ class StatestoreCatalogdMgr {
   /// This function should be called after the active catalogd is designated.
   const SubscriberId& GetActiveCatalogdSubscriberId();
 
+  /// Return the protocol version of catalog service and address of standby catalogd.
+  const TCatalogRegistration& GetStandbyCatalogRegistration();
+
   /// Check if the subscriber with given subscriber_id is active catalogd.
   bool IsActiveCatalogd(const SubscriberId&subscriber_id);
 
   /// Return the mutex lock.
   std::mutex* GetLock() { return &catalog_mgr_lock_; }
+
+  /// Return the last time when the catalogd is updated.
+  int64_t GetLastUpdateCatalogTime();
 
  private:
   /// Protect all member variables.
@@ -119,6 +126,9 @@ class StatestoreCatalogdMgr {
   /// Monotonically increasing version number. The value is increased when a new active
   /// catalogd is designated.
   int64_t active_catalogd_version_;
+
+  /// The time is updated when a new active catalogd is designated.
+  int64_t last_update_catalogd_time_;
 };
 
 } // namespace impala

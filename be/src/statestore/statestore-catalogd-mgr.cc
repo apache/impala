@@ -59,6 +59,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
     is_active_catalogd_assigned_ = true;
     COPY_CATALOGD_REGISTRATION_FROM_LOCAL_VARIABLES(active);
     ++active_catalogd_version_;
+    last_update_catalogd_time_ = UnixMillis();
     return true;
   }
 
@@ -73,6 +74,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
         LOG(INFO) << active_catalogd_subscriber_id_
                   << " is re-registered with FLAGS_force_catalogd_active.";
         ++active_catalogd_version_;
+        last_update_catalogd_time_ = UnixMillis();
         return true;
       }
     } else {
@@ -86,6 +88,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
                   << " is re-registered after HA preemption waiting period and "
                   << "is assigned as active catalogd.";
         ++active_catalogd_version_;
+        last_update_catalogd_time_ = UnixMillis();
         return true;
       }
     }
@@ -116,6 +119,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
       COPY_CATALOGD_REGISTRATION_FROM_LOCAL_VARIABLES(active);
       LOG(INFO) << active_catalogd_subscriber_id_ << " is assigned as active catalogd.";
       ++active_catalogd_version_;
+      last_update_catalogd_time_ = UnixMillis();
       return true;
     }
     // Wait second catalogd to be registered.
@@ -138,6 +142,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
                 << " is registered with FLAGS_force_catalogd_active and is assigned as "
                 << "active catalogd.";
       ++active_catalogd_version_;
+      last_update_catalogd_time_ = UnixMillis();
       return true;
     } else if (is_active_catalogd_assigned_) {
       // Existing one is already assigned as active catalogd.
@@ -159,6 +164,7 @@ bool StatestoreCatalogdMgr::RegisterCatalogd(bool is_reregistering,
       LOG(INFO) << active_catalogd_subscriber_id_
                 << " has higher priority and is assigned as active catalogd.";
       ++active_catalogd_version_;
+      last_update_catalogd_time_ = UnixMillis();
       return true;
     }
   }
@@ -182,6 +188,7 @@ bool StatestoreCatalogdMgr::CheckActiveCatalog() {
   LOG(INFO) << active_catalogd_subscriber_id_
             << " is assigned as active catalogd after preemption waiting period.";
   ++active_catalogd_version_;
+  last_update_catalogd_time_ = UnixMillis();
   return true;
 }
 
@@ -197,6 +204,7 @@ bool StatestoreCatalogdMgr::UnregisterCatalogd(
       COPY_CATALOGD_REGISTRATION_FROM_MEMBER_VARIABLES(active, standby);
       RESET_CATALOGD_REGISTRATION_MEMBER_VARIABLES(standby);
       LOG(INFO) << "Fail over active catalogd to " << active_catalogd_subscriber_id_;
+      last_update_catalogd_time_ = UnixMillis();
       ++active_catalogd_version_;
       return true;
     } else {
@@ -226,6 +234,11 @@ const TCatalogRegistration& StatestoreCatalogdMgr::GetActiveCatalogRegistration(
   return active_catalogd_registration_;
 }
 
+const TCatalogRegistration& StatestoreCatalogdMgr::GetStandbyCatalogRegistration() {
+  std::lock_guard<std::mutex> l(catalog_mgr_lock_);
+  return standby_catalogd_registration_;
+}
+
 const SubscriberId& StatestoreCatalogdMgr::GetActiveCatalogdSubscriberId() {
   std::lock_guard<std::mutex> l(catalog_mgr_lock_);
   return active_catalogd_subscriber_id_;
@@ -236,3 +249,7 @@ bool StatestoreCatalogdMgr::IsActiveCatalogd(const SubscriberId& subscriber_id) 
   return active_catalogd_subscriber_id_ == subscriber_id;
 }
 
+int64_t StatestoreCatalogdMgr::GetLastUpdateCatalogTime() {
+  std::lock_guard<std::mutex> l(catalog_mgr_lock_);
+  return last_update_catalogd_time_;
+}

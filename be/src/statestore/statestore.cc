@@ -284,6 +284,7 @@ class StatestoreThriftIf : public StatestoreServiceIf {
     TCatalogRegistration catalogd_registration;
     if (params.__isset.catalogd_registration) {
       catalogd_registration = params.catalogd_registration;
+      catalogd_registration.__set_registration_time(UnixMillis());
     }
 
     RegistrationId registration_id;
@@ -306,6 +307,7 @@ class StatestoreThriftIf : public StatestoreServiceIf {
     if (is_active_statestored && has_active_catalogd) {
       response.__set_catalogd_registration(active_catalogd_registration);
       response.__set_catalogd_version(active_catalogd_version);
+      statestore_->UpdateSubscriberCatalogInfo(params.subscriber_id);
     }
   }
 
@@ -645,6 +647,13 @@ void Statestore::Subscriber::RefreshLastHeartbeatTimestamp() {
   last_heartbeat_ts_.Store(MonotonicMillis());
 }
 
+void Statestore::Subscriber::UpdateCatalogInfo(
+    int64_t catalogd_version, const TNetworkAddress& catalogd_address) {
+  catalogd_version_ = catalogd_version;
+  catalogd_address_ = catalogd_address;
+  last_update_catalogd_time_ = UnixMillis();
+}
+
 Statestore::Statestore(MetricGroup* metrics)
   : protocol_version_(StatestoreServiceVersion::V2),
     catalog_manager_(FLAGS_enable_catalogd_ha),
@@ -816,6 +825,13 @@ void Statestore::RegisterWebpages(Webserver* webserver, bool metrics_only) {
       bind<void>(&Statestore::SubscribersHandler, this, _1, _2);
   webserver->RegisterUrlCallback("/subscribers", "statestore_subscribers.tmpl",
       subscribers_callback, true);
+
+  if (FLAGS_enable_catalogd_ha) {
+    Webserver::UrlCallback show_catalog_ha_callback =
+        bind<void>(&Statestore::CatalogHAInfoHandler, this, _1, _2);
+    webserver->RegisterUrlCallback(
+        "/catalog_ha_info", "catalog_ha_info.tmpl", show_catalog_ha_callback, true);
+  }
 
   RegisterLogLevelCallbacks(webserver, false);
 }
@@ -1580,6 +1596,7 @@ void Statestore::SendUpdateCatalogdNotification(int64_t* last_active_catalogd_ve
         // left in the receiver list so that RPC will be resent to it in next round.
         ++it;
       } else {
+        UpdateSubscriberCatalogInfo(it->get()->id());
         successful_update_catalogd_rpc_metric_->Increment(1);
         // Remove the subscriber from the receiver list so that Statestore will not resend
         // RPC to it in next round.
@@ -2154,4 +2171,123 @@ Status Statestore::SendHaHeartbeat() {
     status = Status(response.status);
   }
   return status;
+}
+
+void Statestore::UpdateSubscriberCatalogInfo(const SubscriberId& subscriber_id) {
+  lock_guard<mutex> l(subscribers_lock_);
+  SubscriberMap::iterator it = subscribers_.find(subscriber_id);
+  if (it == subscribers_.end()) return;
+  std::shared_ptr<Subscriber> subscriber = it->second;
+  bool has_active_catalogd;
+  int64_t active_catalogd_version = 0;
+  TCatalogRegistration catalogd_registration =
+      catalog_manager_.GetActiveCatalogRegistration(
+          &has_active_catalogd, &active_catalogd_version);
+  if (has_active_catalogd) {
+    subscriber->UpdateCatalogInfo(active_catalogd_version, catalogd_registration.address);
+  }
+}
+
+void Statestore::CatalogHAInfoHandler(
+    const Webserver::WebRequest& req, Document* document) {
+  if (FLAGS_enable_statestored_ha && !is_active_) {
+    document->AddMember("is_active_statestored", false, document->GetAllocator());
+    return;
+  }
+  document->AddMember("is_active_statestored", true, document->GetAllocator());
+  // HA INFO
+  bool has_active_catalogd;
+  int64_t active_catalogd_version = 0;
+  TCatalogRegistration active_catalog_registration =
+      catalog_manager_.GetActiveCatalogRegistration(&has_active_catalogd,
+          &active_catalogd_version);
+
+  document->AddMember("has_active_catalogd", has_active_catalogd,
+      document->GetAllocator());
+  document->AddMember("active_catalogd_version", active_catalogd_version,
+      document->GetAllocator());
+  if (active_catalogd_version > 0) {
+    Value last_update_catalogd_time_(ToStringFromUnixMillis(
+        catalog_manager_.GetLastUpdateCatalogTime(),
+        TimePrecision::Millisecond).c_str(), document->GetAllocator());
+    document->AddMember("last_update_catalogd_time", last_update_catalogd_time_,
+        document->GetAllocator());
+  }
+
+  if (has_active_catalogd) {
+    // Active catalogd information.
+    document->AddMember("active_catalogd_enable_catalogd_ha",
+        active_catalog_registration.enable_catalogd_ha, document->GetAllocator());
+    Value active_catalogd_address(
+        TNetworkAddressToString(active_catalog_registration.address).c_str(),
+        document->GetAllocator());
+    document->AddMember("active_catalogd_address", active_catalogd_address,
+        document->GetAllocator());
+    document->AddMember("active_catalogd_force_catalogd_active",
+        active_catalog_registration.force_catalogd_active, document->GetAllocator());
+    Value active_catalogd_registration_time(ToStringFromUnixMillis(
+        active_catalog_registration.registration_time,
+        TimePrecision::Millisecond).c_str(), document->GetAllocator());
+    document->AddMember("active_catalogd_registration_time",
+        active_catalogd_registration_time, document->GetAllocator());
+  }
+
+  // Standby catalogd information.
+  TCatalogRegistration standby_catalog_registration =
+      catalog_manager_.GetStandbyCatalogRegistration();
+  if (standby_catalog_registration.__isset.registration_time) {
+    document->AddMember("standby_catalogd_enable_catalogd_ha",
+        standby_catalog_registration.enable_catalogd_ha, document->GetAllocator());
+    Value standby_catalogd_address(
+        TNetworkAddressToString(standby_catalog_registration.address).c_str(),
+        document->GetAllocator());
+    document->AddMember(
+        "standby_catalogd_address", standby_catalogd_address, document->GetAllocator());
+    document->AddMember("standby_catalogd_force_catalogd_active",
+        standby_catalog_registration.force_catalogd_active, document->GetAllocator());
+    Value standby_catalogd_registration_time(ToStringFromUnixMillis(
+        standby_catalog_registration.registration_time,
+        TimePrecision::Millisecond).c_str(), document->GetAllocator());
+    document->AddMember("standby_catalogd_registration_time",
+        standby_catalogd_registration_time, document->GetAllocator());
+  }
+
+  lock_guard<mutex> l(subscribers_lock_);
+  Value notified_subscribers(kArrayType);
+  for (const SubscriberMap::value_type& subscriber : subscribers_) {
+    // Only subscribers of type COORDINATOR, COORDINATOR_EXECUTOR, or CATALOGD
+    // need to be returned.
+    if (subscriber.second->IsSubscribedCatalogdChange()) {
+      Value sub_json(kObjectType);
+      Value subscriber_id(subscriber.second->id().c_str(), document->GetAllocator());
+      sub_json.AddMember("id", subscriber_id, document->GetAllocator());
+      Value address(TNetworkAddressToString(
+          subscriber.second->network_address()).c_str(), document->GetAllocator());
+      sub_json.AddMember("address", address, document->GetAllocator());
+      Value registration_id(PrintId(subscriber.second->registration_id()).c_str(),
+          document->GetAllocator());
+      sub_json.AddMember("registration_id", registration_id, document->GetAllocator());
+      Value subscriber_type(SubscriberTypeToString(
+          subscriber.second->subscriber_type()).c_str(), document->GetAllocator());
+      sub_json.AddMember("subscriber_type", subscriber_type, document->GetAllocator());
+      if (subscriber.second->catalogd_version() > 0) {
+        sub_json.AddMember("catalogd_version", subscriber.second->catalogd_version(),
+            document->GetAllocator());
+        Value catalogd_address(TNetworkAddressToString(
+            subscriber.second->catalogd_address()).c_str(), document->GetAllocator());
+        sub_json.AddMember("catalogd_address", catalogd_address,
+            document->GetAllocator());
+        Value last_subscriber_update_catalogd_time(ToStringFromUnixMillis(
+            subscriber.second->last_update_catalogd_time(),
+            TimePrecision::Millisecond).c_str(), document->GetAllocator());
+        sub_json.AddMember("last_subscriber_update_catalogd_time",
+            last_subscriber_update_catalogd_time, document->GetAllocator());
+      }
+
+      notified_subscribers.PushBack(sub_json, document->GetAllocator());
+    }
+  }
+  document->AddMember(
+      "notified_subscribers", notified_subscribers, document->GetAllocator());
+  return;
 }
