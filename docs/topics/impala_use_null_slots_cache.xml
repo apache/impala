@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="use_null_slots_cache">
+
+ <title>USE_NULL_SLOTS_CACHE Query Option</title>
+ <titlealts audience="PDF"><navtitle>USE NULL SLOTS CACHE</navtitle></titlealts>
+ <prolog>
+  <metadata>
+   <data name="Category" value="Impala"/>
+   <data name="Category" value="Impala Query Options"/>
+   <data name="Category" value="Troubleshooting"/>
+   <data name="Category" value="Querying"/>
+   <data name="Category" value="Developers"/>
+   <data name="Category" value="Data Analysts"/>
+  </metadata>
+ </prolog>
+
+ <conbody>
+  <p>
+   <indexterm audience="hidden">USE_NULL_SLOTS_CACHE Query Option</indexterm> Impala
+   optimizes expressions that contain null-rejecting conjuncts - expressions that are
+   false if all "slots" (values returned from a table) are <codeph>NULL</codeph>.
+   Evaluating whether a conjunct is null-rejecting can be expensive when performed over a
+   lot of expressions. The "null slots cache" speeds analysis of generated queries with
+   many similar expressions by caching the result of evaluating an expression after slots
+   have been replaced with <codeph>NULL</codeph>s.
+  </p>
+
+  <p>
+   If query analysis uses a lot of memory, performance of the "null slots cache" can be
+   reviewed by enabling logging <codeph>org.apache.impala.analysis.Analyzer=DEBUG</codeph>
+   and searching coordinator logs for messages like
+  </p>
+
+<codeblock>
+null slots cache size: 286, median entry: 4416.0, 99th entry: 252688.88, hit rate: 0.99456364
+</codeblock>
+
+  <p><b>Type: </b>BOOLEAN</p>
+  <p><b>Default: </b>TRUE</p>
+  <p><b>Added in: </b>Impala 4.5</p>
+ </conbody>
+</concept>

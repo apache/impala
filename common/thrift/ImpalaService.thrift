@@ -940,6 +940,11 @@ enum TImpalaQueryOptions {
   // cache when its reference count equals 0. By caching DBCP DataSource objects, we can
   // avoid to reload JDBC driver.
   CLEAN_DBCP_DS_CACHE = 178
+
+  // Enables cache for isTrueWithNullSlots, which can be expensive when evaluating lots
+  // of expressions. The cache helps with generated expressions, which often contain lots
+  // of repeated patterns.
+  USE_NULL_SLOTS_CACHE = 179
 }
 
 // The summary of a DML statement.

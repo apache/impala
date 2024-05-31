@@ -194,6 +194,7 @@ under the License.
         <topicref href="topics/impala_enable_expr_rewrites.xml"/>
         <topicref href="topics/impala_exec_single_node_rows_threshold.xml"/>
         <topicref href="topics/impala_exec_time_limit_s.xml"/>
+        <topicref rev="4.2.0" href="topics/impala_expand_complex_types.xml"/>
         <topicref href="topics/impala_explain_level.xml">
           <topicref rev="2.5.0" href="topics/impala_max_num_runtime_filters.xml"/>
         </topicref>
@@ -255,8 +256,8 @@ under the License.
         <topicref href="topics/impala_thread_reservation_limit.xml"/>
         <topicref href="topics/impala_timezone.xml"/>
         <topicref href="topics/impala_topn_bytes_limit.xml"/>
+        <topicref rev="4.5.0" href="topics/impala_use_null_slots_cache.xml"/>
         <topicref href="topics/impala_utf8_mode.xml"/>
-        <topicref href="topics/impala_expand_complex_types.xml"/>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
       <topicref href="topics/impala_shutdown.xml"/>
