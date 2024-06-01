@@ -20,12 +20,11 @@
 
 from __future__ import absolute_import, division, print_function
 
-import unittest
-
 from shell.kerberos_util import get_kerb_host_from_kerberos_host_fqdn
+from tests.common.base_test_suite import BaseTestSuite
 
 
-class TestKerberosUtil(unittest.TestCase):
+class TestKerberosUtil(BaseTestSuite):
   def test_get_kerb_host_from_kerberos_host_fqdn(self):
     assert isinstance(get_kerb_host_from_kerberos_host_fqdn("any.host:1234"), str)
     assert get_kerb_host_from_kerberos_host_fqdn("any.host:1234") == "any.host"

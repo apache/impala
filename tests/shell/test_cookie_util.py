@@ -21,7 +21,8 @@
 from __future__ import absolute_import, division, print_function
 
 import sys
-import unittest
+
+from tests.common.base_test_suite import BaseTestSuite
 
 from datetime import datetime, timedelta
 from http.client import HTTPMessage
@@ -30,7 +31,7 @@ from shell.cookie_util import (cookie_matches_path, get_cookie_expiry,
                                get_all_matching_cookies)
 
 
-class TestCookieUtil(unittest.TestCase):
+class TestCookieUtil(BaseTestSuite):
     def test_cookie_matches_path(self):
         assert cookie_matches_path({}, '/')
         assert cookie_matches_path({}, '')
