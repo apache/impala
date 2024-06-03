@@ -42,6 +42,8 @@ class MetricGroup;
 /// appropriate receivers. Metrics exposed by the service will be added to 'metric_group'.
 class DataStreamService : public DataStreamServiceIf {
  public:
+  static constexpr std::string_view END_DATA_STREAM = "EndDataStream";
+
   DataStreamService(MetricGroup* metric_group);
 
   /// Initializes the service by registering it with the singleton RPC manager.

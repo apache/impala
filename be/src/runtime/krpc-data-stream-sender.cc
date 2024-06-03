@@ -60,6 +60,10 @@
 DEFINE_int64(data_stream_sender_buffer_size, 16 * 1024,
     "(Advanced) Max size in bytes which a row batch in a data stream sender's channel "
     "can accumulate before the row batch is sent over the wire.");
+DEFINE_int64_hidden(data_stream_sender_eos_timeout_ms, 60*60*1000,
+    "Timeout for EndDataStream (EOS) RPCs. Setting a timeout prioritizes them over other "
+    "DataStreamService RPCs. Defaults to 1 hour. Set to 0 or negative value to disable "
+    "the timeout.");
 
 using std::condition_variable_any;
 using namespace apache::thrift;
@@ -676,6 +680,12 @@ Status KrpcDataStreamSender::Channel::DoEndDataStreamRpc() {
   DCHECK(rpc_in_flight_);
   EndDataStreamRequestPB eos_req;
   rpc_controller_.Reset();
+  if (FLAGS_data_stream_sender_eos_timeout_ms > 0) {
+    // Provide a timeout so EOS RPCs are prioritized over others, as completing a stream
+    // can help free up resources.
+    rpc_controller_.set_timeout(
+        MonoDelta::FromMilliseconds(FLAGS_data_stream_sender_eos_timeout_ms));
+  }
   *eos_req.mutable_dest_fragment_instance_id() = fragment_instance_id_;
   eos_req.set_sender_id(parent_->sender_id_);
   eos_req.set_dest_node_id(dest_node_id_);
