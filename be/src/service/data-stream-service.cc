@@ -72,6 +72,7 @@ DataStreamService::DataStreamService(MetricGroup* metric_group)
   mem_tracker_.reset(new MemTracker(
       bytes_limit, "Data Stream Service Queue", process_mem_tracker));
   MemTrackerMetric::CreateMetrics(metric_group, mem_tracker_.get(), "DataStreamService");
+  DCHECK_EQ(methods_by_name_.count(string(END_DATA_STREAM)), 1);
 }
 
 Status DataStreamService::Init() {
