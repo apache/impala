@@ -166,7 +166,9 @@ class TestRestart(CustomClusterTestSuite):
 
     self.cluster.catalogd.start()
     thread.join()
-    self.wait_for_state(query_handle[0], QueryState.FINISHED, 30000)
+    max_wait_time = 300
+    finished = self.client.wait_for_finished_timeout(query_handle[0], max_wait_time)
+    assert finished, "Statement did not finish after {0} seconds".format(max_wait_time)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -219,27 +221,37 @@ class TestRestart(CustomClusterTestSuite):
     # Make the catalog object version grow large enough
     self.execute_query_expect_success(self.client, "invalidate metadata")
 
-    debug_action_sleep_time_sec = 10
+    # IMPALA-12616: If this sleep is not long enough, the alter table could wake up
+    # before the new catalog service ID is finalized, and the query can fail due to the
+    # difference in the service ID. This was a particular problem on s3, which runs a
+    # bit slower.
+    debug_action_sleep_time_sec = 30
     DEBUG_ACTION = ("WAIT_BEFORE_PROCESSING_CATALOG_UPDATE:SLEEP@{}"
                     .format(debug_action_sleep_time_sec * 1000))
 
     query = "alter table {} add columns (age int)".format(tbl_name)
     handle = self.execute_query_async(query, query_options={"debug_action": DEBUG_ACTION})
 
-    # Wait a bit so the RPC from the catalogd arrives to the coordinator.
-    time.sleep(0.5)
+    # Wait a bit so the RPC from the catalogd arrives to the coordinator. Using a generous
+    # value here gives the catalogd plenty of time to respond.
+    time.sleep(5)
 
     self.cluster.catalogd.restart()
 
     # Wait for the query to finish.
     max_wait_time = (debug_action_sleep_time_sec
         + self.WAIT_FOR_CATALOG_UPDATE_TIMEOUT_SEC + 10)
-    self.wait_for_state(handle, self.client.QUERY_STATES["FINISHED"], max_wait_time)
+    finished = self.client.wait_for_finished_timeout(handle, max_wait_time)
+    assert finished, "Statement did not finish after {0} seconds".format(max_wait_time)
 
     self.assert_impalad_log_contains("WARNING",
         "Waiting for catalog update with a new catalog service ID timed out.")
     self.assert_impalad_log_contains("WARNING",
         "Ignoring catalog update result of catalog service ID")
+
+    # Clear the query options so the following statements don't use the debug_action
+    # set above.
+    self.client.clear_configuration()
 
     self.execute_query_expect_success(self.client, "select age from {}".format(tbl_name))
 
@@ -270,21 +282,30 @@ class TestRestart(CustomClusterTestSuite):
     # Make the catalog object version grow large enough
     self.execute_query_expect_success(self.client, "invalidate metadata")
 
-    debug_action_sleep_time_sec = 10
+    # IMPALA-12616: If this sleep is not long enough, the alter table could wake up
+    # before the new catalog service ID is finalized, and the query can fail due to the
+    # difference in the service ID. This was a particular problem on s3, which runs a
+    # bit slower.
+    debug_action_sleep_time_sec = 30
     DEBUG_ACTION = ("WAIT_BEFORE_PROCESSING_CATALOG_UPDATE:SLEEP@{}"
                     .format(debug_action_sleep_time_sec * 1000))
 
     query = "alter table {} add columns (age int)".format(tbl_name)
     handle = self.execute_query_async(query, query_options={"debug_action": DEBUG_ACTION})
 
-    # Wait a bit so the RPC from the catalogd arrives to the coordinator.
-    time.sleep(0.5)
+    # Wait a bit so the RPC from the catalogd arrives to the coordinator. Using a generous
+    # value here gives the catalogd plenty of time to respond.
+    time.sleep(5)
 
     self.cluster.catalogd.restart()
 
     # Sleep until the coordinator is done with the debug action sleep and it starts
     # waiting for catalog updates.
     time.sleep(debug_action_sleep_time_sec + 0.5)
+
+    # Clear the query options so the following statements don't use the debug_action
+    # set above.
+    self.client.clear_configuration()
 
     # Issue DML queries so that the coordinator receives catalog updates.
     for i in range(self.WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS):
@@ -297,7 +318,8 @@ class TestRestart(CustomClusterTestSuite):
 
     # Wait for the query to finish.
     max_wait_time = 10
-    self.wait_for_state(handle, self.client.QUERY_STATES["FINISHED"], max_wait_time)
+    finished = self.client.wait_for_finished_timeout(handle, max_wait_time)
+    assert finished, "Statement did not finish after {0} seconds".format(max_wait_time)
 
     expected_log_msg = "Received {} non-empty catalog updates from the statestore " \
         "while waiting for an update with a new catalog service ID but the catalog " \
