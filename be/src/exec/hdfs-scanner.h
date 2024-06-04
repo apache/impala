@@ -196,7 +196,7 @@ class HdfsScanner {
         return i;
       }
     }
-    DCHECK(false);
+    DCHECK(false) << "Runtime filter id " << filter_id << " not found!";
     return -1;
   }
 
