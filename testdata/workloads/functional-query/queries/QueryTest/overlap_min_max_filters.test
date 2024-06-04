@@ -185,6 +185,24 @@ aggregation(SUM, NumRuntimeFilteredPages): 255
 ====
 ---- QUERY
 ###################################################
+# Test that explicitly skipping minmax runtime filter does not crash backend.
+# Expect to see a total of 0 pages filtered out.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=1.0;
+SET MINMAX_FILTERING_LEVEL=PAGE;
+SET RUNTIME_FILTER_IDS_TO_SKIP=1;
+select straight_join count(*)
+from lineitem_sorted_l_extendedprice a join [SHUFFLE]
+lineitem_sorted_l_extendedprice b
+where a.l_extendedprice = b.l_extendedprice and b.l_orderkey = 1;
+---- RESULTS
+36
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 0
+====
+---- QUERY
+###################################################
 # Join the above sorted column with itself with
 # overlap filtering on sorted columns disabled.
 # Expect to see the same result with 0 pages

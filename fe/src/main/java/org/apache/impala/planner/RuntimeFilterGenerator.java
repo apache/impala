@@ -778,9 +778,9 @@ public final class RuntimeFilterGenerator {
     /**
      * Return true if this filter is deemed highly selective, will arrive on-time, and
      * applied for all rows without ever being disabled by the scanner node.
-     * Mainly used by {@link ScanNode#reduceCardinalityByRuntimeFilter(java.util.Stack)}
-     * to lower the scan cardinality estimation. These properties are hard to predict
-     * during planning, so this method is set very conservative to avoid severe
+     * Mainly used by {@link ScanNode#reduceCardinalityByRuntimeFilter(java.util.Stack,
+     * double)} to lower the scan cardinality estimation. These properties are hard to
+     * predict during planning, so this method is set very conservative to avoid severe
      * underestimation.
      */
     public boolean isHighlySelective() {
@@ -888,8 +888,7 @@ public final class RuntimeFilterGenerator {
     RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator(
         ctx.getQueryOptions());
     filterGenerator.generateFilters(ctx, plan);
-    List<RuntimeFilter> filters =
-        Lists.newArrayList(filterGenerator.getRuntimeFilters(ctx));
+    List<RuntimeFilter> filters = Lists.newArrayList(filterGenerator.getRuntimeFilters());
     if (filters.size() > maxNumBloomFilters) {
       // If more than 'maxNumBloomFilters' were generated, sort them by increasing
       // selectivity and keep the 'maxNumBloomFilters' most selective bloom filters.
@@ -1036,18 +1035,10 @@ public final class RuntimeFilterGenerator {
   /**
    * Returns a list of all the registered runtime filters, ordered by filter ID.
    */
-  public List<RuntimeFilter> getRuntimeFilters(PlannerContext ctx) {
+  public List<RuntimeFilter> getRuntimeFilters() {
     Set<RuntimeFilter> resultSet = new HashSet<>();
     for (List<RuntimeFilter> filters: runtimeFiltersByTid_.values()) {
-      for (RuntimeFilter filter : filters) {
-        if (ctx.getQueryOptions().isSetRuntime_filter_ids_to_skip()
-            && ctx.getQueryOptions().runtime_filter_ids_to_skip.contains(
-                filter.getFilterId().asInt())) {
-          // Skip this filter because it is explicitly excluded via query option.
-          continue;
-        }
-        resultSet.add(filter);
-      }
+      resultSet.addAll(filters);
     }
     List<RuntimeFilter> resultList = Lists.newArrayList(resultSet);
     Collections.sort(resultList, new Comparator<RuntimeFilter>() {
@@ -1112,7 +1103,7 @@ public final class RuntimeFilterGenerator {
               ctx.getRootAnalyzer(), conjunct, joinNode, filterType, filterSizeLimits_,
               /* isTimestampTruncation */ false, level);
           if (filter != null) {
-            registerRuntimeFilter(filter);
+            registerRuntimeFilter(ctx, filter);
             filters.add(filter);
           }
           // For timestamp bloom filters, we also generate a RuntimeFilter with the
@@ -1125,7 +1116,7 @@ public final class RuntimeFilterGenerator {
                 ctx.getRootAnalyzer(), conjunct, joinNode, filterType, filterSizeLimits_,
                 /* isTimestampTruncation */ true, level);
             if (filter2 == null) continue;
-            registerRuntimeFilter(filter2);
+            registerRuntimeFilter(ctx, filter2);
             filters.add(filter2);
           }
         }
@@ -1149,26 +1140,29 @@ public final class RuntimeFilterGenerator {
    * Registers a runtime filter with the tuple id of every scan node that is a candidate
    * destination node for that filter.
    */
-  private void registerRuntimeFilter(RuntimeFilter filter) {
+  private void registerRuntimeFilter(PlannerContext ctx, RuntimeFilter filter) {
     Map<TupleId, List<SlotId>> targetSlotsByTid = filter.getTargetSlots();
     Preconditions.checkState(targetSlotsByTid != null && !targetSlotsByTid.isEmpty());
     for (TupleId tupleId: targetSlotsByTid.keySet()) {
-      registerRuntimeFilter(filter, tupleId);
+      registerRuntimeFilter(ctx, filter, tupleId);
     }
   }
 
   /**
    * Registers a runtime filter with a specific target tuple id.
    */
-  private void registerRuntimeFilter(RuntimeFilter filter, TupleId targetTid) {
-    Preconditions.checkState(filter.getTargetSlots().containsKey(targetTid));
-    List<RuntimeFilter> filters = runtimeFiltersByTid_.get(targetTid);
-    if (filters == null) {
-      filters = new ArrayList<>();
-      runtimeFiltersByTid_.put(targetTid, filters);
+  private void registerRuntimeFilter(
+      PlannerContext ctx, RuntimeFilter filter, TupleId targetTid) {
+    Preconditions.checkArgument(filter.getTargetSlots().containsKey(targetTid),
+        "filter does not contain target slot!");
+    Preconditions.checkArgument(!filter.isFinalized(), "filter must not finalized yet!");
+    if (ctx.getQueryOptions().isSetRuntime_filter_ids_to_skip()
+        && ctx.getQueryOptions().getRuntime_filter_ids_to_skip().contains(
+            filter.getFilterId().asInt())) {
+      // Skip this filter because it is explicitly excluded via query option.
+      return;
     }
-    Preconditions.checkState(!filter.isFinalized());
-    filters.add(filter);
+    runtimeFiltersByTid_.computeIfAbsent(targetTid, t -> new ArrayList<>()).add(filter);
   }
 
   /**
