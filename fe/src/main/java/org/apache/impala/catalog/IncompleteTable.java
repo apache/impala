@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
 import org.apache.impala.common.ImpalaException;
@@ -82,6 +83,24 @@ public class IncompleteTable extends Table implements FeIncompleteTable {
    */
   @Override
   public ImpalaException getCause() { return cause_; }
+
+  /**
+   * Returns true if the load has failed due to recoverable errors such as
+   * metastore connection error
+   * @return
+   */
+  @Override
+  public boolean isLoadFailedByRecoverableError() {
+    if (cause_ instanceof TableLoadingException) {
+      String metastoreConnectionError = "Could not connect to meta store";
+      if (cause_.getMessage().contains(metastoreConnectionError)
+          || (cause_.getCause() instanceof MetaException
+                 && cause_.getCause().getMessage().contains(metastoreConnectionError))) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /**
    * See comment on cause_.

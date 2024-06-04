@@ -87,6 +87,35 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+    impalad_args='--use_local_catalog',
+    catalogd_args='--catalog_topic_mode=minimal')
+  def test_local_catalog_load_with_hms_state_change(self, unique_database):
+    self.run_test_load_with_hms_down_and_up(unique_database,
+                                            "local_catalog_load_with_hms_state_change")
+
+  @pytest.mark.execute_serially
+  def test_load_with_hms_state_change(self, unique_database):
+    self.run_test_load_with_hms_down_and_up(unique_database,
+                                            "load_with_hms_state_change")
+
+  def run_test_load_with_hms_down_and_up(self, unique_database, table_name):
+    table = unique_database + "." + table_name
+    self.client.execute("create table {0} (i int)".format(table))
+    kill_cmd = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/kill-hive-server.sh')
+    check_call([kill_cmd, '-only_metastore'], close_fds=True)
+    for _ in range(2):
+      try:
+        self.client.execute("describe {0}".format(table))
+      except ImpalaBeeswaxException as e:
+        assert "Failed to load metadata for table: %s. "\
+               "Running 'invalidate metadata %s' may resolve this problem." \
+               % (table, table) in str(e)
+    self.run_hive_metastore()
+    res = self.client.execute("describe {0}".format(table))
+    assert res.data == ["i\tint\t"]
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
     impalad_args='--use_local_catalog --catalog_topic_mode=minimal',
     catalogd_args='--catalog_topic_mode=minimal')
   def test_hms_client_retries(self):

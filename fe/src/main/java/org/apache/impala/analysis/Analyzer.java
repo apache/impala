@@ -3700,7 +3700,7 @@ public class Analyzer {
         throw new AnalysisException(TBL_DOES_NOT_EXIST_ERROR_MSG + tblName.toString());
       }
     }
-    Preconditions.checkState(table.isLoaded());
+    Preconditions.checkState(table.isLoaded(), "table: %s should be loaded", tblName);
     if (table instanceof FeIncompleteTable) {
       // If there were problems loading this table's metadata, throw an exception
       // when it is accessed.

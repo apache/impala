@@ -2467,11 +2467,20 @@ public class CatalogServiceCatalog extends Catalog {
       if (tbl == null) return null;
       LOG.trace("table {} exits in cache, last synced id {}", tbl.getFullName(),
           tbl.getLastSyncedEventId());
+      boolean isLoaded = tbl.isLoaded();
+      if (isLoaded && tbl instanceof IncompleteTable
+          && ((IncompleteTable) tbl).isLoadFailedByRecoverableError()) {
+        // If the previous load of incomplete table had failed due to recoverable errors,
+        // try loading again instead of returning the existing table
+        isLoaded = false;
+      }
       // if no validWriteIdList is provided, we return the tbl if its loaded
       // In the external front end use case it is possible that an external table might
       // have validWriteIdList, so we can simply ignore this value if table is external
-      if (tbl.isLoaded() && (validWriteIdList == null ||
-          (!AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())))) {
+      if (isLoaded
+          && (validWriteIdList == null
+                 || (!AcidUtils.isTransactionalTable(
+                        tbl.getMetaStoreTable().getParameters())))) {
         incrementCatalogDCacheHitMetric(reason);
         LOG.trace("returning already loaded table {}", tbl.getFullName());
         return tbl;

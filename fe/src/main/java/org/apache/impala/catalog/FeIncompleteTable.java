@@ -24,4 +24,11 @@ import org.apache.impala.common.ImpalaException;
 public interface FeIncompleteTable extends FeTable {
   /** Return the cause of the failure to load */
   public ImpalaException getCause();
+
+  /**
+   * Whether load has failed due to recoverable errors. Default is false.
+   */
+  default boolean isLoadFailedByRecoverableError() {
+    return false;
+  }
 }

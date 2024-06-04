@@ -166,7 +166,14 @@ public class StmtMetadataLoader {
     Preconditions.checkState(numLoadRequestsSent_ == 0);
     Preconditions.checkState(numCatalogUpdatesReceived_ == 0);
     FeCatalog catalog = fe_.getCatalog();
-    Set<TableName> missingTbls = getMissingTables(catalog, tbls);
+    // missingTblsSnapshot builds tableName to table in the db mapping for tables that
+    // are either not loaded or have failed to load due to recoverable error in the
+    // previous queries. It is used to detect change of table in db since the time it is
+    // added to missingTblsSnapshot when the table is loaded.
+    Map<TableName, FeTable> missingTblsSnapshot = new HashMap<>();
+    // TableName is added to missingTbls set as long as table is not loaded or the table
+    // in db has not changed(i.e., table in db is same as table in missingTblsSnapshot).
+    Set<TableName> missingTbls = getMissingTables(catalog, tbls, missingTblsSnapshot);
     // There are no missing tables. Return to avoid making an RPC to the CatalogServer
     // and adding events to the timeline.
     if (missingTbls.isEmpty()) {
@@ -231,7 +238,8 @@ public class StmtMetadataLoader {
 
       // Wait for the next catalog update and then revise the loaded/missing tables.
       catalog.waitForCatalogUpdate(Frontend.MAX_CATALOG_UPDATE_WAIT_TIME_MS);
-      Set<TableName> newMissingTbls = getMissingTables(catalog, missingTbls);
+      Set<TableName> newMissingTbls =
+          getMissingTables(catalog, missingTbls, missingTblsSnapshot);
       // Issue a load request for the new missing tables in these cases:
       // 1) Catalog has restarted so all in-flight loads have been lost
       // 2) There are new missing tables due to view expansion
@@ -303,7 +311,8 @@ public class StmtMetadataLoader {
    * Path.getCandidateTables(). Non-existent tables are ignored and not returned or
    * added to 'loadedOrFailedTbls_'.
    */
-  private Set<TableName> getMissingTables(FeCatalog catalog, Set<TableName> tbls) {
+  private Set<TableName> getMissingTables(FeCatalog catalog, Set<TableName> tbls,
+      Map<TableName, FeTable> missingTblsSnapshot) {
     Set<TableName> missingTbls = new HashSet<>();
     Set<TableName> viewTbls = new HashSet<>();
     for (TableName tblName: tbls) {
@@ -313,7 +322,14 @@ public class StmtMetadataLoader {
       dbs_.add(tblName.getDb());
       FeTable tbl = db.getTable(tblName.getTbl());
       if (tbl == null) continue;
-      if (!tbl.isLoaded()) {
+      if (!tbl.isLoaded()
+          || (tbl instanceof FeIncompleteTable
+                 && ((FeIncompleteTable) tbl).isLoadFailedByRecoverableError())) {
+        // Add table to missingTblsSnapshot only for the first time(putIfAbsent) if the
+        // table is not loaded or the previous load has failed due to recoverable error.
+        missingTblsSnapshot.putIfAbsent(tblName, tbl);
+      }
+      if (!tbl.isLoaded() || missingTblsSnapshot.get(tblName) == tbl) {
         missingTbls.add(tblName);
         continue;
       }
@@ -338,7 +354,9 @@ public class StmtMetadataLoader {
       }
     }
     // Recursively collect loaded/missing tables from loaded views.
-    if (!viewTbls.isEmpty()) missingTbls.addAll(getMissingTables(catalog, viewTbls));
+    if (!viewTbls.isEmpty()) {
+      missingTbls.addAll(getMissingTables(catalog, viewTbls, missingTblsSnapshot));
+    }
     return missingTbls;
   }
 
