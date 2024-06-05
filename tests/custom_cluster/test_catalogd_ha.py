@@ -21,6 +21,7 @@ import logging
 import re
 import requests
 
+from beeswaxd.BeeswaxService import QueryState
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.util.filesystem_utils import get_fs_path
@@ -434,6 +435,42 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
     # Verify simple queries are ran successfully.
     self.__run_simple_queries()
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+    catalogd_args="--debug_actions='catalogd_wait_sync_ddl_version_delay:SLEEP@5000'",
+    start_args="--enable_catalogd_ha")
+  def test_catalogd_failover_with_sync_ddl(self, unique_database):
+    """Tests for Catalog Service force fail-over when running DDL with SYNC_DDL
+    enabled."""
+    # Verify two catalogd instances are created with one as active.
+    catalogds = self.cluster.catalogds()
+    assert(len(catalogds) == 2)
+    catalogd_service_1 = catalogds[0].service
+    catalogd_service_2 = catalogds[1].service
+    assert(catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
+
+    # Run DDL with SYNC_DDL enabled.
+    client = self.cluster.impalads[0].service.create_beeswax_client()
+    assert client is not None
+    self.execute_query_expect_success(client, "set SYNC_DDL=1")
+    ddl_query = "CREATE TABLE {database}.failover_sync_ddl (c int)"
+    handle = client.execute_async(ddl_query.format(database=unique_database))
+
+    # Restart standby catalogd with force_catalogd_active as true.
+    catalogds[1].kill()
+    catalogds[1].start(wait_until_ready=True,
+                       additional_args="--force_catalogd_active=true")
+    # Wait until original active catalogd becomes in-active.
+    catalogd_service_1 = catalogds[0].service
+    catalogd_service_1.wait_for_metric_value(
+        "catalog-server.active-status", expected_value=False, timeout=15)
+    assert(not catalogd_service_1.get_metric_value("catalog-server.active-status"))
+
+    # Verify that the query is failed due to the Catalogd HA fail-over.
+    self.wait_for_state(handle, QueryState.EXCEPTION, 30, client=client)
+    client.close()
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",

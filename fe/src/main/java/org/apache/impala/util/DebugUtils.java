@@ -86,6 +86,10 @@ public class DebugUtils {
   // debug action to enable eventProcessor
   public static final String ENABLE_EVENT_PROCESSOR = "enable_event_processor";
 
+  // debug action label to inject a delay when waiting SYNC DDL version
+  public static final String WAIT_SYNC_DDL_VER_DELAY =
+      "catalogd_wait_sync_ddl_version_delay";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */

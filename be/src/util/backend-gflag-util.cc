@@ -128,6 +128,7 @@ DECLARE_string(common_hms_event_types);
 DECLARE_int32(dbcp_max_conn_pool_size);
 DECLARE_int32(dbcp_max_wait_millis_for_conn);
 DECLARE_int32(dbcp_data_source_idle_timeout_s);
+DECLARE_bool(enable_catalogd_ha);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -491,6 +492,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
 #else
   cfg.__set_is_release_build(false);
 #endif
+  cfg.__set_enable_catalogd_ha(FLAGS_enable_catalogd_ha);
   return Status::OK();
 }
 
