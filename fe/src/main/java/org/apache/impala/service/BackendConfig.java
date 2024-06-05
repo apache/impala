@@ -525,4 +525,8 @@ public class BackendConfig {
   public boolean isReleaseBuild() {
     return backendCfg_.is_release_build;
   }
+
+  public boolean isCatalogdHAEnabled() {
+    return backendCfg_.enable_catalogd_ha;
+  }
 }

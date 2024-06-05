@@ -306,4 +306,6 @@ struct TBackendGflags {
   137: required i32 dbcp_data_source_idle_timeout
 
   138: required bool is_release_build
+
+  139: required bool enable_catalogd_ha
 }

@@ -713,6 +713,8 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
                 << TNetworkAddressToString(catalogd_registration.address)
                 << ", active_catalogd_version: "
                 << active_catalogd_version;
+      // Regenerate Catalog Service ID.
+      catalog_->RegenerateServiceId();
     }
   }
 }

@@ -132,9 +132,11 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TTableUsageMetrics;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.CatalogBlacklistUtils;
+import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.NoOpEventSequence;
@@ -152,6 +154,7 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -3499,9 +3502,28 @@ public class CatalogServiceCatalog extends Catalog {
     long numAttempts = 0;
     long begin = System.currentTimeMillis();
     long versionToWaitFor = -1;
+    TUniqueId serviceId = JniCatalog.getServiceId();
     while (versionToWaitFor == -1) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("waitForSyncDdlVersion() attempt: " + numAttempts);
+      }
+      if (BackendConfig.INSTANCE.isCatalogdHAEnabled()) {
+        // Catalog serviceId is changed when the HA role of the catalog instance is
+        // changed from active to standby, or from standby to active. Inactive catalogd
+        // does not receive catalog topic updates from the statestore. To avoid waiting
+        // indefinitely, throw exception if its service id has been changed.
+        if (!Strings.isNullOrEmpty(BackendConfig.INSTANCE.debugActions())) {
+          DebugUtils.executeDebugAction(
+              BackendConfig.INSTANCE.debugActions(), DebugUtils.WAIT_SYNC_DDL_VER_DELAY);
+        }
+        if (!serviceId.equals(JniCatalog.getServiceId())) {
+          String errorMsg = "Couldn't retrieve the catalog topic update for the " +
+              "SYNC_DDL operation since HA role of this catalog instance has been " +
+              "changed. The operation has been successfully executed but its effects " +
+              "may have not been broadcast to all the coordinators.";
+          LOG.error(errorMsg);
+          throw new CatalogException(errorMsg);
+        }
       }
       // Examine the topic update log to determine the latest topic update that
       // covers the added/modified/deleted objects in 'result'.
