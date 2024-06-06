@@ -121,6 +121,8 @@ PROFILE_DEFINE_COUNTER(NumCompletedBackends, STABLE_HIGH, TUnit::UNIT,"The numbe
 PROFILE_DEFINE_TIMER(FinalizationTimer, STABLE_LOW,
     "Total time spent in finalization (typically 0 except for INSERT into hdfs tables).");
 
+const string Coordinator::PROFILE_EVENT_LABEL_FIRST_ROW_FETCHED = "First row fetched";
+
 // Maximum number of fragment instances that can publish each broadcast filter.
 static const int MAX_BROADCAST_FILTER_PRODUCERS = 3;
 
@@ -1048,7 +1050,7 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos,
 
   Status status = coord_sink_->GetNext(runtime_state, results, max_rows, eos, timeout_us);
   if (!first_row_fetched_ && results->size() > 0) {
-    query_events_->MarkEvent("First row fetched");
+    query_events_->MarkEvent(Coordinator::PROFILE_EVENT_LABEL_FIRST_ROW_FETCHED);
     first_row_fetched_ = true;
   }
   RETURN_IF_ERROR(UpdateExecState(

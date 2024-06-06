@@ -80,6 +80,9 @@ struct QueryStateRecord {
   /// The number of rows fetched by the client
   int64_t num_rows_fetched;
 
+  /// Total time spent returning rows to the client and other client-side processing.
+  int64_t client_fetch_wait_time_ns;
+
   /// The state of the query as of this snapshot. The possible values for the
   /// query_state = union(beeswax::QueryState, ClientRequestState::RetryState). This is
   /// necessary so that the query_state can accurately reflect if a query has been

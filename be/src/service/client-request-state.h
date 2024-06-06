@@ -398,6 +398,11 @@ class ClientRequestState {
     return wait_end_time_ms - wait_start_time_ms_;
   }
 
+  /// Returns the time taken for the client to fetch all rows.
+  int64_t client_fetch_wait_time_ns() const {
+    return client_wait_timer_->value();
+  }
+
   /// Sets the RetryState to RETRYING. Updates the runtime profile with the retry status
   /// and cause. Must be called while 'lock_' is held. Sets the query_status_. Future
   /// calls to UpdateQueryStatus will not have any effect. This is necessary to prevent

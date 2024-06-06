@@ -69,6 +69,7 @@ void QueryStateRecord::Init(const ClientRequestState& query_handle) {
   start_time_us = query_handle.start_time_us();
   end_time_us = query_handle.end_time_us();
   wait_time_ms = query_handle.wait_time_ms();
+  client_fetch_wait_time_ns = query_handle.client_fetch_wait_time_ns();
   query_handle.summary_profile()->GetTimeline(&timeline);
 
   Coordinator* coord = query_handle.GetCoordinator();

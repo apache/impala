@@ -118,6 +118,8 @@ class TUpdateCatalogRequest;
 /// and unnest them
 class Coordinator { // NOLINT: The member variables could be re-ordered to save space
  public:
+  static const std::string PROFILE_EVENT_LABEL_FIRST_ROW_FETCHED;
+
   Coordinator(ClientRequestState* parent, const TExecRequest& exec_request,
       const QuerySchedulePB& query_schedule, RuntimeProfile::EventSequence* events);
   ~Coordinator();

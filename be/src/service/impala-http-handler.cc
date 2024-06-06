@@ -456,6 +456,14 @@ void ImpalaHttpHandler::AddQueryRecordTips(Document* document) {
   document->AddMember("tips_end_time", "The end time of the query, i.e. the time when the"
       " query is completed, canceled or failed.", document->GetAllocator());
 
+  document->AddMember("tips_first_fetch", "The time taken to fetch the first row."
+      " Available in the query profile as \"First row fetched\".",
+      document->GetAllocator());
+
+  document->AddMember("tips_client_fetch_duration", "Total time spent returning rows to "
+      "the client and other client-side processing. Available in the query profile as "
+      "\"ClientFetchWaitTimer\".", document->GetAllocator());
+
   document->AddMember("tips_duration", "The total duration of the query, including queued"
       " time.", document->GetAllocator());
 
@@ -537,6 +545,26 @@ void ImpalaHttpHandler::QueryStateToJson(const QueryStateRecord& record,
   Value end_time(ToStringFromUnixMicros(record.end_time_us,
       TimePrecision::Millisecond).c_str(), document->GetAllocator());
   value->AddMember("end_time", end_time, document->GetAllocator());
+
+  vector<string>::const_iterator it = std::find(record.event_sequence.labels.begin(),
+      record.event_sequence.labels.end(),
+      Coordinator::PROFILE_EVENT_LABEL_FIRST_ROW_FETCHED);
+  int64_t first_fetch_ns = 0;
+  if (it != record.event_sequence.labels.end()) {
+    first_fetch_ns = record.event_sequence.timestamps[it
+        - record.event_sequence.labels.begin()];
+  }
+  const string& printed_first_fetch = PrettyPrinter::Print(first_fetch_ns,
+      TUnit::TIME_NS);
+  Value val_first_fetch(printed_first_fetch.c_str(), document->GetAllocator());
+  value->AddMember("first_fetch", val_first_fetch, document->GetAllocator());
+
+  const string& printed_client_fetch_duration = PrettyPrinter::Print(
+      record.client_fetch_wait_time_ns, TUnit::TIME_NS);
+  Value val_client_fetch_duration(printed_client_fetch_duration.c_str(),
+      document->GetAllocator());
+  value->AddMember("client_fetch_duration", val_client_fetch_duration,
+      document->GetAllocator());
 
   // record.end_time_us might still be zero if the query is not yet done
   // Use the current Unix time in that case. Note that the duration can be
