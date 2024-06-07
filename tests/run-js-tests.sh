@@ -51,8 +51,8 @@ if [ -r "$IMPALA_NODEJS" ]; then
   echo "NodeJS ${NODEJS_VERSION} installation found";
 else
   echo "Fetching NodeJS ${NODEJS_VERSION}-${NODEJS_DISTRO} binaries ...";
-  NODE_URL_PREFIX="https://nodejs.org/dist"
-  NODE_URL_SUFFIX="${NODEJS_VERSION}/node-${NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz"
+  NODE_URL_PREFIX="https://${IMPALA_TOOLCHAIN_HOST}/mirror/nodejs"
+  NODE_URL_SUFFIX="node-${NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz"
   curl "${NODE_URL_PREFIX}/${NODE_URL_SUFFIX}" -O
 
   tar -xJf node-${NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz
