@@ -1,0 +1,113 @@
+insert into functional_kudu.timestamp_primary_key
+values ("1970-01-01", "1970-01-01", 1)
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=20.00MB mem-reservation=0B thread-reservation=1
+  INSERT INTO KUDU [functional_kudu.timestamp_primary_key]
+  |  output exprs: to_utc_timestamp(CAST('1970-01-01' AS TIMESTAMP), 'UTC', TRUE), to_utc_timestamp(CAST('1970-01-01' AS TIMESTAMP), 'UTC', TRUE), CAST(1 AS INT)
+  |  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+  |
+  00:UNION
+     constant-operands=1
+     mem-estimate=0B mem-reservation=0B thread-reservation=0
+     tuple-ids=0 row-size=25B cardinality=1
+     in pipelines: <none>
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(to_utc_timestamp('1970-01-01', 'UTC', TRUE)))] hosts=1 instances=1
+Per-Host Resources: mem-estimate=24.02MB mem-reservation=4.00MB thread-reservation=1
+  INSERT INTO KUDU [functional_kudu.timestamp_primary_key]
+  |  output exprs: to_utc_timestamp('1970-01-01', 'UTC', TRUE), to_utc_timestamp(CAST('1970-01-01' AS TIMESTAMP), 'UTC', TRUE), CAST(1 AS INT)
+  |  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+  |
+  02:PARTIAL SORT
+  |  order by: KuduPartition(to_utc_timestamp('1970-01-01', 'UTC', TRUE)) ASC NULLS LAST, to_utc_timestamp('1970-01-01', 'UTC', TRUE) ASC NULLS LAST
+  |  materialized: KuduPartition(to_utc_timestamp('1970-01-01', 'UTC', TRUE)), to_utc_timestamp('1970-01-01', 'UTC', TRUE)
+  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+  |  tuple-ids=1 row-size=33B cardinality=1
+  |  in pipelines: <none>
+  |
+  01:EXCHANGE [KUDU(KuduPartition(to_utc_timestamp('1970-01-01', 'UTC', TRUE)))]
+     mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+     tuple-ids=0 row-size=25B cardinality=1
+     in pipelines: <none>
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=116.00KB mem-reservation=0B thread-reservation=1
+  DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, KUDU(KuduPartition(to_utc_timestamp('1970-01-01', 'UTC', TRUE)))]
+  |  mem-estimate=116.00KB mem-reservation=0B thread-reservation=0
+  00:UNION
+     constant-operands=1
+     mem-estimate=0B mem-reservation=0B thread-reservation=0
+     tuple-ids=0 row-size=25B cardinality=1
+     in pipelines: <none>
+====
+upsert into functional_kudu.timestamp_primary_key
+select ts, ts, id from functional_kudu.timestamp_at_dst_changes
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=21.50MB mem-reservation=0B thread-reservation=2
+  UPSERT INTO KUDU [functional_kudu.timestamp_primary_key]
+  |  output exprs: to_utc_timestamp(ts, 'UTC', TRUE), to_utc_timestamp(ts, 'UTC', TRUE), id
+  |  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+  |
+  00:SCAN KUDU [functional_kudu.timestamp_at_dst_changes]
+     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
+     tuple-ids=0 row-size=20B cardinality=unavailable
+     in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(to_utc_timestamp(ts, 'UTC', TRUE)))] hosts=3 instances=3
+Per-Host Resources: mem-estimate=148.07MB mem-reservation=2.00MB thread-reservation=1
+  UPSERT INTO KUDU [functional_kudu.timestamp_primary_key]
+  |  output exprs: to_utc_timestamp(ts, 'UTC', TRUE), to_utc_timestamp(ts, 'UTC', TRUE), id
+  |  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+  |
+  02:PARTIAL SORT
+  |  order by: KuduPartition(to_utc_timestamp(ts, 'UTC', TRUE)) ASC NULLS LAST, to_utc_timestamp(ts, 'UTC', TRUE) ASC NULLS LAST
+  |  materialized: KuduPartition(to_utc_timestamp(ts, 'UTC', TRUE)), to_utc_timestamp(ts, 'UTC', TRUE)
+  |  mem-estimate=128.00MB mem-reservation=2.00MB spill-buffer=2.00MB thread-reservation=0
+  |  tuple-ids=1 row-size=24B cardinality=unavailable
+  |  in pipelines: 00(GETNEXT)
+  |
+  01:EXCHANGE [KUDU(KuduPartition(to_utc_timestamp(ts, 'UTC', TRUE)))]
+     mem-estimate=71.99KB mem-reservation=0B thread-reservation=0
+     tuple-ids=0 row-size=20B cardinality=unavailable
+     in pipelines: 00(GETNEXT)
+
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=1.78MB mem-reservation=0B thread-reservation=2
+  DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, KUDU(KuduPartition(to_utc_timestamp(ts, 'UTC', TRUE)))]
+  |  mem-estimate=288.00KB mem-reservation=0B thread-reservation=0
+  00:SCAN KUDU [functional_kudu.timestamp_at_dst_changes]
+     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
+     tuple-ids=0 row-size=20B cardinality=unavailable
+     in pipelines: 00(GETNEXT)
+====
+update functional_kudu.timestamp_primary_key set t="1970-01-01"
+where tkey="1970-01-01"
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=20.75MB mem-reservation=0B thread-reservation=2
+  UPDATE KUDU [functional_kudu.timestamp_primary_key]
+  |  output exprs: to_utc_timestamp(functional_kudu.timestamp_primary_key.tkey, 'UTC', TRUE), TIMESTAMP '1970-01-01 00:00:00'
+  |  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+  |
+  00:SCAN KUDU [functional_kudu.timestamp_primary_key]
+     kudu predicates: tkey = TIMESTAMP '1970-01-01 00:00:00'
+     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+     tuple-ids=0 row-size=16B cardinality=1
+     in pipelines: 00(GETNEXT)
+====
+delete from functional_kudu.timestamp_primary_key where tkey="1970-01-01"
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=20.75MB mem-reservation=0B thread-reservation=2
+  DELETE FROM KUDU [functional_kudu.timestamp_primary_key]
+  |  output exprs: to_utc_timestamp(functional_kudu.timestamp_primary_key.tkey, 'UTC', TRUE)
+  |  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+  |
+  00:SCAN KUDU [functional_kudu.timestamp_primary_key]
+     kudu predicates: tkey = TIMESTAMP '1970-01-01 00:00:00'
+     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+     tuple-ids=0 row-size=16B cardinality=1
+     in pipelines: 00(GETNEXT)
+====

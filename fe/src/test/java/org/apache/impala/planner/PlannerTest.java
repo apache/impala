@@ -743,6 +743,17 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testKuduDmlWithUtcConversion() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.VERBOSE);
+    options.setWrite_kudu_utc_timestamps(true);
+    // convert_kudu_utc_timestamps is not really needed for the planner test, but it would
+    // be critical for update/delete if the queries were actually executed.
+    options.setConvert_kudu_utc_timestamps(true);
+    runPlannerTestFile("kudu-dml-with-utc-conversion", options);
+  }
+
+  @Test
   public void testMtDopValidation() {
     // Tests that queries planned with mt_dop > 0 produce a parallel plan.
     // Since IMPALA-9812 was fixed all plans are supported. Previously some plans

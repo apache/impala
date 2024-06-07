@@ -45,7 +45,7 @@ import com.google.common.base.Preconditions;
  * clause. The type of the right-hand side of each assignments must be
  * assignment compatible with the left-hand side column type.
  *
- * Currently, only Kudu tables can be updated.
+ * Currently, only Kudu and Iceberg tables can be updated.
  */
 public class UpdateStmt extends ModifyStmt {
   public UpdateStmt(List<String> targetTablePath, FromClause tableRefs,

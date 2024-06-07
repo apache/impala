@@ -24,6 +24,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.util.ExprUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -94,6 +95,8 @@ abstract class KuduModifyImpl extends ModifyImpl {
     addKeyColumns(analyzer, selectList, referencedColumns_, uniqueSlots,
         keySlots, colIndexMap);
 
+    boolean convertToUtc = analyzer.getQueryOptions().isWrite_kudu_utc_timestamps();
+
     // Assignments are only used in the context of updates.
     for (Pair<SlotRef, Expr> valueAssignment : modifyStmt_.assignments_) {
       SlotRef lhsSlotRef = valueAssignment.first;
@@ -125,6 +128,11 @@ abstract class KuduModifyImpl extends ModifyImpl {
       rhsExpr = StatementBase.checkTypeCompatibility(
           modifyStmt_.targetTableRef_.getDesc().getTable().getFullName(),
           c, rhsExpr, analyzer, null /*widestTypeSrcExpr*/);
+
+      if (convertToUtc && rhsExpr.getType().isTimestamp()) {
+        rhsExpr = ExprUtil.toUtcTimestampExpr(
+            analyzer, rhsExpr, true /*expectPreIfNonUnique*/);
+      }
       uniqueSlots.add(lhsSlotRef.getSlotId());
       selectList.add(new SelectListItem(rhsExpr, null));
       referencedColumns_.add(colIndexMap.get(c.getName()));
@@ -148,23 +156,29 @@ abstract class KuduModifyImpl extends ModifyImpl {
       List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
       Map<String, Integer> colIndexMap, String colName)
       throws AnalysisException {
-    SlotRef ref = addSlotRef(analyzer, selectList, referencedColumns, uniqueSlots,
+    Expr ref = addSlotRef(analyzer, selectList, referencedColumns, uniqueSlots,
         keySlots, colIndexMap, colName);
     resultExprs_.add(ref);
   }
 
-  private SlotRef addSlotRef(Analyzer analyzer, List<SelectListItem> selectList,
+  private Expr addSlotRef(Analyzer analyzer, List<SelectListItem> selectList,
       List<Integer> referencedColumns, Set<SlotId> uniqueSlots, Set<SlotId> keySlots,
       Map<String, Integer> colIndexMap, String colName) throws AnalysisException {
     List<String> path = Path.createRawPath(modifyStmt_.targetTableRef_.getUniqueAlias(),
         colName);
     SlotRef ref = new SlotRef(path);
     ref.analyze(analyzer);
-    selectList.add(new SelectListItem(ref, null));
+    Expr expr = ref;
+    boolean convertToUtc = analyzer.getQueryOptions().isWrite_kudu_utc_timestamps();
+    if (convertToUtc && expr.getType().isTimestamp()) {
+      expr = ExprUtil.toUtcTimestampExpr(
+          analyzer, expr, true /*expectPreIfNonUnique*/);
+    }
+    selectList.add(new SelectListItem(expr, null));
     uniqueSlots.add(ref.getSlotId());
     keySlots.add(ref.getSlotId());
     referencedColumns.add(colIndexMap.get(colName));
-    return ref;
+    return expr;
   }
 
   @Override

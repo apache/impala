@@ -83,6 +83,7 @@ public class ExprUtil {
    */
   public static long localTimestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr)
       throws AnalysisException, InternalException {
+    Preconditions.checkArgument(timestampExpr.isConstant());
     return utcTimestampToUnixTimeMicros(analyzer,
         toUtcTimestampExpr(analyzer, timestampExpr, null));
   }
@@ -100,6 +101,7 @@ public class ExprUtil {
    */
   public static Long localTimestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr,
       Boolean expectPreIfNonUnique) throws AnalysisException, InternalException {
+    Preconditions.checkArgument(timestampExpr.isConstant());
     Expr toUtcTimestampExpr = toUtcTimestampExpr(analyzer, timestampExpr,
         expectPreIfNonUnique);
     Expr toUnixTimeExpr = new FunctionCallExpr("utc_to_unix_micros",
@@ -116,14 +118,19 @@ public class ExprUtil {
    */
   public static String localTimestampToString(Analyzer analyzer, Expr timestampExpr)
       throws AnalysisException, InternalException {
+    Preconditions.checkArgument(timestampExpr.isConstant());
     return utcTimestampToSpecifiedTimeZoneTimestamp(analyzer,
         toUtcTimestampExpr(analyzer, timestampExpr, null));
   }
 
-  private static Expr toUtcTimestampExpr(Analyzer analyzer, Expr timestampExpr,
+  /**
+   * Wraps 'timestampExpr' in to_utc_timestamp() that converts it to UTC from local
+   * time zone. If the conversion is ambigious, the earlier/later result will be returned
+   * based on 'expectPreIfNonUnique'.
+   */
+  public static Expr toUtcTimestampExpr(Analyzer analyzer, Expr timestampExpr,
       Boolean expectPreIfNonUnique) throws AnalysisException {
     Preconditions.checkArgument(timestampExpr.isAnalyzed());
-    Preconditions.checkArgument(timestampExpr.isConstant());
     Preconditions.checkArgument(timestampExpr.getType() == Type.TIMESTAMP);
     List<Expr> params = Lists.newArrayList(timestampExpr,
         new StringLiteral(analyzer.getQueryCtx().getLocal_time_zone()));

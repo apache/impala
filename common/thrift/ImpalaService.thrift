@@ -881,8 +881,9 @@ enum TImpalaQueryOptions {
   // See KUDU-3326 for details.
   KUDU_TABLE_RESERVE_SECONDS = 168
 
-  // When true, TIMESTAMPs read from Kudu will be converted from UTC to local time.
-  // Writes are unaffected.
+  // When true, UNIXTIME_MICRO columns read from Kudu will be interpreted as UTC and
+  // and UTC->local timezone conversion is applied when converting to Impala TIMESTAMP.
+  // Writes are unaffected (see WRITE_KUDU_UTC_TIMESTAMPS).
   CONVERT_KUDU_UTC_TIMESTAMPS = 169
 
   // This only makes sense when 'CONVERT_KUDU_UTC_TIMESTAMPS' is true. When true, it
@@ -947,6 +948,11 @@ enum TImpalaQueryOptions {
   // of expressions. The cache helps with generated expressions, which often contain lots
   // of repeated patterns.
   USE_NULL_SLOTS_CACHE = 179
+
+  // When true, Impala TIMESTAMPs are converted from local timezone to UTC before being
+  // written to Kudu as UNIXTIME_MICRO.
+  // Reads are unaffected (see CONVERT_KUDU_UTC_TIMESTAMPS).
+  WRITE_KUDU_UTC_TIMESTAMPS = 180
 }
 
 // The summary of a DML statement.

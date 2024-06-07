@@ -1,27 +1,175 @@
 ====
 ---- QUERY
-# Test that kutu UTC timestamp can be convert to local time.
-select id, from_unixtime(unixtime), ts from timestamp_at_dst_changes;
+# Test that TIMESTAMPs stored in Kudu are converted from UTC to local time when
+# convert_kudu_utc_timestamps=true.
+select id, from_unixtime(unixtime), ts from functional_kudu.timestamp_at_dst_changes;
 ---- TYPES
-BIGINT,TIMESTAMP,TIMESTAMP
+INT,STRING,TIMESTAMP
 ---- RESULTS
-1,2011-03-13 09:00:00,2011-03-13 01:00:00
-2,2011-03-13 09:30:00,2011-03-13 01:30:00
-3,2011-03-13 10:00:00,2011-03-13 03:00:00
-4,2011-03-13 10:30:00,2011-03-13 03:30:00
-5,2011-11-06 08:00:00,2011-11-06 01:00:00
-6,2011-11-06 08:20:00,2011-11-06 01:20:00
-7,2011-11-06 08:40:00,2011-11-06 01:40:00
-8,2011-11-06 09:00:00,2011-11-06 01:00:00
-9,2011-11-06 09:20:00,2011-11-06 01:20:00
-10,2011-11-06 09:40:00,2011-11-06 01:40:00
+1,'2011-03-13 09:00:00',2011-03-13 01:00:00
+2,'2011-03-13 09:30:00',2011-03-13 01:30:00
+3,'2011-03-13 10:00:00',2011-03-13 03:00:00
+4,'2011-03-13 10:30:00',2011-03-13 03:30:00
+5,'2011-11-06 08:00:00',2011-11-06 01:00:00
+6,'2011-11-06 08:20:00',2011-11-06 01:20:00
+7,'2011-11-06 08:40:00',2011-11-06 01:40:00
+8,'2011-11-06 09:00:00',2011-11-06 01:00:00
+9,'2011-11-06 09:20:00',2011-11-06 01:20:00
+10,'2011-11-06 09:40:00',2011-11-06 01:40:00
 ====
 ---- QUERY
-# Test that kutu UTC timestamp conversion results are consistent with from_utc_timestamp().
-select count(*) from functional.alltypes t1 join alltypes t2
+# Test that Kudu UTC timestamp conversion results are consistent with from_utc_timestamp().
+select count(*) from functional.alltypes t1 join functional_kudu.alltypes t2
 on from_utc_timestamp(t1.timestamp_col, 'America/Los_Angeles') = t2.timestamp_col;
 ---- TYPES
 BIGINT
 ---- RESULTS
 7300
+====
+---- QUERY
+# Shift timestamp key with 'id' seconds to have unique primary keys.
+create table utc_kudu (ts_pk_col timestamp primary key, ts_col timestamp, id int)
+  partition by hash(ts_pk_col) partitions 2 stored as kudu;
+insert into utc_kudu select date_add(ts, interval id seconds), ts, id
+  from functional_kudu.timestamp_at_dst_changes;
+select * from utc_kudu where id = 1
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-03-13 01:00:01,2011-03-13 01:00:00,1
+====
+---- QUERY
+select count(*) from utc_kudu t1 join functional_kudu.timestamp_at_dst_changes t2
+  on t1.id=t2.id and t1.ts_pk_col=date_add(t2.ts, interval t2.id seconds) and t1.ts_col=t2.ts;
+---- TYPES
+BIGINT
+---- RESULTS
+10
+====
+---- QUERY
+# Insert values.
+insert into utc_kudu values
+  ("2011-03-13 01:50:00","2011-03-13 01:50:00",11),
+  ("2011-11-06 01:50:00","2011-11-06 01:50:00",12);
+select * from utc_kudu where id > 10;
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-03-13 01:50:00,2011-03-13 01:50:00,11
+2011-11-06 01:50:00,2011-11-06 01:50:00,12
+====
+---- QUERY
+# Upsert values.
+upsert into utc_kudu values
+  ("2011-03-13 01:50:00","2011-03-13 01:50:00",13),
+  ("2011-11-06 01:55:00","2011-11-06 01:55:00",14);
+select * from utc_kudu where id > 10;
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-11-06 01:50:00,2011-11-06 01:50:00,12
+2011-03-13 01:50:00,2011-03-13 01:50:00,13
+2011-11-06 01:55:00,2011-11-06 01:55:00,14
+====
+---- QUERY
+# Upsert from self, decrease ids by 1.
+upsert into utc_kudu
+  select ts_pk_col, ts_col, cast(id-1 as int) from utc_kudu
+    union all select "2011-03-13 01:55:00","2011-03-13 01:55:00",15;
+select * from utc_kudu where id > 10;
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-11-06 01:50:00,2011-11-06 01:50:00,11
+2011-03-13 01:50:00,2011-03-13 01:50:00,12
+2011-11-06 01:55:00,2011-11-06 01:55:00,13
+2011-03-13 01:55:00,2011-03-13 01:55:00,15
+====
+---- QUERY
+# Simple update on timestamp column.
+update utc_kudu set ts_col = "2011-03-13 01:55:01" where ts_pk_col="2011-03-13 01:55:00";
+select * from utc_kudu where ts_pk_col = "2011-03-13 01:55:00";
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-03-13 01:55:00,2011-03-13 01:55:01,15
+====
+---- QUERY
+# Simple update on non-timestamp column.
+update utc_kudu set id=16 where ts_pk_col="2011-03-13 01:55:00";
+select * from utc_kudu where ts_pk_col = "2011-03-13 01:55:00";
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-03-13 01:55:00,2011-03-13 01:55:01,16
+====
+---- QUERY
+# Update with non-const expression.
+update utc_kudu set ts_col=date_add(ts_col, interval 1 second) where id=16;
+select * from utc_kudu where ts_pk_col = "2011-03-13 01:55:00";
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-03-13 01:55:00,2011-03-13 01:55:02,16
+====
+---- QUERY
+# Update with non-const expression.
+update utc_kudu set ts_col=date_add(ts_col, interval 1 second);
+select * from utc_kudu where ts_pk_col = "2011-03-13 01:55:00";
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-03-13 01:55:00,2011-03-13 01:55:03,16
+====
+---- QUERY
+# Update with join.
+update t1 set t1.ts_col=date_add(t2.ts, interval t2.id second)
+  from utc_kudu t1 join functional_kudu.timestamp_at_dst_changes t2
+  on t1.id + 1 = t2.id;
+select * from utc_kudu where ts_pk_col = ts_col;
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-03-13 01:00:01,2011-03-13 01:00:01,0
+2011-03-13 01:30:02,2011-03-13 01:30:02,1
+2011-03-13 03:00:03,2011-03-13 03:00:03,2
+2011-03-13 03:30:04,2011-03-13 03:30:04,3
+2011-11-06 01:00:05,2011-11-06 01:00:05,4
+2011-11-06 01:20:06,2011-11-06 01:20:06,5
+2011-11-06 01:40:07,2011-11-06 01:40:07,6
+2011-11-06 01:00:08,2011-11-06 01:00:08,7
+2011-11-06 01:20:09,2011-11-06 01:20:09,8
+2011-11-06 01:40:10,2011-11-06 01:40:10,9
+====
+---- QUERY
+# Delete based on timestamp primary key column.
+delete from utc_kudu where ts_pk_col="2011-03-13 01:55:00";
+select * from utc_kudu where id > 10;
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-11-06 01:50:00,2011-11-06 01:50:01,11
+2011-03-13 01:50:00,2011-03-13 01:50:01,12
+2011-11-06 01:55:00,2011-11-06 01:55:01,13
+====
+---- QUERY
+# Delete based on timestamp non primary key column.
+delete from utc_kudu where ts_col="2011-11-06 01:55:01";
+select * from utc_kudu where id > 10;
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-11-06 01:50:00,2011-11-06 01:50:01,11
+2011-03-13 01:50:00,2011-03-13 01:50:01,12
+====
+---- QUERY
+# Delete rows inserted from timestamp_at_dst_changes.
+delete t1 from utc_kudu t1 join functional_kudu.timestamp_at_dst_changes t2
+  on t1.ts_pk_col = date_add(t2.ts, interval t2.id seconds);
+select * from utc_kudu;
+---- TYPES
+TIMESTAMP,TIMESTAMP,INT
+---- RESULTS
+2011-11-06 01:50:00,2011-11-06 01:50:01,11
+2011-03-13 01:50:00,2011-03-13 01:50:01,12
 ====

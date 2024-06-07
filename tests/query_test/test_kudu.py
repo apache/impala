@@ -105,11 +105,15 @@ class TestKuduTimestampConvert(KuduTestSuite):
   def add_test_dimensions(cls):
     super(TestKuduTimestampConvert, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_mandatory_exec_option('convert_kudu_utc_timestamps', 'true')
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('write_kudu_utc_timestamps', 'true')
+    cls.ImpalaTestMatrix.add_mandatory_exec_option(
+        'use_local_tz_for_unix_timestamp_conversions', 'false')
     cls.ImpalaTestMatrix.add_mandatory_exec_option('timezone', '"America/Los_Angeles"')
 
   @SkipIfKudu.no_hybrid_clock()
-  def test_kudu_timestamp_conversion(self, vector):
-    self.run_test_case('QueryTest/kudu_timestamp_conversion', vector)
+  def test_kudu_timestamp_conversion(self, vector, unique_database):
+    self.run_test_case(
+        'QueryTest/kudu_timestamp_conversion', vector, use_db=unique_database)
 
   @SkipIfKudu.no_hybrid_clock()
   def test_kudu_predicate_with_timestamp_conversion(self, vector):

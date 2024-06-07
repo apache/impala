@@ -61,6 +61,7 @@ import org.apache.impala.planner.TableSink;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.IcebergUtil;
 
 /**
@@ -849,6 +850,9 @@ public class InsertStmt extends DmlStatementBase {
       widestTypeExprList = unionStmt.getWidestExprs();
     }
 
+    boolean convertToUtc =
+        isKuduTable && analyzer.getQueryOptions().isWrite_kudu_utc_timestamps();
+
     // Check dynamic partition columns for type compatibility.
     for (int i = 0; i < selectListExprs.size(); ++i) {
       Column targetColumn = selectExprTargetColumns.get(i);
@@ -899,7 +903,12 @@ public class InsertStmt extends DmlStatementBase {
         Column c = table_.getColumns().get(i);
         for (int j = 0; j < tmpPartitionKeyNames.size(); ++j) {
           if (c.getName().equals(tmpPartitionKeyNames.get(j))) {
-            partitionKeyExprs_.add(tmpPartitionKeyExprs.get(j));
+            Expr expr = tmpPartitionKeyExprs.get(j);
+            if (convertToUtc && expr.getType().isTimestamp()) {
+              expr = ExprUtil.toUtcTimestampExpr(
+                  analyzer, expr, true /*expectPreIfNonUnique*/);
+            }
+            partitionKeyExprs_.add(expr);
             partitionColPos_.add(i);
             break;
           }
@@ -938,7 +947,12 @@ public class InsertStmt extends DmlStatementBase {
       boolean matchFound = false;
       for (int i = 0; i < selectListExprs.size(); ++i) {
         if (selectExprTargetColumns.get(i).getName().equals(tblColumn.getName())) {
-          resultExprs_.add(selectListExprs.get(i));
+          Expr expr = selectListExprs.get(i);
+          if (convertToUtc && expr.getType().isTimestamp()) {
+            expr = ExprUtil.toUtcTimestampExpr(
+                analyzer, expr, true /*expectPreIfNonUnique*/);
+          }
+          resultExprs_.add(expr);
           if (isKuduTable) mentionedColumns_.add(col);
           matchFound = true;
           break;

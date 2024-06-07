@@ -422,9 +422,9 @@ def verify_raw_results(test_section, exec_result, file_format, result_section,
     expected_types = [c.strip().upper()
                       for c in remove_comments(section).rstrip('\n').split(',')]
 
-    # Avro and Kudu represent TIMESTAMP columns as strings, so tests using TIMESTAMP are
+    # Avro represents TIMESTAMP columns as strings, so tests using TIMESTAMP are
     # skipped because results will be wrong.
-    if file_format in ('avro', 'kudu') and 'TIMESTAMP' in expected_types:
+    if file_format == 'avro' and 'TIMESTAMP' in expected_types:
         LOG.info("TIMESTAMP columns unsupported in %s, skipping verification." %\
             file_format)
         return

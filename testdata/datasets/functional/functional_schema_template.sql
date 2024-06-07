@@ -4723,3 +4723,20 @@ SELECT id,
   case when id % 2 = 0 then date_add(DATE '2023-12-31', interval id days) else null end
 FROM functional.alltypessmall order by id;
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+timestamp_primary_key
+---- COLUMNS
+tkey timestamp
+t timestamp
+id int
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  tkey TIMESTAMP PRIMARY KEY,
+  t TIMESTAMP,
+  id INT
+)
+PARTITION BY HASH (tkey) PARTITIONS 3 STORED AS KUDU;
+====

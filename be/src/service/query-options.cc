@@ -1297,6 +1297,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_use_null_slots_cache(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::WRITE_KUDU_UTC_TIMESTAMPS: {
+        query_options->__set_write_kudu_utc_timestamps(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

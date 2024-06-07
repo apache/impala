@@ -273,7 +273,7 @@ table_name:large_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:multistream_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:large_multistream_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
 
-# Kudu can't handle certain types such as timestamp so we pick and choose the tables
+# Kudu needs CREATE_KUDU section in the schema sql so we pick and choose the tables
 # we actually use for Kudu related tests.
 table_name:alltypes, constraint:only, table_format:kudu/none/none
 table_name:alltypessmall, constraint:only, table_format:kudu/none/none
@@ -300,6 +300,7 @@ table_name:date_tbl, constraint:only, table_format:kudu/none/none
 table_name:timestamp_at_dst_changes, constraint:only, table_format:kudu/none/none
 table_name:binary_tbl, constraint:only, table_format:kudu/none/none
 table_name:binary_tbl_big, constraint:only, table_format:kudu/none/none
+table_name:timestamp_primary_key, constraint:only, table_format:kudu/none/none
 
 # Skipping header lines is only effective with text tables
 table_name:table_with_header, constraint:restrict_to, table_format:text/none/none
@@ -422,9 +423,14 @@ table_name:empty_parquet_page_source_impala10186, constraint:restrict_to, table_
 table_name:empty_stream_tbl, constraint:restrict_to, table_format:orc/def/block
 
 # The table is used to test DST changes in timestamps, the timestamps in the table near
-# DST changes in the 'America/Los_Angeles' time zone.
+# DST changes in the 'America/Los_Angeles' time zone. (DST: UTC-7 / outside DST: UTC-8)
+# The table containts timestamps from 2011. In 2011 Los Angeles, DST starts at 2 a.m. on
+# Sunday, March 13 (clocks were turned forward 1 hour) and fall back to standard time
+# again at 2 a.m. on Sunday, November 6 (clocks were turned backward 1 hour).
 table_name:timestamp_at_dst_changes, constraint:restrict_to, table_format:text/none/none
 table_name:timestamp_at_dst_changes, constraint:restrict_to, table_format:kudu/none/none
+
+table_name:timestamp_primary_key, constraint:restrict_to, table_format:kudu/none/none
 
 # Table where all column values are unique but have some NULLs.
 # Depends on functional.alltypessmall.

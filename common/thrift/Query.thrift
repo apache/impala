@@ -732,6 +732,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   180: optional bool use_null_slots_cache = true;
+
+  // See comment in ImpalaService.thrift
+  181: optional bool write_kudu_utc_timestamps = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
