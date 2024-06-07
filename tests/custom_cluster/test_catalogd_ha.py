@@ -18,16 +18,24 @@
 from __future__ import absolute_import, division, print_function
 import logging
 import re
+import time
 
 from beeswaxd.BeeswaxService import QueryState
+from builtins import round
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
-from tests.util.filesystem_utils import get_fs_path
+from tests.util.filesystem_utils import IS_S3, get_fs_path
 from time import sleep
 
 LOG = logging.getLogger('catalogd_ha_test')
 DEFAULT_STATESTORE_SERVICE_PORT = 24000
 DEFAULT_CATALOG_SERVICE_PORT = 26000
+SLOW_BUILD_SYNC_DDL_DELAY_S = 20
+SYNC_DDL_DELAY_S = build_flavor_timeout(
+    10, slow_build_timeout=SLOW_BUILD_SYNC_DDL_DELAY_S)
+# s3 can behave as a slow build.
+if IS_S3:
+  SYNC_DDL_DELAY_S = SLOW_BUILD_SYNC_DDL_DELAY_S
 
 
 class TestCatalogdHA(CustomClusterTestSuite):
@@ -430,7 +438,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
-    catalogd_args="--debug_actions='catalogd_wait_sync_ddl_version_delay:SLEEP@5000'",
+    catalogd_args="--debug_actions='catalogd_wait_sync_ddl_version_delay:SLEEP@{0}'"
+                  .format(SYNC_DDL_DELAY_S * 1000),
     start_args="--enable_catalogd_ha")
   def test_catalogd_failover_with_sync_ddl(self, unique_database):
     """Tests for Catalog Service force fail-over when running DDL with SYNC_DDL
@@ -451,6 +460,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     handle = client.execute_async(ddl_query.format(database=unique_database))
 
     # Restart standby catalogd with force_catalogd_active as true.
+    start_s = time.time()
     catalogds[1].kill()
     catalogds[1].start(wait_until_ready=True,
                        additional_args="--force_catalogd_active=true")
@@ -459,9 +469,14 @@ class TestCatalogdHA(CustomClusterTestSuite):
     catalogd_service_1.wait_for_metric_value(
         "catalog-server.active-status", expected_value=False, timeout=15)
     assert(not catalogd_service_1.get_metric_value("catalog-server.active-status"))
+    elapsed_s = time.time() - start_s
+    assert elapsed_s < SYNC_DDL_DELAY_S, \
+        "Catalogd failover took %s seconds to complete" % (elapsed_s)
+    LOG.info("Catalogd failover took %s seconds to complete" % round(elapsed_s, 1))
 
     # Verify that the query is failed due to the Catalogd HA fail-over.
-    self.wait_for_state(handle, QueryState.EXCEPTION, 30, client=client)
+    self.wait_for_state(
+        handle, QueryState.EXCEPTION, SYNC_DDL_DELAY_S * 2 + 10, client=client)
     client.close()
 
   @CustomClusterTestSuite.with_args(
