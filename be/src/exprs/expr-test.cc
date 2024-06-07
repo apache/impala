@@ -11227,7 +11227,10 @@ TEST_P(ExprTest, AiFunctionsTest) {
   string secret_key("do_not_share");
   AiFunctions::set_api_key(secret_key);
   // valid endpoint
-  StringVal openai_endpoint("https://openai.azure.com");
+  std::string_view openai_endpoint("https://api.openai.com/v1/chat/completions");
+  std::string_view azure_openai_endpoint(
+      "https://resource.openai.azure.com/openai/deployments/"
+      "deployment/completions?api-version=2024-02-01");
   // empty jceks secret key
   StringVal jceks_secret("");
   // dummy model.
@@ -11239,9 +11242,19 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // dry_run to receive HTTP request header and body
   bool dry_run = true;
 
+  // Test GetAiPlatformFromEndpoint
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::OPEN_AI,
+      AiFunctions::GetAiPlatformFromEndpoint(openai_endpoint));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::AZURE_OPEN_AI,
+      AiFunctions::GetAiPlatformFromEndpoint(azure_openai_endpoint));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://qwerty.com"));
+
   // Test fastpath
-  StringVal result = AiFunctions::AiGenerateTextInternal<true>(ctx, StringVal::null(),
-      prompt, StringVal::null(), StringVal::null(), StringVal::null(), dry_run);
+  StringVal result =
+    AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::OPEN_AI>(
+        ctx, FLAGS_ai_endpoint, prompt, StringVal::null(), StringVal::null(),
+        StringVal::null(), dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
@@ -11249,22 +11262,34 @@ TEST_P(ExprTest, AiFunctionsTest) {
              "\n{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"user\",\"content\":"
              "\"hello!\"}]}"));
 
+  result =
+    AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::AZURE_OPEN_AI>(
+        ctx, azure_openai_endpoint, prompt, StringVal::null(), StringVal::null(),
+        StringVal::null(), dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      string("https://resource.openai.azure.com/openai/deployments/"
+             "deployment/completions?api-version=2024-02-01"
+             "\nContent-Type: application/json"
+             "\napi-key: do_not_share"
+             "\n{\"messages\":[{\"role\":\"user\",\"content\":"
+             "\"hello!\"}]}"));
+
   // Test endpoints.
   // endpoints must begin with https.
-  result = AiFunctions::AiGenerateTextInternal<false>(
-      ctx, StringVal("http://ai.com"), prompt, model, jceks_secret, json_params, dry_run);
+  result = AiFunctions::AiGenerateText(
+      ctx, StringVal("http://ai.com"), prompt, model, jceks_secret, json_params);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_INVALID_PROTOCOL_ERROR);
   // only OpenAI endpoints are supported.
-  result = AiFunctions::AiGenerateTextInternal<false>(ctx, StringVal("https://ai.com"),
-      prompt, model, jceks_secret, json_params, dry_run);
+  result = AiFunctions::AiGenerateText(
+      ctx, "https://ai.com", prompt, model, jceks_secret, json_params);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_UNSUPPORTED_ENDPOINT_ERROR);
   // valid request using OpenAI endpoint.
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, json_params, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      string("https://openai.azure.com"
+      string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
              "\nAuthorization: Bearer do_not_share"
              "\n{\"model\":\"bot\",\"messages\":[{\"role\":\"user\",\"content\":\"hello!"
@@ -11273,21 +11298,27 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // Test prompt.
   // prompt cannot be empty.
   StringVal invalid_prompt("");
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, invalid_prompt, model, jceks_secret, json_params, dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      AiFunctions::AI_GENERATE_TXT_INVALID_PROMPT_ERROR);
+  result = AiFunctions::AiGenerateTextDefault(ctx, invalid_prompt);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_INVALID_PROMPT_ERROR);
   // prompt cannot be null.
   invalid_prompt = StringVal::null();
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, invalid_prompt, model, jceks_secret, json_params, dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      AiFunctions::AI_GENERATE_TXT_INVALID_PROMPT_ERROR);
+  result = AiFunctions::AiGenerateTextDefault(ctx, invalid_prompt);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_INVALID_PROMPT_ERROR);
 
   // Test override/additional params
   // invalid json results in error.
   StringVal invalid_json_params("{\"temperature\": 0.49, \"stop\": [\"*\",::,]}");
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, invalid_json_params, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
@@ -11295,10 +11326,10 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // like 'temperature' and 'stop'.
   StringVal valid_json_params(
       "{\"model\": \"gpt\", \"temperature\": 0.49, \"stop\": [\"*\", \"%\"]}");
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, valid_json_params, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      string("https://openai.azure.com"
+      string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
              "\nAuthorization: Bearer do_not_share"
              "\n{\"model\":\"gpt\",\"messages\":[{\"role\":\"user\",\"content\":\"hello!"
@@ -11306,44 +11337,45 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // messages cannot be overriden, as they we constructed from the prompt.
   StringVal forbidden_msg_override(
       "{\"messages\": [{\"role\":\"system\",\"content\":\"howdy!\"}]}");
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_msg_override, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR);
   // 'n != 1' cannot be overriden as additional params
   StringVal forbidden_n_value("{\"n\": 2}");
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_value, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
   // non integer value of 'n' cannot be overriden as additional params
   StringVal forbidden_n_type("{\"n\": \"1\"}");
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_type, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
   // accept 'n=1' override as additional params
   StringVal allowed_n_override("{\"n\": 1}");
-  result = AiFunctions::AiGenerateTextInternal<false>(
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, allowed_n_override, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      string("https://openai.azure.com"
+      string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
              "\nAuthorization: Bearer do_not_share"
              "\n{\"model\":\"bot\",\"messages\":[{\"role\":\"user\",\"content\":\"hello!"
              "\"}],\"n\":1}"));
 
   // Test flag file options are used when input is empty/null
-  result = AiFunctions::AiGenerateTextInternal<false>(ctx, StringVal::null(), prompt,
-      StringVal::null(), jceks_secret, json_params, dry_run);
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, FLAGS_ai_endpoint, prompt, StringVal::null(), jceks_secret, json_params,
+      dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
              "\nAuthorization: Bearer do_not_share"
              "\n{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"user\",\"content\":"
              "\"hello!\"}]}"));
-  result = AiFunctions::AiGenerateTextInternal<false>(
-      ctx, StringVal(""), prompt, StringVal(""), jceks_secret, json_params, dry_run);
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, FLAGS_ai_endpoint, prompt, StringVal(""), jceks_secret, json_params, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"

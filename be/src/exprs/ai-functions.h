@@ -37,6 +37,16 @@ class AiFunctions {
   static const string AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR;
   static const string AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR;
   static const char* OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER;
+  static const char* OPEN_AI_REQUEST_AUTH_HEADER;
+  static const char* AZURE_OPEN_AI_REQUEST_AUTH_HEADER;
+  enum AI_PLATFORM {
+    /// Unsupported platform
+    UNSUPPORTED,
+    /// OpenAI public platform
+    OPEN_AI,
+    /// Azure OpenAI platform
+    AZURE_OPEN_AI
+  };
   /// Sends a prompt to the input AI endpoint using the input model, api_key and
   /// optional params.
   static StringVal AiGenerateText(FunctionContext* ctx, const StringVal& endpoint,
@@ -58,14 +68,26 @@ class AiFunctions {
   /// Internal function which implements the logic of parsing user input and sending
   /// request to the external API endpoint. If 'dry_run' is set, the POST request is
   /// returned. 'dry_run' mode is used only for unit tests.
-  template <bool fastpath>
-  static StringVal AiGenerateTextInternal(FunctionContext* ctx, const StringVal& endpoint,
+  template <bool fastpath, AI_PLATFORM platform>
+  static StringVal AiGenerateTextInternal(
+      FunctionContext* ctx, const std::string_view& endpoint,
       const StringVal& prompt, const StringVal& model,
       const StringVal& api_key_jceks_secret, const StringVal& params, const bool dry_run);
+  /// Helper function for calling AiGenerateTextInternal with common code for both
+  /// fastpath and regular path.
+  template <bool fastpath>
+  static StringVal AiGenerateTextHelper(
+    FunctionContext* ctx, const StringVal& endpoint, const StringVal& prompt,
+    const StringVal& model, const StringVal& api_key_jceks_secret,
+    const StringVal& params);
   /// Internal helper function for parsing OPEN AI's API response. Input parameter is the
   /// json representation of the OPEN AI's API response.
   static std::string AiGenerateTextParseOpenAiResponse(
       const std::string_view& reponse);
+  /// Helper function for getting AI Platform from the endpoint
+  static AI_PLATFORM GetAiPlatformFromEndpoint(const std::string_view& endpoint);
+  /// Helper functions for deep copying error message
+  static StringVal copyErrorMessage(FunctionContext* ctx, const string& errorMsg);
 
   friend class ExprTest_AiFunctionsTest_Test;
 };

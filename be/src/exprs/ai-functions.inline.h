@@ -42,55 +42,69 @@ DECLARE_int32(ai_connection_timeout_s);
 
 namespace impala {
 
-template <bool fastpath>
-StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
-    const StringVal& endpoint, const StringVal& prompt, const StringVal& model,
-    const StringVal& api_key_jceks_secret, const StringVal& params, const bool dry_run) {
-  std::string_view endpoint_sv(FLAGS_ai_endpoint);
-  // endpoint validation
-  if (!fastpath && endpoint.ptr != nullptr && endpoint.len != 0) {
-    endpoint_sv = std::string_view(reinterpret_cast<char*>(endpoint.ptr), endpoint.len);
-    // Simple validation for endpoint. It should start with https://
-    if (!is_api_endpoint_valid(endpoint_sv)) {
-      LOG(ERROR) << "AI Generate Text: \ninvalid protocol: " << endpoint_sv;
-      return StringVal(AI_GENERATE_TXT_INVALID_PROTOCOL_ERROR.c_str());
-    }
-    // Only OpenAI endpoints are supported.
-    if (!is_api_endpoint_supported(endpoint_sv)) {
-      LOG(ERROR) << "AI Generate Text: \nunsupported endpoint: " << endpoint_sv;
-      return StringVal(AI_GENERATE_TXT_UNSUPPORTED_ENDPOINT_ERROR.c_str());
-    }
+#define RETURN_STRINGVAL_IF_ERROR(ctx, stmt)               \
+  do {                                                     \
+    const ::impala::Status& _status = (stmt);              \
+    if (UNLIKELY(!_status.ok())) {                         \
+      return copyErrorMessage(ctx, _status.msg().msg());   \
+    }                                                      \
+  } while (false)
+
+template<AiFunctions::AI_PLATFORM platform>
+Status getAuthorizationHeader(string& authHeader, const string& api_key) {
+  switch(platform) {
+    case AiFunctions::AI_PLATFORM::OPEN_AI:
+      authHeader = AiFunctions::OPEN_AI_REQUEST_AUTH_HEADER + api_key;
+      return Status::OK();
+    case AiFunctions::AI_PLATFORM::AZURE_OPEN_AI:
+      authHeader =  AiFunctions::AZURE_OPEN_AI_REQUEST_AUTH_HEADER + api_key;
+      return Status::OK();
+    default:
+      DCHECK(false) <<
+          "AiGenerateTextInternal should only be called for Supported Platforms";
+      return Status(AiFunctions::AI_GENERATE_TXT_UNSUPPORTED_ENDPOINT_ERROR);
   }
+}
+
+template <bool fastpath, AiFunctions::AI_PLATFORM platform>
+StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
+    const std::string_view& endpoint_sv, const StringVal& prompt, const StringVal& model,
+    const StringVal& api_key_jceks_secret, const StringVal& params, const bool dry_run) {
   // Generate the header for the POST request
   vector<string> headers;
   headers.emplace_back(OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER);
+  string authHeader;
   if (!fastpath && api_key_jceks_secret.ptr != nullptr && api_key_jceks_secret.len != 0) {
     string api_key;
     string api_key_secret(
         reinterpret_cast<char*>(api_key_jceks_secret.ptr), api_key_jceks_secret.len);
-    Status status = ExecEnv::GetInstance()->frontend()->GetSecretFromKeyStore(
-        api_key_secret, &api_key);
-    if (!status.ok()) {
-      return StringVal::CopyFrom(ctx,
-          reinterpret_cast<const uint8_t*>(status.msg().msg().c_str()),
-          status.msg().msg().length());
-    }
-    headers.emplace_back("Authorization: Bearer " + api_key);
+    RETURN_STRINGVAL_IF_ERROR(ctx,
+        ExecEnv::GetInstance()->frontend()->GetSecretFromKeyStore(
+            api_key_secret, &api_key));
+    RETURN_STRINGVAL_IF_ERROR(ctx,
+        getAuthorizationHeader<platform>(authHeader, api_key));
   } else {
-    headers.emplace_back("Authorization: Bearer " + ai_api_key_);
+    RETURN_STRINGVAL_IF_ERROR(ctx,
+        getAuthorizationHeader<platform>(authHeader, ai_api_key_));
   }
+  headers.emplace_back(authHeader);
   // Generate the payload for the POST request
   Document payload;
   payload.SetObject();
   Document::AllocatorType& payload_allocator = payload.GetAllocator();
-  if (!fastpath && model.ptr != nullptr && model.len != 0) {
-    payload.AddMember("model",
-        rapidjson::StringRef(reinterpret_cast<char*>(model.ptr), model.len),
-        payload_allocator);
-  } else {
-    payload.AddMember("model",
-        rapidjson::StringRef(FLAGS_ai_model.c_str(), FLAGS_ai_model.length()),
-        payload_allocator);
+  // Azure Open AI endpoint doesn't expect model as a separate param since it's
+  // embedded in the endpoint. The 'deployment_name' below maps to a model.
+  // https://<resource_name>.openai.azure.com/openai/deployments/<deployment_name>/..
+  if (platform != AI_PLATFORM::AZURE_OPEN_AI) {
+    if (!fastpath && model.ptr != nullptr && model.len != 0) {
+      payload.AddMember("model",
+          rapidjson::StringRef(reinterpret_cast<char*>(model.ptr), model.len),
+          payload_allocator);
+    } else {
+      payload.AddMember("model",
+          rapidjson::StringRef(FLAGS_ai_model.c_str(), FLAGS_ai_model.length()),
+          payload_allocator);
+    }
   }
   Value message_array(rapidjson::kArrayType);
   Value message(rapidjson::kObjectType);
@@ -169,11 +183,7 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
     status = curl.PostToURL(endpoint_str, payload_str, &resp, headers);
   }
   VLOG(2) << "AI Generate Text: \noriginal response: " << resp.ToString();
-  if (!status.ok()) {
-    string msg = status.ToString();
-    return StringVal::CopyFrom(
-        ctx, reinterpret_cast<const uint8_t*>(msg.c_str()), msg.size());
-  }
+  if (UNLIKELY(!status.ok())) return copyErrorMessage(ctx, status.ToString());
   // Parse the JSON response string
   std::string response = AiGenerateTextParseOpenAiResponse(
       std::string_view(reinterpret_cast<char*>(resp.data()), resp.size()));

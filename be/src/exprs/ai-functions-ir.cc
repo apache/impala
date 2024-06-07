@@ -60,6 +60,10 @@ const string AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR =
 string AiFunctions::ai_api_key_;
 const char* AiFunctions::OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER =
     "Content-Type: application/json";
+const char* AiFunctions::OPEN_AI_REQUEST_AUTH_HEADER =
+    "Authorization: Bearer ";
+const char* AiFunctions::AZURE_OPEN_AI_REQUEST_AUTH_HEADER =
+    "api-key: ";
 
 // other constants
 static const StringVal NULL_STRINGVAL = StringVal::null();
@@ -83,6 +87,22 @@ bool AiFunctions::is_api_endpoint_supported(const std::string_view& endpoint) {
   return (
       gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr ||
       gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size()) != nullptr);
+}
+
+AiFunctions::AI_PLATFORM AiFunctions::GetAiPlatformFromEndpoint(
+    const std::string_view& endpoint) {
+  // Only OpenAI endpoints are supported.
+  if (gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size()) != nullptr)
+    return AiFunctions::AI_PLATFORM::OPEN_AI;
+  if (gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr)
+    return AiFunctions::AI_PLATFORM::AZURE_OPEN_AI;
+  return AiFunctions::AI_PLATFORM::UNSUPPORTED;
+}
+
+StringVal AiFunctions::copyErrorMessage(FunctionContext* ctx, const string& errorMsg) {
+  return StringVal::CopyFrom(ctx,
+      reinterpret_cast<const uint8_t*>(errorMsg.c_str()),
+      errorMsg.length());
 }
 
 string AiFunctions::AiGenerateTextParseOpenAiResponse(
@@ -123,17 +143,48 @@ string AiFunctions::AiGenerateTextParseOpenAiResponse(
   return message[OPEN_AI_RESPONSE_FIELD_CONTENT].GetString();
 }
 
+template <bool fastpath>
+StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
+    const StringVal& endpoint, const StringVal& prompt, const StringVal& model,
+    const StringVal& api_key_jceks_secret, const StringVal& params) {
+  std::string_view endpoint_sv(FLAGS_ai_endpoint);
+  // endpoint validation
+  if (!fastpath && endpoint.ptr != nullptr && endpoint.len != 0) {
+    endpoint_sv = std::string_view(reinterpret_cast<char*>(endpoint.ptr), endpoint.len);
+    // Simple validation for endpoint. It should start with https://
+    if (!is_api_endpoint_valid(endpoint_sv)) {
+      LOG(ERROR) << "AI Generate Text: \ninvalid protocol: " << endpoint_sv;
+      return StringVal(AI_GENERATE_TXT_INVALID_PROTOCOL_ERROR.c_str());
+    }
+  }
+  AI_PLATFORM platform = GetAiPlatformFromEndpoint(endpoint_sv);
+  switch(platform) {
+    case AI_PLATFORM::OPEN_AI:
+      return AiGenerateTextInternal<fastpath, AI_PLATFORM::OPEN_AI>(
+          ctx, endpoint_sv, prompt, model, api_key_jceks_secret, params, false);
+    case AI_PLATFORM::AZURE_OPEN_AI:
+      return AiGenerateTextInternal<fastpath, AI_PLATFORM::AZURE_OPEN_AI>(
+          ctx, endpoint_sv, prompt, model, api_key_jceks_secret, params, false);
+    default:
+      if (fastpath) {
+        DCHECK(false) << "Default endpoint " << FLAGS_ai_endpoint << "must be supported";
+      }
+      LOG(ERROR) << "AI Generate Text: \nunsupported endpoint: " << endpoint_sv;
+      return StringVal(AI_GENERATE_TXT_UNSUPPORTED_ENDPOINT_ERROR.c_str());
+  }
+}
+
 StringVal AiFunctions::AiGenerateText(FunctionContext* ctx, const StringVal& endpoint,
     const StringVal& prompt, const StringVal& model,
     const StringVal& api_key_jceks_secret, const StringVal& params) {
-  return AiGenerateTextInternal<false>(
-      ctx, endpoint, prompt, model, api_key_jceks_secret, params, false);
+  return AiGenerateTextHelper<false>(
+      ctx, endpoint, prompt, model, api_key_jceks_secret, params);
 }
 
 StringVal AiFunctions::AiGenerateTextDefault(
   FunctionContext* ctx, const StringVal& prompt) {
-  return AiGenerateTextInternal<true>(
-      ctx, NULL_STRINGVAL, prompt, NULL_STRINGVAL, NULL_STRINGVAL, NULL_STRINGVAL, false);
+  return AiGenerateTextHelper<true>(
+      ctx, NULL_STRINGVAL, prompt, NULL_STRINGVAL, NULL_STRINGVAL, NULL_STRINGVAL);
 }
 
 } // namespace impala
