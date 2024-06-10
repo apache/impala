@@ -1939,7 +1939,7 @@ TEST_F(MultiNullableTupleStreamTest, MultiNullableTupleManyBufferSpill) {
   TestIntValuesInterleaved(100, 15, true, buffer_size);
 }
 
-/// Test that ComputeRowSizeAndSmallifyStrings handles nulls
+/// Test that ComputeRowSize handles nulls
 TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
   Init(BUFFER_POOL_LIMIT);
   const vector<TupleDescriptor*>& tuple_descs = string_desc_->tuple_descriptors();
@@ -1968,28 +1968,27 @@ TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
   row->SetTuple(1, nullptr);
   row->SetTuple(2, nullptr);
   EXPECT_EQ(tuple_null_indicator_bytes + tuple_descs[0]->byte_size(),
-      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+      stream.ComputeRowSize(row.get()));
 
   // Tuples are initialized to empty and have no var-len data.
   row->SetTuple(1, tuple1.get());
   row->SetTuple(2, tuple2.get());
   EXPECT_EQ(tuple_null_indicator_bytes + string_desc_->GetRowSize(),
-      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+      stream.ComputeRowSize(row.get()));
 
   // Tuple 0 has some data.
   const SlotDescriptor* string_slot = tuple_descs[0]->slots()[0];
   StringValue* sv = tuple0->GetStringSlot(string_slot->tuple_offset());
-  *sv = STRINGS[0];
-  sv->Smallify();
+  sv->Assign(StringValue::MakeSmallStringFrom(STRINGS[0]));
   int64_t expected_len =
       tuple_null_indicator_bytes + string_desc_->GetRowSize() +
       (sv->IsSmall() ? 0 : sv->Len());
-  EXPECT_EQ(expected_len, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+  EXPECT_EQ(expected_len, stream.ComputeRowSize(row.get()));
 
   // Check that external slots aren't included in count.
   sv = tuple1->GetStringSlot(external_string_slot->tuple_offset());
   sv->Assign(reinterpret_cast<char*>(1234), 1234);
-  EXPECT_EQ(expected_len, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+  EXPECT_EQ(expected_len, stream.ComputeRowSize(row.get()));
 
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
@@ -2055,7 +2054,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     builder.CommitTuples(array_len);
 
     // Check that internal row size computation gives correct result.
-    EXPECT_EQ(expected_row_size, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+    EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
     bool b = stream.AddRow(row.get(), &status);
     ASSERT_TRUE(b);
     ASSERT_OK(status);
@@ -2104,7 +2103,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
-/// Test that ComputeRowSizeAndSmallifyStrings handles nulls
+/// Test that ComputeRowSize handles nulls
 TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   Init(BUFFER_POOL_LIMIT);
   const vector<TupleDescriptor*>& tuple_descs = array_desc_->tuple_descriptors();
@@ -2130,13 +2129,13 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   row->SetTuple(0, nullptr);
   row->SetTuple(1, nullptr);
   EXPECT_EQ(tuple_null_indicator_bytes,
-      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+      stream.ComputeRowSize(row.get()));
 
   // Tuples are initialized to empty and have no var-len data.
   row->SetTuple(0, tuple0.get());
   row->SetTuple(1, tuple1.get());
   EXPECT_EQ(tuple_null_indicator_bytes + array_desc_->GetRowSize(),
-      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+      stream.ComputeRowSize(row.get()));
 
   // Tuple 0 has an array.
   int expected_row_size = tuple_null_indicator_bytes + array_desc_->GetRowSize();
@@ -2160,19 +2159,19 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
     expected_row_size += str->Len();
   }
   builder.CommitTuples(array_len);
-  EXPECT_EQ(expected_row_size, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+  EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
 
   // Check that the external slot isn't included in size.
   cv = tuple0->GetCollectionSlot(external_array_slot->tuple_offset());
   // ptr of external slot shouldn't be dereferenced when computing size.
   cv->ptr = reinterpret_cast<uint8_t*>(1234);
   cv->num_tuples = 1234;
-  EXPECT_EQ(expected_row_size, stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+  EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
 
   // Check that the array is excluded if tuple 0's array has its null indicator set.
   tuple0->SetNull(array_slot->null_indicator_offset());
   EXPECT_EQ(tuple_null_indicator_bytes + array_desc_->GetRowSize(),
-      stream.ComputeRowSizeAndSmallifyStrings(row.get()));
+      stream.ComputeRowSize(row.get()));
 
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }

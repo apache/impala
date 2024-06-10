@@ -102,7 +102,7 @@ Status SpillableRowBatchQueue::AddBatch(RowBatch* batch) {
                                     "in unpinned mode unless an error occurred. "
                                     "batch_queue_: $1",
             PrettyPrinter::PrintBytes(
-                batch_queue_->ComputeRowSizeAndSmallifyStrings(batch_itr.Get())),
+                batch_queue_->ComputeRowSize(batch_itr.Get())),
             batch_queue_->DebugString());
       }
     }

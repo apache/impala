@@ -1,0 +1,29 @@
+====
+---- QUERY
+set RUNTIME_FILTER_WAIT_TIME_MS=10000;
+set MT_DOP=12;
+set RUNTIME_FILTER_MIN_SIZE=8192;
+set RUNTIME_FILTER_MAX_SIZE=2097152;
+set MINMAX_FILTER_THRESHOLD=0.5;
+set MINMAX_FILTERING_LEVEL=PAGE;
+SELECT ecc.letter_mission_name, re.`date` as date_, c.war_group
+FROM letter_marketing_response_events re
+    LEFT JOIN letter_missions_combined ecc ON ecc.letter_mission=re.letter_mission
+    LEFT JOIN (SELECT b.letter_hash, b.war
+               FROM (SELECT letter_hash, war, id,
+                            row_number() over(partition by letter_hash order by id desc) as latest
+                     FROM subscriptions
+                     WHERE is_affiliate=0
+                     GROUP BY letter_hash, war, id) b
+                WHERE latest=1
+                GROUP BY b.letter_hash, b.war) su ON re.letter_hash=su.letter_hash
+    LEFT JOIN letterwargroups c ON upper(c.war)=upper(su.war)
+    LEFT JOIN dim_letter em ON em.letter_hash=re.letter_hash
+    WHERE re.`date`>='2024-06-01'
+      AND re.send_account_sk not in (43)
+    GROUP BY ecc.letter_mission_name, re.`date`, c.war_group;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*,'2024-06-07',.*
+---- TYPES
+STRING,STRING,STRING
+====
