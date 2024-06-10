@@ -708,6 +708,10 @@ struct StringVal : public AnyVal {
     return ptr == other.ptr || memcmp(ptr, other.ptr, len) == 0;
   }
   bool operator!=(const StringVal& other) const { return !(*this == other); }
+
+ private:
+  static void AllocateStringValWithLenCheck(FunctionContext* ctx, uint64_t str_len,
+      StringVal* res);
 };
 
 struct DecimalVal : public impala_udf::AnyVal {

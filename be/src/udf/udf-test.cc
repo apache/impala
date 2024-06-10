@@ -337,4 +337,65 @@ TEST(UdfTest, MemTest) {
 
 }
 
+// Creates and manages a FunctionContext for a dummy UDF with no arguments.
+class FunctionCtxGuard {
+ public:
+  FunctionCtxGuard(): ctx_(UdfTestHarness::CreateTestContext(return_type, arg_types)) {}
+
+  ~FunctionCtxGuard() { UdfTestHarness::CloseContext(ctx_.get()); }
+
+  FunctionContext* getCtx() { return ctx_.get(); }
+ private:
+  static const FunctionContext::TypeDesc return_type;
+  static const std::vector<FunctionContext::TypeDesc> arg_types;
+
+  const std::unique_ptr<FunctionContext> ctx_;
+};
+const FunctionContext::TypeDesc FunctionCtxGuard::return_type {};
+const std::vector<FunctionContext::TypeDesc> FunctionCtxGuard::arg_types;
+
+bool StringValEqualsStr(const StringVal& string_val, const std::string& str) {
+  return str.length() == string_val.len &&
+      std::memcmp(str.c_str(), string_val.ptr, str.length()) == 0;
+}
+
+void CheckStringValCopyFromSucceeds(const std::string& str) {
+  FunctionCtxGuard ctx_guard;
+
+  const StringVal string_val = StringVal::CopyFrom(ctx_guard.getCtx(),
+      reinterpret_cast<const uint8_t*>(str.c_str()), str.length());
+  EXPECT_TRUE(StringValEqualsStr(string_val, str));
+  EXPECT_FALSE(string_val.is_null);
+  EXPECT_FALSE(ctx_guard.getCtx()->has_error());
+}
+
+void CheckStringValCopyFromFailsWithLength(uint64_t len) {
+  FunctionCtxGuard ctx_guard;
+  const StringVal string_val = StringVal::CopyFrom(ctx_guard.getCtx(), nullptr, len);
+  EXPECT_TRUE(string_val.is_null);
+  EXPECT_TRUE(ctx_guard.getCtx()->has_error());
+}
+
+TEST(UdfTest, TestStringValCopyFrom) {
+  const std::string empty_string = "";
+  const std::string small_string = "small";
+  const std::string longer_string = "This is a somewhat longer string.";
+
+  // Test that copying works correctly.
+  CheckStringValCopyFromSucceeds(empty_string);
+  CheckStringValCopyFromSucceeds(small_string);
+  CheckStringValCopyFromSucceeds(longer_string);
+
+  // Test that if a length bigger than StringVal::MAX_LENGTH is passed, the result is null
+  // and an error.
+  constexpr int len32 = StringVal::MAX_LENGTH + 1;
+  CheckStringValCopyFromFailsWithLength(len32);
+
+  // Test that if a length bigger than StringVal::MAX_LENGTH is passed as a size_t, but
+  // when truncated to int it is no longer too big, the result is still null and an error.
+  // Regression test for IMPALA-13150.
+  constexpr uint64_t len64 = (1UL << 40) + 1;
+  CheckStringValCopyFromFailsWithLength(len64);
+}
+
 IMPALA_TEST_MAIN();

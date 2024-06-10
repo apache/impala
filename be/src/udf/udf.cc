@@ -525,26 +525,13 @@ void FunctionContextImpl::SetNonConstantArgs(NonConstantArgsVector&& non_constan
 // Note: this function crashes LLVM's JIT in expr-test if it's xcompiled. Do not move to
 // expr-ir.cc. This could probably use further investigation.
 StringVal::StringVal(FunctionContext* context, int str_len) noexcept : len(str_len),
-                                                                       ptr(NULL) {
-  if (UNLIKELY(str_len > StringVal::MAX_LENGTH)) {
-    context->SetError("String length larger than allowed limit of "
-                      "1 GB character data.");
-    len = 0;
-    is_null = true;
-  } else {
-    ptr = context->impl()->AllocateForResults(str_len);
-    if (UNLIKELY(ptr == NULL && str_len > 0)) {
-#ifndef IMPALA_UDF_SDK_BUILD
-      assert(!context->impl()->state()->GetQueryStatus().ok());
-#endif
-      len = 0;
-      is_null = true;
-    }
-  }
+                                                                       ptr(nullptr) {
+  AllocateStringValWithLenCheck(context, str_len, this);
 }
 
 StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) noexcept {
-  StringVal result(ctx, len);
+  StringVal result;
+  AllocateStringValWithLenCheck(ctx, len, &result);
   if (LIKELY(!result.is_null)) {
     std::copy(buf, buf + len, result.ptr);
   }
@@ -571,6 +558,26 @@ bool StringVal::Resize(FunctionContext* ctx, int new_len) noexcept {
     return true;
   }
   return false;
+}
+
+void StringVal::AllocateStringValWithLenCheck(FunctionContext* ctx, uint64_t str_len,
+    StringVal* res) {
+  if (UNLIKELY(str_len > StringVal::MAX_LENGTH)) {
+    ctx->SetError("String length larger than allowed limit of 1 GB character data.");
+    res->len = 0;
+    res->is_null = true;
+  } else {
+    res->ptr = ctx->impl()->AllocateForResults(str_len);
+    if (UNLIKELY(res->ptr == nullptr && str_len > 0)) {
+#ifndef IMPALA_UDF_SDK_BUILD
+      assert(!ctx->impl()->state()->GetQueryStatus().ok());
+#endif
+      res->len = 0;
+      res->is_null = true;
+    } else {
+      res->len = str_len;
+    }
+  }
 }
 
 void StructVal::ReserveMemory(FunctionContext* ctx) {
