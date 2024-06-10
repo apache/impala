@@ -945,7 +945,7 @@ void BufferedTupleStream::FixUpCollectionsForRead(
   }
 }
 
-int64_t BufferedTupleStream::ComputeRowSizeAndSmallifyStrings(TupleRow* row)
+int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row)
     const noexcept {
   int64_t size = 0;
   if (has_nullable_tuple_) {
@@ -965,7 +965,7 @@ int64_t BufferedTupleStream::ComputeRowSizeAndSmallifyStrings(TupleRow* row)
     for (auto it = slots.begin(); it != slots.end(); ++it) {
       if (tuple->IsNull((*it)->null_indicator_offset())) continue;
       StringValue* sv = tuple->GetStringSlot((*it)->tuple_offset());
-      if (sv->Smallify()) continue;
+      if (sv->IsSmall()) continue;
       size += sv->Len();
     }
   }
@@ -992,7 +992,7 @@ int64_t BufferedTupleStream::ComputeRowSizeAndSmallifyStrings(TupleRow* row)
 
 bool BufferedTupleStream::AddRowSlow(TupleRow* row, Status* status) noexcept {
   // Use AddRowCustom*() to do the work of advancing the page.
-  int64_t row_size = ComputeRowSizeAndSmallifyStrings(row);
+  int64_t row_size = ComputeRowSize(row);
   uint8_t* data = AddRowCustomBeginSlow(row_size, status);
   if (data == nullptr) return false;
   bool success = DeepCopy(row, &data, data + row_size);

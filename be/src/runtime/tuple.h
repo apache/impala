@@ -328,8 +328,6 @@ class Tuple {
         reinterpret_cast<const char*>(this) + offset);
   }
 
-  void SmallifyStrings(const TupleDescriptor& desc);
-
   /// For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 
@@ -384,6 +382,10 @@ class Tuple {
   /// avoid emitting unnecessary code for ~Status() in perf-critical code.
   char* AllocateStrings(const char* err_ctx, RuntimeState* state, int64_t bytes,
       MemPool* pool, Status* status) noexcept;
+
+  /// Smallify string values of the tuple. It should only be called for newly created
+  /// tuples, e.g. in DeepCopy().
+  void SmallifyStrings(const TupleDescriptor& desc);
 
   // Defined in tuple-ir.cc to force the compilation of the CodegenTypes struct.
   void dummy(Tuple::CodegenTypes*);

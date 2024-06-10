@@ -30,6 +30,9 @@
 
 namespace impala {
 
+class StringValueTest;
+class Tuple;
+
 /// The format of a string-typed slot.
 /// The returned StringValue of all functions that return StringValue
 /// shares its buffer with the parent.
@@ -64,6 +67,16 @@ public:
   explicit StringValue(const char* s)
     : string_impl_(s) {}
 
+  /// Only valid to call if source's length is small enough. Returns a StringValue object
+  /// that is smallified.
+  static StringValue MakeSmallStringFrom(const StringValue& source) {
+    DCHECK_LE(source.Len(), SmallableString::SMALL_LIMIT);
+    StringValue sv(source);
+    sv.Smallify();
+    DCHECK(sv.IsSmall());
+    return sv;
+  }
+
   void Assign(const StringValue& other) { string_impl_.Assign(other.string_impl_); }
 
   void Assign(char* ptr, int len) {
@@ -77,10 +90,6 @@ public:
   void Clear() { string_impl_.Clear(); }
 
   bool IsSmall() const { return string_impl_.IsSmall(); }
-
-  /// Tries to apply Small String Optimization if possible. Returns 'true' on success,
-  /// 'false' otherwise. In the latter case the object remains unmodified.
-  bool Smallify() { return string_impl_.Smallify(); }
 
   int Len() const { return string_impl_.Len(); }
 
@@ -174,6 +183,16 @@ public:
   static const char* LLVM_CLASS_NAME;
 
 private:
+  friend Tuple;
+  friend StringValueTest;
+  /// !!! THIS IS UNSAFE TO CALL ON EXISTING STRINGVALUE OBJECTS !!!
+  /// Please make sure you only invoke it for newly created StringValues, e.g. on the
+  /// target StringValue object of a deep copy operation.
+  /// Tries to apply Small String Optimization if possible. Returns 'true' on success,
+  /// 'false' otherwise. In the latter case the object remains unmodified.
+  /// !!! THIS IS UNSAFE TO CALL ON EXISTING STRINGVALUE OBJECTS !!!
+  bool Smallify() { return string_impl_.Smallify(); }
+
   SmallableString string_impl_;
 };
 

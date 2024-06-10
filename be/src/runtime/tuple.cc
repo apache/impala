@@ -109,6 +109,7 @@ Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
 void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) {
   if (desc.HasVarlenSlots()) {
     memcpy(dst, this, desc.byte_size());
+    // 'dst' is a new tuple, so it is safe to smallify its string values.
     dst->SmallifyStrings(desc);
     dst->DeepCopyVarlenData(desc, pool);
   } else {

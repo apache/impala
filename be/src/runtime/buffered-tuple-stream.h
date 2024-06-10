@@ -557,9 +557,7 @@ class BufferedTupleStream {
   /// Returns the total additional bytes that this row will consume in write_page_ if
   /// appended to the page. This includes the row's null indicators, the fixed length
   /// part of the row and the data for inlined_string_slots_ and inlined_coll_slots_.
-  /// It will also try to smallify string values, so small string data won't require
-  /// additional space.
-  int64_t ComputeRowSizeAndSmallifyStrings(TupleRow* row) const noexcept;
+  int64_t ComputeRowSize(TupleRow* row) const noexcept;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);

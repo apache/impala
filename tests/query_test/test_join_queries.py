@@ -194,3 +194,26 @@ class TestSemiJoinQueries(ImpalaTestSuite):
     """Expensive and memory-intensive semi-join tests."""
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
     self.run_test_case('QueryTest/semi-joins-exhaustive', vector)
+
+
+class TestSpillingHashJoin(ImpalaTestSuite):
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestSpillingHashJoin, cls).add_test_dimensions()
+    # To cut down on test execution time, only run in exhaustive.
+    if cls.exploration_strategy() != 'exhaustive':
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False)
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_spilling_hash_join(self, vector, unique_database):
+    """Regression test for IMPALA-13138. It loads a few large tables and runs a complex
+    query that spills during JOIN build that crashed Impala before IMPALA-13138."""
+    self.run_test_case('QueryTest/create-tables-impala-13138', vector, unique_database)
+    for i in range(0, 5):
+      self.run_test_case('QueryTest/query-impala-13138', vector, unique_database)

@@ -66,7 +66,32 @@ void TestCompareImpl(StringValue* svs, int NUM_STRINGS) {
   }
 }
 
-TEST(StringValueTest, TestCompare) {
+class StringValueTest : public ::testing::Test {
+protected:
+    void SmallifySV(StringValue* sv) { sv->Smallify(); }
+
+    void SmallifySVExpect(StringValue* sv, bool expect_to_succeed) {
+      if (expect_to_succeed) {
+        EXPECT_TRUE(sv->Smallify());
+      } else {
+        EXPECT_FALSE(sv->Smallify());
+      }
+    }
+
+    void TestLargestSmallerString(StringValue& sv, const string& expected) {
+      EXPECT_EQ(sv.LargestSmallerString(), expected);
+      sv.Smallify();
+      EXPECT_EQ(sv.LargestSmallerString(), expected);
+    }
+
+    void TestLeastLargerString(StringValue& sv, const string& expected) {
+      EXPECT_EQ(sv.LeastLargerString(), expected);
+      sv.Smallify();
+      EXPECT_EQ(sv.LeastLargerString(), expected);
+    }
+};
+
+TEST_F(StringValueTest, TestCompare) {
   string empty_str = "";
   string str1_str("\0", 1);
   string str2_str("\0xy", 3);
@@ -96,7 +121,7 @@ TEST(StringValueTest, TestCompare) {
 
   TestCompareImpl(svs, NUM_STRINGS);
   for (int i = 0; i < NUM_STRINGS; ++i) {
-    svs[i].Smallify();
+    SmallifySV(&svs[i]);
   }
   TestCompareImpl(svs, NUM_STRINGS);
 }
@@ -111,7 +136,7 @@ void TestUnpaddedCharLength(StringValue* chars) {
   EXPECT_EQ(StringValue::UnpaddedCharLength(chars[6].Ptr(), 20), 17);
 }
 
-TEST(StringValueTest, TestCharFunctions) {
+TEST_F(StringValueTest, TestCharFunctions) {
   string char0_str("hi", 2);
   string char1_str("hi  ", 4);
   string char2_str(" hi  ", 5);
@@ -132,7 +157,7 @@ TEST(StringValueTest, TestCharFunctions) {
 
   TestUnpaddedCharLength(chars);
   for (int i = 0; i < NUM_CHARS; ++i) {
-    chars[i].Smallify();
+    SmallifySV(&chars[i]);
   }
   TestUnpaddedCharLength(chars);
 
@@ -157,7 +182,7 @@ void TestConvertToUInt64Impl(StringValue* svs) {
   EXPECT_EQ(svs[6].ToUInt64(), 0x102030405060707);
 }
 
-TEST(StringValueTest, TestConvertToUInt64) {
+TEST_F(StringValueTest, TestConvertToUInt64) {
   // Test converting StringValues to uint64_t which utilizes up to first 8 bytes.
   const int NUM_STRINGS = 7;
   string strings[NUM_STRINGS];
@@ -177,46 +202,34 @@ TEST(StringValueTest, TestConvertToUInt64) {
 
   TestConvertToUInt64Impl(svs);
   for (int i = 0; i < NUM_STRINGS; ++i) {
-    svs[i].Smallify();
+    SmallifySV(&svs[i]);
   }
   TestConvertToUInt64Impl(svs);
 }
 
-void TestLargestSmallString(StringValue& sv, string expected) {
-  EXPECT_EQ(sv.LargestSmallerString(), expected);
-  sv.Smallify();
-  EXPECT_EQ(sv.LargestSmallerString(), expected);
-}
-
 // Test finding the largest smaller strings.
-TEST(StringValueTest, TestLargestSmallerString) {
+TEST_F(StringValueTest, TestLargestSmallerString) {
   string oneKbNullStr(1024, 0x00);
   string a1023NullStr(1023, 0x00);
   EXPECT_EQ(StringValue(oneKbNullStr).LargestSmallerString(), a1023NullStr);
 
   StringValue asv(const_cast<char*>("\x12\xef"), 2);
-  TestLargestSmallString(asv, "\x12\xee");
+  TestLargestSmallerString(asv, "\x12\xee");
   StringValue bsv(const_cast<char*>("\x12\x00"), 2);
-  TestLargestSmallString(bsv, "\x12");
+  TestLargestSmallerString(bsv, "\x12");
 
   // "0x00" is the smallest non-empty string.
   string oneNullStr("\00", 1);
   StringValue oneNullStrSv(oneNullStr);
-  TestLargestSmallString(oneNullStrSv, "");
+  TestLargestSmallerString(oneNullStrSv, "");
 
   // The empty string is the absolute smallest string.
   StringValue emptySv(const_cast<char*>(""));
-  TestLargestSmallString(emptySv, "");
-}
-
-void TestLeastLargerString(StringValue& sv, const string& expected) {
-  EXPECT_EQ(sv.LeastLargerString(), expected);
-  sv.Smallify();
-  EXPECT_EQ(sv.LeastLargerString(), expected);
+  TestLargestSmallerString(emptySv, "");
 }
 
 // Test finding the least larger strings.
-TEST(StringValueTest, TestLeastLargerString) {
+TEST_F(StringValueTest, TestLeastLargerString) {
   string nullStr(const_cast<char*>("\x00"), 1);
   StringValue nullStrSv(nullStr);
   TestLeastLargerString(nullStrSv, string("\x01", 1));
@@ -241,7 +254,7 @@ TEST(StringValueTest, TestLeastLargerString) {
   TestLeastLargerString(emptySv, string("\00", 1));
 }
 
-TEST(StringValueTest, TestConstructors) {
+TEST_F(StringValueTest, TestConstructors) {
   // Test that all strings are non-small initially.
   StringValue def_ctor;
   EXPECT_FALSE(def_ctor.IsSmall());
@@ -249,7 +262,7 @@ TEST(StringValueTest, TestConstructors) {
   StringValue copy_ctor(def_ctor);
   EXPECT_FALSE(copy_ctor.IsSmall());
   // Modify 'copy_ctor' to make Clang Tidy happy.
-  EXPECT_TRUE(copy_ctor.Smallify());
+  SmallifySVExpect(&copy_ctor, true);
 
   StringValue char_ctor(const_cast<char*>("small"));
   EXPECT_FALSE(char_ctor.IsSmall());
@@ -262,7 +275,7 @@ TEST(StringValueTest, TestConstructors) {
   EXPECT_FALSE(string_ctor.IsSmall());
 }
 
-TEST(StringValueTest, TestSmallify) {
+TEST_F(StringValueTest, TestSmallify) {
   StringValue nullstr;
   StringValue empty(const_cast<char*>(""), 0);
   StringValue one_char(const_cast<char*>("a"), 1);
@@ -275,11 +288,11 @@ TEST(StringValueTest, TestSmallify) {
   StringValue limit_clone(limit);
   StringValue over_the_limit_clone(over_the_limit);
 
-  EXPECT_TRUE(nullstr.Smallify());
-  EXPECT_TRUE(empty.Smallify());
-  EXPECT_TRUE(one_char.Smallify());
-  EXPECT_TRUE(limit.Smallify());
-  EXPECT_FALSE(over_the_limit.Smallify());
+  SmallifySVExpect(&nullstr, true);
+  SmallifySVExpect(&empty, true);
+  SmallifySVExpect(&one_char, true);
+  SmallifySVExpect(&limit, true);
+  SmallifySVExpect(&over_the_limit, false);
 
   EXPECT_EQ(nullstr, nullstr_clone);
   EXPECT_NE(nullstr.Ptr(), nullstr_clone.Ptr());

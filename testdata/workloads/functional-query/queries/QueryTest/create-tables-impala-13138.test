@@ -1,0 +1,77 @@
+====
+---- QUERY
+CREATE TABLE letterwargroups (
+   war_group STRING, war STRING
+);
+
+CREATE TABLE letter_missions_combined (
+   letter_mission INT,
+   letter_mission_name STRING
+ )
+STORED AS PARQUET;
+
+CREATE TABLE dim_letter (
+   letter_hash STRING)
+PARTITIONED BY (`date` STRING)
+STORED AS PARQUET;
+
+CREATE TABLE subscriptions (
+   id BIGINT,
+   war STRING,
+   letter_hash STRING,
+   is_affiliate BOOLEAN
+ )
+PARTITIONED BY (`date` STRING)
+STORED AS PARQUET;
+
+CREATE TABLE letter_marketing_response_events (
+   letter_mission INT,
+   send_account_sk INT,
+   letter_hash STRING
+ )
+PARTITIONED BY (`date` STRING)
+STORED AS PARQUET;
+
+-- INSERT VALUES ('0', '0'), ('1', '1'), ... , ('50', '50')
+with v   as (values (0 as x), (1), (2), (3), (4), (5), (6), (7), (8), (9)),
+     v10 as (select 10*x as x from v),
+    range_i as (select cast(v10.x + v.x as STRING) as stri from v10, v where v10.x + v.x <= 50)
+insert into letterwargroups select stri, stri from range_i;
+
+insert into subscriptions (`date`, id, war, letter_hash, is_affiliate)
+values ('2024-06-07', 100, '100', 'letter_hash_100', TRUE);
+
+with v        as (values (0 as x), (1), (2), (3), (4), (5), (6), (7), (8), (9)),
+     v10      as (select 10*x as x from v),
+     v100     as (select 10*x as x from v10),
+     v1000    as (select 10*x as x from v100),
+     v10000   as (select 10*x as x from v1000),
+     v100000  as (select 10*x as x from v1000),
+     range_i  as (select v100000.x + v10000.x + v1000.x + v100.x + v10.x + v.x + 1 as i
+                  from   v100000,    v10000,    v1000,    v100,    v10,    v)
+insert into subscriptions partition (`date`)
+select cast(random(1)*100000000 as bigint), cast(cast(random(2)*100 as int) as string), base64encode(cast(random(3) as string)), false, `date` from subscriptions, range_i;
+
+insert into subscriptions partition (`date`) select cast(random(1)*100000000 as bigint),
+cast(cast(random(2)*100 as int) as string), base64encode(cast(random(3) as string)), false, `date` from subscriptions;
+insert into subscriptions partition (`date`) select cast(random(4)*100000000 as bigint),
+cast(cast(random(5)*100 as int) as string), base64encode(cast(random(6) as string)), false, `date` from subscriptions;
+insert into subscriptions partition (`date`) select cast(random(7)*100000000 as bigint),
+cast(cast(random(8)*100 as int) as string), base64encode(cast(random(9) as string)), false, `date` from subscriptions;
+insert into subscriptions partition (`date`) select cast(random(10)*100000000 as bigint),
+cast(cast(random(11)*100 as int) as string), base64encode(cast(random(12) as string)), false, `date` from subscriptions;
+insert into subscriptions partition (`date`) select cast(random(13)*100000000 as bigint),
+cast(cast(random(14)*100 as int) as string), base64encode(cast(random(15) as string)), false, `date` from subscriptions;
+insert into subscriptions partition (`date`) select cast(random(16)*100000000 as bigint),
+cast(cast(random(17)*100 as int) as string), base64encode(cast(random(18) as string)), false, `date` from subscriptions;
+
+insert into letter_marketing_response_events (`date`, letter_hash, letter_mission, send_account_sk)
+select `date`, letter_hash, cast(random(19)*100 as int), cast(random(20)*100 as int) from subscriptions;
+
+insert into letterwargroups select 'war_group',war from subscriptions group by war;
+
+insert into dim_letter(letter_hash, `date`) select letter_hash, `date` from subscriptions;
+
+insert into letter_missions_combined(letter_mission, letter_mission_name)
+values (cast(random(21)*100 as int), "name");
+====
