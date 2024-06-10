@@ -144,6 +144,19 @@ if target_filesystem == 's3':
       'fs.s3a.s3guard.ddb.table': '${S3GUARD_DYNAMODB_TABLE}',
       'fs.s3a.s3guard.ddb.region': '${S3GUARD_DYNAMODB_REGION}',
     })
+  # Figure out if we are running in an EC2 VM, with S3 credentials supplied by an IAM
+  # instance role. Evaluate the decision table in bin/impala-config.sh (search
+  # for "Environment variables carrying AWS security credentials")
+  if ( not "AWS_ACCESS_KEY_ID" in os.environ and
+       not "AWS_SECRET_ACCESS_KEY" in os.environ and
+       os.environ.get("RUNNING_IN_EC2") == 'true' ) :
+    print("Using credentials provided by the IAM Instance role;")
+    print("setting the Hadoop Credential Provider to IAMInstanceCredentialsProvider.")
+    # If yes, set the S3 credential provider directly to IAMInstanceCredentialsProvider
+    # instead of leaving it empty, which would try all available credential providers
+    # sequentially. This is supposed to result in more detailed error reporting.
+    CONFIG.update({'fs.s3a.aws.credentials.provider':
+        'org.apache.hadoop.fs.s3a.auth.IAMInstanceCredentialsProvider'})
 
 if target_filesystem == 'obs':
   CONFIG.update({
