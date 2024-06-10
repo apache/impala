@@ -71,12 +71,9 @@ using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 
 using kudu::MetricEntity;
-using kudu::MonoDelta;
-using kudu::MonoTime;
 using kudu::rpc::ResultTracker;
 using kudu::rpc::RpcContext;
 using kudu::rpc::ServiceIf;
-using kudu::SleepFor;
 
 DEFINE_int32(port, 20001, "port on which to run Impala krpc based test backend.");
 DECLARE_int32(datastream_sender_timeout_ms);
@@ -884,18 +881,13 @@ TEST_F(DataStreamTestSlowServiceQueue, TestPrioritizeEos) {
   RuntimeProfile* profile;
   StartReceiver(stream_type, 3, 0, buffer_size, false, &instance_id, &profile);
 
-  MonotonicStopWatch timer;
-  timer.Start();
+  int64_t start = MonotonicNanos();
   // Start sender; TRANSMIT_DATA_DELAY:SLEEP will block up the queue.
   StartSender(stream_type, buffer_size, false, num_batches);
   StartSender(stream_type, buffer_size, false, num_batches);
   // Wait for 1st sender batch to be received and 2nd sender batch queued.
-  while (test_service_->NumTransmitsReceived() == 0) {
-    SleepFor(MonoDelta::FromMilliseconds(1));
-  }
-  while (test_service_->QueueSize() == 0) {
-    SleepFor(MonoDelta::FromMilliseconds(1));
-  }
+  while (test_service_->NumTransmitsReceived() == 0) SleepForMs(1);
+  while (test_service_->QueueSize() == 0) SleepForMs(1);
 
   // Start last sender with no batches so it just sends EndDataStream.
   StartSender(stream_type, buffer_size, false, 0);
@@ -909,13 +901,14 @@ TEST_F(DataStreamTestSlowServiceQueue, TestPrioritizeEos) {
   ASSERT_EQ(1, counters.size());
   EXPECT_EQ(1, counters.front()->value());
   // Assert 2nd TRANSMIT_DATA_DELAY sleep is not finished.
-  EXPECT_GT(timer.ElapsedTime(), 3 * MonoTime::kNanosecondsPerSecond);
-  EXPECT_LT(timer.ElapsedTime(), 6 * MonoTime::kNanosecondsPerSecond);
+  int64_t duration = MonotonicNanos() - start;
+  EXPECT_GE(duration, 3 * NANOS_PER_SEC);
+  EXPECT_LT(duration, 6 * NANOS_PER_SEC);
 
   // Clean up.
   JoinSenders();
   JoinReceivers();
-  EXPECT_GT(timer.ElapsedTime(), 6 * MonoTime::kNanosecondsPerSecond);
+  EXPECT_GE(MonotonicNanos() - start, 6 * NANOS_PER_SEC);
   EXPECT_EQ(2 * num_batches * BATCH_CAPACITY, receiver_info_[0]->data_values.size());
   EXPECT_EQ(3, counters.front()->value());
 }
@@ -945,14 +938,11 @@ TEST_F(DataStreamTestShortServiceQueue, TestFullQueue) {
   RuntimeProfile* profile;
   StartReceiver(stream_type, 2, 0, buffer_size, false, &instance_id, &profile);
 
-  MonotonicStopWatch timer;
-  timer.Start();
+  int64_t start = MonotonicNanos();
   // Start sender; TRANSMIT_DATA_DELAY:SLEEP will block up the queue.
   StartSender(stream_type, buffer_size, false, num_batches);
   // Wait for 1st batch to be received.
-  while (test_service_->NumTransmitsReceived() == 0) {
-    SleepFor(MonoDelta::FromMilliseconds(1));
-  }
+  while (test_service_->NumTransmitsReceived() == 0) SleepForMs(1);
 
   // Start last sender with no batches so it just sends EndDataStream.
   StartSender(stream_type, buffer_size, false, 0);
@@ -966,12 +956,12 @@ TEST_F(DataStreamTestShortServiceQueue, TestFullQueue) {
   ASSERT_EQ(1, counters.size());
   EXPECT_EQ(1, counters.front()->value());
   // Assert TRANSMIT_DATA_DELAY sleep is not finished.
-  EXPECT_LT(timer.ElapsedTime(), 3 * MonoTime::kNanosecondsPerSecond);
+  EXPECT_LT(MonotonicNanos() - start, 3 * NANOS_PER_SEC);
 
   // Clean up.
   JoinSenders();
   JoinReceivers();
-  EXPECT_GT(timer.ElapsedTime(), 3 * MonoTime::kNanosecondsPerSecond);
+  EXPECT_GE(MonotonicNanos() - start, 3 * NANOS_PER_SEC);
   EXPECT_EQ(num_batches * BATCH_CAPACITY, receiver_info_[0]->data_values.size());
   EXPECT_EQ(2, counters.front()->value());
 }
