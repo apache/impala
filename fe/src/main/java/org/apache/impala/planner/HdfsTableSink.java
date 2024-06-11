@@ -158,7 +158,7 @@ public class HdfsTableSink extends TableSink {
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
     PlanNode inputNode = fragment_.getPlanRoot();
-    long cardinality = inputNode.getCardinality();
+    long cardinality = Math.max(0, inputNode.getCardinality());
     float avgRowDataSize = inputNode.getAvgRowSizeWithoutPad();
     long estBytesInserted = (long) Math.ceil(avgRowDataSize * (double) cardinality);
     double totalCost = 0.0F;

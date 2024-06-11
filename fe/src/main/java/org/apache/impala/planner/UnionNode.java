@@ -164,7 +164,7 @@ public class UnionNode extends PlanNode {
       PlanNode child = children_.get(i);
       if (child.cardinality_ >= 0) {
         totalMaterializedCardinality =
-            checkedAdd(totalMaterializedCardinality, child.cardinality_);
+            checkedAdd(totalMaterializedCardinality, Math.max(0, child.cardinality_));
       }
     }
     long estBytesMaterialized =

@@ -200,3 +200,81 @@ max-parallelism=1 segment-costs=[28]
    tuple-ids=0 row-size=12B cardinality=20 cost=3
    in pipelines: 00(GETNEXT)
 ====
+# IMPALA-13152: Regression test for TOP-N query over empty table.
+select field, rk from (
+select
+  field, f2,
+  row_number()
+      over (partition by field order by f2) rk
+from functional.emptytable
+) b
+where rk = 1;
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=48.00MB Threads=4
+Per-Host Resource Estimates: Memory=48MB
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[0] cpu-comparison-result=2 [max(1 (self) vs 2 (sum children))]
+PLAN-ROOT SINK
+|  output exprs: field, row_number()
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=0
+|
+06:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=64.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4,3 row-size=24B cardinality=0 cost=0
+|  in pipelines: 05(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(field)] hosts=1 instances=2 (adjusted from 1)
+Per-Instance Resources: mem-estimate=16.12MB mem-reservation=16.00MB thread-reservation=1
+max-parallelism=1 segment-costs=[0, 0] cpu-comparison-result=2 [max(2 (self) vs 1 (sum children))]
+03:SELECT
+|  predicates: row_number() = CAST(1 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=4,3 row-size=24B cardinality=0 cost=0
+|  in pipelines: 05(GETNEXT)
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: field
+|  order by: f2 ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4,3 row-size=24B cardinality=0 cost=0
+|  in pipelines: 05(GETNEXT)
+|
+05:TOP-N
+|  partition by: field
+|  order by: f2 ASC
+|  partition limit: 1
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=16B cardinality=0 cost=0
+|  in pipelines: 05(GETNEXT), 01(OPEN)
+|
+04:EXCHANGE [HASH(field)]
+|  mem-estimate=20.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=16B cardinality=0 cost=0
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=12.16MB mem-reservation=12.00MB thread-reservation=1
+max-parallelism=1 segment-costs=[0, 0]
+01:TOP-N
+|  partition by: field
+|  order by: f2 ASC
+|  partition limit: 1
+|  source expr: row_number() = CAST(1 AS BIGINT)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=16B cardinality=0 cost=0
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.emptytable, RANDOM]
+   partitions=0/0 files=0 size=0B
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/0 rows=0
+     columns missing stats: field
+   extrapolated-rows=disabled max-scan-range-rows=0
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=0 cost=0
+   in pipelines: 00(GETNEXT)
+====

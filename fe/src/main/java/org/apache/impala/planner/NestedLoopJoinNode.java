@@ -111,7 +111,7 @@ public class NestedLoopJoinNode extends JoinNode {
     // different costs here based on that RHS threshold.
     // We return the full cost in the first element of the Pair.
     long probeCardinality = getProbeCardinalityForCosting();
-    long buildCardinality = getChild(1).getCardinality();
+    long buildCardinality = Math.max(0, getChild(1).getCardinality());
     long cardProduct = checkedMultiply(probeCardinality, buildCardinality);
     long perInstanceBuildCardinality =
         (long) Math.ceil(buildCardinality / fragment_.getNumInstancesForCosting());

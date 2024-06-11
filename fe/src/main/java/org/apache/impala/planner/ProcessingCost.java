@@ -80,10 +80,6 @@ public abstract class ProcessingCost implements Cloneable {
         Math.max(0, cardinality), exprsCost, materializationCost);
   }
 
-  private static ProcessingCost computeValidBaseCost(double totalCost) {
-    return new BaseProcessingCost(totalCost);
-  }
-
   public static ProcessingCost basicCost(
       String label, long cardinality, float exprsCost, float materializationCost) {
     ProcessingCost processingCost =
@@ -99,10 +95,20 @@ public abstract class ProcessingCost implements Cloneable {
     return processingCost;
   }
 
+  /**
+   * Create new ProcessingCost.
+   * 'totalCost' must not be a negative, NaN, or infinite.
+   */
   public static ProcessingCost basicCost(String label, double totalCost) {
-    ProcessingCost processingCost = computeValidBaseCost(totalCost);
-    processingCost.setLabel(label);
-    return processingCost;
+    try {
+      ProcessingCost processingCost = new BaseProcessingCost(totalCost);
+      processingCost.setLabel(label);
+      return processingCost;
+    } catch (IllegalArgumentException ex) {
+      // Rethrow with label mentioned in the exception message.
+      throw new IllegalArgumentException(
+          String.format("Invalid totalCost supplied for %s", label), ex);
+    }
   }
 
   /**

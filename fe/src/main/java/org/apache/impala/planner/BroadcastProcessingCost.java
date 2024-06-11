@@ -36,7 +36,7 @@ public class BroadcastProcessingCost extends ProcessingCost {
   protected BroadcastProcessingCost(
       ProcessingCost cost, Supplier<Integer> countSupplier) {
     Preconditions.checkArgument(
-        cost.isValid(), "BroadcastProcessingCost: cost is invalid!");
+        cost.isValid(), "BroadcastProcessingCost: cost is invalid! %s", cost);
     childProcessingCost_ = cost;
     setNumInstanceExpected(countSupplier);
   }

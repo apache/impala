@@ -228,9 +228,9 @@ public class IcebergDeleteNode extends JoinNode {
             getProbeCardinalityForCosting(), eqJoinPredicateEvalCost);
 
     // Compute the processing cost for rhs.
-    ProcessingCost buildProcessingCost =
-        ProcessingCost.basicCost(getDisplayLabel() + " Build side",
-            getChild(1).getCardinality(), eqJoinPredicateEvalCost);
+    long buildCardinality = Math.max(0, getChild(1).getCardinality());
+    ProcessingCost buildProcessingCost = ProcessingCost.basicCost(
+        getDisplayLabel() + " Build side", buildCardinality, eqJoinPredicateEvalCost);
     return Pair.create(probeProcessingCost, buildProcessingCost);
   }
 }

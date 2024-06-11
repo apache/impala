@@ -26,7 +26,8 @@ public class ScaledProcessingCost extends ProcessingCost {
   private final long multiplier_;
 
   protected ScaledProcessingCost(ProcessingCost cost, long multiplier) {
-    Preconditions.checkArgument(cost.isValid(), "ScaledProcessingCost: cost is invalid!");
+    Preconditions.checkArgument(
+        cost.isValid(), "ScaledProcessingCost: cost is invalid! %s", cost);
     Preconditions.checkArgument(
         multiplier >= 0, "ScaledProcessingCost: multiplier must be non-negative!");
     cost_ = cost;

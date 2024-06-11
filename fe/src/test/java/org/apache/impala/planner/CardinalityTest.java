@@ -18,6 +18,7 @@
 package org.apache.impala.planner;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.Arrays;
@@ -25,11 +26,14 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.common.collect.ImmutableSet;
@@ -41,6 +45,16 @@ import com.google.common.collect.ImmutableSet;
 public class CardinalityTest extends PlannerTestBase {
 
   private static double CARDINALITY_TOLERANCE = 0.05;
+
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    RuntimeEnv.INSTANCE.setTestEnv(true);
+  }
+
+  @AfterClass
+  public static void cleanUpClass() {
+    RuntimeEnv.INSTANCE.reset();
+  }
 
   /**
    * Test the happy path: table with stats, no all-null cols.
@@ -1117,6 +1131,9 @@ public class CardinalityTest extends PlannerTestBase {
     // the distributed plan).
     PlanNode currentNode = plan.get(plan.size() - 1).getPlanRoot();
     for (Integer currentChildIndex: path) {
+      assertTrue(currentNode.getDisplayLabel() + " does not have child index "
+              + currentChildIndex,
+          currentNode.hasChild(currentChildIndex));
       currentNode = currentNode.getChild(currentChildIndex);
     }
     assertEquals("PlanNode class not matched: ", cl.getName(),

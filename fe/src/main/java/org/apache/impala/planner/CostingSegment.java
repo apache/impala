@@ -120,7 +120,8 @@ public class CostingSegment extends TreeNode<CostingSegment> {
   }
 
   private void appendCost(ProcessingCost additionalCost) {
-    Preconditions.checkArgument(additionalCost.isValid());
+    Preconditions.checkArgument(
+        additionalCost.isValid(), "additionalCost is invalid! %s", additionalCost);
     ProcessingCost newTotalCost = ProcessingCost.sumCost(additionalCost, cost_);
     newTotalCost.setNumRowToConsume(cost_.getNumRowToConsume());
     newTotalCost.setNumRowToProduce(additionalCost.getNumRowToConsume());

@@ -1045,7 +1045,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   public void computeRowConsumptionAndProductionToCost() {
     Preconditions.checkState(processingCost_.isValid(),
-        "Processing cost of PlanNode " + getDisplayLabel() + " is invalid!");
+        "Processing cost of PlanNode %s is invalid! %s", getDisplayLabel(),
+        processingCost_);
     processingCost_.setNumRowToConsume(getInputCardinality());
     processingCost_.setNumRowToProduce(getCardinality());
   }
@@ -1279,6 +1280,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     filteredCardinality_ = newCardinality;
   }
 
+  // May return -1.
   // TODO: merge this with getCardinality().
   protected long getFilteredCardinality() {
     return filteredCardinality_ > -1 ? filteredCardinality_ : getCardinality();

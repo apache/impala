@@ -2228,8 +2228,6 @@ public class HdfsScanNode extends ScanNode {
    */
   @Override
   protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
-    Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
-
     long inputCardinality = getFilteredInputCardinality();
     long estBytes = 0L;
     double bytesCostCoefficient = 0.0;
@@ -2255,6 +2253,7 @@ public class HdfsScanNode extends ScanNode {
       }
       return ProcessingCost.basicCost(getDisplayLabel(), totalCost);
     } else {
+      // Input cardinality is 0 or unknown. Fallback to superclass.
       return super.computeScanProcessingCost(queryOptions);
     }
   }
