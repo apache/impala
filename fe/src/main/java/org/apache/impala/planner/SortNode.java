@@ -473,10 +473,12 @@ public class SortNode extends PlanNode {
     // TODO: Benchmark partial sort cost separately.
     // TODO: Improve this for larger spilling sorts.
     double totalCost = 0.0F;
-    long inputCardinality = getChild(0).getFilteredCardinality();
+    long inputCardinality = Math.max(0, getChild(0).getFilteredCardinality());
+    double log2InputCardinality =
+        inputCardinality <= 0 ? 0.0 : (Math.log(inputCardinality) / Math.log(2));
     if (type_ == TSortType.TOTAL || type_ == TSortType.PARTIAL) {
       if (avgRowSize_ <= 10) {
-        totalCost = inputCardinality * (Math.log(inputCardinality) / Math.log(2))
+        totalCost = inputCardinality * log2InputCardinality
             * COST_COEFFICIENT_SORT_TOTAL_SMALL_ROW;
       } else {
         double fullInputSize = inputCardinality * avgRowSize_;
@@ -487,8 +489,7 @@ public class SortNode extends PlanNode {
       Preconditions.checkState(
           type_ == TSortType.TOPN || type_ == TSortType.PARTITIONED_TOPN);
       // Benchmarked TopN sort costs were ~ NlogN rows.
-      totalCost = inputCardinality * (Math.log(inputCardinality) / Math.log(2))
-          * COST_COEFFICIENT_SORT_TOPN;
+      totalCost = inputCardinality * log2InputCardinality * COST_COEFFICIENT_SORT_TOPN;
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("Sort CPU cost estimate: " + totalCost + ", Type: " + type_

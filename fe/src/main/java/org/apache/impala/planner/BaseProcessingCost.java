@@ -17,6 +17,8 @@
 
 package org.apache.impala.planner;
 
+import com.google.common.base.Preconditions;
+
 /**
  * A basic implementation of {@link ProcessingCost} that takes account expression cost
  * and average row size as per-row costing weight.
@@ -42,6 +44,10 @@ public class BaseProcessingCost extends ProcessingCost {
   }
 
   public BaseProcessingCost(double totalCost) {
+    Preconditions.checkArgument(!Double.isNaN(totalCost), "totalCost must not be a NaN!");
+    Preconditions.checkArgument(
+        Double.isFinite(totalCost), "totalCost must be a finite double!");
+    Preconditions.checkArgument(totalCost >= 0, "totalCost must not be a negative!");
     cardinality_ = 0L;
     exprsCost_ = 0.0F;
     materializationCost_ = 0.0F;
@@ -74,7 +80,7 @@ public class BaseProcessingCost extends ProcessingCost {
   public String getDetails() {
     StringBuilder output = new StringBuilder();
     output.append(super.getDetails());
-    output.append(" total-cost=").append(totalCost_);
+    output.append(" raw-cost=").append(totalCost_);
     if (cardinality_ != 0L) { output.append(" cardinality=").append(cardinality_); }
     return output.toString();
   }

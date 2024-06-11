@@ -1101,7 +1101,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     List<CostingSegment> costingSegments = rootSegment_.getNodesPreOrder();
     for (CostingSegment costingSegment : costingSegments) {
       ProcessingCost cost = costingSegment.getProcessingCost();
-      Preconditions.checkState(cost.isValid());
+      Preconditions.checkState(cost.isValid(), "Segment cost is invalid! %s", cost);
       Preconditions.checkState(
           cost.getNumInstancesExpected() == getAdjustedInstanceCount());
     }

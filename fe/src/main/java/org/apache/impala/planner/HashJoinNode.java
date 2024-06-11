@@ -339,12 +339,13 @@ public class HashJoinNode extends JoinNode {
     // Compute the processing cost for lhs. Benchmarking suggests we can estimate the
     // probe cost as a linear function combining the probe input cardinality and the
     // estimated output cardinality.
+    long outputCardinality = Math.max(0, getCardinality());
     double totalProbeCost =
         (getProbeCardinalityForCosting() * COST_COEFFICIENT_PROBE_INPUT)
-        + (getCardinality() * COST_COEFFICIENT_HASH_JOIN_OUTPUT);
+        + (outputCardinality * COST_COEFFICIENT_HASH_JOIN_OUTPUT);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Probe CPU cost estimate: " + totalProbeCost + ", Input Card: "
-          + getProbeCardinalityForCosting() + ", Output Card: " + getCardinality());
+          + getProbeCardinalityForCosting() + ", Output Card: " + outputCardinality);
     }
     ProcessingCost probeProcessingCost =
         ProcessingCost.basicCost(getDisplayLabel(), totalProbeCost);
@@ -357,8 +358,8 @@ public class HashJoinNode extends JoinNode {
     // build fragment count is fixed for broadcast(at num hosts) regardless of the cost
     // computed here. But we should clean up the costing here to avoid any future
     // confusion.
-    double totalBuildCost =
-        getChild(1).getFilteredCardinality() * COST_COEFFICIENT_BUILD_INPUT;
+    long buildCardinality = Math.max(0, getChild(1).getFilteredCardinality());
+    double totalBuildCost = buildCardinality * COST_COEFFICIENT_BUILD_INPUT;
     ProcessingCost buildProcessingCost =
         ProcessingCost.basicCost(getDisplayLabel() + " Build side", totalBuildCost);
     return Pair.create(probeProcessingCost, buildProcessingCost);

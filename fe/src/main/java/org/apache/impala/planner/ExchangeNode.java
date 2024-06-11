@@ -253,7 +253,7 @@ public class ExchangeNode extends PlanNode {
     //      bottom sending fragment;
     //   2. The receiving processing cost in the top receiving fragment which is computed
     //      here.
-    long inputCardinality = getChild(0).getFilteredCardinality();
+    long inputCardinality = Math.max(0, getChild(0).getFilteredCardinality());
 
     // It's not obvious whether the per-byte CPU costs are more accurately estimated
     // using the serialized or deserialized sizes, but the coefficients were determined

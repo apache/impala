@@ -1000,8 +1000,12 @@ public abstract class JoinNode extends PlanNode {
    */
   public abstract Pair<ProcessingCost, ProcessingCost> computeJoinProcessingCost();
 
+  /**
+   * Get filtered cardinality of probe hand of join node.
+   * Sanitized unknown cardinality (-1) into 0.
+   */
   protected long getProbeCardinalityForCosting() {
-    return getChild(0).getFilteredCardinality();
+    return Math.max(0, getChild(0).getFilteredCardinality());
   }
 
   @Override

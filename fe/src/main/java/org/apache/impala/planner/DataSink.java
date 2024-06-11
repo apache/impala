@@ -138,9 +138,9 @@ public abstract class DataSink {
    */
   public void computeRowConsumptionAndProductionToCost() {
     Preconditions.checkState(processingCost_.isValid(),
-        "Processing cost of DataSink " + fragment_.getId() + ":" + getLabel()
-            + " is invalid!");
-    long inputOutputCardinality = fragment_.getPlanRoot().getCardinality();
+        "Processing cost of DataSink %s:%s is invalid! %s", fragment_.getId(), getLabel(),
+        processingCost_);
+    long inputOutputCardinality = Math.max(0, fragment_.getPlanRoot().getCardinality());
     processingCost_.setNumRowToConsume(inputOutputCardinality);
     processingCost_.setNumRowToProduce(inputOutputCardinality);
   }

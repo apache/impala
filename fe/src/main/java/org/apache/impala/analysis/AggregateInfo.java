@@ -734,6 +734,10 @@ public class AggregateInfo extends AggregateInfoBase {
 
   public ProcessingCost computeProcessingCost(
       String label, long inputCardinality, long intermediateOutputCardinality) {
+    Preconditions.checkArgument(
+        inputCardinality >= 0, "inputCardinality should not be negative!");
+    Preconditions.checkArgument(intermediateOutputCardinality >= 0,
+        "intermediateOutputCardinality should not be negative!");
     // Benchmarking suggests we can estimate the processing cost as a linear function
     // based the probe input cardinality, the "intermediate" output cardinality, and
     // an incremental cost per input row for each additional aggregate function.

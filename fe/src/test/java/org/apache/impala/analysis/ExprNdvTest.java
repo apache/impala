@@ -20,13 +20,25 @@ package org.apache.impala.analysis;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.RuntimeEnv;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
  * Tests computeNumDistinctValues() estimates for Exprs
  */
 public class ExprNdvTest extends FrontendTestBase {
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    RuntimeEnv.INSTANCE.setTestEnv(true);
+  }
+
+  @AfterClass
+  public static void cleanUpClass() {
+    RuntimeEnv.INSTANCE.reset();
+  }
 
   public void verifyNdv(String expr, long expectedNdv)
       throws ImpalaException {

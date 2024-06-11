@@ -73,9 +73,9 @@ public class PlanRootSink extends DataSink {
     if (queryOptions.isSpool_query_results() && queryOptions.getScratch_limit() != 0
         && !BackendConfig.INSTANCE.getScratchDirs().isEmpty()) {
       // The processing cost to buffer these many rows in root.
-      processingCost_ =
-          ProcessingCost.basicCost(getLabel(), fragment_.getPlanRoot().getCardinality(),
-              ExprUtil.computeExprsTotalCost(outputExprs_));
+      long outputCardinality = Math.max(0, fragment_.getPlanRoot().getCardinality());
+      processingCost_ = ProcessingCost.basicCost(
+          getLabel(), outputCardinality, ExprUtil.computeExprsTotalCost(outputExprs_));
     } else {
       processingCost_ = ProcessingCost.zero();
     }

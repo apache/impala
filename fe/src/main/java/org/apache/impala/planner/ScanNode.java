@@ -345,6 +345,7 @@ abstract public class ScanNode extends PlanNode {
     return capInputCardinalityWithLimit(inputCardinality_);
   }
 
+  // May return -1.
   // TODO: merge this with getInputCardinality().
   public long getFilteredInputCardinality() {
     return capInputCardinalityWithLimit(
@@ -396,8 +397,6 @@ abstract public class ScanNode extends PlanNode {
    * number of scan ranges and related query options.
    */
   protected int computeMaxScannerThreadsForCPC(TQueryOptions queryOptions) {
-    Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
-
     // maxThread calculation below intentionally does not include core count from
     // executor group config. This is to allow scan fragment parallelism to scale
     // regardless of the core count limit.
@@ -417,8 +416,6 @@ abstract public class ScanNode extends PlanNode {
    * the return value of this method.
    */
   protected ProcessingCost computeScanProcessingCost(TQueryOptions queryOptions) {
-    Preconditions.checkArgument(queryOptions.isCompute_processing_cost());
-
     int maxScannerThreads = computeMaxScannerThreadsForCPC(queryOptions);
     long inputCardinality = getFilteredInputCardinality();
 

@@ -26,8 +26,10 @@ public class SumProcessingCost extends ProcessingCost {
   private final ProcessingCost cost2_;
 
   protected SumProcessingCost(ProcessingCost cost1, ProcessingCost cost2) {
-    Preconditions.checkArgument(cost1.isValid(), "SumProcessingCost: cost1 is invalid!");
-    Preconditions.checkArgument(cost2.isValid(), "SumProcessingCost: cost2 is invalid!");
+    Preconditions.checkArgument(
+        cost1.isValid(), "SumProcessingCost: cost1 is invalid! %s", cost1);
+    Preconditions.checkArgument(
+        cost2.isValid(), "SumProcessingCost: cost2 is invalid! %s", cost2);
     cost1_ = cost1;
     cost2_ = cost2;
   }

@@ -736,7 +736,9 @@ enum TImpalaQueryOptions {
   // If true, replanning is enabled.
   ENABLE_REPLAN = 143;
 
-  // If true, test replan by imposing artificial two executor groups in FE.
+  // If true, test replan by imposing artificial two executor groups in FE and always
+  // compute ProcessingCost. The degree of parallelism adjustment, however, still require
+  // COMPUTE_PROCESSING_COST option set to true.
   TEST_REPLAN = 144;
 
   // Maximum wait time on HMS ACID lock in seconds.

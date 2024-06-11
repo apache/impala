@@ -100,7 +100,7 @@ public class DataStreamSink extends DataSink {
   public void computeProcessingCost(TQueryOptions queryOptions) {
     // The sending part of the processing cost for the exchange node.
 
-    long outputCardinality = exchNode_.getFilteredCardinality();
+    long outputCardinality = Math.max(0, exchNode_.getFilteredCardinality());
     long outputSize = (long) (exchNode_.getAvgDeserializedRowSize() * outputCardinality);
     double totalCost = 0.0;
     String exchType;

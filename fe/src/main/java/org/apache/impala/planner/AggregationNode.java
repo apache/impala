@@ -575,13 +575,15 @@ public class AggregationNode extends PlanNode {
       // duplicate keys across fragments.  Calculate an overall "intermediate" output
       // cardinality that attempts to account for the dups. Cap it at the input
       // cardinality because an aggregation cannot increase the cardinality.
-      long inputCardinality = getAggClassNumGroup(prevAgg, aggInfo);
+      long inputCardinality = Math.max(0, getAggClassNumGroup(prevAgg, aggInfo));
       long perInstanceNdv = fragment_.getPerInstanceNdvForCpuCosting(
           inputCardinality, aggInfo.getGroupingExprs());
-      long intermediateOutputCardinality = Math.min(
-          inputCardinality, perInstanceNdv * fragment_.getNumInstancesForCosting());
+      long intermediateOutputCardinality = Math.max(0,
+          Math.min(
+              inputCardinality, perInstanceNdv * fragment_.getNumInstancesForCosting()));
+      long aggClassNumGroup = Math.max(0, getAggClassNumGroup(prevAgg, aggInfo));
       ProcessingCost aggCost = aggInfo.computeProcessingCost(getDisplayLabel(),
-          getAggClassNumGroup(prevAgg, aggInfo), intermediateOutputCardinality);
+          aggClassNumGroup, intermediateOutputCardinality);
       processingCost_ = ProcessingCost.sumCost(processingCost_, aggCost);
     }
   }

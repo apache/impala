@@ -550,15 +550,23 @@ public class Planner {
   public static void computeProcessingCost(
       List<PlanFragment> planRoots, TQueryExecRequest request, PlannerContext planCtx) {
     Analyzer rootAnalyzer = planCtx.getRootAnalyzer();
-    if (!rootAnalyzer.getQueryOptions().isCompute_processing_cost()) {
-      request.setCores_required(-1);
-      return;
-    }
+    TQueryOptions queryOptions = rootAnalyzer.getQueryOptions();
 
     PlanFragment rootFragment = planRoots.get(0);
-    List<PlanFragment> postOrderFragments = rootFragment.getNodesPostOrder();
-    for (PlanFragment fragment : postOrderFragments) {
-      fragment.computeCostingSegment(rootAnalyzer.getQueryOptions());
+    List<PlanFragment> postOrderFragments = new ArrayList<>();
+    boolean testCostCalculation = queryOptions.isEnable_replan()
+        && (RuntimeEnv.INSTANCE.isTestEnv() || queryOptions.isTest_replan());
+    if (queryOptions.isCompute_processing_cost() || testCostCalculation) {
+      postOrderFragments = rootFragment.getNodesPostOrder();
+      for (PlanFragment fragment : postOrderFragments) {
+        fragment.computeCostingSegment(queryOptions);
+      }
+    }
+
+    // Only do parallelism adjustment if COMPUTE_PROCESSING_COST is enabled.
+    if (!queryOptions.isCompute_processing_cost()) {
+      request.setCores_required(-1);
+      return;
     }
 
     if (LOG.isTraceEnabled()) {
@@ -571,7 +579,7 @@ public class Planner {
 
     computeEffectiveParallelism(postOrderFragments,
         rootAnalyzer.getMinParallelismPerNode(), rootAnalyzer.getMaxParallelismPerNode(),
-        rootAnalyzer.getQueryOptions());
+        queryOptions);
 
     // Count bounded core count. This is taken from final instance count from previous
     // step.
