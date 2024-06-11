@@ -107,7 +107,7 @@ class JsonParserTest : public ::testing::TestWithParam<int> {
   };
 };
 
-INSTANTIATE_TEST_CASE_P(StreamSize, JsonParserTest, ::testing::Values(1, 16, 256));
+INSTANTIATE_TEST_SUITE_P(StreamSize, JsonParserTest, ::testing::Values(1, 16, 256));
 
 TEST_P(JsonParserTest, Basic) {
   SimpleJsonScanner js(schema(), [this](const char** begin, const char** end) {

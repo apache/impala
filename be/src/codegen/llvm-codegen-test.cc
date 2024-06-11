@@ -704,7 +704,7 @@ TEST_P(LlvmOptTest, CachedOptFunction) {
   EXPECT_EQ(cache_misses->GetValue(), opt_levels.size() - num_less);
 }
 
-INSTANTIATE_TEST_CASE_P(OptLevels, LlvmOptTest, ::testing::Values(
+INSTANTIATE_TEST_SUITE_P(OptLevels, LlvmOptTest, ::testing::Values(
   //              Optimization level    Expect unoptimized
   std::make_tuple(TCodeGenOptLevel::O0, true),
   std::make_tuple(TCodeGenOptLevel::O1, false),

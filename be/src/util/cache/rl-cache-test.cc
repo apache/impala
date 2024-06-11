@@ -41,7 +41,7 @@ class CacheInvalidationTest :
   }
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     CacheTypes, CacheInvalidationTest,
     ::testing::Values(
         make_tuple(Cache::EvictionPolicy::FIFO,
@@ -277,7 +277,7 @@ class LRUCacheTest :
   }
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     CacheTypes, LRUCacheTest,
     ::testing::Values(ShardingPolicy::MultiShard,
                       ShardingPolicy::SingleShard));

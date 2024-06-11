@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <gtest/gtest.h>
+
 #include "common/names.h"
 #include "runtime/io/disk-io-mgr-internal.h"
 #include "testutil/death-test-util.h"
@@ -29,6 +31,8 @@ class DiskFileTest : public testing::Test {
   void ValidateMemBlockStatusTransition(MemBlock& block, MemBlockStatus old_status,
       MemBlockStatus new_status, bool expect_success);
 };
+
+typedef DiskFileTest DiskFileDeathTest;
 
 // last_status is the MemBlock's last status it is going to reach other than
 // MemBlockStatus::DISABLED.
@@ -88,7 +92,9 @@ TEST_F(DiskFileTest, MemBlockTest) {
 }
 
 // Test the MemBlock status transition.
-TEST_F(DiskFileTest, MemBlockStatusTransition) {
+TEST_F(DiskFileDeathTest, MemBlockStatusTransition) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
   MemBlock block(0);
   ValidateMemBlockStatusTransition(
       block, MemBlockStatus::UNINIT, MemBlockStatus::UNINIT, false);

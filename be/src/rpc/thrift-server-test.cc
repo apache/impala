@@ -135,10 +135,10 @@ class ThriftKerberizedParamsTest :
   }
 };
 
-INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
-                        ThriftKerberizedParamsTest,
-                        ::testing::Values(KERBEROS_OFF,
-                                          KERBEROS_ON));
+INSTANTIATE_TEST_SUITE_P(KerberosOnAndOff,
+                         ThriftKerberizedParamsTest,
+                         ::testing::Values(KERBEROS_OFF,
+                                           KERBEROS_ON));
 
 TEST(ThriftTestBase, Connectivity) {
   int port = GetServerPort();

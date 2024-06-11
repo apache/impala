@@ -332,7 +332,7 @@ class DataCacheTest :
   }
 };
 
-INSTANTIATE_TEST_CASE_P(DataCacheTestTypes, DataCacheTest,::testing::Values(
+INSTANTIATE_TEST_SUITE_P(DataCacheTestTypes, DataCacheTest,::testing::Values(
     DataCacheTestParam("LRU", 0),
     DataCacheTestParam("LRU", NUM_THREADS),
     DataCacheTestParam("LIRS", 0),

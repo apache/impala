@@ -284,7 +284,7 @@ TEST_P(RpcMgrKerberizedTest, InternalAuthorizationSkip) {
 
 // Run tests with Unix domain socket and TCP socket by setting
 // FLAGS_rpc_use_unix_domain_socket as true and false.
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     UdsOnAndOff, RpcMgrKerberizedTest, ::testing::Values(true, false));
 
 } // namespace impala

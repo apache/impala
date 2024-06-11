@@ -73,7 +73,7 @@ class CacheTest :
   }
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     CacheTypes, CacheTest,
     ::testing::Values(
         make_tuple(Cache::EvictionPolicy::FIFO,

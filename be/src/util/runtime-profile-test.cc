@@ -1661,7 +1661,7 @@ TEST_P(TimeSeriesCounterResampleTest, TestPrettyPrint) {
   for (const char* e : param.expected) EXPECT_STR_CONTAINS(pretty_str, e);
 }
 
-INSTANTIATE_TEST_CASE_P(VariousNumbers, TimeSeriesCounterResampleTest,
+INSTANTIATE_TEST_SUITE_P(VariousNumbers, TimeSeriesCounterResampleTest,
     ::testing::Values(
     TimeSeriesTestParam(64, {"TestCounter (500.000ms): 0, 1, 2, 3", "61, 62, 63"}),
 

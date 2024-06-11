@@ -60,7 +60,7 @@ add_executable(data-cache-trace-replayer data-cache-trace-replayer.cc)
 target_link_libraries(data-cache-trace-replayer ${IMPALA_TEST_LINK_LIBS})
 
 ADD_UNIFIED_BE_LSAN_TEST(disk-io-mgr-test DiskIoMgrTest.*)
-ADD_UNIFIED_BE_LSAN_TEST(disk-file-test DiskFileTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(disk-file-test DiskFileTest.*:DiskFileDeathTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(data-cache-trace-test DataCacheTraceTest.*)
 # Exception to unified be: Custom main function (platform tests)
 ADD_BE_LSAN_TEST(data-cache-test)
