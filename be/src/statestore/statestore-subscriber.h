@@ -341,6 +341,12 @@ class StatestoreSubscriber {
       return MonotonicMillis() - last_registration_ms_.Load();
     }
 
+    int64_t MilliSecondsSinceLastFailover() const {
+      int64_t time_ms = MonotonicMillis() - last_failover_time_.Load();
+      DCHECK_GE(time_ms, 0);
+      return time_ms;
+    }
+
     bool IsInPostRecoveryGracePeriod() const;
 
     /// Check if the subscriber is interesting to receive the notification of catalogd
@@ -351,7 +357,8 @@ class StatestoreSubscriber {
     bool IsRegistered();
 
     /// Set the active state of the registered statestore instance.
-    void SetStatestoreActive(bool is_active, int64_t active_statestored_version);
+    void SetStatestoreActive(bool is_active, int64_t active_statestored_version,
+        bool has_failover = false);
 
     /// Return the version of active statestore.
     int64_t GetActiveVersion(bool* is_active);
@@ -380,6 +387,9 @@ class StatestoreSubscriber {
 
     /// The version of active statestored.
     int64_t active_statestored_version_ = 0;
+
+    /// Monotonic timestamp of the last failover.
+    AtomicInt64 last_failover_time_{0};
 
     /// Protects is_active_ and active_statestored_version_. Must be taken after lock_
     /// if both are to be taken together.
