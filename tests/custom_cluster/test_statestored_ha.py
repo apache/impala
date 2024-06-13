@@ -18,12 +18,15 @@
 from __future__ import absolute_import, division, print_function
 import logging
 import pytest
+import time
 
+from beeswaxd.BeeswaxService import QueryState
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.impala_cluster import (
     DEFAULT_CATALOG_SERVICE_PORT, DEFAULT_STATESTORE_SERVICE_PORT)
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIfBuildType, SkipIfNotHdfsMinicluster
 from time import sleep
 
 from thrift.protocol import TBinaryProtocol
@@ -632,6 +635,112 @@ class TestStatestoredHA(CustomClusterTestSuite):
     statestore_service_0.wait_for_metric_value(
         "statestore.in-ha-recovery-mode", expected_value=False, timeout=120)
     assert(not statestore_service_0.get_metric_value("statestore.active-status"))
+
+  SUBSCRIBER_TIMEOUT_S = 2
+  SS_PEER_TIMEOUT_S = 2
+  RECOVERY_GRACE_PERIOD_S = 5
+
+  @pytest.mark.execute_serially
+  @SkipIfNotHdfsMinicluster.scheduling
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--statestore_peer_timeout_seconds={timeout_s} "
+                     "--use_subscriber_id_as_catalogd_priority=true"
+                     .format(timeout_s=SS_PEER_TIMEOUT_S),
+    impalad_args="--statestore_subscriber_timeout_seconds={timeout_s} "
+                 "--statestore_subscriber_recovery_grace_period_ms={recovery_period_ms}"
+                 .format(timeout_s=SUBSCRIBER_TIMEOUT_S,
+                         recovery_period_ms=(RECOVERY_GRACE_PERIOD_S * 1000)),
+    catalogd_args="--statestore_subscriber_timeout_seconds={timeout_s}"
+                  .format(timeout_s=SUBSCRIBER_TIMEOUT_S),
+    start_args="--enable_statestored_ha --enable_catalogd_ha")
+  def test_statestore_failover_query_resilience(self):
+    """Test that a momentary inconsistent cluster membership state after statestore
+    service fail-over will not result in query cancellation. Also make sure that query
+    get cancelled if a backend actually went down after recovery grace period."""
+    # Verify two statestored instances are created with one in active role.
+    statestoreds = self.cluster.statestoreds()
+    assert (len(statestoreds) == 2)
+    statestore_service_0 = statestoreds[0].service
+    statestore_service_1 = statestoreds[1].service
+    assert (statestore_service_0.get_metric_value("statestore.active-status")), \
+        "First statestored must be active"
+    assert (not statestore_service_1.get_metric_value("statestore.active-status")), \
+        "Second statestored must not be active"
+
+    slow_query = \
+        "select distinct * from tpch_parquet.lineitem where l_orderkey > sleep(1000)"
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    try:
+      # Run a slow query
+      handle = client.execute_async(slow_query)
+      # Make sure query starts running.
+      self.wait_for_state(handle, QueryState.RUNNING, 120, client)
+      profile = client.get_runtime_profile(handle)
+      assert "NumBackends: 3" in profile, profile
+      # Kill active statestored
+      statestoreds[0].kill()
+      # Wait for long enough for the standby statestored to detect the failure of active
+      # statestored and assign itself in active role.
+      statestore_service_1.wait_for_metric_value(
+          "statestore.active-status", expected_value=True, timeout=120)
+      assert (statestore_service_1.get_metric_value("statestore.active-status")), \
+          "Second statestored must be active now"
+      statestore_service_1.wait_for_live_subscribers(5)
+      # Wait till the grace period ends + some buffer to verify the slow query is still
+      # running.
+      sleep(self.RECOVERY_GRACE_PERIOD_S + 1)
+      assert client.get_state(handle) == QueryState.RUNNING, \
+          "Query expected to be in running state"
+      # Now kill a backend, and make sure the query fails.
+      self.cluster.impalads[2].kill()
+      try:
+        client.wait_for_finished_timeout(handle, 100)
+        assert False, "Query expected to fail"
+      except ImpalaBeeswaxException as e:
+        assert "Failed due to unreachable impalad" in str(e), str(e)
+
+      # Restart original active statestored. Verify that the statestored does not resume
+      # its active role.
+      statestoreds[0].start(wait_until_ready=True)
+      statestore_service_0.wait_for_metric_value(
+          "statestore.active-status", expected_value=False, timeout=120)
+      assert (not statestore_service_0.get_metric_value("statestore.active-status")), \
+          "First statestored must not be active"
+      assert (statestore_service_1.get_metric_value("statestore.active-status")), \
+          "Second statestored must be active"
+      # Run a slow query
+      handle = client.execute_async(slow_query)
+      # Make sure query starts running.
+      self.wait_for_state(handle, QueryState.RUNNING, 120, client)
+      profile = client.get_runtime_profile(handle)
+      assert "NumBackends: 2" in profile, profile
+      # Kill current active statestored
+      start_time = time.time()
+      statestoreds[1].kill()
+      # Wait till the standby statestored becomes active.
+      query_state = client.get_state(handle)
+      assert query_state == QueryState.RUNNING
+      statestore_service_0.wait_for_metric_value(
+          "statestore.active-status", expected_value=True, timeout=120)
+      assert (statestore_service_0.get_metric_value("statestore.active-status")), \
+          "First statestored must be active now"
+      # Kill one backend
+      self.cluster.impalads[1].kill()
+      # Verify that it has to wait longer than the RECOVERY_GRACE_PERIOD_S for the
+      # query to fail. Combine failover time (SS_PEER_TIMEOUT_S) and recovery grace
+      # period (RECOVERY_GRACE_PERIOD_S) to avoid flaky test.
+      timeout_s = self.SS_PEER_TIMEOUT_S + self.RECOVERY_GRACE_PERIOD_S * 2
+      self.wait_for_state(handle, QueryState.EXCEPTION, timeout_s, client)
+      client.close_query(handle)
+      elapsed_s = time.time() - start_time
+      assert elapsed_s >= self.SS_PEER_TIMEOUT_S + self.RECOVERY_GRACE_PERIOD_S, \
+          ("Query was canceled in %s seconds, less than failover time + grace-period"
+           % (elapsed_s))
+    finally:
+      client.close()
 
 
 class TestStatestoredHAStartupDelay(CustomClusterTestSuite):

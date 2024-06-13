@@ -446,8 +446,10 @@ void StatestoreSubscriber::UpdateStatestoredRole(bool is_active,
       StatestoreStub* tmp = active_statestore_;
       active_statestore_ = standby_statestore_;
       standby_statestore_ = tmp;
-      active_statestore_->SetStatestoreActive(is_active, active_statestored_version);
-      standby_statestore_->SetStatestoreActive(!is_active, active_statestored_version);
+      active_statestore_->SetStatestoreActive(
+          is_active, active_statestored_version, /* has_failover */ true);
+      standby_statestore_->SetStatestoreActive(
+          !is_active, active_statestored_version, /* has_failover */ true);
       LOG(INFO) << "Updated active statestored as " << active_statestore_->GetAddress();
     }
 
@@ -1090,10 +1092,13 @@ Status StatestoreSubscriber::StatestoreStub::UpdateState(
 }
 
 bool StatestoreSubscriber::StatestoreStub::IsInPostRecoveryGracePeriod() const {
-  bool has_failed_before = connection_failure_metric_->GetValue() > 0;
-  bool in_grace_period = MilliSecondsSinceLastRegistration()
+  bool has_disconnect_before = connection_failure_metric_->GetValue() > 0;
+  bool in_disconnect_grace_period = MilliSecondsSinceLastRegistration()
       < FLAGS_statestore_subscriber_recovery_grace_period_ms;
-  return has_failed_before && in_grace_period;
+  bool in_failover_grace_period = MilliSecondsSinceLastFailover()
+      < FLAGS_statestore_subscriber_recovery_grace_period_ms;
+  return (has_disconnect_before && in_disconnect_grace_period)
+      || in_failover_grace_period;
 }
 
 bool StatestoreSubscriber::StatestoreStub::IsRegistered() {
@@ -1102,11 +1107,14 @@ bool StatestoreSubscriber::StatestoreStub::IsRegistered() {
 }
 
 void StatestoreSubscriber::StatestoreStub::SetStatestoreActive(
-    bool is_active, int64_t active_statestored_version) {
+    bool is_active, int64_t active_statestored_version, bool has_failover) {
   lock_guard<mutex> l(active_lock_);
   is_active_ = is_active;
   DCHECK(active_statestored_version_ <= active_statestored_version);
   active_statestored_version_ = active_statestored_version;
+  if (has_failover) {
+    last_failover_time_.Store(MonotonicMillis());
+  }
   active_status_metric_->SetValue(is_active);
 }
 

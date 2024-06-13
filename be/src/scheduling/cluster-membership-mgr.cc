@@ -213,8 +213,8 @@ void ClusterMembershipMgr::UpdateMembership(
   BeDescSharedPtr local_be_desc = GetLocalBackendDescriptor();
   bool needs_local_be_update = NeedsLocalBackendUpdate(*base_snapshot, local_be_desc);
 
-  // We consider the statestore to be recovering from a connection failure until its post
-  // recovery grace period has elapsed.
+  // We consider the statestore service to be recovering from a connection failure or
+  // fail-over until its post recovery grace period has elapsed.
   bool ss_is_recovering = statestore_subscriber_ != nullptr
       && statestore_subscriber_->IsInPostRecoveryGracePeriod();
 
