@@ -1187,6 +1187,8 @@ public class PlannerTest extends PlannerTestBase {
         filter.transform(" foo=bar cardinality=10.3K"));
     assertEquals(" foo=bar cardinality=",
         filter.transform(" foo=bar cardinality=unavailable"));
+    assertEquals(" foo=bar cardinality=",
+        filter.transform(" foo=bar cardinality=1.58K(filtered from 2.88M)"));
     filter = TestUtils.ROW_SIZE_FILTER;
     assertEquals(" row-size= cardinality=10.3K",
         filter.transform(" row-size=10B cardinality=10.3K"));
