@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -163,7 +164,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
     // Forbid unsupported and complex types.
     if (hasSignature()) {
       List<Type> refdTypes = Lists.newArrayList(fn_.getReturnType());
-      refdTypes.addAll(Lists.newArrayList(fn_.getArgs()));
+      refdTypes.addAll(Arrays.asList(fn_.getArgs()));
       for (Type t: refdTypes) {
         if (!t.isSupported() || t.isComplexType()) {
           throw new AnalysisException(

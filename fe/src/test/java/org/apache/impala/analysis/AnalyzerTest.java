@@ -143,24 +143,24 @@ public class AnalyzerTest extends FrontendTestBase {
     descTbl.computeMemLayout();
 
     assertEquals(89.0f, tupleDesc.getAvgSerializedSize(), 0.0);
-    checkLayoutParams("functional.alltypes.timestamp_col", 16, 0, 80, 0, analyzer);
-    checkLayoutParams("functional.alltypes.date_string_col", 12, 16, 80, 1, analyzer);
-    checkLayoutParams("functional.alltypes.string_col", 12, 28, 80, 2, analyzer);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 40, 80, 3, analyzer);
-    checkLayoutParams("functional.alltypes.double_col", 8, 48, 80, 4, analyzer);
-    checkLayoutParams("functional.alltypes.id", 4, 56, 80, 5, analyzer);
-    checkLayoutParams("functional.alltypes.int_col", 4, 60, 80, 6, analyzer);
-    checkLayoutParams("functional.alltypes.float_col", 4, 64, 80, 7, analyzer);
-    checkLayoutParams("functional.alltypes.year", 4, 68, 81, 0, analyzer);
-    checkLayoutParams("functional.alltypes.month", 4, 72, 81, 1, analyzer);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 76, 81, 2, analyzer);
-    checkLayoutParams("functional.alltypes.bool_col", 1, 78, 81, 3, analyzer);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 79, 81, 4, analyzer);
+    checkLayoutParams(tupleDesc, "timestamp_col", 16, 0, 80, 0, analyzer);
+    checkLayoutParams(tupleDesc, "date_string_col", 12, 16, 80, 1, analyzer);
+    checkLayoutParams(tupleDesc, "string_col", 12, 28, 80, 2, analyzer);
+    checkLayoutParams(tupleDesc, "bigint_col", 8, 40, 80, 3, analyzer);
+    checkLayoutParams(tupleDesc, "double_col", 8, 48, 80, 4, analyzer);
+    checkLayoutParams(tupleDesc, "id", 4, 56, 80, 5, analyzer);
+    checkLayoutParams(tupleDesc, "int_col", 4, 60, 80, 6, analyzer);
+    checkLayoutParams(tupleDesc, "float_col", 4, 64, 80, 7, analyzer);
+    checkLayoutParams(tupleDesc, "year", 4, 68, 81, 0, analyzer);
+    checkLayoutParams(tupleDesc, "month", 4, 72, 81, 1, analyzer);
+    checkLayoutParams(tupleDesc, "smallint_col", 2, 76, 81, 2, analyzer);
+    checkLayoutParams(tupleDesc, "bool_col", 1, 78, 81, 3, analyzer);
+    checkLayoutParams(tupleDesc, "tinyint_col", 1, 79, 81, 4, analyzer);
 
     Assert.assertEquals(12, dateTblTupleDesc.getAvgSerializedSize(), 0.0);
-    checkLayoutParams("functional.date_tbl.id_col", 4, 0, 12, 0, analyzer);
-    checkLayoutParams("functional.date_tbl.date_col", 4, 4, 12, 1, analyzer);
-    checkLayoutParams("functional.date_tbl.date_part", 4, 8, 12, 2, analyzer);
+    checkLayoutParams(dateTblTupleDesc, "id_col", 4, 0, 12, 0, analyzer);
+    checkLayoutParams(dateTblTupleDesc, "date_col", 4, 4, 12, 1, analyzer);
+    checkLayoutParams(dateTblTupleDesc, "date_part", 4, 8, 12, 2, analyzer);
   }
 
   private void testNonNullable() throws AnalysisException {
@@ -225,27 +225,27 @@ public class AnalyzerTest extends FrontendTestBase {
 
     assertEquals(64.0f, tupleDesc.getAvgSerializedSize(), 0.0);
     // Check non-materialized slots.
-    checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0, analyzer);
-    checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0, analyzer);
-    checkLayoutParams("functional.alltypes.string_col", 0, -1, 0, 0, analyzer);
+    checkLayoutParams(tupleDesc, "id", 0, -1, 0, 0, analyzer);
+    checkLayoutParams(tupleDesc, "double_col", 0, -1, 0, 0, analyzer);
+    checkLayoutParams(tupleDesc, "string_col", 0, -1, 0, 0, analyzer);
     // Check materialized slots.
-    checkLayoutParams("functional.alltypes.timestamp_col", 16, 0, 56, 0, analyzer);
-    checkLayoutParams("functional.alltypes.date_string_col", 12, 16, 56, 1, analyzer);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 28, 56, 2, analyzer);
-    checkLayoutParams("functional.alltypes.int_col", 4, 36, 56, 3, analyzer);
-    checkLayoutParams("functional.alltypes.float_col", 4, 40, 56, 4, analyzer);
-    checkLayoutParams("functional.alltypes.year", 4, 44, 56, 5, analyzer);
-    checkLayoutParams("functional.alltypes.month", 4, 48, 56, 6, analyzer);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 52, 56, 7, analyzer);
-    checkLayoutParams("functional.alltypes.bool_col", 1, 54, 57, 0, analyzer);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 55, 57, 1, analyzer);
+    checkLayoutParams(tupleDesc, "timestamp_col", 16, 0, 56, 0, analyzer);
+    checkLayoutParams(tupleDesc, "date_string_col", 12, 16, 56, 1, analyzer);
+    checkLayoutParams(tupleDesc, "bigint_col", 8, 28, 56, 2, analyzer);
+    checkLayoutParams(tupleDesc, "int_col", 4, 36, 56, 3, analyzer);
+    checkLayoutParams(tupleDesc, "float_col", 4, 40, 56, 4, analyzer);
+    checkLayoutParams(tupleDesc, "year", 4, 44, 56, 5, analyzer);
+    checkLayoutParams(tupleDesc, "month", 4, 48, 56, 6, analyzer);
+    checkLayoutParams(tupleDesc, "smallint_col", 2, 52, 56, 7, analyzer);
+    checkLayoutParams(tupleDesc, "bool_col", 1, 54, 57, 0, analyzer);
+    checkLayoutParams(tupleDesc, "tinyint_col", 1, 55, 57, 1, analyzer);
 
     Assert.assertEquals(4, dateTblTupleDesc.getAvgSerializedSize(), 0.0);
     // Non-materialized slots.
-    checkLayoutParams("functional.date_tbl.id_col", 0, -1, 0, 0, analyzer);
-    checkLayoutParams("functional.date_tbl.date_col", 0, -1, 0, 0, analyzer);
+    checkLayoutParams(dateTblTupleDesc, "id_col", 0, -1, 0, 0, analyzer);
+    checkLayoutParams(dateTblTupleDesc, "date_col", 0, -1, 0, 0, analyzer);
     // Materialized slot.
-    checkLayoutParams("functional.date_tbl.date_part", 4, 0, 4, 0, analyzer);
+    checkLayoutParams(dateTblTupleDesc, "date_part", 4, 0, 4, 0, analyzer);
   }
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,
@@ -256,10 +256,10 @@ public class AnalyzerTest extends FrontendTestBase {
     assertEquals(nullIndicatorBit, d.getNullIndicatorBit());
   }
 
-  private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
-      int nullIndicatorByte, int nullIndicatorBit, Analyzer analyzer) {
-    List<String> colAliasRawPath = Arrays.asList(colAlias.split("\\."));
-    SlotDescriptor d = analyzer.getSlotDescriptor(colAliasRawPath);
+  private void checkLayoutParams(TupleDescriptor desc, String colAlias, int byteSize,
+      int byteOffset, int nullIndicatorByte, int nullIndicatorBit, Analyzer analyzer) {
+    Path colAliasPath = new Path(desc, Arrays.asList(colAlias.split("\\.")));
+    SlotDescriptor d = analyzer.getSlotDescriptor(colAliasPath);
     checkLayoutParams(d, byteSize, byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
 

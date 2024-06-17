@@ -891,9 +891,9 @@ public class Analyzer {
   // Set of lowercase ambiguous implicit table aliases.
   private final Set<String> ambiguousAliases_ = new HashSet<>();
 
-  // Map from lowercase fully-qualified path to its slot descriptor. Only contains paths
-  // that have a scalar or struct type as destination (see registerSlotRef()).
-  private final Map<List<String>, SlotDescriptor> slotPathMap_ = new HashMap<>();
+  // Map from path to its slot descriptor. Only contains paths that have a scalar or
+  // struct type as destination (see registerSlotRef()).
+  private final Map<Path, SlotDescriptor> slotPathMap_ = new HashMap<>();
 
   // Indicates whether this analyzer/block is guaranteed to have an empty result set
   // due to a limit 0 or constant conjunct evaluating to false.
@@ -1428,10 +1428,10 @@ public class Analyzer {
   }
 
   /**
-   * Given a list of {"table alias", "column alias"}, return the SlotDescriptor.
+   * Given a Path, return the SlotDescriptor.
    */
-  public SlotDescriptor getSlotDescriptor(List<String> qualifiedColumnName) {
-    return slotPathMap_.get(qualifiedColumnName);
+  public SlotDescriptor getSlotDescriptor(Path slotPath) {
+    return slotPathMap_.get(slotPath);
   }
 
   /**
@@ -1793,7 +1793,7 @@ public class Analyzer {
       List<String> key = slotPath.getFullyQualifiedRawPath();
       Preconditions.checkState(key.stream().allMatch(s -> s.equals(s.toLowerCase())),
           "Slot paths should be lower case: " + key);
-      SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
+      SlotDescriptor existingSlotDesc = slotPathMap_.get(slotPath);
       if (existingSlotDesc != null) return existingSlotDesc;
 
       SlotDescriptor existingInTuple = findPathInCurrentTuple(slotPath);
@@ -1817,13 +1817,9 @@ public class Analyzer {
     TupleDescriptor currentTupleDesc = tupleStack_.peek();
     Preconditions.checkNotNull(currentTupleDesc);
 
-    final List<String> slotPathFQR = slotPath.getFullyQualifiedRawPath();
-    Preconditions.checkNotNull(slotPathFQR);
-
     for (SlotDescriptor slotDesc : currentTupleDesc.getSlots()) {
-      final List<String> tupleSlotFQR = slotDesc.getPath().getFullyQualifiedRawPath();
-      if (slotPathFQR.equals(tupleSlotFQR) &&
-            !globalState_.duplicateCollectionSlots.contains(slotDesc.getId())) {
+      if (slotPath.equals(slotDesc.getPath()) &&
+          !globalState_.duplicateCollectionSlots.contains(slotDesc.getId())) {
         return slotDesc;
       }
     }
@@ -1868,7 +1864,7 @@ public class Analyzer {
     Preconditions.checkState(slotPath.isRootedAtTuple());
     desc.setPath(slotPath);
     if (insertIntoSlotPathMap) {
-      slotPathMap_.put(slotPath.getFullyQualifiedRawPath(), desc);
+      slotPathMap_.put(slotPath, desc);
     }
     registerColumnPrivReq(desc);
   }

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.google.common.base.MoreObjects;
@@ -35,6 +36,7 @@ import org.apache.impala.util.AcidUtils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 import org.slf4j.Logger;
@@ -167,6 +169,10 @@ public class Path {
 
   // Resolved path before we resolved it again inside the table masking view.
   private Path pathBeforeMasking_ = null;
+
+  // Fully-qualified raw path. Populated on first call to getFullyQualifiedRawPath.
+  // Its inputs are all private final fields, so value can't change after init.
+  private List<String> fullyQualifiedRawPath_ = null;
 
   /**
    * Constructs a Path rooted at the given rootDesc.
@@ -444,7 +450,8 @@ public class Path {
    *
    * @param preferAlias {@code boolean} specifying if a path that represents an alias
    *                    should use that alias in the return or if the alias should be
-   *                    resolved to its actual db, table, and column.
+   *                    resolved to its actual db, table, and column. Canonical identity
+   *                    paths use {@code true} here for e.g. equals() and hashCode().
    *
    * @return {@link List} of {@link String}s with each element of the list containing an
    *         individual piece of the path. Element {@code 0} contains the database,
@@ -453,22 +460,40 @@ public class Path {
    */
   public List<String> getFullyQualifiedRawPath(boolean preferAlias) {
     Preconditions.checkState(rootTable_ != null || rootDesc_ != null);
-    List<String> result = Lists.newArrayListWithCapacity(rawPath_.size() + 2);
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
     if (rootDesc_ != null && (preferAlias || rootTable_ == null)) {
-      result.addAll(Lists.newArrayList(rootDesc_.getAlias().split("\\.")));
+      builder.addAll(Arrays.asList(rootDesc_.getAlias().split("\\.")));
     } else {
-      result.add(rootTable_.getDb().getName());
-      result.add(rootTable_.getName());
+      builder.add(rootTable_.getDb().getName());
+      builder.add(rootTable_.getName());
       if (rootTable_ instanceof IcebergMetadataTable) {
-        result.add(((IcebergMetadataTable)rootTable_).getMetadataTableName());
+        builder.add(((IcebergMetadataTable)rootTable_).getMetadataTableName());
       }
     }
-    result.addAll(rawPath_);
-    return result;
+    builder.addAll(rawPath_);
+    return builder.build();
   }
 
+  /**
+   * Returns the fully-qualified raw path, preferring aliases for the root if available.
+   * Caches the result for repeated calls, as all inputs to the path are marked final.
+   */
   public List<String> getFullyQualifiedRawPath() {
-    return getFullyQualifiedRawPath(true);
+    if (fullyQualifiedRawPath_ == null) {
+      fullyQualifiedRawPath_ = getFullyQualifiedRawPath(true);
+    }
+    return fullyQualifiedRawPath_;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    return obj instanceof Path && getFullyQualifiedRawPath().equals(
+        ((Path)obj).getFullyQualifiedRawPath());
+  }
+
+  @Override
+  public int hashCode() {
+    return getFullyQualifiedRawPath().hashCode();
   }
 
   /**
@@ -618,7 +643,7 @@ public class Path {
 
   public static Path createRelPath(Path rootPath, String... fieldNames) {
     Preconditions.checkState(rootPath.isResolved());
-    Path result = new Path(rootPath, Lists.newArrayList(fieldNames));
+    Path result = new Path(rootPath, Arrays.asList(fieldNames));
     return result;
   }
 }

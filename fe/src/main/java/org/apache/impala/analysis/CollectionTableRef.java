@@ -136,8 +136,7 @@ public class CollectionTableRef extends TableRef {
       // substituted in SelectStmt.resolveInlineViewRefs()
       // TODO: currently we cannot use the same array twice (e.g. self join) in this
       //       case
-      SlotDescriptor parentSlotDesc = analyzer.getSlotDescriptor(
-          resolvedPath_.getFullyQualifiedRawPath());
+      SlotDescriptor parentSlotDesc = analyzer.getSlotDescriptor(resolvedPath_);
       collectionExpr_ = new SlotRef(parentSlotDesc);
       collectionExpr_ =
         collectionExpr_.trySubstitute(sourceView.getBaseTblSmap(), analyzer, true);
