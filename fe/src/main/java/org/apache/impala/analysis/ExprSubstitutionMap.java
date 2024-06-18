@@ -64,8 +64,14 @@ public final class ExprSubstitutionMap {
   }
 
   private void buildMap() {
-    // Build lookup map and ensure keys are unique.
-    substitutions_ = new HashMap<>();
+    // Build lookup map and ensure keys are unique. Set initial size to avoid rehash.
+    // https://docs.oracle.com/javase/8/docs/api/java/util/HashMap.html describes
+    // HashMap's arguments (and defaults): initial capacity (16) and load factor (0.75).
+    // "If the initial capacity is greater than the maximum number of entries divided
+    // by the load factor, no rehash operation will ever occur." Set initial capacity to
+    // current size / 0.75 (i.e. (size+1) * 4/3 to round up), with floor of 16 to allow
+    // space for later puts.
+    substitutions_ = new HashMap<>(Math.max(16, (lhs_.size() + 1) * 4 / 3));
     List<Integer> toRemove = new ArrayList<>();
     for (int i = 0; i < lhs_.size(); i++) {
       Expr existingVal = substitutions_.putIfAbsent(lhs_.get(i), rhs_.get(i));
@@ -142,6 +148,16 @@ public final class ExprSubstitutionMap {
     return result;
   }
 
+  /*
+   * Concatenates two lists without triggering intermediate resizes in the resulting list.
+   */
+  private static List<Expr> concat(List<Expr> lhs, List<Expr> rhs) {
+    List<Expr> result = new ArrayList<>(lhs.size() + rhs.size());
+    result.addAll(lhs);
+    result.addAll(rhs);
+    return result;
+  }
+
   /**
    * Returns the union of two substitution maps. Always returns a non-null map.
    */
@@ -150,9 +166,7 @@ public final class ExprSubstitutionMap {
     if (f == null && g == null) return new ExprSubstitutionMap();
     if (f == null) return g;
     if (g == null) return f;
-    return new ExprSubstitutionMap(
-      Lists.newArrayList(Iterables.concat(f.lhs_, g.lhs_)),
-      Lists.newArrayList(Iterables.concat(f.rhs_, g.rhs_)));
+    return new ExprSubstitutionMap(concat(f.lhs_, g.lhs_), concat(f.rhs_, g.rhs_));
   }
 
   /**
