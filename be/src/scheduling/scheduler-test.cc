@@ -779,11 +779,11 @@ TEST_F(SchedulerTest, TestMultipleFinstances) {
 
   // Test handling of the single instance case - all ranges go to the same instance.
   vector<vector<ScanRangeParamsPB>> fs_one_instance =
-      Scheduler::AssignRangesToInstances(1, fs_ranges);
+      Scheduler::AssignRangesToInstances(1, &fs_ranges);
   ASSERT_EQ(1, fs_one_instance.size());
   EXPECT_EQ(NUM_RANGES, fs_one_instance[0].size());
   vector<vector<ScanRangeParamsPB>> kudu_one_instance =
-      Scheduler::AssignRangesToInstances(1, kudu_ranges);
+      Scheduler::AssignRangesToInstances(1, &kudu_ranges);
   ASSERT_EQ(1, kudu_one_instance.size());
   EXPECT_EQ(NUM_RANGES, kudu_one_instance[0].size());
 
@@ -791,7 +791,7 @@ TEST_F(SchedulerTest, TestMultipleFinstances) {
   for (int attempt = 0; attempt < 20; ++attempt) {
     std::shuffle(fs_ranges.begin(), fs_ranges.end(), rng_);
     vector<vector<ScanRangeParamsPB>> range_per_instance =
-        Scheduler::AssignRangesToInstances(NUM_RANGES, fs_ranges);
+        Scheduler::AssignRangesToInstances(NUM_RANGES, &fs_ranges);
     EXPECT_EQ(NUM_RANGES, range_per_instance.size());
     // Confirm each range is present and each instance got exactly one range.
     for (int i = 0; i < NUM_RANGES; ++i) {
@@ -804,7 +804,7 @@ TEST_F(SchedulerTest, TestMultipleFinstances) {
   for (int attempt = 0; attempt < 20; ++attempt) {
     std::shuffle(fs_ranges.begin(), fs_ranges.end(), rng_);
     vector<vector<ScanRangeParamsPB>> range_per_instance =
-        Scheduler::AssignRangesToInstances(4, fs_ranges);
+        Scheduler::AssignRangesToInstances(4, &fs_ranges);
     EXPECT_EQ(4, range_per_instance.size());
     for (int i = 0; i < range_per_instance.size(); ++i) {
       EXPECT_EQ(4, range_per_instance[i].size()) << i;
@@ -814,7 +814,7 @@ TEST_F(SchedulerTest, TestMultipleFinstances) {
   for (int attempt = 0; attempt < 20; ++attempt) {
     std::shuffle(kudu_ranges.begin(), kudu_ranges.end(), rng_);
     vector<vector<ScanRangeParamsPB>> range_per_instance =
-        Scheduler::AssignRangesToInstances(4, kudu_ranges);
+        Scheduler::AssignRangesToInstances(4, &kudu_ranges);
     EXPECT_EQ(4, range_per_instance.size());
     for (const auto& instance_ranges : range_per_instance) {
       EXPECT_EQ(4, instance_ranges.size());
@@ -823,5 +823,196 @@ TEST_F(SchedulerTest, TestMultipleFinstances) {
       }
     }
   }
+}
+
+// This tests the pre-IMPALA-9655 LPT scheduling code that is now used for tuple caching
+// This is equivalent to the TestMultipleFinstances test before IMPALA-9655.
+TEST_F(SchedulerTest, TestMultipleFinstancesLPT) {
+  const int NUM_RANGES = 16;
+  std::vector<ScanRangeParamsPB> fs_ranges(NUM_RANGES);
+  std::vector<ScanRangeParamsPB> kudu_ranges(NUM_RANGES);
+  // Create ranges with lengths 1, 2, ..., etc.
+  for (int i = 0; i < NUM_RANGES; ++i) {
+    *fs_ranges[i].mutable_scan_range()->mutable_hdfs_file_split() = HdfsFileSplitPB();
+    fs_ranges[i].mutable_scan_range()->mutable_hdfs_file_split()->set_length(i + 1);
+    kudu_ranges[i].mutable_scan_range()->set_kudu_scan_token("fake token");
+  }
+
+  // Test handling of the single instance case - all ranges go to the same instance.
+  vector<vector<ScanRangeParamsPB>> fs_one_instance =
+      Scheduler::AssignRangesToInstances(1, &fs_ranges, /* use_lpt */ true);
+  ASSERT_EQ(1, fs_one_instance.size());
+  EXPECT_EQ(NUM_RANGES, fs_one_instance[0].size());
+  vector<vector<ScanRangeParamsPB>> kudu_one_instance =
+      Scheduler::AssignRangesToInstances(1, &kudu_ranges, /* use_lpt */ true);
+  ASSERT_EQ(1, kudu_one_instance.size());
+  EXPECT_EQ(NUM_RANGES, kudu_one_instance[0].size());
+
+  // Ensure that each executor gets one range regardless of input order.
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    std::shuffle(fs_ranges.begin(), fs_ranges.end(), rng_);
+    vector<vector<ScanRangeParamsPB>> range_per_instance =
+        Scheduler::AssignRangesToInstances(NUM_RANGES, &fs_ranges, /* use_lpt */ true);
+    EXPECT_EQ(NUM_RANGES, range_per_instance.size());
+    // Confirm each range is present and each instance got exactly one range.
+    vector<int> range_length_count(NUM_RANGES);
+    for (const auto& instance_ranges : range_per_instance) {
+      ASSERT_EQ(1, instance_ranges.size());
+      ++range_length_count[instance_ranges[0].scan_range().hdfs_file_split().length()
+          - 1];
+    }
+    for (int i = 0; i < NUM_RANGES; ++i) {
+      EXPECT_EQ(1, range_length_count[i]) << i;
+    }
+  }
+
+  // Test load balancing FS ranges across 4 instances. We should get an even assignment
+  // across the instances regardless of input order.
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    std::shuffle(fs_ranges.begin(), fs_ranges.end(), rng_);
+    vector<vector<ScanRangeParamsPB>> range_per_instance =
+        Scheduler::AssignRangesToInstances(4, &fs_ranges, /* use_lpt */ true);
+    EXPECT_EQ(4, range_per_instance.size());
+    // Ensure we got a range of each length in the output.
+    vector<int> range_length_count(NUM_RANGES);
+    for (const auto& instance_ranges : range_per_instance) {
+      EXPECT_EQ(4, instance_ranges.size());
+      int64_t instance_bytes = 0;
+      for (const auto& range : instance_ranges) {
+        instance_bytes += range.scan_range().hdfs_file_split().length();
+        ++range_length_count[range.scan_range().hdfs_file_split().length() - 1];
+      }
+      // Expect each instance to get sum([1, 2, ..., 16]) / 4 bytes when things are
+      // distributed evenly.
+      EXPECT_EQ(34, instance_bytes);
+    }
+    for (int i = 0; i < NUM_RANGES; ++i) {
+      EXPECT_EQ(1, range_length_count[i]) << i;
+    }
+  }
+
+  // Test load balancing Kudu ranges across 4 instances. We should get an even assignment
+  // across the instances regardless of input order. We don't know the size of each Kudu
+  // range, so we just need to check the # of ranges.
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    std::shuffle(kudu_ranges.begin(), kudu_ranges.end(), rng_);
+    vector<vector<ScanRangeParamsPB>> range_per_instance =
+        Scheduler::AssignRangesToInstances(4, &kudu_ranges, /* use_lpt */ true);
+    EXPECT_EQ(4, range_per_instance.size());
+    for (const auto& instance_ranges : range_per_instance) {
+      EXPECT_EQ(4, instance_ranges.size());
+      for (const auto& range : instance_ranges) {
+        EXPECT_TRUE(range.scan_range().has_kudu_scan_token());
+      }
+    }
+  }
+}
+
+// This tests the ScanRangeComparator to verify that it is consistent.
+TEST_F(SchedulerTest, TestScanRangeComparator) {
+  // Test comparisons for HDFS ranges
+  // Start with two ranges a and b that are identical
+  ScanRangeParamsPB a;
+  *a.mutable_scan_range()->mutable_hdfs_file_split() = HdfsFileSplitPB();
+  HdfsFileSplitPB* a_hdfs = a.mutable_scan_range()->mutable_hdfs_file_split();
+  a_hdfs->set_relative_path("aaaa.txt");
+  a_hdfs->set_offset(0);
+  a_hdfs->set_length(512);
+  a_hdfs->set_partition_id(10);
+  a_hdfs->set_file_length(1024);
+  a_hdfs->set_file_compression(CompressionTypePB::LZ4);
+  a_hdfs->set_mtime(12345);
+  a_hdfs->set_is_erasure_coded(false);
+  a_hdfs->set_partition_path_hash(11111);
+  a_hdfs->set_absolute_path("absolute_path");
+  a_hdfs->set_is_encrypted(false);
+
+  ScanRangeParamsPB b = a;
+  HdfsFileSplitPB* b_hdfs = b.mutable_scan_range()->mutable_hdfs_file_split();
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a, b));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b, a));
+
+  // Some fields don't matter, so changing them should have no influence on the
+  // comparator.
+  a_hdfs->set_partition_id(1);
+  a_hdfs->set_file_compression(CompressionTypePB::LZO);
+  a_hdfs->set_is_erasure_coded(true);
+  a_hdfs->set_is_encrypted(true);
+  a_hdfs->set_absolute_path("other absolute path");
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a, b));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b, a));
+
+  // ScanRangeComparator checks fields in a specific order to bail out early.
+  // This is testing them in the opposite order of their predence, starting with the
+  // lowest predence field and moving up to the highest predence field. Each field
+  // overrides the lower predence field, flipping the comparison.
+  // The last thing it compares is relative path. Make a > b based on relative path.
+  a_hdfs->set_relative_path("bbbb.txt");
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(a, b));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b, a));
+
+  // 2nd to last is partition_path_hash. Make b > a. This takes precedence over the
+  // relative_path.
+  b_hdfs->set_partition_path_hash(22222);
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(b, a));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a, b));
+
+  // 3rd to last is file_length. Make a > b.
+  a_hdfs->set_file_length(1025);
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(a, b));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b, a));
+
+  // 4th to last is offset. Make b > a.
+  b_hdfs->set_offset(1);
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(b, a));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a, b));
+
+  // 5th to last field checked is mtime. Make a > b.
+  a_hdfs->set_mtime(12346);
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(a, b));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b, a));
+
+  // Length is used by ScanRangeWeight and is the first field checked. Make b > a.
+  b_hdfs->set_length(513);
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(b, a));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a, b));
+
+  // Test comparison for Kudu ranges
+  ScanRangeParamsPB a_kudu;
+  a_kudu.mutable_scan_range()->set_kudu_scan_token("abc");
+  ScanRangeParamsPB b_kudu = a_kudu;
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a_kudu, b_kudu));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b_kudu, a_kudu));
+
+  // Set the kudu scan token to make a > b
+  a_kudu.mutable_scan_range()->set_kudu_scan_token("bcd");
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(a_kudu, b_kudu));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b_kudu, a_kudu));
+
+  // Test comparison for HBase ranges
+  ScanRangeParamsPB a_hbase;
+  *a_hbase.mutable_scan_range()->mutable_hbase_key_range() = HBaseKeyRangePB();
+  HBaseKeyRangePB* a_hbase_keyrange =
+      a_hbase.mutable_scan_range()->mutable_hbase_key_range();
+  a_hbase_keyrange->set_startkey("aaa");
+  a_hbase_keyrange->set_stopkey("fff");
+
+  ScanRangeParamsPB b_hbase = a_hbase;
+  HBaseKeyRangePB* b_hbase_keyrange =
+      b_hbase.mutable_scan_range()->mutable_hbase_key_range();
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a_hbase, b_hbase));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b_hbase, a_hbase));
+
+  // Again, set fields differently from the lowest precedence field to the
+  // highest predence field.
+  // The last field ScanRangeComparator compares is stopkey. Make a > b.
+  a_hbase_keyrange->set_stopkey("ggg");
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(a_hbase, b_hbase));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(b_hbase, a_hbase));
+
+  // Set startkey so that b > a. This takes precedence over stopkey.
+  b_hbase_keyrange->set_startkey("bbb");
+  EXPECT_TRUE(Scheduler::ScanRangeComparator(b_hbase, a_hbase));
+  EXPECT_FALSE(Scheduler::ScanRangeComparator(a_hbase, b_hbase));
 }
 } // end namespace impala

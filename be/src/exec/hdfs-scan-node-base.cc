@@ -254,7 +254,11 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
   int64_t total_splits = 0;
   const vector<const PlanFragmentInstanceCtxPB*>& instance_ctx_pbs =
       state->instance_ctx_pbs();
-  for (auto ctx : instance_ctx_pbs) {
+  auto instance_ctxs = state->instance_ctxs();
+  DCHECK_EQ(instance_ctxs.size(), instance_ctx_pbs.size());
+  for (int i = 0; i < instance_ctxs.size(); ++i) {
+    auto ctx = instance_ctx_pbs[i];
+    auto instance_ctx = instance_ctxs[i];
     auto ranges = ctx->per_node_scan_ranges().find(tnode_->node_id);
     if (ranges == ctx->per_node_scan_ranges().end()) continue;
     for (const ScanRangeParamsPB& params : ranges->second.scan_ranges()) {
@@ -307,6 +311,7 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
         file_desc->is_encrypted = split.is_encrypted();
         file_desc->is_erasure_coded = split.is_erasure_coded();
         file_desc->file_metadata = file_metadata;
+        file_desc->fragment_instance_id = instance_ctx->fragment_instance_id;
         if (file_metadata) {
           DCHECK(file_metadata->iceberg_metadata() != nullptr);
           switch (file_metadata->iceberg_metadata()->file_format()) {
@@ -375,22 +380,32 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
   // Distribute the work evenly for issuing initial scan ranges.
   DCHECK(shared_state_.use_mt_scan_node_ || instance_ctx_pbs.size() == 1)
       << "Non MT scan node should only have a single instance.";
-  auto instance_ctxs = state->instance_ctxs();
-  DCHECK_EQ(instance_ctxs.size(), instance_ctx_pbs.size());
-  int files_per_instance = file_descs.size() / instance_ctxs.size();
-  int remainder = file_descs.size() % instance_ctxs.size();
-  int num_lists = min(file_descs.size(), instance_ctxs.size());
-  auto fd_it = file_descs.begin();
-  for (int i = 0; i < num_lists; ++i) {
-    vector<HdfsFileDesc*>* curr_file_list =
-        &shared_state_
-             .file_assignment_per_instance_[instance_ctxs[i]->fragment_instance_id];
-    for (int j = 0; j < files_per_instance + (i < remainder); ++j) {
-      curr_file_list->push_back(fd_it->second);
-      ++fd_it;
+  if (tnode_->hdfs_scan_node.deterministic_scanrange_assignment) {
+    // If using deterministic scan range assignment, there is no need to rebalance
+    // the scan ranges. The scan ranges stay with their original fragment instance.
+    for (auto& fd : file_descs) {
+      const TUniqueId& instance_id = fd.second->fragment_instance_id;
+      shared_state_.file_assignment_per_instance_[instance_id].push_back(fd.second);
     }
+  } else {
+    // When not using the deterministic scan range assignment, the scan ranges are
+    // balanced round robin across fragment instances for the purpose of issuing
+    // initial scan ranges.
+    int files_per_instance = file_descs.size() / instance_ctxs.size();
+    int remainder = file_descs.size() % instance_ctxs.size();
+    int num_lists = min(file_descs.size(), instance_ctxs.size());
+    auto fd_it = file_descs.begin();
+    for (int i = 0; i < num_lists; ++i) {
+      vector<HdfsFileDesc*>* curr_file_list =
+          &shared_state_
+              .file_assignment_per_instance_[instance_ctxs[i]->fragment_instance_id];
+      for (int j = 0; j < files_per_instance + (i < remainder); ++j) {
+        curr_file_list->push_back(fd_it->second);
+        ++fd_it;
+      }
+    }
+    DCHECK(fd_it == file_descs.end());
   }
-  DCHECK(fd_it == file_descs.end());
   return Status::OK();
 }
 
@@ -470,6 +485,8 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pno
     disks_accessed_bitmap_(TUnit::UNIT, 0),
     active_hdfs_read_thread_counter_(TUnit::UNIT, 0),
     shared_state_(const_cast<ScanRangeSharedState*>(&(pnode.shared_state_))),
+    deterministic_scanrange_assignment_(
+        hdfs_scan_node.deterministic_scanrange_assignment),
     file_metadata_utils_(this) {}
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {}

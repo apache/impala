@@ -19,8 +19,8 @@ package org.apache.impala.common;
 
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.TupleId;
-import org.apache.impala.catalog.FeTable;
 import org.apache.impala.planner.TupleCacheInfo;
+import org.apache.impala.planner.HdfsScanNode;
 
 /**
  * The Thrift serialization functions need to adjust output based on whether the
@@ -80,13 +80,14 @@ public class ThriftSerializationCtx {
   }
 
   /**
-   * registerTable() should be called for any table that is referenced from a PlanNode
-   * that participates in tuple caching. In practice, this is only used for HDFS tables
-   * at the moment.
+   * registerInputScanNode() is used to keep track of which HdfsScanNodes feed into a
+   * particular location for tuple caching. Tuple caching only supports HDFS tables at
+   * the moment, so this is limited to HdfsScanNode. See TupleCacheInfo for more
+   * information about how this is used.
    */
-  public void registerTable(FeTable table) {
+  public void registerInputScanNode(HdfsScanNode hdfsScanNode) {
     if (isTupleCache()) {
-      tupleCacheInfo_.registerTable(table);
+      tupleCacheInfo_.registerInputScanNode(hdfsScanNode);
     }
   }
 

@@ -410,8 +410,11 @@ class Scheduler {
   /// to at most 'max_num_instances' fragment instances running on the same host.
   /// 'max_num_ranges' must be positive. Only returns non-empty vectors: if there are not
   /// enough ranges to create 'max_num_instances', fewer instances are assigned ranges.
+  /// 'use_lpt' determines whether this assigns scan ranges via the Longest Processing
+  /// Time algorithm. If false, this uses round-robin (which is cheaper).
   static std::vector<std::vector<ScanRangeParamsPB>> AssignRangesToInstances(
-      int max_num_instances, std::vector<ScanRangeParamsPB>& ranges);
+      int max_num_instances, std::vector<ScanRangeParamsPB>* ranges,
+      bool use_lpt = false);
 
   /// For each instance of fragment_state's input fragment, create a collocated
   /// instance for fragment_state's fragment.
@@ -482,12 +485,21 @@ class Scheduler {
             > state->query_options().max_fs_writers);
   }
 
+  /// Comparator to order scan ranges for scheduling. This uses ScanRangeWeight(), but it
+  /// also compares other fields so that it is deterministic for scan ranges with the
+  /// same weight. This comparator only works when both scan ranges have the same storage
+  /// type: HDFS vs HDFS, Kudu vs Kudu, HBase vs HBase. Otherwise, it asserts.
+  static bool ScanRangeComparator(const ScanRangeParamsPB& a,
+      const ScanRangeParamsPB& b);
+
   friend class impala::test::SchedulerWrapper;
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomNonCached);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomDiskLocal);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomRemote);
   FRIEND_TEST(SchedulerTest, TestMultipleFinstances);
+  FRIEND_TEST(SchedulerTest, TestMultipleFinstancesLPT);
+  FRIEND_TEST(SchedulerTest, TestScanRangeComparator);
 };
 
 }

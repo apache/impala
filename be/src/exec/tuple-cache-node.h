@@ -35,7 +35,7 @@ class TupleCachePlanNode : public PlanNode {
 
 /// Node that caches rows produced by a child node.
 ///
-/// If the subtree_hash_ matches an existing cache entry, returns result rows from the
+/// If the combined_key_ matches an existing cache entry, returns result rows from the
 /// cache rather than from the child. Otherwise reads results from the child, writes them
 /// to cache, and returns them.
 
@@ -52,7 +52,14 @@ class TupleCacheNode : public ExecNode {
   void Close(RuntimeState* state) override;
   void DebugString(int indentation_level, std::stringstream* out) const override;
 private:
-  const std::string subtree_hash_;
+  // Fragment instance cache key. This is calculated at runtime by combining information
+  // about the input nodes for this fragment. It currently focuses on hashing the
+  // scan ranges from scan nodes. In future, it will need to handle exchanges.
+  uint32_t fragment_instance_key_;
+
+  // This is a string containing the compile time key and the fragment_instance_key_.
+  // This combination is unique for a given fragment instance.
+  std::string combined_key_;
 
   /// Number of results that were found in the tuple cache
   RuntimeProfile::Counter* num_hits_counter_ = nullptr;
@@ -67,6 +74,10 @@ private:
   bool cached_rowbatch_returned_to_caller_ = false;
 
   void ReleaseResult();
+
+  // Construct the fragment instance part of the cache key by hashing information about
+  // inputs to this fragment (e.g. scan ranges).
+  void ComputeFragmentInstanceKey(const RuntimeState *state);
 
   /// Reader/Writer for caching
   TupleCacheMgr::UniqueHandle handle_;

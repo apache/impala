@@ -103,6 +103,10 @@ struct HdfsFileDesc {
   /// Whether file is erasure coded.
   bool is_erasure_coded = false;
 
+  /// Fragment instance assignment from the scheduler (used for maintaining
+  /// deterministic assignments when that mode is enabled).
+  TUniqueId fragment_instance_id;
+
   /// Some useful typedefs for creating HdfsFileDesc related data structures.
   /// This is a pair for partition ID and filename which uniquely identifies a file.
   typedef pair<int64_t, std::string> PartitionFileKey;
@@ -818,6 +822,12 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Pointer to the scan range related state that is shared across all node instances.
   ScanRangeSharedState* shared_state_ = nullptr;
+
+  /// Whether mt_dop uses deterministic scan range assignment
+  /// If true, each fragment instance has its own list of scan ranges.
+  /// If false, the fragment instances get scan ranges from the shared queue.
+  /// Not used for mt_dop=0.
+  bool deterministic_scanrange_assignment_;
 
   /// Utility class for handling file metadata.
   FileMetadataUtils file_metadata_utils_;

@@ -280,6 +280,11 @@ public class HdfsScanNode extends ScanNode {
   // Set in computeNodeResourceProfile().
   private boolean useMtScanNode_;
 
+  // True if this scan node should do deterministic assignment of scan ranges to
+  // fragment instances when using mt_dop. If false, this uses the shared queue.
+  // This has no impact on mt_dop=0.
+  private boolean deterministicScanRangeAssignment_ = false;
+
   // True if this is a scan that only returns partition keys and is only required to
   // return at least one of each of the distinct values of the partition keys.
   private final boolean isPartitionKeyScan_;
@@ -1930,8 +1935,8 @@ public class HdfsScanNode extends ScanNode {
   protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     msg.hdfs_scan_node = new THdfsScanNode(serialCtx.translateTupleId(
         desc_.getId()).asInt(), new HashSet<>());
-    // Register the table for this scan node so tuple caching knows about it.
-    serialCtx.registerTable(desc_.getTable());
+    // Register this scan node as an input for tuple caching.
+    serialCtx.registerInputScanNode(this);
     if (replicaPreference_ != null) {
       msg.hdfs_scan_node.setReplica_preference(replicaPreference_);
     }
@@ -1951,6 +1956,14 @@ public class HdfsScanNode extends ScanNode {
       msg.hdfs_scan_node.setSkip_header_line_count(skipHeaderLineCount_);
     }
     msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
+    // The reason we skip setting the deterministic scan range assignment field for
+    // tuple cache is that has not been set yet at this point. At the point we are
+    // computing the tuple cache key, it is always false and has no information.
+    // Even if it was set, it would not tell us anything about the result set.
+    if (!serialCtx.isTupleCache()) {
+      msg.hdfs_scan_node.setDeterministic_scanrange_assignment(
+          deterministicScanRangeAssignment_);
+    }
     Preconditions.checkState((optimizedAggSmap_ == null) == (countStarSlot_ == null));
     if (countStarSlot_ != null) {
       msg.hdfs_scan_node.setCount_star_slot_offset(countStarSlot_.getByteOffset());
@@ -1977,8 +1990,12 @@ public class HdfsScanNode extends ScanNode {
     }
     msg.hdfs_scan_node.setIs_partition_key_scan(isPartitionKeyScan_);
 
-    for (HdfsFileFormat format : fileFormats_) {
-      msg.hdfs_scan_node.addToFile_formats(format.toThrift());
+    // Since the tuple cache will hash information about the scan ranges at runtime,
+    // it is not necessary to include the file formats in the hash.
+    if (!serialCtx.isTupleCache()) {
+      for (HdfsFileFormat format : fileFormats_) {
+        msg.hdfs_scan_node.addToFile_formats(format.toThrift());
+      }
     }
 
     if (!overlapPredicateDescs_.isEmpty()) {
@@ -2042,6 +2059,15 @@ public class HdfsScanNode extends ScanNode {
         output.append(detailPrefix);
         output.append(String.format(partMetaTemplate, 0, table.getPartitions().size(),
             0, PrintUtils.printBytes(0)));
+      }
+
+      // Add information about whether this uses deterministic scan range scheduling
+      // To avoid polluting the explain output, only add this if mt_dop>0 and
+      // deterministic scan range scheduling is enabled.
+      if (useMtScanNode_ && deterministicScanRangeAssignment_) {
+        output.append(detailPrefix)
+          .append(String.format("deterministic scan range assignment: %b\n",
+              deterministicScanRangeAssignment_));
       }
 
       if (!conjuncts_.isEmpty()) {
@@ -2669,4 +2695,14 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public boolean isTupleCachingImplemented() { return true; }
+
+  public void setDeterministicScanRangeAssignment(boolean enabled) {
+    // Deterministic scan range assignment only applies when using mt_dop,
+    // but we set it unconditionally for simplicity.
+    deterministicScanRangeAssignment_ = enabled;
+  }
+
+  public boolean usesDeterministicScanRangeAssignment() {
+    return deterministicScanRangeAssignment_;
+  }
 }

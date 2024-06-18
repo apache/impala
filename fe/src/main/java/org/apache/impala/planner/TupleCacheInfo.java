@@ -17,8 +17,10 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -107,6 +109,15 @@ public class TupleCacheInfo {
   private final IdGenerator<SlotId> translatedSlotIdGenerator_ =
       SlotId.createGenerator();
 
+  // This tracks all the HdfsScanNodes that are inputs. This is used for several
+  // purposes:
+  // 1. Input scan nodes need to use deterministic scan range scheduling.
+  // 2. At runtime, the tuple cache needs to hash the input scan ranges, so this
+  //    provides information about which scan nodes feed in.
+  // 3. In future, when tuple caching moves past exchanges, the exchange will need
+  //    to hash the scan ranges of input scan nodes to generate the key.
+  private final List<HdfsScanNode> inputScanNodes_ = new ArrayList<HdfsScanNode>();
+
   // These fields accumulate partial results until finalizeHash() is called.
   private Hasher hasher_ = Hashing.murmur3_128().newHasher();
 
@@ -181,6 +192,9 @@ public class TupleCacheInfo {
       // and each contribution would be clear.
       hashTraceBuilder_.append(child.getHashTrace());
 
+      // Merge the child's inputScanNodes_
+      inputScanNodes_.addAll(child.inputScanNodes_);
+
       // Incorporate the child's tuple references. This is creating a new translation
       // of TupleIds, because it will be incorporating multiple children.
       for (TupleId id : child.tupleTranslationMap_.keySet()) {
@@ -241,6 +255,9 @@ public class TupleCacheInfo {
       tupleTranslationMap_.put(id, translatedTupleIdGenerator_.getNextId());
 
       TupleDescriptor tupleDesc = descriptorTable_.getTupleDesc(id);
+      // This matches the behavior of DescriptorTable::toThrift() and skips
+      // non-materialized tuple descriptors. See comment in DescriptorTable::toThrift().
+      if (!tupleDesc.isMaterialized()) return;
       if (incorporateIntoHash) {
         // Incorporate the tupleDescriptor into the hash
         boolean needs_table_id =
@@ -250,8 +267,9 @@ public class TupleCacheInfo {
         hashThrift(thriftTupleDesc);
       }
 
-      // Go through the tuple's slots and add them
-      for (SlotDescriptor slotDesc : tupleDesc.getSlots()) {
+      // Go through the tuple's slots and add them. This matches the behavior of
+      // DescriptorTable::toThrift() and only serializes the materialized slots.
+      for (SlotDescriptor slotDesc : tupleDesc.getMaterializedSlots()) {
         // Assign a translated slot id and it to the map
         slotTranslationMap_.put(slotDesc.getId(), translatedSlotIdGenerator_.getNextId());
 
@@ -274,7 +292,7 @@ public class TupleCacheInfo {
    * designed to be called by scan nodes via the ThriftSerializationCtx. In future,
    * this will store information about the table's scan ranges.
    */
-  public void registerTable(FeTable tbl) {
+  private void registerTable(FeTable tbl) {
     Preconditions.checkState(!(tbl instanceof FeView),
         "registerTable() only applies to base tables");
     Preconditions.checkState(tbl != null, "Invalid null argument to registerTable()");
@@ -283,6 +301,28 @@ public class TupleCacheInfo {
     TTableName tblName = tbl.getTableName().toThrift();
     hashThrift(tblName);
   }
+
+  /**
+   * registerInputScanNode() is used to keep track of which HdfsScanNodes feed into a
+   * particular location for tuple caching. Tuple caching only supports HDFS tables at
+   * the moment, so this is limited to HdfsScanNode. Tuple caching uses this for
+   * multiple things:
+   * 1. HdfsScanNodes that feed into a TupleCacheNode need to be marked to use
+   *    deterministic scheduling.
+   * 2. Each fragment instance needs to construct the fragment instance specific key
+   *    based on the scan ranges it will process. To construct that, it needs to know
+   *    which HdfsScanNodes feed into it.
+   * 3. There will be future uses when tuple caching extends past exchanges.
+   *
+   * Since this has all the information needed, it also calls registerTable() under
+   * the covers.
+   */
+  public void registerInputScanNode(HdfsScanNode hdfsScanNode) {
+    registerTable(hdfsScanNode.getTupleDesc().getTable());
+    inputScanNodes_.add(hdfsScanNode);
+  }
+
+  public List<HdfsScanNode> getInputScanNodes() { return inputScanNodes_; }
 
   /**
    * getLocalTupleId() converts a global TupleId to a local TupleId (i.e an id that is

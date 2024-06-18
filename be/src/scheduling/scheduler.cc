@@ -572,6 +572,103 @@ Status Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_confi
   return CheckEffectiveInstanceCount(fragment_state, state);
 }
 
+/// Returns a numeric weight that is proportional to the estimated processing time for
+/// the scan range represented by 'params'. Weights from different scan node
+/// implementations, e.g. FS vs Kudu, are not comparable.
+static int64_t ScanRangeWeight(const ScanRangeParamsPB& params) {
+  if (params.scan_range().has_hdfs_file_split()) {
+    return params.scan_range().hdfs_file_split().length();
+  } else {
+    // Give equal weight to each Kudu and Hbase split.
+    // TODO: implement more accurate logic for Kudu and Hbase
+    return 1;
+  }
+}
+
+bool Scheduler::ScanRangeComparator(const ScanRangeParamsPB& a,
+    const ScanRangeParamsPB& b) {
+  // We are ordering by weight largest to smallest. Return quickly if the weights are
+  // different.
+  int64_t a_weight = ScanRangeWeight(a), b_weight = ScanRangeWeight(b);
+  if (a_weight != b_weight) return a_weight > b_weight;
+  // The weights are the same, so we need to break ties to make this deterministic.
+  if (a.scan_range().has_hdfs_file_split()) {
+    // HDFS scan ranges should be compared against other HDFS scan ranges.
+    if (!b.scan_range().has_hdfs_file_split()) {
+      DCHECK(false) << "HDFS scan ranges can only be compared against other HDFS ranges";
+      return false;
+    }
+    // Break ties by comparing various fields of the HDFS split. The ordering here is
+    // arbitrary, so this starts with cheap checks and moves to more expensive checks.
+    const HdfsFileSplitPB& a_hdfs_split = a.scan_range().hdfs_file_split();
+    const HdfsFileSplitPB& b_hdfs_split = b.scan_range().hdfs_file_split();
+    if (a_hdfs_split.mtime() != b_hdfs_split.mtime()) {
+      return a_hdfs_split.mtime() > b_hdfs_split.mtime();
+    }
+    if (a_hdfs_split.offset() != b_hdfs_split.offset()) {
+      return a_hdfs_split.offset() > b_hdfs_split.offset();
+    }
+    if (a_hdfs_split.file_length() != b_hdfs_split.file_length()) {
+      return a_hdfs_split.file_length() > b_hdfs_split.file_length();
+    }
+    if (a_hdfs_split.partition_path_hash() != b_hdfs_split.partition_path_hash()) {
+      return a_hdfs_split.partition_path_hash() > b_hdfs_split.partition_path_hash();
+    }
+    if (a_hdfs_split.relative_path() != b_hdfs_split.relative_path()) {
+      return a_hdfs_split.relative_path() > b_hdfs_split.relative_path();
+    }
+  } else if (a.scan_range().has_kudu_scan_token()) {
+    // Kudu scan ranges should be compared against other Kudu scan ranges
+    if (!b.scan_range().has_kudu_scan_token()) {
+      DCHECK(false) << "Kudu scan ranges can only be compared against other Kudu ranges";
+      return false;
+    }
+    // Break ties by comparing the kudu scan token
+    return a.scan_range().kudu_scan_token() > b.scan_range().kudu_scan_token();
+  } else if (a.scan_range().has_hbase_key_range()) {
+    // HBase scan ranges should be compared against other HBase scan ranges
+    if (!b.scan_range().has_hbase_key_range()) {
+      DCHECK(false)
+          << "HBase scan ranges can only be compared against other HBase ranges";
+      return false;
+    }
+    const HBaseKeyRangePB& a_hbase_range = a.scan_range().hbase_key_range();
+    const HBaseKeyRangePB& b_hbase_range = b.scan_range().hbase_key_range();
+    if (a_hbase_range.startkey() != b_hbase_range.startkey()) {
+      return a_hbase_range.startkey() > b_hbase_range.startkey();
+    }
+    if (a_hbase_range.stopkey() != b_hbase_range.stopkey()) {
+      return a_hbase_range.stopkey() > b_hbase_range.stopkey();
+    }
+  }
+  return false;
+}
+
+/// Helper class used in CreateScanInstances() to track the amount of work assigned
+/// to each instance so far.
+struct InstanceAssignment {
+  // The weight assigned so far.
+  int64_t weight;
+
+  // The index of the instance in 'per_instance_ranges'
+  int instance_idx;
+
+  // Comparator for use in a heap as part of the longest processing time algo.
+  // Invert the comparison order because the *_heap functions implement a max-heap
+  // and we want to assign to the least-loaded instance first.
+  bool operator<(InstanceAssignment& other) const {
+    if (weight == other.weight) {
+      // To make this deterministic, break ties by comparing the instance idxs
+      // (which are unique). Like the weight, this is also inverted to put the lower
+      // indexes first as this is a max heap. That matches the order that we use when
+      // constructing the initial list, so there is no need to call make_heap().
+      return instance_idx > other.instance_idx;
+    } else {
+      return weight > other.weight;
+    }
+  }
+};
+
 // Maybe the easiest way to understand the objective of this algorithm is as a
 // generalization of two simpler instance creation algorithms that decide how many
 // instances of a fragment to create on each node, given a set of nodes that were
@@ -694,8 +791,22 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
       if (assignment_it == sra.end()) continue;
       auto scan_ranges_it = assignment_it->second.find(scan_node_id);
       if (scan_ranges_it == assignment_it->second.end()) continue;
+      const TPlanNode& scan_node = state->GetNode(scan_node_id);
+      // For mt_dop, there are two scheduling modes. The first is the normal mode
+      // that uses a shared queue. For that mode, there is no reason to do anything
+      // special about assigning scan ranges to fragment instances, because they will
+      // all be placed in a single queue at runtime. The other is deterministic
+      // scheduling that does not use the shared queue. In this mode, no rebalancing
+      // takes place at runtime, so balancing the scan ranges among the fragment
+      // instances is important. For this mode, use the longest processing time (LPT)
+      // algorithm. The deterministic mode is used for tuple caching.
+      bool use_lpt = scan_node.__isset.hdfs_scan_node
+          && scan_node.hdfs_scan_node.__isset.use_mt_scan_node
+          && scan_node.hdfs_scan_node.use_mt_scan_node
+          && scan_node.hdfs_scan_node.__isset.deterministic_scanrange_assignment
+          && scan_node.hdfs_scan_node.deterministic_scanrange_assignment;
       per_scan_per_instance_ranges.back() =
-          AssignRangesToInstances(max_num_instances, scan_ranges_it->second);
+          AssignRangesToInstances(max_num_instances, &scan_ranges_it->second, use_lpt);
       DCHECK_LE(per_scan_per_instance_ranges.back().size(), max_num_instances);
     }
 
@@ -746,18 +857,48 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
 }
 
 vector<vector<ScanRangeParamsPB>> Scheduler::AssignRangesToInstances(
-    int max_num_instances, vector<ScanRangeParamsPB>& ranges) {
+    int max_num_instances, vector<ScanRangeParamsPB>* ranges, bool use_lpt) {
   DCHECK_GT(max_num_instances, 0);
-  int num_instances = min(max_num_instances, static_cast<int>(ranges.size()));
+  int num_instances = min(max_num_instances, static_cast<int>(ranges->size()));
   vector<vector<ScanRangeParamsPB>> per_instance_ranges(num_instances);
   if (num_instances < 2) {
     // Short-circuit the assignment algorithm for the single instance case.
-    per_instance_ranges[0] = ranges;
+    per_instance_ranges[0] = *ranges;
   } else {
-    int idx = 0;
-    for (auto& range : ranges) {
-      per_instance_ranges[idx].push_back(range);
-      idx = (idx + 1 == num_instances) ? 0 : idx + 1;
+    if (use_lpt) {
+      // We need to assign scan ranges to instances. We would like the assignment to be
+      // as even as possible, so that each instance does about the same amount of work.
+      // Use longest-processing time (LPT) algorithm, which is a good approximation of the
+      // optimal solution (there is a theoretic bound of ~4/3 of the optimal solution
+      // in the worst case). It also guarantees that at least one scan range is assigned
+      // to each instance.
+      // The LPT algorithm is straightforward:
+      // 1. sort the scan ranges to be assigned by descending weight.
+      // 2. assign each item to the instance with the least weight assigned so far.
+      vector<InstanceAssignment> instance_heap;
+      instance_heap.reserve(num_instances);
+      for (int i = 0; i < num_instances; ++i) {
+        instance_heap.emplace_back(InstanceAssignment{0, i});
+      }
+      // The instance_heap vector was created in sorted order, so this is already a heap
+      // without needing a make_heap() call.
+      DCHECK(std::is_heap(instance_heap.begin(), instance_heap.end()));
+      std::sort(ranges->begin(), ranges->end(), ScanRangeComparator);
+      for (ScanRangeParamsPB& range : *ranges) {
+        per_instance_ranges[instance_heap[0].instance_idx].push_back(range);
+        instance_heap[0].weight += ScanRangeWeight(range);
+        pop_heap(instance_heap.begin(), instance_heap.end());
+        push_heap(instance_heap.begin(), instance_heap.end());
+      }
+    } else {
+      // When not using LPT, a simple round-robin is sufficient. The use case for non-LPT
+      // is when the ranges will be placed in a shared queue anyway, so the balancing
+      // is not as crucial.
+      int idx = 0;
+      for (auto& range : *ranges) {
+        per_instance_ranges[idx].push_back(range);
+        idx = (idx + 1 == num_instances) ? 0 : idx + 1;
+      }
     }
   }
   return per_instance_ranges;

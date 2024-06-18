@@ -25,6 +25,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-cache-mgr.h"
+#include "util/hash-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/runtime-profile.h"
 
@@ -41,8 +42,7 @@ Status TupleCachePlanNode::CreateExecNode(
 
 TupleCacheNode::TupleCacheNode(
     ObjectPool* pool, const TupleCachePlanNode& pnode, const DescriptorTbl& descs)
-    : ExecNode(pool, pnode, descs)
-    , subtree_hash_(pnode.tnode_->tuple_cache_node.subtree_hash) {
+  : ExecNode(pool, pnode, descs) {
 }
 
 TupleCacheNode::~TupleCacheNode() = default;
@@ -54,6 +54,14 @@ Status TupleCacheNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), "NumTupleCacheHalted", TUnit::UNIT);
   num_skipped_counter_ =
       ADD_COUNTER(runtime_profile(), "NumTupleCacheSkipped", TUnit::UNIT);
+
+  // Compute the combined cache key by computing the fragment instance key and
+  // fusing it with the compile time key.
+  ComputeFragmentInstanceKey(state);
+  combined_key_ = plan_node().tnode_->tuple_cache_node.compile_time_key + "_" +
+      std::to_string(fragment_instance_key_);
+  runtime_profile()->AddInfoString("Combined Key", combined_key_);
+
   return Status::OK();
 }
 
@@ -69,7 +77,7 @@ Status TupleCacheNode::Open(RuntimeState* state) {
   }
 
   TupleCacheMgr* tuple_cache_mgr = ExecEnv::GetInstance()->tuple_cache_mgr();
-  handle_ = tuple_cache_mgr->Lookup(subtree_hash_, true);
+  handle_ = tuple_cache_mgr->Lookup(combined_key_, true);
   if (tuple_cache_mgr->IsAvailableForRead(handle_)) {
     reader_ = make_unique<TupleFileReader>(
         tuple_cache_mgr->GetPath(handle_), mem_tracker(), runtime_profile());
@@ -101,7 +109,7 @@ Status TupleCacheNode::Open(RuntimeState* state) {
       // - the query requests caching but cache is disabled via startup option
       // - another fragment is currently writing this cache entry
       // - the cache entry is a tombstone to prevent retries for too large entries
-      VLOG_FILE << "Tuple Cache: skipped for " << subtree_hash_;
+      VLOG_FILE << "Tuple Cache: skipped for " << combined_key_;
       COUNTER_ADD(num_skipped_counter_, 1);
       tuple_cache_mgr->IncrementMetric(TupleCacheMgr::MetricType::SKIPPED);
     }
@@ -161,7 +169,7 @@ Status TupleCacheNode::GetNext(
       // continue reading from the child node.
       if (!status.ok()) {
         if (writer_->ExceededMaxSize()) {
-          VLOG_FILE << "Tuple Cache entry for " << subtree_hash_
+          VLOG_FILE << "Tuple Cache entry for " << combined_key_
                     << " hit the maximum file size: " << status.GetDetail();
           COUNTER_ADD(num_halted_counter_, 1);
           tuple_cache_mgr->IncrementMetric(TupleCacheMgr::MetricType::HALTED);
@@ -230,9 +238,45 @@ void TupleCacheNode::Close(RuntimeState* state) {
 
 void TupleCacheNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "TupleCacheNode(" << subtree_hash_;
+  *out << "TupleCacheNode(" << combined_key_;
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
+}
+
+void TupleCacheNode::ComputeFragmentInstanceKey(const RuntimeState* state) {
+  const PlanFragmentInstanceCtxPB& ctx = state->instance_ctx_pb();
+  uint32_t hash = 0;
+  for (int32_t node_id : plan_node().tnode_->tuple_cache_node.input_scan_node_ids) {
+    auto ranges = ctx.per_node_scan_ranges().find(node_id);
+    if (ranges == ctx.per_node_scan_ranges().end()) continue;
+    for (const ScanRangeParamsPB& params : ranges->second.scan_ranges()) {
+      // This only supports HDFS right now
+      DCHECK(params.scan_range().has_hdfs_file_split());
+      const HdfsFileSplitPB& split = params.scan_range().hdfs_file_split();
+      if (split.has_relative_path() && !split.relative_path().empty()) {
+        hash = HashUtil::Hash(
+            split.relative_path().data(), split.relative_path().length(), hash);
+        DCHECK(split.has_partition_path_hash());
+        int32_t partition_path_hash = split.partition_path_hash();
+        hash = HashUtil::Hash(&partition_path_hash, sizeof(partition_path_hash), hash);
+      } else if (split.has_absolute_path() && !split.absolute_path().empty()) {
+        hash = HashUtil::Hash(
+            split.absolute_path().data(), split.absolute_path().length(), hash);
+      } else {
+        DCHECK("Either relative_path or absolute_path must be set");
+      }
+      DCHECK(split.has_offset());
+      int64_t offset = split.offset();
+      hash = HashUtil::Hash(&offset, sizeof(offset), hash);
+      DCHECK(split.has_length());
+      int64_t length = split.length();
+      hash = HashUtil::Hash(&length, sizeof(length), hash);
+      DCHECK(split.has_mtime());
+      int64_t mtime = split.mtime();
+      hash = HashUtil::Hash(&mtime, sizeof(mtime), hash);
+    }
+  }
+  fragment_instance_key_ = hash;
 }
 
 }

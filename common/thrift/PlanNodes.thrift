@@ -350,6 +350,11 @@ struct THdfsScanNode {
   // For IcebergScanNodes that are the left children of an IcebergDeleteNode this stores
   // the node ID of the right child.
   14: optional Types.TPlanNodeId deleteFileScanNodeId
+
+  // Whether mt_dop should use deterministic scan range assignment. If true,
+  // each fragment instance has its own list of scan ranges. If false,
+  // the fragment instances use a shared queue.
+  15: optional bool deterministic_scanrange_assignment
 }
 
 struct TDataSourceScanNode {
@@ -711,9 +716,13 @@ struct TIcebergMetadataScanNode {
 }
 
 struct TTupleCacheNode {
-  // Cache key that includes a hashed representation of the entire subtree below
-  // this point in the plan.
-  1: required string subtree_hash
+  // Compile-time cache key that includes a hashed representation of the entire subtree
+  // below this point in the plan.
+  1: required string compile_time_key
+  // To calculate the per-fragment key, this keeps track of scan nodes that feed
+  // into this node. The TupleCacheNode will hash the scan ranges for its fragment
+  // at runtime.
+  2: required list<i32> input_scan_node_ids;
 }
 
 // See PipelineMembership in the frontend for details.

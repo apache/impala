@@ -54,7 +54,10 @@ Status HdfsScanNodeMt::Open(RuntimeState* state) {
   ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(HdfsScanNodeBase::Open(state));
   DCHECK(!initial_ranges_issued_.Load());
-  shared_state_->AddCancellationHook(state);
+  // The cancellation hook is only needed when using the shared queue
+  if (!deterministic_scanrange_assignment_) {
+    shared_state_->AddCancellationHook(state);
+  }
   RETURN_IF_ERROR(IssueInitialScanRanges(state));
   return Status::OK();
 }
@@ -150,6 +153,11 @@ Status HdfsScanNodeMt::AddDiskIoRanges(
       << "Don't call AddScanRanges() after all ranges finished.";
   DCHECK_GT(shared_state_->RemainingScanRangeSubmissions(), 0);
   DCHECK_GT(ranges.size(), 0);
+  if (deterministic_scanrange_assignment_) {
+    // Use independent scan ranges for different fragment instances
+    // Same code as non-mt-dop
+    return reader_context_->AddScanRanges(ranges, enqueue_location);
+  }
   bool at_front = false;
   if (enqueue_location == EnqueueLocation::HEAD) {
     at_front = true;
@@ -160,6 +168,10 @@ Status HdfsScanNodeMt::AddDiskIoRanges(
 
 Status HdfsScanNodeMt::GetNextScanRangeToRead(
     io::ScanRange** scan_range, bool* needs_buffers) {
+  // With deterministic scan ranges, use the same code as non-mt-dop
+  if (deterministic_scanrange_assignment_) {
+    return reader_context_->GetNextUnstartedRange(scan_range, needs_buffers);
+  }
   RETURN_IF_ERROR(shared_state_->GetNextScanRange(runtime_state_, scan_range));
   if (*scan_range != nullptr) {
     RETURN_IF_ERROR(reader_context_->StartScanRange(*scan_range, needs_buffers));

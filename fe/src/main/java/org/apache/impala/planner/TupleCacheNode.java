@@ -17,6 +17,10 @@
 
 package org.apache.impala.planner;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TTupleCacheNode;
@@ -37,8 +41,9 @@ import com.google.common.hash.HashCode;
  */
 public class TupleCacheNode extends PlanNode {
 
-  protected String subtreeHash_;
+  protected String compileTimeKey_;
   protected String hashTrace_;
+  protected final List<Integer> inputScanNodeIds_ = new ArrayList<Integer>();
 
   public TupleCacheNode(PlanNodeId id, PlanNode child) {
     super(id, "TUPLE CACHE");
@@ -48,8 +53,13 @@ public class TupleCacheNode extends PlanNode {
 
     TupleCacheInfo childCacheInfo = child.getTupleCacheInfo();
     Preconditions.checkState(childCacheInfo.isEligible());
-    subtreeHash_ = childCacheInfo.getHashString();
+    compileTimeKey_ = childCacheInfo.getHashString();
     hashTrace_ = childCacheInfo.getHashTrace();
+    for (HdfsScanNode scanNode : childCacheInfo.getInputScanNodes()) {
+      // Inputs into the tuple cache need to use deterministic scan range assignment
+      scanNode.setDeterministicScanRangeAssignment(true);
+      inputScanNodeIds_.add(scanNode.getId().asInt());
+    }
   }
 
   @Override
@@ -75,7 +85,8 @@ public class TupleCacheNode extends PlanNode {
     Preconditions.checkState(!hasLimit(),
         "TupleCacheNode does not enforce limits itself and cannot have a limit set.");
     TTupleCacheNode tupleCacheNode = new TTupleCacheNode();
-    tupleCacheNode.setSubtree_hash(subtreeHash_);
+    tupleCacheNode.setCompile_time_key(compileTimeKey_);
+    tupleCacheNode.setInput_scan_node_ids(inputScanNodeIds_);
     msg.setTuple_cache_node(tupleCacheNode);
   }
 
@@ -101,21 +112,23 @@ public class TupleCacheNode extends PlanNode {
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(String.format("%s%s:%s\n", prefix, id_.toString(), displayName_));
-    output.append(detailPrefix + "cache key: " + subtreeHash_ + "\n");
+    output.append(detailPrefix + "cache key: " + compileTimeKey_ + "\n");
 
     // For debuggability, always print the hash trace until the cache key calculation
     // matures. Print trace in chunks to avoid excessive wrapping and padding in
     // impala-shell. There are other explain lines at VERBOSE level that are
     // over 100 chars long so we limit the key chunk length similarly here.
     final int keyFormatWidth = 100;
-    for(int idx = 0; idx < hashTrace_.length(); idx += keyFormatWidth) {
+    for (int idx = 0; idx < hashTrace_.length(); idx += keyFormatWidth) {
       int stop_idx = Math.min(hashTrace_.length(), idx + keyFormatWidth);
       output.append(detailPrefix + "[" + hashTrace_.substring(idx, stop_idx) + "]\n");
     }
+    List<String> input_scan_node_ids_strs =
+        inputScanNodeIds_.stream().map(Object::toString).collect(Collectors.toList());
+    output.append(detailPrefix + "input scan node ids: " +
+        String.join(",", input_scan_node_ids_strs) + "\n");
     return output.toString();
   }
-
-  public String getSubtreeHash() { return subtreeHash_; }
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
