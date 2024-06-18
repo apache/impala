@@ -81,6 +81,7 @@ public class TupleDescriptor {
   private final TupleId id_;
   private final String debugName_;  // debug-only
   private final List<SlotDescriptor> slots_ = new ArrayList<>();
+  private final Map<Path, SlotDescriptor> slotByPath_ = new HashMap<>();
 
   // Resolved path to the collection corresponding to this tuple descriptor, if any,
   // Only set for materialized tuples.
@@ -136,8 +137,26 @@ public class TupleDescriptor {
     slots_.add(desc);
   }
 
+  /**
+   * Marks SlotDescriptor as unique and makes it accessible by getUniqueSlotDescriptor.
+   */
+  public void registerUniqueSlotDescriptorPath(SlotDescriptor desc) {
+    Preconditions.checkState(desc.getPath() != null);
+    Preconditions.checkState(desc.getParent() == this);
+    SlotDescriptor oldDesc = slotByPath_.put(desc.getPath(), desc);
+    Preconditions.checkState(oldDesc == null, "SlotDescriptor must be unique");
+  }
+
   public TupleId getId() { return id_; }
   public List<SlotDescriptor> getSlots() { return slots_; }
+
+  /**
+   * Returns a unique slot descriptor for a given Path. For collections that can have
+   * multiple descriptors for a Path, returns null.
+   */
+  public SlotDescriptor getUniqueSlotDescriptor(Path p) {
+    return slotByPath_.get(p);
+  }
 
   /**
    * Returns the slots in this 'TupleDescriptor' and if any slot is a struct slot, returns

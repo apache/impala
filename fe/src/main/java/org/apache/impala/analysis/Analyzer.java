@@ -663,10 +663,6 @@ public class Analyzer {
     // Shows how many zipping unnests were in the query;
     public int numZippingUnnests = 0;
 
-    // Ids of (collection-typed) SlotDescriptors that were registered with
-    // 'duplicateIfCollections=true' in 'Analyzer.registerSlotRef()'.
-    public Set<SlotId> duplicateCollectionSlots = new HashSet<>();
-
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
       this.stmtTableCache = stmtTableCache;
@@ -1785,20 +1781,19 @@ public class Analyzer {
         // Register a new slot descriptor for collection types. The BE currently
         // relies on this behavior for setting unnested collection slots to NULL.
         SlotDescriptor res = createAndRegisterRawSlotDesc(slotPath, false);
-        globalState_.duplicateCollectionSlots.add(res.getId());
         return res;
       }
-      // SlotRefs with scalar or struct types are registered against the slot's
-      // fully-qualified lowercase path.
-      List<String> key = slotPath.getFullyQualifiedRawPath();
-      Preconditions.checkState(key.stream().allMatch(s -> s.equals(s.toLowerCase())),
-          "Slot paths should be lower case: " + key);
       SlotDescriptor existingSlotDesc = slotPathMap_.get(slotPath);
       if (existingSlotDesc != null) return existingSlotDesc;
 
       SlotDescriptor existingInTuple = findPathInCurrentTuple(slotPath);
       if (existingInTuple != null) return existingInTuple;
 
+      // SlotRefs with scalar or struct types are registered against the slot's
+      // fully-qualified lowercase path.
+      List<String> key = slotPath.getFullyQualifiedRawPath();
+      Preconditions.checkState(key.stream().allMatch(s -> s.equals(s.toLowerCase())),
+          "Slot paths should be lower case: " + key);
       return createAndRegisterSlotDesc(slotPath);
     }
   }
@@ -1817,13 +1812,7 @@ public class Analyzer {
     TupleDescriptor currentTupleDesc = tupleStack_.peek();
     Preconditions.checkNotNull(currentTupleDesc);
 
-    for (SlotDescriptor slotDesc : currentTupleDesc.getSlots()) {
-      if (slotPath.equals(slotDesc.getPath()) &&
-          !globalState_.duplicateCollectionSlots.contains(slotDesc.getId())) {
-        return slotDesc;
-      }
-    }
-    return null;
+    return currentTupleDesc.getUniqueSlotDescriptor(slotPath);
   }
 
   private SlotDescriptor createAndRegisterSlotDesc(Path slotPath)
@@ -1865,6 +1854,8 @@ public class Analyzer {
     desc.setPath(slotPath);
     if (insertIntoSlotPathMap) {
       slotPathMap_.put(slotPath, desc);
+      // Ensure parent TupleDescriptor can find desc by path.
+      desc.getParent().registerUniqueSlotDescriptorPath(desc);
     }
     registerColumnPrivReq(desc);
   }
