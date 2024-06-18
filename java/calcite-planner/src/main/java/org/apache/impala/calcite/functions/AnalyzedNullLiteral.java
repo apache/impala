@@ -25,22 +25,21 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 
 /**
- * A NulLLiteral that is always in analyzed state
+ * A NulLLiteral specialized for Calcite
+ *
+ * The analysisImpl is overriden for Calcite so that the NullLiteral
+ * can be cast to the type that was determined by Calcite.
  */
 public class AnalyzedNullLiteral extends NullLiteral {
-  private final Analyzer analyzer_;
 
   private final Type savedType_;
 
-  public AnalyzedNullLiteral(Analyzer analyzer, Type type) throws ImpalaException {
-    this.analyzer_ = analyzer;
+  public AnalyzedNullLiteral(Type type) {
     savedType_ = type;
-    this.analyze(analyzer);
   }
 
   public AnalyzedNullLiteral(AnalyzedNullLiteral other) {
     super(other);
-    this.analyzer_ = other.analyzer_;
     this.savedType_ = other.savedType_;
   }
 

@@ -24,7 +24,6 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.TimestampString;
-import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.DateLiteral;
@@ -55,26 +54,23 @@ public class RexLiteralConverter {
   /*
    * Returns Expr object for ImpalaRexLiteral
    */
-  public static Expr getExpr(RexLiteral rexLiteral, Analyzer analyzer)
-      throws ImpalaException {
+  public static Expr getExpr(RexLiteral rexLiteral) {
     if (SqlTypeName.INTERVAL_TYPES.contains(rexLiteral.getTypeName())) {
-      return new NumericLiteral(
+      return NumericLiteral.create(
           new BigDecimal(rexLiteral.getValueAs(Long.class)), Type.BIGINT);
     }
     switch (rexLiteral.getTypeName()) {
       case NULL:
         Type type = ImpalaTypeConverter.createImpalaType(rexLiteral.getType());
-        return new AnalyzedNullLiteral(null, type);
+        return new AnalyzedNullLiteral(type);
       case BOOLEAN:
-        Expr boolExpr = new BoolLiteral(rexLiteral.getValueAs(Boolean.class));
-        boolExpr.analyze(null);
+        Expr boolExpr = new BoolLiteral((Boolean) rexLiteral.getValueAs(Boolean.class));
         return boolExpr;
       case BIGINT:
       case DECIMAL:
       case DOUBLE:
-        Expr numericExpr = new NumericLiteral(rexLiteral.getValueAs(BigDecimal.class),
+        Expr numericExpr = NumericLiteral.create(rexLiteral.getValueAs(BigDecimal.class),
             ImpalaTypeConverter.createImpalaType(rexLiteral.getType()));
-        numericExpr.analyze(null);
         return numericExpr;
       case CHAR:
       case VARCHAR:
@@ -87,19 +83,18 @@ public class RexLiteralConverter {
         }
         Expr charExpr = new StringLiteral(rexLiteral.getValueAs(String.class),
             charType, false);
-        charExpr.analyze(null);
         return charExpr;
       case DATE:
         DateString dateStringClass = rexLiteral.getValueAs(DateString.class);
         String dateString = (dateStringClass == null) ? null : dateStringClass.toString();
         Expr dateExpr = new DateLiteral(rexLiteral.getValueAs(Integer.class), dateString);
-        dateExpr.analyze(null);
         return dateExpr;
       case TIMESTAMP:
-          return createCastTimestampExpr(rexLiteral, analyzer);
+          return createCastTimestampExpr(rexLiteral);
       default:
-        throw new AnalysisException("Unsupported RexLiteral: "
+        Preconditions.checkState(false, "Unsupported RexLiteral: "
             + rexLiteral.getTypeName());
+        return null;
     }
   }
 
@@ -110,9 +105,7 @@ public class RexLiteralConverter {
    * If constant folding was not allowed, it means we did not have access to the backend
    * and thus need to do a cast in order to support conversion to a Timestamp.
    */
-  private static Expr createCastTimestampExpr(RexLiteral rexLiteral,
-      Analyzer analyzer)
-      throws ImpalaException {
+  private static Expr createCastTimestampExpr(RexLiteral rexLiteral) {
     List<RelDataType> typeNames =
         ImmutableList.of(ImpalaTypeConverter.getRelDataType(Type.STRING));
 
@@ -120,7 +113,6 @@ public class RexLiteralConverter {
     List<Expr> argList =
         Lists.newArrayList(new StringLiteral(timestamp, Type.STRING, false));
     Function castFunc = FunctionResolver.getFunction("casttotimestamp", typeNames);
-    return new AnalyzedFunctionCallExpr(castFunc, argList, null, Type.TIMESTAMP,
-        analyzer);
+    return new AnalyzedFunctionCallExpr(castFunc, argList, null, Type.TIMESTAMP);
   }
 }

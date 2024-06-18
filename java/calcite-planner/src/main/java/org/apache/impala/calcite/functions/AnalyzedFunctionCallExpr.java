@@ -31,14 +31,12 @@ import org.apache.impala.common.ImpalaException;
 import java.util.List;
 
 /**
- * A FunctionCallExpr that is always in an analyzed state
+ * A FunctionCallExpr specialized for Calcite.
  *
- * The analysis for Calcite expressions can be done in the constructor
- * rather than issuing a separate call to "analyze" after the object
- * is constructed.
- *
- * For this class, we also want to override the "analyzeImpl" call since
- * the "fn_" member is passed in rather than deduced at analysis time.
+ * The analysis for Calcite expressions is done through Calcite and
+ * does not need the analysis provided through the Impala expression.
+ * The analyzeImpl is overridden for FunctionCallExpr and only does
+ * the minimal analysis needed.
  *
  */
 public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
@@ -49,40 +47,27 @@ public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
   // variable so it can be properly set in analyzeImpl()
   private final Function savedFunction_;
 
-  private final Analyzer analyzer_;
-
   // c'tor that takes a list of Exprs that eventually get converted to FunctionParams
   public AnalyzedFunctionCallExpr(Function fn, List<Expr> params,
-      RexCall rexCall, Type retType, Analyzer analyzer) throws ImpalaException {
+      RexCall rexCall, Type retType) {
     super(fn.getFunctionName(), params);
     this.savedFunction_ = fn;
     this.type_ = retType;
-    this.analyze(analyzer);
-    this.analyzer_ = analyzer;
   }
 
   // c'tor which does not depend on Calcite's RexCall but is used when Impala's
   // FunctionParams are created or there is some modifications to it
   public AnalyzedFunctionCallExpr(Function fn, FunctionParams funcParams,
-      Type retType, Analyzer analyzer) throws ImpalaException {
+      Type retType) {
     super(fn.getFunctionName(), funcParams);
     this.savedFunction_ = fn;
     this.type_ = retType;
-    this.analyze(analyzer);
-    this.analyzer_ = analyzer;
   }
 
   public AnalyzedFunctionCallExpr(AnalyzedFunctionCallExpr other) {
     super(other);
     this.savedFunction_ = other.savedFunction_;
     this.type_ = other.type_;
-    this.analyzer_ = other.analyzer_;
-    try {
-      this.analyze(this.analyzer_);
-    } catch (ImpalaException e) {
-      //TODO: IMPALA-13097: Don't throw runtime exception
-      throw new RuntimeException(e);
-    }
   }
 
   @Override
@@ -106,12 +91,8 @@ public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
 
   @Override
   public FunctionCallExpr cloneWithNewParams(FunctionParams params) {
-    try {
-      return new AnalyzedFunctionCallExpr(this.getFn(), params,
-          this.type_, analyzer_);
-    } catch (ImpalaException e) {
-      throw new IllegalStateException(e);
-    }
+    return new AnalyzedFunctionCallExpr(this.getFn(), params,
+        this.type_);
   }
 
 }

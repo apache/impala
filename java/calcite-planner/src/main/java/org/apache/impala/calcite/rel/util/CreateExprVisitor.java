@@ -70,24 +70,16 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
 
   @Override
   public Expr visitCall(RexCall rexCall) {
-    try {
-      List<Expr> params = Lists.newArrayList();
-      for (RexNode operand : rexCall.getOperands()) {
-        params.add(operand.accept(this));
-      }
-      return RexCallConverter.getExpr(rexCall, params, rexBuilder_, analyzer_);
-    } catch (ImpalaException e) {
-      throw new RuntimeException(e);
+    List<Expr> params = Lists.newArrayList();
+    for (RexNode operand : rexCall.getOperands()) {
+      params.add(operand.accept(this));
     }
+    return RexCallConverter.getExpr(rexCall, params, rexBuilder_);
   }
 
   @Override
   public Expr visitLiteral(RexLiteral rexLiteral) {
-    try {
-      return RexLiteralConverter.getExpr(rexLiteral, analyzer_);
-    } catch (ImpalaException e) {
-      throw new RuntimeException(e);
-    }
+    return RexLiteralConverter.getExpr(rexLiteral);
   }
 
   @Override
@@ -142,7 +134,9 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
   public static Expr getExpr(CreateExprVisitor visitor, RexNode operand)
       throws ImpalaException {
     try {
-      return operand.accept(visitor);
+      Expr expr = operand.accept(visitor);
+      expr.analyze(visitor.analyzer_);
+      return expr;
     } catch (Exception e) {
       throw new AnalysisException(e);
     }
