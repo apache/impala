@@ -174,6 +174,9 @@ public class Path {
   // Its inputs are all private final fields, so value can't change after init.
   private List<String> fullyQualifiedRawPath_ = null;
 
+  // Object hashCode, based on fullyQualifiedRawPath_.
+  int hashCode_ = 0;
+
   /**
    * Constructs a Path rooted at the given rootDesc.
    */
@@ -481,6 +484,7 @@ public class Path {
   public List<String> getFullyQualifiedRawPath() {
     if (fullyQualifiedRawPath_ == null) {
       fullyQualifiedRawPath_ = getFullyQualifiedRawPath(true);
+      hashCode_ = fullyQualifiedRawPath_.hashCode();
     }
     return fullyQualifiedRawPath_;
   }
@@ -493,7 +497,11 @@ public class Path {
 
   @Override
   public int hashCode() {
-    return getFullyQualifiedRawPath().hashCode();
+    if (fullyQualifiedRawPath_ == null) {
+      // Populate hashCode_
+      getFullyQualifiedRawPath();
+    }
+    return hashCode_;
   }
 
   /**
