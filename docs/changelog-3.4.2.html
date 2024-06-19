@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Impala 3.4.2 Change Log</title>
+</head>
+<body>
+<h1>Impala 3.4.2 Change Log</h1>
+        Release Notes - IMPALA - Version Impala 3.4.2
+                
+<h2>        Bug
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5476'>IMPALA-5476</a>] -         Catalogd restart bring about metadata is out of sync 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9572'>IMPALA-9572</a>] -         Impalad crash when process decimal value
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9845'>IMPALA-9845</a>] -         Ant had a new release, so bootstrap_system.sh can&#39;t find the old one on Centos
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9952'>IMPALA-9952</a>] -          Invalid offset index in Parquet file
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10057'>IMPALA-10057</a>] -         TransactionKeepalive NoClassDefFoundError floods logs during JDBC_TEST/FE_TEST
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10257'>IMPALA-10257</a>] -         Hit DCHECK in HdfsParquetScanner::CheckPageFiltering in a CORE S3 build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10310'>IMPALA-10310</a>] -         Couldn&#39;t skip rows in parquet file
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11296'>IMPALA-11296</a>] -         The executor has some resident threads that occupy CPU abnormally.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11406'>IMPALA-11406</a>] -         Incorrect duration logged in &quot;Authorization check took n ms&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11444'>IMPALA-11444</a>] -         Wrong results in reading wide rows from ORC
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11648'>IMPALA-11648</a>] -         validate-java-pom-versions.sh should skip pom.xml in toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12102'>IMPALA-12102</a>] -         The JniUtil::GetJniExceptionMsg() method has the risk of memory leakage when handling JNI exceptions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12565'>IMPALA-12565</a>] -          When executing pmod (anyNumber, 0), it will cause the executor to crash
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12755'>IMPALA-12755</a>] -         could not resolve artifact &#39;cdh-root:6.x-20220131.115617-21547795&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12979'>IMPALA-12979</a>] -         Wildcard in CLASSPATH might not work in the RPM package
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12999'>IMPALA-12999</a>] -         Missing log4j.properties in the package
+</li>
+</ul>
+            
+<h2>        New Feature
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10262'>IMPALA-10262</a>] -         Linux Packaging Support
+</li>
+</ul>
+    
+<h2>        Improvement
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-9577'>IMPALA-9577</a>] -         Use `system_unsync` time for Kudu test clusters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10052'>IMPALA-10052</a>] -         Expose daemon health on /healthz endpoint for catalogd and statestored as well
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12288'>IMPALA-12288</a>] -         Avoiding building all the backend tests when running a packaging build
+</li>
+</ul>
+</body>
+</html>
