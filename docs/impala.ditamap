@@ -328,6 +328,7 @@ under the License.
     <topicref href="topics/impala_rcfile.xml"/>
     <topicref href="topics/impala_seqfile.xml"/>
   </topicref>
+  <topicref href="topics/impala_jdbc_external_table.xml"/>
   <topicref href="topics/impala_kudu.xml"/>
   <topicref href="topics/impala_hbase.xml"/>
   <topicref rev="4.1.0" href="topics/impala_iceberg.xml"/>
