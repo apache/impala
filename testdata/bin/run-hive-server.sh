@@ -189,6 +189,7 @@ fi
 
 export HIVESERVER2_HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,\
 suspend=n,address=30020"
+export HIVE_CLUSTER_ID="hive-test-cluster"
 if [[ ${START_HIVESERVER} -eq 1 && -z $HS2_PID ]]; then
   # Starts a HiveServer2 instance on the port specified by the HIVE_SERVER2_THRIFT_PORT
   # environment variable. HADOOP_HEAPSIZE should be set to at least 2048 to avoid OOM
