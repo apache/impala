@@ -611,7 +611,8 @@ enum CatalogLookupStatus {
   // cases this lookup status is set and the caller can retry the fetch.
   // TODO: Fix partition lookup logic to not do it with IDs.
   PARTITION_NOT_FOUND,
-  DATA_SOURCE_NOT_FOUND
+  DATA_SOURCE_NOT_FOUND,
+  VERSION_MISMATCH
 }
 
 // RPC response for GetPartialCatalogObject.

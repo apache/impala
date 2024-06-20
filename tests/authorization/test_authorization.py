@@ -26,6 +26,8 @@ import re
 import random
 import sys
 import subprocess
+import threading
+import time
 import urllib
 
 from getpass import getuser
@@ -228,3 +230,39 @@ class TestAuthorization(CustomClusterTestSuite):
                   "--ranger_app_id=impala --authorization_provider=ranger")
   def test_num_check_authorization_threads_with_ranger(self, unique_name):
     self._test_ranger_show_stmts_helper(unique_name, PRIVILEGES)
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala --authorization_provider=ranger "
+                 "--use_local_catalog=true",
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala --authorization_provider=ranger "
+                  "--catalog_topic_mode=minimal")
+  def test_local_catalog_show_dbs_with_transient_db(self, unique_name):
+    """Regression test for IMPALA-13170"""
+    # Starts a background thread to create+drop the transient db.
+    # Use admin user to have create+drop privileges.
+    unique_database = unique_name + "_db"
+    admin_client = self.create_impala_client()
+    stop = False
+
+    def create_drop_db():
+      while not stop:
+        admin_client.execute("create database " + unique_database, user=ADMIN)
+        # Sleep some time so coordinator can get the updates of it.
+        time.sleep(0.1)
+        if stop:
+          break
+        admin_client.execute("drop database " + unique_database, user=ADMIN)
+    t = threading.Thread(target=create_drop_db)
+    t.start()
+
+    try:
+      for i in range(100):
+        self.execute_query("show databases")
+        # Sleep some time so the db can be dropped.
+        time.sleep(0.2)
+    finally:
+      stop = True
+      t.join()
+      admin_client.execute("drop database if exists " + unique_database, user=ADMIN)

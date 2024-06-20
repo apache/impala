@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog.local;
 
+import org.apache.impala.thrift.CatalogLookupStatus;
+
 /**
  * If this is thrown, it indicates that the catalog implementation in the Impalad
  * has identified that the metadata it read was not a proper snapshot of the source
@@ -31,7 +33,12 @@ package org.apache.impala.catalog.local;
 public class InconsistentMetadataFetchException extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
-  public InconsistentMetadataFetchException(String msg) {
+  private final CatalogLookupStatus reason_;
+
+  public InconsistentMetadataFetchException(CatalogLookupStatus reason, String msg) {
     super(msg);
+    reason_ = reason;
   }
+
+  public CatalogLookupStatus getReason() { return reason_; }
 }

@@ -326,13 +326,13 @@ public class MetadataOp {
       PatternMatcher columnPatternMatcher, PatternMatcher fnPatternMatcher, User user)
       throws ImpalaException {
     Frontend.RetryTracker retries = new Frontend.RetryTracker(
-        String.format("fetching metadata"));
+        String.format("fetching metadata for user %s", user.getName()));
     while (true) {
       try {
         return doGetDbsMetadata(fe, catalogName,
             schemaPatternMatcher, tablePatternMatcher,
             columnPatternMatcher, fnPatternMatcher, user);
-      } catch(InconsistentMetadataFetchException e) {
+      } catch (InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
     }
@@ -356,6 +356,10 @@ public class MetadataOp {
         // Get function metadata
         List<Function> fns = db.getFunctions(null, fnPatternMatcher);
         result.functions.add(fns);
+      } else if (tablePatternMatcher == PatternMatcher.MATCHER_MATCH_NONE
+          && columnPatternMatcher == PatternMatcher.MATCHER_MATCH_NONE) {
+        // Get db list. No need to list table names.
+        result.dbs.add(db.getName());
       } else {
         // Get table metadata
         List<String> tableList = Lists.newArrayList();
