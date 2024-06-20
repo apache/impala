@@ -106,8 +106,9 @@ elseif (${CPACK_GENERATOR} MATCHES "DEB")
 endif()
 message(STATUS "Package name: ${CPACK_PACKAGE_FILE_NAME}")
 
-if ($ENV{STRIP_DEPLOYMENT_IMPALAD})
-  set(CPACK_STRIP_FILES ${IMPALA_INSTALLDIR}/sbin/impalad)
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
+  set(CPACK_STRIP_FILES TRUE)
+  set(CPACK_PRE_BUILD_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/strip.cmake")
   message("Binaries in the package will be stripped")
 endif()
 

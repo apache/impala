@@ -1060,9 +1060,6 @@ CLASSPATH="$IMPALA_FE_DIR/src/test/resources:$CLASSPATH"
 # A marker in the environment to prove that we really did source this file
 export IMPALA_CONFIG_SOURCED=1
 
-# Whether to strip the impalad binary when generating deployment package
-export STRIP_DEPLOYMENT_IMPALAD=true
-
 echo "IMPALA_VERSION          = $IMPALA_VERSION"
 echo "IMPALA_HOME             = $IMPALA_HOME"
 echo "HADOOP_HOME             = $HADOOP_HOME"
