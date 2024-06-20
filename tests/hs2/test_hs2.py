@@ -470,6 +470,59 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_invalid_session(self.hs2_client.GetSchemas(get_schemas_req))
 
   @needs_session_cluster_properties()
+  def test_get_schemas_on_transient_db(self, cluster_properties, unique_database):
+    # Use a new db name
+    unique_database += "_tmp"
+    stop = False
+
+    def create_drop_db():
+      while not stop:
+        self.execute_query("create database if not exists " + unique_database)
+        time.sleep(0.1)
+        if stop:
+          break
+        self.execute_query("drop database " + unique_database)
+    t = threading.Thread(target=create_drop_db)
+    t.start()
+
+    try:
+      get_schemas_req = TCLIService.TGetSchemasReq(self.session_handle)
+      for i in range(100):
+        get_schemas_resp = self.hs2_client.GetSchemas(get_schemas_req)
+        TestHS2.check_response(get_schemas_resp)
+        time.sleep(0.2)
+    finally:
+      stop = True
+      t.join()
+
+  @needs_session_cluster_properties()
+  def test_get_tables_on_transient_db(self, cluster_properties, unique_database):
+    # Use a new db name
+    unique_database += "_tmp"
+    stop = False
+
+    def create_drop_db():
+      while not stop:
+        self.execute_query("create database if not exists " + unique_database)
+        time.sleep(0.1)
+        if stop:
+          break
+        self.execute_query("drop database " + unique_database)
+    t = threading.Thread(target=create_drop_db)
+    t.start()
+
+    try:
+      # Use empty 'schemaName' to get tables in all dbs.
+      get_tables_req = TCLIService.TGetTablesReq(self.session_handle)
+      for i in range(100):
+        get_tables_resp = self.hs2_client.GetTables(get_tables_req)
+        TestHS2.check_response(get_tables_resp)
+        time.sleep(0.2)
+    finally:
+      stop = True
+      t.join()
+
+  @needs_session_cluster_properties()
   def test_get_tables(self, cluster_properties, unique_database):
     """Basic test for the GetTables() HS2 method. Needs to execute serially because
     the test depends on controlling whether a table is loaded or not and other
