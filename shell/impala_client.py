@@ -414,11 +414,13 @@ class ImpalaClient(object):
       url = "https://{0}/{1}".format(host_and_port, self.http_path)
       transport = ImpalaHttpClient(url, ssl_context=ssl_ctx,
                                    http_cookie_names=self.http_cookie_names,
-                                   socket_timeout_s=self.http_socket_timeout_s)
+                                   socket_timeout_s=self.http_socket_timeout_s,
+                                   verbose=self.verbose)
     else:
       url = "http://{0}/{1}".format(host_and_port, self.http_path)
       transport = ImpalaHttpClient(url, http_cookie_names=self.http_cookie_names,
-                                   socket_timeout_s=self.http_socket_timeout_s)
+                                   socket_timeout_s=self.http_socket_timeout_s,
+                                   verbose=self.verbose)
 
     if self.use_ldap:
       # Set the BASIC authorization

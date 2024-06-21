@@ -94,8 +94,8 @@ public class LdapSimpleBindImpalaShellTest extends LdapImpalaShellTest {
    */
   @Test
   public void testShellLdapAuth() throws Exception {
-    setUp("");
-    testShellLdapAuthImpl();
+    setUp("--test_cookie=impala.ldap=testShellLdapAuth");
+    testShellLdapAuthImpl("impala.ldap");
   }
 
   /**

@@ -218,6 +218,9 @@ DEFINE_bool(enable_group_filter_check_for_authenticated_kerberos_user, false,
     "is the same Active Directory server). "
     "The default value is false, which provides backwards-compatible behavior.");
 
+DEFINE_string_hidden(test_cookie, "",
+    "Adds Set-Cookie: <test_cookie> to BasicAuth for testing.");
+
 namespace impala {
 
 // Sasl callbacks.  Why are these here?  Well, Sasl isn't that bright, and
@@ -674,6 +677,10 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
     // Create a cookie to return.
     connection_context->return_headers.push_back(
         Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+    if (!FLAGS_test_cookie.empty()) {
+      connection_context->return_headers.push_back(
+          Substitute("Set-Cookie: $0", FLAGS_test_cookie));
+    }
     return true;
   }
   connection_context->return_headers.push_back("WWW-Authenticate: Basic");

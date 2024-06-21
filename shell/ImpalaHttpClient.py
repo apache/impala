@@ -16,6 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+from __future__ import print_function, unicode_literals
 
 from io import BytesIO
 import os
@@ -31,7 +32,7 @@ from six.moves import urllib, http_client
 
 from thrift.transport.TTransport import TTransportBase
 from shell_exceptions import HttpError, AuthenticationException
-from cookie_util import get_all_matching_cookies, get_cookie_expiry
+from cookie_util import get_all_matching_cookies, get_all_cookies, get_cookie_expiry
 
 import six
 
@@ -52,7 +53,8 @@ class ImpalaHttpClient(TTransportBase):
   MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
   def __init__(self, uri_or_host, port=None, path=None, cafile=None, cert_file=None,
-      key_file=None, ssl_context=None, http_cookie_names=None, socket_timeout_s=None):
+      key_file=None, ssl_context=None, http_cookie_names=None, socket_timeout_s=None,
+      verbose=False):
     """ImpalaHttpClient supports two different types of construction:
 
     ImpalaHttpClient(host, port, path) - deprecated
@@ -66,7 +68,8 @@ class ImpalaHttpClient(TTransportBase):
     http_cookie_names is used to specify a comma-separated list of possible cookie names
     used for cookie-based authentication or session management. If a cookie with one of
     these names is returned in an http response by the server or an intermediate proxy
-    then it will be included in each subsequent request for the same connection.
+    then it will be included in each subsequent request for the same connection. If it
+    is set as wildcards, all cookies in an http response will be preserved.
     """
     if port is not None:
       warnings.warn(
@@ -111,16 +114,22 @@ class ImpalaHttpClient(TTransportBase):
     else:
       self.realhost = self.realport = self.proxy_auth = None
     if (not http_cookie_names) or (str(http_cookie_names).strip() == ""):
+      self.__preserve_all_cookies = False
       self.__http_cookie_dict = None
       self.__auth_cookie_names = None
+    elif str(http_cookie_names).strip() == "*":
+      self.__preserve_all_cookies = True
+      self.__http_cookie_dict = dict()
+      self.__auth_cookie_names = set()
     else:
+      self.__preserve_all_cookies = False
       # Build a dictionary that maps cookie name to namedtuple.
       cookie_names = http_cookie_names.split(',')
       self.__http_cookie_dict = \
           {cn: Cookie(cookie=None, expiry_time=None) for cn in cookie_names}
       # Store the auth cookie names in __auth_cookie_names.
       # Assume auth cookie names end with ".auth".
-      self.__auth_cookie_names = [cn for cn in cookie_names if cn.endswith(".auth")]
+      self.__auth_cookie_names = {cn for cn in cookie_names if cn.endswith(".auth")}
     # Set __are_matching_cookies_found as True if matching cookies are found in response.
     self.__are_matching_cookies_found = False
     self.__wbuf = BytesIO()
@@ -134,6 +143,7 @@ class ImpalaHttpClient(TTransportBase):
     self.__basic_auth = None
     self.__kerb_service = None
     self.__add_custom_headers_funcs = []
+    self.__verbose = verbose
 
   @staticmethod
   def basic_proxy_auth_header(proxy):
@@ -309,13 +319,25 @@ class ImpalaHttpClient(TTransportBase):
   # Extract cookies from response and save those cookies for which the cookie names
   # are in the cookie name list specified in the __init__().
   def extractHttpCookiesFromResponse(self):
-    if self.__http_cookie_dict:
+    if self.__preserve_all_cookies:
+      matching_cookies = get_all_cookies(self.path, self.headers)
+    elif self.__http_cookie_dict:
       matching_cookies = get_all_matching_cookies(
           self.__http_cookie_dict.keys(), self.path, self.headers)
-      if matching_cookies:
-        self.__are_matching_cookies_found = True
-        for c in matching_cookies:
-          self.__http_cookie_dict[c.key] = Cookie(c, get_cookie_expiry(c))
+    else:
+      matching_cookies = None
+
+    if matching_cookies:
+      if self.__verbose:
+        names = sorted([c.key for c in matching_cookies])
+        print("Preserving cookies: " + ', '.join(names), file=sys.stderr)
+        sys.stderr.flush()
+
+      self.__are_matching_cookies_found = True
+      for c in matching_cookies:
+        self.__http_cookie_dict[c.key] = Cookie(c, get_cookie_expiry(c))
+        if c.key.endswith(".auth"):
+          self.__auth_cookie_names.add(c.key)
 
   # Return True if there are any saved cookies which are sent in previous request.
   def areHttpCookiesSaved(self):

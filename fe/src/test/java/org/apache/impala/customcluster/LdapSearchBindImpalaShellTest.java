@@ -97,7 +97,7 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
   public void testShellLdapAuth() throws Exception {
     setUp("--ldap_user_search_basedn=dc=myorg,dc=com "
         + "--ldap_user_filter=(&(objectClass=person)(cn={0}))");
-    testShellLdapAuthImpl();
+    testShellLdapAuthImpl(null);
   }
 
   /**

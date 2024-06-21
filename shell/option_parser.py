@@ -333,12 +333,14 @@ def get_option_parser(defaults):
                     "spooling is disabled only a single row batch can be fetched at a "
                     "time regardless of the specified fetch_size.")
   parser.add_option("--http_cookie_names", dest="http_cookie_names",
-                    default="impala.auth,impala.session.id",
+                    default="*",
                     help="A comma-separated list of HTTP cookie names that are supported "
                     "by the impala-shell. If a cookie with one of these names is "
                     "returned in an http response by the server or an intermediate proxy "
                     "then it will be included in each subsequent request for the same "
-                    "connection.")
+                    "connection. If set to wildcard (*), all cookies in an http response "
+                    "will be preserved. The name of an authentication cookie must end "
+                    "with '.auth', for example 'impala.auth'.")
   parser.add_option("--no_http_tracing", dest="no_http_tracing",
                     action="store_true",
                     help="Tracing http headers 'X-Request-Id', 'X-Impala-Session-Id', "
