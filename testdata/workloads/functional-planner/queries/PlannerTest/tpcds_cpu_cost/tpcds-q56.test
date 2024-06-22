@@ -69,10 +69,10 @@ where i_color in ('tan','lace','gainsboro'))
 
 # end query 56 in stream 0 using template query56.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=123.88MB Threads=1
-Per-Host Resource Estimates: Memory=211MB
+Max Per-Host Resource Reservation: Memory=126.88MB Threads=1
+Per-Host Resource Estimates: Memory=214MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=211.38MB mem-reservation=123.88MB thread-reservation=1 runtime-filters-memory=10.00MB
+|  Per-Instance Resources: mem-estimate=214.38MB mem-reservation=126.88MB thread-reservation=1 runtime-filters-memory=13.00MB
 |  max-parallelism=1 segment-costs=[551105337, 277352786, 142028482, 714528, 1831104, 200]
 PLAN-ROOT SINK
 |  output exprs: i_item_id, sum(total_sales)
@@ -396,7 +396,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=511.58M(filtered from 8.64G) cost=117866905
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=951.31MB Threads=43
+Max Per-Host Resource Reservation: Memory=957.31MB Threads=43
 Per-Host Resource Estimates: Memory=1.61GB
 F20:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
@@ -461,7 +461,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
-|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  Per-Instance Resources: mem-estimate=37.25MB mem-reservation=5.12MB thread-reservation=1
 |  max-parallelism=20 segment-costs=[139563358, 621440] cpu-comparison-result=59 [max(20 (self) vs 59 (sum children))]
 |  30:AGGREGATE [STREAMING]
@@ -554,7 +554,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 21(GETNEXT), 23(OPEN)
 |  |
 |  |--F31:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=79.12MB mem-reservation=69.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=80.12MB mem-reservation=70.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  |  |  max-parallelism=10 segment-costs=[5647923]
 |  |  JOIN BUILD
 |  |  |  join-table-id=10 plan-id=11 cohort-id=03
@@ -646,7 +646,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
-|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  Per-Instance Resources: mem-estimate=37.25MB mem-reservation=6.00MB thread-reservation=1
 |  max-parallelism=30 segment-costs=[277893755, 621440] cpu-comparison-result=59 [max(30 (self) vs 59 (sum children))]
 |  20:AGGREGATE [STREAMING]
@@ -739,7 +739,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 11(GETNEXT), 13(OPEN)
 |  |
 |  |--F27:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=113.12MB mem-reservation=103.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=114.12MB mem-reservation=104.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  |  |  max-parallelism=10 segment-costs=[5647923]
 |  |  JOIN BUILD
 |  |  |  join-table-id=06 plan-id=07 cohort-id=02
@@ -831,7 +831,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
-Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
+Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=37.25MB mem-reservation=13.00MB thread-reservation=1
 max-parallelism=60 segment-costs=[557234058, 621440] cpu-comparison-result=60 [max(60 (self) vs 59 (sum children))]
 10:AGGREGATE [STREAMING]
@@ -924,7 +924,7 @@ max-parallelism=60 segment-costs=[557234058, 621440] cpu-comparison-result=60 [m
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--F23:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=215.12MB mem-reservation=205.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=216.12MB mem-reservation=206.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  |  max-parallelism=10 segment-costs=[5647923]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
@@ -1003,7 +1003,7 @@ max-parallelism=60 segment-costs=[557234058, 621440] cpu-comparison-result=60 [m
    tuple-ids=0 row-size=16B cardinality=511.58M(filtered from 8.64G) cost=117866905
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=951.31MB Threads=43
+Max Per-Host Resource Reservation: Memory=957.31MB Threads=43
 Per-Host Resource Estimates: Memory=1.61GB
 F20:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
@@ -1068,7 +1068,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
-|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  Per-Instance Resources: mem-estimate=37.25MB mem-reservation=5.12MB thread-reservation=1
 |  max-parallelism=20 segment-costs=[139563358, 621440] cpu-comparison-result=59 [max(20 (self) vs 59 (sum children))]
 |  30:AGGREGATE [STREAMING]
@@ -1161,7 +1161,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 21(GETNEXT), 23(OPEN)
 |  |
 |  |--F31:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=79.12MB mem-reservation=69.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=80.12MB mem-reservation=70.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  |  |  max-parallelism=10 segment-costs=[5647923]
 |  |  JOIN BUILD
 |  |  |  join-table-id=10 plan-id=11 cohort-id=03
@@ -1253,7 +1253,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
-|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  Per-Instance Resources: mem-estimate=37.25MB mem-reservation=6.00MB thread-reservation=1
 |  max-parallelism=30 segment-costs=[277893755, 621440] cpu-comparison-result=59 [max(30 (self) vs 59 (sum children))]
 |  20:AGGREGATE [STREAMING]
@@ -1346,7 +1346,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  |  in pipelines: 11(GETNEXT), 13(OPEN)
 |  |
 |  |--F27:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  Per-Instance Resources: mem-estimate=113.12MB mem-reservation=103.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=114.12MB mem-reservation=104.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  |  |  max-parallelism=10 segment-costs=[5647923]
 |  |  JOIN BUILD
 |  |  |  join-table-id=06 plan-id=07 cohort-id=02
@@ -1438,7 +1438,7 @@ max-parallelism=60 segment-costs=[594266, 594266, 594266, 1688338, 621440] cpu-c
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
-Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
+Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=37.25MB mem-reservation=13.00MB thread-reservation=1
 max-parallelism=60 segment-costs=[557234058, 621440] cpu-comparison-result=60 [max(60 (self) vs 59 (sum children))]
 10:AGGREGATE [STREAMING]
@@ -1531,7 +1531,7 @@ max-parallelism=60 segment-costs=[557234058, 621440] cpu-comparison-result=60 [m
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--F23:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=215.12MB mem-reservation=205.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=216.12MB mem-reservation=206.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  |  max-parallelism=10 segment-costs=[5647923]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01

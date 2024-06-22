@@ -285,7 +285,7 @@ PLAN-ROOT SINK
 02:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate > '1995-03-15'
    runtime filters: RF002 -> l_orderkey, RF003 -> l_orderkey
-   row-size=24B cardinality=575.77K(filtered from 600.12K)
+   row-size=24B cardinality=57.58K(filtered from 600.12K)
 ====
 # Q4 - Order Priority Checking Query
 select
@@ -489,8 +489,8 @@ order by
   cust_nation,
   l_year
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=55.25MB Threads=7
-Per-Host Resource Estimates: Memory=110MB
+Max Per-Host Resource Reservation: Memory=56.25MB Threads=7
+Per-Host Resource Estimates: Memory=111MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -705,8 +705,8 @@ order by
   nation,
   o_year desc
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=85.50MB Threads=7
-Per-Host Resource Estimates: Memory=176MB
+Max Per-Host Resource Reservation: Memory=86.50MB Threads=7
+Per-Host Resource Estimates: Memory=177MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -754,7 +754,7 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  runtime filters: RF010 <- p_partkey, RF011 <- p_partkey
-|  row-size=105B cardinality=598.58K(filtered from 598.58K)
+|  row-size=105B cardinality=574.29K(filtered from 598.58K)
 |
 |--00:SCAN KUDU [tpch_kudu.part]
 |     predicates: p_name LIKE '%green%'
@@ -763,7 +763,7 @@ PLAN-ROOT SINK
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    runtime filters: RF010 -> l_partkey, RF011 -> l_partkey, RF008 -> l_orderkey, RF009 -> l_orderkey, RF002 -> l_partkey, RF003 -> l_suppkey, RF004 -> l_partkey, RF005 -> l_suppkey, RF006 -> l_suppkey, RF007 -> l_suppkey
-   row-size=48B cardinality=598.58K(filtered from 6.00M)
+   row-size=48B cardinality=574.29K(filtered from 6.00M)
 ====
 # Q10 - Returned Item Reporting Query
 # Converted select from multiple tables to joins
@@ -838,7 +838,7 @@ PLAN-ROOT SINK
 |  02:SCAN KUDU [tpch_kudu.lineitem]
 |     kudu predicates: l_returnflag = 'R'
 |     runtime filters: RF004 -> l_orderkey, RF005 -> l_orderkey
-|     row-size=24B cardinality=575.77K(filtered from 2.00M)
+|     row-size=24B cardinality=191.92K(filtered from 2.00M)
 |
 00:SCAN KUDU [tpch_kudu.customer]
    runtime filters: RF000 -> c_nationkey, RF001 -> c_nationkey, RF002 -> c_custkey, RF003 -> c_custkey
@@ -1327,8 +1327,8 @@ order by
   o_orderdate
 limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=96.50MB Threads=5
-Per-Host Resource Estimates: Memory=214MB
+Max Per-Host Resource Reservation: Memory=97.50MB Threads=5
+Per-Host Resource Estimates: Memory=215MB
 PLAN-ROOT SINK
 |
 09:TOP-N [LIMIT=100]
@@ -1435,7 +1435,7 @@ PLAN-ROOT SINK
    predicates: l_quantity <= 11 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity >= 20
    kudu predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF000 -> l_partkey, RF001 -> l_partkey
-   row-size=32B cardinality=42.86K(filtered from 197.63K)
+   row-size=32B cardinality=1.41K(filtered from 197.63K)
 ====
 # Q20 - Potential Part Promotion Query
 select

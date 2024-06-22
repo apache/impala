@@ -181,8 +181,8 @@ from tpch_parquet.lineitem
 group by 1, 2
 having count(*) = 1
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=156.00MB Threads=7
-Per-Host Resource Estimates: Memory=426MB
+Max Per-Host Resource Reservation: Memory=158.00MB Threads=7
+Per-Host Resource Estimates: Memory=428MB
 Analyzed query: SELECT /* +straight_join */ l_orderkey, o_orderstatus, count(*)
 FROM tpch_parquet.lineitem INNER JOIN tpch_parquet.orders ON o_orderkey =
 l_orderkey GROUP BY l_orderkey, o_orderstatus HAVING count(*) = CAST(1 AS
@@ -215,7 +215,7 @@ Per-Host Resources: mem-estimate=71.23MB mem-reservation=46.00MB thread-reservat
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=123.37MB mem-reservation=81.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=124.37MB mem-reservation=82.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: l_orderkey, o_orderstatus
@@ -254,7 +254,7 @@ Per-Host Resources: mem-estimate=123.37MB mem-reservation=81.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=81.14MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=82.14MB mem-reservation=6.00MB thread-reservation=2 runtime-filters-memory=2.00MB
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    HDFS partitions=1/1 files=3 size=193.98MB
    runtime filters: RF000[bloom] -> l_orderkey

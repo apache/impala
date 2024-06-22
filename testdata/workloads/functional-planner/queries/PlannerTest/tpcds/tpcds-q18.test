@@ -206,8 +206,8 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=4B cardinality=28.95K(filtered from 1.92M)
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=166.00MB Threads=18
-Per-Host Resource Estimates: Memory=874MB
+Max Per-Host Resource Reservation: Memory=168.00MB Threads=18
+Per-Host Resource Estimates: Memory=876MB
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -262,7 +262,7 @@ Per-Host Resources: mem-estimate=61.94MB mem-reservation=29.44MB thread-reservat
 |  in pipelines: 00(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(c_current_cdemo_sk)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=98.17MB mem-reservation=75.94MB thread-reservation=1 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=99.17MB mem-reservation=76.94MB thread-reservation=1 runtime-filters-memory=3.00MB
 13:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
@@ -417,7 +417,7 @@ Per-Host Resources: mem-estimate=399.42MB mem-reservation=29.62MB thread-reserva
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=82.09MB mem-reservation=4.00MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=83.09MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=3.00MB
 |  03:SCAN HDFS [tpcds_parquet.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.49MB
 |     predicates: c_birth_month IN (CAST(9 AS INT), CAST(5 AS INT), CAST(12 AS INT), CAST(4 AS INT), CAST(1 AS INT), CAST(10 AS INT))
@@ -471,8 +471,8 @@ Per-Host Resources: mem-estimate=399.42MB mem-reservation=29.62MB thread-reserva
    tuple-ids=0 row-size=40B cardinality=294.63K(filtered from 1.44M)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=178.56MB Threads=17
-Per-Host Resource Estimates: Memory=370MB
+Max Per-Host Resource Reservation: Memory=180.56MB Threads=17
+Per-Host Resource Estimates: Memory=372MB
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -590,7 +590,7 @@ Per-Instance Resources: mem-estimate=59.98MB mem-reservation=38.00MB thread-rese
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--F12:PLAN FRAGMENT [HASH(c_current_cdemo_sk)] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=42.34MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=43.34MB mem-reservation=36.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: cd2.cd_demo_sk
@@ -723,7 +723,7 @@ Per-Instance Resources: mem-estimate=49.79MB mem-reservation=16.00MB thread-rese
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=2.00MB thread-reservation=1
 |  03:SCAN HDFS [tpcds_parquet.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.49MB

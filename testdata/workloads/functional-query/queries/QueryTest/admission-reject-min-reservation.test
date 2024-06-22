@@ -35,8 +35,8 @@ from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 44.00 MB. Adjust the MEM_LIMIT option for the query to allow the query
- memory limit to be at least 76.00 MB. Note that changing the memory limit
+ current plan: 46.00 MB. Adjust the MEM_LIMIT option for the query to allow the query
+ memory limit to be at least 78.00 MB. Note that changing the memory limit
  may also change the plan. See 'Per Host Min Memory Reservation' in the query
  profile for more information about the per-node memory requirements.
 ====
@@ -47,8 +47,8 @@ from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 43.00 MB. Adjust the MEM_LIMIT option for the query to allow the query
- memory limit to be at least 75.00 MB. Note that changing the memory limit
+ current plan: 44.00 MB. Adjust the MEM_LIMIT option for the query to allow the query
+ memory limit to be at least 76.00 MB. Note that changing the memory limit
  may also change the plan. See 'Per Host Min Memory Reservation' in the query
  profile for more information about the per-node memory requirements.
 ====

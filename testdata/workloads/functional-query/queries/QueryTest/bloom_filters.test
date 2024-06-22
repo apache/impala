@@ -32,7 +32,7 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 0
 ---- RUNTIME_PROFILE
 row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(64.00 KB\).*
+row_regex: .*Filter 0 \(128.00 KB\).*
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -45,7 +45,7 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 0
 ---- RUNTIME_PROFILE
 row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(256.00 KB\).*
+row_regex: .*Filter 0 \(512.00 KB\).*
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -58,7 +58,7 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 0
 ---- RUNTIME_PROFILE
 row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(512.00 KB\).*
+row_regex: .*Filter 0 \(1.00 MB\).*
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -72,7 +72,7 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 0
 ---- RUNTIME_PROFILE
 row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(1.00 MB\).*
+row_regex: .*Filter 0 \(2.00 MB\).*
 ====
 
 

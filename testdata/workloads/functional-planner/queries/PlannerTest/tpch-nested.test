@@ -2408,8 +2408,8 @@ where
       l_partkey = p_partkey
   )
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=96.94MB Threads=4
-Per-Host Resource Estimates: Memory=1.04GB
+Max Per-Host Resource Reservation: Memory=104.94MB Threads=4
+Per-Host Resource Estimates: Memory=1.05GB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -2447,8 +2447,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
    row-size=24B cardinality=15.00M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=154.94MB Threads=8
-Per-Host Resource Estimates: Memory=987MB
+Max Per-Host Resource Reservation: Memory=178.94MB Threads=8
+Per-Host Resource Estimates: Memory=1011MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]

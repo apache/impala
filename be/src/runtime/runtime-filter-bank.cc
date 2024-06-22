@@ -52,7 +52,7 @@ using kudu::rpc::RpcSidecar;
 using namespace impala;
 using namespace strings;
 
-DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The target false positive "
+DEFINE_double(max_filter_error_rate, 0.10, "(Advanced) The target false positive "
     "probability used to determine the ideal size for each bloom filter size. This value "
     "can be overriden by the RUNTIME_FILTER_ERROR_RATE query option.");
 

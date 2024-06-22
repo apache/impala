@@ -31,10 +31,10 @@ select c_last_name
 
 # end query 34 in stream 0 using template query34.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=73.00MB Threads=1
+Max Per-Host Resource Reservation: Memory=76.00MB Threads=1
 Per-Host Resource Estimates: Memory=1.17GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=1.17GB mem-reservation=73.00MB thread-reservation=1 runtime-filters-memory=4.00MB
+|  Per-Instance Resources: mem-estimate=1.17GB mem-reservation=76.00MB thread-reservation=1 runtime-filters-memory=7.00MB
 |  max-parallelism=1 segment-costs=[960041231, 26467220, 19951626]
 PLAN-ROOT SINK
 |  output exprs: c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number, cnt
@@ -148,8 +148,8 @@ PLAN-ROOT SINK
    tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=8730511
    in pipelines: 08(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=389.70MB Threads=22
-Per-Host Resource Estimates: Memory=879MB
+Max Per-Host Resource Reservation: Memory=395.70MB Threads=22
+Per-Host Resource Estimates: Memory=885MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=126.26MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[21326023] cpu-comparison-result=100 [max(1 (self) vs 100 (sum children))]
@@ -164,7 +164,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=41.44MB mem-reservation=13.00MB thread-reservation=1
 max-parallelism=10 segment-costs=[23141949, 8033154] cpu-comparison-result=100 [max(10 (self) vs 100 (sum children))]
 10:SORT
@@ -182,7 +182,7 @@ max-parallelism=10 segment-costs=[23141949, 8033154] cpu-comparison-result=100 [
 |  in pipelines: 08(GETNEXT), 15(OPEN)
 |
 |--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=171.13MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=174.13MB mem-reservation=38.00MB thread-reservation=1 runtime-filters-memory=4.00MB
 |  |  max-parallelism=10 segment-costs=[7744551] cpu-comparison-result=100 [max(10 (self) vs 100 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
@@ -359,8 +359,8 @@ max-parallelism=10 segment-costs=[23141949, 8033154] cpu-comparison-result=100 [
    tuple-ids=6 row-size=68B cardinality=3.33M(filtered from 30.00M) cost=8730511
    in pipelines: 08(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=389.70MB Threads=22
-Per-Host Resource Estimates: Memory=879MB
+Max Per-Host Resource Reservation: Memory=395.70MB Threads=22
+Per-Host Resource Estimates: Memory=885MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=126.26MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[21326023] cpu-comparison-result=100 [max(1 (self) vs 100 (sum children))]
@@ -375,7 +375,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=41.44MB mem-reservation=13.00MB thread-reservation=1
 max-parallelism=10 segment-costs=[23141949, 8033154] cpu-comparison-result=100 [max(10 (self) vs 100 (sum children))]
 10:SORT
@@ -393,7 +393,7 @@ max-parallelism=10 segment-costs=[23141949, 8033154] cpu-comparison-result=100 [
 |  in pipelines: 08(GETNEXT), 15(OPEN)
 |
 |--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=171.13MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=174.13MB mem-reservation=38.00MB thread-reservation=1 runtime-filters-memory=4.00MB
 |  |  max-parallelism=10 segment-costs=[7744551] cpu-comparison-result=100 [max(10 (self) vs 100 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
