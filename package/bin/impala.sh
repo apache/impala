@@ -75,7 +75,9 @@ stop_await() {
   for ((i=1; ${counts} == -1 || i<=${counts}; i++)); do
     [[ ${i} -gt 1 ]] && sleep ${period}
     if ! kill -0 ${pid} &> /dev/null; then
-      rm ${service_pidfile} && echo "(${i}/${counts}) ${service} is stopped." && return 0
+      rm -f ${service_pidfile} &&\
+        echo "(${i}/${counts}) ${service} is stopped." &&\
+        return 0
     else
       echo "(${i}/${counts}) Waiting ${service} to stop."
     fi
@@ -115,7 +117,7 @@ stop() {
   fi
   local pid=$(cat ${service_pidfile})
   if ! ps -p ${pid} -o comm=|grep ${service} &> /dev/null ; then
-    rm ${service_pidfile}
+    rm -f ${service_pidfile}
     echo "Already stopped: ${service} is not running with PID ${pid}." \
     "Removed stale file '${service_pidfile}'."
     return 0

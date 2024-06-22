@@ -71,6 +71,20 @@ endif()
 install(DIRECTORY bin/ DESTINATION ${IMPALA_INSTALLDIR}/bin
   USE_SOURCE_PERMISSIONS FILES_MATCHING PATTERN "*.sh")
 install(DIRECTORY conf/ DESTINATION ${IMPALA_INSTALLDIR}/conf)
+install(FILES
+  etc/init.d/impalad
+  etc/init.d/catalogd
+  etc/init.d/admissiond
+  etc/init.d/statestored
+  DESTINATION /etc/init.d/
+  PERMISSIONS
+  OWNER_READ
+  OWNER_WRITE
+  OWNER_EXECUTE
+  GROUP_READ
+  GROUP_EXECUTE
+  WORLD_READ
+  WORLD_EXECUTE)
 
 # packaging
 option(BUILD_PACKAGES "Build deployment packages")
@@ -132,6 +146,12 @@ if (${CPACK_GENERATOR} MATCHES "RPM")
   set(CPACK_RPM_PACKAGE_REQUIRES ${PKG_LIST})
 else()
   set(CPACK_DEBIAN_PACKAGE_DEPENDS ${PKG_LIST})
+endif()
+
+if (${CPACK_GENERATOR} MATCHES "RPM")
+  set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/postinst")
+else()
+  set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/postinst")
 endif()
 
 include(CPack)
