@@ -83,6 +83,31 @@ CREATE TABLE decimal_tbl
 __EOT__
 sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_decimal_tbl.sql
 
+# Create test_strategy1 table for unit test
+cat > /tmp/jdbc_test_strategy.sql << __EOT__
+DROP TABLE IF EXISTS test_strategy;
+CREATE TABLE test_strategy
+(
+  strategy_id INT,
+  name VARCHAR(50),
+  referrer VARCHAR(1024),
+  landing VARCHAR(1024),
+  priority INT,
+  implementation VARCHAR(512),
+  last_modified timestamp,
+  PRIMARY KEY (strategy_id)
+);
+
+INSERT INTO test_strategy (strategy_id, name, referrer, landing, priority,
+  implementation, last_modified) VALUES
+  (1, 'S1', 'aaa', 'abc', 1000, NULL, '2012-05-08 15:01:15'),
+  (2, 'S2', 'bbb', 'def', 990, NULL, '2012-05-08 15:01:15'),
+  (3, 'S3', 'ccc', 'ghi', 1000, NULL, '2012-05-08 15:01:15'),
+  (4, 'S4', 'ddd', 'jkl', 980, NULL, '2012-05-08 15:01:15'),
+  (5, 'S5', 'eee', NULL, NULL, NULL, '2012-05-08 15:01:15');
+__EOT__
+sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_test_strategy.sql
+
 # Load data to jdbc table
 cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/jdbc_alltypes.csv
 loadCmd="COPY alltypes FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
@@ -128,4 +153,5 @@ ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -f /tmp/impala_jdbc_alltypes.sq
 rm /tmp/jdbc_alltypes.*
 rm /tmp/jdbc_alltypes_with_quote.*
 rm /tmp/jdbc_decimal_tbl.*
+rm /tmp/jdbc_test_strategy.*
 rm /tmp/impala_jdbc_alltypes.sql

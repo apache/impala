@@ -33,6 +33,8 @@ import org.apache.impala.extdatasource.thrift.TPrepareParams;
 import org.apache.impala.extdatasource.thrift.TPrepareResult;
 import org.apache.impala.extdatasource.thrift.TRowBatch;
 import org.apache.impala.extdatasource.thrift.TTableSchema;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TColumnData;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TColumnValue;
@@ -44,6 +46,8 @@ import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
 import org.junit.Assert;
 import org.junit.FixMethodOrder;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
@@ -51,13 +55,32 @@ import org.slf4j.LoggerFactory;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class JdbcDataSourceTest {
+  private static TBackendGflags origFlags;
+
+  @BeforeClass
+  public static void setup() {
+    // The original BackendConfig need to be mocked, we are saving the values here, so
+    // they can be restored and not break other tests
+    if (BackendConfig.INSTANCE == null) {
+      BackendConfig.create(new TBackendGflags());
+    }
+    origFlags = BackendConfig.INSTANCE.getBackendCfg();
+  }
+
+  @AfterClass
+  public static void teardown() {
+    BackendConfig.create(origFlags);
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(JdbcDataSourceTest.class);
 
-  private static String initString_ = "CACHE_CLASS::{\"database.type\":\"H2\", "
-      + "\"jdbc.url\":\"jdbc:h2:mem:test;MODE=MySQL;INIT=runscript from "
-      + "'classpath:test_script.sql'\", "
-      + "\"jdbc.driver\":\"org.h2.Driver\", "
+  private static String initString_ = "{\"database.type\":\"POSTGRES\", "
+      + "\"jdbc.url\":\"jdbc:postgresql://localhost:5432/functional\", "
+      + "\"jdbc.driver\":\"org.postgresql.Driver\", "
+      + "\"driver.url\":\"hdfs://localhost:20500/test-warehouse/data-sources/"
+      + "jdbc-drivers/postgresql-jdbc.jar\", "
+      + "\"dbcp.username\":\"hiveuser\", "
+      + "\"dbcp.password\":\"password\", "
       + "\"table\":\"test_strategy\","
       + "\"column.mapping\":\"id=strategy_id\"}";
 
@@ -66,9 +89,12 @@ public class JdbcDataSourceTest {
   private static String scanHandle_;
   private static TTableSchema schema_;
   private static List<List<TBinaryPredicate>> predicates_ = Lists.newArrayList();
-  private static List<List<TBinaryPredicate>> acceptedPredicates_ = Lists.newArrayList();
+  private static List<List<TBinaryPredicate>> acceptedPredicates_ =
+      Lists.newArrayList();
   private static long expectReturnRows_ = 5L;
 
+  // Please note that the unit test cases in this class have a dependency on
+  // previous tests. They must be ran sequentially.
   @Test
   public void test01Init() {
     String colName = "id";
@@ -91,7 +117,8 @@ public class JdbcDataSourceTest {
     // predicates filter
     predicates_.add(Lists.newArrayList(idPredicate));
     expectReturnRows_ = 3L;
-    LOG.info("setup predicates:{}, expectReturnRows: {}", predicates_, expectReturnRows_);
+    LOG.info("setup predicates:{}, expectReturnRows: {}", predicates_,
+        expectReturnRows_);
 
     boolean ret = jdbcDataSource_.convertInitStringToConfiguration(initString_);
     Assert.assertTrue(ret);
@@ -102,7 +129,6 @@ public class JdbcDataSourceTest {
     TPrepareParams params = new TPrepareParams();
     params.setTable_name("test_strategy");
     params.setInit_string(initString_);
-    params.setPredicates(Lists.newArrayList());
     params.setPredicates(predicates_);
     TPrepareResult resp = jdbcDataSource_.prepare(params);
     Assert.assertEquals(TErrorCode.OK, resp.getStatus().status_code);
@@ -133,7 +159,6 @@ public class JdbcDataSourceTest {
     TUniqueId unique_id = new TUniqueId();
     unique_id.hi = 0xfeedbeeff00d7777L;
     unique_id.lo = 0x2020202020202020L;
-    String str = "feedbeeff00d7777:2020202020202020";
     params.setQuery_id(unique_id);
     params.setTable_name("test_strategy");
     params.setInit_string(initString_);
@@ -177,7 +202,7 @@ public class JdbcDataSourceTest {
   private static TTableSchema initSchema() {
     // strategy_id int, name string, referrer string, landing string, priority  int,
     // implementation string, last_modified timestamp
-    TTableSchema schema_ = new TTableSchema();
+    TTableSchema schema = new TTableSchema();
     TColumnDesc col = new TColumnDesc();
     col.setName("id");
     TTypeNode typeNode = new TTypeNode();
@@ -188,7 +213,7 @@ public class JdbcDataSourceTest {
     TColumnType colType = new TColumnType();
     colType.setTypes(Lists.newArrayList(typeNode));
     col.setType(colType);
-    schema_.addToCols(col);
+    schema.addToCols(col);
 
     col = new TColumnDesc();
     col.setName("name");
@@ -200,7 +225,7 @@ public class JdbcDataSourceTest {
     colType = new TColumnType();
     colType.setTypes(Lists.newArrayList(typeNode));
     col.setType(colType);
-    schema_.addToCols(col);
+    schema.addToCols(col);
 
     col = new TColumnDesc();
     col.setName("priority");
@@ -212,7 +237,7 @@ public class JdbcDataSourceTest {
     colType = new TColumnType();
     colType.setTypes(Lists.newArrayList(typeNode));
     col.setType(colType);
-    schema_.addToCols(col);
+    schema.addToCols(col);
 
     col = new TColumnDesc();
     col.setName("implementation");
@@ -224,7 +249,7 @@ public class JdbcDataSourceTest {
     colType = new TColumnType();
     colType.setTypes(Lists.newArrayList(typeNode));
     col.setType(colType);
-    schema_.addToCols(col);
+    schema.addToCols(col);
 
     col = new TColumnDesc();
     col.setName("last_modified");
@@ -236,18 +261,7 @@ public class JdbcDataSourceTest {
     colType = new TColumnType();
     colType.setTypes(Lists.newArrayList(typeNode));
     col.setType(colType);
-    schema_.addToCols(col);
-    return schema_;
+    schema.addToCols(col);
+    return schema;
   }
-
-  public static void printData(List<TColumnDesc> colDescs, List<TColumnData> colDatas) {
-    for (int i = 0; i < colDatas.size(); ++i) {
-      TColumnDesc colDesc = colDescs.get(i);
-      TColumnData colData = colDatas.get(i);
-      System.out.println("idx: " + i);
-      System.out.println(" Name: " + colDesc);
-      System.out.println(" Data: " + colData);
-    }
-  }
-
 }
