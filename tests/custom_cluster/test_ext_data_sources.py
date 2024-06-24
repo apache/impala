@@ -45,9 +45,10 @@ class TestExtDataSources(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal")
-  def test_data_source_tables(self, vector, unique_database):
+  def test_data_source_tables(self, vector, unique_database, unique_name):
     """Start Impala cluster in LocalCatalog Mode"""
-    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database,
+        test_file_vars={'$UNIQUE_DATASOURCE': unique_name})
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -60,16 +61,18 @@ class TestExtDataSources(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args='--data_source_batch_size=2048')
-  def test_data_source_big_batch_size(self, vector, unique_database):
+  def test_data_source_big_batch_size(self, vector, unique_database, unique_name):
     """Run test with batch size greater than default size 1024"""
-    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database,
+        test_file_vars={'$UNIQUE_DATASOURCE': unique_name})
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args='--data_source_batch_size=512')
-  def test_data_source_small_batch_size(self, vector, unique_database):
+  def test_data_source_small_batch_size(self, vector, unique_database, unique_name):
     """Run test with batch size less than default size 1024"""
-    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database,
+        test_file_vars={'$UNIQUE_DATASOURCE': unique_name})
 
   @SkipIfApacheHive.data_connector_not_supported
   @pytest.mark.execute_serially

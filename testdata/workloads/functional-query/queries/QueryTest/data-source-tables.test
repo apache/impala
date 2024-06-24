@@ -1,8 +1,8 @@
 ====
 ---- QUERY
 # Create DataSource
-DROP DATA SOURCE IF EXISTS TestGenericDataSource;
-CREATE DATA SOURCE TestGenericDataSource
+DROP DATA SOURCE IF EXISTS $UNIQUE_DATASOURCE;
+CREATE DATA SOURCE $UNIQUE_DATASOURCE
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/data-sources/test-data-source.jar'
 CLASS 'org.apache.impala.extdatasource.AllTypesDataSource'
 API_VERSION 'V1';
@@ -11,11 +11,11 @@ API_VERSION 'V1';
 ====
 ---- QUERY
 # Show created DataSource
-SHOW DATA SOURCES LIKE 'testgenericdatasource';
+SHOW DATA SOURCES LIKE '$UNIQUE_DATASOURCE';
 ---- LABELS
 NAME,LOCATION,CLASS NAME,API VERSION
 ---- RESULTS
-'testgenericdatasource',regex:'.*/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
+'$UNIQUE_DATASOURCE',regex:'.*/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
@@ -39,7 +39,7 @@ CREATE TABLE alltypes_datasource (
   dec_col4 DECIMAL(38,37),
   dec_col5 DECIMAL(10,5),
   date_col DATE)
-PRODUCED BY DATA SOURCE TestGenericDataSource("TestInitString");
+PRODUCED BY DATA SOURCE $UNIQUE_DATASOURCE("TestInitString");
 ---- RESULTS
 'Table has been created.'
 ====
@@ -181,7 +181,7 @@ DROP TABLE alltypes_datasource;
 ====
 ---- QUERY
 # Drop DataSource
-DROP DATA SOURCE TestGenericDataSource;
+DROP DATA SOURCE $UNIQUE_DATASOURCE;
 ---- RESULTS
 'Data source has been dropped.'
 ====

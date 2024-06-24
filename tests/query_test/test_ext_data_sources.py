@@ -84,8 +84,9 @@ class TestExtDataSources(ImpalaTestSuite):
         break
     assert match, result.data
 
-  def test_data_source_tables(self, vector, unique_database):
-    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database)
+  def test_data_source_tables(self, vector, unique_database, unique_name):
+    self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database,
+        test_file_vars={'$UNIQUE_DATASOURCE': unique_name})
 
   def test_jdbc_data_source(self, vector, unique_database):
     self.run_test_case('QueryTest/jdbc-data-source', vector, use_db=unique_database)
