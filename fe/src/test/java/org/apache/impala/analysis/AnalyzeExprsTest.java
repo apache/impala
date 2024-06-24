@@ -3302,6 +3302,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     RunCastFormatTestOnType("DATE");
   }
 
+  @Test
+  public void TestMatchingCasts() throws AnalysisException {
+    // IMPALA-12800: ensure identical cast-to-decimal expressions match hashCodes.
+    String clause =
+        "sum(CASE WHEN id IS NOT NULL THEN cast(0.4 as decimal(20,10)) ELSE 0 END)";
+    AnalyzesOk("SELECT CASE WHEN (" + clause + ") > 0 " +
+      "THEN (" + clause + ") ELSE null END q FROM functional.alltypes");
+  }
+
   private void RunCastFormatTestOnType(String type) {
     String to_timestamp_cast = "cast('05-01-2017' as " + type + ")";
     AnalysisError(

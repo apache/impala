@@ -117,6 +117,11 @@ public class StructType extends Type {
   }
 
   @Override
+  public int hashCode() {
+    return fields_.hashCode();
+  }
+
+  @Override
   public void toThrift(TColumnType container) {
     TTypeNode node = new TTypeNode();
     container.types.add(node);

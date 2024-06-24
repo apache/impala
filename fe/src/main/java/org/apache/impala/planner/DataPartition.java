@@ -19,6 +19,7 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
@@ -102,6 +103,11 @@ public class DataPartition {
     DataPartition other = (DataPartition) obj;
     if (type_ != other.type_) return false;
     return Expr.equalLists(partitionExprs_, other.partitionExprs_);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(type_, partitionExprs_);
   }
 
   public String debugString() {

@@ -1022,7 +1022,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Returns true if two expressions are equal. The equality comparison works on analyzed
-   * as well as unanalyzed exprs by ignoring implicit casts.
+   * as well as unanalyzed exprs by ignoring implicit casts. If overridden by a subclass,
+   * also provide an appropriate implementation for hashCode.
    */
   @Override
   public final boolean equals(Object obj) {
@@ -1037,7 +1038,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Returns a hash code based on the same keys used for equals.
+   * Returns a hash code based on the same keys used for equals. Any subclasses that
+   * override equals must ensure hashCode is defined such that a.equals(b) implies
+   * a.hashCode() == b.hashCode(), as required by
+   * https://docs.oracle.com/javase/8/docs/api/java/lang/Object.html#hashCode--
    */
   @Override
   public int hashCode() {

@@ -319,6 +319,17 @@ public abstract class Type {
   public abstract void toThrift(TColumnType container);
 
   /**
+   * Subclasses must provide consistent equals and hashCode implementations such that
+   * a.equals(b) implies a.hashCode() == b.hashCode().
+   */
+  public abstract boolean equals(Object other);
+
+  /**
+   * hashCode must be defined such that a.equals(b) implies a.hashCode() == b.hashCode().
+   */
+  public abstract int hashCode();
+
+  /**
    * Returns true if this type is equal to t, or if t is a wildcard variant of this
    * type. Subclasses should override this as appropriate. The default implementation
    * here is to avoid special-casing logic in callers for concrete types.

@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -381,6 +382,22 @@ public class ColumnDef {
         .append(defaultValue_, rhs.defaultValue_)
         .append(blockSize_, rhs.blockSize_)
         .isEquals();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        colName_,
+        comment_,
+        isPrimaryKey_,
+        isPrimaryKeyUnique_,
+        typeDef_,
+        type_,
+        isNullable_,
+        encoding_,
+        compression_,
+        defaultValue_,
+        blockSize_);
   }
 
   public TColumn toThrift() {

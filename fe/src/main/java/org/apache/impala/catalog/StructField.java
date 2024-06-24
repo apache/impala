@@ -95,6 +95,9 @@ public class StructField {
     type_.toThrift(container);
   }
 
+  /**
+   * Implements equals and hashCode so a.equals(b) implies a.hashCode()==b.hashCode().
+   */
   @Override
   public boolean equals(Object other) {
     if (!(other instanceof StructField)) return false;

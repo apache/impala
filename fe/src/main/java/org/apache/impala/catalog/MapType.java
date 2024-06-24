@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog;
 
+import java.util.Objects;
+
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.impala.thrift.TColumnType;
@@ -47,6 +49,11 @@ public class MapType extends Type {
     MapType otherMapType = (MapType) other;
     return otherMapType.keyType_.equals(keyType_) &&
         otherMapType.valueType_.equals(valueType_);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(keyType_, valueType_);
   }
 
   @Override

@@ -50,6 +50,12 @@ public class ArrayType extends Type {
   }
 
   @Override
+  public int hashCode() {
+    // Add 1 to differentiate between e.g. array<int> and array<array<int>>.
+    return 1 + itemType_.hashCode();
+  }
+
+  @Override
   public void toThrift(TColumnType container) {
     TTypeNode node = new TTypeNode();
     container.types.add(node);

@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import com.google.common.base.Joiner;
 
@@ -54,6 +55,11 @@ public class PlanHint {
     if (getClass() != o.getClass()) return false;
     PlanHint oh = (PlanHint) o;
     return name_.equals(oh.name_) && args_.equals(oh.args_);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(name_, args_);
   }
 
   @Override

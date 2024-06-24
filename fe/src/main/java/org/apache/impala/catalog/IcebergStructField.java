@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog;
 
+import java.util.Objects;
+
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TStructField;
 import org.apache.impala.thrift.TTypeNode;
@@ -53,5 +55,10 @@ public class IcebergStructField extends StructField {
     IcebergStructField otherStructField = (IcebergStructField) other;
     return otherStructField.name_.equals(name_) && otherStructField.type_.equals(type_)
         && (otherStructField.fieldId_ == fieldId_);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(name_, type_, fieldId_);
   }
 }

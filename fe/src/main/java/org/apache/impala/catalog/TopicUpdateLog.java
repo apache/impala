@@ -18,6 +18,7 @@
 package org.apache.impala.catalog;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
@@ -102,6 +103,15 @@ public class TopicUpdateLog {
           && lastSentTopicUpdate_ == entry.getLastSentCatalogUpdate()
           && numSkippedUpdatesLockContention_ == entry
           .getNumSkippedUpdatesLockContention();
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(
+          numSkippedUpdates_,
+          lastSentVersion_,
+          lastSentTopicUpdate_,
+          numSkippedUpdatesLockContention_);
     }
   }
 

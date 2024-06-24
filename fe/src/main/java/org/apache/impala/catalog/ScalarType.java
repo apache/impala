@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog;
 
+import java.util.Objects;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.TypesUtil;
 import org.apache.impala.thrift.TColumnType;
@@ -385,6 +387,20 @@ public class ScalarType extends Type {
       return precision_ == other.precision_ && scale_ == other.scale_;
     }
     return true;
+  }
+
+  @Override
+  public int hashCode() {
+    switch (type_) {
+      case CHAR:
+      case FIXED_UDA_INTERMEDIATE:
+      case VARCHAR:
+        return Objects.hash(type_, len_);
+      case DECIMAL:
+        return Objects.hash(type_, precision_, scale_);
+      default:
+        return Objects.hash(type_);
+    }
   }
 
   public Type getMaxResolutionType() {
