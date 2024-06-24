@@ -1018,6 +1018,13 @@ public class ColumnStats {
     return SUPPORTED_COL_TYPES.contains(scalarType.getPrimitiveType());
   }
 
+  /**
+   * Returns whether the given type supports NDV stats.
+   */
+  public static boolean supportsNdv(Type colType) {
+    return isSupportedColType(colType) && !colType.isBoolean() && !colType.isBinary();
+  }
+
   public void update(Type colType, TColumnStats stats) {
     initColStats(colType);
     if (!colType.isFixedLengthType() && stats.getAvg_size() >= 0) {

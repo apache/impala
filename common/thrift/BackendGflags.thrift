@@ -312,4 +312,6 @@ struct TBackendGflags {
   140: required bool iceberg_always_allow_merge_on_read_operations
 
   141: required i64 data_stream_sender_buffer_size_used_by_planner
+
+  142: required bool disable_reading_puffin_stats
 }

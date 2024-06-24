@@ -448,6 +448,10 @@ public class BackendConfig {
     return backendCfg_.data_stream_sender_buffer_size_used_by_planner;
   }
 
+  public boolean disableReadingPuffinStats() {
+    return backendCfg_.disable_reading_puffin_stats;
+  }
+
   public boolean isJsonScannerEnabled() {
     return backendCfg_.enable_json_scanner;
   }

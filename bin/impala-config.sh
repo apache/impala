@@ -282,6 +282,7 @@ export IMPALA_OBS_VERSION=3.1.1-hw-42
 export IMPALA_DBCP2_VERSION=2.9.0
 export IMPALA_DROPWIZARD_METRICS_VERSION=4.2.26
 export IMPALA_AIRCOMPRESSOR_VERSION=0.27
+export IMPALA_DATASKETCHES_VERSION=6.0.0
 
 # When Impala is building docker images on Redhat-based distributions,
 # it is useful to be able to customize the base image. Some users will

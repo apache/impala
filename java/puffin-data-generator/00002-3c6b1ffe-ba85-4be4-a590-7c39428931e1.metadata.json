@@ -1,0 +1,229 @@
+{
+  "format-version" : 1,
+  "table-uuid" : "e3fb99cf-b22e-43c4-b1ca-e9a47770a275",
+  "location" : "hdfs://localhost:20500/test-warehouse/ice_puffin",
+  "last-updated-ms" : 1719573340405,
+  "last-column-id" : 8,
+  "schema" : {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "bool_col",
+      "required" : false,
+      "type" : "boolean"
+    }, {
+      "id" : 2,
+      "name" : "int_col",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "bigint_col",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "float_col",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "double_col",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "date_col",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 7,
+      "name" : "string_col",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 8,
+      "name" : "timestamp_col",
+      "required" : false,
+      "type" : "timestamp"
+    } ]
+  },
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "bool_col",
+      "required" : false,
+      "type" : "boolean"
+    }, {
+      "id" : 2,
+      "name" : "int_col",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "bigint_col",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "float_col",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "double_col",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "date_col",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 7,
+      "name" : "string_col",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 8,
+      "name" : "timestamp_col",
+      "required" : false,
+      "type" : "timestamp"
+    } ]
+  } ],
+  "partition-spec" : [ ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "engine.hive.enabled" : "true",
+    "impala.events.catalogServiceId" : "3b153406d7cf46eb:8e8d056f492535db",
+    "external.table.purge" : "TRUE",
+    "impala.events.catalogVersion" : "2058",
+    "write.format.default" : "parquet",
+    "hive.metastore.table.owner" : "danielbecker",
+    "OBJCAPABILITIES" : "EXTREAD,EXTWRITE",
+    "storage_handler" : "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler"
+  },
+  "current-snapshot-id" : 4592649074073110045,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 4592649074073110045,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "snapshot-id" : 4592649074073110045,
+    "timestamp-ms" : 1719573336119,
+    "summary" : {
+      "operation" : "append",
+      "added-data-files" : "1",
+      "added-records" : "1",
+      "added-files-size" : "1842",
+      "changed-partition-count" : "1",
+      "total-records" : "1",
+      "total-files-size" : "1842",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/snap-4592649074073110045-1-2f2c61f0-0886-465c-af09-251b06c5346d.avro",
+    "schema-id" : 0
+  } ],
+  "statistics" : [ {
+    "snapshot-id" : 4592649074073110045,
+    "statistics-path" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/20240628_111540_00004_ihhpt-f0149596-b20a-4156-bcfd-ff74a60996ad.stats",
+    "file-size-in-bytes" : 1721,
+    "file-footer-size-in-bytes" : 1541,
+    "blob-metadata" : [ {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 1 ],
+      "properties" : {
+        "ndv" : "1"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 2 ],
+      "properties" : {
+        "ndv" : "0"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 3 ],
+      "properties" : {
+        "ndv" : "0"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 4 ],
+      "properties" : {
+        "ndv" : "0"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 5 ],
+      "properties" : {
+        "ndv" : "0"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 6 ],
+      "properties" : {
+        "ndv" : "0"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 7 ],
+      "properties" : {
+        "ndv" : "0"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4592649074073110045,
+      "sequence-number" : 0,
+      "fields" : [ 8 ],
+      "properties" : {
+        "ndv" : "0"
+      }
+    } ]
+  } ],
+  "partition-statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1719573336119,
+    "snapshot-id" : 4592649074073110045
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1719572987102,
+    "metadata-file" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/00000-85d0bcdf-b7b7-4263-97e7-c8531f54e14e.metadata.json"
+  }, {
+    "timestamp-ms" : 1719573336148,
+    "metadata-file" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/00001-bd5ad524-134a-4ca8-9982-4e9eeaac7991.metadata.json"
+  } ]
+}

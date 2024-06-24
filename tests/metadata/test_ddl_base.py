@@ -78,26 +78,6 @@ class TestDdlBase(ImpalaTestSuite):
     """Extracts the DB properties mapping from the output of DESCRIBE FORMATTED"""
     return self._get_properties("Owner:", db_name, True)
 
-  def _get_properties(self, section_name, name, is_db=False):
-    """Extracts the db/table properties mapping from the output of DESCRIBE FORMATTED"""
-    result = self.client.execute("describe {0} formatted {1}".format(
-      "database" if is_db else "", name))
-    match = False
-    properties = dict()
-    for row in result.data:
-      fields = row.split("\t")
-      if fields[0] != '':
-        # Start of new section.
-        if match:
-          # Finished processing matching section.
-          break
-        match = section_name in fields[0]
-      elif match:
-        if fields[1] == 'NULL':
-          break
-        properties[fields[1].rstrip()] = fields[2].rstrip()
-    return properties
-
   def _get_property(self, property_name, name, is_db=False):
     """Extracts a db/table property value from the output of DESCRIBE FORMATTED."""
     result = self.client.execute("describe {0} formatted {1}".format(

@@ -36,6 +36,7 @@ import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -59,9 +60,20 @@ import org.apache.thrift.TException;
 
 /**
  * Representation of an Iceberg table in the catalog cache.
+ *
+ * For an Iceberg table, stats can come from 3 places:
+ * 1. numRows: written by Iceberg
+ * 2. HMS column stats: used even if stale
+ * 3. NDV from Puffin: only from the current snapshot, overrides HMS NDV stats if present.
+ *
+ * As Puffin only contains NDV stats, it is possible that at a given point the NDV is from
+ * Puffin but other column stats, e.g. num nulls, come from the HMS and are based on a
+ * much older state of the table.
+ * Note that reading Puffin stats may be disabled by setting the
+ * 'disable_reading_puffin_stats' startup flag or the table property
+ * 'impala.iceberg_disable_reading_puffin_stats' to true.
  */
 public class IcebergTable extends Table implements FeIcebergTable {
-
   // Alias to the string key that identifies the storage handler for Iceberg tables.
   public static final String KEY_STORAGE_HANDLER =
       hive_metastoreConstants.META_TABLE_STORAGE;
@@ -89,6 +101,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Iceberg table namespace key in tblproperties when using HadoopCatalog,
   // We use database.table instead if this property not been set in SQL
   public static final String ICEBERG_TABLE_IDENTIFIER = "iceberg.table_identifier";
+
+  public static final String ICEBERG_DISABLE_READING_PUFFIN_STATS =
+      "impala.iceberg_disable_reading_puffin_stats";
 
   // Internal Iceberg table property that specifies the absolute path of the current
   // table metadata. This property is only valid for tables in 'hive.catalog'.
@@ -208,6 +223,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // The snapshot id cached in the CatalogD, necessary to syncronize the caches.
   private long catalogSnapshotId_ = -1;
 
+  private Map<Integer, IcebergColumn> icebergFieldIdToCol_;
   private Map<String, TIcebergPartitionStats> partitionStats_;
 
   protected IcebergTable(org.apache.hadoop.hive.metastore.api.Table msTable,
@@ -221,6 +237,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
     icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTable);
     hdfsTable_ = new HdfsTable(msTable, db, name, owner);
+    icebergFieldIdToCol_ = new HashMap<>();
   }
 
   /**
@@ -355,6 +372,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     return partitionStats_;
   }
 
+  public IcebergColumn getColumnByIcebergFieldId(int fieldId) {
+    return icebergFieldIdToCol_.get(fieldId);
+  }
+
   @Override
   public TTable toThrift() {
     TTable table = super.toThrift();
@@ -422,6 +443,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();
         loadAllColumnStats(msClient, catalogTimeline);
+        applyPuffinNdvStats(catalogTimeline);
         setAvroSchema(msClient, msTbl, fileStore_, catalogTimeline);
 
         // We no longer need to keep Iceberg's content files in memory.
@@ -453,6 +475,56 @@ public class IcebergTable extends Table implements FeIcebergTable {
     } finally {
       context.stop();
     }
+  }
+
+  // Reads NDV stats from Puffin files belonging to the table (if any). Only considers
+  // statistics written for the current snapshot. Overrides NDV stats coming from the HMS
+  // - this is safe because we only consider Puffin stats for the current snapshot, so the
+  // NDV from Puffin is at least as current as the one in the HMS. Note that even if a
+  // value from HMS is overridden here, the new value will not be written back to HMS.
+  // Other stats, e.g. number of nulls, are not modified as Puffin stats only contain NDV
+  // values.
+  private void applyPuffinNdvStats(EventSequence catalogTimeline) {
+    if (BackendConfig.INSTANCE.disableReadingPuffinStats()) return;
+    if (isPuffinStatsReadingDisabledForTable()) return;
+
+    Map<Integer, PuffinStatsLoader.PuffinStatsRecord> puffinNdvs =
+        PuffinStatsLoader.loadPuffinStats(icebergApiTable_, getFullName());
+    for (Map.Entry<Integer, PuffinStatsLoader.PuffinStatsRecord> entry
+        : puffinNdvs.entrySet()) {
+      int fieldId = entry.getKey();
+      long ndv = entry.getValue().ndv;
+
+      // Don't override a possibly existing HMS stat with an explicitly invalid value.
+      if (ndv >= 0) {
+        IcebergColumn col = getColumnByIcebergFieldId(fieldId);
+        Preconditions.checkNotNull(col);
+        Type colType = col.getType();
+        if (ColumnStats.supportsNdv(colType)) {
+          // For some types, e.g. BOOLEAN, HMS does not support NDV stats. We could still
+          // set them here, but it would cause differences between legacy and local
+          // catalog mode: in local catalog mode, the catalog sends the stats in HMS
+          // objects, so NDVs for unsupported types would be lost.
+          col.getStats().setNumDistinctValues(ndv);
+
+          // In local catalog mode, the stats sent from the catalog are those of
+          // 'hdfsTable_', not those of this class.
+          Column hdfsTableCol = hdfsTable_.getColumn(col.getName());
+          Preconditions.checkNotNull(hdfsTableCol);
+          hdfsTableCol.getStats().setNumDistinctValues(ndv);
+        }
+      }
+    }
+
+    if (!puffinNdvs.isEmpty()) {
+      catalogTimeline.markEvent("Loaded Puffin stats");
+    }
+  }
+
+  private boolean isPuffinStatsReadingDisabledForTable() {
+    String val = msTable_.getParameters().get(ICEBERG_DISABLE_READING_PUFFIN_STATS);
+    if (val == null) return false;
+    return Boolean.parseBoolean(val);
   }
 
   /**
@@ -522,11 +594,18 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public void addColumn(Column col) {
     Preconditions.checkState(col instanceof IcebergColumn);
     IcebergColumn iCol = (IcebergColumn) col;
+    icebergFieldIdToCol_.put(iCol.getFieldId(), iCol);
     colsByPos_.add(iCol);
     colsByName_.put(iCol.getName().toLowerCase(), col);
     ((StructType) type_.getItemType()).addField(
         new IcebergStructField(col.getName(), col.getType(), col.getComment(),
             iCol.getFieldId()));
+  }
+
+  @Override
+  public void clearColumns() {
+    super.clearColumns();
+    icebergFieldIdToCol_.clear();
   }
 
   private void addVirtualColumns() {

@@ -85,6 +85,7 @@ under the License.
     <log4j2.version>${env.IMPALA_LOG4J2_VERSION}</log4j2.version>
     <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
     <aircompressor.version>${env.IMPALA_AIRCOMPRESSOR_VERSION}</aircompressor.version>
+    <datasketches.version>${env.IMPALA_DATASKETCHES_VERSION}</datasketches.version>
   </properties>
 
   <repositories>
@@ -392,6 +393,7 @@ under the License.
 
   <modules>
     <module>datagenerator</module>
+    <module>puffin-data-generator</module>
     <module>executor-deps</module>
     <module>ext-data-source</module>
     <module>../fe</module>

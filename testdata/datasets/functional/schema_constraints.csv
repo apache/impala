@@ -70,6 +70,7 @@ table_name:complextypestbl_iceberg_orc, constraint:restrict_to, table_format:par
 table_name:hadoop_catalog_test_external, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_int_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_non_partitioned, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_with_puffin_stats, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_partitioned_orc_external, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_partition_transforms_zorder, constraint:restrict_to, table_format:parquet/none/none

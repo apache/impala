@@ -1,0 +1,172 @@
+{
+  "format-version" : 1,
+  "table-uuid" : "6c803f57-98f6-4d14-8f7d-712d6a588325",
+  "location" : "hdfs://localhost:20500/test-warehouse/ice_puffin",
+  "last-updated-ms" : 1728483427091,
+  "last-column-id" : 10,
+  "schema" : {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "int_col1",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "int_col2",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "bigint_col",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "float_col",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "double_col",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "decimal_col",
+      "required" : false,
+      "type" : "decimal(9, 0)"
+    }, {
+      "id" : 7,
+      "name" : "date_col",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 8,
+      "name" : "string_col",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 9,
+      "name" : "timestamp_col",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 10,
+      "name" : "bool_col",
+      "required" : false,
+      "type" : "boolean"
+    } ]
+  },
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "int_col1",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "int_col2",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "bigint_col",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "float_col",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "double_col",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "decimal_col",
+      "required" : false,
+      "type" : "decimal(9, 0)"
+    }, {
+      "id" : 7,
+      "name" : "date_col",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 8,
+      "name" : "string_col",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 9,
+      "name" : "timestamp_col",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 10,
+      "name" : "bool_col",
+      "required" : false,
+      "type" : "boolean"
+    } ]
+  } ],
+  "partition-spec" : [ ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "engine.hive.enabled" : "true",
+    "impala.events.catalogServiceId" : "95d77e9a4a3d4e27:96a993b690a3fba6",
+    "external.table.purge" : "TRUE",
+    "impala.events.catalogVersion" : "2108",
+    "write.format.default" : "parquet",
+    "hive.metastore.table.owner" : "danielbecker",
+    "OBJCAPABILITIES" : "EXTREAD,EXTWRITE",
+    "storage_handler" : "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler"
+  },
+  "current-snapshot-id" : 2532372403033748214,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 2532372403033748214,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "snapshot-id" : 2532372403033748214,
+    "timestamp-ms" : 1728483427081,
+    "summary" : {
+      "operation" : "delete",
+      "changed-partition-count" : "0",
+      "total-records" : "0",
+      "total-files-size" : "0",
+      "total-data-files" : "0",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/snap-2532372403033748214-1-c9f94c00-2920-4a39-8e7f-c7faf7e71a7d.avro",
+    "schema-id" : 0
+  } ],
+  "statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1728483427081,
+    "snapshot-id" : 2532372403033748214
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1728483321332,
+    "metadata-file" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/00000-0991de67-dc39-4226-af9c-8f347dbd57e5.metadata.json"
+  } ]
+}

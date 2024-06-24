@@ -24,7 +24,6 @@ import os
 import pytest
 import pytz
 import random
-
 import re
 import time
 

@@ -435,6 +435,13 @@ under the License.
       <version>${iceberg.version}</version>
     </dependency>
 
+    <!-- Needed for reading Iceberg Puffin files. -->
+    <dependency>
+      <groupId>org.apache.datasketches</groupId>
+      <artifactId>datasketches-java</artifactId>
+      <version>${datasketches.version}</version>
+    </dependency>
+
     <!-- Needed for tests like JdbcTest which instantiates HiveDriver -->
     <dependency>
       <groupId>org.apache.hive</groupId>

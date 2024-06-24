@@ -1404,3 +1404,23 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     assert length > 0
     return prefix + ''.join(choice(string.ascii_lowercase) for i in range(length))
+
+  def _get_properties(self, section_name, name, is_db=False):
+    """Extracts the db/table properties mapping from the output of DESCRIBE FORMATTED"""
+    result = self.client.execute("describe {0} formatted {1}".format(
+      "database" if is_db else "", name))
+    match = False
+    properties = dict()
+    for row in result.data:
+      fields = row.split("\t")
+      if fields[0] != '':
+        # Start of new section.
+        if match:
+          # Finished processing matching section.
+          break
+        match = section_name in fields[0]
+      elif match:
+        if fields[1] == 'NULL':
+          break
+        properties[fields[1].rstrip()] = fields[2].rstrip()
+    return properties

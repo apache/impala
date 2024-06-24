@@ -1,0 +1,121 @@
+{
+  "format-version" : 1,
+  "table-uuid" : "1804053c-6ba0-48df-8d22-f1bd139a3635",
+  "location" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats",
+  "last-updated-ms" : 1725612966926,
+  "last-column-id" : 2,
+  "schema" : {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "i",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "d",
+      "required" : false,
+      "type" : "decimal(9, 0)"
+    } ]
+  },
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "i",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "d",
+      "required" : false,
+      "type" : "decimal(9, 0)"
+    } ]
+  } ],
+  "partition-spec" : [ ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "engine.hive.enabled" : "true",
+    "impala.events.catalogServiceId" : "a6b8da59a60e425a:ad0468614a61e340",
+    "external.table.purge" : "TRUE",
+    "impala.events.catalogVersion" : "4097",
+    "write.format.default" : "parquet",
+    "hive.metastore.table.owner" : "danielbecker",
+    "OBJCAPABILITIES" : "EXTREAD,EXTWRITE",
+    "storage_handler" : "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler"
+  },
+  "current-snapshot-id" : 1880359224532128423,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 1880359224532128423,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "snapshot-id" : 1880359224532128423,
+    "timestamp-ms" : 1725612500115,
+    "summary" : {
+      "operation" : "append",
+      "added-data-files" : "1",
+      "added-records" : "2",
+      "added-files-size" : "604",
+      "changed-partition-count" : "1",
+      "total-records" : "2",
+      "total-files-size" : "604",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats/metadata/snap-1880359224532128423-1-11cd04ec-55ea-40aa-a89b-197c3c275e7a.avro",
+    "schema-id" : 0
+  } ],
+  "statistics" : [ {
+    "snapshot-id" : 1880359224532128423,
+    "statistics-path" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats/metadata/20240906_085606_00006_wsfgs-4d9242d5-bd79-4069-be8b-2cfced8e0647.stats",
+    "file-size-in-bytes" : 534,
+    "file-footer-size-in-bytes" : 440,
+    "blob-metadata" : [ {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 1880359224532128423,
+      "sequence-number" : 0,
+      "fields" : [ 1 ],
+      "properties" : {
+        "ndv" : "2"
+      }
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 1880359224532128423,
+      "sequence-number" : 0,
+      "fields" : [ 2 ],
+      "properties" : {
+        "ndv" : "2"
+      }
+    } ]
+  } ],
+  "partition-statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1725612500115,
+    "snapshot-id" : 1880359224532128423
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1725612488531,
+    "metadata-file" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats/metadata/00000-c1fdc549-6895-4b22-987b-b1c229294749.metadata.json"
+  }, {
+    "timestamp-ms" : 1725612500133,
+    "metadata-file" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats/metadata/00001-1765f110-5212-4aee-9667-3d571582e15a.metadata.json"
+  } ]
+}
