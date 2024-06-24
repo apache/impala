@@ -66,11 +66,11 @@ class TestQueryLogTableBase(CustomClusterTestSuite):
     # code checks to make sure the table create has finished before returning.
     create_re = r'\]\s+(\w+:\w+)\]\s+Analyzing query: CREATE TABLE IF NOT EXISTS {}' \
         .format(query_table_name)
-    create_match = self.assert_impalad_log_contains("INFO", create_re)
+    create_match = self.assert_impalad_log_contains("INFO", create_re, timeout_s=60)
 
     finish_re = r'Query successfully unregistered: query_id={}' \
         .format(create_match.group(1))
-    self.assert_impalad_log_contains("INFO", finish_re)
+    self.assert_impalad_log_contains("INFO", finish_re, timeout_s=60)
 
     if protocol == self.PROTOCOL_BEESWAX:
       return self.client
