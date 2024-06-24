@@ -851,10 +851,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "tblproperties ('__IMPALA_DATA_SOURCE_NAME')",
         "Unsetting the '__IMPALA_DATA_SOURCE_NAME' table property is not supported " +
         "for DataSource table.");
-    AnalysisError("alter table functional.alltypes_jdbc_datasource unset " +
-        "tblproperties ('driver.url')",
-        "Unsetting the 'driver.url' table property is not supported for JDBC " +
-        "DataSource table.");
+    AnalyzesOk("alter table functional.alltypes_jdbc_datasource unset " +
+        "tblproperties ('driver.url')");
 
     AnalyzesOk("alter table functional.alltypes set tblproperties('sort.columns'='id')");
     AnalyzesOk("alter table functional.alltypes set tblproperties(" +

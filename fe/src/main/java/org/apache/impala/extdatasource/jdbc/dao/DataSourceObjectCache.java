@@ -18,6 +18,8 @@
 package org.apache.impala.extdatasource.jdbc.dao;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.sql.SQLException;
@@ -25,7 +27,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
-
 import javax.sql.DataSource;
 
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -106,21 +107,35 @@ public class DataSourceObjectCache {
       String driverUrl = props.getProperty("driverUrl");
       try {
         BasicDataSource dbcpDs = BasicDataSourceFactory.createDataSource(props);
-        // Copy jdbc driver to local file system.
-        String driverLocalPath = FileSystemUtil.copyFileFromUriToLocal(driverUrl);
-        // Create class loader for jdbc driver and set it for the
-        // BasicDataSource object so that the driver class could be loaded
-        // from jar file without searching classpath.
-        URL driverJarUrl = new File(driverLocalPath).toURI().toURL();
-        URLClassLoader driverLoader = URLClassLoader.newInstance(
-            new URL[] { driverJarUrl }, getClass().getClassLoader());
-        dbcpDs.setDriverClassLoader(driverLoader);
+        String driverLocalPath = null;
+        if (!Strings.isNullOrEmpty(driverUrl)) {
+          // Copy jdbc driver to local file system.
+          driverLocalPath = FileSystemUtil.copyFileFromUriToLocal(driverUrl);
+          // Create class loader for jdbc driver and set it for the
+          // BasicDataSource object so that the driver class could be loaded
+          // from jar file without searching classpath.
+          URL driverJarUrl = new File(driverLocalPath).toURI().toURL();
+          URLClassLoader driverLoader = URLClassLoader.newInstance(
+              new URL[] { driverJarUrl }, getClass().getClassLoader());
+          dbcpDs.setDriverClassLoader(driverLoader);
+        }
+        // Cache the datasource (no need to store driver path since it's in classpath)
         entry = new Entry(dbcpDs, driverLocalPath);
         cacheMap_.put(cacheKey, entry);
         return dbcpDs;
+      } catch (MalformedURLException e) {
+          throw new JdbcDatabaseAccessException(String.format(
+              "Invalid JDBC driver URL: '%s'.", driverUrl), e);
+      } catch (IOException e) {
+          throw new JdbcDatabaseAccessException(String.format(
+              "Failed to copy JDBC driver from '%s' to local filesystem.", driverUrl), e);
+      } catch (SQLException e) {
+          throw new JdbcDatabaseAccessException(String.format(
+              "Unable to fetch jdbc driver jar from location '%s'. ", driverUrl), e);
       } catch (Exception e) {
-        throw new JdbcDatabaseAccessException(String.format(
-            "Unable to fetch jdbc driver jar from location '%s'. ", driverUrl));
+          // createDataSource() in commons-dbcp 2.9 throws Exception.
+          throw new JdbcDatabaseAccessException(
+              "Error while creating datasource.", e);
       }
     }
   }

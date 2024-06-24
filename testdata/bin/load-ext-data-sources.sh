@@ -108,6 +108,36 @@ INSERT INTO test_strategy (strategy_id, name, referrer, landing, priority,
 __EOT__
 sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_test_strategy.sql
 
+# Create country table
+cat > /tmp/jdbc_country.sql << __EOT__
+DROP TABLE IF EXISTS country;
+CREATE TABLE country
+(
+  id int,
+  name varchar(20),
+  bool_col BOOLEAN,
+  tinyint_col     SMALLINT,
+  smallint_col    SMALLINT,
+  int_col         INT,
+  bigint_col      BIGINT,
+  float_col       FLOAT,
+  double_col      DOUBLE PRECISION,
+  date_col        DATE,
+  string_col      VARCHAR(10),
+  timestamp_col   TIMESTAMP
+);
+INSERT INTO country (id, name, bool_col, tinyint_col, smallint_col, int_col,
+bigint_col, float_col, double_col, date_col, string_col, timestamp_col)
+VALUES
+(1, 'India', TRUE, 10, 100, 1000, 10000, 1.1, 1.11, '2024-01-01',
+  'IN', '2024-01-01 10:00:00'),
+(2, 'Russia', FALSE, 20, 200, 2000, 20000, 2.2, 2.22, '2024-02-01',
+  'RU', '2024-02-01 11:00:00'),
+(3, 'USA', TRUE, 30, 300, 3000, 30000, 3.3, 3.33, '2024-03-01',
+  'US', '2024-03-01 12:00:00');
+__EOT__
+sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_country.sql
+
 # Load data to jdbc table
 cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/jdbc_alltypes.csv
 loadCmd="\COPY alltypes FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
@@ -154,4 +184,5 @@ rm /tmp/jdbc_alltypes.*
 rm /tmp/jdbc_alltypes_with_quote.*
 rm /tmp/jdbc_decimal_tbl.*
 rm /tmp/jdbc_test_strategy.*
+rm /tmp/jdbc_country.*
 rm /tmp/impala_jdbc_alltypes.sql

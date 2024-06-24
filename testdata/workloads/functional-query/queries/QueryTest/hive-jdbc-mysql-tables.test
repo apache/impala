@@ -1,0 +1,234 @@
+====
+---- QUERY
+select * from country_mysql;
+---- RESULTS
+1,'India',true,10,100,1000,10000,1.100000023841858,1.11,2024-01-01,'IN',2024-01-01 10:00:00
+2,'Russia',false,20,200,2000,20000,2.200000047683716,2.22,2024-02-01,'RU',2024-02-01 11:00:00
+3,'USA',true,30,300,3000,30000,3.299999952316284,3.33,2024-03-01,'US',2024-03-01 12:00:00
+---- TYPES
+INT, STRING, BOOLEAN, SMALLINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
+====
+---- QUERY
+select * from country_keystore_mysql;
+---- RESULTS
+1,'India',true,10,100,1000,10000,1.100000023841858,1.11,2024-01-01,'IN',2024-01-01 10:00:00
+2,'Russia',false,20,200,2000,20000,2.200000047683716,2.22,2024-02-01,'RU',2024-02-01 11:00:00
+3,'USA',true,30,300,3000,30000,3.299999952316284,3.33,2024-03-01,'US',2024-03-01 12:00:00
+---- TYPES
+INT, STRING, BOOLEAN, SMALLINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
+====
+---- QUERY
+select id, name, date_col from country_mysql;
+---- RESULTS
+1,'India',2024-01-01
+2,'Russia',2024-02-01
+3,'USA',2024-03-01
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+select id, name, date_col from country_keystore_mysql;
+---- RESULTS
+1,'India',2024-01-01
+2,'Russia',2024-02-01
+3,'USA',2024-03-01
+---- TYPES
+INT, STRING, DATE
+====
+---- QUERY
+select count(*) from country_mysql;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from country_keystore_mysql;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+select distinct name from country_mysql;
+---- RESULTS
+'India'
+'Russia'
+'USA'
+---- TYPES
+STRING
+====
+---- QUERY
+select distinct name from country_keystore_mysql;
+---- RESULTS
+'India'
+'Russia'
+'USA'
+---- TYPES
+STRING
+====
+---- QUERY
+# Check for null values
+select * from country_mysql where string_col IS NULL;
+---- RESULTS
+---- TYPES
+INT, STRING, BOOLEAN, SMALLINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
+====
+---- QUERY
+select * from country_keystore_mysql where string_col IS NULL;
+---- RESULTS
+---- TYPES
+INT, STRING, BOOLEAN, SMALLINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
+====
+---- QUERY
+# Order by integer column
+select id, name, int_col from country_mysql order by int_col DESC;
+---- RESULTS
+3,'USA',3000
+2,'Russia',2000
+1,'India',1000
+---- TYPES
+INT, STRING, INT
+====
+---- QUERY
+select id, name, int_col from country_keystore_mysql order by int_col DESC;
+---- RESULTS
+3,'USA',3000
+2,'Russia',2000
+1,'India',1000
+---- TYPES
+INT, STRING, INT
+====
+---- QUERY
+# Select using case statement
+select id, name, case when bool_col then 'Active' else 'Inactive' end as status from country_mysql;
+---- RESULTS
+1,'India','Active'
+2,'Russia','Inactive'
+3,'USA','Active'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+select id, name, case when bool_col then 'Active' else 'Inactive' end as status from country_keystore_mysql;
+---- RESULTS
+1,'India','Active'
+2,'Russia','Inactive'
+3,'USA','Active'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Check for minimum date
+select min(date_col) from country_mysql;
+---- RESULTS
+2024-01-01
+---- TYPES
+DATE
+====
+---- QUERY
+select min(date_col) from country_keystore_mysql;
+---- RESULTS
+2024-01-01
+---- TYPES
+DATE
+====
+---- QUERY
+# Join with a self table alias
+select a.id, a.name, b.name from country_mysql a join country_mysql b on a.id <> b.id;
+---- RESULTS
+1,'India','Russia'
+1,'India','USA'
+2,'Russia','India'
+2,'Russia','USA'
+3,'USA','India'
+3,'USA','Russia'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+select a.id, a.name, b.name from country_keystore_mysql a join country_keystore_mysql b on a.id <> b.id;
+---- RESULTS
+1,'India','Russia'
+1,'India','USA'
+2,'Russia','India'
+2,'Russia','USA'
+3,'USA','India'
+3,'USA','Russia'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Left join with another table
+select a.id, a.name, b.string_col from country_mysql a left join country_keystore_mysql b on a.id = b.id;
+---- RESULTS
+1,'India','IN'
+2,'Russia','RU'
+3,'USA','US'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+select a.id, a.name, b.string_col from country_keystore_mysql a left join country_mysql b on a.id = b.id;
+---- RESULTS
+1,'India','IN'
+2,'Russia','RU'
+3,'USA','US'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Right join with another table
+select a.id, a.name, b.string_col from country_mysql a right join country_keystore_mysql b on a.id = b.id;
+---- RESULTS
+1,'India','IN'
+2,'Russia','RU'
+3,'USA','US'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+select a.id, a.name, b.string_col from country_keystore_mysql a right join country_mysql b on a.id = b.id;
+---- RESULTS
+1,'India','IN'
+2,'Russia','RU'
+3,'USA','US'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Full outer join
+select a.id, a.name, b.string_col from country_mysql a full outer join country_keystore_mysql b on a.id = b.id;
+---- RESULTS
+1,'India','IN'
+2,'Russia','RU'
+3,'USA','US'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+select a.id, a.name, b.string_col from country_keystore_mysql a full outer join country_mysql b on a.id = b.id;
+---- RESULTS
+1,'India','IN'
+2,'Russia','RU'
+3,'USA','US'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Using IN clause
+select * from country_mysql where name IN ('India', 'USA');
+---- RESULTS
+1,'India',true,10,100,1000,10000,1.100000023841858,1.11,2024-01-01,'IN',2024-01-01 10:00:00
+3,'USA',true,30,300,3000,30000,3.299999952316284,3.33,2024-03-01,'US',2024-03-01 12:00:00
+---- TYPES
+INT, STRING, BOOLEAN, SMALLINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
+====
+---- QUERY
+select * from country_keystore_mysql where name IN ('India', 'USA');
+---- RESULTS
+1,'India',true,10,100,1000,10000,1.100000023841858,1.11,2024-01-01,'IN',2024-01-01 10:00:00
+3,'USA',true,30,300,3000,30000,3.299999952316284,3.33,2024-03-01,'US',2024-03-01 12:00:00
+---- TYPES
+INT, STRING, BOOLEAN, SMALLINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DATE, STRING, TIMESTAMP
+====

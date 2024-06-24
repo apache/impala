@@ -32,7 +32,7 @@ public enum JdbcStorageConfig {
   JDBC_DRIVER_CLASS("jdbc.driver", true),
   // Driver URL for downloading the Jar file package that is used to access the external
   // database.
-  JDBC_DRIVER_URL("driver.url", true),
+  JDBC_DRIVER_URL("driver.url", false),
   // Username for accessing the external database.
   DBCP_USERNAME("dbcp.username", false),
   // Password of the user.

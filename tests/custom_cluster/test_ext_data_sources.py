@@ -176,8 +176,95 @@ class TestExtDataSources(CustomClusterTestSuite):
     assert "FailoverInSyncJdbcDataSource" not in result.get_data()
 
 
+class TestHivePostgresJdbcTables(CustomClusterTestSuite):
+  """Tests for hive jdbc postgres tables. """
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    super(TestHivePostgresJdbcTables, cls).setup_class()
+
+  @pytest.mark.execute_serially
+  def test_postgres_hive_jdbc_tables(self, vector, unique_database):
+    """Run tests for external hive jdbc tables."""
+    hive_sql = """
+    DROP TABLE IF EXISTS {0}.country_postgres;
+    CREATE EXTERNAL TABLE {0}.country_postgres
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "POSTGRES",
+        "hive.sql.jdbc.driver" = "org.postgresql.Driver",
+        "hive.sql.jdbc.url" = "jdbc:postgresql://localhost:5432/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.table" = "country"
+    );
+
+    DROP TABLE IF EXISTS {0}.country_keystore_postgres;
+    CREATE EXTERNAL TABLE {0}.country_keystore_postgres
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "POSTGRES",
+        "hive.sql.jdbc.driver" = "org.postgresql.Driver",
+        "hive.sql.jdbc.url" = "jdbc:postgresql://localhost:5432/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password.keystore" =
+        "jceks://hdfs/test-warehouse/data-sources/test.jceks",
+        "hive.sql.dbcp.password.key" = "hiveuser",
+        "hive.sql.table" = "country"
+    );
+    """.format(unique_database)
+    try:
+      self.run_stmt_in_hive(hive_sql)
+    except Exception:
+      pytest.xfail(reason="Can't create hive jdbc table.")
+    self.client.execute("INVALIDATE METADATA {0}.country_postgres".
+                        format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_keystore_postgres".
+                        format(unique_database))
+    # Describing postgres hive jdbc table in Impala.
+    self.client.execute("DESCRIBE {0}.country_postgres".format(unique_database))
+    self.client.execute("DESCRIBE {0}.country_keystore_postgres".format(unique_database))
+
+  # Select statements are verified in hive-jdbc-postgres-tables.test.
+    self.run_test_case('QueryTest/hive-jdbc-postgres-tables', vector,
+                       use_db=unique_database)
+
+
 class TestMySqlExtJdbcTables(CustomClusterTestSuite):
-  """Impala query tests for external jdbc tables on MySQL server."""
+  """Impala query tests for external jdbc tables on MySQL server.
+  It also includes tests for external hive jdbc tables on mysql."""
 
   @classmethod
   def get_workload(cls):
@@ -193,7 +280,7 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
       subprocess.check_call(run_cmd, close_fds=True)
     except subprocess.CalledProcessError as e:
       if e.returncode == 10:
-        pytest.skip("These tests requireadd the docker to be added to sudoer's group")
+        pytest.skip("These tests required the docker to be added to sudoer's group")
       elif e.returncode == 20:
         pytest.skip("Can't connect to local MySQL server")
       elif e.returncode == 30:
@@ -226,6 +313,82 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
   def test_mysql_ext_jdbc_tables(self, vector, unique_database):
     """Run tests for external jdbc tables on MySQL"""
     self.run_test_case('QueryTest/mysql-ext-jdbc-tables', vector, use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  def test_mysql_hive_jdbc_tables(self, vector, unique_database):
+    """ Run tests for external hive jdbc tables on mysql"""
+    hive_sql = """
+    ADD JAR hdfs:///test-warehouse/data-sources/jdbc-drivers/mysql-jdbc.jar;
+
+    DROP TABLE IF EXISTS {0}.country_mysql;
+    CREATE EXTERNAL TABLE {0}.country_mysql
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "MYSQL",
+        "hive.sql.jdbc.driver" = "com.mysql.cj.jdbc.Driver",
+        "hive.sql.jdbc.url" = "jdbc:mysql://localhost:3306/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.table" = "country"
+    );
+
+    DROP TABLE IF EXISTS {0}.country_keystore_mysql;
+    CREATE EXTERNAL TABLE {0}.country_keystore_mysql
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "MYSQL",
+        "hive.sql.jdbc.driver" = "com.mysql.cj.jdbc.Driver",
+        "hive.sql.jdbc.url" = "jdbc:mysql://localhost:3306/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password.keystore" =
+        "jceks://hdfs/test-warehouse/data-sources/test.jceks",
+        "hive.sql.dbcp.password.key" = "hiveuser",
+        "hive.sql.table" = "country"
+    );
+    """.format(unique_database)
+    try:
+      self.run_stmt_in_hive(hive_sql)
+    except Exception:
+      pytest.xfail(reason="Can't create hive jdbc table.")
+    self.client.execute("INVALIDATE METADATA {0}.country_mysql"
+                        .format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_keystore_mysql"
+                        .format(unique_database))
+    # Describing mysql hive jdbc table in Impala.
+    self.client.execute("DESCRIBE {0}.country_mysql".format(unique_database))
+    self.client.execute("DESCRIBE {0}.country_keystore_mysql".format(unique_database))
+
+  # Select statements are verified in hive-jdbc-mysql-tables.test.
+    self.run_test_case('QueryTest/hive-jdbc-mysql-tables', vector,
+                       use_db=unique_database)
 
 
 class TestImpalaExtJdbcTables(CustomClusterTestSuite):

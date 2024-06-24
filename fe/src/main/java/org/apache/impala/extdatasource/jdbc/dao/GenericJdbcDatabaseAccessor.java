@@ -319,8 +319,10 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
     dbProperties.put("url", jdbcUrl);
     dbProperties.put("driverClassName",
         conf.get(JdbcStorageConfig.JDBC_DRIVER_CLASS.getPropertyName()));
-    dbProperties.put("driverUrl",
-        conf.get(JdbcStorageConfig.JDBC_DRIVER_URL.getPropertyName()));
+    if (conf.get(JdbcStorageConfig.JDBC_DRIVER_URL.getPropertyName()) != null) {
+      dbProperties.put("driverUrl",
+          conf.get(JdbcStorageConfig.JDBC_DRIVER_URL.getPropertyName()));
+    }
     dbProperties.put("type", "javax.sql.DataSource");
     return dbProperties;
   }

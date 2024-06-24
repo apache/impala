@@ -20,6 +20,8 @@ package org.apache.impala.catalog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -117,6 +119,14 @@ public class TableLoader {
             "Unsupported table type '%s' for: %s", tableType, fullTblName));
       }
 
+      // Support for Hive JDBC storage handler
+      String val = msTbl.getParameters().get("storage_handler");
+      if (val != null && val.equals("org.apache.hive.storage.jdbc.JdbcStorageHandler")) {
+        Map<String, String> impalaTblProps = setHiveJdbcProperties(msTbl);
+        msTbl.unsetParameters();
+        msTbl.setParameters(impalaTblProps);
+      }
+
       // Create a table of appropriate type and have it load itself
       table = Table.fromMetastoreTable(db, msTbl);
       if (table == null) {
@@ -177,6 +187,61 @@ public class TableLoader {
     LOG.info("Loaded metadata for: " + fullTblName + " (" +
         sw.elapsed(TimeUnit.MILLISECONDS) + "ms)");
     return table;
+  }
+
+  private Map<String, String> setHiveJdbcProperties(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
+    Map<String, String> impala_tbl_props = new HashMap<>();
+    // Insert Impala specific JDBC storage handler properties
+    impala_tbl_props.put("__IMPALA_DATA_SOURCE_NAME", "impalajdbcdatasource");
+    String val = msTbl.getParameters().get("hive.sql.database.type");
+    if (val == null) {
+      throw new TableLoadingException("Required parameter: hive.sql.database.type" +
+          "is missing.");
+    } else {
+      impala_tbl_props.put("database.type", val);
+    }
+    val = msTbl.getParameters().get("hive.sql.dbcp.password");
+    if (val != null) {
+      impala_tbl_props.put("dbcp.password", val);
+    }
+    val = msTbl.getParameters().get("hive.sql.dbcp.password.keystore");
+    if (val != null) {
+      impala_tbl_props.put("dbcp.password.keystore", val);
+    }
+    val = msTbl.getParameters().get("hive.sql.dbcp.password.key");
+    if (val != null) {
+      impala_tbl_props.put("dbcp.password.key", val);
+    }
+    val = msTbl.getParameters().get("hive.sql.jdbc.url");
+    if (val == null) {
+      throw new TableLoadingException("Required parameter: hive.sql.jdbc.url" +
+          "is missing.");
+    } else {
+      impala_tbl_props.put("jdbc.url", val);
+    }
+    val = msTbl.getParameters().get("hive.sql.dbcp.username");
+    if (val == null) {
+      throw new TableLoadingException("Required parameter: hive.sql.dbcp.username" +
+          "is missing.");
+    } else {
+      impala_tbl_props.put("dbcp.username", val);
+    }
+    val = msTbl.getParameters().get("hive.sql.table");
+    if (val == null) {
+      throw new TableLoadingException("Required parameter: hive.sql.table" +
+          "is missing.");
+    } else {
+      impala_tbl_props.put("table", val);
+    }
+    val = msTbl.getParameters().get("hive.sql.jdbc.driver");
+    if (val == null) {
+      throw new TableLoadingException("Required parameter: hive.sql.jdbc.driver" +
+          "is missing.");
+    } else {
+      impala_tbl_props.put("jdbc.driver", val);
+    }
+    return impala_tbl_props;
   }
 
   private void initMetrics(Metrics metrics) {
