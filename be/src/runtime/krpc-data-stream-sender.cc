@@ -39,6 +39,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"
+#include "runtime/iceberg-position-delete-collector.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
@@ -50,6 +51,7 @@
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/pretty-printer.h"
+#include "util/ubsan.h"
 
 #include "gen-cpp/data_stream_service.pb.h"
 #include "gen-cpp/data_stream_service.proxy.h"
@@ -219,12 +221,15 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // Returns OK otherwise. This should be only called from a fragment executor thread.
   Status WaitForRpc();
 
+  int RowBatchCapacity() const;
+
   // The type for a RPC worker function.
   typedef boost::function<Status()> DoRpcFn;
 
   bool IsLocal() const { return is_local_; }
 
  private:
+  friend KrpcDataStreamSender::IcebergPositionDeleteChannel;
   // The parent data stream sender owning this channel. Not owned.
   KrpcDataStreamSender* parent_;
 
@@ -296,6 +301,9 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // be dropped silently.
   // TODO: Fix IMPALA-3990
   bool remote_recvr_closed_ = false;
+
+  // Returns the serialization batch from 'parent'.
+  unique_ptr<OutboundRowBatch>* GetSerializationBatch();
 
   // Returns true if the channel should terminate because the parent sender
   // has been closed or cancelled.
@@ -383,10 +391,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
 Status KrpcDataStreamSender::Channel::Init(
     RuntimeState* state, std::shared_ptr<CharMemTrackerAllocator> allocator) {
-  // TODO: take into account of var-len data at runtime.
-  int capacity =
-      max(1, parent_->per_channel_buffer_size_ / max(row_desc_->GetRowSize(), 1));
-  batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker()));
+  batch_.reset(new RowBatch(row_desc_, RowBatchCapacity(), parent_->mem_tracker()));
 
   // Create a DataStreamService proxy to the destination.
   RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
@@ -395,6 +400,12 @@ Status KrpcDataStreamSender::Channel::Init(
   outbound_batch_.reset(new OutboundRowBatch(allocator));
 
   return Status::OK();
+}
+
+int KrpcDataStreamSender::Channel::RowBatchCapacity() const {
+  // TODO: take into account of var-len data at runtime.
+  return
+      max(1, parent_->per_channel_buffer_size_ / max(row_desc_->GetRowSize(), 1));
 }
 
 void KrpcDataStreamSender::Channel::MarkDone(const Status& status) {
@@ -613,16 +624,21 @@ Status KrpcDataStreamSender::Channel::TransmitData(
 }
 
 Status KrpcDataStreamSender::Channel::SerializeAndSendBatch(RowBatch* batch) {
+  unique_ptr<OutboundRowBatch>* serialization_batch = GetSerializationBatch();
+  RETURN_IF_ERROR(parent_->SerializeBatch(batch, serialization_batch->get(), !is_local_));
+  // Swap serialization_batch with outbound_batch_ once the old RPC is finished.
+  RETURN_IF_ERROR(TransmitData(serialization_batch, true /*swap_batch*/));
+  return Status::OK();
+}
+
+unique_ptr<OutboundRowBatch>* KrpcDataStreamSender::Channel::GetSerializationBatch() {
   unique_ptr<OutboundRowBatch>* serialization_batch = &parent_->serialization_batch_;
   DCHECK(serialization_batch->get() != nullptr);
   // Reads 'rpc_in_flight_batch_' without acquiring 'lock_', so reads can be racey.
   ANNOTATE_IGNORE_READS_BEGIN();
   DCHECK(serialization_batch->get() != rpc_in_flight_batch_);
   ANNOTATE_IGNORE_READS_END();
-  RETURN_IF_ERROR(parent_->SerializeBatch(batch, serialization_batch->get(), !is_local_));
-  // Swap serialization_batch with outbound_batch_ once the old RPC is finished.
-  RETURN_IF_ERROR(TransmitData(serialization_batch, true /*swap_batch*/));
-  return Status::OK();
+  return serialization_batch;
 }
 
 Status KrpcDataStreamSender::Channel::SendCurrentBatch() {
@@ -743,6 +759,64 @@ void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
   outbound_batch_.reset(nullptr);
 }
 
+/// Channel's AddRow() and the generic serialization methods are inefficient for
+/// Iceberg position delete records. This class stores and effciently serializes
+/// such data, then uses an internal Channel object's TransmitData() to send out
+/// the already serialized outbound row batches.
+class KrpcDataStreamSender::IcebergPositionDeleteChannel {
+ public:
+  IcebergPositionDeleteChannel(KrpcDataStreamSender* parent, Channel* channel,
+      TupleDescriptor* desc) : delete_collector_(desc) {
+    parent_ = parent;
+    channel_ = channel;
+    capacity_ = channel_->RowBatchCapacity();
+  }
+
+  void Prepare(MemTracker* parent_mem_tracker) {
+    delete_collector_.Init(parent_mem_tracker);
+  }
+
+  void Teardown() {
+    delete_collector_.Close();
+  }
+
+  Status AddRow(TupleRow* row) {
+    RETURN_IF_ERROR(delete_collector_.AddRow(row));
+    if (delete_collector_.RowCount() == capacity_) {
+      RETURN_IF_ERROR(Flush());
+    }
+    return Status::OK();
+  }
+
+  Status Flush() {
+    if (delete_collector_.RowCount() == 0) return Status::OK();
+    unique_ptr<OutboundRowBatch>* serialization_batch = channel_->GetSerializationBatch();
+    RETURN_IF_ERROR(ToOutboundRowBatch(serialization_batch->get()));
+    RETURN_IF_ERROR(channel_->TransmitData(serialization_batch, /*swap_batch=*/true));
+    return Status::OK();
+  }
+
+ private:
+  Status ToOutboundRowBatch(OutboundRowBatch* dest) {
+    {
+      SCOPED_TIMER(parent_->serialize_batch_timer_);
+      RETURN_IF_ERROR(delete_collector_.Serialize(dest));
+      constexpr int NUM_TUPLES_PER_ROW = 1;
+      bool compress = !channel_->IsLocal();
+      RETURN_IF_ERROR(dest->PrepareForSend(NUM_TUPLES_PER_ROW,
+          compress ? parent_->compression_scratch_.get(): nullptr));
+      int64_t uncompressed_bytes = RowBatch::GetDeserializedSize(*dest);
+      COUNTER_ADD(parent_->uncompressed_bytes_counter_, uncompressed_bytes);
+    }
+    return Status::OK();
+  }
+
+  KrpcDataStreamSender* parent_;
+  KrpcDataStreamSender::Channel* channel_;
+  int capacity_;
+  IcebergPositionDeleteCollector delete_collector_;
+};
+
 KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     const KrpcDataStreamSenderConfig& sink_config, const TDataStreamSink& sink,
     const google::protobuf::RepeatedPtrField<PlanFragmentDestinationPB>& destinations,
@@ -777,6 +851,14 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     if (IsDirectedMode()) {
       DCHECK(host_to_channel_.find(destination.address()) == host_to_channel_.end());
       host_to_channel_[destination.address()] = channels_.back().get();
+    }
+  }
+  if (IsDirectedMode()) {
+    DCHECK_EQ(row_desc_->tuple_descriptors().size(), 1);
+    TupleDescriptor* tuple_desc = row_desc_->tuple_descriptors()[0];
+    for (unique_ptr<Channel>& ch : channels_) {
+      channel_to_ice_channel_[ch.get()] = make_unique<IcebergPositionDeleteChannel>(
+          this, ch.get(), tuple_desc);
     }
   }
 
@@ -837,6 +919,9 @@ Status KrpcDataStreamSender::Prepare(
 
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state, char_mem_tracker_allocator_));
+  }
+  for (auto& [ch, ice_ch] : channel_to_ice_channel_) {
+    ice_ch->Prepare(mem_tracker_.get());
   }
   return Status::OK();
 }
@@ -1105,13 +1190,13 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   } else if (partition_type_ == TPartitionType::DIRECTED) {
     const int num_rows = batch->num_rows();
     char* prev_filename_ptr = nullptr;
-    vector<Channel*> prev_channels;
+    vector<IcebergPositionDeleteChannel*> prev_channels;
     bool skipped_prev_row = false;
     for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
       DCHECK_EQ(batch->num_tuples_per_row(), 1);
       TupleRow* tuple_row = batch->GetRow(row_idx);
-      Tuple* row = batch->GetRow(row_idx)->GetTuple(0);
-      StringValue* filename_value = row->GetStringSlot(0);
+      Tuple* tuple = batch->GetRow(row_idx)->GetTuple(0);
+      StringValue* filename_value = tuple->GetStringSlot(0);
       DCHECK(filename_value != nullptr);
       StringValue::SimpleString filename_value_ss = filename_value->ToSimpleString();
       if (filename_value_ss.ptr == prev_filename_ptr) {
@@ -1119,7 +1204,9 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
         // send the row to the same channels as the previous row.
         DCHECK(skipped_prev_row || !prev_channels.empty() ||
             (filename_value_ss.len == 0 && prev_channels.empty()));
-        for (Channel* ch : prev_channels) RETURN_IF_ERROR(ch->AddRow(tuple_row));
+        for (IcebergPositionDeleteChannel* ch : prev_channels) {
+          RETURN_IF_ERROR(ch->AddRow(tuple_row));
+        }
         continue;
       }
       prev_filename_ptr = filename_value_ss.ptr;
@@ -1159,8 +1246,10 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
           return Status(ss.str());
         }
 
-        prev_channels.push_back(channel_map_it->second);
-        RETURN_IF_ERROR(channel_map_it->second->AddRow(tuple_row));
+        IcebergPositionDeleteChannel* ice_channel =
+            channel_to_ice_channel_[channel_map_it->second].get();
+        prev_channels.push_back(ice_channel);
+        RETURN_IF_ERROR(ice_channel->AddRow(tuple_row));
       }
     }
   } else {
@@ -1209,6 +1298,9 @@ Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {
   // If we hit an error here, we can return without closing the remaining channels as
   // the error is propagated back to the coordinator, which in turn cancels the query,
   // which will cause the remaining open channels to be closed.
+  for (auto& [ch, ice_ch] : channel_to_ice_channel_) {
+    RETURN_IF_ERROR(ice_ch->Flush());
+  }
   for (unique_ptr<Channel>& channel : channels_) {
     RETURN_IF_ERROR(channel->FlushBatches());
   }
@@ -1227,6 +1319,11 @@ Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {
 void KrpcDataStreamSender::Close(RuntimeState* state) {
   SCOPED_TIMER(profile()->total_time_counter());
   if (closed_) return;
+
+  for (auto& [ch, ice_ch] : channel_to_ice_channel_) {
+    ice_ch->Teardown();
+  }
+
   for (int i = 0; i < channels_.size(); ++i) {
     channels_[i]->Teardown(state);
   }

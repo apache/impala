@@ -109,15 +109,8 @@ class IcebergDeleteBuilder : public JoinBuilder {
 
   std::string DebugString() const;
 
-  struct StringValueHashWrapper {
-    size_t operator()(const impala::StringValue& str) const {
-      return impala::hash_value(str);
-    }
-  };
-
   using DeleteRowHashTable =
-      std::unordered_map<impala::StringValue, RoaringBitmap64,
-          StringValueHashWrapper>;
+      std::unordered_map<impala::StringValue, RoaringBitmap64>;
 
   DeleteRowHashTable& deleted_rows() { return deleted_rows_; }
 

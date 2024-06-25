@@ -68,6 +68,7 @@ add_library(Runtime
   lib-cache.cc
   mem-tracker.cc
   mem-pool.cc
+  outbound-row-batch.cc
   query-driver.cc
   query-exec-mgr.cc
   query-exec-params.cc

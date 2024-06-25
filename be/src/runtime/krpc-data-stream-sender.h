@@ -163,6 +163,7 @@ class KrpcDataStreamSender : public DataSink {
 
  private:
   class Channel;
+  class IcebergPositionDeleteChannel;
 
   /// Serializes the src batch into the serialized row batch 'dest' and updates
   /// various stat counters.
@@ -304,6 +305,11 @@ class KrpcDataStreamSender : public DataSink {
   /// A mapping between host addresses to channels. Used for DIRECTED distribution mode
   /// where only one channel is associated with each host address.
   std::unordered_map<NetworkAddressPB, Channel*> host_to_channel_;
+  /// A mapping from Channel to IcebergPositionDeleteChannel. Only used in DIRECTED mode
+  /// where IcebergPositionDeleteChannel applies a specific serialization algorithm on
+  /// position delete records.
+  std::unordered_map<Channel*, std::unique_ptr<IcebergPositionDeleteChannel>>
+    channel_to_ice_channel_;
 };
 
 } // namespace impala

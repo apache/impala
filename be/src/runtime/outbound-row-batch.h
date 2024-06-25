@@ -64,9 +64,24 @@ class OutboundRowBatch {
          header_.has_compression_type();
   }
 
+  // Prepares the outbound row batch for sending over the network. If
+  // 'compression_scratch' is not null, then it also tries to compress the tuple_data,
+  // and swaps tuple_data and compression_scratch if the compressed data is smaller.
+  // Also sets the header.
+  Status PrepareForSend(int num_tuples_per_row, TrackedString* compression_scratch);
+
  private:
+  friend class IcebergPositionDeleteCollector;
   friend class RowBatch;
   friend class RowBatchSerializeBaseline;
+
+  // Try compressing tuple_data to compression_scratch, swap if compressed data is
+  // smaller.
+  Status TryCompress(TrackedString* compression_scratch, bool* is_compressed);
+
+  // Sets header of this outbound row batch.
+  void SetHeader(int num_rows, int num_tuples_per_row, int64_t uncompressed_size,
+      bool is_compressed);
 
   /// The serialized header which contains the meta-data of the row batch such as the
   /// number of rows and compression scheme used etc.

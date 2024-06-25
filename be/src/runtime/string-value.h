@@ -205,4 +205,15 @@ std::ostream& operator<<(std::ostream& os, const StringValue& string_value);
 
 }
 
+/// With this specialization it is possbile to use StringValues in hash-based std
+/// containers (unordered_set, unordered_map) without the need of explicitly
+/// specifying the Hash template parameter.
+namespace std {
+  template <> struct hash<impala::StringValue> {
+    size_t operator()(const impala::StringValue& str) const {
+      return hash_value(str);
+    }
+  };
+}
+
 #endif
