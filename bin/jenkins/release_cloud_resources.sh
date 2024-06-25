@@ -43,8 +43,12 @@ if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
         -region "${S3GUARD_DYNAMODB_REGION}"
     echo "Done cleaning up s3guard"
   fi
-  # Remove the test warehouse
-  echo "Removing test warehouse from s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR} ..."
-  aws s3 rm --recursive --quiet s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}
-  echo "Done removing test warehouse"
+
+  echo "Removing temporary data files and test warehouse..."
+  # Add temp files and HDFS .Trash to the delete list
+  for del_dir in ${TEST_WAREHOUSE_DIR} /other /tmp /user/jenkins/.Trash ; do
+    echo "Removing s3://${S3_BUCKET}${del_dir}"
+    aws s3 rm --recursive --quiet s3://${S3_BUCKET}${del_dir}
+  done
+  echo "Done cleaning the test bucket s3://${S3_BUCKET}"
 fi
