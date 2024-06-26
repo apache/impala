@@ -112,6 +112,15 @@ for jar in /opt/impala/lib/*.jar
 do
   CLASSPATH+=:$jar
 done
+
+# Add custom jars
+if [ -d /opt/impala/aux-jars ]; then
+  for jar in /opt/impala/aux-jars/*.jar
+  do
+    CLASSPATH+=:$jar
+  done
+fi
+
 echo "CLASSPATH: $CLASSPATH"
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 
