@@ -20,9 +20,6 @@ namespace org.apache.impala.fb;
 enum FbIcebergDataFileFormat: byte {
   PARQUET,
   ORC,
-  // We add AVRO here as a future possibility.
-  // The Iceberg spec allows AVRO data files, but currently Impala
-  // cannot read such Iceberg tables. See IMPALA-11158.
   AVRO
 }
 

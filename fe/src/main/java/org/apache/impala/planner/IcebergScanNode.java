@@ -82,8 +82,7 @@ public class IcebergScanNode extends HdfsScanNode {
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
-      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId)
-      throws ImpalaRuntimeException {
+      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId) {
     this(id, tblRef, conjuncts, aggInfo, fileDescs, nonIdentityConjuncts,
         skippedConjuncts, null, snapshotId);
   }
@@ -91,8 +90,7 @@ public class IcebergScanNode extends HdfsScanNode {
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId,
-      long snapshotId)
-      throws ImpalaRuntimeException {
+      long snapshotId) {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
         aggInfo, null, false);
@@ -111,26 +109,6 @@ public class IcebergScanNode extends HdfsScanNode {
     }
     nonIdentityConjuncts_ = nonIdentityConjuncts;
     snapshotId_ = snapshotId;
-    //TODO IMPALA-11577: optimize file format counting
-    boolean hasParquet = false;
-    boolean hasOrc = false;
-    boolean hasAvro = false;
-    for (FileDescriptor fileDesc : fileDescs_) {
-      byte fileFormat = fileDesc.getFbFileMetadata().icebergMetadata().fileFormat();
-      if (fileFormat == FbIcebergDataFileFormat.PARQUET) {
-        hasParquet = true;
-      } else if (fileFormat == FbIcebergDataFileFormat.ORC) {
-        hasOrc = true;
-      } else if (fileFormat == FbIcebergDataFileFormat.AVRO) {
-        hasAvro = true;
-      } else {
-        throw new ImpalaRuntimeException(String.format(
-            "Invalid Iceberg file format of file: %s", fileDesc.getAbsolutePath()));
-      }
-    }
-    if (hasParquet) fileFormats_.add(HdfsFileFormat.PARQUET);
-    if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
-    if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
     this.skippedConjuncts_ = skippedConjuncts;
     this.deleteFileScanNodeId = deleteId;
   }
@@ -281,5 +259,29 @@ public class IcebergScanNode extends HdfsScanNode {
               Expr.getExplainString(skippedConjuncts_, detailLevel)));
     }
     return output.toString();
+  }
+
+  @Override
+  protected void populateFileFormats() throws ImpalaRuntimeException {
+    //TODO IMPALA-11577: optimize file format counting
+    boolean hasParquet = false;
+    boolean hasOrc = false;
+    boolean hasAvro = false;
+    for (FileDescriptor fileDesc : fileDescs_) {
+      byte fileFormat = fileDesc.getFbFileMetadata().icebergMetadata().fileFormat();
+      if (fileFormat == FbIcebergDataFileFormat.PARQUET) {
+        hasParquet = true;
+      } else if (fileFormat == FbIcebergDataFileFormat.ORC) {
+        hasOrc = true;
+      } else if (fileFormat == FbIcebergDataFileFormat.AVRO) {
+        hasAvro = true;
+      } else {
+        throw new ImpalaRuntimeException(String.format(
+            "Invalid Iceberg file format of file: %s", fileDesc.getAbsolutePath()));
+      }
+    }
+    if (hasParquet) fileFormats_.add(HdfsFileFormat.PARQUET);
+    if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
+    if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
   }
 }

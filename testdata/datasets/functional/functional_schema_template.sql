@@ -3872,6 +3872,29 @@ INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(3, 'parquet', 2.5, fa
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_mixed_file_format_part
+---- CREATE_HIVE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  string_col string,
+  double_col double,
+  bool_col boolean
+)
+PARTITIONED BY (int_col int)
+STORED BY ICEBERG
+LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_mixed_file_format_part';
+---- DEPENDENT_LOAD_HIVE
+-- This INSERT must run in Hive, because Impala doesn't support inserting into tables
+-- with avro and orc file formats.
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES('write.format.default'='avro');
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values('avro', 0.5, true, 1);
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES('write.format.default'='orc');
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values('orc', 1.5, false, 2);
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET TBLPROPERTIES('write.format.default'='parquet');
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values('parquet', 2.5, false, 3);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 iceberg_query_metadata
 ---- CREATE
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (

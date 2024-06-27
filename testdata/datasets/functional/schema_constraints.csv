@@ -103,6 +103,7 @@ table_name:iceberg_v2_partitioned_position_deletes_orc, constraint:restrict_to, 
 table_name:iceberg_multiple_storage_locations, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_avro_format, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_mixed_file_format, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_mixed_file_format_part, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_test_metadata, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_with_key_metadata, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_lineitem_multiblock, constraint:restrict_to, table_format:parquet/none/none

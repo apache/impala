@@ -495,7 +495,8 @@ public class HdfsScanNode extends ScanNode {
    * Initialize sampledFiles_, sampledPartitions_, fileFormats_, and countStarSlot_.
    * @param analyzer Analyzer object used to init this class.
    */
-  private void checkSamplingAndCountStar(Analyzer analyzer) {
+  private void checkSamplingAndCountStar(Analyzer analyzer)
+      throws ImpalaRuntimeException {
     if (sampleParams_ != null) {
       long percentBytes = sampleParams_.getPercentBytes();
       long randomSeed;
@@ -521,18 +522,21 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    // Populate fileFormats_.
-    for (FeFsPartition partition : getSampledOrRawPartitions()) {
-      if (partition.getFileFormat() != HdfsFileFormat.ICEBERG) {
-        fileFormats_.add(partition.getFileFormat());
-      }
-    }
+    populateFileFormats();
 
     // Initialize countStarSlot_.
     if (canApplyCountStarOptimization(analyzer, fileFormats_)) {
       Preconditions.checkState(desc_.getPath().destTable() != null);
       Preconditions.checkState(collectionConjuncts_.isEmpty());
       countStarSlot_ = applyCountStarOptimization(analyzer);
+    }
+  }
+
+  protected void populateFileFormats() throws ImpalaRuntimeException {
+    for (FeFsPartition partition : getSampledOrRawPartitions()) {
+      if (partition.getFileFormat() != HdfsFileFormat.ICEBERG) {
+        fileFormats_.add(partition.getFileFormat());
+      }
     }
   }
 

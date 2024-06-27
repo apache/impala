@@ -1297,6 +1297,17 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Checks file format listing for Iceberg tables.
+   */
+  @Test
+  public void testIcebergMixedFileFormat() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.VERBOSE);
+    runPlannerTestFile("iceberg-mixed-file-format", "functional_parquet", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  /**
    * Checks exercising predicate pushdown with Iceberg tables, without predicate
    * subsetting.
    */
