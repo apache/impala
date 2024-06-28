@@ -304,15 +304,16 @@ command line parameter.</p>
     };
   }
 
-  function clearProfiles() {
-    db.transaction("profiles", "readwrite").objectStore("profiles").clear().onsuccess = () => {
-      setScrollReload();
-    };
-  }
-
   function showImportedQueriesStatusMessage(status_message) {
     error_message.style.display = "unset";
     error_message.textContent = status_message;
+  }
+
+  function clearProfiles() {
+    indexedDB.deleteDatabase("imported_queries");
+    showImportedQueriesStatusMessage("Clearing imported query profiles in progress."
+        + " Do not close/refresh the page.");
+    setTimeout(setScrollReload, 1000);
   }
 
   function startProfilesUpload() {
