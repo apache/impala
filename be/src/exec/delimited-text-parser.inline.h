@@ -71,7 +71,9 @@ inline Status DelimitedTextParser<DELIMITED_TUPLES>::AddColumn(int64_t len,
   }
   if (PROCESS_ESCAPES) current_column_has_escape_ = false;
   *next_column_start += len + 1;
-  ++column_idx_;
+  // No need to keep bumping 'column_idx_' if it's already 'num_cols_'. Otherwise,
+  // a large file with full of field delimiters might lead to 'column_idx_' overflow.
+  if (column_idx_ < num_cols_) ++column_idx_;
   return Status::OK();
 }
 
