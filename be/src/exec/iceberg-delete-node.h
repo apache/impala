@@ -21,6 +21,7 @@
 #include "exec/blocking-join-node.h"
 #include "exec/iceberg-delete-builder.h"
 #include "runtime/row-batch.h"
+#include "util/roaring-bitmap.h"
 
 namespace impala {
 
@@ -115,7 +116,8 @@ class IcebergDeleteNode : public BlockingJoinNode {
 
   /// Probes 'current_probe_row_' against the hash tables and append outputs
   /// to output batch.
-  bool inline ProcessProbeRow(RowBatch::Iterator* out_batch_iterator,
+  bool inline ProcessProbeRow(const RoaringBitmap64& deletes,
+      RoaringBitmap64::BulkContext* context, RowBatch::Iterator* out_batch_iterator,
       int* remaining_capacity) WARN_UNUSED_RESULT;
 
   /// Append outputs to output batch.
@@ -149,6 +151,8 @@ class IcebergDeleteNode : public BlockingJoinNode {
   /// contains the last rows from the child.
   Status NextProbeRowBatchFromChild(RuntimeState* state, RowBatch* out_batch, bool* eos);
 
+  bool NeedToCheckBatch(const RoaringBitmap64& deletes);
+
   /// Prepares for probing the next batch. Called after populating 'probe_batch_'
   /// with rows and entering 'probe_state_' PROBING_IN_BATCH.
   inline void ResetForProbe() {
@@ -177,48 +181,6 @@ class IcebergDeleteNode : public BlockingJoinNode {
 
   int file_path_offset_;
   int pos_offset_;
-
-  class IcebergDeleteState {
-   public:
-    void Init(IcebergDeleteBuilder* builder);
-
-    // Recalculated the next delete row id if:
-    //  1. data file path changed
-    //  2. probe position is bigger than the next delete row id (there was a gap)
-    //     in the probe side
-    void Update(impala::StringValue* file_path, int64_t* probe_pos);
-
-    // Checks if the current probe row is deleted.
-    bool IsDeleted() const;
-
-    // Progresses the delete row id, or sets to invalid if we reached to the end
-    // of the delete vector.
-    void Delete();
-
-    // Returns true, if we can pass through the rest of the row batch
-    bool NeedCheck() const;
-
-    // Clears the state after the row batch is processed
-    void Clear();
-
-    void Reset();
-
-   private:
-    void UpdateImpl();
-    static constexpr int64_t INVALID_ROW_ID = -1;
-
-    // Using pointers and index instead of iterators to have nicer default state
-    // when we switch rowbatch
-    const impala::StringValue* current_file_path_;
-    const impala::StringValue* previous_file_path_;
-    IcebergDeleteBuilder::DeleteRowVector* current_delete_row_;
-    int64_t current_deleted_pos_row_id_;
-    int64_t current_probe_pos_;
-
-    IcebergDeleteBuilder* builder_ = nullptr;
-  };
-
-  IcebergDeleteState iceberg_delete_state_;
 };
 
 } // namespace impala

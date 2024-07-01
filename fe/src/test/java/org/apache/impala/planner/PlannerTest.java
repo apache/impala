@@ -1316,6 +1316,21 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Check that Iceberg V2 table scans work as expected. Also check resource estimates.
+   */
+  @Test
+  public void testIcebergV2TableScansWithResources() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setTimezone("UTC");
+    runPlannerTestFile("iceberg-v2-tables-resources", "functional_parquet", options,
+        ImmutableSet.of(
+            PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS,
+            PlannerTestOption.VALIDATE_RESOURCES));
+  }
+
+  /**
    * Check that Iceberg V2 table scans work as expected with hash join
    */
   @Test

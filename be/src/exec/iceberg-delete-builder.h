@@ -23,6 +23,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/join-builder.h"
+#include "util/roaring-bitmap.h"
 
 namespace impala {
 
@@ -67,8 +68,8 @@ class IcebergDeleteBuilderConfig : public JoinBuilderConfig {
       const RowDescriptor* build_row_desc, TDataSink* tsink);
 };
 
-/// The build side for the IcebergDeleteNode. Processed the scanned data from delete
-/// files, and stores them in unordered_map<file_path, ordered vector of row ids> to allow
+/// The build side for the IcebergDeleteNode. Processes the scanned data from delete
+/// files, and stores them in unordered_map<file_path, RoaringBitmap64> to allow
 /// fast probing.
 ///
 /// Unlike the PartitionedHashJoin, there is only one mode:
@@ -92,8 +93,7 @@ class IcebergDeleteBuilder : public JoinBuilder {
       int64_t max_row_buffer_size, RuntimeState* state);
   ~IcebergDeleteBuilder();
 
-  // Checks distribution mode and collects the processed data files' file path in case
-  // of broadcast mode.
+  // Collects the processed data files' file paths and fills 'deleted_rows_' with them.
   Status CalculateDataFiles();
 
   /// Implementations of DataSink interface methods.
@@ -115,9 +115,9 @@ class IcebergDeleteBuilder : public JoinBuilder {
     }
   };
 
-  using DeleteRowVector = std::vector<int64_t>;
   using DeleteRowHashTable =
-      std::unordered_map<impala::StringValue, DeleteRowVector, StringValueHashWrapper>;
+      std::unordered_map<impala::StringValue, RoaringBitmap64,
+          StringValueHashWrapper>;
 
   DeleteRowHashTable& deleted_rows() { return deleted_rows_; }
 
@@ -128,6 +128,8 @@ class IcebergDeleteBuilder : public JoinBuilder {
   /// Helper method for Send() that does the actual work apart from updating the
   /// counters.
   Status AddBatch(RuntimeState* state, RowBatch* build_batch);
+
+  Status AddToDeletedRows(const StringValue& path, const vector<uint64_t>& positions);
 
   /// Helper method for FlushFinal() that does the actual work.
   Status FinalizeBuild(RuntimeState* state);
@@ -140,18 +142,12 @@ class IcebergDeleteBuilder : public JoinBuilder {
   // Runtime profile for this node. Owned by the QueryState's ObjectPool.
   RuntimeProfile* const runtime_profile_;
 
-  // Measuring the time took to sort row ids
-  RuntimeProfile::Counter* position_sort_timer_;
-
   // Specification of iceberg delete files allows to optimize for data extraction
   const RowDescriptor* build_row_desc_;
   int file_path_offset_;
   int pos_offset_;
 
-  // Use the length of a cache line as initial capacity
-  static constexpr size_t INITIAL_DELETE_VECTOR_CAPACITY = 8;
-
-  // Stores {file_path: ordered row ids vector}
+  // Stores {file_path: positions in roaring bitmap}
   DeleteRowHashTable deleted_rows_;
 };
 } // namespace impala

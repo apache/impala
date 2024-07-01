@@ -20,6 +20,7 @@ add_subdirectory(cache)
 set(SQUEASEL_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/squeasel")
 set(MUSTACHE_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/mustache")
 set(MPFIT_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/mpfit")
+set(ROARING_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/roaring")
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
@@ -116,7 +117,8 @@ set(UTIL_SRCS
   webserver.cc
   zip-util.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
-  ${MPFIT_SRC_DIR}/mpfit.c)
+  ${MPFIT_SRC_DIR}/mpfit.c
+  ${ROARING_SRC_DIR}/roaring.c)
 
 # Detect AVX2 support
 set(AVX2_CMD "echo | ${CMAKE_CXX_COMPILER} -mavx2 -dM -E - | awk '$2 == \"__AVX2__\" { print $3 }'")
@@ -142,6 +144,15 @@ if (AVX2_SUPPORT)
   message("Compiler supports AVX2")
 else()
   message("Compiler does not support AVX2")
+endif()
+
+# roaring.c uses AVX operations
+# disable AVX512 unconditionally
+set_source_files_properties(${ROARING_SRC_DIR}/roaring.c
+    PROPERTIES COMPILE_DEFINITIONS "CROARING_COMPILER_SUPPORTS_AVX512=0")
+if (NOT AVX2_SUPPORT)
+  set_source_files_properties(${ROARING_SRC_DIR}/roaring.c
+      PROPERTIES COMPILE_DEFINITIONS "ROARING_DISABLE_AVX=1")
 endif()
 
 add_library(Util ${UTIL_SRCS})
@@ -208,6 +219,7 @@ add_library(UtilTests STATIC
   redactor-test-utils.cc
   redactor-unconfigured-test.cc
   rle-test.cc
+  roaring-bitmap-test.cc
   runtime-profile-test.cc
   simple-logger-test.cc
   sql-util-test.cc
@@ -272,6 +284,7 @@ ADD_UNIFIED_BE_LSAN_TEST(redactor-config-parser-test ParserTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(redactor-test "RedactorTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(redactor-unconfigured-test "RedactorUnconfigTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(rle-test "BitArray.*:RleTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(roaring-bitmap-test "RoaringBitmap64Test.*")
 ADD_UNIFIED_BE_LSAN_TEST(runtime-profile-test "CountersTest.*:TimerCounterTest.*:TimeSeriesCounterTest.*:VariousNumbers/TimeSeriesCounterResampleTest.*:ToThrift.*:ToJson.*")
 ADD_UNIFIED_BE_LSAN_TEST(simple-logger-test "SimpleLoggerTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(sql-util-test "SqlUtilTest.*")

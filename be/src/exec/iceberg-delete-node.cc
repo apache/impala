@@ -25,6 +25,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
+#include "util/roaring-bitmap.h"
 #include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -115,7 +116,6 @@ Status IcebergDeleteNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::GetFirstProbeRow(state));
   ResetForProbe();
   probe_state_ = ProbeState::PROBING_IN_BATCH;
-  iceberg_delete_state_.Init(builder_);
   return Status::OK();
 }
 
@@ -128,7 +128,6 @@ Status IcebergDeleteNode::AcquireResourcesForBuild(RuntimeState* state) {
 
 Status IcebergDeleteNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   builder_->Reset(nullptr);
-  iceberg_delete_state_.Reset();
   return BlockingJoinNode::Reset(state, row_batch);
 }
 
@@ -145,7 +144,6 @@ void IcebergDeleteNode::Close(RuntimeState* state) {
       waited_for_build_ = false;
     }
   }
-  iceberg_delete_state_.Reset();
   BlockingJoinNode::Close(state);
 }
 
@@ -292,105 +290,19 @@ string IcebergDeleteNode::NodeDebugString() const {
   return ss.str();
 }
 
-void IcebergDeleteNode::IcebergDeleteState::Init(IcebergDeleteBuilder* builder) {
-  builder_ = builder;
-  current_file_path_ = nullptr;
-  previous_file_path_ = nullptr;
-  current_delete_row_ = nullptr;
-  current_deleted_pos_row_id_ = INVALID_ROW_ID;
-  current_probe_pos_ = INVALID_ROW_ID;
-}
-
-void IcebergDeleteNode::IcebergDeleteState::UpdateImpl() {
-  DCHECK(current_delete_row_ != nullptr);
-  // We need to use binary search to find the next delete candidate in 2 cases:
-  //   1. new file (or start of row batch)
-  //   2. discontinuity in probe row ids
-  auto next_deleted_pos_it_ = std::lower_bound(
-      current_delete_row_->begin(), current_delete_row_->end(), current_probe_pos_);
-  if (next_deleted_pos_it_ == current_delete_row_->end()) {
-    current_deleted_pos_row_id_ = INVALID_ROW_ID;
-  } else {
-    current_deleted_pos_row_id_ =
-        std::distance(current_delete_row_->begin(), next_deleted_pos_it_);
-  }
-}
-
-void IcebergDeleteNode::IcebergDeleteState::Update(
-    impala::StringValue* file_path, int64_t* next_probe_pos) {
-  DCHECK(builder_ != nullptr);
-  // Making sure the row ids are in ascending order inside a row batch in DIRECTED mode
-  DCHECK(current_probe_pos_ == INVALID_ROW_ID || current_probe_pos_ < *next_probe_pos);
-  current_probe_pos_ = *next_probe_pos;
-
-  if (previous_file_path_ != nullptr) {
-    // We already have a file path, no need to hash again
-    if (current_deleted_pos_row_id_ != INVALID_ROW_ID
-        && current_probe_pos_ > (*current_delete_row_)[current_deleted_pos_row_id_]) {
-      UpdateImpl();
-    }
-  } else {
-    auto it = builder_->deleted_rows().find(*file_path);
-    if (it != builder_->deleted_rows().end()) {
-      current_file_path_ = &it->first;
-      current_delete_row_ = &it->second;
-      UpdateImpl();
-      previous_file_path_ = current_file_path_;
-    }
-  }
-}
-
-bool IcebergDeleteNode::IcebergDeleteState::IsDeleted() const {
-  DCHECK(builder_ != nullptr);
-
-  if (current_deleted_pos_row_id_ == INVALID_ROW_ID) return false;
-
-  DCHECK(current_probe_pos_ != INVALID_ROW_ID);
-  DCHECK(current_delete_row_ != nullptr);
-  DCHECK(current_deleted_pos_row_id_ < current_delete_row_->size());
-
-  return current_probe_pos_ == (*current_delete_row_)[current_deleted_pos_row_id_];
-}
-
-void IcebergDeleteNode::IcebergDeleteState::Delete() {
-  DCHECK(builder_ != nullptr);
-
-  current_deleted_pos_row_id_++;
-  if (current_deleted_pos_row_id_ == current_delete_row_->size()) {
-    current_deleted_pos_row_id_ = INVALID_ROW_ID;
-  }
-}
-
-bool IcebergDeleteNode::IcebergDeleteState::NeedCheck() const {
-  return current_deleted_pos_row_id_ != INVALID_ROW_ID
-      || current_probe_pos_ == INVALID_ROW_ID;
-}
-
-void IcebergDeleteNode::IcebergDeleteState::Clear() {
-  current_file_path_ = nullptr;
-  previous_file_path_ = nullptr;
-  current_delete_row_ = nullptr;
-  current_deleted_pos_row_id_ = INVALID_ROW_ID;
-  current_probe_pos_ = INVALID_ROW_ID;
-}
-
-void IcebergDeleteNode::IcebergDeleteState::Reset() {
-  builder_ = nullptr;
-  Clear();
-}
-
 bool IR_ALWAYS_INLINE IcebergDeleteNode::ProcessProbeRow(
+    const RoaringBitmap64& deletes, RoaringBitmap64::BulkContext* context,
     RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
   DCHECK(current_probe_row_ != nullptr);
+  uint64_t current_probe_pos = std::make_unsigned_t<int64_t>(
+      *current_probe_row_->GetTuple(0)->GetBigIntSlot(pos_offset_));
   TupleRow* out_row = out_batch_iterator->Get();
-  if (!iceberg_delete_state_.IsDeleted()) {
+  if (!deletes.ContainsBulk(current_probe_pos, context)) {
     out_batch_iterator->parent()->CopyRow(current_probe_row_, out_row);
     matched_probe_ = true;
     --(*remaining_capacity);
     if (*remaining_capacity == 0) return false;
     out_row = out_batch_iterator->Next();
-  } else {
-    iceberg_delete_state_.Delete();
   }
   return true;
 }
@@ -415,39 +327,50 @@ int IcebergDeleteNode::ProcessProbeBatch(
   const int max_rows = out_batch->capacity() - out_batch->num_rows();
   // Note that 'probe_batch_pos_' is the row no. of the row after 'current_probe_row_'.
   RowBatch::Iterator probe_batch_iterator(probe_batch_.get(), probe_batch_pos_);
+  if (probe_batch_iterator.AtEnd()) return 0;
+
   int remaining_capacity = max_rows;
 
-  while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0) {
-    current_probe_row_ = probe_batch_iterator.Get();
-    if (iceberg_delete_state_.NeedCheck()) {
-      impala::StringValue* file_path =
-          current_probe_row_->GetTuple(0)->GetStringSlot(file_path_offset_);
-      int64_t* current_probe_pos =
-          current_probe_row_->GetTuple(0)->GetBigIntSlot(pos_offset_);
+  impala::StringValue* file_path =
+      probe_batch_iterator.Get()->GetTuple(0)->GetStringSlot(file_path_offset_);
+  const IcebergDeleteBuilder::DeleteRowHashTable& delete_rows_table =
+      builder_->deleted_rows();
+  auto it = delete_rows_table.find(*file_path);
 
-      iceberg_delete_state_.Update(file_path, current_probe_pos);
-      if (!ProcessProbeRow(&out_batch_iterator, &remaining_capacity)) {
-        DCHECK_EQ(remaining_capacity, 0);
-      }
-    } else {
+  bool needs_check;
+  if (it == delete_rows_table.end()) {
+    needs_check = false;
+  } else {
+    needs_check = NeedToCheckBatch(it->second);
+  }
+
+  if (!needs_check) {
+    while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0) {
+      current_probe_row_ = probe_batch_iterator.Get();
       if (!ProcessProbeRowNoCheck(&out_batch_iterator, &remaining_capacity)) {
         DCHECK_EQ(remaining_capacity, 0);
       }
+      probe_batch_iterator.Next();
     }
-
-    probe_batch_iterator.Next();
-
-    // Update where we are in the probe batch.
-    probe_batch_pos_ = (probe_batch_iterator.Get() - probe_batch_->GetRow(0));
+  } else {
+    const RoaringBitmap64& deletes = it->second;
+    RoaringBitmap64::BulkContext context;
+    while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0) {
+      current_probe_row_ = probe_batch_iterator.Get();
+      if (!ProcessProbeRow(deletes, &context, &out_batch_iterator, &remaining_capacity)) {
+        DCHECK_EQ(remaining_capacity, 0);
+      }
+      probe_batch_iterator.Next();
+    }
   }
-
+  // Update where we are in the probe batch.
+  probe_batch_pos_ = (probe_batch_iterator.Get() - probe_batch_->GetRow(0));
   int num_rows_added = max_rows - remaining_capacity;
 
   // Clear state as ascending order of row ids are not guaranteed between probe row
   // batches
   if (probe_batch_iterator.AtEnd()) {
     current_probe_row_ = nullptr;
-    iceberg_delete_state_.Clear();
   }
 
   DCHECK_GE(probe_batch_pos_, 0);
@@ -455,4 +378,22 @@ int IcebergDeleteNode::ProcessProbeBatch(
   DCHECK_LE(num_rows_added, max_rows);
   return num_rows_added;
 }
+
+bool IcebergDeleteNode::NeedToCheckBatch(const RoaringBitmap64& deletes) {
+  DCHECK_GE(probe_batch_pos_, 0);
+  if (deletes.IsEmpty()) return false;
+
+  TupleRow* first_row = probe_batch_->GetRow(probe_batch_pos_);
+  int64_t* first_row_pos = first_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
+
+  if (*first_row_pos > deletes.Max()) return false;
+
+  TupleRow* last_row = probe_batch_->GetRow(probe_batch_->num_rows() - 1);
+  int64_t* last_row_pos = last_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
+
+  if (*last_row_pos < deletes.Min()) return false;
+
+  return true;
+}
+
 } // namespace impala

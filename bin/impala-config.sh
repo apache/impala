@@ -85,13 +85,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=45-e78b0ef342
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=438-e78b0ef342
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=47-51aac19036
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=442-51aac19036
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-e78b0ef34241218cda7eac3b526cb6a824596df1}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-51aac190369b543daddff2c0f29f54ded149a5f9}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -149,9 +149,9 @@ export IMPALA_LIBEV_VERSION=4.20-p1
 unset IMPALA_LIBEV_URL
 export IMPALA_LIBUNWIND_VERSION=1.7.2-p1
 unset IMPALA_LIBUNWIND_URL
-export IMPALA_LLVM_VERSION=5.0.1-p7
+export IMPALA_LLVM_VERSION=5.0.1-p8
 unset IMPALA_LLVM_URL
-export IMPALA_LLVM_ASAN_VERSION=5.0.1-p7
+export IMPALA_LLVM_ASAN_VERSION=5.0.1-p8
 unset IMPALA_LLVM_ASAN_URL
 
 # To limit maximum memory available for the mini-cluster and CDH cluster, add the
@@ -165,7 +165,7 @@ export IMPALA_LLVM_UBSAN_BASE_VERSION=5.0.1
 
 # Debug builds should use the release+asserts build to get additional coverage.
 # Don't use the LLVM debug build because the binaries are too large to distribute.
-export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p7
+export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p8
 unset IMPALA_LLVM_DEBUG_URL
 export IMPALA_LZ4_VERSION=1.9.3
 unset IMPALA_LZ4_URL

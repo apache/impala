@@ -1,0 +1,34 @@
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table.
+# Scanning iceberg_v2_positional_update_all_rows involves a UNION node which behaves
+# differently if it is scheduled on 1 node or 2 nodes. Setting num_nodes is not
+# allowed, so let's just check that not all rows are returned.
+select count(*) < 6 from iceberg_v2_positional_update_all_rows where rand(6) < 0.5;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table. Also time travel is involved
+select * from iceberg_v2_positional_update_all_rows for system_version as of 5392552459484846077 where rand(6) < 0.5;
+---- RESULTS
+1,'a'
+3,'c'
+1,'A'
+3,'C'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Regression test for IMPALA-12879: Conjunct not referring to table field causes ERROR
+# for Iceberg table. Also time travel is involved
+select count(*) from iceberg_v2_positional_update_all_rows for system_version as of 5392552459484846077 where rand(6) < 0.5;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====

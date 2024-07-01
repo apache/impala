@@ -172,38 +172,44 @@ public class IcebergDeleteNode extends JoinNode {
   @Override
   public Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
       TQueryOptions queryOptions) {
-    long perBuildInstanceMemEstimate;
-    long perBuildInstanceDataBytes;
-    int numInstances = fragment_.getNumInstances();
-    if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
-        || numInstances <= 0) {
-      perBuildInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
-      perBuildInstanceDataBytes = -1;
-    } else {
-      long rhsCard = getChild(1).getCardinality();
-      long rhsNdv = 1;
-      // Calculate the ndv of the right child, which is the multiplication of
-      // the ndv of the right child column
-      for (Expr eqJoinPredicate : eqJoinConjuncts_) {
-        long rhsPdNdv = getNdv(eqJoinPredicate.getChild(1));
-        rhsPdNdv = Math.min(rhsPdNdv, rhsCard);
-        if (rhsPdNdv != -1) {
-          rhsNdv = PlanNode.checkedMultiply(rhsNdv, rhsPdNdv);
-        }
+    Preconditions.checkState(getChild(1).getCardinality() != -1);
+    Preconditions.checkState(getChild(1).getAvgRowSize() != -1);
+    Preconditions.checkState(fragment_.getNumNodes() > 0);
+
+    long rhsCard = getChild(1).getCardinality();
+    long rhsNdv = 1;
+    // Calculate the ndv of the right child, which is the multiplication of
+    // the ndv of the right child column
+    for (Expr eqJoinPredicate : eqJoinConjuncts_) {
+      long rhsPdNdv = getNdv(eqJoinPredicate.getChild(1));
+      rhsPdNdv = Math.min(rhsPdNdv, rhsCard);
+      if (rhsPdNdv != -1) {
+        rhsNdv = PlanNode.checkedMultiply(rhsNdv, rhsPdNdv);
       }
-
-      // The memory of the data stored in hash table is the file path of the data files
-      // which have delete files and 8 byte for every deleted row position
-      int numberOfDataFilesWithDelete = ((IcebergScanNode) getChild(0))
-          .getFileDescriptorsWithLimit(null, false, -1).size();
-
-      perBuildInstanceDataBytes = (long) Math.ceil(
-          numberOfDataFilesWithDelete * getChild(1).getAvgRowSize() + 8 * rhsCard);
-
-      // In both modes, on average the data in the hash tables are distributed evenly
-      // among the instances.
-      perBuildInstanceMemEstimate = perBuildInstanceDataBytes / numInstances;
     }
+
+    // The memory of the data stored in hash table is the file path of the data files
+    // which have delete files and roaring bitmaps that store the positions. Roaring
+    // bitmaps store bitmaps in a compressed format, so 2 bytes per position is a
+    // conservative estimate (actual mem usage is expected to be lower).
+    int numberOfDataFilesWithDelete = ((IcebergScanNode) getChild(0))
+        .getFileDescriptorsWithLimit(null, false, -1).size();
+    double avgFilePathLen = getChild(1).getAvgRowSize();
+    long filePathsSize = (long) Math.ceil(numberOfDataFilesWithDelete * avgFilePathLen);
+    // Number of bytes needed to store a file position in a RoaringBitmap.
+    final int BYTES_PER_POSITION = 2;
+    // Let's calculate with some overhead per roaring bitmap.
+    final int PER_ROARING_BITMAP_OVERHEAD = 512;
+    long roaringBitmapOverhead =
+        PER_ROARING_BITMAP_OVERHEAD * numberOfDataFilesWithDelete;
+    long roaringBitmapSize = (long) Math.ceil(BYTES_PER_POSITION * rhsCard) +
+        roaringBitmapOverhead;
+    long totalBuildDataBytes = filePathsSize + roaringBitmapSize;
+
+    // In both modes, on average the data in the hash tables are distributed evenly
+    // among the instances.
+    int numBuildInstances = fragment_.getNumNodes();
+    long perBuildInstanceMemEstimate = totalBuildDataBytes / numBuildInstances;
 
     // Almost all resource consumption is in the build, or shared between the build and
     // the probe. These are accounted for in the build profile.

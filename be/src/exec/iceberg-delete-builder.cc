@@ -173,13 +173,9 @@ Status IcebergDeleteBuilder::CalculateDataFiles() {
 
       memcpy(ptr_copy, file_path_str.c_str(), file_path_str.length());
 
-      std::pair<DeleteRowHashTable::iterator, bool> retval =
-          deleted_rows_.emplace(std::piecewise_construct,
-              std::forward_as_tuple(ptr_copy, file_path_str.length()),
-              std::forward_as_tuple());
-
-      // emplace succeeded, reserve capacity for the new file
-      if (retval.second) retval.first->second.reserve(INITIAL_DELETE_VECTOR_CAPACITY);
+      deleted_rows_.emplace(std::piecewise_construct,
+          std::forward_as_tuple(ptr_copy, file_path_str.length()),
+          std::forward_as_tuple());
     }
   }
 
@@ -201,8 +197,6 @@ Status IcebergDeleteBuilder::Prepare(
 
   file_path_offset_ = slot_descs[0]->tuple_offset();
   pos_offset_ = slot_descs[1]->tuple_offset();
-
-  position_sort_timer_ = ADD_TIMER(runtime_profile_, "IcebergDeletePositionSortTimer");
 
   return Status::OK();
 }
@@ -231,17 +225,6 @@ Status IcebergDeleteBuilder::FlushFinal(RuntimeState* state) {
 }
 
 Status IcebergDeleteBuilder::FinalizeBuild(RuntimeState* state) {
-  {
-    SCOPED_TIMER(position_sort_timer_);
-    for (auto& ids : deleted_rows_) {
-      DeleteRowVector& vec = ids.second;
-      std::sort(vec.begin(), vec.end());
-
-      // Iceberg allows concurrent deletes, there can be duplicates
-      vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
-    }
-  }
-
   if (is_separate_build_) {
     HandoffToProbesAndWait(state);
   }
@@ -269,27 +252,59 @@ string IcebergDeleteBuilder::DebugString() const {
   return ss.str();
 }
 
+Status IcebergDeleteBuilder::AddToDeletedRows(const StringValue& path,
+    const vector<uint64_t>& positions) {
+  auto it = deleted_rows_.find(path);
+  if (LIKELY(it != deleted_rows_.end())) {
+    RoaringBitmap64& deletes = it->second;
+    deletes.AddElements(positions);
+  } else if (path.Len() == 0) {
+    return Status("NULL found as file_path in delete file");
+  } else {
+    // 'deleted_rows_' should contain all data file paths that this join
+    // processes.
+    stringstream ss;
+    ss << "Invalid file path arrived at builder: " << path << " Paths expected: [";
+    for (auto& [vec_path, unused] : deleted_rows_) {
+      ss << vec_path << ", ";
+    }
+    ss << "]";
+    DCHECK(false) << ss.str();
+    return Status(ss.str());
+  }
+  return Status::OK();
+}
+
 Status IcebergDeleteBuilder::ProcessBuildBatch(RuntimeState* state,
     RowBatch* build_batch) {
-  FOREACH_ROW(build_batch, 0, build_batch_iter) {
+  if (UNLIKELY(build_batch->num_rows() == 0)) return Status::OK();
+
+  TupleRow* first_row = build_batch->GetRow(0);
+  impala::StringValue* file_path =
+      first_row->GetTuple(0)->GetStringSlot(file_path_offset_);
+  uint64_t pos = *first_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
+
+  StringValue prev_file_path(*file_path);
+  vector<uint64_t> pos_buffer;
+  pos_buffer.reserve(128);
+  pos_buffer.push_back(pos);
+
+  FOREACH_ROW(build_batch, 1, build_batch_iter) {
     TupleRow* build_row = build_batch_iter.Get();
 
-    impala::StringValue* file_path =
-        build_row->GetTuple(0)->GetStringSlot(file_path_offset_);
+    file_path = build_row->GetTuple(0)->GetStringSlot(file_path_offset_);
+    pos = *build_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
 
-    const int length = file_path->Len();
-    if (UNLIKELY(length == 0)) {
-      state->LogError(
-          ErrorMsg(TErrorCode::GENERAL, "NULL found as file_path in delete file"));
-      continue;
-    }
-    int64_t* id = build_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
-    auto it = deleted_rows_.find(*file_path);
-    // deleted_rows_ filled with the relevant data file names, processing only those.
-    if (it != deleted_rows_.end()) {
-      it->second.emplace_back(*id);
+    if (*file_path == prev_file_path) {
+      pos_buffer.push_back(pos);
+    } else {
+      RETURN_IF_ERROR(AddToDeletedRows(prev_file_path, pos_buffer));
+      pos_buffer.clear();
+      pos_buffer.push_back(pos);
+      prev_file_path.Assign(*file_path);
     }
   }
+  RETURN_IF_ERROR(AddToDeletedRows(prev_file_path, pos_buffer));
 
   return Status::OK();
 }

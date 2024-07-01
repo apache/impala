@@ -36,6 +36,7 @@ from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
+    SkipIfDockerizedCluster,
     SkipIfFS,
     SkipIfHive2,
     SkipIfHive3,
@@ -518,6 +519,14 @@ class TestIceberg(ImpalaTestSuite):
 
   def test_iceberg_query(self, vector):
     self.run_test_case('QueryTest/iceberg-query', vector)
+
+  # The test uses pre-written Iceberg tables where the position delete files refer to
+  # the data files via full URI, i.e. they start with 'hdfs://localhost:2050/...'. In the
+  # dockerised environment the namenode is accessible on a different hostname/port.
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  def test_iceberg_query_v2(self, vector):
+    self.run_test_case('QueryTest/iceberg-query-v2', vector)
 
   def test_iceberg_old_fileformat(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-old-fileformat', vector, use_db=unique_database)

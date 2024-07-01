@@ -243,6 +243,7 @@ LICENSE.txt
 NOTICE.txt
 
 # Notices in thirdparty sources included in the Impala repo and called out in /LICENSE.txt
+be/src/thirdparty/roaring/LICENSE
 be/src/thirdparty/squeasel/LICENSE
 be/src/thirdparty/pcg-cpp-0.98/LICENSE.txt
 be/src/thirdparty/xxhash/xxhash.h
