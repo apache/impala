@@ -19,6 +19,7 @@ package org.apache.impala.calcite.rel.node;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -27,6 +28,13 @@ import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexOver;
+import org.apache.calcite.rex.RexVisitor;
+import org.apache.calcite.rex.RexVisitorImpl;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * ConvertToImpalaRelRules.  Contains the rules used to change the Calcite RelNodes
@@ -44,7 +52,11 @@ public class ConvertToImpalaRelRules {
     @Override
     public void onMatch(RelOptRuleCall call) {
       final LogicalProject project = call.rel(0);
-      call.transformTo(new ImpalaProjectRel(project));
+      List<RexOver> rexOvers = ImpalaAnalyticRel.gatherRexOver(project.getProjects());
+      Project newProject = rexOvers.size() > 0
+          ? new ImpalaAnalyticRel(project)
+          : new ImpalaProjectRel(project);
+      call.transformTo(newProject);
     }
   }
 
@@ -136,5 +148,4 @@ public class ConvertToImpalaRelRules {
       call.transformTo(new ImpalaJoinRel(join));
     }
   }
-
 }

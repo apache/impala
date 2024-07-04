@@ -145,6 +145,9 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
   public static List<Expr> getExprs(CreateExprVisitor visitor, List<RexNode> operands)
       throws ImpalaException {
     List<Expr> exprs = new ArrayList<>();
+    if (operands == null) {
+      return exprs;
+    }
     for (RexNode operand : operands) {
       exprs.add(getExpr(visitor, operand));
     }

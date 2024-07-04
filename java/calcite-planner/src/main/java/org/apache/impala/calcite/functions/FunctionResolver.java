@@ -41,8 +41,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The FunctionResolver is a wrapper around the Impala Function Resolver (via the
- * (Db.getFunction() method). In this current iteration, only exact matches are
- * resolved. TODO: IMPALA-13022: change this comment when implicit conversion is handled.
+ * (Db.getFunction() method).
  */
 public class FunctionResolver {
   protected static final Logger LOG =

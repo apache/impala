@@ -26,6 +26,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexOver;
 import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
@@ -112,7 +113,7 @@ public class CoerceOperandShuttle extends RexShuttle {
           call);
     }
 
-    RelDataType retType = ImpalaTypeConverter.getRelDataType(fn.getReturnType());
+    RelDataType retType = getReturnType(castedOperandsCall, fn.getReturnType());
 
     // This code does not handle changes in the return type when the Calcite
     // function is not a decimal but the function resolves to a function that
@@ -140,6 +141,34 @@ public class CoerceOperandShuttle extends RexShuttle {
   }
 
   @Override
+  public RexNode visitOver(RexOver over) {
+    // recursively call all embedded RexCalls first
+    RexOver castedOver = (RexOver) super.visitOver(over);
+
+    Function fn = FunctionResolver.getSupertypeFunction(castedOver);
+
+    if (fn == null) {
+      throw new RuntimeException("Could not find a matching signature for call " +
+          over);
+    }
+
+    RelDataType retType = getReturnType(castedOver, fn.getReturnType());
+
+    List<RexNode> newOperands =
+        getCastedArgTypes(fn, castedOver.getOperands(), factory, rexBuilder);
+
+    return retType.equals(castedOver.getType()) &&
+           newOperands.equals(castedOver.getOperands())
+        ? castedOver
+        : (RexOver) rexBuilder.makeOver(retType, castedOver.getAggOperator(),
+              newOperands, castedOver.getWindow().partitionKeys,
+              castedOver.getWindow().orderKeys, castedOver.getWindow().getLowerBound(),
+              castedOver.getWindow().getUpperBound(), castedOver.getWindow().isRows(),
+              true /*allowPartial*/, false /*nullWhenCountZero*/, castedOver.isDistinct(),
+              castedOver.ignoreNulls());
+  }
+
+  @Override
   public RexNode visitLiteral(RexLiteral literal) {
     // Coerce CHAR literal types into STRING
     if (literal.getType().getSqlTypeName().equals(SqlTypeName.CHAR)) {
@@ -164,6 +193,28 @@ public class CoerceOperandShuttle extends RexShuttle {
     return inputRef.getType().equals(inputRefIndexType)
         ? inputRef
         : rexBuilder.makeInputRef(inputRefIndexType, inputRef.getIndex());
+  }
+
+
+  private RelDataType getReturnType(RexNode rexNode, Type impalaReturnType) {
+
+    RelDataType retType = ImpalaTypeConverter.getRelDataType(impalaReturnType);
+
+    // This code does not handle changes in the return type when the Calcite
+    // function is not a decimal but the function resolves to a function that
+    // returns a decimal type. The Decimal type from the function resolver would
+    // have to calculate the precision and scale based on operand types. If
+    // necessary, this code should be added later.
+    Preconditions.checkState(retType.getSqlTypeName() != SqlTypeName.DECIMAL ||
+        rexNode.getType().getSqlTypeName() == SqlTypeName.DECIMAL);
+
+    // So if the original return type is Decimal and the function resolves to
+    // decimal, the precision and scale are saved from the original function.
+    if (retType.getSqlTypeName().equals(SqlTypeName.DECIMAL)) {
+      retType = rexNode.getType();
+    }
+
+    return retType;
   }
 
   /**
