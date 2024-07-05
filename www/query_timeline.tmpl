@@ -60,11 +60,11 @@ g.plan_node:active {
 }
 
 #hor_zoomout {
-  background-image: url("www/icons/horizontal_zoomout.png");
+  background-image: url("{{ __common__.host-url }}/www/icons/horizontal_zoomout.png");
 }
 
 #hor_zoomin {
-  background-image: url("www/icons/horizontal_zoomin.png");
+  background-image: url("{{ __common__.host-url }}/www/icons/horizontal_zoomin.png");
 }
 
 #hor_zoomout, #hor_zoomin{
@@ -139,7 +139,7 @@ g.plan_node:active {
     </div>
   </div>
   <div id="host_utilization_wrapper">
-    <img id="host_utilization_resize_bar" src="www/icons/drag_handle.png" draggable="false"/>
+    <img id="host_utilization_resize_bar" src="{{ __common__.host-url }}/www/icons/drag_handle.png" draggable="false"/>
     <input id="host_utilization_close_btn" class="btn btn-primary btn-sm" type="button"
         value="X" data-dismiss="modal"/>
     <div id="host_utilization_diagram">
@@ -148,7 +148,7 @@ g.plan_node:active {
     </div>
   </div>
   <div id="fragment_metrics_wrapper">
-    <img id="fragment_metrics_resize_bar" src="www/icons/drag_handle.png" draggable="false"/>
+    <img id="fragment_metrics_resize_bar" src="{{ __common__.host-url }}/www/icons/drag_handle.png" draggable="false"/>
     <input id="fragment_metrics_close_btn" class="btn btn-primary btn-sm" type="button"
         value="X" data-dismiss="modal"/>
     <div id="fragment_metrics_diagram">
@@ -164,16 +164,16 @@ g.plan_node:active {
 $("#plan-timing-tab").addClass("active");
 
 import {renderTimingDiagram, collectFragmentEventsFromProfile, ntics, set_ntics} from
-    "./www/scripts/query_timeline/fragment_diagram.js";
+    "{{ __common__.host-url }}/www/scripts/query_timeline/fragment_diagram.js";
 import {collectUtilizationFromProfile, toogleUtilizationVisibility,
     destroyUtilizationChart}
-    from "./www/scripts/query_timeline/host_utilization_diagram.js";
+    from "{{ __common__.host-url }}/www/scripts/query_timeline/host_utilization_diagram.js";
 import {collectFragmentMetricsFromProfile, closeFragmentMetricsChart} from
-    "./www/scripts/query_timeline/fragment_metrics_diagram.js";
+    "{{ __common__.host-url }}/www/scripts/query_timeline/fragment_metrics_diagram.js";
 import {profile, set_profile, maxts, set_maxts, diagram_width, set_diagram_width,
     border_stroke_width, resizeHorizontalAll}
-    from "./www/scripts/query_timeline/global_members.js";
-import {inflateParseJSON} from "./www/scripts/compression_util.js";
+    from "{{ __common__.host-url }}/www/scripts/query_timeline/global_members.js";
+import {inflateParseJSON} from "{{ __common__.host-url }}/www/scripts/compression_util.js";
 
 var chart_export_style;
 var last_maxts;
