@@ -129,3 +129,37 @@ SELECT * FROM parquet_dict_runtime_filter_partitioned a
 aggregation(SUM, NumDictFilteredRowGroups): 2
 aggregation(SUM, RowGroups total): 2
 ====
+---- QUERY
+CREATE TABLE parquet_dict_runtime_filter_null_values (
+  col_1 BIGINT,
+  col_2 STRING
+)
+STORED AS PARQUET;
+====
+---- QUERY
+INSERT INTO parquet_dict_runtime_filter_null_values
+  VALUES (0, "abc"), (1, NULL), (2, NULL), (3, "abc");
+====
+---- QUERY
+CREATE TABLE null_values_dim_tbl (
+  col_1 STRING
+)
+STORED AS PARQUET;
+====
+---- QUERY
+INSERT INTO null_values_dim_tbl VALUES (NULL);
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SELECT * FROM parquet_dict_runtime_filter_null_values a
+  JOIN null_values_dim_tbl b
+  ON IFNULL(a.col_2, '') = IFNULL(b.col_1, '');
+---- RESULTS
+1,'NULL','NULL'
+2,'NULL','NULL'
+---- TYPES
+BIGINT,STRING,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 0
+aggregation(SUM, RowGroups total): 1
+====
