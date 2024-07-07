@@ -286,6 +286,8 @@ class ClusterMembershipMgr {
   /// 'current_membership_lock_'.
   mutable std::mutex callback_fn_lock_;
 
+  std::string membership_topic_name_;
+
   friend class impala::test::SchedulerWrapper;
   friend class ClusterMembershipMgrUnitTest_TestPopulateExpectedExecGroupSets_Test;
 };

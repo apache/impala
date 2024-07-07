@@ -912,6 +912,8 @@ class AdmissionController {
   typedef boost::unordered_map<UniqueIdPB, int> NumReleasedBackends;
   NumReleasedBackends num_released_backends_;
 
+  std::string request_queue_topic_name_;
+
   /// Resolves the resource pool name in 'query_ctx.request_pool' and stores the resulting
   /// name in 'pool_name' and the resulting config in 'pool_config'.
   Status ResolvePoolAndGetConfig(const TQueryCtx& query_ctx, std::string* pool_name,

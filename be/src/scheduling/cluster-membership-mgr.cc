@@ -31,6 +31,7 @@
 
 DECLARE_int32(num_expected_executors);
 DECLARE_string(expected_executor_group_sets);
+DECLARE_string(cluster_id);
 
 namespace {
 using namespace impala;
@@ -90,6 +91,11 @@ ClusterMembershipMgr::ClusterMembershipMgr(
     current_membership_(std::make_shared<const Snapshot>()),
     statestore_subscriber_(subscriber),
     local_backend_id_(move(local_backend_id)) {
+  if (FLAGS_cluster_id.empty()) {
+    membership_topic_name_ = Statestore::IMPALA_MEMBERSHIP_TOPIC;
+  } else {
+    membership_topic_name_ = FLAGS_cluster_id + '-' + Statestore::IMPALA_MEMBERSHIP_TOPIC;
+  }
   Status status = PopulateExpectedExecGroupSets(expected_exec_group_sets_);
   if(!status.ok()) {
     LOG(FATAL) << "Error populating expected executor group sets: " << status;
@@ -132,7 +138,7 @@ Status ClusterMembershipMgr::Init() {
   StatestoreSubscriber::UpdateCallback cb =
       bind<void>(mem_fn(&ClusterMembershipMgr::UpdateMembership), this, _1, _2);
   Status status = statestore_subscriber_->AddTopic(
-      Statestore::IMPALA_MEMBERSHIP_TOPIC, /* is_transient=*/ true,
+      membership_topic_name_, /* is_transient=*/ true,
       /* populate_min_subscriber_topic_version=*/ false,
       /* filter_prefix= */"", cb);
   if (!status.ok()) {
@@ -196,7 +202,7 @@ void ClusterMembershipMgr::UpdateMembership(
 
   // First look to see if the topic we're interested in has an update.
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
-      incoming_topic_deltas.find(Statestore::IMPALA_MEMBERSHIP_TOPIC);
+      incoming_topic_deltas.find(membership_topic_name_);
 
   // Ignore spurious messages.
   if (topic == incoming_topic_deltas.end()) return;
@@ -526,7 +532,7 @@ void ClusterMembershipMgr::AddLocalBackendToStatestore(
 
   subscriber_topic_updates->emplace_back(TTopicDelta());
   TTopicDelta& update = subscriber_topic_updates->back();
-  update.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;
+  update.topic_name = membership_topic_name_;
   update.topic_entries.emplace_back(TTopicItem());
   // Setting this flag allows us to pass the resulting topic update to other
   // ClusterMembershipMgr instances in tests unmodified.

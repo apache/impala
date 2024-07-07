@@ -309,6 +309,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             num_coordinators=NUM_COORDINATORS,
                             use_exclusive_coordinators=False,
                             add_executors=False,
+                            add_impalads=False,
                             log_level=1,
                             expected_num_impalads=DEFAULT_CLUSTER_SIZE,
                             expected_subscribers=0,
@@ -337,6 +338,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     if add_executors:
       cmd.append("--add_executors")
+
+    if add_impalads:
+      cmd.append("--add_impalads")
 
     if pytest.config.option.use_local_catalog:
       cmd.append("--impalad_args=--use_local_catalog=1")

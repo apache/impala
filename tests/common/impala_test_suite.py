@@ -316,7 +316,16 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def create_client_for_nth_impalad(cls, nth=0, protocol='beeswax'):
-    host_port = cls.__get_cluster_host_ports(protocol)[nth]
+    host_ports = cls.__get_cluster_host_ports(protocol)
+    if nth < len(IMPALAD_HOST_PORT_LIST):
+      host_port = host_ports[nth]
+    else:
+      # IMPALAD_HOST_PORT_LIST just has 3 items. When we start more impalads, calculate
+      # the ports based on the first item.
+      host_port = host_ports[0]
+      host, port = host_port.split(':')
+      port = str(int(port) + nth)
+      host_port = host + ':' + port
     return ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
 
   @classmethod
