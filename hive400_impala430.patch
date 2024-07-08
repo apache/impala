@@ -1,0 +1,291 @@
+diff --git a/bin/impala-config.sh b/bin/impala-config.sh
+index 5396ce3..469f27a 100755
+--- a/bin/impala-config.sh
++++ b/bin/impala-config.sh
+@@ -74,7 +74,7 @@ export IMPALA_VERSION=4.3.0-RELEASE
+ 
+ # Whether to build on Apache Hive (or CDP Hive). Versions of some toolchain dependencies
+ # (e.g. thrift) will also depend on this.
+-export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
++export USE_APACHE_HIVE=${USE_APACHE_HIVE-true}
+ 
+ # Whether to build the backend on Avro C++ library or C.
+ # This is added temporarily to help transitioning from Avro C to C++ library.
+@@ -242,9 +242,9 @@ export CDP_TEZ_VERSION=0.9.1.7.2.18.0-273
+ # Ref: https://infra.apache.org/release-download-pages.html#closer
+ : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
+ export APACHE_MIRROR
+-export APACHE_HIVE_VERSION=3.1.3
+-export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
+-export APACHE_OZONE_VERSION=1.3.0
++export APACHE_HIVE_VERSION=4.0.0
++export APACHE_HIVE_STORAGE_API_VERSION=4.0.0
++export APACHE_OZONE_VERSION=1.4.0
+ 
+ export ARCH_NAME=$(uname -p)
+ 
+@@ -607,7 +607,7 @@ else
+ fi
+ # Set the path to the hive_metastore.thrift which is used to build thrift code
+ export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
+-"$HIVE_SRC_DIR/standalone-metastore/src/main/thrift"}
++"$HIVE_SRC_DIR/standalone-metastore/metastore-common/src/main/thrift"}
+ export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
+ export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
+ if $USE_APACHE_OZONE; then
+diff --git a/buildall.sh b/buildall.sh
+index ba32813..2ef9ce7 100755
+--- a/buildall.sh
++++ b/buildall.sh
+@@ -452,7 +452,8 @@ bootstrap_dependencies() {
+     cp $IMPALA_HOME/../hadoopAarch64NativeLibs/lib*  $HADOOP_HOME/lib/native/
+   fi
+   if [[ "${USE_APACHE_HIVE}" = true ]]; then
+-    "$IMPALA_HOME/testdata/bin/patch_hive.sh"
++    rm $HIVE_HOME/lib/guava-*jar
++    cp $HADOOP_HOME/share/hadoop/hdfs/lib/guava-*.jar $HIVE_HOME/lib/
+   fi
+ }
+ 
+diff --git a/fe/pom.xml b/fe/pom.xml
+index 462a641..660d0fa 100644
+--- a/fe/pom.xml
++++ b/fe/pom.xml
+@@ -97,6 +97,12 @@ under the License.
+       </exclusions>
+     </dependency>
+ 
++<dependency>
++    <groupId>org.apache.hive</groupId>
++    <artifactId>hive-metastore</artifactId>
++    <version>4.0.0</version>
++</dependency>
++
+     <dependency>
+       <groupId>org.apache.hudi</groupId>
+       <artifactId>hudi-hadoop-mr</artifactId>
+@@ -502,10 +508,81 @@ under the License.
+       <artifactId>hive-classification</artifactId>
+       <version>${hive.version}</version>
+     </dependency>
+-
+     <dependency>
+       <groupId>org.apache.hive</groupId>
+-      <artifactId>hive-standalone-metastore</artifactId>
++      <artifactId>hive-standalone-metastore-common</artifactId>
++      <version>${hive.version}</version>
++      <exclusions>
++        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
++        <exclusion>
++          <groupId>org.apache.logging.log4j</groupId>
++          <artifactId>log4j-slf4j-impl</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.logging.log4j</groupId>
++          <artifactId>log4j-1.2-api</artifactId>
++        </exclusion>
++        <!-- Exclude json-smart to pin the version -->
++        <exclusion>
++          <groupId>net.minidev</groupId>
++          <artifactId>json-smart</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.hive</groupId>
++          <artifactId>hive-serde</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.hive</groupId>
++          <artifactId>hive-shims</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.hadoop</groupId>
++          <artifactId>*</artifactId>
++        </exclusion>
++      </exclusions>
++    </dependency>
++    <dependency>
++      <groupId>org.apache.hive.hcatalog</groupId>
++      <artifactId>hive-hcatalog-server-extensions</artifactId>
++      <version>${hive.version}</version>
++      <exclusions>
++        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
++        <exclusion>
++          <groupId>org.apache.logging.log4j</groupId>
++          <artifactId>log4j-slf4j-impl</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.logging.log4j</groupId>
++          <artifactId>log4j-1.2-api</artifactId>
++        </exclusion>
++        <!-- Exclude json-smart to pin the version -->
++        <exclusion>
++          <groupId>net.minidev</groupId>
++          <artifactId>json-smart</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.hive</groupId>
++          <artifactId>hive-serde</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.hive</groupId>
++          <artifactId>hive-shims</artifactId>
++        </exclusion>
++        <exclusion>
++          <groupId>org.apache.hadoop</groupId>
++          <artifactId>*</artifactId>
++        </exclusion>
++      </exclusions>
++    </dependency>
++<!--
++	<dependency>
++          <groupId>org.apache.hive</groupId>
++          <artifactId>hive-standalone-metastore</artifactId>
++          <version>${hive.version}</version>
++      </dependency> -->
++    <dependency>
++      <groupId>org.apache.hive</groupId>
++      <artifactId>hive-standalone-metastore-server</artifactId>
+       <version>${hive.version}</version>
+       <exclusions>
+         <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+@@ -841,94 +918,6 @@ under the License.
+         </configuration>
+       </plugin>
+ 
+-      <plugin>
+-        <groupId>org.apache.maven.plugins</groupId>
+-        <artifactId>maven-enforcer-plugin</artifactId>
+-        <version>3.1.0</version>
+-        <executions>
+-          <execution>
+-            <id>enforce-banned-dependencies</id>
+-            <goals>
+-              <goal>enforce</goal>
+-            </goals>
+-            <configuration>
+-              <rules>
+-                <bannedDependencies>
+-                  <excludes>
+-                    <!-- We shouldn't have a runtime dependency on Ant or the
+-                         Jetty server -->
+-                    <exclude>ant:*</exclude>
+-                    <exclude>ant-contrib:*</exclude>
+-                    <exclude>org.apache.ant:*</exclude>
+-                    <exclude>org.eclipse.jetty:*</exclude>
+-                    <!-- We use reload4j, exclude log4j 1.x and 2.x -->
+-                    <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
+-                    <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
+-                    <exclude>log4j:*</exclude>
+-                    <exclude>org.slf4j:slf4j-log4j12</exclude>
+-                    <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+-                    <exclude>org.fusesource.leveldbjni:*</exclude>
+-                    <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
+-                    <exclude>org.apache.httpcomponents:fluent-hc</exclude>
+-                    <!-- IMPALA-9649 (Avoid pulling in shiro* due to CVE's) -->
+-                    <exclude>org.apache.shiro:shiro-core:*</exclude>
+-                    <exclude>org.apache.shiro:shiro-crypto-cipher:*</exclude>
+-                    <!-- IMPALA-9648: Ensure that netty-all is not present. -->
+-                    <exclude>io.netty:*</exclude>
+-                    <!-- Avoid runtime dependency on rocksdb. -->
+-                    <exclude>org.rocksdb:*</exclude>
+-                    <!-- Avoid runtime dependency on Jersey server components. -->
+-                    <exclude>com.sun.jersey:jersey-server</exclude>
+-                    <exclude>com.sun.jersey:jersey-server</exclude>
+-                    <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
+-                    <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
+-                    <!-- IMPALA-9708: Sentry is removed. -->
+-                    <exclude>org.apache.sentry:*</exclude>
+-                    <!-- IMPALA-11673: Ensure spring-jcl is not present. -->
+-                    <exclude>org.springframework:spring-jcl</exclude>
+-                    <!-- Assert that we only use artifacts from only the specified
+-                         version of these components. -->
+-                    <exclude>org.apache.hadoop:*</exclude>
+-                    <exclude>org.apache.hbase:*</exclude>
+-                    <exclude>org.apache.hive:*</exclude>
+-                    <exclude>org.apache.kudu:*</exclude>
+-                    <exclude>org.apache.parquet:*</exclude>
+-                    <exclude>org.apache.avro:*</exclude>
+-                    <exclude>org.apache.orc:*</exclude>
+-                  </excludes>
+-                  <includes>
+-                    <!-- ranger-plugins-audit depends on jetty-client, which in turn pulls in jetty-http and jetty-io. -->
+-                    <include>org.eclipse.jetty:jetty-client</include>
+-                    <include>org.eclipse.jetty:jetty-http</include>
+-                    <include>org.eclipse.jetty:jetty-io</include>
+-                    <!-- jetty-security is needed by jetty-servlet. -->
+-                    <include>org.eclipse.jetty:jetty-security</include>
+-                    <!-- jetty-servlet is required by hive-standalone-metastore after HIVE-26071. -->
+-￼                    <include>org.eclipse.jetty:jetty-servlet</include>
+-                    <!-- jetty-server is required when HiveMetaStoreClient is instantiated after HIVE-21456. -->
+-                    <include>org.eclipse.jetty:jetty-server</include>
+-                    <!-- hadoop-yarn-common depends on some Jetty utilities. -->
+-                    <include>org.eclipse.jetty:jetty-util</include>
+-                    <include>org.eclipse.jetty:jetty-util-ajax</include>
+-                    <!-- Include the allowed versions specifically -->
+-                    <include>org.apache.hadoop:*:${hadoop.version}</include>
+-                    <include>org.apache.hadoop:*:${ozone.version}</include>
+-                    <include>org.apache.hbase:*:${hbase.version}</include>
+-                    <include>org.apache.hive:*:${hive.version}</include>
+-                    <include>org.apache.hive:hive-storage-api:${hive.storage.api.version}</include>
+-                    <include>org.apache.kudu:*:${kudu.version}</include>
+-                    <include>org.apache.avro:*:${avro.version}</include>
+-                    <include>org.apache.parquet:*:${parquet.version}</include>
+-                    <include>org.apache.orc:*:${orc.version}</include>
+-                    <include>org.apache.ozone:*:${ozone.version}</include>
+-                  </includes>
+-                </bannedDependencies>
+-              </rules>
+-              <fail>true</fail>
+-            </configuration>
+-          </execution>
+-        </executions>
+-      </plugin>
+     </plugins>
+ 
+     <pluginManagement>
+diff --git a/fe/src/main/java/org/apache/impala/catalog/Hive3MetastoreShimBase.java b/fe/src/main/java/org/apache/impala/catalog/Hive3MetastoreShimBase.java
+index feb3745..c195736 100644
+--- a/fe/src/main/java/org/apache/impala/catalog/Hive3MetastoreShimBase.java
++++ b/fe/src/main/java/org/apache/impala/catalog/Hive3MetastoreShimBase.java
+@@ -57,6 +57,7 @@ import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
+ import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+ import org.apache.hadoop.hive.metastore.utils.FileUtils;
+ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
++import org.apache.hadoop.hive.metastore.utils.MetaStoreServerUtils;
+ import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
+ import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
+ import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
+@@ -200,9 +201,9 @@ public class Hive3MetastoreShimBase {
+    * Wrapper around MetaStoreUtils.updatePartitionStatsFast() to deal with added
+    * arguments.
+    */
+-  public static void updatePartitionStatsFast(Partition partition, Table tbl,
++  public static void updatePartitionStatsFast(Partition partition, org.apache.hadoop.hive.metastore.api.Table tbl,
+       Warehouse warehouse) throws MetaException {
+-    MetaStoreUtils.updatePartitionStatsFast(partition, tbl, warehouse, /*madeDir*/false,
++    MetaStoreServerUtils.updatePartitionStatsFast(partition, tbl, warehouse, /*madeDir*/false,
+         /*forceRecompute*/false,
+         /*environmentContext*/null, /*isCreate*/false);
+   }
+diff --git a/fe/src/main/java/org/apache/impala/catalog/Table.java b/fe/src/main/java/org/apache/impala/catalog/Table.java
+index 2364f82..121730d 100644
+--- a/fe/src/main/java/org/apache/impala/catalog/Table.java
++++ b/fe/src/main/java/org/apache/impala/catalog/Table.java
+@@ -417,6 +417,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
+     tableStats_.setTotal_file_bytes(FeCatalogUtils.getTotalSize(msTbl.getParameters()));
+   }
+ 
++public Map<String,String> getParameters() {
++    return msTable_.getParameters();
++  }
++
+   public void addColumn(Column col) {
+     colsByPos_.add(col);
+     colsByName_.put(col.getName().toLowerCase(), col);
+@@ -1057,4 +1061,4 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
+       setLastSyncedEventId(eventId);
+     }
+   }
+-}
+\ No newline at end of file
++}

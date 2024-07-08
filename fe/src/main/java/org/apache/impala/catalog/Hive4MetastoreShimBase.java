@@ -80,13 +80,12 @@ import org.apache.impala.util.HiveMetadataFormatUtils;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 
 /**
  * Base class for Hive 3 MetastoreShim.
  */
-public class Hive3MetastoreShimBase {
-  private static final Logger LOG = LoggerFactory.getLogger(Hive3MetastoreShimBase.class);
+public class Hive4MetastoreShimBase {
+  private static final Logger LOG = LoggerFactory.getLogger(Hive4MetastoreShimBase.class);
 
   protected static final String EXTWRITE = "EXTWRITE";
   protected static final String EXTREAD = "EXTREAD";
@@ -100,7 +99,7 @@ public class Hive3MetastoreShimBase {
   protected static final String HIVEMQT = "HIVEMQT";
   // Virtual View
   protected static final String HIVESQL = "HIVESQL";
-  protected static final long MAJOR_VERSION = 3;
+  protected static final long MAJOR_VERSION = 4;
   protected static boolean capabilitiestSet_ = false;
 
   // Max sleep interval during acquiring an ACID lock.
@@ -268,7 +267,7 @@ public class Hive3MetastoreShimBase {
           .put("MANAGED_TABLE", TImpalaTableType.TABLE)
           .put("INDEX_TABLE", TImpalaTableType.TABLE)
           .put("VIRTUAL_VIEW", TImpalaTableType.VIEW)
-          .put("MATERIALIZED_VIEW", TImpalaTableType.MATERIALIZED_VIEW).build();
+          .put("MATERIALIZED_VIEW", TImpalaTableType.VIEW).build();
 
   /**
    * Method which maps Metastore's TableType to Impala's table type. In metastore 2
@@ -289,9 +288,8 @@ public class Hive3MetastoreShimBase {
       case MANAGED_TABLE:
         return TImpalaTableType.TABLE;
       case VIRTUAL_VIEW:
-        return TImpalaTableType.VIEW;
       case MATERIALIZED_VIEW:
-        return TImpalaTableType.MATERIALIZED_VIEW;
+        return TImpalaTableType.VIEW;
       default:
         return defaultTableType;
     }
@@ -299,21 +297,14 @@ public class Hive3MetastoreShimBase {
 
   // hive-3 introduces a catalog object in hive
   // Impala only supports the default catalog of hive
-  private static final String DEFAULT_CATALOG_NAME = MetaStoreUtils
+  private static final String defaultCatalogName_ = MetaStoreUtils
       .getDefaultCatalog(MetastoreConf.newMetastoreConf());
 
   /**
    * Gets the name of the default catalog from metastore configuration.
    */
   public static String getDefaultCatalogName() {
-    return DEFAULT_CATALOG_NAME;
-  }
-
-  /**
-   * Returns whether the catalog name is the default catalog.
-   */
-  public static boolean isDefaultCatalog(String catalogName) {
-    return DEFAULT_CATALOG_NAME.equalsIgnoreCase(catalogName);
+    return defaultCatalogName_;
   }
 
   /**
@@ -831,12 +822,5 @@ public class Hive3MetastoreShimBase {
     // TODO(IMPALA-9088): deal with customized transformer in HMS.
     return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
         .toString();
-  }
-
-  /**
-   * At the Metadata level there are no restrictions on column names.
-   */
-  public static boolean validateColumnName(String name) {
-    return MetaStoreUtils.validateColumnName(name);
   }
 }

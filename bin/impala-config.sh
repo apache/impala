@@ -74,7 +74,7 @@ export IMPALA_VERSION=4.5.0-SNAPSHOT
 
 # Whether to build on Apache Hive (or CDP Hive). Versions of some toolchain dependencies
 # (e.g. thrift) will also depend on this.
-export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
+export USE_APACHE_HIVE=${USE_APACHE_HIVE-true}
 
 # Whether to build the backend on Avro C++ library or C.
 # This is added temporarily to help transitioning from Avro C to C++ library.
@@ -272,9 +272,9 @@ export CDP_TEZ_VERSION=0.9.1.7.3.0.0-128
 # Ref: https://infra.apache.org/release-download-pages.html#closer
 : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
 export APACHE_MIRROR
-export APACHE_HIVE_VERSION=3.1.3
-export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
-export APACHE_OZONE_VERSION=1.3.0
+export APACHE_HIVE_VERSION=4.0.0
+export APACHE_HIVE_STORAGE_API_VERSION=4.0.0
+export APACHE_OZONE_VERSION=1.4.0
 
 # Java dependencies that are not also runtime components. Declaring versions here allows
 # other branches to override them in impala-config-branch.sh for cleaner patches.
@@ -650,7 +650,7 @@ else
 fi
 # Set the path to the hive_metastore.thrift which is used to build thrift code
 export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
-"$HIVE_SRC_DIR/standalone-metastore/src/main/thrift"}
+"$HIVE_SRC_DIR/standalone-metastore/metastore-common/src/main/thrift"}
 export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
 export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
 if $USE_APACHE_OZONE; then

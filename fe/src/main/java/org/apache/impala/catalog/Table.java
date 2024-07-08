@@ -453,6 +453,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     tableStats_.setNum_rows(rowCount);
   }
 
+public Map<String,String> getParameters() {
+    return msTable_.getParameters();
+  }
+
   public void addColumn(Column col) {
     colsByPos_.add(col);
     colsByName_.put(col.getName().toLowerCase(), col);
