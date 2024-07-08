@@ -276,6 +276,8 @@ export APACHE_HIVE_VERSION=4.0.0
 export APACHE_HIVE_STORAGE_API_VERSION=4.0.0
 export APACHE_OZONE_VERSION=1.4.0
 
+export ARCH_NAME=$(uname -p)
+
 # Java dependencies that are not also runtime components. Declaring versions here allows
 # other branches to override them in impala-config-branch.sh for cleaner patches.
 export IMPALA_BOUNCY_CASTLE_VERSION=1.78

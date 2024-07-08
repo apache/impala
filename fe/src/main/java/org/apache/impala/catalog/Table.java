@@ -457,6 +457,10 @@ public Map<String,String> getParameters() {
     return msTable_.getParameters();
   }
 
+public Map<String,String> getParameters() {
+    return msTable_.getParameters();
+  }
+
   public void addColumn(Column col) {
     colsByPos_.add(col);
     colsByName_.put(col.getName().toLowerCase(), col);
