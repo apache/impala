@@ -157,9 +157,8 @@ on (a.id = b.id and 1 + 1 > 10)
 ---- PLAN
 PLAN-ROOT SINK
 |
-02:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: a.id = b.id
-|  other join predicates: FALSE
+02:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  join predicates: FALSE
 |  row-size=178B cardinality=100
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
@@ -179,11 +178,9 @@ on (a.id = b.id and !true)
 ---- PLAN
 PLAN-ROOT SINK
 |
-02:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: a.id = b.id
-|  other join predicates: FALSE
-|  runtime filters: RF000 <- b.id
-|  row-size=178B cardinality=9
+02:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: FALSE
+|  row-size=178B cardinality=100
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     HDFS partitions=4/4 files=4 size=460B
@@ -191,7 +188,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypessmall a]
    HDFS partitions=4/4 files=4 size=6.32KB
-   runtime filters: RF000 -> a.id
    row-size=89B cardinality=100
 ====
 # Constant conjunct in the ON-clause of an outer join is
