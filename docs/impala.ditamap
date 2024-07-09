@@ -256,7 +256,7 @@ under the License.
         <topicref href="topics/impala_thread_reservation_limit.xml"/>
         <topicref href="topics/impala_timezone.xml"/>
         <topicref href="topics/impala_topn_bytes_limit.xml"/>
-        <topicref rev="4.5.0" href="topics/impala_use_null_slots_cache.xml"/>
+        <topicref rev="4.4.0" href="topics/impala_use_null_slots_cache.xml"/>
         <topicref href="topics/impala_utf8_mode.xml"/>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
@@ -295,7 +295,7 @@ under the License.
     <topicref href="topics/impala_porting.xml"/>
     <topicref href="topics/impala_utf_8.xml"/>
   </topicref>
-  
+
   <topicref href="topics/impala_performance.xml">
     <topicref href="topics/impala_perf_cookbook.xml"/>
     <topicref href="topics/impala_perf_joins.xml"/>
