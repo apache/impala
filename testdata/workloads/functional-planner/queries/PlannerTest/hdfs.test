@@ -1276,6 +1276,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: functional.alltypes.int_col = 1, FALSE OR 1 + random() * 1 = 100
+   predicates: functional.alltypes.int_col = 1, 1 + random() * 1 = 100
    row-size=4B cardinality=231
 ====
