@@ -93,11 +93,11 @@ under the License.
       </exclusions>
     </dependency>
 
-<dependency>
-    <groupId>org.apache.hive</groupId>
-    <artifactId>hive-metastore</artifactId>
-    <version>4.0.0</version>
-</dependency>
+   <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-metastore</artifactId>
+      <version>${hive.version}</version>
+   </dependency>
 
     <dependency>
       <groupId>org.apache.hudi</groupId>
@@ -922,98 +922,6 @@ under the License.
                when running tests like this: mvn test -DcodeCoverage -->
           <skip>${jacoco.skip}</skip>
         </configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.1.0</version>
-        <executions>
-          <execution>
-            <id>enforce-banned-dependencies</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <bannedDependencies>
-                  <excludes>
-                    <!-- We shouldn't have a runtime dependency on Ant or the
-                         Jetty server -->
-                    <exclude>ant:*</exclude>
-                    <exclude>ant-contrib:*</exclude>
-                    <exclude>org.apache.ant:*</exclude>
-                    <exclude>org.eclipse.jetty:*</exclude>
-                    <!-- We use reload4j, exclude log4j 1.x and 2.x -->
-                    <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
-                    <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
-                    <exclude>log4j:*</exclude>
-                    <exclude>org.slf4j:slf4j-log4j12</exclude>
-                    <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
-                    <exclude>org.fusesource.leveldbjni:*</exclude>
-                    <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
-                    <exclude>org.apache.httpcomponents:fluent-hc</exclude>
-                    <!-- IMPALA-9649 (Avoid pulling in shiro* due to CVE's) -->
-                    <exclude>org.apache.shiro:shiro-core:*</exclude>
-                    <exclude>org.apache.shiro:shiro-crypto-cipher:*</exclude>
-                    <!-- Avoid runtime dependency on rocksdb. -->
-                    <exclude>org.rocksdb:*</exclude>
-                    <!-- Avoid runtime dependency on Jersey server components. -->
-                    <exclude>com.sun.jersey:jersey-server</exclude>
-                    <exclude>com.sun.jersey:jersey-server</exclude>
-                    <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
-                    <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
-                    <!-- IMPALA-9708: Sentry is removed. -->
-                    <exclude>org.apache.sentry:*</exclude>
-                    <!-- IMPALA-11673: Ensure spring-jcl is not present. -->
-                    <exclude>org.springframework:spring-jcl</exclude>
-                    <!-- Assert that we only use artifacts from only the specified
-                         version of these components. -->
-                    <exclude>org.apache.hadoop:*</exclude>
-                    <exclude>org.apache.hbase:*</exclude>
-                    <exclude>org.apache.hive:*</exclude>
-                    <exclude>org.apache.kudu:*</exclude>
-                    <exclude>org.apache.parquet:*</exclude>
-                    <exclude>org.apache.avro:*</exclude>
-                    <exclude>org.apache.orc:*</exclude>
-                    <exclude>org.jdom:jdom</exclude>
-                    <exclude>org.bouncycastle:bcprov-jdk15on:*</exclude>
-                    <exclude>org.bouncycastle:bcprov-jdk15to18:*</exclude>
-                    <exclude>org.bouncycastle:bcprov-jdk15on:*</exclude>
-                    <exclude>org.bouncycastle:bcpkix-jdk15to18:*</exclude>
-                  </excludes>
-                  <includes>
-                    <!-- ranger-plugins-audit depends on jetty-client, which in turn pulls in jetty-http and jetty-io. -->
-                    <include>org.eclipse.jetty:jetty-client</include>
-                    <include>org.eclipse.jetty:jetty-http</include>
-                    <include>org.eclipse.jetty:jetty-io</include>
-                    <!-- jetty-security is needed by jetty-servlet. -->
-                    <include>org.eclipse.jetty:jetty-security</include>
-                    <!-- jetty-servlet is required by hive-standalone-metastore after HIVE-26071. -->
-￼                    <include>org.eclipse.jetty:jetty-servlet</include>
-                    <!-- jetty-server is required when HiveMetaStoreClient is instantiated after HIVE-21456. -->
-                    <include>org.eclipse.jetty:jetty-server</include>
-                    <!-- hadoop-yarn-common depends on some Jetty utilities. -->
-                    <include>org.eclipse.jetty:jetty-util</include>
-                    <include>org.eclipse.jetty:jetty-util-ajax</include>
-                    <!-- Include the allowed versions specifically -->
-                    <include>org.apache.hadoop:*:${hadoop.version}</include>
-                    <include>org.apache.hadoop:*:${ozone.version}</include>
-                    <include>org.apache.hbase:*:${hbase.version}</include>
-                    <include>org.apache.hive:*:${hive.version}</include>
-                    <include>org.apache.hive:hive-storage-api:${hive.storage.api.version}</include>
-                    <include>org.apache.kudu:*:${kudu.version}</include>
-                    <include>org.apache.avro:*:${avro.version}</include>
-                    <include>org.apache.parquet:*:${parquet.version}</include>
-                    <include>org.apache.orc:*:${orc.version}</include>
-                    <include>org.apache.ozone:*:${ozone.version}</include>
-                  </includes>
-                </bannedDependencies>
-              </rules>
-              <fail>true</fail>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
 

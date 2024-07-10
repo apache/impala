@@ -397,7 +397,7 @@ under the License.
     <module>ext-data-source</module>
     <module>../fe</module>
     <module>external-frontend</module>
-    <module>calcite-planner</module>
+    <!--module>calcite-planner</module-->
     <module>query-event-hook-api</module>
     <module>shaded-deps/hive-exec</module>
     <module>shaded-deps/s3a-aws-sdk</module>

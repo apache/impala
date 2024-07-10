@@ -163,10 +163,11 @@ public class Hive3MetastoreShimBase {
 
   /**
    * Wrapper around MetaStoreUtils.validateName() to deal with added arguments.
-   */
+
   public static boolean validateName(String name) {
-    return MetaStoreUtils.validateName(name, null);
+    return MetaStoreServerUtils.validateName(name, null);
   }
+*/
 
   /**
    * Wrapper around IMetaStoreClient.alter_partition() to deal with added arguments.
@@ -831,12 +832,5 @@ public class Hive3MetastoreShimBase {
     // TODO(IMPALA-9088): deal with customized transformer in HMS.
     return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
         .toString();
-  }
-
-  /**
-   * At the Metadata level there are no restrictions on column names.
-   */
-  public static boolean validateColumnName(String name) {
-    return MetaStoreUtils.validateColumnName(name);
   }
 }

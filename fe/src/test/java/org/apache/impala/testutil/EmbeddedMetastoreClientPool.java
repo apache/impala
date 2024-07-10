@@ -77,13 +77,10 @@ public class EmbeddedMetastoreClientPool extends  MetaStoreClientPool {
     // hive.metastore.uris - empty
     // javax.jdo.option.ConnectionDriverName - org.apache.derby.jdbc.EmbeddedDriver
     // javax.jdo.option.ConnectionURL - jdbc:derby:;databaseName=<path>;create=true"
-    conf.set(ConfVars.METASTOREURIS.varname, "");
     conf.set(ConfVars.METASTORE_CONNECTION_DRIVER.varname,
         "org.apache.derby.jdbc.EmbeddedDriver");
     conf.setBoolean(ConfVars.METASTORE_SCHEMA_VERIFICATION.varname, false);
     conf.setBoolean(ConfVars.METASTORE_AUTO_CREATE_ALL.varname, true);
-    conf.set(ConfVars.METASTORECONNECTURLKEY.varname,
-        String.format(CONNECTION_URL_TEMPLATE, dbStorePath.toString()));
     conf.set(ConfVars.METASTORE_EXPRESSION_PROXY_CLASS.varname,
         DEFAULT_PARTITION_EXPRESSION_PROXY_CLASS);
     conf.set(METASTORE_TASK_THREAD_ALWAYS_KEY, DEFAULT_EVENT_CLEANER_TASK_CLASS);
