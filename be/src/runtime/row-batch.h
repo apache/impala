@@ -292,6 +292,12 @@ class RowBatch {
     memcpy(dest, src, num_tuples_per_row_ * sizeof(Tuple*));
   }
 
+  /// Copies tuple pointers from another row batch. It is allowed for 'src' to have
+  /// less tuples per row - in this case the prefix is copied and remaining tuples are
+  /// initialized to 0. The caller must ensure that src has enough rows / dst has enough
+  /// capacity.
+  void CopyRows(RowBatch* src, int num_rows, int src_offset, int dst_offset);
+
   /// Copy 'num_rows' rows from 'src' to 'dest' within the batch. Useful for exec
   /// nodes that skip an offset and copied more than necessary.
   void CopyRows(int64_t dest, int64_t src, int64_t num_rows) {

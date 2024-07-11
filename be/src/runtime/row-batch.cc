@@ -545,4 +545,29 @@ void RowBatch::VLogRows(const string& context) {
   }
 }
 
+void RowBatch::CopyRows(RowBatch* src, int num_rows, int src_offset, int dst_offset) {
+  DCHECK_GT(num_rows, 0);
+  DCHECK_GE(num_tuples_per_row_, src->num_tuples_per_row_);
+  DCHECK_GE(src_offset, 0);
+  DCHECK_GE(dst_offset, 0);
+  DCHECK_GE(capacity_, num_rows + dst_offset);
+  DCHECK_GE(src->num_rows_, num_rows + src_offset);
+  bool same_layout = num_tuples_per_row_ == src->num_tuples_per_row_;
+  if (same_layout) {
+    // Fast path, single copy.
+    TupleRow* dst_row = GetRow(dst_offset);
+    TupleRow* src_row = src->GetRow(src_offset);
+    memcpy(dst_row, src_row, num_rows * num_tuples_per_row_ * sizeof(Tuple*));
+    return;
+  }
+  // Slow path, null tuples and copy prefixes.
+  DCHECK_GT(num_tuples_per_row_, src->num_tuples_per_row_);
+  for (int i = 0; i < num_rows; i++) {
+    TupleRow* dst_row = GetRow(dst_offset + i);
+    TupleRow* src_row = src->GetRow(src_offset + i);
+    ClearRow(dst_row);
+    src->CopyRow(src_row, dst_row);
+  }
+}
+
 } // namespace impala
