@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
+import org.apache.iceberg.TableProperties;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
@@ -41,13 +42,6 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
     super.analyze(analyzer);
     // Make the virtual position delete table the new target table.
     modifyStmt_.setTargetTable(icePosDelTable_);
-
-    String deleteMode = originalTargetTable_.getIcebergApiTable().properties().get(
-      org.apache.iceberg.TableProperties.DELETE_MODE);
-    if (deleteMode != null && !deleteMode.equals("merge-on-read")) {
-      throw new AnalysisException(String.format("Unsupported delete mode: '%s' for " +
-          "Iceberg table: %s", deleteMode, originalTargetTable_.getFullName()));
-    }
 
     Expr wherePredicate = modifyStmt_.getWherePredicate();
     if (wherePredicate == null ||
@@ -81,5 +75,9 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
     Preconditions.checkState(modifyStmt_.table_ instanceof FeIcebergTable);
     return new IcebergBufferedDeleteSink(icePosDelTable_, deletePartitionKeyExprs_,
         deleteResultExprs_);
+  }
+
+  String getModifyMode() {
+    return TableProperties.DELETE_MODE;
   }
 }

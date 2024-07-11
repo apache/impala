@@ -425,6 +425,11 @@ DEFINE_bool(iceberg_allow_datafiles_in_table_location_only, true, "If true, Impa
     "does not allow Iceberg data file locations outside of the table directory during "
     "reads");
 
+DEFINE_bool(iceberg_always_allow_merge_on_read_operations, false, "Impala can only "
+    "write delete files with 'merge-on-read'. If this flag is true, Impala allows "
+    "executing DELETE, UPDATE and MERGE operations on Iceberg tables even if the table "
+    "property is 'copy-on-write'.");
+
 // Host and port of Statestore Service
 DEFINE_string(state_store_host, "localhost",
     "hostname where StatestoreService is running");

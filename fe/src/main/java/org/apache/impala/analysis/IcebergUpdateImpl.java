@@ -33,7 +33,6 @@ import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.IcebergBufferedDeleteSink;
 import org.apache.impala.planner.MultiDataSink;
 import org.apache.impala.planner.TableSink;
-import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TSortingOrder;
 
 import com.google.common.base.Preconditions;
@@ -64,12 +63,6 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
     super.analyze(analyzer);
     deleteTableId_ = analyzer.getDescTbl().addTargetTable(icePosDelTable_);
     IcebergUtil.validateIcebergTableForInsert(originalTargetTable_);
-    String updateMode = originalTargetTable_.getIcebergApiTable().properties().get(
-        TableProperties.UPDATE_MODE);
-    if (updateMode != null && !updateMode.equals("merge-on-read")) {
-      throw new AnalysisException(String.format("Unsupported update mode: '%s' for " +
-          "Iceberg table: %s", updateMode, originalTargetTable_.getFullName()));
-    }
   }
 
   @Override
@@ -187,5 +180,9 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
     ret.addDataSink(insertSink);
     ret.addDataSink(deleteSink);
     return ret;
+  }
+
+  String getModifyMode() {
+    return TableProperties.UPDATE_MODE;
   }
 }

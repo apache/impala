@@ -757,7 +757,7 @@ AnalysisException: Impala can only write delete files in PARQUET, but the given 
 alter table ice_delete set tblproperties ('write.delete.format.default'='PARQUET', 'write.delete.mode'='copy-on-write');
 delete from ice_delete where i = 1;
 ---- CATCH
-AnalysisException: Unsupported delete mode: 'copy-on-write' for Iceberg table: $DATABASE.ice_delete
+AnalysisException: Unsupported 'write.delete.mode': 'copy-on-write' for Iceberg table: $DATABASE.ice_delete
 ====
 ---- QUERY
 optimize table non_iceberg_table;
@@ -792,7 +792,7 @@ AnalysisException: Left-hand side in assignment appears multiple times 'k=2'
 create table cow (i int, j int) stored by iceberg tblproperties ('format-version'='2', 'write.update.mode'='copy-on-write');
 update cow set i = 2;
 ---- CATCH
-AnalysisException: Unsupported update mode: 'copy-on-write' for Iceberg table: $DATABASE.cow
+AnalysisException: Unsupported 'write.update.mode': 'copy-on-write' for Iceberg table: $DATABASE.cow
 ====
 ---- QUERY
 update ice_complex set id = id + 1;

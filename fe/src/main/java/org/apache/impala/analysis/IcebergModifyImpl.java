@@ -20,11 +20,13 @@ package org.apache.impala.analysis;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TIcebergFileFormat;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import com.google.common.collect.Lists;
 
@@ -69,6 +71,15 @@ abstract class IcebergModifyImpl extends ModifyImpl {
           "but the given table uses a different file format: " +
           originalTargetTable_.getFullName());
     }
+    String modifyMode = getModifyMode();
+    String modifyWriteMode = originalTargetTable_.getIcebergApiTable().properties()
+        .get(modifyMode);
+    if (modifyWriteMode != null && !Objects.equals(modifyWriteMode, "merge-on-read")
+        && !isMergeOnReadAlwaysAllowed()) {
+      throw new AnalysisException(String.format(
+          "Unsupported '%s': '%s' for Iceberg table: %s",
+          modifyMode, modifyWriteMode, originalTargetTable_.getFullName()));
+    }
   }
 
   @Override
@@ -112,5 +123,11 @@ abstract class IcebergModifyImpl extends ModifyImpl {
     SlotRef ref = new SlotRef(path);
     ref.analyze(analyzer);
     return ref;
+  }
+
+  abstract String getModifyMode();
+
+  protected boolean isMergeOnReadAlwaysAllowed() {
+    return BackendConfig.INSTANCE.icebergAlwaysAllowMergeOnReadOperations();
   }
 }

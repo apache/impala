@@ -440,6 +440,10 @@ public class BackendConfig {
     backendCfg_.iceberg_allow_datafiles_in_table_location_only = flag;
   }
 
+  public boolean icebergAlwaysAllowMergeOnReadOperations() {
+    return backendCfg_.iceberg_always_allow_merge_on_read_operations;
+  }
+
   public boolean isJsonScannerEnabled() {
     return backendCfg_.enable_json_scanner;
   }

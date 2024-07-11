@@ -308,4 +308,6 @@ struct TBackendGflags {
   138: required bool is_release_build
 
   139: required bool enable_catalogd_ha
+
+  140: required bool iceberg_always_allow_merge_on_read_operations
 }
