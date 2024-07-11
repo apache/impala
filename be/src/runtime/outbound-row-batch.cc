@@ -99,6 +99,7 @@ void OutboundRowBatch::Reset() {
   header_.Clear();
   tuple_offsets_.clear();
   tuple_data_offset_ = 0;
+  consumers_left_ = 0;
   // Do not clear tuple_data_ to avoid unnecessary delete + allocate.
 }
 

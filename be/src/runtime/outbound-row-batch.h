@@ -20,6 +20,9 @@
 #include <cstring>
 #include <vector>
 
+#include <boost/intrusive/list.hpp>
+#include <boost/intrusive/list_hook.hpp>
+
 #include "codegen/impala-ir.h"
 #include "gen-cpp/row_batch.pb.h"
 #include "kudu/util/slice.h"
@@ -44,7 +47,7 @@ class TupleRow;
 
 /// A KRPC outbound row batch which contains the serialized row batch header and buffers
 /// for holding the tuple offsets and tuple data.
-class OutboundRowBatch {
+class OutboundRowBatch : public boost::intrusive::list_base_hook<> {
  public:
   static const char* LLVM_CLASS_NAME;
 
@@ -127,6 +130,11 @@ class OutboundRowBatch {
   // Create a codegen'd version of AppendRowWithDedup based on a RowDescriptor
   static Status CodegenAppendRowWithDedup(LlvmCodeGen* codegen,
       const RowDescriptor* row_desc, llvm::Function** fn);
+
+  // Number of channels that still need to send this batch (broadcast refcount).
+  // Only meaningful while the batch is on an OutboundQueue. Set in Add(), decremented
+  // in RpcFinished(). Protected by OutboundQueue::lock_.
+  int consumers_left_ = 0;
 
  private:
   friend class IcebergPositionDeleteCollector;

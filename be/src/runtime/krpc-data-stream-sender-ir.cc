@@ -54,14 +54,19 @@ Status KrpcDataStreamSender::HashAndAddRows(RowBatch* batch) {
 
 Status KrpcDataStreamSender::PartitionRowCollector::AppendRow(
     const TupleRow* row, const RowDescriptor* row_desc) {
+  if (collector_batch_ == nullptr) {
+    RETURN_IF_ERROR(parent_->WaitForCapacity(&collector_batch_));
+    DCHECK_NE(collector_batch_, nullptr);
+  }
   DCHECK_LT(num_rows_, row_batch_capacity_);
   num_rows_++;
   RETURN_IF_ERROR(collector_batch_->AppendRow(row, row_desc));
   DCHECK_GT(row_batch_capacity_, 0);
   if (UNLIKELY(
       num_rows_ == row_batch_capacity_ || collector_batch_->ReachedSizeLimit())) {
-    // This swaps collector_batch_ with an empty batch.
-    RETURN_IF_ERROR(SendCurrentBatch());
+    // This submits collector_batch_ to the queue and replaces it with a fresh batch
+    // from the pool.
+    RETURN_IF_ERROR(EnqueueCurrentBatch());
   }
   return Status::OK();
 }

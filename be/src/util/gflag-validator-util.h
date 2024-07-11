@@ -19,27 +19,29 @@
 
 #include <glog/logging.h>
 
+// Assert that the provided value is greater or equal to 'minval'.
+template<typename T>
+bool at_least(const char* flagname, const T value, const T minval) {
+  if (value < minval) {
+    LOG(ERROR) << "Flag '" << flagname <<
+        "' must be greater than or equal to  " << minval << ".";
+    return false;
+  }
+
+  return true;
+}
+
 // GFlag validator that asserts the provided value is greater than or equal to 0.
 template<typename T>
 bool ge_zero(const char* flagname, const T value) {
-  if (value >= 0){
-    return true;
-  }
-
-  LOG(ERROR) << "Flag '" << flagname << "' must be greater than or equal to 0.";
-  return false;
-};
+  return at_least<T>(flagname, value, 0);
+}
 
 // GFlag validator that asserts the provided value is greater than or equal to 1.
 // Double values greater than 0 but less than 1 will fail validation.
 template<typename T>
 bool ge_one(const char* flagname, const T value) {
-  if (value < 1) {
-    LOG(ERROR) << "Flag '" << flagname << "' must be greater than or equal to 1.";
-    return false;
-  }
-
-  return true;
+  return at_least<T>(flagname, value, 1);
 }
 
 // GFlag validator that asserts the provided value is greater than 0.

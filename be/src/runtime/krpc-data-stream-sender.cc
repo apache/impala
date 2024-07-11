@@ -18,7 +18,6 @@
 #include "runtime/krpc-data-stream-sender.h"
 
 #include <chrono>
-#include <condition_variable>
 #include <functional>
 #include <iostream>
 #include <thrift/protocol/TDebugProtocol.h>
@@ -49,6 +48,7 @@
 #include "util/aligned-new.h"
 #include "util/compress.h"
 #include "util/debug-util.h"
+#include "util/gflag-validator-util.h"
 #include "util/network-util.h"
 #include "util/pretty-printer.h"
 #include "util/ubsan.h"
@@ -66,6 +66,18 @@ DEFINE_int64_hidden(data_stream_sender_eos_timeout_ms, 60*60*1000,
     "Timeout for EndDataStream (EOS) RPCs. Setting a timeout prioritizes them over other "
     "DataStreamService RPCs. Defaults to 1 hour. Set to 0 or negative value to disable "
     "the timeout.");
+DEFINE_int32_hidden(data_stream_sender_broadcast_queue_depth, 2,
+    "(Experimental) Number of batches that can be queued in the broadcast "
+    "(UNPARTITIONED) data stream sender before the sender blocks.");
+DEFINE_int32_hidden(data_stream_sender_per_channel_queue_depth, 2,
+    "(Experimental) Number of batches that can be queued per channel in partitioned "
+    "data stream senders (HASH_PARTITIONED, KUDU, RANDOM, DIRECTED).");
+
+bool at_least_2(const char* flagname, const int32_t value) {
+  return at_least<int32_t>(flagname, value, 2);
+}
+DEFINE_validator(data_stream_sender_broadcast_queue_depth, at_least_2);
+DEFINE_validator(data_stream_sender_per_channel_queue_depth, at_least_2);
 
 using std::condition_variable_any;
 using std::placeholders::_1;
@@ -119,30 +131,22 @@ void KrpcDataStreamSenderConfig::Close() {
 // A datastream sender may send row batches to multiple destinations. There is one
 // channel for each destination.
 //
-// Clients can call TransmitData() to send a serialized (and optionally
-// compressed) row batch to the destination. The underlying RPC layer is implemented
-// with KRPC, which provides interfaces for asynchronous RPC calls. Normally, the
-// calls above will return before the RPC has completed but they may block if there
-// is already an in-flight RPC.
-//
-// Each channel owns a single OutboundRowBatch outbound_batch_. This holds the buffers
-// backing the in-flight RPC or kept as reserve if there is no ongoing RPC. The actual
-// serialization happens to a shared OutboundRowBatch (see IMPALA-12433 for details) which
-// can be swapped with outbound_batch_ once the previous in-flight RPC is finished.
-// This means that the client can serialize the next row batch while the current row batch
-// is being sent. outbound_batch_ is only used in the partitioned case - in the
-// unpartitioned case the shared outbound_batch_ holds the data for the in-flight RPC.
+// Callers submit batches via OutboundQueue::Add(), which either dispatches them
+// immediately to an idle channel via TransmitData() or enqueues them for later.
+// The underlying RPC layer is implemented with KRPC, which provides interfaces for
+// asynchronous RPC calls. TransmitData() returns before the RPC has completed.
 //
 // Upon completion of a RPC, the callback TransmitDataCompleteCb() is invoked. If the RPC
 // fails due to remote service's queue being full, TransmitDataCompleteCb() will schedule
-// the retry callback RetryCb() after some delay dervied from
-// 'FLAGS_rpc_retry_internal_ms'.
+// the retry callback RetryCb() after some delay derived from
+// 'FLAGS_rpc_retry_interval_ms'.
 //
 // When a data stream sender is shut down, it will call Teardown() on all channels to
 // release resources. Teardown() will cancel any in-flight RPC and wait for the
 // completion callback to be called before returning. It's expected that the execution
-// thread to flush all buffered row batches and send the end-of-stream message (by
-// SendEosAsync() and WaitForRpc()) before closing the data stream sender.
+// thread flushes all buffered row batches and sends the end-of-stream message (via
+// OutboundQueue::FlushFinal() and WaitUntilEmpty()) before closing the data stream
+// sender.
 //
 // Note that the RPC payloads are owned solely by the channel and the KRPC layer will
 // relinquish references of them before the completion callback is invoked so it's
@@ -153,15 +157,15 @@ void KrpcDataStreamSenderConfig::Close() {
 // right place, except that's currently called too early). RpcController::Cancel() ensures
 // that the callback is called only after the RPC layer no longer references the sidecar
 // buffers.
-class KrpcDataStreamSender::Channel : public CacheLineAligned {
+class KrpcDataStreamSender::Channel : public CacheLineAligned,
+    public boost::intrusive::list_base_hook<> {
  public:
   // Creates a channel to send data to particular ipaddress/port/fragment instance id/node
-  // combination. buffer_size is specified in bytes and a soft limit on how much tuple
-  // data is getting accumulated before being sent; it only applies when data is added via
-  // AddRow() and not sent directly via SendBatch().
+  // combination. Row batch capacity is derived from the parent's per_channel_buffer_size_
+  // and the row descriptor.
   Channel(KrpcDataStreamSender* parent, const RowDescriptor* row_desc,
       const std::string& hostname, const NetworkAddressPB& destination,
-      const UniqueIdPB& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size,
+      const UniqueIdPB& fragment_instance_id, PlanNodeId dest_node_id,
       bool is_local)
     : parent_(parent),
       row_desc_(row_desc),
@@ -176,39 +180,24 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
   // Initializes the channel.
   // Returns OK if successful, error indication otherwise.
-  Status Init(RuntimeState* state, const shared_ptr<CharMemTrackerAllocator>& allocator);
+  Status Init(RuntimeState* state, OutboundQueue* queue = nullptr);
 
-  // Serializes the given row batch and send it to the destination. If the preceding
-  // RPC is in progress, this function may block until the previous RPC finishes.
-  // Return error status if serialization or the preceding RPC failed. Return OK
-  // otherwise.
-  Status SerializeAndSendBatch(RowBatch* batch);
-
-  // Transmits the serialized row batch 'outbound_batch'. This function may block if the
-  // preceding RPC is still in-flight. This is expected to be called from the fragment
-  // instance execution thread. Return error status if initialization of the RPC request
-  // parameters failed or if the preceding RPC failed. Returns OK otherwise.
-  // If 'swap_batch' is true, 'outbound_batch' is swapped with the Channel's
-  // 'outbound_batch_'. This happens after the previous RPC is finished so its buffers
-  // can be reused.
-  Status TransmitData(std::unique_ptr<OutboundRowBatch>* outbound_batch, bool swap_batch);
+  // Transmits the serialized row batch 'outbound_batch'. This is expected to be called
+  // from the fragment instance execution thread without holding OutboundQueue::lock_.
+  // Returns error status if initialization of the RPC request parameters failed.
+  Status TransmitData(OutboundRowBatch* outbound_batch);
 
   // Shutdowns the channel and frees the row batch allocation. Any in-flight RPC will
-  // be cancelled. It's expected that clients normally call SendEosAsync()
-  // and WaitForRpc() before calling Teardown() to flush all buffered row batches to
-  // destinations. Teardown() may be called without flushing the channel in cases such
-  // as cancellation or error.
+  // be cancelled. It's expected that callers normally drain all data via
+  // OutboundQueue::FlushFinal() and WaitUntilEmpty() before calling Teardown().
+  // Teardown() may be called without flushing the channel in cases such as
+  // cancellation or error.
   void Teardown(RuntimeState* state);
 
-  // Sends the EOS RPC to close the channel. Return error status if sending the EOS RPC
-  // failed. The RPC is sent asynchrononously. WaitForRpc() must be called to wait for
-  // the RPC. This should be only called from a fragment executor thread.
+  // Sends the EOS RPC to close the channel. The RPC is sent asynchronously.
+  // OutboundQueue::WaitUntilEmpty() must be called to wait for the RPC to complete.
+  // This should only be called from a fragment executor thread.
   Status SendEosAsync();
-
-  // Waits for the preceding RPC to complete. Return error status if the preceding
-  // RPC fails. Returns CANCELLED if the parent sender is cancelled or shut down.
-  // Returns OK otherwise. This should be only called from a fragment executor thread.
-  Status WaitForRpc();
 
   int RowBatchCapacity() const { return row_batch_capacity_; }
   int CalculateRowBatchCapacity() const;
@@ -239,15 +228,6 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
   int row_batch_capacity_ = -1;
 
-  // Owns an outbound row batch that can be referenced by the in-flight RPC. Contains
-  // a RowBatchHeaderPB and the buffers for the serialized tuple offsets and data.
-  //
-  // TODO: replace this with a queue. Schedule another RPC callback in the
-  // completion callback if the queue is not empty.
-  // datastream sender and sharing them across all channels. This buffer is not used in
-  // "UNPARTITIONED" scheme.
-  std::unique_ptr<OutboundRowBatch> outbound_batch_;
-
   // Synchronize accesses to the following fields between the main execution thread and
   // the KRPC reactor thread. Note that there should be only one reactor thread invoking
   // the callbacks for a channel so there should be no races between multiple reactor
@@ -276,6 +256,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
   // The pointer to the current serialized row batch being sent.
   const OutboundRowBatch* rpc_in_flight_batch_ = nullptr;
+  const OutboundRowBatch* finished_batch_ = nullptr;
 
   // The monotonic time in nanoseconds of when current RPC started.
   int64_t rpc_start_time_ns_ = 0;
@@ -291,18 +272,16 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // TODO: Fix IMPALA-3990
   bool remote_recvr_closed_ = false;
 
-  // Returns the serialization batch from 'parent'.
-  unique_ptr<OutboundRowBatch>* GetSerializationBatch();
+  // True once the EOS RPC has been started, either from TransmitDataCompleteCb() when
+  // the queue signals that all data for this channel is sent, or from SendEosAsync().
+  // Guards against sending EOS twice.
+  bool eos_sent_ = false;
+
+  OutboundQueue* queue_ = nullptr;
 
   // Returns true if the channel should terminate because the parent sender
   // has been closed or cancelled.
   bool ShouldTerminate() const { return shutdown_ || parent_->state_->is_cancelled(); }
-
-  // Send the rows accumulated in the internal row batch. This will serialize the
-  // internal row batch before sending them to the destination. This may block if
-  // the preceding RPC is still in progress. Returns error status if serialization
-  // fails or if the preceding RPC fails.
-  Status SendCurrentBatch();
 
   // Called when an RPC failed. If it turns out that the RPC failed because the
   // remote server is too busy, this function will schedule RetryCb() to be called
@@ -315,10 +294,6 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // Kudu status 'controller_status'.
   void HandleFailedRPC(const DoRpcFn& rpc_fn, const kudu::Status& controller_status,
       const string& err_msg);
-
-  // Same as WaitForRpc() except expects to be called with 'lock_' held and
-  // may drop the lock while waiting for the RPC to complete.
-  Status WaitForRpcLocked(std::unique_lock<SpinLock>* lock);
 
   // A callback function called from KRPC reactor thread to retry an RPC which failed
   // previously due to remote server being too busy. This will re-arm the request
@@ -337,6 +312,13 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // response. HandleFailedRPC() is called to handle failed KRPC call. The RPC may be
   // rescheduled if it's due to remote server being too busy.
   void TransmitDataCompleteCb();
+
+  // Called from TransmitDataCompleteCb() with lock_ held when there is a next data
+  // batch or EOS to dispatch ('next_batch != nullptr || send_eos').
+  Status SendNextRpcInCallback(OutboundRowBatch* next_batch, bool send_eos);
+
+  void TransmitDataCompleteCbInner();
+  void EndDataStreamCompleteCbInner();
 
   // Initializes the parameters for TransmitData() RPC and invokes the async RPC call.
   // It will add 'tuple_offsets_' and 'tuple_data_' in 'rpc_in_flight_batch_' as sidecars
@@ -378,13 +360,15 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
       const char* rpc_name, int64_t total_time_ns, const kudu::Status& err);
 };
 
+struct KrpcDataStreamSender::OutboundQueue::IdleList
+    : public boost::intrusive::list<Channel> {};
+
 Status KrpcDataStreamSender::Channel::Init(
-    RuntimeState* state, const shared_ptr<CharMemTrackerAllocator>& allocator) {
+    RuntimeState* state, OutboundQueue* queue) {
   // Create a DataStreamService proxy to the destination.
   RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
 
-  // Init outbound_batch_.
-  outbound_batch_.reset(new OutboundRowBatch(*allocator));
+  queue_ = queue;
 
   return Status::OK();
 }
@@ -403,6 +387,7 @@ void KrpcDataStreamSender::Channel::MarkDone(const Status& status) {
   }
   rpc_status_ = status;
   rpc_in_flight_ = false;
+  finished_batch_ = rpc_in_flight_batch_;
   rpc_in_flight_batch_ = nullptr;
   rpc_done_cv_.notify_one();
   rpc_start_time_ns_ = 0;
@@ -427,45 +412,6 @@ void KrpcDataStreamSender::Channel::LogSlowFailedRpc(
             << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
             << "took " << PrettyPrinter::Print(total_time_ns, TUnit::TIME_NS) << ". "
             << "Error: " << err.ToString();
-}
-
-Status KrpcDataStreamSender::Channel::WaitForRpc() {
-  std::unique_lock<SpinLock> l(lock_);
-  return WaitForRpcLocked(&l);
-}
-
-Status KrpcDataStreamSender::Channel::WaitForRpcLocked(std::unique_lock<SpinLock>* lock) {
-  DCHECK(lock != nullptr);
-  DCHECK(lock->owns_lock());
-
-  ScopedTimer<MonotonicStopWatch> timer(parent_->profile()->inactive_timer(),
-      parent_->state_->total_network_send_timer());
-
-  // Wait for in-flight RPCs to complete unless the parent sender is closed or cancelled.
-  while(rpc_in_flight_ && !ShouldTerminate()) {
-    rpc_done_cv_.wait_for(*lock, std::chrono::milliseconds(50));
-  }
-  int64_t elapsed_time_ns = timer.ElapsedTime();
-  if (IsSlowRpc(elapsed_time_ns)) {
-    LOG(INFO) << "Long delay waiting for RPC to " << address_
-              << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
-              << "took " << PrettyPrinter::Print(elapsed_time_ns, TUnit::TIME_NS);
-  }
-
-  if (UNLIKELY(ShouldTerminate())) {
-    // DSS is single-threaded so it's impossible for shutdown_ to be true here.
-    DCHECK(!shutdown_);
-    return Status::CANCELLED;
-  }
-
-  DCHECK(!rpc_in_flight_);
-  if (UNLIKELY(!rpc_status_.ok())) {
-    LOG(ERROR) << "channel send to " << address_ << " failed: (fragment_instance_id="
-               << PrintId(fragment_instance_id_)
-               << "): " << rpc_status_.GetDetail();
-    return rpc_status_;
-  }
-  return Status::OK();
 }
 
 void KrpcDataStreamSender::Channel::RetryCb(
@@ -512,6 +458,53 @@ void KrpcDataStreamSender::Channel::HandleFailedRPC(const DoRpcFn& rpc_fn,
 
 void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
   std::unique_lock<SpinLock> l(lock_);
+  TransmitDataCompleteCbInner();
+  // rpc_in_flight_ true means a retry was scheduled; RpcFinished will be called later.
+  if (rpc_in_flight_) return;
+  if (!rpc_status_.ok()) {
+    queue_->SetError(rpc_status_);
+    rpc_done_cv_.notify_one();
+    return;
+  }
+  DCHECK_NE(finished_batch_, nullptr);
+  OutboundRowBatch* last_batch = const_cast<OutboundRowBatch*>(finished_batch_);
+  finished_batch_ = nullptr;
+  bool send_eos = false;
+  OutboundRowBatch* next_batch =
+      queue_->RpcFinished(last_batch, this, remote_recvr_closed_, &send_eos);
+  bool has_more_work = next_batch != nullptr || send_eos;
+  DCHECK(next_batch == nullptr || !send_eos);
+  DCHECK(!remote_recvr_closed_ || !has_more_work);
+  if (!has_more_work || ShouldTerminate()) {
+    // No more work for this channel; notify Teardown() that rpc_in_flight_ is clear.
+    rpc_done_cv_.notify_one();
+    return;
+  }
+  Status s = SendNextRpcInCallback(next_batch, send_eos);
+  if (UNLIKELY(!s.ok())) {
+    MarkDone(s);
+    queue_->SetError(s);  // acquires OutboundQueue::lock_, safe under Channel::lock_
+  }
+}
+
+Status KrpcDataStreamSender::Channel::SendNextRpcInCallback(
+    OutboundRowBatch* next_batch, bool send_eos) {
+  lock_.DCheckLocked();
+  DCHECK(next_batch != nullptr || send_eos);
+  DCHECK(next_batch == nullptr || !send_eos);
+  DCHECK(!rpc_in_flight_);
+  rpc_in_flight_ = true;
+  if (next_batch != nullptr) {
+    rpc_in_flight_batch_ = next_batch;
+    return DoTransmitDataRpc();
+  }
+  DCHECK(send_eos);
+  eos_sent_ = true;
+  COUNTER_ADD(parent_->eos_sent_counter_, 1);
+  return DoEndDataStreamRpc();
+}
+
+void KrpcDataStreamSender::Channel::TransmitDataCompleteCbInner() {
   DCHECK(rpc_in_flight_);
   DCHECK_NE(rpc_start_time_ns_, 0);
   int64_t total_time = MonotonicNanos() - rpc_start_time_ns_;
@@ -592,63 +585,56 @@ Status KrpcDataStreamSender::Channel::DoTransmitDataRpc() {
   return Status::OK();
 }
 
-Status KrpcDataStreamSender::Channel::TransmitData(
-    unique_ptr<OutboundRowBatch>* outbound_batch, bool swap_batch) {
+Status KrpcDataStreamSender::Channel::TransmitData(OutboundRowBatch* outbound_batch) {
   VLOG_ROW << "Channel::TransmitData() fragment_instance_id="
            << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
-           << " #rows=" << outbound_batch->get()->header()->num_rows();
+           << " #rows=" << outbound_batch->header()->num_rows();
   std::unique_lock<SpinLock> l(lock_);
-  RETURN_IF_ERROR(WaitForRpcLocked(&l));
-  // Measure the time needed after getting the lock.
   SCOPED_TIMER(parent_->transmit_data_timer_);
   DCHECK(!rpc_in_flight_);
   DCHECK(rpc_in_flight_batch_ == nullptr);
-  // If the remote receiver is closed already, there is no point in sending anything.
-  // TODO: Needs better solution for IMPALA-3990 in the long run.
-  if (UNLIKELY(remote_recvr_closed_)) return Status::OK();
+  // Channels are only in the idle list when the remote receiver is still open.
+  // TODO: Fix IMPALA-3990
+  DCHECK(!remote_recvr_closed_);
   rpc_in_flight_ = true;
-  rpc_in_flight_batch_ = outbound_batch->get();
+  rpc_in_flight_batch_ = outbound_batch;
   RETURN_IF_ERROR(DoTransmitDataRpc());
-  // At this point the previous RPC must be already finished and the previous buffer
-  // in outbound_batch_ can be reused.
-  DCHECK_NE(rpc_in_flight_batch_, outbound_batch_.get());
-  if (swap_batch) outbound_batch_.swap(*outbound_batch);
   return Status::OK();
 }
 
-Status KrpcDataStreamSender::Channel::SerializeAndSendBatch(RowBatch* batch) {
-  unique_ptr<OutboundRowBatch>* serialization_batch = GetSerializationBatch();
-  RETURN_IF_ERROR(parent_->SerializeBatch(batch, serialization_batch->get(), !is_local_));
-  // Swap serialization_batch with outbound_batch_ once the old RPC is finished.
-  RETURN_IF_ERROR(TransmitData(serialization_batch, true /*swap_batch*/));
-  return Status::OK();
-}
-
-unique_ptr<OutboundRowBatch>* KrpcDataStreamSender::Channel::GetSerializationBatch() {
-  unique_ptr<OutboundRowBatch>* serialization_batch = &parent_->serialization_batch_;
-  DCHECK(serialization_batch->get() != nullptr);
-  // Reads 'rpc_in_flight_batch_' without acquiring 'lock_', so reads can be racey.
-  ANNOTATE_IGNORE_READS_BEGIN();
-  DCHECK(serialization_batch->get() != rpc_in_flight_batch_);
-  ANNOTATE_IGNORE_READS_END();
-  return serialization_batch;
-}
-
-Status KrpcDataStreamSender::PartitionRowCollector::SendCurrentBatch() {
-  if (collector_batch_->IsEmpty()) {
+Status KrpcDataStreamSender::PartitionRowCollector::EnqueueCurrentBatch() {
+  if (collector_batch_ == nullptr || collector_batch_->IsEmpty()) {
     DCHECK_EQ(num_rows_, 0);
     return Status::OK();
   }
   num_rows_ = 0;
   RETURN_IF_ERROR(channel_->GetParent()->PrepareBatchForSend(
-      collector_batch_.get(), !channel_->IsLocal()));
-  RETURN_IF_ERROR(channel_->TransmitData(&collector_batch_, true /*swap_batch*/));
-  collector_batch_->Reset();
+      collector_batch_, !channel_->IsLocal()));
+  // Obtain the next buffer from the pool before handing the current one to the queue,
+  // so serialization of the next batch can overlap with the in-flight RPC.
+  // Pass queue_ so WaitForCapacity() avoids allocating a new batch when the queue is
+  // already at capacity (uses a pooled batch instead).
+  OutboundRowBatch* next_batch = nullptr;
+  RETURN_IF_ERROR(channel_->GetParent()->WaitForCapacity(&next_batch, queue_));
+  RETURN_IF_ERROR(queue_->Add(collector_batch_));
+  collector_batch_ = next_batch;
   return Status::OK();
 }
 
 void KrpcDataStreamSender::Channel::EndDataStreamCompleteCb() {
   std::unique_lock<SpinLock> l(lock_);
+  EndDataStreamCompleteCbInner();
+  // rpc_in_flight_ true means a retry was scheduled; EosFinished will be called later.
+  if (rpc_in_flight_) return;
+  if (!rpc_status_.ok()) {
+    queue_->SetError(rpc_status_);
+  } else {
+    queue_->EosFinished();
+  }
+  rpc_done_cv_.notify_one();
+}
+
+void KrpcDataStreamSender::Channel::EndDataStreamCompleteCbInner() {
   DCHECK(rpc_in_flight_);
   DCHECK_NE(rpc_start_time_ns_, 0);
   int64_t total_time_ns = MonotonicNanos() - rpc_start_time_ns_;
@@ -697,11 +683,13 @@ Status KrpcDataStreamSender::Channel::DoEndDataStreamRpc() {
 Status KrpcDataStreamSender::Channel::SendEosAsync() {
   {
     std::unique_lock<SpinLock> l(lock_);
+    // Guard against sending EOS to a closed receiver or a channel that already sent EOS.
+    if (UNLIKELY(remote_recvr_closed_ || eos_sent_)) return Status::OK();
     DCHECK(!rpc_in_flight_);
     DCHECK(rpc_status_.ok());
-    if (UNLIKELY(remote_recvr_closed_)) return Status::OK();
     VLOG_RPC << "calling EndDataStream() to terminate channel. fragment_instance_id="
              << PrintId(fragment_instance_id_);
+    eos_sent_ = true;
     rpc_in_flight_ = true;
     COUNTER_ADD(parent_->eos_sent_counter_, 1);
     RETURN_IF_ERROR(DoEndDataStreamRpc());
@@ -711,25 +699,27 @@ Status KrpcDataStreamSender::Channel::SendEosAsync() {
 
 void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
   // Normally, the channel should have been flushed before calling Teardown(), which means
-  // that all the data should already be drained. If the fragment was was closed or
-  // cancelled, there may still be some in-flight RPCs and buffered row batches to be
-  // flushed.
+  // that all the data should already be drained. In case of error or cancellation
+  // there may still be some in-flight RPCs which are safe to cancel.
   std::unique_lock<SpinLock> l(lock_);
   shutdown_ = true;
   // Cancel any in-flight RPC.
-  if (rpc_in_flight_) {
-    rpc_controller_.Cancel();
-    while (rpc_in_flight_) rpc_done_cv_.wait(l);
-  }
-  outbound_batch_.reset(nullptr);
+  if (rpc_in_flight_) rpc_controller_.Cancel();
+  // Wait for any in-flight RPC to complete. The callbacks (TransmitDataCompleteCb,
+  // EndDataStreamCompleteCb) call RpcFinished()/EosFinished() while holding lock_, so
+  // once rpc_in_flight_ is false all queue access from this channel is complete.
+  while (rpc_in_flight_) rpc_done_cv_.wait(l);
 }
 
 /// KrpcDataStreamSender's generic partitioning and serialization methods are inefficient
 /// for Iceberg position delete records. This class stores and efficiently serializes
 /// such data, then uses an internal Channel object's TransmitData() to send out
 /// the already serialized outbound row batches.
+// TODO: this is not a channel but a collector, rename it
 class KrpcDataStreamSender::IcebergPositionDeleteChannel {
  public:
+  friend class KrpcDataStreamSender;
+
   IcebergPositionDeleteChannel(KrpcDataStreamSender* parent, Channel* channel,
       TupleDescriptor* desc) : delete_collector_(desc) {
     parent_ = parent;
@@ -755,9 +745,10 @@ class KrpcDataStreamSender::IcebergPositionDeleteChannel {
 
   Status Flush() {
     if (delete_collector_.RowCount() == 0) return Status::OK();
-    unique_ptr<OutboundRowBatch>* serialization_batch = channel_->GetSerializationBatch();
-    RETURN_IF_ERROR(ToOutboundRowBatch(serialization_batch->get()));
-    RETURN_IF_ERROR(channel_->TransmitData(serialization_batch, /*swap_batch=*/true));
+    OutboundRowBatch* batch = nullptr;
+    RETURN_IF_ERROR(parent_->WaitForCapacity(&batch, queue_));
+    RETURN_IF_ERROR(ToOutboundRowBatch(batch));
+    RETURN_IF_ERROR(queue_->Add(batch));
     return Status::OK();
   }
 
@@ -780,6 +771,7 @@ class KrpcDataStreamSender::IcebergPositionDeleteChannel {
   KrpcDataStreamSender::Channel* channel_;
   int capacity_;
   IcebergPositionDeleteCollector delete_collector_;
+  OutboundQueue* queue_ = nullptr;
 };
 
 KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
@@ -812,12 +804,13 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
         process_address == NetworkAddressPBToString(destination.krpc_backend());
     channels_.emplace_back(new Channel(this, row_desc_, destination.address().hostname(),
         destination.krpc_backend(), destination.fragment_instance_id(), sink.dest_node_id,
-        per_channel_buffer_size, is_local));
+        is_local));
 
     if (partition_type_  == TPartitionType::HASH_PARTITIONED
         || sink.output_partition.type == TPartitionType::KUDU) {
       partition_row_collectors_.emplace_back();
       partition_row_collectors_.back().channel_ = channels_.back().get();
+      partition_row_collectors_.back().parent_ = this;
     }
 
     if (IsDirectedMode()) {
@@ -881,25 +874,56 @@ Status KrpcDataStreamSender::Prepare(
   char_mem_tracker_allocator_.reset(
       new CharMemTrackerAllocator(outbound_rb_mem_tracker_));
 
-  string process_address =
-       NetworkAddressPBToString(ExecEnv::GetInstance()->krpc_address());
-
-  serialization_batch_.reset(new OutboundRowBatch(*char_mem_tracker_allocator_));
-  if (partition_type_ == TPartitionType::UNPARTITIONED) {
-    in_flight_batch_.reset(new OutboundRowBatch(*char_mem_tracker_allocator_));
-  }
-
   compression_scratch_.reset(new TrackedString(*char_mem_tracker_allocator_));
 
-  for (int i = 0; i < channels_.size(); ++i) {
-    RETURN_IF_ERROR(channels_[i]->Init(state, char_mem_tracker_allocator_));
+  queue_depth_limit_before_reuse_ = (partition_type_ == TPartitionType::UNPARTITIONED)
+      ? FLAGS_data_stream_sender_broadcast_queue_depth
+      : FLAGS_data_stream_sender_per_channel_queue_depth;
+  if (partition_type_ == TPartitionType::UNPARTITIONED) {
+    batch_pool_max_size_ = FLAGS_data_stream_sender_broadcast_queue_depth;
+    queues_.emplace_back(new OutboundQueue(channels_, this));
   }
   for (PartitionRowCollector& collector: partition_row_collectors_) {
-    collector.collector_batch_.reset(new OutboundRowBatch(*char_mem_tracker_allocator_));
     collector.row_batch_capacity_ = collector.channel_->RowBatchCapacity();
+  }
+  if ((partition_type_ == TPartitionType::HASH_PARTITIONED
+      || partition_type_ == TPartitionType::KUDU)) {
+    batch_pool_max_size_ = partition_row_collectors_.size()
+        * FLAGS_data_stream_sender_per_channel_queue_depth;
+    queues_.reserve(partition_row_collectors_.size());
+    for (PartitionRowCollector& collector : partition_row_collectors_) {
+      queues_.emplace_back(new OutboundQueue(collector.channel_, this));
+      collector.queue_ = queues_.back().get();
+    }
+  }
+  if (partition_type_ == TPartitionType::RANDOM) {
+    batch_pool_max_size_ =
+        channels_.size() * FLAGS_data_stream_sender_per_channel_queue_depth;
+    for (auto& ch : channels_) {
+      queues_.emplace_back(new OutboundQueue(ch.get(), this));
+    }
+  }
+  if (partition_type_ == TPartitionType::DIRECTED) {
+    // Use a pool size of (queue_depth - 1) per channel: IcebergPositionDeleteChannel's
+    // internal delete_collector_ buffer serves as the extra slot.
+    DCHECK_GE(FLAGS_data_stream_sender_per_channel_queue_depth, 2);
+    batch_pool_max_size_ =
+        channels_.size() * (FLAGS_data_stream_sender_per_channel_queue_depth - 1);
+    for (int i = 0; i < (int)channels_.size(); ++i) {
+      queues_.emplace_back(new OutboundQueue(channels_[i].get(), this));
+      auto it = channel_to_ice_channel_.find(channels_[i].get());
+      DCHECK(it != channel_to_ice_channel_.end());
+      it->second->queue_ = queues_.back().get();
+    }
   }
   for (auto& [ch, ice_ch] : channel_to_ice_channel_) {
     ice_ch->Prepare(mem_tracker_.get());
+  }
+  for (int i = 0; i < (int)channels_.size(); ++i) {
+    OutboundQueue* q = nullptr;
+    if (queues_.size() == 1) q = queues_[0].get();
+    else if (i < (int)queues_.size()) q = queues_[i].get();
+    RETURN_IF_ERROR(channels_[i]->Init(state, q));
   }
   return Status::OK();
 }
@@ -1144,28 +1168,25 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
 
   if (batch->num_rows() == 0) return Status::OK();
   if (partition_type_ == TPartitionType::UNPARTITIONED) {
-    // Only skip compression if there is a single channel and destination is in the same
-    // process. TODO: could be optimized to send the uncompressed buffer to the local
-    // targets to avoid decompression cost at the receiver.
+    // Skip compression only when there is a single local channel to avoid the
+    // decompression cost at the receiver. For all other cases (including single remote
+    // channel) compression is attempted.
     bool is_local = channels_.size() == 1 && channels_[0]->IsLocal();
+    OutboundRowBatch* serialization_batch = nullptr;
+    RETURN_IF_ERROR(WaitForCapacity(&serialization_batch));
     RETURN_IF_ERROR(SerializeBatch(
-        batch, serialization_batch_.get(), !is_local,  channels_.size()));
-    // TransmitData() will block if there are still in-flight rpcs (and those will
-    // reference the previously written in_flight_batch_).
-    for (int i = 0; i < channels_.size(); ++i) {
-      // Do not swap serialization_batch_ with the channel's outbound_batch_ to allow
-      // multiple channels to use the data backing serialization_batch_ in parallel.
-      RETURN_IF_ERROR(
-          channels_[i]->TransmitData(&serialization_batch_, false /*swap_batch*/));
-    }
-    // At this point no RPCs can still refer to the old in_flight_batch_.
-    in_flight_batch_.swap(serialization_batch_);
-  } else if (partition_type_ == TPartitionType::RANDOM ||
-      (channels_.size() == 1 && partition_type_ != TPartitionType::DIRECTED)) {
-    // Round-robin batches among channels. Wait for the current channel to finish its
-    // rpc before overwriting its batch.
-    Channel* current_channel = channels_[current_channel_idx_].get();
-    RETURN_IF_ERROR(current_channel->SerializeAndSendBatch(batch));
+        batch, serialization_batch, !is_local, channels_.size()));
+    // Add() dispatches the batch to all channels.
+    DCHECK_EQ(queues_.size(), 1);
+    RETURN_IF_ERROR(queues_[0]->Add(serialization_batch));
+  } else if (partition_type_ == TPartitionType::RANDOM) {
+    // Round-robin batches among channels using per-channel queues.
+    bool is_local = channels_.size() == 1 && channels_[current_channel_idx_]->IsLocal();
+    OutboundRowBatch* serialization_batch = nullptr;
+    RETURN_IF_ERROR(WaitForCapacity(&serialization_batch,
+        queues_[current_channel_idx_].get()));
+    RETURN_IF_ERROR(SerializeBatch(batch, serialization_batch, !is_local, 1));
+    RETURN_IF_ERROR(queues_[current_channel_idx_]->Add(serialization_batch));
     current_channel_idx_ = (current_channel_idx_ + 1) % channels_.size();
   } else if (partition_type_ == TPartitionType::KUDU) {
     DCHECK_EQ(partition_expr_evals_.size(), 1);
@@ -1305,16 +1326,13 @@ Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {
     RETURN_IF_ERROR(ice_ch->Flush());
   }
   for (PartitionRowCollector& collector: partition_row_collectors_) {
-    RETURN_IF_ERROR(collector.SendCurrentBatch());
+    RETURN_IF_ERROR(collector.EnqueueCurrentBatch());
   }
-  for (unique_ptr<Channel>& channel : channels_) {
-    RETURN_IF_ERROR(channel->WaitForRpc());
+  for (auto& q : queues_) {
+    RETURN_IF_ERROR(q->FlushFinal());
   }
-  for (unique_ptr<Channel>& channel : channels_) {
-    RETURN_IF_ERROR(channel->SendEosAsync());
-  }
-  for (unique_ptr<Channel>& channel : channels_) {
-    RETURN_IF_ERROR(channel->WaitForRpc());
+  for (auto& q : queues_) {
+    RETURN_IF_ERROR(q->WaitUntilEmpty());
   }
   return Status::OK();
 }
@@ -1333,9 +1351,14 @@ void KrpcDataStreamSender::Close(RuntimeState* state) {
     channels_[i]->Teardown(state);
   }
 
-  serialization_batch_.reset(nullptr);
-  in_flight_batch_.reset(nullptr);
   compression_scratch_.reset(nullptr);
+  // Destroy queues first — their destructors unlink any remaining batches from queue_
+  // lists (safe_link mode auto-clears on destruction).
+  queues_.clear();
+  // Unlink any batches remaining in free_batch_pool_.
+  free_batch_pool_.clear();
+  // Now all batches are unlinked — safe to destroy the objects.
+  all_batches_.clear();
 
   if (outbound_rb_mem_tracker_.get() != nullptr) {
     outbound_rb_mem_tracker_->Close();
@@ -1378,9 +1401,243 @@ Status KrpcDataStreamSender::PrepareBatchForSend(
   return Status::OK();
 }
 
-
 int64_t KrpcDataStreamSender::GetNumDataBytesSent() const {
   return bytes_sent_counter_->value();
+}
+
+Status KrpcDataStreamSender::WaitForCapacity(
+    OutboundRowBatch** batch, OutboundQueue* queue) {
+  ScopedTimer<MonotonicStopWatch> timer(profile()->inactive_timer(),
+      state_->total_network_send_timer());
+  // If the queue is already at capacity, force reuse of a pooled batch instead of
+  // allocating a new one.
+  // must_reuse_batch can be stale by the time it is used. This is not a problem as
+  // WaitForCapacity() is only called from a single thread, so queue->Size() can only
+  // decrease, in which case a batch is being released on a parallel thread, which can
+  // be reused.
+  bool must_reuse_batch = (queue != nullptr
+      && queue->Size() >= queue_depth_limit_before_reuse_);
+  std::unique_lock<SpinLock> l(batch_pool_lock_);
+  while (free_batch_pool_.empty()
+      && (batches_allocated_ >= batch_pool_max_size_ || must_reuse_batch)
+      && batch_pool_error_.ok() && !state_->is_cancelled()) {
+    batch_pool_cv_.wait_for(l, std::chrono::milliseconds(50));
+  }
+  if (!batch_pool_error_.ok()) return batch_pool_error_;
+  if (state_->is_cancelled()) return Status::CANCELLED;
+  if (!free_batch_pool_.empty()) {
+    *batch = &free_batch_pool_.front();
+    free_batch_pool_.pop_front();
+  } else {
+    DCHECK_LT(batches_allocated_, batch_pool_max_size_);
+    all_batches_.push_back(
+        std::make_unique<OutboundRowBatch>(*char_mem_tracker_allocator_));
+    *batch = all_batches_.back().get();
+    ++batches_allocated_;
+  }
+  (*batch)->Reset();
+  return Status::OK();
+}
+
+void KrpcDataStreamSender::ReleaseBatch(OutboundRowBatch* batch) {
+  std::unique_lock<SpinLock> l(batch_pool_lock_);
+  free_batch_pool_.push_back(*batch);
+  batch_pool_cv_.notify_one();
+}
+
+void KrpcDataStreamSender::SetBatchPoolError(const Status& status) {
+  std::unique_lock<SpinLock> l(batch_pool_lock_);
+  if (batch_pool_error_.ok()) batch_pool_error_ = status;
+  batch_pool_cv_.notify_one();
+}
+
+KrpcDataStreamSender::OutboundQueue::OutboundQueue(
+  const std::vector<std::unique_ptr<Channel>>& channels,
+  KrpcDataStreamSender* parent)
+  : parent_(parent),
+    idle_channels_(new IdleList())
+{
+  channels_.reserve(channels.size());
+  for (auto& ch : channels) {
+    channels_.push_back(ch.get());
+    idle_channels_->push_back(*ch);
+  }
+}
+
+KrpcDataStreamSender::OutboundQueue::OutboundQueue(
+    Channel* channel, KrpcDataStreamSender* parent)
+  : parent_(parent),
+    idle_channels_(new IdleList()) {
+  channels_.push_back(channel);
+  idle_channels_->push_back(*channel);
+}
+
+KrpcDataStreamSender::OutboundQueue::~OutboundQueue() = default;
+
+Status KrpcDataStreamSender::OutboundQueue::Add(OutboundRowBatch* batch) {
+  IdleList local_idle;
+  bool all_closed;
+  {
+    std::unique_lock<SpinLock> l(lock_);
+    DCHECK(!eos_);
+    local_idle.splice(local_idle.end(), *idle_channels_);
+    all_closed = (closed_channel_count_ == (int)channels_.size());
+    if (!all_closed) {
+      batch->consumers_left_ = channels_.size() - closed_channel_count_;
+      queue_.push_back(*batch);
+    }
+  }
+  if (all_closed) {
+    DCHECK(local_idle.empty());
+    // All channels are closed. Return the batch directly to the pool.
+    parent_->ReleaseBatch(batch);
+    return Status::OK();
+  }
+  // Dispatch to idle channels outside the lock. Busy channels will pick up the batch
+  // from the queue when their current RPC completes (via RpcFinished()).
+  // Pop each channel before calling TransmitData: the async RPC may complete on a
+  // reactor thread and RpcFinished() may re-link the channel into idle_channels_
+  // before this loop advances. The channel must be unlinked at that point.
+  while (!local_idle.empty()) {
+    Channel& ch = local_idle.front();
+    local_idle.pop_front();
+    Status s = ch.TransmitData(batch);
+    if (UNLIKELY(!s.ok())) {
+      SetError(s);
+      return s;
+    }
+  }
+  return Status::OK();
+}
+
+Status KrpcDataStreamSender::OutboundQueue::FlushFinal() {
+  IdleList local_idle;
+  {
+    std::unique_lock<SpinLock> l(lock_);
+    eos_ = true;
+    local_idle.splice(local_idle.end(), *idle_channels_);
+    // No notify here: WaitUntilEmpty() is called from the same thread after FlushFinal()
+    // returns, so it cannot be waiting yet.
+  }
+  // Send EOS to idle channels outside the lock. In-flight channels will send EOS
+  // directly from RpcFinished() once they deliver their last data batch (eos_ is true).
+  for (Channel& ch : local_idle) {
+    RETURN_IF_ERROR(ch.SendEosAsync());
+  }
+  return Status::OK();
+}
+
+OutboundRowBatch* KrpcDataStreamSender::OutboundQueue::RpcFinished(
+    OutboundRowBatch* batch, Channel* channel, bool closed, bool* send_eos) {
+  *send_eos = false;
+  std::unique_lock<SpinLock> l(lock_);
+  if (!status_.ok()) return nullptr;
+  DCHECK(!queue_.empty());
+
+  // Find 'batch' in the queue and decrement its consumers_left_. If the channel is
+  // closing, also decrement consumers_left_ for all subsequent entries, since this
+  // channel will never send them. In broadcast (multiple channels), 'batch' may be
+  // at any position in the queue as other channels may be in-flight on earlier batches.
+  // For non-closing channels, also capture the next queued entry to send next.
+  // This is potentially O(N) iteration, but with the exception of broadcast the first
+  // element must contain 'batch', and in case of broadcast the queue depth is limited
+  // (default 2).
+  OutboundRowBatch* next_queued = nullptr;
+  bool past_batch = false;
+  for (auto& e : queue_) {
+    DCHECK_GT(e.consumers_left_, 0);
+    if (past_batch) {
+      if (!closed) {
+        next_queued = &e;
+        break;
+      }
+      // closed is true: decrement consumers_left_ for all subsequent entries,
+      // since this channel will never send them.
+      --e.consumers_left_;
+    } else if (&e == batch) {
+      --e.consumers_left_;
+      past_batch = true;
+    }
+  }
+  DCHECK(past_batch) << "batch not found in queue_";
+  // Drain any newly-exhausted entries from the front. In the non-closed case only the
+  // front entry can reach consumers_left_ == 0 (non-front entries cannot be exhausted
+  // before the front because channels process batches in order). When a channel closes,
+  // multiple front entries may become exhausted in one pass.
+  // Collect exhausted entries into a local intrusive list and call ReleaseBatch() after
+  // dropping lock_ to shorten the critical section. No heap allocation.
+  OutboundBatchList to_release;
+  while (!queue_.empty() && queue_.front().consumers_left_ == 0) {
+    OutboundRowBatch& b = queue_.front();
+    queue_.pop_front();
+    to_release.push_back(b);
+  }
+  if (closed) {
+    DCHECK(next_queued == nullptr);
+    closed_channel_count_++;
+    DCHECK_LE(closed_channel_count_, (int)channels_.size());
+    NotifyIfAllChannelsDone();
+  } else if (next_queued == nullptr) {
+    // This channel sent all batches in queue. Can send EOS if FlushFinal() was called.
+    if (eos_) {
+      *send_eos = true;
+    } else {
+      idle_channels_->push_back(*channel);
+    }
+  }
+  l.unlock();
+  while (!to_release.empty()) {
+    OutboundRowBatch& b = to_release.front();
+    to_release.pop_front();
+    parent_->ReleaseBatch(&b);
+  }
+  return next_queued;
+}
+
+void KrpcDataStreamSender::OutboundQueue::EosFinished() {
+  std::unique_lock<SpinLock> l(lock_);
+  ++eos_completed_count_;
+  NotifyIfAllChannelsDone();
+}
+
+int KrpcDataStreamSender::OutboundQueue::Size() {
+  std::unique_lock<SpinLock> l(lock_);
+  return (int)queue_.size();
+}
+
+void KrpcDataStreamSender::OutboundQueue::SetError(const Status& status) {
+  DCHECK(!status.ok());
+  {
+    std::unique_lock<SpinLock> l(lock_);
+    if (status_.ok()) status_ = status;
+  }
+  queue_empty_cv_.notify_one();
+  parent_->SetBatchPoolError(status);
+}
+
+void KrpcDataStreamSender::OutboundQueue::NotifyIfAllChannelsDone() {
+  if (eos_completed_count_ + closed_channel_count_ == (int)channels_.size()) {
+    queue_empty_cv_.notify_one();
+  }
+}
+
+
+Status KrpcDataStreamSender::OutboundQueue::WaitUntilEmpty() {
+  ScopedTimer<MonotonicStopWatch> timer(parent_->profile()->inactive_timer(),
+      parent_->state_->total_network_send_timer());
+  std::unique_lock<SpinLock> l(lock_);
+  DCHECK(eos_);
+  bool cancelled = parent_->state_->is_cancelled();
+  int num_channels = (int)channels_.size();
+  while ((!queue_.empty()
+      || eos_completed_count_ + closed_channel_count_ < num_channels)
+      && !cancelled && status_.ok()) {
+    queue_empty_cv_.wait_for(l, std::chrono::milliseconds(50));
+    cancelled = parent_->state_->is_cancelled();
+  }
+  if (!status_.ok()) return status_;
+  if (cancelled) return Status::CANCELLED;
+  return Status::OK();
 }
 
 } // namespace impala
