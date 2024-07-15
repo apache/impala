@@ -83,12 +83,12 @@ public abstract class PartitionSpecBase extends StmtNode {
       throw new AnalysisException(e.getMessage(), e);
     }
 
-    // Make sure the target table is partitioned.
+    // Make sure the target table is partitioned. The table format can be either HDFS or
+    // Iceberg, but only HDFS table partition keys are stored in HMS.
     if (!isPartitioned(table)) {
       throw new AnalysisException("Table is not partitioned: " + tableName_);
     }
 
-    // Only HDFS tables are partitioned.
     Preconditions.checkState(table instanceof FeFsTable);
     table_ = (FeFsTable) table;
     nullPartitionKeyValue_ = table_.getNullPartitionKeyValue();

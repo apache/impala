@@ -458,6 +458,9 @@ public class AnalyzerTest extends FrontendTestBase {
             + "Expected type: 'INT'");
     AnalysisError("refresh functional.zipcode_incomes partition (year=2009, month=1)",
         "Table is not partitioned: functional.zipcode_incomes");
+    AnalysisError(
+        "refresh functional_parquet.iceberg_partitioned partition(action='view')",
+        "Partition clause in this statement is not supported for Iceberg tables.");
   }
 
   @Test

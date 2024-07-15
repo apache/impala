@@ -26,6 +26,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -61,6 +62,11 @@ public class PartitionSpec extends PartitionSpecBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    // Iceberg partition keys are not stored in HMS.
+    if (table_ instanceof FeIcebergTable) {
+      throw new AnalysisException(String.format("Partition clause in this statement is " +
+          "not supported for Iceberg tables."));
+    }
 
     // Make sure static partition key values only contain constant exprs.
     for (PartitionKeyValue kv: partitionSpec_) {
