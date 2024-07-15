@@ -214,8 +214,11 @@ class TestSpillingHashJoin(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       cls.ImpalaTestMatrix.add_constraint(lambda v: False)
     cls.ImpalaTestMatrix.add_constraint(
-      lambda v: v.get_value('table_format').file_format == 'parquet')
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('exec_option')['disable_codegen'] is False)
 
+  @pytest.mark.execute_serially
   def test_spilling_hash_join(self, vector, unique_database):
     """Regression test for IMPALA-13138. It loads a few large tables and runs a complex
     query that spills during JOIN build that crashed Impala before IMPALA-13138."""
