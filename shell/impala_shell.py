@@ -712,7 +712,9 @@ class ImpalaShell(cmd.Cmd, object):
       except Exception as e:
         # Suppress harmless errors.
         err_msg = str(e).strip()
-        if err_msg in ['ERROR: Cancelled', 'ERROR: Invalid or unknown query handle']:
+        # Check twice so that it can work with both the old and the new error formats.
+        if err_msg in ['ERROR: Cancelled', 'ERROR: Invalid or unknown query handle'] or \
+          ('\nCancelled' in err_msg or '\nInvalid or unknown query handle' in err_msg):
           break
         err_details = "Failed to reconnect and close (try %i/%i): %s"
         print(err_details % (cancel_try + 1, ImpalaShell.CANCELLATION_TRIES, err_msg),
@@ -813,8 +815,7 @@ class ImpalaShell(cmd.Cmd, object):
     try:
       summary, failed_summary = self.imp_client.get_summary(self.last_query_handle)
     except RPCException as e:
-      import re
-      error_pattern = re.compile("ERROR: Query id [a-f0-9]+:[a-f0-9]+ not found.")
+      error_pattern = re.compile("Query id [a-f0-9]+:[a-f0-9]+ not found.")
       if error_pattern.match(e.value):
         print("Could not retrieve summary for query.", file=sys.stderr)
       else:

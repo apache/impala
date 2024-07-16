@@ -458,6 +458,7 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 
 const char* ImpalaServer::GET_LOG_QUERY_RETRY_INFO_FORMAT =
     "Original query failed:\n$0\nQuery has been retried using query id: $1\n";
+const char* ImpalaServer::QUERY_ERROR_FORMAT = "Query $0 failed:\n$1\n";
 
 // Interval between checks for query expiration.
 const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
@@ -1255,7 +1256,6 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> sess
     QueryHandle* query_handle, const TExecRequest* external_exec_request,
     const bool include_in_query_log) {
   PrepareQueryContext(query_ctx);
-  ScopedThreadContext debug_ctx(GetThreadDebugInfo(), query_ctx->query_id);
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
 
   // Redact the SQL stmt and update the query context

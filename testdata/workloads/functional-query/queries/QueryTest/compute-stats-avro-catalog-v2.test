@@ -94,7 +94,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 # Avro table with missing two column definitions.
 compute stats avro_hive_alltypes_missing_coldef
 ---- CATCH
-MESSAGE: AnalysisException: Cannot COMPUTE STATS on Avro table 'avro_hive_alltypes_missing_coldef' because its column definitions do not match those in the Avro schema.
+AnalysisException: Cannot COMPUTE STATS on Avro table 'avro_hive_alltypes_missing_coldef' because its column definitions do not match those in the Avro schema.
 Definition of column 'smallint_col' of type 'smallint' does not match the Avro-schema column 'tinyint_col' of type 'INT' at position '2'.
 Please re-create the table with column definitions, e.g., using the result of 'SHOW CREATE TABLE'
 ====

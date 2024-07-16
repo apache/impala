@@ -733,6 +733,9 @@ class ImpalaServer : public ImpalaServiceIf,
   static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
   /// String format of retry information returned in GetLog() RPCs.
   static const char* GET_LOG_QUERY_RETRY_INFO_FORMAT;
+  /// String format of errors related to a query. It contains a placeholder for
+  /// the query id.
+  static const char* QUERY_ERROR_FORMAT;
 
   /// Used in situations where the client provides a session ID and a query ID and the
   /// caller needs to validate that the query can be accessed from the session. The two
@@ -1010,6 +1013,9 @@ class ImpalaServer : public ImpalaServiceIf,
       const beeswax::QueryHandle& beeswax_handle, TUniqueId* query_id);
 
   /// Helper function to raise BeeswaxException
+  ///
+  /// To include query id in the error message, it is required that the query id of the
+  /// thread debug info is set in at least the caller's scope.
   [[noreturn]] void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
 
   /// Executes the fetch logic. Doesn't clean up the exec state if an error occurs.

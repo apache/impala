@@ -39,10 +39,12 @@ from tests.common.skip import SkipIf
 from tests.common.test_dimensions import (
   create_client_protocol_dimension, create_client_protocol_strict_dimension,
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
+from tests.common.test_result_verifier import error_msg_expected
 from time import sleep, time
 from tests.shell.util import (get_impalad_host_port, assert_var_substitution,
   run_impala_shell_cmd, ImpalaShell, build_shell_env, wait_for_query_state,
-  create_impala_shell_executable_dimension, get_impala_shell_executable)
+  create_impala_shell_executable_dimension, get_impala_shell_executable,
+  stderr_get_first_error_msg)
 from contextlib import closing
 
 
@@ -274,8 +276,11 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['-q', 'set abort_on_error=true;'
             'select id from functional_parquet.bad_column_metadata t']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
-    assert 'ERROR: Column metadata states there are 11 values, ' in result.stderr
-    assert 'but read 10 values from column id.' in result.stderr
+    assert error_msg_expected(
+      stderr_get_first_error_msg(result.stderr),
+      "Column metadata states there are 11 values, but read 10 values from column id."
+    )
+
 
   def test_completed_query_errors_2(self, vector):
     if vector.get_value('strict_hs2_protocol'):
@@ -284,9 +289,10 @@ class TestImpalaShell(ImpalaTestSuite):
             'select id, cnt from functional_parquet.bad_column_metadata t, '
             '(select 1 cnt) u']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
-    assert 'ERROR: Column metadata states there are 11 values, ' in result.stderr,\
-        result.stderr
-    assert 'but read 10 values from column id.' in result.stderr, result.stderr
+    assert error_msg_expected(
+      stderr_get_first_error_msg(result.stderr),
+      "Column metadata states there are 11 values, but read 10 values from column id."
+    )
 
   def test_no_warnings_in_log_with_quiet_mode(self, vector):
     if vector.get_value('strict_hs2_protocol'):

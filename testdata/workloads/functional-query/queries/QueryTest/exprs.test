@@ -3044,12 +3044,12 @@ timestamp
 ---- QUERY
 select to_timestamp('01:01:01', 'HH:mm:ss');
 ---- CATCH
-Query aborted:Bad date/time conversion format: HH:mm:ss
+Bad date/time conversion format: HH:mm:ss
 ====
 ---- QUERY
 select to_timestamp('01:01:01.123', 'HH:mm:ss.SSS');
 ---- CATCH
-Query aborted:Bad date/time conversion format: HH:mm:ss
+Bad date/time conversion format: HH:mm:ss
 ====
 ---- QUERY
 select from_unixtime(1382337792,"HH:mm:ss.SSSSSSSSS");

@@ -21,6 +21,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.parametrize import UniqueDatabase
+from tests.common.test_result_verifier import error_msg_expected
 from tests.util.concurrent_workload import ConcurrentWorkload
 
 import json
@@ -530,12 +531,12 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 1)
     # Run query to make sure it times out
     result = self.execute_query_expect_failure(self.client, TEST_QUERY)
-    expected_error = "Query aborted:Admission for query exceeded timeout 2000ms in " \
+    expected_error = "Admission for query exceeded timeout 2000ms in " \
                      "pool default-pool. Queued reason: Waiting for executors to " \
                      "start. Only DDL queries and queries scheduled only on the " \
                      "coordinator (either NUM_NODES set to 1 or when small query " \
                      "optimization is triggered) can currently run."
-    assert expected_error in str(result)
+    assert error_msg_expected(str(result), expected_error)
     assert self._get_num_executor_groups(only_healthy=True) == 0
 
   @pytest.mark.execute_serially

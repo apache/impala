@@ -39,6 +39,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.iceberg_test_suite import IcebergTestSuite
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfDockerizedCluster
 from tests.common.test_dimensions import add_exec_option_dimension
+from tests.common.test_result_verifier import error_msg_expected
 from tests.common.file_utils import (
   create_iceberg_table_from_directory,
   create_table_from_parquet)
@@ -1378,7 +1379,7 @@ class TestIcebergTable(IcebergTestSuite):
         query_options=abort_ice_transaction_options)
     # Check that the error message looks reasonable.
     result = str(err)
-    assert "Query aborted:CommitFailedException: simulated commit failure" in result
+    assert error_msg_expected(result, "CommitFailedException: simulated commit failure")
     # Check that no data was inserted.
     data = self.execute_query_expect_success(self.client,
         "select * from {0}".format(tbl_name))
@@ -1393,7 +1394,8 @@ class TestIcebergTable(IcebergTestSuite):
         .format(tbl_name, "j"), query_options=abort_ice_transaction_options)
     ddl_result = str(ddl_err)
     # Check that the error message looks reasonable.
-    assert "Query aborted:CommitFailedException: simulated commit failure" in ddl_result
+    assert error_msg_expected(ddl_result,
+                              "CommitFailedException: simulated commit failure")
     # Check that no column was added.
     data = self.execute_query_expect_success(self.client,
         "select * from {0}".format(tbl_name))

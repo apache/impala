@@ -51,7 +51,6 @@ LOG = logging.getLogger('impala_beeswax')
 
 # Custom exception wrapper.
 # All exceptions coming from thrift/beeswax etc. go through this wrapper.
-# __str__ preserves the exception type.
 # TODO: Add the ability to print some of the stack.
 class ImpalaBeeswaxException(Exception):
   __name__ = "ImpalaBeeswaxException"
@@ -60,7 +59,7 @@ class ImpalaBeeswaxException(Exception):
     self.inner_exception = inner_exception
 
   def __str__(self):
-    return "%s:\n %s" % (self.__name__, self.__message)
+    return self.__message
 
 class ImpalaBeeswaxResult(object):
   def __init__(self, **kwargs):
@@ -402,7 +401,7 @@ class ImpalaBeeswaxClient(object):
         try:
           error_log = self.__do_rpc(
             lambda: self.imp_service.get_log(query_handle.log_context))
-          raise ImpalaBeeswaxException("Query aborted:" + error_log, None)
+          raise ImpalaBeeswaxException(error_log, None)
         finally:
           self.close_query(query_handle)
       time.sleep(0.05)
@@ -420,7 +419,7 @@ class ImpalaBeeswaxClient(object):
         try:
           error_log = self.__do_rpc(
             lambda: self.imp_service.get_log(query_handle.log_context))
-          raise ImpalaBeeswaxException("Query aborted:" + error_log, None)
+          raise ImpalaBeeswaxException(error_log, None)
         finally:
           self.close_query(query_handle)
       time.sleep(0.05)
@@ -523,7 +522,7 @@ class ImpalaBeeswaxClient(object):
     message = str(exception)
     if isinstance(exception, BeeswaxService.BeeswaxException):
       message = exception.message
-    return 'INNER EXCEPTION: %s\n MESSAGE: %s' % (exception.__class__, message)
+    return message
 
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking.

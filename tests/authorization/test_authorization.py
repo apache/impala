@@ -39,6 +39,7 @@ from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import assert_file_in_dir_contains,\
     assert_no_files_in_dir_contain
+from tests.common.test_result_verifier import error_msg_equal
 from tests.common.skip import SkipIf
 
 
@@ -131,7 +132,7 @@ class TestAuthorization(CustomClusterTestSuite):
       exc1_str = str(self.execute_query_expect_failure(self.client, query, user=user))
       exc2_str = str(self.execute_query_expect_failure(self.client, query_non_existent,
           user=user))
-      assert exc1_str == exc2_str
+      assert error_msg_equal(exc1_str, exc2_str)
       assert "AuthorizationException" in exc1_str
       assert "does not have privileges to access"
 

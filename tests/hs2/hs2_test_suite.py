@@ -26,6 +26,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
+from tests.common.test_result_verifier import error_msg_expected
 from time import sleep, time
 
 
@@ -136,10 +137,11 @@ class HS2TestSuite(ImpalaTestSuite):
   def check_response(response,
                      expected_status_code = TCLIService.TStatusCode.SUCCESS_STATUS,
                      expected_error_prefix = None):
-    assert response.status.statusCode == expected_status_code
+    assert response.status.statusCode == expected_status_code, str(response)
     if expected_status_code != TCLIService.TStatusCode.SUCCESS_STATUS\
        and expected_error_prefix is not None:
-      assert response.status.errorMessage.startswith(expected_error_prefix)
+      assert response.status.errorMessage.startswith(expected_error_prefix) or \
+             error_msg_expected(response.status.errorMessage, expected_error_prefix)
 
   @staticmethod
   def check_invalid_session(response):

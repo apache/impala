@@ -14,7 +14,7 @@ INT
 set DEBUG_ACTION="FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0";
 insert into insertonly_acid values (42);
 ---- CATCH
-Query aborted:Debug Action: FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0
+Debug Action: FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0
 ====
 ---- QUERY
 select * from insertonly_acid;
@@ -28,7 +28,7 @@ INT
 set DEBUG_ACTION="CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0";
 insert into insertonly_acid values (42);
 ---- CATCH
-Query aborted:Debug Action: CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0
+Debug Action: CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0
 ====
 ---- QUERY
 select * from insertonly_acid;
@@ -58,7 +58,7 @@ INT,INT
 set DEBUG_ACTION="FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0";
 insert into part (p, n) select cast(i + 1 as INT), 11 from insertonly_acid;
 ---- CATCH
-Query aborted:Debug Action: FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0
+Debug Action: FIS_FAIL_HDFS_TABLE_SINK_FLUSH_FINAL:FAIL@1.0
 ====
 ---- QUERY
 select p, n from part;
@@ -73,7 +73,7 @@ INT,INT
 set DEBUG_ACTION="CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0";
 insert into part (p, n) select cast(i + 1 as INT), 11 from insertonly_acid;
 ---- CATCH
-Query aborted:Debug Action: CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0
+Debug Action: CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0
 ====
 ---- QUERY
 select p, n from part;

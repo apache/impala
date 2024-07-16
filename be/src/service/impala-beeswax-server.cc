@@ -18,6 +18,7 @@
 #include "service/impala-server.h"
 
 #include "common/logging.h"
+#include "common/thread-debug-info.h"
 #include "gen-cpp/Frontend_types.h"
 #include "rpc/thrift-util.h"
 #include "runtime/coordinator.h"
@@ -73,6 +74,9 @@ void ImpalaServer::query(beeswax::QueryHandle& beeswax_handle, const Query& quer
   RAISE_IF_ERROR(Execute(&query_ctx, session, &query_handle, nullptr),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_handle->query_id());
+
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
   Status status = query_handle->WaitAsync();
@@ -120,6 +124,9 @@ void ImpalaServer::executeAndWait(beeswax::QueryHandle& beeswax_handle,
   QueryHandle query_handle;
   RAISE_IF_ERROR(Execute(&query_ctx, session, &query_handle, nullptr),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
+
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_handle->query_id());
 
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
@@ -184,6 +191,9 @@ void ImpalaServer::fetch(Results& query_results,
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
   VLOG_ROW << "fetch(): query_id=" << PrintId(query_id) << " fetch_size=" << fetch_size;
 
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
+
   QueryHandle query_handle;
   RAISE_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
 
@@ -230,6 +240,9 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
   VLOG_QUERY << "get_results_metadata(): query_id=" << PrintId(query_id);
+
+  // Make query id available to the following RAISE_IF_ERROR().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
 
   QueryHandle query_handle;
   RAISE_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
@@ -278,6 +291,10 @@ void ImpalaServer::close(const beeswax::QueryHandle& beeswax_handle) {
   VLOG_QUERY << "close(): query_id=" << PrintId(query_id);
   // TODO: do we need to raise an exception if the query state is EXCEPTION?
   // TODO: use timeout to get rid of unwanted query_handle.
+
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
+
   RAISE_IF_ERROR(UnregisterQuery(query_id, true), SQLSTATE_GENERAL_ERROR);
 }
 
@@ -290,6 +307,9 @@ beeswax::QueryState::type ImpalaServer::get_state(
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
   VLOG_ROW << "get_state(): query_id=" << PrintId(query_id);
+
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
 
   QueryHandle query_handle;
   Status status = GetActiveQueryHandle(query_id, &query_handle);
@@ -336,6 +356,9 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
 
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
+
   QueryHandle query_handle;
   RAISE_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
 
@@ -365,7 +388,8 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
         !query_handle->query_status().ok());
     // If the query status is !ok, include the status error message at the top of the log.
     if (!query_handle->query_status().ok()) {
-      error_log_ss << query_handle->query_status().GetDetail() << "\n";
+      error_log_ss << Substitute(QUERY_ERROR_FORMAT, PrintId(query_handle->query_id()),
+          query_handle->query_status().GetDetail());
     }
   }
 
@@ -408,6 +432,9 @@ void ImpalaServer::Cancel(impala::TStatus& tstatus,
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
 
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
+
   // Impala-shell and administrative tools can call this from a different connection,
   // e.g. to allow an admin to force-terminate queries. We should allow the operation to
   // proceed without validating the session/query relation so that workflows don't
@@ -426,6 +453,9 @@ void ImpalaServer::CloseInsert(TDmlResult& dml_result,
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
   VLOG_QUERY << "CloseInsert(): query_id=" << PrintId(query_id);
+
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
 
   // CloseInsertInternal() will validates that 'session' has access to 'query_id'.
   Status status = CloseInsertInternal(session.get(), query_id, &dml_result);
@@ -453,6 +483,9 @@ void ImpalaServer::GetRuntimeProfile(
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
 
   VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
+
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
 
   // If the query was retried, fetch the profile for the most recent attempt of the query
   // The original query profile should still be accessible via the web ui.
@@ -489,6 +522,10 @@ void ImpalaServer::GetExecSummary(impala::TExecSummary& result,
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
   VLOG_RPC << "GetExecSummary(): query_id=" << PrintId(query_id);
+
+  // Make query id available to the following RaiseBeeswaxException().
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
+
   // GetExecSummary() will validate that the user has access to 'query_id'.
   Status status = GetExecSummary(query_id, GetEffectiveUser(*session), &result);
   if (!status.ok()) RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
@@ -580,7 +617,10 @@ inline void ImpalaServer::BeeswaxHandleToTUniqueId(
 [[noreturn]] void ImpalaServer::RaiseBeeswaxException(
     const string& msg, const char* sql_state) {
   BeeswaxException exc;
-  exc.__set_message(msg);
+  exc.__set_message(GetThreadDebugInfo()->GetQueryId() == TUniqueId() ?
+          (msg) :
+          Substitute(ImpalaServer::QUERY_ERROR_FORMAT,
+              PrintId(GetThreadDebugInfo()->GetQueryId()), (msg)));
   exc.__set_SQLState(sql_state);
   throw exc;
 }

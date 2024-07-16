@@ -208,7 +208,7 @@ public class LdapHS2Test {
     TCancelOperationResp cancelResp = client.CancelOperation(cancelReq);
     verifyMetrics(5, 0);
     assertEquals(cancelResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
-    assertEquals(cancelResp.getStatus().getErrorMessage(), expectedError);
+    assertTrue(cancelResp.getStatus().getErrorMessage().contains(expectedError));
 
     // Open another session which will get username 'Test2Ldap'.
     TOpenSessionReq openReq2 = new TOpenSessionReq();

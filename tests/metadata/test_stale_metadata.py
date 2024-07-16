@@ -84,7 +84,7 @@ class TestRewrittenFile(ImpalaTestSuite):
     #   Metadata for file '...' appears stale. Try running "refresh
     #   unique_database_name.new_file_shorter" to reload the file metadata.
     # IMPALA-2512: Error message could also be something like
-    #   Query aborted:Disk I/O error on ...:27001: Error seeking ...
+    #   Disk I/O error on ...:27001: Error seeking ...
     #   between 0 and ... for '...'
     # TODO: find a better way to detect stale file meta and remove skip markers.
     table_name = "new_file_shorter"

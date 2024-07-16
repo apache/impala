@@ -46,9 +46,11 @@ from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (
   create_client_protocol_dimension, create_client_protocol_strict_dimension,
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
+from tests.common.test_result_verifier import error_msg_expected
 from tests.shell.util import (assert_var_substitution, ImpalaShell, get_impalad_port,
   get_shell_cmd, get_open_sessions_metric, spawn_shell, get_unused_port,
-  create_impala_shell_executable_dimension, get_impala_shell_executable)
+  create_impala_shell_executable_dimension, get_impala_shell_executable,
+  stderr_get_first_error_msg)
 
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
@@ -1161,8 +1163,10 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       assert "ParseException" in result.stderr,\
              result.stderr
     else:
-      assert "ERROR: ParseException: Unmatched string literal" in result.stderr,\
-             result.stderr
+      assert error_msg_expected(
+          stderr_get_first_error_msg(result.stderr),
+          "ParseException: Unmatched string literal"
+      )
 
   def test_utf8_error_message(self, vector):
     if vector.get_value('strict_hs2_protocol'):
@@ -1172,8 +1176,11 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     query = "select cast(now() as string format 'yyyy年MM月dd日')"
     shell.send_cmd(query)
     result = shell.get_result()
-    assert "ERROR: Bad date/time conversion format: yyyy年MM月dd日" in result.stderr,\
-           result.stderr
+    assert error_msg_expected(
+        stderr_get_first_error_msg(result.stderr),
+        "Bad date/time conversion format: yyyy年MM月dd日"
+    )
+
 
   def test_timezone_validation(self, vector):
     """Test that query option TIMEZONE is validated when executing a query.

@@ -739,7 +739,10 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     Status status = executor_->Exec(stmt, &result_types);
     status = executor_->FetchResult(&result_row);
     ASSERT_FALSE(status.ok());
-    ASSERT_TRUE(EndsWith(status.msg().msg(), error_string)) << "Actual: '"
+    // Ignore the tailing '\n' characters when matching
+    string actual_msg = boost::trim_right_copy(status.msg().msg());
+    string expected_msg = boost::trim_right_copy(error_string);
+    ASSERT_TRUE(EndsWith(actual_msg, expected_msg)) << "Actual: '"
         << status.msg().msg() << "'" << endl << "Expected: '" << error_string << "'";
   }
 
