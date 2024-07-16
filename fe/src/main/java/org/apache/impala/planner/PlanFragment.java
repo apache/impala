@@ -100,7 +100,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // exchange node or join node to which this fragment sends its output
   private PlanNode destNode_;
 
-  // created in finalize() or set in setSink()
+  // created in finalizeExchanges() or set in setSink()
   private DataSink sink_;
 
   // specification of the partition of the input of this fragment;

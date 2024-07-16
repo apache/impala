@@ -40,7 +40,6 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 
 import com.google.common.base.Preconditions;
 import com.google.common.hash.Hasher;
-import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 
 /**
@@ -81,8 +80,8 @@ import com.google.common.hash.Hashing;
  * Anything hashed will have a representation incorporated into the trace.
  *
  * This accumulates information from various sources, then it is finalized and cannot
- * be modified further. The hash key and hash trace cannot be accessed until finalize()
- * is called.
+ * be modified further. The hash key and hash trace cannot be accessed until
+ * finalizeHash() is called.
  */
 public class TupleCacheInfo {
   // Keep track of the reasons why a location in the plan is ineligible. This may be
@@ -108,13 +107,13 @@ public class TupleCacheInfo {
   private final IdGenerator<SlotId> translatedSlotIdGenerator_ =
       SlotId.createGenerator();
 
-  // These fields accumulate partial results until finalize() is called.
+  // These fields accumulate partial results until finalizeHash() is called.
   private Hasher hasher_ = Hashing.murmur3_128().newHasher();
 
   // The hash trace keeps a human-readable record of the items hashed into the cache key.
   private StringBuilder hashTraceBuilder_ = new StringBuilder();
 
-  // When finalize() is called, these final values are filled in and the hasher and
+  // When finalizeHash() is called, these final values are filled in and the hasher and
   // hash trace builder are destroyed.
   private boolean finalized_ = false;
   private String finalizedHashTrace_ = null;
@@ -152,9 +151,9 @@ public class TupleCacheInfo {
   /**
    * Finish accumulating information and calculate the final hash value and
    * hash trace. This must be called before accessing the hash or hash trace.
-   * No further modifications can be made after calling finalize().
+   * No further modifications can be made after calling finalizeHash().
    */
-  public void finalize() {
+  public void finalizeHash() {
     finalizedHashString_ = hasher_.hash().toString();
     hasher_ = null;
     finalizedHashTrace_ = hashTraceBuilder_.toString();

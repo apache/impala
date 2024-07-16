@@ -23,9 +23,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.SlotDescriptor;
-import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.TupleDescriptor;
-import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.thrift.TUniqueId;
@@ -42,11 +40,11 @@ public class TupleCacheInfoTest {
     // This test doesn't need a DescriptorTable, so it just sets it to null.
     TupleCacheInfo info1 = new TupleCacheInfo(null);
     info1.hashThrift(new TUniqueId(1L, 2L));
-    info1.finalize();
+    info1.finalizeHash();
 
     TupleCacheInfo info2 = new TupleCacheInfo(null);
     info2.hashThrift(new TUniqueId(1L, 2L));
-    info2.finalize();
+    info2.finalizeHash();
 
     assertEquals(info1.getHashTrace(), "TUniqueId(hi:1, lo:2)");
     assertEquals(info1.getHashTrace(), info2.getHashTrace());
@@ -60,17 +58,17 @@ public class TupleCacheInfoTest {
     // This test doesn't need a DescriptorTable, so it just sets it to null.
     TupleCacheInfo child1 = new TupleCacheInfo(null);
     child1.hashThrift(new TUniqueId(1L, 2L));
-    child1.finalize();
+    child1.finalizeHash();
 
     TupleCacheInfo child2 = new TupleCacheInfo(null);
     child2.hashThrift(new TUniqueId(3L, 4L));
-    child2.finalize();
+    child2.finalizeHash();
 
     TupleCacheInfo parent = new TupleCacheInfo(null);
     parent.mergeChild(child1);
     parent.mergeChild(child2);
     parent.hashThrift(new TUniqueId(5L, 6L));
-    parent.finalize();
+    parent.finalizeHash();
 
     assertEquals(parent.getHashTrace(),
         "TUniqueId(hi:1, lo:2)TUniqueId(hi:3, lo:4)TUniqueId(hi:5, lo:6)");
@@ -84,13 +82,13 @@ public class TupleCacheInfoTest {
     // Child 1 is eligible
     TupleCacheInfo child1 = new TupleCacheInfo(null);
     child1.hashThrift(new TUniqueId(1L, 2L));
-    child1.finalize();
+    child1.finalizeHash();
     assertTrue(child1.isEligible());
 
     // Child 2 is ineligible
     TupleCacheInfo child2 = new TupleCacheInfo(null);
     child2.setIneligible(TupleCacheInfo.IneligibilityReason.NOT_IMPLEMENTED);
-    child2.finalize();
+    child2.finalizeHash();
     assertTrue(!child2.isEligible());
 
     TupleCacheInfo parent = new TupleCacheInfo(null);
@@ -98,9 +96,9 @@ public class TupleCacheInfoTest {
     // Still eligible after adding child1 without child2
     assertTrue(parent.isEligible());
     parent.mergeChild(child2);
-    // It is allowed to check eligibility before finalize()
+    // It is allowed to check eligibility before finalizeHash()
     assertTrue(!parent.isEligible());
-    parent.finalize();
+    parent.finalizeHash();
 
     assertTrue(!parent.isEligible());
   }
@@ -129,7 +127,7 @@ public class TupleCacheInfoTest {
     TupleCacheInfo child1 = new TupleCacheInfo(descTbl);
     child1.hashThrift(new TUniqueId(1L, 2L));
     child1.registerTuple(tuple1.getId());
-    child1.finalize();
+    child1.finalizeHash();
     assertEquals(child1.getLocalTupleId(tuple1.getId()).asInt(), 0);
     assertEquals(child1.getLocalSlotId(t1slot.getId()).asInt(), 0);
     String child1ExpectedHashTrace = "TUniqueId(hi:1, lo:2)" +
@@ -145,7 +143,7 @@ public class TupleCacheInfoTest {
     TupleCacheInfo child2 = new TupleCacheInfo(descTbl);
     child2.hashThrift(new TUniqueId(1L, 2L));
     child2.registerTuple(tuple2.getId());
-    child2.finalize();
+    child2.finalizeHash();
     // Note: we expect the id's to be translated to local ids, so even though this is
     // tuple 2 and slot 2, this will still have TupleId=0 and SlotId=0. In fact, at this
     // point the only difference between child1 and child2 is the TUniqueId.
@@ -160,7 +158,7 @@ public class TupleCacheInfoTest {
     TupleCacheInfo parent = new TupleCacheInfo(descTbl);
     parent.mergeChild(child2);
     parent.mergeChild(child1);
-    parent.finalize();
+    parent.finalizeHash();
 
     // Tuple1 = second index
     // Tuple2 = first index

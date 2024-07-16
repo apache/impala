@@ -1331,7 +1331,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
     // If we are already ineligible, there is no need to process the Thrift
     if (!tupleCacheInfo_.isEligible()) {
-      tupleCacheInfo_.finalize();
+      tupleCacheInfo_.finalizeHash();
       return;
     }
 
@@ -1343,7 +1343,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     initThrift(msg, serialCtx);
     toThrift(msg, serialCtx);
     tupleCacheInfo_.hashThrift(msg);
-    tupleCacheInfo_.finalize();
+    tupleCacheInfo_.finalizeHash();
   }
 
   /**
