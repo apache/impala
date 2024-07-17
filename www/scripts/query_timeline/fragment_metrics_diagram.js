@@ -27,10 +27,10 @@ import "./global_dom.js";
 
 export var exportedForTest;
 
-export var fragment_id_selections = new Map();
 export var fragment_metrics_parse_successful = false;
 export var fragment_metrics_chart = null;
 
+var fragment_id_selections = new Map();
 var fragment_metrics_aggregate;
 var fragment_metrics_counters = [
   ["MemoryUsage", "memory usage", 0],
@@ -84,7 +84,7 @@ function initializeFragmentMetricsChart() {
       y2 :
       {
         tick : {
-          format : function (y2) { return (y2 == Math.floor(y2) ? y2 : ""); }
+          format : function (y2) { return (y2 === Math.floor(y2) ? y2 : ""); }
         },
         show : true
       }
@@ -115,7 +115,7 @@ function initializeFragmentMetricsChart() {
 }
 
 function dragResizeBar(mousemove_e) {
-  if (mousemove_e.target.classList[0] == "c3-event-rect") return;
+  if (mousemove_e.target.classList[0] === "c3-event-rect") return;
   var next_height = getFragmentMetricsHeight() + (fragment_metrics_resize_bar.offsetTop -
       mousemove_e.clientY);
   if (next_height >= diagram_min_height &&
@@ -163,7 +163,7 @@ export function toogleFragmentMetricsVisibility() {
 
 export function collectFragmentMetricsFromProfile() {
   // do not collect metrics, in case a fragment is not selected
-  if (fragment_id_selections.size == 0) {
+  if (fragment_id_selections.size === 0) {
     fragment_metrics_parse_successful = false;
     return;
   }
@@ -179,7 +179,7 @@ export function collectFragmentMetricsFromProfile() {
       // initialize the collection arrays for subsequent collections
       // arrays are overwritten without further re-allocation to reduce memory usage
       if(fragment_id_selections.has(fragment_profile.profile_name)) {
-        if (fragment_metrics_chart == null) {
+        if (fragment_metrics_chart === null) {
           ({fragment_metrics_aggregate, sampled_fragment_metrics_timeseries} =
               initializeFragmentMetrics(fragment_profile, fragment_metrics_counters,
                   max_samples_fragment_metrics, fragment_metrics_timeaxis_name));
@@ -237,7 +237,7 @@ export function collectFragmentMetricsFromProfile() {
 }
 
 export async function resizeFragmentMetricsChart() {
-  if (fragment_metrics_chart == null) return;
+  if (fragment_metrics_chart === null) return;
   var chart_width = diagram_width - margin_chart_end - name_width;
   fragment_metrics_resize_bar.style.marginLeft = `${name_width + chart_width / 4}px`;
   fragment_metrics_resize_bar.style.width = `${chart_width / 2}px`;
@@ -249,9 +249,10 @@ export async function resizeFragmentMetricsChart() {
 }
 
 export function updateFragmentMetricsChartOnClick(click_event) {
+  if (click_event.target.tagName !== "rect") return;
   var selected_fragment_id = click_event.target.parentElement.parentElement.id;
   fragment_id_selections.delete(selected_fragment_id);
-  if (fragment_metrics_chart != null) {
+  if (fragment_metrics_chart !== null) {
     var unloaded = fragment_metrics_chart.internal.getTargets().every(function (target) {
       if (target.id.includes(selected_fragment_id)) {
         var unload_ids = new Array(fragment_metrics_counters.length);
@@ -264,7 +265,7 @@ export function updateFragmentMetricsChartOnClick(click_event) {
       }
       return true;
     });
-    if (fragment_id_selections.size == 0) {
+    if (fragment_id_selections.size === 0) {
       fragment_metrics_chart = destroyChart(fragment_metrics_chart,
           fragment_metrics_diagram);
       toogleFragmentMetricsVisibility();
@@ -273,7 +274,7 @@ export function updateFragmentMetricsChartOnClick(click_event) {
     }
     if (!unloaded) return;
   }
-  if(fragment_id_selections.size == 0) {
+  if(fragment_id_selections.size === 0) {
     resetUtilizationHeight();
   }
   fragment_id_selections.set(selected_fragment_id, 1);
@@ -306,6 +307,6 @@ fragment_metrics_close_btn.addEventListener('click', closeFragmentMetricsChart);
 fragment_metrics_close_btn.style.height = `${diagram_controls_height}px`;
 fragment_metrics_close_btn.style.fontSize = `${diagram_controls_height / 2}px`;
 
-if (typeof process != "undefined" && process.env.NODE_ENV === 'test') {
+if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
   exportedForTest = {initializeFragmentMetrics};
 }

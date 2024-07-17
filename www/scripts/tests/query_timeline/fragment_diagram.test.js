@@ -25,17 +25,18 @@ describe("Test getSvg*", () => {
       light_grey : "#F0F0F0", transperent : "rgba(0, 0, 0, 0)" };
 
   test("Test getSvgRect", () => {
-    expect(getSvgRect(stroke_fill_colors.transperent, 0, 0, 100, 100, true,
+    expect(getSvgRect(stroke_fill_colors.transperent, 0, 0, 100, 100, "2 2",
         stroke_fill_colors.black).outerHTML).toBe(
-          '<rect x="0px" y="0px" width="100px" height="100px"'
+          '<rect x="0" y="0" width="100" height="100"'
         + ` fill="${stroke_fill_colors.transperent}"`
+        + ` stroke-width="0.5"`
         + ` stroke="${stroke_fill_colors.black}"`
         + ` stroke-dasharray="2 2"></rect>`);
   });
 
   test("Test getSvgLine", () => {
     expect(getSvgLine(stroke_fill_colors.black, 0, 0, 100, 100, true).outerHTML).toBe(
-          '<line x1="0px" y1="0px" x2="100px" y2="100px"'
+          '<line x1="0" y1="0" x2="100" y2="100"'
         + ` stroke="${stroke_fill_colors.black}"`
         + ' stroke-dasharray="2 2"></line>');
   });
@@ -43,15 +44,7 @@ describe("Test getSvg*", () => {
   test("Test getSvgText", () => {
     expect(getSvgText("Text", stroke_fill_colors.black, 0, 0, 15, true, 300)
         .outerHTML).toBe(
-        '<text x="0px" y="0px" style="font-size: 10px;" dominant-baseline="middle" '
-        + `text-anchor="middle" fill="${stroke_fill_colors.black}" textLength="300" `
-        + 'lengthAdjust="spacingAndGlyphs">Text</text>');
-  });
-
-  test("Test getSvgText", () => {
-    expect(getSvgText("Text", stroke_fill_colors.black, 0, 0, 15, true, 300)
-        .outerHTML).toBe(
-        '<text x="0px" y="0px" style="font-size: 10px;" dominant-baseline="middle" '
+        '<text x="0" y="0" style="font-size: 10px;" dominant-baseline="middle" '
         + `text-anchor="middle" fill="${stroke_fill_colors.black}" textLength="300" `
         + 'lengthAdjust="spacingAndGlyphs">Text</text>');
   });

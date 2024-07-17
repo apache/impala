@@ -77,7 +77,7 @@ $(document).ready(function() {
 });
 
 function toggleRefresh() {
-    if (document.getElementById("toggle").checked == true) {
+    if (document.getElementById("toggle").checked === true) {
         intervalId = setInterval(refresh, 1000);
         document.getElementById("refresh_on").textContent = "Auto-refresh on";
     } else {

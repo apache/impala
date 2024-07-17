@@ -59,7 +59,7 @@ export function generateTimesamples(timesamples_array, max_samples, extend) {
     set_maxts(timesamples_array[max_samples.available + 1] * 1e9);
   }
   var j = max_samples.available + (extend ? 3 : 2);
-  for (; j < timesamples_array.length && timesamples_array[j] != null; ++j) {
+  for (; j < timesamples_array.length && timesamples_array[j] !== null; ++j) {
     timesamples_array[j] = null;
   }
 }
@@ -68,7 +68,7 @@ export function mapTimeseriesCounters(time_series_counters, counters) {
   for (var i = 0; i < counters.length; i++) {
     var no_change = true;
     for (var j = 0; j < time_series_counters.length; j++) {
-      if (time_series_counters[j].counter_name == counters[i][0]) {
+      if (time_series_counters[j].counter_name === counters[i][0]) {
         counters[i][2] = j;
         no_change = false;
       }
@@ -98,13 +98,13 @@ export function aggregateProfileTimeseries(parent_profile, aggregate_array,
 }
 
 export function showTooltip(chart, x) {
-  if (chart == undefined) return;
+  if (chart === null) return;
   chart.tooltip.show({x : chart.internal.findClosestFromTargetsByX(
       chart.internal.getTargets(), x).x});
 }
 
 export function hideTooltip(chart) {
-  if (chart == undefined) return;
+  if (chart === null) return;
   chart.tooltip.hide();
 }
 
@@ -131,6 +131,6 @@ export function destroyChart(chart, chart_dom_obj) {
   return null;
 }
 
-if (typeof process != "undefined" && process.env.NODE_ENV === 'test') {
+if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
   exportedForTest = {accumulateTimeseriesValues};
 }

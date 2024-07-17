@@ -277,7 +277,7 @@ function refresh() {
 
 // Attaches a blob of the current SVG viewport to the associated link
 export_link.addEventListener('click', function(event) {
-  if (export_format.value == ".html") {
+  if (export_format.value === ".html") {
     var svg_viewport = document.querySelector("svg");
     var export_style = document.getElementById("css");
     var html_blob = new Blob([`<!DOCTYPE html><body>`,

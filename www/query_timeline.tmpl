@@ -187,7 +187,7 @@ function refreshView() {
   collectFragmentEventsFromProfile();
   collectUtilizationFromProfile();
   collectFragmentMetricsFromProfile();
-  if (last_maxts != maxts) {
+  if (last_maxts !== maxts) {
     renderTimingDiagram();
     last_maxts = maxts;
   }
@@ -227,11 +227,11 @@ if (window.location.search.includes("imported")) {
   window.onload = function refreshProfile() {
     var req = new XMLHttpRequest();
     req.onload = function() {
-      if (req.status == 200) {
+      if (req.status === 200) {
         set_profile(JSON.parse(req.responseText)["profile_json"]);
         refreshView();
         if (profile.child_profiles[0].info_strings.find(({key}) =>
-            key === "End Time").value == "") {
+            key === "End Time").value === "") {
           setTimeout(refreshProfile, 1000);
         }
       }
@@ -286,7 +286,7 @@ hor_zoomout.addEventListener('click', function(event) {
 
 // Attaches a SVG blob of the complete timeline to the associated link
 export_link.addEventListener('click', function (event) {
-  if (export_format.value == ".html") {
+  if (export_format.value === ".html") {
     var export_style = document.getElementById("page_export-css");
 
     // Deep clone 'parentNode's as wrappers to SVG components

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-if (typeof process != "undefined" && process.env.NODE_ENV === 'test' &&
+if (typeof process !== "undefined" && process.env.NODE_ENV === 'test' &&
     document.body.innerHTML === "") {
   const fs = await import('fs');
   document.body.innerHTML = fs.readFileSync(`${process.env.IMPALA_HOME}/www/query_timeline.tmpl`, "utf-8")

@@ -141,7 +141,7 @@ function initializeUtilizationChart() {
 }
 
 function dragResizeBar(mousemove_e) {
-  if (mousemove_e.target.classList[0] == "c3-event-rect") return;
+  if (mousemove_e.target.classList[0] === "c3-event-rect") return;
   var next_height = getUtilizationHeight() + (host_utilization_resize_bar.offsetTop -
       mousemove_e.clientY);
   if (next_height >= diagram_min_height && window.innerHeight - next_height
@@ -154,7 +154,7 @@ function dragResizeBar(mousemove_e) {
 
 function initializeUtilizationMetrics(parent_profile, counters_y1, counters_y2,
     max_samples, timeaxis_name) {
-  console.assert(parent_profile.profile_name == "Per Node Profiles");
+  console.assert(parent_profile.profile_name === "Per Node Profiles");
   // user, sys, io and sampled timeticks
   var cpu_nodes_usage_aggregate = new Array(counters_y1.length);
   max_samples.available = 0;
@@ -204,7 +204,7 @@ export function toogleUtilizationVisibility() {
 }
 
 export async function resizeUtilizationChart() {
-  if (host_utilization_chart == null) return;
+  if (host_utilization_chart === null) return;
   var chart_width = diagram_width - margin_chart_end - name_width;
   host_utilization_resize_bar.style.marginLeft = `${name_width + chart_width / 4}px`;
   host_utilization_resize_bar.style.width = `${chart_width / 2}px`;
@@ -228,8 +228,8 @@ export function collectUtilizationFromProfile() {
     // initialize the collection arrays for subsequent collections
     // arrays are overwritten without further re-allocation to reduce memory usage
     var per_node_profiles = profile.child_profiles[2].child_profiles[0];
-    console.assert(per_node_profiles.profile_name == "Per Node Profiles");
-    if (host_utilization_chart == null) {
+    console.assert(per_node_profiles.profile_name === "Per Node Profiles");
+    if (host_utilization_chart === null) {
       ({cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
           sampled_utilization_timeseries} = initializeUtilizationMetrics(
           per_node_profiles, cpu_utilization_counters, read_write_metrics_counters,
@@ -237,7 +237,7 @@ export function collectUtilizationFromProfile() {
       initializeUtilizationChart();
     }
     var impala_server_profile = profile.child_profiles[1];
-    console.assert(impala_server_profile.profile_name == "ImpalaServer");
+    console.assert(impala_server_profile.profile_name === "ImpalaServer");
     // Update the plot, only when number of samples in SummaryStatsCounter is updated
     if (impala_server_profile.summary_stats_counters[0].num_of_samples ==
         prev_utilization_num_samples) {
@@ -329,6 +329,6 @@ host_utilization_close_btn.addEventListener('click', function(e) {
 host_utilization_close_btn.style.height = `${diagram_controls_height}px`;
 host_utilization_close_btn.style.fontSize = `${diagram_controls_height / 2}px`;
 
-if (typeof process != "undefined" && process.env.NODE_ENV === 'test') {
+if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
   exportedForTest = {initializeUtilizationMetrics};
 }

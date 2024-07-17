@@ -420,7 +420,7 @@ command line parameter.</p>
   };
 
   window.onload = () => {
-    if (localStorage.getItem("imported") == "T") {
+    if (localStorage.getItem("imported") === "T") {
       imported_queries_header.scrollIntoView({ behavior : "instant", block : "start" });
       localStorage.setItem("imported", "F");
     }
