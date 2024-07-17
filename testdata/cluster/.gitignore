@@ -7,4 +7,6 @@
 /ranger/setup/impala_group.json
 /ranger/setup/impala_group_owner.json
 /ranger/setup/impala_user_non_owner.json
+/ranger/setup/impala_user_non_owner_2.json
 /ranger/setup/impala_user_owner.json
+/ranger/setup/all_database_policy_revised.json
