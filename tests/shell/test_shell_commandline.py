@@ -183,11 +183,11 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_unsecure_message(self, vector):
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Strict protocol always runs with LDAP.")
-    results = run_impala_shell_cmd(vector, [], wait_until_connected=False)
+    results = run_impala_shell_cmd(vector, [])
     assert "with no authentication" in results.stderr
 
   def test_fastbinary_warning_message(self, vector):
-    results = run_impala_shell_cmd(vector, [], wait_until_connected=False)
+    results = run_impala_shell_cmd(vector, [])
     # Verify that we don't print any message about fastbinary
     # This doesn't check the full error string, because that could change.
     assert "fastbinary" not in results.stderr
@@ -729,8 +729,7 @@ class TestImpalaShell(ImpalaTestSuite):
 
     # Testing config file related warning and error messages
     args = ['--config_file=%s/impalarc_with_warnings' % QUERY_FILE_PATH]
-    result = run_impala_shell_cmd(
-        vector, args, expect_success=True, wait_until_connected=False)
+    result = run_impala_shell_cmd(vector, args, expect_success=True)
     assert "WARNING: Option 'config_file' can be only set from shell." in result.stderr
     err_msg = ("WARNING: Unable to read configuration file correctly. "
                "Ignoring unrecognized config option: 'invalid_option'\n")
@@ -742,21 +741,25 @@ class TestImpalaShell(ImpalaTestSuite):
                "'maybe' is not a valid value for a boolean option.")
     assert  err_msg in result.stderr
 
-    # Test the optional configuration file with live_progress and live_summary
-    # Positive test
-    args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH]
-    result = run_impala_shell_cmd(vector, args)
-    assert 'WARNING:' not in result.stderr, \
-      "A valid config file should not trigger any warning: {0}".format(result.stderr)
-    # Negative Tests
-    # specified config file with live_summary enabled for non interactive mode
-    args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH, '--query=select 3']
-    result = run_impala_shell_cmd(vector, args, expect_success=False)
-    assert 'live_summary is available for interactive mode only' in result.stderr
+    # live_progress and live_summary are not supported with strict_hs2_protocol
+    if not vector.get_value('strict_hs2_protocol'):
+      # Test the optional configuration file with live_progress and live_summary
+      # Positive test
+      args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH]
+      result = run_impala_shell_cmd(vector, args)
+      filtered_stderr = [line for line in result.stderr.splitlines()
+                         if 'WARNING: Unable to load command history' not in line]
+      assert 'WARNING:' not in '\n'.join(filtered_stderr), \
+        "A valid config file should not trigger any warning: {0}".format(result.stderr)
+      # Negative Tests
+      # specified config file with live_summary enabled for non interactive mode
+      args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH, '--query=select 3']
+      result = run_impala_shell_cmd(vector, args, expect_success=False)
+      assert 'live_summary is available for interactive mode only' in result.stderr
+
     # testing config file related warning messages
     args = ['--config_file=%s/impalarc_with_warnings2' % QUERY_FILE_PATH]
-    result = run_impala_shell_cmd(
-      vector, args, expect_success=True, wait_until_connected=False)
+    result = run_impala_shell_cmd(vector, args, expect_success=True)
     err_msg = ("WARNING: Unable to read configuration file correctly. "
                "Ignoring unrecognized config option: 'Live_Progress'\n")
     assert err_msg in result.stderr

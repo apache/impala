@@ -122,15 +122,14 @@ def assert_pattern(pattern, result, text, message):
 
 
 def run_impala_shell_cmd(vector, shell_args, env=None, expect_success=True,
-                         stdin_input=None, wait_until_connected=True,
-                         stdout_file=None, stderr_file=None):
+                         stdin_input=None, stdout_file=None, stderr_file=None):
   """Runs the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
   Returns a ImpalaShellResult.
   """
   result = run_impala_shell_cmd_no_expect(vector, shell_args, env, stdin_input,
-                                          expect_success and wait_until_connected,
+                                          wait_until_connected=expect_success,
                                           stdout_file=stdout_file,
                                           stderr_file=stderr_file)
   if expect_success:
@@ -151,7 +150,11 @@ def run_impala_shell_cmd_no_expect(vector, shell_args, env=None, stdin_input=Non
 
   Does not assert based on success or failure of command.
   """
-  p = ImpalaShell(vector, shell_args, env=env, wait_until_connected=wait_until_connected,
+  # Only wait_until_connected if we also have input to send. Otherwise expect that
+  # the command will run without input and exit. Avoid waiting as ImpalaShell may
+  # exit before it can detect there is a successful connection and assert False.
+  p = ImpalaShell(vector, shell_args, env=env,
+                  wait_until_connected=wait_until_connected and stdin_input,
                   stdout_file=stdout_file, stderr_file=stderr_file)
   result = p.get_result(stdin_input)
   return result

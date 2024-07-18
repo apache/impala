@@ -247,7 +247,7 @@ class TestClientSsl(CustomClusterTestSuite):
   def _validate_positive_cases(self, vector, ca_cert=""):
     python3_10_version_re = re.compile(r"using Python 3\.1[0-9]")
     shell_options = ["--ssl", "-q", "select 1 + 2"]
-    result = run_impala_shell_cmd(vector, shell_options, wait_until_connected=False)
+    result = run_impala_shell_cmd(vector, shell_options)
     for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
       assert msg in result.stderr
     # Python >3.10 has deprecated ssl.PROTOCOL_TLS and impala-shell currently emits a
@@ -260,7 +260,7 @@ class TestClientSsl(CustomClusterTestSuite):
 
     if ca_cert != "":
       shell_options = shell_options + ["--ca_cert=%s" % ca_cert]
-      result = run_impala_shell_cmd(vector, shell_options, wait_until_connected=False)
+      result = run_impala_shell_cmd(vector, shell_options)
       for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
         assert msg in result.stderr
       if not python3_10_version_re.search(result.stderr):
@@ -294,7 +294,6 @@ class TestClientSslUnsupported(CustomClusterTestSuite):
                                     catalogd_args=SSL_ARGS)
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
   def test_shell_warning(self, vector):
-    result = run_impala_shell_cmd_no_expect(
-      vector, ["--ssl", "-q", "select 1 + 2"], wait_until_connected=False)
+    result = run_impala_shell_cmd_no_expect(vector, ["--ssl", "-q", "select 1 + 2"])
     assert "Warning: TLSv1.2 is not supported for Python < 2.7.9" in result.stderr, \
       result.stderr
