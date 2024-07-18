@@ -81,6 +81,7 @@ under the License.
     <json-smart.version>${env.IMPALA_JSON_SMART_VERSION}</json-smart.version>
     <commons-dbcp2.version>${env.IMPALA_DBCP2_VERSION}</commons-dbcp2.version>
     <log4j2.version>${env.IMPALA_LOG4J2_VERSION}</log4j2.version>
+    <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
   </properties>
 
   <repositories>
@@ -387,6 +388,24 @@ under the License.
         <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-core</artifactId>
         <version>${log4j2.version}</version>
+      </dependency>
+
+      <!-- Pin Dropwizard Metrics versions. We directly use metrics-core, and
+           metrics-jvm/metrics-json are imported via HMS. -->
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${dropwizard-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-jvm</artifactId>
+        <version>${dropwizard-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-json</artifactId>
+        <version>${dropwizard-metrics.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
