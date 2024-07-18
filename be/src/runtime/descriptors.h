@@ -842,6 +842,10 @@ class RowDescriptor {
     return tuple_desc_map_;
   }
 
+  /// Number of tuples per row. Has IR_NO_INLINE to make it replacable with constant
+  /// during codegen.
+  int IR_NO_INLINE num_tuples_no_inline() const { return tuple_desc_map_.size(); }
+
   /// Populate row_tuple_ids with our ids.
   void ToThrift(std::vector<TTupleId>* row_tuple_ids) const;
 

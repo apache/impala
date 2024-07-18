@@ -110,7 +110,7 @@ class KrpcDataStreamSender : public DataSink {
   /// 'per_channel_buffer_size' is the soft limit in bytes of the buffering into the
   /// per-channel's accumulating row batch before it will be sent.
   /// NOTE: supported partition types are UNPARTITIONED (broadcast), HASH_PARTITIONED,
-  /// RANDOM, and DIRECTED (used for sending rows from Iceberg delete files).
+  /// KUDU, RANDOM, and DIRECTED (used for sending rows from Iceberg delete files).
   KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
       const KrpcDataStreamSenderConfig& sink_config, const TDataStreamSink& sink,
       const google::protobuf::RepeatedPtrField<PlanFragmentDestinationPB>& destinations,
@@ -165,6 +165,30 @@ class KrpcDataStreamSender : public DataSink {
   class Channel;
   class IcebergPositionDeleteChannel;
 
+  // Per partition structure to collect rows before sending the OutboundRowBatch to
+  // Channel. Only used in HASH/KUDU partitioning.
+  struct PartitionRowCollector {
+    std::unique_ptr<OutboundRowBatch> collector_batch_;
+    Channel* channel_ = nullptr;
+    int num_rows_ = 0;
+    int row_batch_capacity_ = 0;
+
+    // Copies a single row into collector_batch_ and flushes it (SendCurrentBatch())
+    // once row count or memory capacity is reached. This call may block if capacity is
+    // reached and channel_'s preceding RPC is still in progress. Returns error status
+    // if serialization failed or if the preceding RPC failed. Returns OK otherwise.
+    Status IR_ALWAYS_INLINE AppendRow(
+        const TupleRow* row, const RowDescriptor* row_desc);
+
+    // Finalizes and compresses collector_batch_ and sends it with channel_'s
+    // TransmitData(). This call may block if channel_'s preceding RPC is still
+    // in progress. Swaps collector_batch_ with the channel's outbound_batch_.
+    // Returns error status if compression failed or if the preceding RPC failed.
+    // Returns OK otherwise.
+    Status SendCurrentBatch();
+  };
+  std::vector<PartitionRowCollector> partition_row_collectors_;
+
   /// Serializes the src batch into the serialized row batch 'dest' and updates
   /// various stat counters.
   /// 'compress' decides whether compression is attempted after serialization.
@@ -172,6 +196,10 @@ class KrpcDataStreamSender : public DataSink {
   /// updating the stat counters.
   Status SerializeBatch(
       RowBatch* src, OutboundRowBatch* dest, bool compress, int num_receivers = 1);
+
+  // Like SerializeBatch, but the batch is already serialized and only compression is
+  // needed.
+  Status PrepareBatchForSend(OutboundRowBatch* batch, bool compress);
 
   /// Returns 'partition_expr_evals_[i]'. Used by the codegen'd HashRow() IR function.
   ScalarExprEvaluator* GetPartitionExprEvaluator(int i);
@@ -189,9 +217,6 @@ class KrpcDataStreamSender : public DataSink {
   /// Cross-compiled to be patched by Codegen() at runtime. Returns error status if
   /// insertion into the channel fails. Returns OK status otherwise.
   Status HashAndAddRows(RowBatch* batch);
-
-  /// Adds the given row to 'channels_[channel_id]'.
-  Status AddRowToChannel(const int channel_id, TupleRow* row);
 
   /// Functions to dump the content of the "filename to hosts" related mappings into logs.
   void DumpFilenameToHostsMapping() const;
@@ -241,14 +266,23 @@ class KrpcDataStreamSender : public DataSink {
   const std::vector<ScalarExpr*>& partition_exprs_;
   std::vector<ScalarExprEvaluator*> partition_expr_evals_;
 
-  /// Time for serializing row batches.
+  /// Time for serializing row batches. In case of Kudu/Hash partitioning
+  /// this mainly included compression time, while in other cases also
+  /// contains deep copying tuples to OutboundRowBatch.
   RuntimeProfile::Counter* serialize_batch_timer_ = nullptr;
+
+  /// "Active" time spent in TransmitData(). Waiting for the previous RPC to
+  /// finish is not included.
+  RuntimeProfile::Counter* transmit_data_timer_ = nullptr;
 
   /// Number of TransmitData() RPC retries due to remote service being busy.
   RuntimeProfile::Counter* rpc_retry_counter_ = nullptr;
 
   /// Total number of times RPC fails or the remote responds with a non-retryable error.
   RuntimeProfile::Counter* rpc_failure_counter_ = nullptr;
+
+  /// Total number of successful TransmitData() and EndDataStream() RPCs.
+  RuntimeProfile::Counter* rpc_success_counter_ = nullptr;
 
   /// Total number of bytes sent. Updated on RPC completion.
   RuntimeProfile::Counter* bytes_sent_counter_ = nullptr;

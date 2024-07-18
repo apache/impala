@@ -16,13 +16,20 @@
 // under the License.
 
 #include "runtime/outbound-row-batch.h"
+#include "runtime/outbound-row-batch.inline.h"
 #include "util/compress.h"
 #include "util/scope-exit-trigger.h"
 
 namespace impala {
 
 Status OutboundRowBatch::PrepareForSend(int num_tuples_per_row,
-    TrackedString* compression_scratch) {
+    TrackedString* compression_scratch, bool used_append_row) {
+  if (used_append_row) {
+    DCHECK_GE(tuple_data_.size(), tuple_data_offset_);
+    tuple_data_.resize(tuple_data_offset_);
+  } else {
+    DCHECK_EQ(tuple_data_offset_, 0);
+  }
   bool is_compressed = false;
   int64_t uncompressed_size = tuple_data_.size();
   if (uncompressed_size > 0 && compression_scratch != nullptr) {
@@ -80,6 +87,13 @@ void OutboundRowBatch::SetHeader(int num_rows, int num_tuples_per_row,
   header_.set_uncompressed_size(uncompressed_size);
   header_.set_compression_type(
       is_compressed ? CompressionTypePB::LZ4 : CompressionTypePB::NONE);
+}
+
+void OutboundRowBatch::Reset() {
+  header_.Clear();
+  tuple_offsets_.clear();
+  tuple_data_offset_ = 0;
+  // Do not clear tuple_data_ to avoid unnecessary delete + allocate.
 }
 
 }

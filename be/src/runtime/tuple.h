@@ -153,6 +153,13 @@ class Tuple {
   void DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
                 bool convert_ptrs = false) const;
 
+  /// Similar to DeepCopy() above, but returns false if the buffer is not large enough
+  /// ('*data' would pass 'data_end') instead of assuming that the tuple fits to buffer.
+  /// If it fails, 'data' will be the same as before the call, but the buffer
+  /// can be modified (between before '*data' and 'data_end').
+  bool TryDeepCopy(uint8_t** data, const uint8_t* data_end, int* offset,
+      const TupleDescriptor& desc, bool convert_ptrs) const;
+
   /// This function should only be called on tuples created by DeepCopy() with
   /// 'convert_ptrs' = true. It takes all pointers contained in this tuple (i.e. in
   /// StringValues and CollectionValues, including those contained within other
@@ -353,6 +360,11 @@ class Tuple {
   /// Also smallifies the copied strings when possible.
   void DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
       bool convert_ptrs);
+
+  bool TryDeepCopyStrings(uint8_t** data, const uint8_t* data_end, int* offset,
+      const TupleDescriptor& desc, bool convert_ptrs);
+  bool TryDeepCopyCollections(uint8_t** data, const uint8_t* data_end, int* offset,
+      const TupleDescriptor& desc, bool convert_ptrs);
 
   /// During the construction of hand-crafted codegen'd functions, types cannot generally
   /// be looked up by name. In our own types we use the static 'LLVM_CLASS_NAME' member to
