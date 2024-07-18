@@ -141,6 +141,16 @@ class __attribute__((__packed__)) SmallableString {
     }
   }
 
+  /// Returns the number of bytes needed outside the slot itself:
+  /// - if the length is too long to smallify, return length
+  /// - if the length is small enough to smallify:
+  ///   - if assume_smallify is true or the string is already smallified return 0
+  ///   - otherwise (not already smallified and assume_smallify is false) return length
+  int ExternalLen(bool assume_smallify) const {
+    if (IsSmall() || (assume_smallify && rep.long_rep.len <= SMALL_LIMIT)) return 0;
+    return rep.long_rep.len;
+  }
+
   char* Ptr() const {
     if (IsSmall()) {
       return const_cast<char*>(rep.small_rep.buf);

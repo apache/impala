@@ -175,7 +175,8 @@ class RowBatchSerializeBaseline {
       for (int j = 0; j < batch->num_tuples_per_row_; ++j) {
         Tuple* tuple = batch->GetRow(i)->GetTuple(j);
         if (tuple == NULL) continue;
-        result += tuple->TotalByteSize(*batch->row_desc_->tuple_descriptors()[j]);
+        result += tuple->TotalByteSize(
+            *batch->row_desc_->tuple_descriptors()[j], false /*assume_smallify*/);
       }
     }
     return result;

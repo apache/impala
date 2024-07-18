@@ -983,7 +983,7 @@ int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row)
       if (!item_desc.HasVarlenSlots()) continue;
       for (int j = 0; j < cv->num_tuples; ++j) {
         Tuple* item = reinterpret_cast<Tuple*>(&cv->ptr[j * item_desc.byte_size()]);
-        size += item->VarlenByteSize(item_desc);
+        size += item->VarlenByteSize(item_desc, false /*assume_smallify*/);
       }
     }
   }

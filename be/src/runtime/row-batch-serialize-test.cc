@@ -214,7 +214,9 @@ class RowBatchSerializeTest : public testing::Test {
         StringValue* string_value = reinterpret_cast<StringValue*>(slot);
         StringValue* deserialized_string_value =
             reinterpret_cast<StringValue*>(deserialized_slot);
-        EXPECT_NE(string_value->Ptr(), deserialized_string_value->Ptr());
+        if (!deserialized_string_value->IsSmall()) {
+          EXPECT_NE(string_value->Ptr(), deserialized_string_value->Ptr());
+        }
       }
 
       if (type.IsCollectionType()) {
@@ -621,7 +623,7 @@ void RowBatchSerializeTest::TestDupRemoval(bool full_dedup) {
   // Serialized data should only have one copy of each tuple.
   int64_t total_byte_size = 0; // Total size without duplication
   for (int i = 0; i < tuples.size(); ++i) {
-    total_byte_size += tuples[i]->TotalByteSize(tuple_desc);
+    total_byte_size += tuples[i]->TotalByteSize(tuple_desc, true /*assume_smallify*/);
   }
   EXPECT_EQ(total_byte_size, row_batch.header()->uncompressed_size());
   TestRowBatch(row_desc, batch, false, full_dedup);

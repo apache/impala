@@ -118,32 +118,40 @@ class Tuple {
 
   /// The total size of all data represented in this tuple (tuple data and referenced
   /// string and collection data).
-  int64_t TotalByteSize(const TupleDescriptor& desc) const;
+  /// If 'assume_smallify' is true, calculates with smallified string sizes even for not
+  /// (yet) smallified strings.
+  int64_t TotalByteSize(const TupleDescriptor& desc, bool assume_smallify) const;
 
   /// The size of all referenced string and collection data. Smallified strings aren't
   /// counted here as they don't need extra storage space.
-  int64_t VarlenByteSize(const TupleDescriptor& desc) const;
+  /// If 'assume_smallify' is true, calculates with smallified string sizes even for not
+  /// (yet) smallified strings.
+  int64_t VarlenByteSize(const TupleDescriptor& desc, bool assume_smallify) const;
 
   /// Create a copy of 'this', including all of its referenced variable-length data
   /// (i.e. strings and collections), using pool to allocate memory. Returns the copy.
-  Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool);
+  /// Also smallifies the copied strings when possible.
+  Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool) const;
 
   /// Create a copy of 'this', including all its referenced variable-length data
   /// (i.e. strings and collections), using pool to allocate memory. This version does
   /// not allocate a tuple, instead copying to 'dst'. 'dst' must already be allocated to
-  /// the correct size (i.e. TotalByteSize()).
-  void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool);
+  /// the correct size (i.e. TotalByteSize()). Also smallifies the copied strings when
+  /// possible - to get the exact size needed TotalByteSize() has to be called with
+  /// 'assume_smallify'=true.
+  void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) const;
 
   /// Create a copy of 'this', including all referenced variable-length data (i.e. strings
   /// and collections), into 'data'. The tuple is written first, followed by any
   /// variable-length data. 'data' and 'offset' will be incremented by the total number of
   /// bytes written. 'data' must already be allocated to the correct size
-  /// (i.e. TotalByteSize()).
+  /// (i.e. TotalByteSize()). Also smallifies the copied strings when possible - to get
+  /// the exact size needed TotalByteSize() has to be called with 'assume_smallify'=true.
   /// If 'convert_ptrs' is true, rewrites pointers that are part of the tuple as offsets
   /// into 'data'. Otherwise they will remain pointers directly into data. The offsets are
   /// determined by 'offset', where '*offset' corresponds to address '*data'.
   void DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
-                bool convert_ptrs = false);
+                bool convert_ptrs = false) const;
 
   /// This function should only be called on tuples created by DeepCopy() with
   /// 'convert_ptrs' = true. It takes all pointers contained in this tuple (i.e. in
@@ -336,11 +344,13 @@ class Tuple {
 
   /// Copy all referenced string and collection data by allocating memory from pool,
   /// copying data, then updating pointers in tuple to reference copied data.
+  /// Also smallifies the copied strings when possible.
   void DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool);
 
   /// Copies all referenced string and collection data into 'data'. Increments 'data' and
   /// 'offset' by the number of bytes written. Recursively writes collection tuple data
   /// and referenced collection and string data.
+  /// Also smallifies the copied strings when possible.
   void DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
       bool convert_ptrs);
 
@@ -382,10 +392,6 @@ class Tuple {
   /// avoid emitting unnecessary code for ~Status() in perf-critical code.
   char* AllocateStrings(const char* err_ctx, RuntimeState* state, int64_t bytes,
       MemPool* pool, Status* status) noexcept;
-
-  /// Smallify string values of the tuple. It should only be called for newly created
-  /// tuples, e.g. in DeepCopy().
-  void SmallifyStrings(const TupleDescriptor& desc);
 
   // Defined in tuple-ir.cc to force the compilation of the CodegenTypes struct.
   void dummy(Tuple::CodegenTypes*);

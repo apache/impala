@@ -50,23 +50,21 @@ const char* Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL = "MaterializeExprsILb0ELb
 
 Tuple* const Tuple::POISON = reinterpret_cast<Tuple*>(42L);
 
-int64_t Tuple::TotalByteSize(const TupleDescriptor& desc) const {
+int64_t Tuple::TotalByteSize(const TupleDescriptor& desc, bool assume_smallify) const {
   int64_t result = desc.byte_size();
   if (!desc.HasVarlenSlots()) return result;
-  result += VarlenByteSize(desc);
+  result += VarlenByteSize(desc, assume_smallify);
   return result;
 }
 
-int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc) const {
+int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc, bool assume_smallify) const {
   int64_t result = 0;
   vector<SlotDescriptor*>::const_iterator slot = desc.string_slots().begin();
   for (; slot != desc.string_slots().end(); ++slot) {
     DCHECK((*slot)->type().IsVarLenStringType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
     const StringValue* string_val = GetStringSlot((*slot)->tuple_offset());
-    // Small strings don't require extra storage space in the varlen section.
-    if (string_val->IsSmall()) continue;
-    result += string_val->Len();
+    result += string_val->ExternalLen(assume_smallify);
   }
 
   slot = desc.collection_slots().begin();
@@ -77,27 +75,15 @@ int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc) const {
     uint8_t* coll_data = coll_value->ptr;
     const TupleDescriptor& item_desc = *(*slot)->children_tuple_descriptor();
     for (int i = 0; i < coll_value->num_tuples; ++i) {
-      result += reinterpret_cast<Tuple*>(coll_data)->TotalByteSize(item_desc);
+      Tuple* tuple = reinterpret_cast<Tuple*>(coll_data);
+      result += tuple->TotalByteSize(item_desc, assume_smallify);
       coll_data += item_desc.byte_size();
     }
   }
   return result;
 }
 
-inline void Tuple::SmallifyStrings(const TupleDescriptor& desc) {
-  for (const SlotDescriptor* slot : desc.string_slots()) {
-    DCHECK(slot->type().IsVarLenStringType());
-    if (IsNull(slot->null_indicator_offset())) continue;
-    StringValue* string_v = GetStringSlot(slot->tuple_offset());
-    // StringValues are only smallified on a on-demand basis. And we only smallify
-    // them in batches for whole tuples. I.e. if we encounter the first small string
-    // in a tuple we can assume that the rest of the strings are already smallified.
-    if (string_v->IsSmall()) return;
-    string_v->Smallify();
-  }
-}
-
-Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
+Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) const {
   Tuple* result = reinterpret_cast<Tuple*>(pool->Allocate(desc.byte_size()));
   DeepCopy(result, desc, pool);
   return result;
@@ -106,11 +92,9 @@ Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
 // TODO: the logic is very similar to the other DeepCopy implementation aside from how
 // memory is allocated - can we templatise it somehow to avoid redundancy without runtime
 // overhead.
-void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) {
+void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) const {
   if (desc.HasVarlenSlots()) {
     memcpy(dst, this, desc.byte_size());
-    // 'dst' is a new tuple, so it is safe to smallify its string values.
-    dst->SmallifyStrings(desc);
     dst->DeepCopyVarlenData(desc, pool);
   } else {
     memcpy(dst, this, desc.byte_size());
@@ -124,7 +108,9 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
     DCHECK((*slot)->type().IsVarLenStringType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
     StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
-    if (string_v->IsSmall()) continue;
+    // It is safe to smallify at this point as DeepCopyVarlenData is called on the new
+    // tuple which can be modified.
+    if (string_v->Smallify()) continue;
     char* string_copy = reinterpret_cast<char*>(pool->Allocate(string_v->Len()));
     Ubsan::MemCpy(string_copy, string_v->Ptr(), string_v->Len());
     string_v->SetPtr(string_copy);
@@ -151,12 +137,14 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
 }
 
 void Tuple::DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
-                     bool convert_ptrs) {
+                     bool convert_ptrs) const {
   Tuple* dst = reinterpret_cast<Tuple*>(*data);
   memcpy(dst, this, desc.byte_size());
   *data += desc.byte_size();
   *offset += desc.byte_size();
-  if (desc.HasVarlenSlots()) dst->DeepCopyVarlenData(desc, data, offset, convert_ptrs);
+  if (desc.HasVarlenSlots()) {
+    dst->DeepCopyVarlenData(desc, data, offset, convert_ptrs);
+  }
 }
 
 void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
@@ -167,7 +155,9 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* of
     if (IsNull((*slot)->null_indicator_offset())) continue;
 
     StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
-    if (string_v->IsSmall()) continue;
+    // It is safe to smallify at this point as DeepCopyVarlenData is called on the new
+    // tuple which can be modified.
+    if (string_v->Smallify()) continue;
     unsigned int len = string_v->Len();
     Ubsan::MemCpy(*data, string_v->Ptr(), len);
     string_v->SetPtr(convert_ptrs ? reinterpret_cast<char*>(*offset) : *data);
@@ -194,8 +184,8 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* of
     // Copy per-tuple varlen data if necessary.
     if (!item_desc.HasVarlenSlots()) continue;
     for (int i = 0; i < coll_value->num_tuples; ++i) {
-      reinterpret_cast<Tuple*>(coll_data)->DeepCopyVarlenData(
-          item_desc, data, offset, convert_ptrs);
+      Tuple* dst_item = reinterpret_cast<Tuple*>(coll_data);
+      dst_item->DeepCopyVarlenData(item_desc, data, offset, convert_ptrs);
       coll_data += item_desc.byte_size();
     }
   }

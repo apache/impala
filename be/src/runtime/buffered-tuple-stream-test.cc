@@ -1844,7 +1844,8 @@ TEST_F(MultiTupleStreamTest, MultiTupleAddRowCustom) {
       for (int k = 0; k < string_desc_->tuple_descriptors().size(); k++) {
         TupleDescriptor* tuple_desc = string_desc_->tuple_descriptors()[k];
         fixed_size += tuple_desc->byte_size();
-        varlen_size += row->GetTuple(k)->VarlenByteSize(*tuple_desc);
+        varlen_size += row->GetTuple(k)->VarlenByteSize(
+            *tuple_desc, false /*assume_smallify*/);
       }
       uint8_t* data = stream.AddRowCustomBegin(fixed_size + varlen_size, &status);
       ASSERT_TRUE(data != nullptr);

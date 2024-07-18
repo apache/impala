@@ -462,7 +462,8 @@ int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
         bool inserted = distinct_tuples->InsertIfNotPresent(tuple, -1);
         if (!inserted) continue;
       }
-      result += tuple->VarlenByteSize(*row_desc_->tuple_descriptors()[j]);
+      result += tuple->VarlenByteSize(
+          *row_desc_->tuple_descriptors()[j], true /*assume_smallify*/);
       ++tuple_count[j];
     }
   }
