@@ -74,6 +74,10 @@ constexpr int TUniqueIdBufferSize = 33;
 void PrintIdCompromised(const TUniqueId& id, char out[TUniqueIdBufferSize],
     const char separator = ':');
 
+inline ostream& operator<<(ostream& os, const TUniqueId& id) {
+  return os << PrintId(id);
+}
+
 inline ostream& operator<<(ostream& os, const UniqueIdPB& id) {
   return os << PrintId(id);
 }

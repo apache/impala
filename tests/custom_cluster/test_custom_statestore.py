@@ -32,6 +32,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfBuildType
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.patterns import print_id
 from time import sleep
 
 from Types.ttypes import TNetworkAddress
@@ -118,8 +119,8 @@ class TestCustomStatestore(CustomClusterTestSuite):
     for x in range(20):
       response = self.__register_subscriber()
       if response.status.status_code == TErrorCode.OK:
-        self.registration_id = response.registration_id
-        LOG.log(logging.INFO, "Registration id %s, x=%d" % (response.registration_id, x))
+        LOG.log(logging.INFO, "Registration id %s, x=%d" % (
+            print_id(response.registration_id), x))
       else:
         assert 'Maximum subscriber limit reached:' in ''.join(response.status.error_msgs)
         return

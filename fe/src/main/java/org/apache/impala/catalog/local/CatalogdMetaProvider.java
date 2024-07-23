@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog.local;
 
+import static org.apache.impala.util.TUniqueIdUtil.PrintId;
+
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -1571,7 +1573,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         if (!catalogServiceId_.equals(Catalog.INITIAL_CATALOG_SERVICE_ID)) {
           LOG.warn("Detected catalog service restart: service ID changed from " +
               "{} to {}. Invalidating all cached metadata on this coordinator.",
-              catalogServiceId_, serviceId);
+              PrintId(catalogServiceId_), PrintId(serviceId));
         }
         catalogServiceId_ = serviceId;
         cache_.invalidateAll();

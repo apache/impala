@@ -18,6 +18,7 @@
 package org.apache.impala.service;
 
 import static org.apache.impala.common.ByteUnits.MEGABYTE;
+import static org.apache.impala.util.TUniqueIdUtil.PrintId;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
@@ -2726,7 +2727,7 @@ public class Frontend {
           planCtx.compilationState_.setKuduTransactionToken(null);
           abortKuduTransaction(queryCtx.getQuery_id());
           timeline.markEvent(
-              "Kudu transaction aborted: " + queryCtx.getQuery_id().toString());
+              "Kudu transaction aborted: " + PrintId(queryCtx.getQuery_id()));
         } catch (TransactionException te) {
           LOG.error("Could not abort transaction because: " + te.getMessage());
         }
@@ -3201,10 +3202,10 @@ public class Frontend {
     KuduTransaction txn = null;
     try {
       // Open Kudu transaction.
-      LOG.info("Open Kudu transaction: " + queryCtx.getQuery_id().toString());
+      LOG.info("Open Kudu transaction: {}", PrintId(queryCtx.getQuery_id()));
       txn = client.newTransaction();
       timeline.markEvent(
-          "Kudu transaction opened with query id: " + queryCtx.getQuery_id().toString());
+          "Kudu transaction opened with query id: " + PrintId(queryCtx.getQuery_id()));
       token = txn.serialize();
       if (analysisResult.isUpdateStmt()) {
         analysisResult.getUpdateStmt().setKuduTransactionToken(token);
@@ -3229,7 +3230,7 @@ public class Frontend {
    * @param queryId is the id of the query.
    */
   public void abortKuduTransaction(TUniqueId queryId) throws TransactionException {
-    LOG.info("Abort Kudu transaction: " + queryId.toString());
+    LOG.info("Abort Kudu transaction: {}", PrintId(queryId));
     KuduTransaction txn = kuduTxnManager_.deleteTransaction(queryId);
     Preconditions.checkNotNull(txn);
     if (txn != null) {
@@ -3250,7 +3251,7 @@ public class Frontend {
    * @param queryId is the id of the query.
    */
   public void commitKuduTransaction(TUniqueId queryId) throws TransactionException {
-    LOG.info("Commit Kudu transaction: " + queryId.toString());
+    LOG.info("Commit Kudu transaction: {}", PrintId(queryId));
     KuduTransaction txn = kuduTxnManager_.deleteTransaction(queryId);
     Preconditions.checkNotNull(txn);
     if (txn != null) {

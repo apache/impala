@@ -24,7 +24,14 @@ import re
 # http://www.cloudera.com/content/www/en-us/documentation/enterprise/latest/topics/impala_identifiers.html
 VALID_IMPALA_IDENTIFIER_REGEX = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]{,127}$')
 
+INT64_MASK = (1 << 64) - 1
+
 
 def is_valid_impala_identifier(identifier):
   """Return True if identifier is a valid Impala identifier, False otherwise."""
   return VALID_IMPALA_IDENTIFIER_REGEX.match(identifier) is not None
+
+
+def print_id(id):
+  """Stringify a TUniqueId as e.g. 8a4673c8fbe83a74:309751e900000000"""
+  return '{:016x}:{:016x}'.format(id.hi & INT64_MASK, id.lo & INT64_MASK)

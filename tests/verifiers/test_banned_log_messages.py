@@ -42,3 +42,8 @@ class TestBannedLogMessages:
   def test_no_unsupported_operations(self):
     """Test that cluster logs do not contain jamm.CannotAccessFieldException"""
     self.assert_message_absent('CannotAccessFieldException')
+
+  def test_no_tuniqueid(self):
+    """Test that cluster logs do not contain TUniqueId. They should instead print
+    IDs with the format 8a4673c8fbe83a74:309751e900000000."""
+    self.assert_message_absent('[^a-zA-Z]TUniqueId(')
