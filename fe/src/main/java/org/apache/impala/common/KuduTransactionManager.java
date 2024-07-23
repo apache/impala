@@ -17,11 +17,14 @@
 
 package org.apache.impala.common;
 
+import static org.apache.impala.util.TUniqueIdUtil.PrintId;
+
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.kudu.client.KuduTransaction;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -33,7 +36,7 @@ import com.google.common.base.Preconditions;
  * to commit or rollback the transaction.
  */
 public class KuduTransactionManager {
-  public static final Logger LOG = Logger.getLogger(KuduTransactionManager.class);
+  public static final Logger LOG = LoggerFactory.getLogger(KuduTransactionManager.class);
 
   // Map of Kudu transactions.
   // It's thread safe.
@@ -62,8 +65,8 @@ public class KuduTransactionManager {
     Preconditions.checkNotNull(queryId);
     KuduTransaction txn = transactions_.remove(queryId);
     if (txn == null) {
-      LOG.info("Kudu transaction with query-id " + queryId + " was already removed "
-          + "from KuduTransactionManager object or never existed.");
+      LOG.info("Kudu transaction with query-id {} was already removed "
+          + "from KuduTransactionManager object or never existed.", PrintId(queryId));
     };
     return txn;
   }
