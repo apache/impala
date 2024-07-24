@@ -325,6 +325,13 @@ class ImpalaShell(cmd.Cmd, object):
     # requests between the handler and the main shell thread.
     signal.signal(signal.SIGINT, self._signal_handler)
 
+    # For debugging, it is useful to be able to get stacktraces from a running shell.
+    # When using Python 3, this hooks up Python 3's faulthandler to handle SIGUSR1.
+    # It will print stacktraces for all threads when receiving SIGUSR1.
+    if sys.version_info.major > 2:
+      import faulthandler
+      faulthandler.register(signal.SIGUSR1)
+
   def __enter__(self):
     return self
 

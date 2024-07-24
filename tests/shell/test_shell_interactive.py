@@ -346,6 +346,25 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     result = p.get_result()
     assert "^C" in result.stderr
 
+  def test_sigusr1_stacktraces(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Strict HS2 mode doesn't support sleep() function")
+    if vector.get_value('impala_shell') in ['dev', 'python2']:
+      pytest.skip("Python 2 doesn't support faulthandler")
+    command = "select sleep(5000); quit;"
+    p = ImpalaShell(vector)
+    p.send_cmd(command)
+    sleep(2)
+    os.kill(p.pid(), signal.SIGUSR1)
+    result = p.get_result()
+    # The stacktrace is printed to stderr. The main thread starts in impala_shell_main,
+    # so we expect that to be present.
+    assert "Current thread" in result.stderr, result.stderr
+    assert "impala_shell_main" in result.stderr, result.stderr
+    # The SIGUSR1 doesn't harm the running query.
+    assert "Fetched 1 row(s)" in result.stderr, result.stderr
+    assert result.rc == 0, result.stderr
+
   @pytest.mark.execute_serially
   def test_cancellation_mid_command(self, vector):
     """Test that keyboard interrupt cancels multiline query strings"""
