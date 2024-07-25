@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_ha">
+  <title>Configuring Impala for High Availability</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="High Availability"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>The Impala StateStore checks on the health of all Impala daemons in a cluster, and
+      continuously relays its findings to each of the daemons. The Catalog stores metadata of
+      databases, tables, partitions, resource usage information, configuration settings, and other
+      objects managed by Impala. If StateStore and Catalog daemons are single instances in an Impala
+      cluster, it will create a single point of failure. Although Impala coordinators/executors
+      continue to execute queries if the StateStore node is down, coordinators/executors will not
+      get state updates. This causes degradation of admission control &amp; cluster membership
+      updates. To mitigate this, a pair of StateStore and Catalog instances can be deployed in an
+      Impala cluster so that Impala cluster could survive failures of StateStore or Catalog.</p>
+    <p><b>Prerequisite:</b></p>
+    <p>To enable High Availability for Impala CatalogD and StateStore, you must configure at least
+      two Impala CatalogD, two StateStore instances on two different nodes.<note
+        id="note_dg1_qhh_fcc" type="note">CatalogD HA and Statestore HA are independent features.
+        Users can enable CatalogD HA, Statestore HA, or both CatalogD HA and Statestore
+      HA.</note></p>
+    <p outputclass="toc"/>
+  </conbody>
+</concept>

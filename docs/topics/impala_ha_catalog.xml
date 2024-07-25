@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_ha_catalog">
+  <title>Configuring Catalog for High Availability</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="High Availability"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Catalog"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>With any new query requests, the Impala coordinator sends metadata requests to Catalog
+      service and sends metadata updates to Catalog which in turn propagates metadata updates to
+      hive metastore. With a pair of primary/standby Catalog instances, the standby Catalog instance
+      will be promoted as the primary instance to continue Catalog service for Impala cluster when
+      the primary instance goes down. The active Catalogd acts as the source of metadata and
+      provides Catalog service for the Impala cluster. This high availability mode of Catalog
+      service reduces the outage duration of the Impala cluster when the primary Catalog instance
+      fails. To support Catalog HA, you can now add two Catalogd instances in an Active-Passive high
+      availability pair to an Impala cluster.</p>
+  </conbody>
+  <concept id="enabling_catalog_ha">
+    <title>Enabling Catalog High Availability</title>
+    <conbody>
+      <p>To enable Catalog high availability in an Impala cluster, follow these steps:<ul
+          id="ul_pj4_ycn_1cc">
+          <li>Set the starting flag <codeph>enable_catalogd_ha</codeph> to <codeph>true</codeph> for
+            both catalogd instances and the StateStore.</li>
+        </ul></p>
+      <p>The active StateStore will assign roles to the CatalogD instances, designating one as the
+        active CatalogD and the other as the standby CatalogD. The active CatalogD acts as the
+        source of metadata and provides Catalog services for the Impala cluster.</p>
+    </conbody>
+  </concept>
+  <concept id="disabling_catalog_ha">
+    <title>Disabling Catalog High Availability</title>
+    <conbody>
+      <p>To disable Catalog high availability in an Impala cluster, follow these steps:<ol
+          id="ol_udj_b1n_1cc">
+          <li>Remove one CatalogD instance from the Impala cluster.</li>
+          <li>Restart the remaining CatalogD instance without the starting flag
+              <codeph>enable_catalogd_ha</codeph>.</li>
+          <li>Restart the StateStore without the starting flag
+            <codeph>enable_catalogd_ha</codeph>.</li>
+        </ol></p>
+    </conbody>
+  </concept>
+  <concept id="monitoring_status_ha">
+    <title>Monitoring Catalog HA Status in the StateStore Web Page</title>
+    <conbody>
+      <p>A new web page <codeph>/catalog_ha_info</codeph> has been added to the StateStore debug web
+        server. This page displays the Catalog HA status, including:</p>
+      <ul id="ha_status_web">
+        <li>Active Catalog Node</li>
+        <li>Standby Catalog Node</li>
+        <li>Notified Subscribers Table</li>
+      </ul>
+      <p>To access this information, navigate to the <codeph>/catalog_ha_info</codeph> page on the
+        StateStore debug web server.</p>
+    </conbody>
+  </concept>
+  <concept id="catalog_failure_detection">
+    <title>Catalog Failure Detection</title>
+    <conbody>
+      <p>The StateStore instance continuously sends heartbeat to its registered clients, including
+        the primary and standby Catalog instances, to track Impala daemons in the cluster to
+        determine if the daemon is healthy. If the StateStore finds the primary Catalog instance is
+        not healthy but the standby Catalog instance is healthy, StateStore promotes the standby
+        Catalog instance as primary instance and notify all coordinators for this change.
+        Coordinators will switch over to the new primary Catalog instance.</p>
+      <p>When the system detects that the active CatalogD is unhealthy, it initiates a failover to
+        the standby CatalogD. During this brief transition, some nodes might not immediately
+        recognize the new active CatalogD, causing currently running queries to fail due to lack of
+        access to metadata. These failed queries need to be rerun after the failover is complete and
+        the new active CatalogD is operational.</p>
+    </conbody>
+  </concept>
+</concept>

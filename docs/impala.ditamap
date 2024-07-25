@@ -64,6 +64,10 @@ under the License.
   <topicref href="topics/impala_tutorial.xml"/>
   <topicref href="topics/impala_admin.xml">
     <topicref href="topics/impala_timeouts.xml"/>
+    <topicref href="topics/impala_ha.xml">
+      <topicref href="topics/impala_ha_statestore.xml"/>
+      <topicref href="topics/impala_ha_catalog.xml"/>
+    </topicref>
     <topicref href="topics/impala_proxy.xml"/>
     <topicref href="topics/impala_disk_space.xml"/>
     <topicref audience="integrated" href="topics/impala_auditing.xml"/>
@@ -361,8 +365,7 @@ under the License.
 <!-- End of former contents of Installing-and-Using-Impala_xi42979.ditamap. -->
   <topicref audience="standalone" href="topics/impala_faq.xml"/>
   <topicref audience="standalone" href="topics/impala_release_notes.xml">
-    <mapref href="impala_release_notes.ditamap" format="ditamap"
-      audience="standalone"/>
+    <mapref href="impala_release_notes.ditamap" format="ditamap" audience="standalone"/>
   </topicref>
 
 <!-- Substitution variables and link destinations abstracted
