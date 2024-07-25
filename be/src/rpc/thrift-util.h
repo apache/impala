@@ -185,6 +185,64 @@ class ImpalaTlsSocketFactory : public apache::thrift::transport::TSSLSocketFacto
       bool disable_tls12);
 };
 
+// Helper function to set keepalive options on the provided THRIFT_SOCKET.
+// These options are only effective if keepalive is enabled separately (by Thrift).
+Status SetKeepAliveOptionsForSocket(THRIFT_SOCKET, int32_t probe_period_s,
+    int32_t retry_period_s, int32_t retry_count);
+
+// Impala uses TServerSocket and TSSLServerSocket for external client connections.
+// Thrift has a built-in ability to turn on keepalive for the TCP socket. However, it
+// does not have an ability to tune the keepalive options, so the socket would use the
+// OS default settings. ImpalaKeepAliveServerSocket is a templated class that takes
+// in an underlying TServerSocket / TSSLServerSocket type. It behaves like the
+// underlying type (and uses the same constructor signatures) except that it sets these
+// keepalive options on the socket returned by createSocket():
+//  - probe period / TCP_KEEPIDLE: Time before first keepalive probe
+//  - retry period / TCP_KEEPINTVL: Time between retries after keepalive starts
+//  - number of retries / TCP_KEEPCNT: Maximum number of retries
+template <typename ThriftServerSocketType>
+class ImpalaKeepAliveServerSocket : public ThriftServerSocketType {
+ public:
+  using ThriftServerSocketType::ThriftServerSocketType;
+
+  // This is called immediately after calling the constructor to store the
+  // keepalive settings to apply to the future sockets. This will set
+  // Thrift's keepalive setting as well. It must be called before anything
+  // will call createSocket().
+  void setKeepAliveOptions(int32_t probe_period_s, int32_t retry_period_s,
+      int32_t retry_count) {
+    keepalive_enabled_ = probe_period_s > 0;
+    ThriftServerSocketType::setKeepAlive(keepalive_enabled_);
+    keepalive_probe_period_s_ = probe_period_s;
+    keepalive_retry_period_s_ = retry_period_s;
+    keepalive_retry_count_ = retry_count;
+  }
+
+ protected:
+  // Get a socket from the underlying TServerSocket / TSSLServerSocket type, then set the
+  // keepalive options on the socket before returning it. Note: The THRIFT_SOCKET
+  // type on Linux is a standard socket file descriptor.
+  std::shared_ptr<apache::thrift::transport::TSocket> createSocket(THRIFT_SOCKET socket) {
+    std::shared_ptr<apache::thrift::transport::TSocket> tsocket =
+        ThriftServerSocketType::createSocket(socket);
+    if (keepalive_enabled_) {
+      Status status = SetKeepAliveOptionsForSocket(socket, keepalive_probe_period_s_,
+          keepalive_retry_period_s_, keepalive_retry_count_);
+      if (!status.ok()) {
+        throw apache::thrift::transport::TTransportException(
+            apache::thrift::transport::TTransportException::INTERNAL_ERROR,
+            status.msg().msg());
+      }
+    }
+    return tsocket;
+  }
+
+ private:
+  bool keepalive_enabled_ = false;
+  int32_t keepalive_probe_period_s_ = 0;
+  int32_t keepalive_retry_period_s_ = 0;
+  int32_t keepalive_retry_count_ = 0;
+};
 
 /// Redirects all Thrift logging to VLOG(1)
 void InitThriftLogging();

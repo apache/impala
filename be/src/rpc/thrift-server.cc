@@ -341,15 +341,22 @@ Status ThriftServer::CreateSocket(std::shared_ptr<TServerSocket>* socket) {
           disable_tls12_);
       socket_factory->loadCertificate(certificate_path_.c_str());
       socket_factory->loadPrivateKey(private_key_path_.c_str());
-      socket->reset(new TSSLServerSocket(port_, socket_factory));
+      ImpalaKeepAliveServerSocket<TSSLServerSocket>* server_socket =
+          new ImpalaKeepAliveServerSocket<TSSLServerSocket>(port_, socket_factory);
+      server_socket->setKeepAliveOptions(keepalive_probe_period_s_,
+          keepalive_retry_period_s_, keepalive_retry_count_);
+      socket->reset(server_socket);
     } catch (const TException& e) {
       return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED, e.what());
     }
-    return Status::OK();
   } else {
-    socket->reset(new TServerSocket(port_));
-    return Status::OK();
+    ImpalaKeepAliveServerSocket<TServerSocket>* server_socket =
+        new ImpalaKeepAliveServerSocket<TServerSocket>(port_);
+    server_socket->setKeepAliveOptions(keepalive_probe_period_s_,
+        keepalive_retry_period_s_, keepalive_retry_count_);
+    socket->reset(server_socket);
   }
+  return Status::OK();
 }
 
 Status ThriftServer::EnableSsl(SSLProtocol version, const string& certificate,
@@ -387,6 +394,13 @@ Status ThriftServer::EnableSsl(SSLProtocol version, const string& certificate,
   }
 
   return Status::OK();
+}
+
+void ThriftServer::SetKeepAliveOptions(int32_t probe_period_s, int32_t retry_period_s,
+    int32_t retry_count) {
+  keepalive_probe_period_s_ = probe_period_s;
+  keepalive_retry_period_s_ = retry_period_s;
+  keepalive_retry_count_ = retry_count;
 }
 
 Status ThriftServer::Start() {

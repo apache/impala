@@ -337,6 +337,18 @@ DEFINE_int64(accepted_client_cnxn_timeout, 300000,
     "the post-accept, pre-setup connection queue before it is timed out and the "
     "connection request is rejected. A value of 0 means there is no timeout.");
 
+DEFINE_int32(client_keepalive_probe_period_s, 0,
+    "The duration in seconds after a client connection has gone idle before a TCP "
+    "keepalive probe is sent to the client. Set to 0 to disable TCP keepalive probes "
+    "from being sent.");
+DEFINE_int32(client_keepalive_retry_period_s, 0,
+    "The duration in second between successive keepalive probes from a client connection "
+    "if the previous probes are not acknowledged. Effective only if "
+    "--client_keepalive_probe_period_s is not 0.");
+DEFINE_int32(client_keepalive_retry_count, 0,
+    "The maximum number of keepalive probes sent before declaring the client as dead. "
+    "Effective only if --client_keepalive_probe_period_s is not 0.");
+
 DEFINE_string(query_event_hook_classes, "", "Comma-separated list of java QueryEventHook "
     "implementation classes to load and register at Impala startup. Class names should "
     "be fully-qualified and on the classpath. Whitespace acceptable around delimiters.");
@@ -3166,6 +3178,9 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
           .max_concurrent_connections(FLAGS_fe_service_threads)
           .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
           .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
+          .keepalive(FLAGS_client_keepalive_probe_period_s,
+              FLAGS_client_keepalive_retry_period_s,
+              FLAGS_client_keepalive_retry_count)
           .Build(&server));
       beeswax_server_.reset(server);
       beeswax_server_->SetConnectionHandler(this);
@@ -3195,6 +3210,9 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
           .max_concurrent_connections(FLAGS_fe_service_threads)
           .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
           .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
+          .keepalive(FLAGS_client_keepalive_probe_period_s,
+              FLAGS_client_keepalive_retry_period_s,
+              FLAGS_client_keepalive_retry_count)
           .Build(&server));
       hs2_server_.reset(server);
       hs2_server_->SetConnectionHandler(this);
@@ -3226,6 +3244,9 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
               .max_concurrent_connections(FLAGS_fe_service_threads)
               .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
               .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
+              .keepalive(FLAGS_client_keepalive_probe_period_s,
+                  FLAGS_client_keepalive_retry_period_s,
+                  FLAGS_client_keepalive_retry_count)
               .Build(&server));
       external_fe_server_.reset(server);
       external_fe_server_->SetConnectionHandler(this);
@@ -3257,6 +3278,9 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
               .max_concurrent_connections(FLAGS_fe_service_threads)
               .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
               .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
+              .keepalive(FLAGS_client_keepalive_probe_period_s,
+                  FLAGS_client_keepalive_retry_period_s,
+                  FLAGS_client_keepalive_retry_count)
               .Build(&http_server));
       hs2_http_server_.reset(http_server);
       hs2_http_server_->SetConnectionHandler(this);

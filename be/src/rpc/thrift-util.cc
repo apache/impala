@@ -18,12 +18,15 @@
 #include "rpc/thrift-util.h"
 
 #include <limits>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include <gtest/gtest.h>
 #include <thrift/config.h>
 
 #include "kudu/security/security_flags.h"
 #include "kudu/util/openssl_util.h"
+#include "util/error-util.h"
 #include "util/hash-util.h"
 #include "util/openssl-util.h"
 #include "util/time.h"
@@ -201,6 +204,34 @@ void ImpalaTlsSocketFactory::configureCiphers(const string& cipher_list,
   }
 #endif
 #endif
+}
+
+template<typename T>
+Status SetSockOpt(THRIFT_SOCKET socket, int level, int option,
+    string option_string, const T& value) {
+  if (::setsockopt(socket, level, option, &value, sizeof(T)) == -1) {
+    int err = errno;
+    return Status(Substitute("Failed to set $0 to $1: $2", option_string,
+        value, GetStrErrMsg(err)));
+  }
+  return Status::OK();
+}
+
+Status SetKeepAliveOptionsForSocket(THRIFT_SOCKET socket, int32_t probe_period_s,
+    int32_t retry_period_s, int32_t retry_count) {
+  if (probe_period_s > 0) {
+    RETURN_IF_ERROR(SetSockOpt(socket, IPPROTO_TCP, TCP_KEEPIDLE,
+        "TCP_KEEPIDLE (keepalive probe period)", probe_period_s));
+  }
+  if (retry_period_s > 0) {
+    RETURN_IF_ERROR(SetSockOpt(socket, IPPROTO_TCP, TCP_KEEPINTVL,
+        "TCP_KEEPINTVL (keepalive retry period)", retry_period_s));
+  }
+  if (retry_count > 0) {
+    RETURN_IF_ERROR(SetSockOpt(socket, IPPROTO_TCP, TCP_KEEPCNT,
+        "TCP_KEEPCNT (keepalive retry count)", retry_count));
+  }
+  return Status::OK();
 }
 
 static void ThriftOutputFunction(const char* output) {

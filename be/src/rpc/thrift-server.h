@@ -307,6 +307,14 @@ class ThriftServer {
           kudu::security::SecurityDefaults::kDefaultTlsCipherSuites,
       bool disable_tls12 = false);
 
+  /// Sets keepalive options for the client TCP connections. Keepalive is only enabled
+  /// if probe_period_s > 0. These are the three standard keepalive settings for Linux:
+  /// If a client connection is idle for probe_period_s seconds, it starts sending
+  /// keepalives. If it doesn't hear back, it retries every retry_period_s seconds until
+  /// it exceeds retry_count.
+  void SetKeepAliveOptions(int32_t probe_period_s, int32_t retry_period_s,
+      int32_t retry_count);
+
   /// Creates the server socket on which this server listens. May be SSL enabled. Returns
   /// OK unless there was a Thrift error.
   Status CreateSocket(std::shared_ptr<apache::thrift::transport::TServerSocket>* socket);
@@ -406,6 +414,11 @@ class ThriftServer {
   TransportType transport_type_;
 
   bool is_external_facing_;
+
+  /// Keepalive options for client connections.
+  int32_t keepalive_probe_period_s_ = 0;
+  int32_t keepalive_retry_period_s_ = 0;
+  int32_t keepalive_retry_count_ = 0;
 };
 
 /// Helper class to build new ThriftServer instances.
@@ -502,6 +515,19 @@ class ThriftServerBuilder {
     return *this;
   }
 
+  /// Sets keepalive options for the client TCP connections. Keepalive is only enabled
+  /// if probe_period_s > 0. These are the three standard keepalive settings for Linux:
+  /// If a client connection is idle for probe_period_s seconds, it starts sending
+  /// keepalives. If it doesn't hear back, it retries every retry_period_s seconds until
+  /// it exceeds retry_count.
+  ThriftServerBuilder& keepalive(int32_t probe_period_s,
+      int32_t retry_period_s, int32_t retry_count) {
+    keepalive_probe_period_s_ = probe_period_s;
+    keepalive_retry_period_s_ = retry_period_s;
+    keepalive_retry_count_ = retry_count;
+    return *this;
+  }
+
   /// Constructs a new ThriftServer and puts it in 'server', if construction was
   /// successful, returns an error otherwise. In the error case, 'server' will not have
   /// been set and will not need to be freed, otherwise the caller assumes ownership of
@@ -516,6 +542,8 @@ class ThriftServerBuilder {
           version_, certificate_, private_key_, pem_password_cmd_, cipher_list_,
           tls_ciphersuites_, disable_tls12_));
     }
+    ptr->SetKeepAliveOptions(keepalive_probe_period_s_, keepalive_retry_period_s_,
+        keepalive_retry_count_);
     (*server) = ptr.release();
     return Status::OK();
   }
@@ -544,6 +572,9 @@ class ThriftServerBuilder {
       kudu::security::SecurityDefaults::kDefaultTlsCipherSuites;
   bool disable_tls12_ = false;
   bool is_external_facing_ = true;
+  int32_t keepalive_probe_period_s_ = 0;
+  int32_t keepalive_retry_period_s_ = 0;
+  int32_t keepalive_retry_count_ = 0;
 };
 
 /// Contains a map from string for --ssl_minimum_version to Thrift's SSLProtocol.
