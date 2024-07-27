@@ -20,12 +20,12 @@ under the License.
 {#  -*- coding: utf-8 -*- #}
 
 {% import 'comments_helper_disqus.tmpl' as disqus with context %}
-{% import 'comments_helper_livefyre.tmpl' as livefyre with context %}
-{% import 'comments_helper_intensedebate.tmpl' as intensedebate with context %}
-{% import 'comments_helper_muut.tmpl' as muut with context %}
-{% import 'comments_helper_googleplus.tmpl' as googleplus with context %}
-{% import 'comments_helper_facebook.tmpl' as facebook with context %}
-{% import 'comments_helper_isso.tmpl' as isso with context %}
+{# import 'comments_helper_livefyre.tmpl' as livefyre with context #}
+{# import 'comments_helper_intensedebate.tmpl' as intensedebate with context #}
+{# import 'comments_helper_muut.tmpl' as muut with context #}
+{# import 'comments_helper_googleplus.tmpl' as googleplus with context #}
+{# import 'comments_helper_facebook.tmpl' as facebook with context #}
+{# import 'comments_helper_isso.tmpl' as isso with context #}
 
 {% macro comment_form(url, title, identifier) %}
     {% if comment_system == 'disqus' %}

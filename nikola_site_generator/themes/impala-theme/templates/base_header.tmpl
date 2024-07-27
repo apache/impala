@@ -35,7 +35,6 @@ under the License.
 
 {% macro html_site_title() %}
     <h3 id="brand">
-        <a href="{{ abs_link(_link("root", None, lang)) }}" title="{{ blog_title|e }}" rel="home">
         {% if logo_url %}
             <img src="{{ logo_url }}" alt="{{ blog_title|e }}" id="logo">
         {% endif %}
@@ -43,7 +42,6 @@ under the License.
         {% if show_blog_title %}
             <span id="blog-title" class="muted" >{{ blog_title|e }}</span>
         {% endif %}
-        </a>
     </h3>
 {% endmacro %}
 
@@ -54,10 +52,10 @@ under the License.
             <div class="container">
 
             <ul class="nav">
-                <li><a href="http://impala.apache.org/index.html">Home</a></li>
-                <li><a href="http://impala.apache.org/downloads.html">Downloads</a></li>
-                <li><a href="http://impala.apache.org/overview.html">Overview</a></li>
-                <li class="active"><a href="index.html">Blog</a></li>
+                <li><a href="https://impala.apache.org/index.html">Home</a></li>
+                <li><a href="https://impala.apache.org/downloads.html">Downloads</a></li>
+                <li><a href="https://impala.apache.org/overview.html">Overview</a></li>
+                <li class="active"><a href="{{ blog_url }}">Blog</a></li>
                 <li><a href="https://cwiki.apache.org/confluence/display/IMPALA/Contributing+to+Impala">Contribute</a></li>
                 <li class="dropdown">
                     <a href='#' class="dropdown-toggle" data-toggle="dropdown" role="button">
@@ -70,8 +68,8 @@ under the License.
                         <li><a href="https://github.com/apache/incubator-impala">GitHub mirror</a></li>
                     </ul>
                 </li>
-                <li><a href="http://impala.apache.org/community.html">Community</a></li>
-                <li><a href="http://impala.apache.org/impala-docs.html">Documentation</a></li>
+                <li><a href="https://impala.apache.org/community.html">Community</a></li>
+                <li><a href="https://impala.apache.org/impala-docs.html">Documentation</a></li>
             </ul>
 
             </div><!-- container -->

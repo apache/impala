@@ -6,23 +6,67 @@
     xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
                         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
  <url>
-  <loc>http://impala.apache.org/</loc>
-  <lastmod>2017-01-25T07:05:00Z</lastmod>
+  <loc>https://impala.apache.org/blog/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
  </url>
  <url>
-  <loc>http://impala.apache.org/2017/</loc>
-  <lastmod>2017-01-24T21:49:00Z</lastmod>
+  <loc>https://impala.apache.org/blog/2015/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
  </url>
  <url>
-  <loc>http://impala.apache.org/archive.html</loc>
-  <lastmod>2017-01-24T21:49:00Z</lastmod>
+  <loc>https://impala.apache.org/blog/2016/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
  </url>
  <url>
-  <loc>http://impala.apache.org/categories/</loc>
-  <lastmod>2017-01-24T21:49:00Z</lastmod>
+  <loc>https://impala.apache.org/blog/2017/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
  </url>
  <url>
-  <loc>http://impala.apache.org/posts/impala-blog-coming-soon/</loc>
-  <lastmod>2017-01-24T22:50:00Z</lastmod>
+  <loc>https://impala.apache.org/blog/2024/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/archive.html</loc>
+  <lastmod>2024-08-05T06:29:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/categories/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/categories/cat_blogs/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/categories/cat_talks/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/impala-25-performance-overview/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/impala-a-modern-open-source-sql-engine-for-hadoop/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/impala-blog-coming-soon/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/lets-see-how-fast-impala-runs-on-iceberg/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/nested-types-in-impala/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/</loc>
+  <lastmod>2024-08-05T06:01:00Z</lastmod>
  </url>
 </urlset>

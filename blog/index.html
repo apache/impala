@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html prefix="
-    og: http://ogp.me/ns# article: http://ogp.me/ns/article#
-    " vocab="http://ogp.me/ns" lang="en">
+    " lang="en">
 <head>
 <meta name="keywords" content="hadoop, impala, sql, mpp, bi, big data, open source">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="utf-8">
-<meta name="description" content="Apache Impala (incubating) is a modern, open source, distributed SQL query engine for Apache Hadoop.">
-<title>Apache Impala (incubating)</title>
+<meta name="description" content="Apache Impala is a modern, open source, distributed SQL query engine for open data and table formats.">
+<title>Apache Impala</title>
 <link href="assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
 <link href="assets/css/bootstrap-responsive.min.css" rel="stylesheet" type="text/css">
 <!-- order is significant to prevent overwriting of some bootstrap-defined css styles --><link href="assets/css/additional_styles.css" rel="stylesheet" type="text/css">
@@ -20,17 +19,15 @@
             ga('create', 'UA-67190974-2', 'auto');
             ga('send', 'pageview');
         </script><meta content="#5670d4" name="theme-color">
-<link rel="canonical" href="http://impala.apache.org/">
-<link rel="prefetch" href="posts/impala-blog-coming-soon/" type="text/html">
+<link rel="canonical" href="https://impala.apache.org/blog/">
+<link rel="prefetch" href="posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" type="text/html">
 </head>
 <body id="index" class="home">
     <div class="container">
         <div class="masthead">
                 <header id="header"><h3 id="brand">
-        <a href="http://impala.apache.org/" title="Apache Impala (incubating)" rel="home">
 
-            <span id="blog-title" class="muted">Apache Impala (incubating)</span>
-        </a>
+            <span id="blog-title" class="muted">Apache Impala</span>
     </h3>
 
             <nav id="menu"><div class="navbar">
@@ -38,10 +35,10 @@
             <div class="container">
 
             <ul class="nav">
-<li><a href="http://impala.apache.org/index.html">Home</a></li>
-                <li><a href="http://impala.apache.org/downloads.html">Downloads</a></li>
-                <li><a href="http://impala.apache.org/overview.html">Overview</a></li>
-                <li class="active"><a href="#">Blog</a></li>
+<li><a href="https://impala.apache.org/index.html">Home</a></li>
+                <li><a href="https://impala.apache.org/downloads.html">Downloads</a></li>
+                <li><a href="https://impala.apache.org/overview.html">Overview</a></li>
+                <li class="active"><a href="https://impala.apache.org/blog/">Blog</a></li>
                 <li><a href="https://cwiki.apache.org/confluence/display/IMPALA/Contributing+to+Impala">Contribute</a></li>
                 <li class="dropdown">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button">
@@ -54,8 +51,8 @@
                         <li><a href="https://github.com/apache/incubator-impala">GitHub mirror</a></li>
                     </ul>
 </li>
-                <li><a href="http://impala.apache.org/community.html">Community</a></li>
-                <li><a href="http://impala.apache.org/impala-docs.html">Documentation</a></li>
+                <li><a href="https://impala.apache.org/community.html">Community</a></li>
+                <li><a href="https://impala.apache.org/impala-docs.html">Documentation</a></li>
             </ul>
 </div>
 <!-- container -->
@@ -69,24 +66,229 @@
         <main id="content"><h3>All articles</h3>
 <div class="postindex">
     <hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" class="u-url">This Impala not only reads, but modifies and optimizes Iceberg tables</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                Impala Dev
+            </span></p>
+            <p class="dateline"><a href="posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:09:35-07:00" title="2024-07-27 07:09">2024-07-27 07:09</time></a></p>
+                <p class="commentline">            <a href="posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/#disqus_thread" data-disqus-identifier="impala-blog/posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables.html">Comments</a>
+
+
+        </p>
+</div>
+    </header><div class="p-summary entry-summary">
+    <p>Apache Impala is a distributed, massively parallel query engine for big data. Initially, it focused
+on fast query execution on top of large datasets that were ingested via long-running batch jobs. The
+table schema and the ingested data typically remained unchanged, and row-level modifications were
+impractical to say the least.</p>
+<p>Today’s expectations for modern data warehouse engines have risen significantly. Users now want to
+have RDBMS-like capabilities in their data warehouses. E.g., they often need to comply with
+regulations like GDPR or CCPA, i.e. they need to be able to remove or update records belonging to
+certain individuals.</p>
+<p>Apache Iceberg is a cutting-edge table format that delivers advanced write capabilities for
+large-scale data. It allows schema and partition evolution, time-travel, and the focus of this talk:
+row-level modifications and table maintenance features. Impala has had support for reading Iceberg
+tables and inserting data for a while, but the capability of deleting and updating rows only
+recently became available.</p>
+<p>Frequent modifications come with a cost: eventually, the table will become full of small data and
+so-called delete files. This degrades the performance of read operations over time. The new table
+maintenance statement in Impala, OPTIMIZE, merges small data files and eliminates delete files to
+keep our table healthy. To make partition-level maintenance easier, DROP PARTITION statement allows
+selective partition removal based on predicates.</p>
+<p>Join us for this session to discover how Apache Impala evolved to meet emerging requirements without
+compromising performance.</p>
+<p><em>Appeared in <a href="https://eu.communityovercode.org/sessions/2024/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/">https://eu.communityovercode.org/sessions/2024/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/</a></em></p>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/lets-see-how-fast-impala-runs-on-iceberg/" class="u-url">Let’s see how fast Impala runs on Iceberg</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                Impala Dev
+            </span></p>
+            <p class="dateline"><a href="posts/lets-see-how-fast-impala-runs-on-iceberg/" rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:07:38-07:00" title="2024-07-27 07:07">2024-07-27 07:07</time></a></p>
+                <p class="commentline">            <a href="posts/lets-see-how-fast-impala-runs-on-iceberg/#disqus_thread" data-disqus-identifier="impala-blog/posts/lets-see-how-fast-impala-runs-on-iceberg.html">Comments</a>
+
+
+        </p>
+</div>
+    </header><div class="p-summary entry-summary">
+    <p>Apache Impala is a distributed massively parallel query engine designed for high-performance
+querying of large-scale data. There has been a long list of new features recently around supporting
+Apache Iceberg tables such as reading, writing, time traveling, and so on. However, in a big data
+environment it is also a must to be performant. Since Impala has been designed to be fast, it has
+its own way of reading Iceberg tables. Other engines might simply use the Iceberg library to perform
+reads, while Impala has a C++ implementation itself optimized for speed.</p>
+<p>Nowadays, even big data storage techniques have to offer the possibility not just to store data but
+also to alter and delete data on a row level. Apache Iceberg solves this by using delete files that
+live alongside the data files. It is the responsibility of the query engines to then apply the
+delete files on the data files when querying the data. To efficiently read the data of such tables
+we implemented new Iceberg-specific operators in Impala.</p>
+<p>In this talk we will go into the implementation details and reveal what is the secret behind
+Impala’s great performance in general and also when reading Iceberg tables with position delete
+files. We will also show some measurements where we compare Impala’s performance with other
+open-source query engines.</p>
+<p>By the end of this talk, you should have a high-level understanding of Impala’s and Iceberg’s
+architecture, the performance tricks we implemented in Impala specifically for Iceberg, and you will
+see how Impala competes with other engines.</p>
+<p><em>Appeared in <a href="https://eu.communityovercode.org/sessions/2024/lets-see-how-fast-impala-runs-on-iceberg/">https://eu.communityovercode.org/sessions/2024/lets-see-how-fast-impala-runs-on-iceberg/</a></em></p>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/" class="u-url">Anatomy of reading Apache Parquet files (from the Apache Impala perspective)</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                Impala Dev
+            </span></p>
+            <p class="dateline"><a href="posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/" rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:02:43-07:00" title="2024-07-27 07:02">2024-07-27 07:02</time></a></p>
+                <p class="commentline">            <a href="posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/#disqus_thread" data-disqus-identifier="impala-blog/posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective.html">Comments</a>
+
+
+        </p>
+</div>
+    </header><div class="p-summary entry-summary">
+    <p>Reading file formats efficiently is a crucial part of big data systems -
+in selective scans data is often only big before hitting the first
+filter and becomes manageable during the rest of the processing. The
+talk describes this early stage of query execution in Apache Impala,
+from reading the bytes of Parquet files on the filesystem to applying
+predicates and runtime filters on individual rows.</p>
+<p>Apache Impala is a distributed massively parallel analytic query engine
+written in C++ and Java. It is optimized both for object stores (S3,
+ABFS) and on-prem distributed file systems (HDFS, Ozone). Apache Parquet
+is one of the most widely used open source column-oriented file formats
+in Big Data.</p>
+<p>Impala has its own Parquet scanner written in C++ instead of using
+existing Parquet libraries like Parquet-mr or Parquet-cpp. This allows
+tighter integration with IO and and memory management, enabling features
+like:</p>
+<ul>
+<li>Data caching to memory and local drive</li>
+<li>Execution within memory bounds</li>
+<li>Efficient parallelism</li>
+</ul>
+<p>These features all play an important role in giving Impala an edge in
+the world of Big Data query engines.</p>
+<p><em>Appeared in <a href="https://eu.communityovercode.org/sessions/2024/anatomy-parquet-files/">https://eu.communityovercode.org/sessions/2024/anatomy-parquet-files/</a></em></p>
+    </div>
+    </article><hr>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-blog-coming-soon/" class="u-url">Impala Blog Coming Soon</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
                 Impala Dev
             </span></p>
             <p class="dateline"><a href="posts/impala-blog-coming-soon/" rel="bookmark"><time class="published dt-published" datetime="2017-01-03T15:45:20-08:00" title="2017-01-03 15:45">2017-01-03 15:45</time></a></p>
-                <p class="commentline">            <a href="posts/impala-blog-coming-soon/#disqus_thread" data-disqus-identifier="cache/posts/blog-coming-soon.html">Comments</a>
+                <p class="commentline">            <a href="posts/impala-blog-coming-soon/#disqus_thread" data-disqus-identifier="impala-blog/posts/blog-coming-soon.html">Comments</a>
 
 
         </p>
 </div>
     </header><div class="p-summary entry-summary">
     <p>Watch this space for the first blog post from the Impala Team.</p>
+<p>See also <a href="https://blog.cloudera.com/tag/apache-impala/">posts about Impala on the Cloudera blog</a>.</p>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-25-performance-overview/" class="u-url">Impala 2.5 performance overview</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                Impala Dev
+            </span></p>
+            <p class="dateline"><a href="posts/impala-25-performance-overview/" rel="bookmark"><time class="published dt-published" datetime="2016-05-24T23:00:00-07:00" title="2016-05-24 23:00">2016-05-24 23:00</time></a></p>
+                <p class="commentline">            <a href="posts/impala-25-performance-overview/#disqus_thread" data-disqus-identifier="impala-blog/posts/impala-25-performance-overview.html">Comments</a>
+
+
+        </p>
+</div>
+    </header><div class="p-summary entry-summary">
+    <p>Impala has proven to be a high-performance analytics query engine since the beginning. Even as an
+initial production release in 2013, it demonstrated performance 2x faster than a traditional DBMS,
+and each subsequent release has continued to demonstrate the wide performance gap between Impala’s
+analytic-database architecture and SQL-on-Apache Hadoop alternatives. Today, we are excited to
+continue that track record via some important performance gains for Impala 2.5 (with more to come on
+the roadmap), summarized below.</p>
+
+<p>Overall, compared to Impala 2.3, in Impala 2.5:</p>
+
+<ul>
+<li>TPC-DS queries run on average 4.3x faster.</li>
+  <li>TPC-H queries run 2.2x faster on flat tables, and 1.71x faster on nested tables.</li>
+</ul>
+<iframe src="https://www.slideshare.net/slideshow/embed_code/key/uslLYaXW8lp1i6?startSlide=1" width="597" height="486" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px;max-width: 100%;" allowfullscreen>
+</iframe>
+
+<div style="margin-bottom:5px">
+  <strong>
+    <a href="https://www.slideshare.net/slideshow/hug-meetup-impala-25-performance-overview/61689036" title="Hug meetup impala 2.5 performance overview" target="_blank">Hug meetup impala 2.5 performance
+overview</a>
+  </strong>
+  from
+  <strong>
+    <a href="https://www.slideshare.net/MostafaMokhtar1" target="_blank">Mostafa Mokhtar</a>
+  </strong>
+</div>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/nested-types-in-impala/" class="u-url">Nested Types in Impala</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                Impala Dev
+            </span></p>
+            <p class="dateline"><a href="posts/nested-types-in-impala/" rel="bookmark"><time class="published dt-published" datetime="2015-03-24T23:00:00-07:00" title="2015-03-24 23:00">2015-03-24 23:00</time></a></p>
+                <p class="commentline">            <a href="posts/nested-types-in-impala/#disqus_thread" data-disqus-identifier="impala-blog/posts/nested-types-in-impala.html">Comments</a>
+
+
+        </p>
+</div>
+    </header><div class="p-summary entry-summary">
+    <p>This document discusses nested data types in Impala, including structs, maps, and arrays. It
+provides an example schema using these types, describes Impala's SQL syntax extensions for querying
+nested data, and discusses techniques for advanced querying capabilities like correlated subqueries.
+The execution model materializes minimal nested structures in memory and uses new execution nodes to
+handle nested data types.</p>
+
+<iframe src="https://www.slideshare.net/slideshow/embed_code/key/unlgM4LQ4qTEZC?startSlide=1" width="597" height="486" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px;max-width: 100%;" allowfullscreen>
+</iframe>
+
+<div style="margin-bottom:5px">
+  <strong>
+    <a href="https://www.slideshare.net/slideshow/nested-types-in-impala-55344174/55344174" title="Nested Types in Impala" target="_blank">Nested Types in Impala</a>
+  </strong>
+  from
+  <strong>
+    <a href="https://www.slideshare.net/cloudera" target="_blank">Cloudera, Inc.</a>
+  </strong>
+</div>
+
+<p><i>Presented in Impala Meetup, PA, March 24th, 2015</i></p>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/" class="u-url">Impala: A Modern, Open-Source SQL Engine for Hadoop</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                Impala Dev
+            </span></p>
+            <p class="dateline"><a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/" rel="bookmark"><time class="published dt-published" datetime="2015-01-05T23:00:00-07:00" title="2015-01-05 23:00">2015-01-05 23:00</time></a></p>
+                <p class="commentline">            <a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/#disqus_thread" data-disqus-identifier="impala-blog/posts/impala-a-modern-open-source-sql-engine-for-hadoop.html">Comments</a>
+
+
+        </p>
+</div>
+    </header><div class="p-summary entry-summary">
+    <p>
+  <i>Presented at
+    <a href="https://www.cidrdb.org/cidr2015/program.html" target="_blank">The Conference on
+    Innovative Data Systems Research (CIDR) 2015</a>.
+  </i>
+</p>
+
+<embed src="https://drive.google.com/viewerng/viewer?embedded=true&amp;url=https://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper28.pdf" width="597" height="486"></embed><p>
+  <a href="https://drive.google.com/viewerng/viewer?embedded=true&amp;url=https://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper28.pdf" target="_blank">Paper</a> |
+  <a href="https://drive.google.com/viewerng/viewer?embedded=true&amp;url=https://www.cidrdb.org/cidr2015/Slides/28_CIDR15_Slides_Paper28.pdf" target="_blank">Slides</a>
+</p>
     </div>
     </article>
 </div>
 
-               <script>var disqus_shortname="impala-blog";(function(){var a=document.createElement("script");a.async=true;a.src="https://"+disqus_shortname+".disqus.com/count.js";(document.getElementsByTagName("head")[0]||document.getElementsByTagName("body")[0]).appendChild(a)}());</script></main><footer id="footer"><p> </p>
+               <script>var disqus_shortname="impala-apache-org";(function(){var a=document.createElement("script");a.async=true;a.src="https://"+disqus_shortname+".disqus.com/count.js";(document.getElementsByTagName("head")[0]||document.getElementsByTagName("body")[0]).appendChild(a)}());</script></main><footer id="footer"><p> </p>
     <div class="navbar">
       <div class="navbar-inner">
         <div class="container">
@@ -106,27 +308,18 @@
 <!-- navbar -->
 
     <div class="footer">
-      <p class="pull-right"><img src="assets/images/incubator.png"></p>
-
-      <p>
-        Apache Impala is an effort undergoing incubation at the Apache Software Foundation
-        (ASF), sponsored by the Apache Incubator PMC. Incubation is required of all newly
-        accepted projects until a further review indicates that the infrastructure,
-        communications, and decision making process have stabilized in a manner consistent
-        with other successful ASF projects. While incubation status is not necessarily a
-        reflection of the completeness or stability of the code, it does indicate that the
-        project has yet to be fully endorsed by the ASF.
-      </p>
-
-      <p>
-        Apache Impala, Impala, Apache, the Apache feather logo, and the Apache Impala
-        project logo are either registered trademarks or trademarks of The Apache Software
-        Foundation in the United States and other countries.
+      <center>
+        <a href="http://www.apache.org/events/current-event.html">
+          <img src="http://www.apache.org/events/current-event-234x60.png"></a>
+      </center>
+      <p>Apache Impala, Impala, Apache, the Apache feather logo, and the Apache
+        Impala project logo are either registered trademarks or trademarks of The
+        Apache Software Foundation in the United States and other countries.
       </p>
     </div>
 <!-- footer -->
 
-      <p>Contents © 2016-2017         <a href="mailto:dev@impala.incubator.apache.org">Impala Dev</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+      <p>Contents © 2016-2024         <a href="mailto:dev@impala.apache.org">Impala Dev</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
       
   </footer>
 </div>

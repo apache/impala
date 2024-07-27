@@ -34,16 +34,17 @@ import time
 
 # Data about this site
 BLOG_AUTHOR = "Impala Dev"  # (translatable)
-BLOG_TITLE = "Apache Impala (incubating)"  # (translatable)
+BLOG_TITLE = "Apache Impala"  # (translatable)
 # This is the main URL for your site. It will be used
 # in a prominent link. Don't forget the protocol (http/https)!
-SITE_URL = "http://impala.apache.org/"
+SITE_URL = "https://impala.apache.org/blog/"
 # This is the URL where Nikola's output will be deployed.
 # If not set, defaults to SITE_URL
-# BASE_URL = "http://impala.apache.org/blog.html/"
-BLOG_EMAIL = "dev@impala.incubator.apache.org"
-BLOG_DESCRIPTION = ("Apache Impala (incubating) is a modern, open source, distributed "
-                    "SQL query engine for Apache Hadoop.")  # (translatable)
+# BASE_URL = "https://impala.apache.org/blog/"
+BLOG_EMAIL = "dev@impala.apache.org"
+BLOG_DESCRIPTION = (
+    "Apache Impala is a modern, open source, distributed SQL query engine "
+    "for open data and table formats.")  # (translatable)
 
 # Nikola is multilingual!
 #
@@ -603,7 +604,7 @@ OUTPUT_FOLDER = '../blog'
 
 # where the "cache" of partial generated content should be located
 # default: 'cache'
-# CACHE_FOLDER = 'cache'
+CACHE_FOLDER = 'impala-blog'
 
 # Filters to apply to the output.
 # A directory where the keys are either: a file extensions, or
@@ -914,7 +915,7 @@ COMMENT_SYSTEM = "disqus"
 # depends on what comment system you use. The default is
 # "nikolademo" which is a test account for Disqus. More information
 # is in the manual.
-COMMENT_SYSTEM_ID = "impala-blog"
+COMMENT_SYSTEM_ID = "impala-apache-org"
 
 # Enable annotations using annotateit.org?
 # If set to False, you can still enable them for individual posts and pages
@@ -1065,7 +1066,7 @@ MARKDOWN_EXTENSIONS = ['fenced_code', 'codehilite', 'extra']
 # SHOW_SOURCELINK = True
 # Copy the source files for your pages?
 # Setting it to False implies SHOW_SOURCELINK = False
-# COPY_SOURCES = True
+COPY_SOURCES = False
 
 # Modify the number of Post per Index Page
 # Defaults to 10
@@ -1186,7 +1187,7 @@ GENERATE_ATOM = False
 
 # If you hate "Filenames with Capital Letters and Spaces.md", you should
 # set this to true.
-UNSLUGIFY_TITLES = True
+FILE_METADATA_UNSLUGIFY_TITLES = True
 
 # Additional metadata that is added to a post when creating a new_post
 # ADDITIONAL_METADATA = {}

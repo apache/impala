@@ -1,7 +1,7 @@
 @charset "UTF-8";
 
 /*
-	Copyright © 2014-2016 Daniel Aleksandersen and others.
+	Copyright © 2014-2024 Daniel Aleksandersen and others.
 
 	Permission is hereby granted, free of charge, to any
 	person obtaining a copy of this software and associated
@@ -67,9 +67,9 @@ body {
 	margin-right: 1.5em;
 }
 
-#menu ul li:dir(rtl),
-#toptranslations ul li:dir(rtl),
-#toptranslations h2:dir(rtl) {
+html[dir="rtl"] #menu ul li,
+html[dir="rtl"] #toptranslations ul li,
+html[dir="rtl"] #toptranslations h2 {
 	margin-left: 1.5em;
 	margin-right: 0;
 }
@@ -79,12 +79,12 @@ body {
 	float: right;
 }
 
-#toptranslations:dir(rtl) {
+html[dir="rtl"] #toptranslations {
 	text-align: left;
 	float: left;
 }
 
-.posttranslations h3 {
+.posttranslations h3, .translationslist h3 {
 	display: inline;
 	font-size: 1em;
 }
@@ -93,7 +93,7 @@ body {
 	font-size: 2em;
 }
 
-.posttranslations h3:last-child {
+.posttranslations h3:last-child, .translationslist h3:last-child {
 	display: none;
 }
 
@@ -120,35 +120,50 @@ body {
 }
 .metadata p:before,
 .postpromonav .tags li:before,
-.postlist .listdate:after {
+.postlist .listdate:after,
+.translationslist p:before {
 	content: " — ";
 }
 .postlist li {
 	margin-bottom: .33em;
+}
+.byline a:not(:last-child):after {
+	content: ",";
 }
 
 /* Post and archive pagers */
 .postindexpager .pager .next:before {
 	content: "↓ ";
 }
-.postindexpager .pager .previous:before {
+.postindexpager .pager .previous:before,
+.archivenav .pager .up:before {
 	content: "↑ ";
 }
-.postpromonav .pager .next:after {
+.postpromonav .pager .next:after,
+.archivenav .pager .next:after {
 	content: " →";
 }
-.postpromonav .pager .previous:dir(rtl):after {
+html[dir="rtl"] .postpromonav .pager .previous:after,
+html[dir="rtl"] .archivenav .pager .previous:after {
 	content: " →";
 }
-.postpromonav .pager .previous:before {
+.postpromonav .pager .previous:before,
+.archivenav .pager .previous:before {
 	content: "← ";
 }
-.postpromonav .pager .next:dir(rtl):before {
+html[dir="rtl"] .postpromonav .pager .next:before,
+html[dir="rtl"] .archivenav .pager .next:before {
 	content: "← ";
 }
-
+html[dir="rtl"] .postpromonav .pager .next:after,
+html[dir="rtl"] .archivenav .pager .next:after,
+html[dir="rtl"] .postpromonav .pager .previous:before,
+html[dir="rtl"] .archivenav .pager .previous:before {
+	content: "";
+}
 .metadata p:first-of-type:before,
-.postpromonav .tags li:first-of-type:before {
+.postpromonav .tags li:first-of-type:before,
+.translationslist p:first-of-type:before {
 	content: "";
 }
 .postpromonav .pager {
@@ -156,24 +171,40 @@ body {
 	height: 1em;
 }
 .postpromonav .tags li,
-.postpromonav .pager li {
+.postpromonav .pager li,
+.archivenav .pager li {
 	display: inline-block;
 }
-.postpromonav .pager .next {
+.archivenav .pager {
+	text-align: center
+}
+.postpromonav .pager .next,
+.archivenav .pager .next {
 	float: right;
 }
-.postpromonav .pager .next:dir(rtl) {
+html[dir="rtl"] .postpromonav .pager .next,
+html[dir="rtl"] .archivenav .pager .next {
 	float: left;
 }
 
-.postpromonav .pager .previous {
+.postpromonav .pager .previous,
+.archivenav .pager .previous {
 	float: left;
 }
-.postpromonav .pager .previous:dir(rtl) {
+html[dir="rtl"] .postpromonav .pager .previous,
+html[dir="rtl"] .archivenav .pager .previous {
 	float: right;
 }
 
-.metadata p {
+.archivenav .pager .disabled,
+.archivenav .pager .disabled a,
+.archivenav .pager .disabled:link {
+	color: #888;
+	cursor: not-allowed;
+}
+
+.metadata p,
+.translationslist p {
 	display: inline;
 }
 
@@ -254,10 +285,6 @@ img {
 	margin-right: 0;
 }
 
-.codetable .linenos {
-	padding-right: 10px;
-}
-
 .sr-only {
 	position: absolute;
 	width: 1px;
@@ -280,9 +307,14 @@ img {
 }
 
 pre.code, code {
-	white-space: pre;
+	white-space: pre-wrap;
 	word-wrap: normal;
 	overflow: auto;
+}
+
+/* Set a minimum logo height to ensure .svg are displayed if there is no brand text (#3493) */
+#logo {
+	min-height: 25px;
 }
 
 /* SOURCE: https://github.com/h5bp/html5-boilerplate/blob/master/src/css/main.css */
