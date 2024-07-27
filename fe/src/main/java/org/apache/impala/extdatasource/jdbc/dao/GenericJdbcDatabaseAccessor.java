@@ -71,7 +71,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
       new DataSourceObjectCache();
 
   @Override
-  public int getTotalNumberOfRecords(Configuration conf)
+  public long getTotalNumberOfRecords(Configuration conf)
       throws JdbcDatabaseAccessException {
     Connection conn = null;
     PreparedStatement ps = null;
@@ -89,7 +89,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
       ps = conn.prepareStatement(countQuery);
       rs = ps.executeQuery();
       if (rs.next()) {
-        return rs.getInt(1);
+        return rs.getLong(1);
       } else {
         LOG.warn("The count query '{}' did not return any results.", countQuery);
         throw new JdbcDatabaseAccessException(
