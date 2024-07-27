@@ -24,7 +24,7 @@ import org.apache.impala.extdatasource.jdbc.exception.JdbcDatabaseAccessExceptio
 
 public interface DatabaseAccessor {
 
-  int getTotalNumberOfRecords(Configuration conf)
+  long getTotalNumberOfRecords(Configuration conf)
       throws JdbcDatabaseAccessException;
 
   JdbcRecordIterator getRecordIterator(Configuration conf, int limit, int offset)

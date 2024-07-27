@@ -143,6 +143,10 @@ Status DataSourceScanNode::ValidateRowBatchSize() {
         Substitute(ERROR_NUM_COLUMNS, tuple_desc_->slots().size(), cols.size()));
   }
 
+  // The capacity of output RowBatch is defined as a 4-byte integer. Making sure that
+  // the number of rows in input batch does not exceed the maximum capacity of output
+  // RowBatch.
+  DCHECK_LE(input_batch_->rows.num_rows, std::numeric_limits<int32_t>::max());
   num_rows_ = -1;
   // If num_rows was set, use that, otherwise we set it to be the number of rows in
   // the first TColumnData and then ensure the number of rows in other columns are
@@ -376,10 +380,11 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
         }
       } else {
         // For count(*)
-        rows_read += num_rows_;
-        next_row_idx_ += num_rows_;
-        IncrementNumRowsReturned(num_rows_);
-        if (input_batch_->eos) {
+        if (InputBatchHasNext()) {
+          // Generate one output RowBatch for one input batch
+          rows_read += num_rows_;
+          next_row_idx_ += num_rows_;
+          IncrementNumRowsReturned(num_rows_);
           row_batch->limit_capacity(rows_read);
           row_batch->CommitRows(rows_read);
         }
