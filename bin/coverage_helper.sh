@@ -66,9 +66,9 @@ fi
 if [ ${REPORT_ACTION} -eq 1 ]; then
   mkdir -p "${REPORT_DIRECTORY}"
   rm -f "${REPORT_DIRECTORY}"/index*.html
-  if ! which gcov > /dev/null; then
-    export PATH="$PATH:$IMPALA_TOOLCHAIN_PACKAGES_HOME/gcc-$IMPALA_GCC_VERSION/bin"
-  fi
+  # Use gcov from the toolchain's GCC directory, so the gcov version always matches
+  # our toolchain compiler version.
+  export PATH="$IMPALA_TOOLCHAIN_PACKAGES_HOME/gcc-$IMPALA_GCC_VERSION/bin:$PATH"
   echo "Using gcov at `which gcov`"
   # src/util/bit-packing.inline.h gets lots of hits, so generating a detailed report
   # for it takes several minutes. Exclude it to keep the execution time down.
