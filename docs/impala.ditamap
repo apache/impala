@@ -285,6 +285,7 @@ under the License.
       <topicref href="topics/impala_datetime_functions.xml"/>
       <topicref href="topics/impala_conditional_functions.xml"/>
       <topicref href="topics/impala_string_functions.xml"/>
+      <topicref href="topics/impala_ai_functions.xml"/>
       <topicref href="topics/impala_misc_functions.xml"/>
       <topicref href="topics/impala_aggregate_functions.xml">
         <topicref href="topics/impala_appx_median.xml"/>

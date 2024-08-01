@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_ai_functions">
+  <title>Advantages and use cases of Impala AI functions</title>
+  <titlealts audience="PDF">
+    <navtitle>AI Functions</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="UDF"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p> You can use Impala's ai_generate_text function to access Large Language Models
+      (LLMs) in SQL queries. This function enables you to input a prompt, retrieve the LLM response,
+      and include it in results. You can create custom UDFs for complex tasks like sentiment
+      analysis and translation.
+    </p>
+    <section id="section_ufg_4tv_fcc">
+      <title>Use LLMs directly in SQL with Impala's <codeph>ai_generate_text</codeph>
+        function></title>
+      <p>Impala introduces a built-in AI function called <codeph>ai_generate_text</codeph> that
+        enables direct access to and utilization of Large Language Models (LLMs) in SQL queries.
+        With this function, you can input a prompt, which may include data. The function
+        communicates with a supported LLM endpoint, sends the prompt, retrieves the response, and
+        includes it in the query result.</p>
+      <p>Alternatively, seamlessly integrate LLM intelligence into your Impala workflow by creating
+        custom User Defined Functions (UDFs) on top of <codeph>ai_generate_text</codeph>. This
+        allows you to use concise SQL statements for sending prompts to an LLM and receiving
+        responses. You can define UDFs for complex tasks like sentiment analysis, language
+        translation, and generative contextual analysis.</p>
+    </section>
+    <section id="ai_advantages">
+      <title>Advantages of using AI functions</title>
+      <p>
+        <ul id="ul_cdc_fm4_tbc">
+          <li><b>Simplified Workflow</b>: Eliminates the necessity for setting up intricate data
+            pipelines.</li>
+          <li><b>No ML Expertise Required</b>: No specialized machine learning skills are
+            needed.</li>
+          <li><b>Swift Decision-Making</b>: Enables faster insights on the data, facilitating
+            critical business decisions by using in-database function calls.</li>
+          <li><b>Integrated Functionality</b>: Requires no external applications, as it is a
+            built-in feature in Data Warehouse.</li>
+        </ul>
+      </p>
+    </section>
+    <section id="ai_usecases">
+      <title>List of possible use cases</title>
+      <p>Here are some practical applications of using AI models with the function:<ul
+          id="ul_ond_pm4_tbc">
+          <li><b>Sentiment Analysis</b>: Use the AI model to examine customer reviews for a product
+            and identify their sentiment as positive, negative, or neutral.</li>
+          <li><b>Language Translation</b>: Translate product reviews written in different languages
+            to understand customer feedback from various regions.</li>
+          <li><b>Generative Contextual Analysis</b>: Generate detailed reports and insights on
+            various topics based on provided data.</li>
+        </ul></p>
+    </section>
+    <section id="syntax_ai_function">
+      <title>Syntax for AI built-in function arguments</title>
+      <p>The following example of a built-in AI function demonstrates the use of the OpenAI API as a
+        large language model. Currently, OpenAI's public endpoint and Azure OpenAI endpoints are
+        supported.</p>
+      <dl id="dl_w5l_nn4_tbc">
+        <dlentry>
+          <dt>AI_GENERATE_TEXT_DEFAULT</dt>
+          <dd>Syntax:<codeblock id="codeblock_ibj_qn4_tbc">ai_generate_text_default(prompt)</codeblock></dd>
+        </dlentry>
+        <dlentry>
+          <dt>AI_GENERATE_TEXT</dt>
+          <dd>Syntax:<codeblock id="codeblock_qdg_zn4_tbc">ai_generate_text(ai_endpoint, prompt, ai_model, ai_api_key_jceks_secret, additional_params)
+          </codeblock></dd>
+        </dlentry>
+      </dl>
+      <p>The <codeph>ai_generate_text</codeph> function uses the values you provide as an argument
+        in the function for <codeph>ai_endpoint</codeph>, <codeph>ai_model</codeph>, and
+          <codeph>ai_api_key_jceks_secret</codeph>. If any of the arguments are left empty or set to
+        NULL, the function uses the default values defined at the instance level. These default
+        values correspond to the flag settings configured in the Impala instance. For example, if
+        the <codeph>ai_endpoint</codeph> argument is NULL or empty, the function will use the value
+        specified by the <codeph>ai_endpoint</codeph> flag as the default.</p>
+      <p dir="ltr">When using the <codeph>ai_generate_text_default</codeph> function, make sure to
+        set all parameters (<codeph>ai_endpoint</codeph>, <codeph>ai_model</codeph>, and
+        <codeph>ai_api_key_jceks_secret</codeph>) in the coordinator/executor flagfiles with
+        appropriate values.</p>
+    </section>
+    <section id="key_parameters_ai_function">
+      <title>Key parameters for using the AI model</title>
+      <ul id="ul_pfm_2p4_tbc">
+        <li><b>ai_endpoint</b>: The endpoint for the model API that is being interfaced with,
+          supports services like OpenAI and Azure OpenAI Service, for example,
+          https://api.openai.com/v1/chat/completions.</li>
+        <li><b>prompt</b>: The text you submit to the AI model to generate a response.</li>
+        <li><b>ai_model</b>: The specific model name you want to use within the desired API, for
+          example, gpt-3.5-turbo.</li>
+        <li><b>ai_api_key_jceks_secret</b>: The key name for the JCEKS secret that contains your API
+          key for the AI API you are using. You need a JCEKS keystore containing the specified JCEKS
+          secret referenced in <codeph>ai_api_key_jceks_secret</codeph>. To do this, set the
+            <codeph>hadoop.security.credential.provider.path</codeph> property in the
+            <codeph>core-site</codeph> configuration for both the executor and coordinator.</li>
+        <li><b>additional_params</b>: Additional parameters that the AI API offers that is provided
+          to the built-in function as a JSON object.</li>
+      </ul>
+    </section>
+    <section id="impala-built-in-ai-function">
+      <title>Examples of using the built-in AI function</title>
+      <p>The following example lists the steps needed to turn a prompt into a custom SQL function
+        using just the built-in function
+        <codeph>ai_generate_text_default</codeph>.<codeblock id="codeblock_ppy_dr4_tbc">> select ai_generate_text_default('hello');
+  Response:
+  Hello! How can I assist you today?
+        </codeblock></p>
+      <p>In the below example, a query is sent to the Amazon book reviews database for the book
+        titled Artificial Superintelligence. The large language model (LLM) is prompted to classify
+        the sentiment as positive, neutral, or
+        negative.<codeblock id="codeblock_hyp_4np_tbc">> select customer_id, star_rating, ai_generate_text_default(CONCAT('Classify the following review as positive, neutral, or negative', and only include the uncapitalized category in the response: ', review_body)) AS review_analysis, review_body from amazon_book_reviews where product_title='Artificial Superintelligence' order by customer_id LIMIT 1;
+  Response:
+  +--+------------+------------+----------------+------------------+
+  |  |customer_id |star_rating |review_analysis |review_body       |
+  +--+------------+------------+----------------+------------------+
+  |1 |4343565     | 5          |positive        |What is this book |
+  |  |            |            |                |all about …………    |
+  +--+------------+------------+----------------+------------------+
+        </codeblock></p>
+    </section>
+    <section id="impala-custom-udf">
+      <title>Examples of creating and using custom UDFs along with the built-in AI function</title>
+      <p>Instead of writing the prompts in a SQL query, you can build a UDF with your intended
+        prompt. Once you build your custom UDF, pass your desired prompt within your custom UDF into
+        the <codeph>ai_generate_text_default</codeph> built-in Impala function.</p>
+      <p>Example: Classify input customer reviews</p>
+      <p>The following UDF uses the Amazon book reviews database as the input and requests the LLM
+        to classify the sentiment.</p>
+      <p>Classify input customer reviews:</p>
+      <codeblock id="codeblock_h1z_yrp_tbc">
+    IMPALA_UDF_EXPORT
+    StringVal ClassifyReviews(FunctionContext* context, const StringVal&amp; input) {
+      std::string request =
+        std::string("Classify the following review as positive, neutral, or negative")
+        + std::string(" and only include the uncapitalized category in the response: ")
+        + std::string(reinterpret_cast&lt;const char*>(input.ptr), input.len);
+      StringVal prompt(request.c_str());
+      const StringVal endpoint("https://api.openai.com/v1/chat/completions");
+      const StringVal model("gpt-3.5-turbo");
+      const StringVal api_key_jceks_secret("open-ai-key");
+      const StringVal params("{\"temperature\": 0.9, \"model\": \"gpt-4\"}");
+      return context->Functions()->ai_generate_text(
+        context, endpoint, prompt, model, api_key_jceks_secret, params);
+    }
+      </codeblock>
+      <p>Now you can define these prompt building UDFs and build them in Impala. Once you have them
+        running, you can query your datasets using them.</p>
+      <p>Creating <codeph>analyze_reviews</codeph> function:</p>
+      <codeblock id="codeblock_b4l_ctp_tbc">> CREATE FUNCTION analyze_reviews(STRING)
+    RETURNS STRING
+    LOCATION ‘s3a://dw-...............’
+    SYMBOL=’ClassifyReviews’
+      </codeblock>
+      <p>Using SELECT query for Sentiment analysis to classify Amazon book reviews</p>
+      <codeblock id="codeblock_xdr_jtp_tbc">> SELECT customer_id, star_rating, analyze_reviews(review_body) AS review_analysis, review_body from amazon_book_reviews where product_title='Artificial Superintelligence' order by customer_id;
+  Response:
+  +--+------------+------------+----------------+----------------------+
+  |  |customer_id |star_rating |review_analysis |review_body           |
+  +--+------------+------------+----------------+----------------------+
+  |1 |44254093    | 5          |positive        |What is this book all |
+  |  |            |            |                |about? It is all about|
+  |  |            |            |                |a mind-blowing        |
+  |  |            |            |                |universal law of      |
+  |  |            |            |                |nature. Mind-blow…    |
+  +--+------------+------------+----------------+----------------------+
+  |2 |50050072    | 5          |positive        |The two tightly-      |
+  |  |            |            |                |connected ideas strike|
+  |  |            |            |                |you as amazed. In the |
+  |  |            |            |                |first place, what has |
+  |  |            |            |                |never bef…            |
+  +--+------------+------------+----------------+----------------------+
+  |3 |50050072    | 5          |positive        |The two tightly-      |
+  |  |            |            |                |connected ideas strike|
+  |  |            |            |                |you as amazed. In the |
+  |  |            |            |                |first place, what has |
+  |  |            |            |                |never bef…            |
+  +--+------------+------------+----------------+----------------------+
+  |4 |52932308    | 1          |negative        |This book is seriously|
+  |  |            |            |                |flawed. I could not   |
+  |  |            |            |                |work out if the author|
+  |  |            |            |                |was a mathemetician   |
+  |  |            |            |                |dabbi…                |
+  +--+------------+------------+----------------+----------------------+
+  |5 |52971961    | 1          |negative        |Abdoullaev's          |
+  |  |            |            |                |exploration of        |
+  |  |            |            |                |Al issues appears to  |
+  |  |            |            |                |be very technological |
+  |  |            |            |                |and straightforward…  |
+  +--+------------+------------+----------------+----------------------+
+  |6 |53008416    | 4          |positive        |As Co Founder of      |
+  |  |            |            |                |ArtilectWorld:ultra   |
+  |  |            |            |                |intelligent machine,  |
+  |  |            |            |                |I recommend reading   |
+  |  |            |            |                |this book!            |
+  +--+------------+------------+----------------+----------------------+
+</codeblock>
+    </section>
+  </conbody>
+</concept>
