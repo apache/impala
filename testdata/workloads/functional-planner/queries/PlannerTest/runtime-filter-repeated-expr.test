@@ -1,0 +1,31 @@
+SELECT alt.int_col, alt.string_col
+FROM alltypes alt
+INNER JOIN (
+  SELECT int_col,
+    concat('20',
+      substring(date_string_col, 7, 2), '-',
+      substring(date_string_col, 4, 2), '-',
+      substring(date_string_col, 1, 2), ' 00:00:00') ts
+  FROM alltypesaggnonulls GROUP BY int_col, date_string_col
+) altann ON altann.ts = from_unixtime(alt.id, 'yyyy-MM-dd HH:mm:ss')
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: concat('20', substring(date_string_col, 7, 2), '-', substring(date_string_col, 4, 2), '-', substring(date_string_col, 1, 2), ' 00:00:00') = from_unixtime(alt.id, 'yyyy-MM-dd HH:mm:ss')
+|  runtime filters: RF000 <- from_unixtime(alt.id, 'yyyy-MM-dd HH:mm:ss')
+|  row-size=36B cardinality=9.08K
+|
+|--00:SCAN HDFS [functional.alltypes alt]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=20B cardinality=6.12K
+|
+02:AGGREGATE [FINALIZE]
+|  group by: int_col, date_string_col
+|  row-size=16B cardinality=9.08K
+|
+01:SCAN HDFS [functional.alltypesaggnonulls]
+   HDFS partitions=10/10 files=10 size=744.82KB
+   runtime filters: RF000 -> concat('20', substring(functional.alltypesaggnonulls.date_string_col, 7, 2), '-', substring(functional.alltypesaggnonulls.date_string_col, 4, 2), '-', substring(functional.alltypesaggnonulls.date_string_col, 1, 2), ' 00:00:00')
+   row-size=16B cardinality=9.08K
+====
