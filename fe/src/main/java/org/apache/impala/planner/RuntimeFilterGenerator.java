@@ -1418,16 +1418,19 @@ public final class RuntimeFilterGenerator {
       targetExpr.collect(SlotRef.class, exprSlots);
       List<SlotId> sids = filter.getTargetSlots().get(targetTid);
       for (SlotRef slotRef: exprSlots) {
+        boolean matched = false;
         for (SlotId sid: sids) {
           if (analyzer.hasValueTransfer(slotRef.getSlotId(), sid)) {
             SlotRef newSlotRef = new SlotRef(analyzer.getSlotDesc(sid));
             newSlotRef.analyzeNoThrow(analyzer);
             smap.put(slotRef, newSlotRef);
+            matched = true;
             break;
           }
         }
+        Preconditions.checkState(matched,
+            "No SlotId found for RuntimeFilter %s SlotRef %s", filter, slotRef);
       }
-      Preconditions.checkState(exprSlots.size() == smap.size());
       try {
         targetExpr = targetExpr.substitute(smap, analyzer, false);
       } catch (Exception e) {

@@ -245,44 +245,4 @@ public final class ExprSubstitutionMap {
     }
     return true;
   }
-
-  /**
-   * Remove expressions that are not used according to baseTblSMap
-   */
-  public void trim(ExprSubstitutionMap baseTblSMap, Analyzer analyzer) {
-    Preconditions.checkState(size() == baseTblSMap.size());
-    for (int i = size() - 1; i >= 0; --i) {
-      final Expr baseTblExpr = baseTblSMap.getRhs().get(i);
-      List<SlotId> slotIds = new ArrayList<>();
-      baseTblExpr.getIds(null, slotIds);
-      // Struct children are allowed to be non-materialised because the query may only
-      // concern a subset of the fields of the struct. In this case we do not remove the
-      // entry from this 'ExprSubstitutionMap', only if none of the children are
-      // materialised.
-      if (!baseTblExpr.getType().isStructType()) {
-        for (SlotId id: slotIds) {
-          if (!analyzer.getSlotDesc(id).isMaterialized()) {
-            Expr removed = lhs_.remove(i);
-            substitutions_.remove(removed);
-            rhs_.remove(i);
-            break;
-          }
-        }
-      } else { // If it is a struct, remove iff none of the children are materialised.
-        boolean foundMaterialized = false;
-        for (SlotId id: slotIds) {
-          if (analyzer.getSlotDesc(id).isMaterialized()) {
-            foundMaterialized = true;
-            break;
-          }
-        }
-        if (!foundMaterialized) {
-          Expr removed = lhs_.remove(i);
-          substitutions_.remove(removed);
-          rhs_.remove(i);
-        }
-      }
-    }
-    verify();
-  }
 }

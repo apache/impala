@@ -1595,4 +1595,13 @@ public class PlannerTest extends PlannerTestBase {
         "location '/'");
     runPlannerTestFile("many-expression", "test_many_expressions");
   }
+
+  /**
+   * Test that runtime filters with the same expression repeated multiple times are
+   * planned successfully (IMPALA-13270).
+   */
+  @Test
+  public void testRuntimeFilterRepeatedExpr() {
+    runPlannerTestFile("runtime-filter-repeated-expr", "functional");
+  }
 }
