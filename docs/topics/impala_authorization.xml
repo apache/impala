@@ -255,14 +255,11 @@ under the License.
 
       <conbody>
 
-        <p>
-          URIs represent the file paths you specify as part of statements such as <codeph>CREATE
-          EXTERNAL TABLE</codeph> and <codeph>LOAD DATA</codeph>. Typically, you specify what
-          look like UNIX paths, but these locations can also be prefixed with
-          <codeph>hdfs://</codeph> to make clear that they are really URIs. To set privileges
-          for a URI, specify the name of a directory, and the privilege applies to all the files
-          in that directory and any directories underneath it.
-        </p>
+        <p> URIs represent the file paths you specify as part of statements such as <codeph>CREATE
+            EXTERNAL TABLE</codeph> and <codeph>LOAD DATA</codeph>. Typically, you specify what look
+          like UNIX paths, but these locations can also be prefixed with <codeph>hdfs://</codeph> to
+          make clear that they are really URIs. To set privileges for a URI, specify the name of a
+          directory, and the privilege applies to all the files in that directory. </p>
 
         <p>
           URIs must start with <codeph>hdfs://</codeph>, <codeph>s3a://</codeph>,
