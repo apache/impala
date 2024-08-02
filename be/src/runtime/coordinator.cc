@@ -1537,7 +1537,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
   std::unordered_set<int> target_fragment_idxs;
   if (!IsExecuting()) {
     LOG(INFO) << "Filter update received for non-executing query with id: "
-        << query_id();
+        << PrintId(query_id());
     return;
   }
   auto it = filter_routing_table_->id_to_filter.find(params.filter_id());
