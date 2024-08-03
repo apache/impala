@@ -47,6 +47,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
@@ -99,7 +100,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // unique w/in plan tree; assigned by planner, and not necessarily in c'tor
   protected PlanNodeId id_;
 
-  protected long limit_; // max. # of rows to be returned; 0: no limit_
+  protected long limit_; // max. # of rows to be returned; -1: no limit_
 
   // ids materialized by the tree rooted at this node
   protected List<TupleId> tupleIds_;
@@ -518,6 +519,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   private void initThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     msg.limit = limit_;
+    if (hasLimit()) {
+      LOG.trace("{} ineligible for caching due to limit", this);
+      serialCtx.setTupleCachingIneligible(IneligibilityReason.LIMIT);
+    }
 
     if (!serialCtx.isTupleCache()) {
       msg.node_id = id_.asInt();
@@ -1378,12 +1383,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
 
     // Incorporate this node's information
-    // TODO: This will also calculate eligibility via initThrift/toThrift.
-    // TODO: This will adjust the output of initThrift/toThrift to mask out items.
     TPlanNode msg = new TPlanNode();
     ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(tupleCacheInfo_);
     initThrift(msg, serialCtx);
     toThrift(msg, serialCtx);
+    // Do not continue if initThrift or toThrift marked this as ineligible.
+    if (!tupleCacheInfo_.isEligible()) {
+      tupleCacheInfo_.finalizeHash();
+      return;
+    }
     tupleCacheInfo_.hashThrift(msg);
     if (getChildCount() == 0 && queryOptsHash != null) {
       // Leaf node, add query options hash.

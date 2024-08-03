@@ -20,6 +20,7 @@ package org.apache.impala.common;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.planner.TupleCacheInfo;
+import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.planner.HdfsScanNode;
 
 /**
@@ -88,6 +89,15 @@ public class ThriftSerializationCtx {
   public void registerInputScanNode(HdfsScanNode hdfsScanNode) {
     if (isTupleCache()) {
       tupleCacheInfo_.registerInputScanNode(hdfsScanNode);
+    }
+  }
+
+  /**
+   * Set this location as ineligible for tuple caching due to the specified reason.
+   */
+  public void setTupleCachingIneligible(IneligibilityReason reason) {
+    if (isTupleCache()) {
+      tupleCacheInfo_.setIneligible(reason);
     }
   }
 

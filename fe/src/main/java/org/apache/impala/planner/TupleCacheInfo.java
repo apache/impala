@@ -95,6 +95,10 @@ public class TupleCacheInfo {
   public enum IneligibilityReason {
     NOT_IMPLEMENTED,
     CHILDREN_INELIGIBLE,
+    // Limits are ineligible because they are implemented in a non-deterministic
+    // way. In future, this can support locations that are deterministic (e.g.
+    // limits on a sorted input).
+    LIMIT,
   }
   private EnumSet<IneligibilityReason> ineligibilityReasons_;
 

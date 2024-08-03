@@ -132,6 +132,13 @@ public class TupleCacheTest extends PlannerTestBase {
     verifyCacheIneligible("select a.id from functional.alltypes a, " +
         "functional_kudu.alltypes b where a.id = b.id");
 
+    // Verify that a limit makes a statement ineligible
+    verifyCacheIneligible("select id from functional.alltypes limit 10");
+    // A limit higher in the plan doesn't impact cache eligibility for the scan nodes.
+    verifyIdenticalCacheKeys(
+        "select a.id from functional.alltypes a, functional.alltypes b",
+        "select a.id from functional.alltypes a, functional.alltypes b limit 10");
+
     // TODO: Random functions should make a location ineligible
     // rand()/random()/uuid()
     // verifyCacheIneligible(
@@ -170,6 +177,15 @@ public class TupleCacheTest extends PlannerTestBase {
         "functional.alltypes build where probe.id = build.id",
         "select straight_join probe.id from functional.alltypes probe, " +
         "functional.alltypes build where probe.id = build.id and probe.int_col=100");
+
+    // A limit on the probe side doesn't impact eligibility on the build side.
+    verifyOverlappingCacheKeys(
+        "select straight_join probe.id from " +
+        "(select id from functional.alltypes limit 10) probe, " +
+        "functional.alltypes build where probe.id = build.id",
+        "select straight_join probe.id from " +
+        "(select id from functional.alltypes) probe, " +
+        "functional.alltypes build where probe.id = build.id");
 
     // Build side is the same. Probe side has an extra int_col = 100 filter.
     // Note that this test requires id translation, because the probe side's reference
