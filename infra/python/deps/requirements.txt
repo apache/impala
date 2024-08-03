@@ -23,10 +23,6 @@
 allpairspy == 2.5.0
 argparse == 1.4.0
 future == 0.18.3
-gcovr == 4.2
-  Jinja2 == 2.11.3
-    MarkupSafe == 1.1.1
-  lxml == 4.9.1
 hdfs == 2.0.2
   docopt == 0.6.2
   execnet == 1.4.0

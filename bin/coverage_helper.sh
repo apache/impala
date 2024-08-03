@@ -79,7 +79,8 @@ if [ ${REPORT_ACTION} -eq 1 ]; then
     --exclude=".*src/benchmarks.*" \
     --exclude=".*generated-sources/gen-cpp.*" \
     --exclude=".*src/util/bit-packing.inline.h.*" \
-    --html --html-details -o "${REPORT_DIRECTORY}/index.html" > "${REPORT_DIRECTORY}/gcovr.out"
+    --html --html-details -o "${REPORT_DIRECTORY}/index.html" \
+    > "${REPORT_DIRECTORY}/gcovr.out" 2>&1
 fi
 
 if [ ${ZERO_COUNTERS_ACTION} -eq 1 ]; then

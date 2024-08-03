@@ -30,3 +30,13 @@ pylint == 2.10.2
   platformdirs == 2.4.1
   typing-extensions == 3.10.0.2
 k5test==0.10.3
+gcovr == 7.2
+  Jinja2 == 3.1.4
+    flit-core == 3.9.0
+  lxml == 5.2.2
+    Cython == 3.0.10
+  colorlog == 6.8.2
+  Pygments == 2.13.0
+    MarkupSafe == 2.1.5
+  tomli == 2.0.1
+    packaging == 24.1
