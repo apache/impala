@@ -42,6 +42,7 @@ under the License.
        The docs included with a distro can refer to the distro release number by
        editing the values here.
        <ul>
+        <li><ph id="impala40">Impala 4.0</ph></li>
         <li><ph id="impala34">Impala 3.4</ph></li>
         <li><ph id="impala33">Impala 3.3</ph></li>
         <li><ph id="impala32">Impala 3.2</ph></li>
