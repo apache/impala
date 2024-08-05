@@ -238,8 +238,10 @@ struct TQueryOptions {
   // be rounded up to the nearest power of two.
   38: optional i32 runtime_bloom_filter_size = 1048576
 
-  // Time in ms to wait until runtime filters are delivered. If 0, the default defined
-  // by the startup flag of the same name is used.
+  // Time in ms to wait until runtime filters are delivered. Note that the wait time for
+  // a runtime filter is with respect to the start of processing the query in the given
+  // executor instead of the beginning of the Open phase of a scan node. If 0, the
+  // default defined by the startup flag of the same name is used.
   39: optional i32 runtime_filter_wait_time_ms = 0
 
   // If true, per-row runtime filtering is disabled
