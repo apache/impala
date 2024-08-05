@@ -320,7 +320,7 @@ public class AnalyticPlanner {
     return createSortInfo(input, sortExprs, isAsc, nullsFirst, TSortingOrder.LEXICAL);
   }
 
-   /**
+  /**
    * Same as above, but with extra parameter, sorting order.
    */
   private SortInfo createSortInfo(PlanNode input, List<Expr> sortExprs,
@@ -329,7 +329,14 @@ public class AnalyticPlanner {
     for (TupleId tid: input.getTupleIds()) {
       TupleDescriptor tupleDesc = analyzer_.getTupleDesc(tid);
       for (SlotDescriptor inputSlotDesc: tupleDesc.getSlots()) {
-        if (inputSlotDesc.isMaterialized()) {
+        // Only add fully materialized slot descriptors. It is possible that a slot desc
+        // shows up that is materialized but not all of its children are, see
+        // IMPALA-13272. This can happen for example if only a subset of the fields of a
+        // struct is queried - the overall struct needs to be marked materialized to allow
+        // the required children to be materialized where they are needed, but the struct
+        // as a whole does not need to be added to the sorting tuple (or any other tuple)
+        // - the required fields are added separately in their own right.
+        if (inputSlotDesc.isFullyMaterialized()) {
           // Project out collection slots that are not supported in the sorting tuple
           // (collections within structs).
           if (SortInfo.isValidInSortingTuple(inputSlotDesc.getType())) {

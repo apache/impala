@@ -276,7 +276,7 @@ public class SortInfo {
           Preconditions.checkNotNull(null);
         }
       } else if (dstType.isCollectionType()) {
-        dstSlotDesc.setIsMaterializedRecursively(true);
+        dstSlotDesc.setShouldMaterializeRecursively(true);
       }
       outputSmap_.put(srcExpr.clone(), dstExpr);
       materializedExprs_.add(srcExpr);
