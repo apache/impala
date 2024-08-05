@@ -242,12 +242,12 @@ under the License.
         <codeph>RUNTIME_FILTER_WAIT_TIME_MS</codeph> query option.
       </p>
       <p>
-        By default, each scan node waits for up to 1 second (1000 milliseconds)
-        for filters to arrive. If all filters have not arrived within the
-        specified interval, the scan node proceeds, using whatever filters
-        did arrive to help avoid reading unnecessary data. If a filter arrives
-        after the scan node begins reading data, the scan node applies that
-        filter to the data that is read after the filter arrives, but not to
+        The time is counted from the start of executing the query — see the query
+        option's doc page for details.
+        If all filters have not arrived within the specified interval, the scan node
+        proceeds, using whatever filters did arrive to help avoid reading unnecessary
+        data. If a filter arrives after the scan node begins reading data, the scan node
+        applies that filter to the data that is read after the filter arrives, but not to
         the data that was already read.
       </p>
       <p>
