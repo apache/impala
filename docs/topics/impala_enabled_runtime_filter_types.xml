@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="enabled_runtime_filter_types" rev="4.0.0">
+
+  <title>ENABLED_RUNTIME_FILTER_TYPES Query Option (<keyword keyref="impala40"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>ENABLED RUNTIME FILTER TYPES</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="4.0.0">
+      <indexterm audience="hidden">ENABLED_RUNTIME_FILTER_TYPES query option</indexterm>
+      The <codeph>ENABLED_RUNTIME_FILTER_TYPES</codeph> query option
+      sets enabled runtime filter types to be applied to scanners.
+      This option only applies to HDFS scan nodes and Kudu scan nodes.
+      The following types are supported.
+      Specify the enabled types by a comma-separated list of the following values
+      or enable all types by "<codeph>ALL</codeph>".
+      <ul>
+        <li>
+          <codeph>BLOOM</codeph>
+        </li>
+        <li>
+          <codeph>MIN_MAX</codeph>
+        </li>
+        <li>
+          <codeph>IN_LIST</codeph>
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>"BLOOM,MIN_MAX"</codeph>
+    </p>
+    <p conref="../shared/impala_common.xml#common/type_string"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_400"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/comma_separated_values_blurb"/>
+
+    <p>
+      Depending on the scan node type, Planner can schedule compatible runtime filter
+      types as follows.
+      <ul>
+        <li>Kudu scan: <codeph>BLOOM</codeph>, <codeph>MIN_MAX</codeph></li>
+        <li>
+          HDFS scan on Parquet files: <codeph>BLOOM</codeph>, <codeph>MIN_MAX</codeph>
+        </li>
+        <li>HDFS scan on ORC files: <codeph>BLOOM</codeph>, <codeph>IN_LIST</codeph></li>
+        <li>HDFS scan on other kinds of files: <codeph>BLOOM</codeph></li>
+      </ul>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_runtime_filtering.xml"/>,
+      <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/>
+    </p>
+
+  </conbody>
+</concept>
