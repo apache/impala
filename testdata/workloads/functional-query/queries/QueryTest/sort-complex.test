@@ -151,6 +151,66 @@ select id, arr_contains_nested_struct from collection_struct_mix order by id;
 INT,STRING
 ====
 ---- QUERY
+# Regression test for # IMPALA-13272
+select
+  row_no
+from (
+  select
+    arr.small,
+    row_number() over (order by arr.inner_struct1.str) as row_no
+  from collection_struct_mix t, t.arr_contains_nested_struct arr
+) res;
+---- RESULTS
+1
+2
+3
+4
+5
+6
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Regression test for # IMPALA-13272
+select
+  row_no, str
+from (
+  select
+    arr.small,
+    arr.inner_struct1.str str,
+    row_number() over (order by arr.inner_struct1.str) as row_no
+  from collection_struct_mix t, t.arr_contains_nested_struct arr
+) res;
+---- RESULTS
+1,''
+2,'a few soju distilleries'
+3,'NULL'
+4,'NULL'
+5,'NULL'
+6,'NULL'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Regression test for # IMPALA-13272
+select
+  row_no, str, small
+from (
+  select
+    arr.small,
+    arr.inner_struct2.str str,
+    row_number() over (order by arr.inner_struct2.str) as row_no
+  from collection_struct_mix t, t.arr_contains_nested_struct arr
+) res limit 4;
+---- RESULTS
+1,'four spaceship captains',2
+2,'lots of soju distilleries',105
+3,'more spaceship captains',20
+4,'very few distilleries',104
+---- TYPES
+BIGINT,STRING, SMALLINT
+====
+---- QUERY
 # Sorting is not supported yet for collections within structs: IMPALA-12160. Test with a
 # struct that contains an array.
 select id, struct_contains_arr from collection_struct_mix order by id
