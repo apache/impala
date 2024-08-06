@@ -45,7 +45,6 @@ from os import environ
 import os.path
 import re
 from subprocess import check_call, check_output, Popen, PIPE
-import sys
 import virtualenv
 
 FLAKE8_VERSION = "3.9.2"
@@ -60,7 +59,7 @@ FLAKE8_DIFF_PATH = os.path.join(VENV_BIN, "flake8-diff")
 LINE_LIMIT = 90
 
 # Source file extensions that we should apply our line limit and whitespace rules to.
-SOURCE_EXTENSIONS = set([".cc", ".h", ".java", ".py", ".sh", ".thrift"])
+SOURCE_EXTENSIONS = {".cc", ".h", ".java", ".py", ".sh", ".thrift"}
 
 # Source file patterns that we exclude from our checks.
 EXCLUDE_FILE_PATTERNS = [
@@ -74,6 +73,49 @@ EXCLUDE_FILE_PATTERNS = [
     re.compile(r".*/.*\.xml\.py")  # Long lines in config template files.
 ]
 
+# Thrift files that are not used in communication between impalad and catalogd/statestore
+EXCLUDE_THRIFT_FILES = {
+  "BackendGflags.thrift",    # Only used between FE and BE
+  "beeswax.thrift",          # Only used between client and impalad
+  "DataSinks.thrift",        # Only used in impalads
+  "Descriptors.thrift",      # Only used in impalads
+  "ExecStats.thrift",        # Only used in impalads
+  "LineageGraph.thrift",     # Only used in impalads
+  "NetworkTest.thrift",      # Unused in production
+  "Planner.thrift",          # Only used in impalads
+  "PlanNodes.thrift",        # Only used in impalads
+  "parquet.thrift",          # Only used in impalads
+  "ResourceProfile.thrift",  # Only used in impalads
+  "SystemTables.thrift",     # Only used in impalads
+  "Zip.thrift",              # Unused
+}
+
+THRIFT_FILE_COMMENT = (
+    "This file is used in communication between impalad and catalogd/statestore. "
+    "Please make sure impalads can still work with new/old versions of catalogd and "
+    "statestore. Basically only new optional fields can be added.")
+FBS_FILE_COMMENT = (
+    "This file is used in communication between impalad and catalogd/statestore. "
+    "Please make sure impalads can still work with new/old versions of catalogd and "
+    "statestore. Basically only new fields can be added and should be added at the end "
+    "of a table definition.\n"
+    "https://flatbuffers.dev/flatbuffers_guide_writing_schema.html")
+COMMENT_REVISION_SIDE = "REVISION"
+COMMENT_PARENT_SIDE = "PARENT"
+
+# Matches range information like:
+#  @@ -229,0 +230,2 @@ struct TColumnStats {
+RANGE_RE = re.compile(r"^@@ -([0-9]*).* \+([0-9]*).*@@\s*(.*)$")
+# Matches required/optional fields like:
+#  7: required i64 num_trues
+REQUIRED_FIELD_RE = re.compile(r"[0-9]*: required \w* \w*")
+OPTIONAL_FIELD_RE = re.compile(r"[0-9]*: optional \w* \w*")
+# Matches include statements like:
+#  include "Exprs.thrift"
+INCLUDE_FILE_RE = re.compile(r"include \"(\w+\.thrift)\"")
+THRIFT_WARNING_SUFFIX = (" might break the compatibility between impalad and "
+                         "catalogd/statestore during upgrade")
+
 
 def setup_virtualenv():
   """Set up virtualenv with flake8-diff."""
@@ -83,7 +125,15 @@ def setup_virtualenv():
               "flake8-diff=={0}".format(FLAKE8_DIFF_VERSION)])
 
 
-def get_flake8_comments(revision):
+def get_comment_input(message, line_number=0, side=COMMENT_REVISION_SIDE,
+                      context_line="", dryrun=False):
+  comment = {"message": message, "line": line_number, "side": side}
+  if dryrun:
+    comment["context_line"] = context_line
+  return comment
+
+
+def get_flake8_comments(base_revision, revision):
   """Get flake8 warnings for code changes made in the git commit 'revision'.
   Returns a dict with file path as keys and a list of CommentInput objects. See
   https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#review-input
@@ -93,7 +143,6 @@ def get_flake8_comments(revision):
   flake8_env = os.environ.copy()
   flake8_env["PATH"] = "{0}:{1}".format(VENV_BIN, flake8_env["PATH"])
 
-  base_revision = "{0}^".format(revision)
   flake8_diff_proc = Popen(
       [FLAKE8_DIFF_PATH, "--standard-flake8-output", "--color", "off", base_revision,
        revision],
@@ -134,7 +183,7 @@ def get_flake8_comments(revision):
   return comments
 
 
-def get_misc_comments(revision):
+def get_misc_comments(base_revision, revision, dryrun=False):
   """Get miscellaneous warnings for code changes made in the git commit 'revision', e.g.
   long lines and trailing whitespace. These warnings are produced by directly parsing the
   diff output."""
@@ -143,7 +192,7 @@ def get_misc_comments(revision):
   #  @@ -128 +133,2 @@ if __name__ == "__main__":
   RANGE_RE = re.compile(r"^@@ -[0-9,]* \+([0-9]*).*$")
 
-  diff = check_output(["git", "diff", "-U0", "{0}^..{0}".format(revision)],
+  diff = check_output(["git", "diff", "-U0", "{0}..{1}".format(base_revision, revision)],
       universal_newlines=True)
   curr_file = None
   check_source_file = False
@@ -168,35 +217,154 @@ def get_misc_comments(revision):
       curr_line_num = int(match.group(1))
     elif diff_line.startswith("+") and check_source_file:
       # An added or modified line - check it to see if we should generate warnings.
-      add_misc_comments_for_line(comments, diff_line[1:], curr_file, curr_line_num)
+      add_misc_comments_for_line(comments, diff_line[1:], curr_file, curr_line_num,
+                                 dryrun)
       curr_line_num += 1
   return comments
 
 
-def add_misc_comments_for_line(comments, line, curr_file, curr_line_num):
+def add_misc_comments_for_line(comments, line, curr_file, curr_line_num, dryrun=False):
   """Helper for get_misc_comments to generate comments for 'line' at 'curr_line_num' in
   'curr_file' and append them to 'comments'."""
   # Check for trailing whitespace.
   if line.rstrip() != line:
-    comments[curr_file].append(
-        {"message": "line has trailing whitespace", "line": curr_line_num})
+    comments[curr_file].append(get_comment_input(
+        "line has trailing whitespace", curr_line_num, context_line=line, dryrun=dryrun))
 
   # Check for long lines. Skip .py files since flake8 already flags long lines.
   if len(line) > LINE_LIMIT and os.path.splitext(curr_file)[1] != ".py":
     msg = "line too long ({0} > {1})".format(len(line), LINE_LIMIT)
-    comments[curr_file].append(
-        {"message": msg, "line": curr_line_num})
+    comments[curr_file].append(get_comment_input(
+        msg, curr_line_num, context_line=line, dryrun=dryrun))
 
   if '\t' in line:
-    comments[curr_file].append(
-        {"message": "tab used for whitespace", "line": curr_line_num})
+    comments[curr_file].append(get_comment_input(
+        "tab used for whitespace", curr_line_num, context_line=line, dryrun=dryrun))
 
-  if 'ThriftDebugString' in line:
-    comments[curr_file].append(
-        {"message": ("Please make sure you don't output sensitive data with "
-                     "ThriftDebugString(). If so, use impala::RedactedDebugString() "
-                     "instead."),
-         "line": curr_line_num })
+  if 'ThriftDebugString' in line and curr_file.startswith("be/src/"):
+    comments[curr_file].append(get_comment_input(
+        "Please make sure you don't output sensitive data with ThriftDebugString(). "
+        "If so, use impala::RedactedDebugString() instead.",
+        curr_line_num, context_line=line, dryrun=dryrun))
+
+
+def get_catalog_compatibility_comments(base_revision, revision, dryrun=False):
+  """Get comments on Thrift/FlatBuffers changes that might break the communication
+  between impalad and catalogd/statestore"""
+  comments = defaultdict(lambda: [])
+
+  diff = check_output(
+      ["git", "diff", "-U0", "{0}..{1}".format(base_revision, revision),
+       "--", "common/thrift"],
+      universal_newlines=True)
+  curr_file = None
+  check_source_file = False
+  has_concerns = False
+  in_enum_clause = False
+  is_thrift_file = False
+  # Line numbers in the old file and in the new file
+  old_line_num = 0
+  new_line_num = 0
+  for diff_line in diff.splitlines():
+    if diff_line.startswith("--- "):
+      continue
+    elif diff_line.startswith("+++ "):
+      # Start of diff for a file. Add a comment for the previous file if has concerns.
+      if curr_file and check_source_file and has_concerns:
+        comments[curr_file].append(get_comment_input(THRIFT_FILE_COMMENT))
+      # Strip off "+++ b/" to get the file path.
+      curr_file = diff_line[6:]
+      check_source_file = False
+      has_concerns = False
+      in_enum_clause = False
+      is_thrift_file = os.path.splitext(curr_file)[1] == ".thrift"
+      if is_thrift_file and os.path.basename(curr_file) not in EXCLUDE_THRIFT_FILES:
+        check_source_file = True
+    elif check_source_file and diff_line.startswith("@@ "):
+      # Figure out the starting line of the hunk. Examples:
+      #  @@ -932,0 +933,5 @@ enum TImpalaQueryOptions {
+      #  @@ -55,0 +56 @@ enum TPlanNodeType {
+      #  @@ -109 +109 @@ struct THdfsTableSink {
+      # We want to extract the start line for the added lines
+      match = RANGE_RE.match(diff_line)
+      if not match:
+        raise Exception("Pattern did not match diff line:\n{0}".format(diff_line))
+      old_line_num = int(match.group(1))
+      new_line_num = int(match.group(2))
+      in_enum_clause = match.group(3).startswith("enum ")
+    elif check_source_file and diff_line.startswith("-"):
+      # Check if deleting/modifying a required field
+      change = diff_line[1:].strip()
+      if in_enum_clause and not change.startswith("//"):
+        has_concerns = True
+        comments[curr_file].append(get_comment_input(
+          "Modifying/deleting this enum item" + THRIFT_WARNING_SUFFIX,
+          old_line_num, COMMENT_PARENT_SIDE, diff_line, dryrun))
+      elif REQUIRED_FIELD_RE.match(change):
+        has_concerns = True
+        comments[curr_file].append(get_comment_input(
+          "Modifying/deleting this required field" + THRIFT_WARNING_SUFFIX,
+          old_line_num, COMMENT_PARENT_SIDE, diff_line, dryrun))
+      elif OPTIONAL_FIELD_RE.match(change):
+        # Removing an optional field should be OK unless the field number is reused by
+        # a new optional field. Add a general comment on the file.
+        has_concerns = True
+      old_line_num += 1
+    elif is_thrift_file and diff_line.startswith("+"):
+      change = diff_line[1:].strip()
+      # Check includes in Thrift files
+      match = INCLUDE_FILE_RE.match(change)
+      # Case 1: a target file includes a whitelist file, E.g. Frontend.thrift includes
+      # LineageGraph.thrift. Future changes in LineageGraph.thrift might impact
+      # Frontend.thrift so
+      #  - LineageGraph.thrift should be removed from the whitelist (i.e.
+      #    EXCLUDE_THRIFT_FILES) if it will be used in impalad and catalogd.
+      #  - Or developers should make sure the included new fields are read/write only
+      #    in impalads or only in catalogd.
+      if match and check_source_file and match.group(1) in EXCLUDE_THRIFT_FILES:
+        comments[curr_file].append(get_comment_input(
+            "Future changes in {0} might break the compatibility between impalad and "
+            "catalogd/statestore. Please remove {0} from EXCLUDE_THRIFT_FILES in "
+            "bin/jenkins/critique-gerrit-review.py or make sure the new fields are "
+            "read/write only in impalads or only in catalogd".format(match.group(1)),
+            new_line_num, context_line=diff_line, dryrun=dryrun))
+      # Case 2: A whitelist file includes a target file, e.g. PlanNodes.thrift includes
+      # Data.thrift. Note that PlanNodes.thrift is supposed to be used inside impalad.
+      # Data.thrift is used in both impalad and catalogd. We should ensure new fields
+      # included from Data.thrift are not set from catalogd.
+      elif (match and not check_source_file
+          and match.group(1) not in EXCLUDE_THRIFT_FILES):
+        comments[curr_file].append(get_comment_input(
+            "Thrift objects in the current file are supposed to be used inside "
+            "impalads. Please make sure new fields includes from {} are not set by "
+            "catalogd.".format(match.group(1)),
+            new_line_num, context_line=diff_line, dryrun=dryrun))
+      elif check_source_file:
+        if REQUIRED_FIELD_RE.match(change):
+          has_concerns = True
+          comments[curr_file].append(get_comment_input(
+              "Modifying/adding this required field" + THRIFT_WARNING_SUFFIX,
+              new_line_num, context_line=diff_line, dryrun=dryrun))
+      new_line_num += 1
+  if curr_file and check_source_file and has_concerns:
+    comments[curr_file].append(get_comment_input(THRIFT_FILE_COMMENT))
+  merge_comments(
+      comments, get_flatbuffers_compatibility_comments(base_revision, revision))
+  return comments
+
+
+def get_flatbuffers_compatibility_comments(base_revision, revision):
+  comments = defaultdict(lambda: [])
+  diff = check_output(
+      ["git", "diff", "--numstat", "{0}..{1}".format(base_revision, revision),
+       "--", "common/fbs"],
+      universal_newlines=True)
+  for diff_line in diff.splitlines():
+    _, _, path = diff_line.split()
+    if os.path.splitext(path)[1] == ".fbs":
+      comments[path].append(get_comment_input(FBS_FILE_COMMENT))
+  return comments
+
 
 def post_review_to_gerrit(review_input):
   """Post a review to the gerrit patchset. 'review_input' is a ReviewInput JSON object
@@ -221,16 +389,31 @@ def merge_comments(a, b):
 if __name__ == "__main__":
   parser = ArgumentParser(description="Generate and post gerrit comments")
   parser.add_argument("--dryrun", action='store_true',
-                      help="Don't post comments back to gerrit")
+                      help="Don't post comments back to gerrit. Also shows the context "
+                           "lines if possible.")
+  parser.add_argument("--revision", default="HEAD",
+                      help="The revision to check. Defaults to HEAD. Note that "
+                           "flake8-diff only actually works correctly on HEAD. So "
+                           "specifying other commits might miss the results of "
+                           "flake8-diff.")
+  parser.add_argument("--base-revision",
+                      help="The base revision to check. Defaults to the parent commit of"
+                           " revision")
   args = parser.parse_args()
 
   setup_virtualenv()
-  # flake8-diff only actually works correctly on HEAD, so this is the only revision
-  # we can correctly handle.
-  revision = 'HEAD'
-  comments = get_flake8_comments(revision)
-  merge_comments(comments, get_misc_comments(revision))
+  revision = args.revision
+  base_revision = args.base_revision if args.base_revision else "{0}^".format(revision)
+  comments = get_flake8_comments(base_revision, revision)
+  merge_comments(comments, get_misc_comments(base_revision, revision, args.dryrun))
+  merge_comments(
+    comments, get_catalog_compatibility_comments(base_revision, revision, args.dryrun))
   review_input = {"comments": comments}
+  if len(comments) > 0:
+    review_input["message"] = (
+        "gerrit-auto-critic failed. You can reproduce it locally using command:\n\n"
+        "  python2 bin/jenkins/critique-gerrit-review.py --dryrun\n\n"
+        "To run it, you might need a virtual env with virtualenv installed.")
   print(json.dumps(review_input, indent=True))
   if not args.dryrun:
     post_review_to_gerrit(review_input)

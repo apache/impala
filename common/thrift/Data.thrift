@@ -33,6 +33,8 @@ struct TColumnValue {
  11: optional i32 date_val
 }
 
+// A result row returned to the client. Used in both impalad and catalogd.
+// Note that catalogd sets the summary of DDL/DMLs.
 struct TResultRow {
   1: list<TColumnValue> colVals
 }
