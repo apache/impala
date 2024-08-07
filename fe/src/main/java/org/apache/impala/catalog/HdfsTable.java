@@ -3053,6 +3053,7 @@ public class HdfsTable extends Table implements FeFsTable {
           || HdfsPartition.comparePartitionKeyValues(
           oldPartition.getPartitionValues(), partBuilder.getPartitionValues()) == 0);
       if (oldPartition != null) {
+        partBuilder.setPrevId(oldPartition.getId());
         partBuilder.setFileDescriptors(oldPartition);
         partBuilder.setCreateEventId(oldPartition.getCreateEventId());
         partBuilder.setLastCompactionId(oldPartition.getLastCompactionId());

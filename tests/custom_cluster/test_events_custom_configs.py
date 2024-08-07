@@ -1307,6 +1307,28 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     verify_partition(True)
     verify_partition(False)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=5",
+    cluster_size=1)
+  def test_invalidate_stale_partition_on_reload(self, unique_database):
+    test_tbl = unique_database + ".test_invalidate_table"
+    self.client.execute("create table {} (id int) partitioned by (p int)"
+        .format(test_tbl))
+    self.client.execute("alter table {} add partition (p=0)".format(test_tbl))
+    self.client.execute("alter table {} add partition (p=1)".format(test_tbl))
+    self.client.execute("alter table {} add partition (p=2)".format(test_tbl))
+    self.run_stmt_in_hive("SET hive.exec.dynamic.partition.mode=nonstrict; "
+        "insert into {} partition(p) values (0,0),(1,1),(2,2)".format(test_tbl))
+    self.client.execute("select * from {}".format(test_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    log_regex = r"Invalidated objects in cache: \[partition %s:p=\d \(id=%%d\)\]" \
+        % test_tbl
+    self.assert_impalad_log_contains('INFO', log_regex % 0)
+    self.assert_impalad_log_contains('INFO', log_regex % 1)
+    self.assert_impalad_log_contains('INFO', log_regex % 2)
+
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
   """This class contains tests that exercise the event processing mechanism in the

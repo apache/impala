@@ -574,6 +574,23 @@ class TestLocalCatalogObservability(CustomClusterTestSuite):
     assert 1 == impalad.get_metric_value(
         "catalog.server.client-cache.total-clients-for-lightweight-rpc")
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=0",
+    cluster_size=1)
+  def test_invalidate_stale_partition_on_reload(self, unique_database):
+    test_tbl = unique_database + ".test_invalidate_table"
+    self.client.execute(
+        "create table {} (id int) partitioned by (p int)".format(test_tbl))
+    self.client.execute("alter table {} add partition (p=0)".format(test_tbl))
+    # Make the partition loaded in the coordinator, so that one instance needs to be
+    # invalidated when the partition is reloaded.
+    self.client.execute("show partitions {}".format(test_tbl))
+    self.client.execute("refresh {} partition(p=0)".format(test_tbl))
+    log_regex = r"Invalidated objects in cache: \[partition %s:p=0 \(id=0\)\]" \
+        % test_tbl
+    self.assert_impalad_log_contains('INFO', log_regex)
 
 class TestFullAcid(CustomClusterTestSuite):
   @classmethod
