@@ -126,43 +126,9 @@ Status ChildQuery::ExecAndFetch() {
   return status;
 }
 
-template <typename T>
-void PrintQueryOptionValue (const T& option, stringstream& val) {
-  val << option;
-}
-
-void PrintQueryOptionValue(const impala::TCompressionCodec& compression_codec,
-    stringstream& val) {
-  if (compression_codec.codec != THdfsCompression::ZSTD) {
-    val << compression_codec.codec;
-  } else {
-    val << compression_codec.codec << ":" << compression_codec.compression_level;
-  }
-}
-
-void PrintQueryOptionValue(const set<impala::TRuntimeFilterType::type>& filter_types,
-    stringstream& val) {
-  val << filter_types;
-}
-
-void PrintQueryOptionValue(const std::set<int32_t>& filter_ids, stringstream& val) {
-  val << filter_ids;
-}
-
 void ChildQuery::SetQueryOptions(TExecuteStatementReq* exec_stmt_req) {
   map<string, string> conf;
-  const TQueryOptions& parent_options =
-      parent_request_state_->exec_request().query_options;
-#define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
-  if (parent_options.__isset.NAME) {\
-    stringstream val;\
-    PrintQueryOptionValue(parent_options.NAME, val);\
-    conf[#ENUM] = val.str();\
-  }
-#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
-  QUERY_OPTS_TABLE
-#undef QUERY_OPT_FN
-#undef REMOVED_QUERY_OPT_FN
+  TQueryOptionsToMap(parent_request_state_->exec_request().query_options, &conf);
   // Ignore debug actions on child queries because they may cause deadlock.
   map<string, string>::iterator it = conf.find("DEBUG_ACTION");
   if (it != conf.end()) conf.erase(it);

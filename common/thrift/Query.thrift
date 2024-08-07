@@ -144,6 +144,12 @@ const i32 MAX_FRAGMENT_INSTANCES_PER_NODE = 128
 // Conservative minimum size of hash table for low-cardinality aggregations.
 const i64 MIN_HASH_TBL_MEM = 10485760  // 10MB
 
+// Used to represent a 128-bit hash of query option values that are relevant to a cache.
+struct TQueryOptionsHash {
+  1: required i64 hi
+  2: required i64 lo
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -927,6 +933,9 @@ struct TQueryCtx {
 
   // True if the query can be optimized for Iceberg V2 table.
   30: required bool optimize_count_star_for_iceberg_v2 = false
+
+  // 128-bit hash representing query option values that affect query results.
+  31: optional TQueryOptionsHash query_options_result_hash
 }
 
 

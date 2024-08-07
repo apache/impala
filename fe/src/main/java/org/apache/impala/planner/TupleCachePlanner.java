@@ -52,7 +52,8 @@ public class TupleCachePlanner {
     // Start at the root of the PlanNode tree
     PlanNode root = plan.get(0).getPlanRoot();
     // Step 1: Compute the TupleCacheInfo for all PlanNodes
-    root.computeTupleCacheInfo(ctx_.getRootAnalyzer().getDescTbl());
+    root.computeTupleCacheInfo(ctx_.getRootAnalyzer().getDescTbl(),
+        ctx_.getRootAnalyzer().getQueryCtx().query_options_result_hash);
 
     // Step 2: Build up the new PlanNode tree with TupleCacheNodes added
     PlanNode newRoot = buildCachingPlan(root);

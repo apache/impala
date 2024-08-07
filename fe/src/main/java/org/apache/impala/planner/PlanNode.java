@@ -54,6 +54,7 @@ import org.apache.impala.thrift.TPlan;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.thrift.TQueryOptionsHash;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExprUtil;
 import org.slf4j.Logger;
@@ -1323,7 +1324,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * This computes the cache key by hashing Thrift structures, but it only computes
    * the key if the node is eligible to avoid overhead.
    */
-  public void computeTupleCacheInfo(DescriptorTable descTbl) {
+  public void computeTupleCacheInfo(DescriptorTable descTbl,
+      TQueryOptionsHash queryOptsHash) {
     if (tupleCacheInfo_ != null) {
       // Already computed.
       LOG.trace("Tuple cache found for {}", this);
@@ -1335,7 +1337,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // computing the tuple cache information is a bottom-up tree traversal,
     // so visit and merge the children before processing this node's contents
     for (PlanNode child : getChildren()) {
-      child.computeTupleCacheInfo(descTbl);
+      child.computeTupleCacheInfo(descTbl, queryOptsHash);
       if (!tupleCacheInfo_.mergeChild(child.getTupleCacheInfo())) {
         LOG.trace("{} ineligible for caching due to {}", this, child);
       }
@@ -1367,7 +1369,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       }
 
       // Build may not have been visited yet.
-      build.computeTupleCacheInfo(descTbl);
+      build.computeTupleCacheInfo(descTbl, queryOptsHash);
       if (!tupleCacheInfo_.mergeChildWithScans(build.getTupleCacheInfo())) {
         LOG.trace("{} on {} ineligible for caching due to {}", filter, this, build);
         tupleCacheInfo_.finalizeHash();
@@ -1383,6 +1385,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     initThrift(msg, serialCtx);
     toThrift(msg, serialCtx);
     tupleCacheInfo_.hashThrift(msg);
+    if (getChildCount() == 0 && queryOptsHash != null) {
+      // Leaf node, add query options hash.
+      tupleCacheInfo_.hashThrift(queryOptsHash);
+    }
     tupleCacheInfo_.finalizeHash();
     LOG.trace("Hash for {}: {}", this, tupleCacheInfo_.getHashTrace());
   }

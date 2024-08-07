@@ -168,7 +168,8 @@ class TestTupleCache(TestTupleCacheBase):
     assertCounters(result2.runtime_profile, num_hits=0, num_halted=0, num_skipped=1)
 
   @CustomClusterTestSuite.with_args(
-    start_args=CACHE_START_ARGS, cluster_size=1)
+    start_args=CACHE_START_ARGS, cluster_size=1,
+    impalad_args="--tuple_cache_ignore_query_options=true")
   @pytest.mark.execute_serially
   def test_failpoints(self, vector, unique_database):
     fq_table = "{0}.failpoints".format(unique_database)
@@ -367,6 +368,90 @@ class TestTupleCache(TestTupleCacheBase):
     assert base_result.data == reload_result.data
     assert base_cache_keys == reload_cache_keys
     # Skips verifying cache hits as fragments may not be assigned to the same nodes.
+
+  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_non_exempt_query_options(self, vector, unique_database):
+    """Non-exempt query options result in different cache entries"""
+    fq_table = "{0}.query_options".format(unique_database)
+    self.create_table(fq_table)
+    query = "SELECT * from {0}".format(fq_table)
+
+    strict_true = dict(vector.get_value('exec_option'))
+    strict_true['strict_mode'] = 'true'
+    strict_false = dict(vector.get_value('exec_option'))
+    strict_false['strict_mode'] = 'false'
+
+    noexempt1 = self.execute_query(query, query_options=strict_false)
+    noexempt2 = self.execute_query(query, query_options=strict_true)
+    noexempt3 = self.execute_query(query, query_options=strict_false)
+    noexempt4 = self.execute_query(query, query_options=strict_true)
+    noexempt5 = self.execute_query(query, query_options=vector.get_value('exec_option'))
+
+    assert noexempt1.success
+    assert noexempt2.success
+    assert noexempt3.success
+    assert noexempt4.success
+    assert noexempt5.success
+    assert noexempt1.data == noexempt2.data
+    assert noexempt1.data == noexempt3.data
+    assert noexempt1.data == noexempt4.data
+    assert noexempt1.data == noexempt5.data
+    assertCounters(noexempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(noexempt2.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(noexempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(noexempt4.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(noexempt5.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+
+  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_exempt_query_options(self, vector, unique_database):
+    """Exempt query options share cache entry"""
+    fq_table = "{0}.query_options".format(unique_database)
+    self.create_table(fq_table)
+    query = "SELECT * from {0}".format(fq_table)
+
+    codegen_false = dict(vector.get_value('exec_option'))
+    codegen_false['disable_codegen'] = 'true'
+    codegen_true = dict(vector.get_value('exec_option'))
+    codegen_true['disable_codegen'] = 'false'
+
+    exempt1 = self.execute_query(query, query_options=codegen_true)
+    exempt2 = self.execute_query(query, query_options=codegen_false)
+    exempt3 = self.execute_query(query, query_options=vector.get_value('exec_option'))
+    assert exempt1.success
+    assert exempt2.success
+    assert exempt1.data == exempt2.data
+    assert exempt1.data == exempt3.data
+    assertCounters(exempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(exempt2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(exempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+
+  @CustomClusterTestSuite.with_args(
+      start_args=CACHE_START_ARGS, cluster_size=1,
+      impalad_args='--tuple_cache_exempt_query_options=max_errors,exec_time_limit_s')
+  @pytest.mark.execute_serially
+  def test_custom_exempt_query_options(self, vector, unique_database):
+    """Custom list of exempt query options share cache entry"""
+    fq_table = "{0}.query_options".format(unique_database)
+    self.create_table(fq_table)
+    query = "SELECT * from {0}".format(fq_table)
+
+    errors_10 = dict(vector.get_value('exec_option'))
+    errors_10['max_errors'] = '10'
+    exec_time_limit = dict(vector.get_value('exec_option'))
+    exec_time_limit['exec_time_limit_s'] = '30'
+
+    exempt1 = self.execute_query(query, query_options=errors_10)
+    exempt2 = self.execute_query(query, query_options=exec_time_limit)
+    exempt3 = self.execute_query(query, query_options=vector.get_value('exec_option'))
+    assert exempt1.success
+    assert exempt2.success
+    assert exempt1.data == exempt2.data
+    assert exempt1.data == exempt3.data
+    assertCounters(exempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(exempt2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(exempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
 
 
 class TestTupleCacheRuntimeKeysBasic(TestTupleCacheBase):

@@ -15,15 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_SERVICE_QUERY_OPTIONS_H
-#define IMPALA_SERVICE_QUERY_OPTIONS_H
+#pragma once
 
-#include <string>
-#include <map>
-#include <unordered_map>
 #include <bitset>
+#include <map>
+#include <string>
+#include <unordered_map>
 
 #include "common/status.h"
+#include "gen-cpp/Query_types.h"  // for TQueryOptionsHash
 
 /// Utility methods to process per-query options
 
@@ -50,9 +50,10 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // option in the enum TImpalaQueryOptions (defined in ImpalaService.thrift)
 // plus one. Thus, the second argument to the DCHECK has to be updated every
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
+constexpr unsigned NUM_QUERY_OPTIONS =
+    TImpalaQueryOptions::ENABLE_TUPLE_CACHE_VERIFICATION + 1;
 #define QUERY_OPTS_TABLE                                                                 \
-  DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),                                 \
-      TImpalaQueryOptions::ENABLE_TUPLE_CACHE_VERIFICATION + 1);                         \
+  DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(), NUM_QUERY_OPTIONS);             \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)               \
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)             \
@@ -62,25 +63,30 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   REMOVED_QUERY_OPT_FN(disable_cached_reads, DISABLE_CACHED_READS)                       \
   QUERY_OPT_FN(                                                                          \
       disable_outermost_topn, DISABLE_OUTERMOST_TOPN, TQueryOptionLevel::DEVELOPMENT)    \
-  QUERY_OPT_FN(disable_codegen, DISABLE_CODEGEN, TQueryOptionLevel::REGULAR)             \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(disable_codegen, DISABLE_CODEGEN,                      \
+      TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(explain_level, EXPLAIN_LEVEL, TQueryOptionLevel::REGULAR)                 \
-  QUERY_OPT_FN(hbase_cache_blocks, HBASE_CACHE_BLOCKS, TQueryOptionLevel::ADVANCED)      \
-  QUERY_OPT_FN(hbase_caching, HBASE_CACHING, TQueryOptionLevel::ADVANCED)                \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(hbase_cache_blocks, HBASE_CACHE_BLOCKS,                \
+      TQueryOptionLevel::ADVANCED)                                                       \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(hbase_caching, HBASE_CACHING,                          \
+      TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(max_errors, MAX_ERRORS, TQueryOptionLevel::ADVANCED)                      \
   REMOVED_QUERY_OPT_FN(max_io_buffers, MAX_IO_BUFFERS)                                   \
   QUERY_OPT_FN(                                                                          \
       max_scan_range_length, MAX_SCAN_RANGE_LENGTH, TQueryOptionLevel::DEVELOPMENT)      \
-  QUERY_OPT_FN(mem_limit, MEM_LIMIT, TQueryOptionLevel::REGULAR)                         \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(mem_limit, MEM_LIMIT, TQueryOptionLevel::REGULAR)      \
   QUERY_OPT_FN(num_nodes, NUM_NODES, TQueryOptionLevel::DEVELOPMENT)                     \
-  QUERY_OPT_FN(num_scanner_threads, NUM_SCANNER_THREADS, TQueryOptionLevel::REGULAR)     \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(num_scanner_threads, NUM_SCANNER_THREADS,              \
+      TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(compression_codec, COMPRESSION_CODEC, TQueryOptionLevel::REGULAR)         \
   QUERY_OPT_FN(parquet_file_size, PARQUET_FILE_SIZE, TQueryOptionLevel::ADVANCED)        \
-  QUERY_OPT_FN(request_pool, REQUEST_POOL, TQueryOptionLevel::REGULAR)                   \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(request_pool, REQUEST_POOL, TQueryOptionLevel::REGULAR)\
   REMOVED_QUERY_OPT_FN(reservation_request_timeout, RESERVATION_REQUEST_TIMEOUT)         \
-  QUERY_OPT_FN(sync_ddl, SYNC_DDL, TQueryOptionLevel::REGULAR)                           \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(sync_ddl, SYNC_DDL, TQueryOptionLevel::REGULAR)        \
   REMOVED_QUERY_OPT_FN(v_cpu_cores, V_CPU_CORES)                                         \
   REMOVED_QUERY_OPT_FN(rm_initial_mem, RM_INITIAL_MEM)                                   \
-  QUERY_OPT_FN(query_timeout_s, QUERY_TIMEOUT_S, TQueryOptionLevel::REGULAR)             \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(query_timeout_s, QUERY_TIMEOUT_S,                      \
+      TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(buffer_pool_limit, BUFFER_POOL_LIMIT, TQueryOptionLevel::ADVANCED)        \
   QUERY_OPT_FN(appx_count_distinct, APPX_COUNT_DISTINCT, TQueryOptionLevel::ADVANCED)    \
   QUERY_OPT_FN(disable_unsafe_spills, DISABLE_UNSAFE_SPILLS, TQueryOptionLevel::REGULAR) \
@@ -117,9 +123,12 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       runtime_filter_max_size, RUNTIME_FILTER_MAX_SIZE, TQueryOptionLevel::ADVANCED)     \
   QUERY_OPT_FN(prefetch_mode, PREFETCH_MODE, TQueryOptionLevel::ADVANCED)                \
   QUERY_OPT_FN(strict_mode, STRICT_MODE, TQueryOptionLevel::DEVELOPMENT)                 \
-  QUERY_OPT_FN(scratch_limit, SCRATCH_LIMIT, TQueryOptionLevel::REGULAR)                 \
-  QUERY_OPT_FN(enable_expr_rewrites, ENABLE_EXPR_REWRITES, TQueryOptionLevel::ADVANCED)  \
-  QUERY_OPT_FN(enable_cnf_rewrites, ENABLE_CNF_REWRITES, TQueryOptionLevel::ADVANCED)    \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(scratch_limit, SCRATCH_LIMIT,                          \
+      TQueryOptionLevel::REGULAR)                                                        \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(enable_expr_rewrites, ENABLE_EXPR_REWRITES,            \
+      TQueryOptionLevel::ADVANCED)                                                       \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(enable_cnf_rewrites, ENABLE_CNF_REWRITES,              \
+      TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(decimal_v2, DECIMAL_V2, TQueryOptionLevel::DEVELOPMENT)                   \
   QUERY_OPT_FN(parquet_dictionary_filtering, PARQUET_DICTIONARY_FILTERING,               \
       TQueryOptionLevel::ADVANCED)                                                       \
@@ -129,14 +138,15 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       parquet_read_statistics, PARQUET_READ_STATISTICS, TQueryOptionLevel::ADVANCED)     \
   QUERY_OPT_FN(default_join_distribution_mode, DEFAULT_JOIN_DISTRIBUTION_MODE,           \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(disable_codegen_rows_threshold, DISABLE_CODEGEN_ROWS_THRESHOLD,           \
-      TQueryOptionLevel::ADVANCED)                                                       \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(disable_codegen_rows_threshold,                        \
+      DISABLE_CODEGEN_ROWS_THRESHOLD, TQueryOptionLevel::ADVANCED)                       \
   QUERY_OPT_FN(default_spillable_buffer_size, DEFAULT_SPILLABLE_BUFFER_SIZE,             \
       TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(                                                                          \
       min_spillable_buffer_size, MIN_SPILLABLE_BUFFER_SIZE, TQueryOptionLevel::ADVANCED) \
   QUERY_OPT_FN(max_row_size, MAX_ROW_SIZE, TQueryOptionLevel::REGULAR)                   \
-  QUERY_OPT_FN(idle_session_timeout, IDLE_SESSION_TIMEOUT, TQueryOptionLevel::REGULAR)   \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(idle_session_timeout, IDLE_SESSION_TIMEOUT,            \
+      TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(compute_stats_min_sample_size, COMPUTE_STATS_MIN_SAMPLE_SIZE,             \
       TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(exec_time_limit_s, EXEC_TIME_LIMIT_S, TQueryOptionLevel::REGULAR)         \
@@ -155,7 +165,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(scan_bytes_limit, SCAN_BYTES_LIMIT, TQueryOptionLevel::ADVANCED)          \
   QUERY_OPT_FN(cpu_limit_s, CPU_LIMIT_S, TQueryOptionLevel::DEVELOPMENT)                 \
   QUERY_OPT_FN(topn_bytes_limit, TOPN_BYTES_LIMIT, TQueryOptionLevel::ADVANCED)          \
-  QUERY_OPT_FN(client_identifier, CLIENT_IDENTIFIER, TQueryOptionLevel::ADVANCED)        \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(client_identifier, CLIENT_IDENTIFIER,                  \
+      TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(resource_trace_ratio, RESOURCE_TRACE_RATIO, TQueryOptionLevel::ADVANCED)  \
   QUERY_OPT_FN(num_remote_executor_candidates, NUM_REMOTE_EXECUTOR_CANDIDATES,           \
       TQueryOptionLevel::ADVANCED)                                                       \
@@ -176,36 +187,41 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(default_hints_insert_statement, DEFAULT_HINTS_INSERT_STATEMENT,           \
       TQueryOptionLevel::REGULAR)                                                        \
-  QUERY_OPT_FN(spool_query_results, SPOOL_QUERY_RESULTS, TQueryOptionLevel::DEVELOPMENT) \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(spool_query_results, SPOOL_QUERY_RESULTS,              \
+      TQueryOptionLevel::DEVELOPMENT)                                                    \
   QUERY_OPT_FN(default_transactional_type, DEFAULT_TRANSACTIONAL_TYPE,                   \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(statement_expression_limit, STATEMENT_EXPRESSION_LIMIT,                   \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(statement_expression_limit, STATEMENT_EXPRESSION_LIMIT,\
       TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(max_statement_length_bytes, MAX_STATEMENT_LENGTH_BYTES,                   \
       TQueryOptionLevel::REGULAR)                                                        \
-  QUERY_OPT_FN(disable_data_cache, DISABLE_DATA_CACHE, TQueryOptionLevel::ADVANCED)      \
-  QUERY_OPT_FN(                                                                          \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(disable_data_cache, DISABLE_DATA_CACHE,                \
+      TQueryOptionLevel::ADVANCED)                                                       \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(                                                       \
       max_result_spooling_mem, MAX_RESULT_SPOOLING_MEM, TQueryOptionLevel::DEVELOPMENT)  \
-  QUERY_OPT_FN(max_spilled_result_spooling_mem, MAX_SPILLED_RESULT_SPOOLING_MEM,         \
-      TQueryOptionLevel::DEVELOPMENT)                                                    \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(max_spilled_result_spooling_mem,                       \
+      MAX_SPILLED_RESULT_SPOOLING_MEM, TQueryOptionLevel::DEVELOPMENT)                   \
   QUERY_OPT_FN(disable_hbase_num_rows_estimate, DISABLE_HBASE_NUM_ROWS_ESTIMATE,         \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(                                                                          \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(                                                       \
       fetch_rows_timeout_ms, FETCH_ROWS_TIMEOUT_MS, TQueryOptionLevel::ADVANCED)         \
   QUERY_OPT_FN(now_string, NOW_STRING, TQueryOptionLevel::DEVELOPMENT)                   \
   QUERY_OPT_FN(parquet_object_store_split_size, PARQUET_OBJECT_STORE_SPLIT_SIZE,         \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(mem_limit_executors, MEM_LIMIT_EXECUTORS, TQueryOptionLevel::ADVANCED)    \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(mem_limit_executors, MEM_LIMIT_EXECUTORS,              \
+      TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(                                                                          \
       broadcast_bytes_limit, BROADCAST_BYTES_LIMIT, TQueryOptionLevel::ADVANCED)         \
   QUERY_OPT_FN(preagg_bytes_limit, PREAGG_BYTES_LIMIT, TQueryOptionLevel::ADVANCED)      \
   QUERY_OPT_FN(max_cnf_exprs, MAX_CNF_EXPRS, TQueryOptionLevel::ADVANCED)                \
   QUERY_OPT_FN(kudu_snapshot_read_timestamp_micros, KUDU_SNAPSHOT_READ_TIMESTAMP_MICROS, \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(retry_failed_queries, RETRY_FAILED_QUERIES, TQueryOptionLevel::REGULAR)   \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(retry_failed_queries, RETRY_FAILED_QUERIES,            \
+      TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(enabled_runtime_filter_types, ENABLED_RUNTIME_FILTER_TYPES,               \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(async_codegen, ASYNC_CODEGEN, TQueryOptionLevel::DEVELOPMENT)             \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(async_codegen, ASYNC_CODEGEN,                          \
+      TQueryOptionLevel::DEVELOPMENT)                                                    \
   QUERY_OPT_FN(enable_distinct_semi_join_optimization,                                   \
       ENABLE_DISTINCT_SEMI_JOIN_OPTIMIZATION, TQueryOptionLevel::ADVANCED)               \
   QUERY_OPT_FN(sort_run_bytes_limit, SORT_RUN_BYTES_LIMIT, TQueryOptionLevel::ADVANCED)  \
@@ -224,7 +240,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION, TQueryOptionLevel::ADVANCED)            \
   QUERY_OPT_FN(targeted_kudu_scan_range_length, TARGETED_KUDU_SCAN_RANGE_LENGTH,         \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(report_skew_limit, REPORT_SKEW_LIMIT, TQueryOptionLevel::ADVANCED)        \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(report_skew_limit, REPORT_SKEW_LIMIT,                  \
+      TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(optimize_simple_limit, OPTIMIZE_SIMPLE_LIMIT, TQueryOptionLevel::REGULAR) \
   QUERY_OPT_FN(use_dop_for_costing, USE_DOP_FOR_COSTING, TQueryOptionLevel::ADVANCED)    \
   QUERY_OPT_FN(broadcast_to_partition_factor, BROADCAST_TO_PARTITION_FACTOR,             \
@@ -280,9 +297,10 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(expand_complex_types, EXPAND_COMPLEX_TYPES, TQueryOptionLevel::REGULAR)   \
   QUERY_OPT_FN(                                                                          \
       fallback_db_for_functions, FALLBACK_DB_FOR_FUNCTIONS, TQueryOptionLevel::ADVANCED) \
-  QUERY_OPT_FN(                                                                          \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(                                                       \
       disable_codegen_cache, DISABLE_CODEGEN_CACHE, TQueryOptionLevel::ADVANCED)         \
-  QUERY_OPT_FN(codegen_cache_mode, CODEGEN_CACHE_MODE, TQueryOptionLevel::DEVELOPMENT)   \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(codegen_cache_mode, CODEGEN_CACHE_MODE,                \
+      TQueryOptionLevel::DEVELOPMENT)                                                    \
   QUERY_OPT_FN(stringify_map_keys, STRINGIFY_MAP_KEYS, TQueryOptionLevel::ADVANCED)      \
   QUERY_OPT_FN(enable_trivial_query_for_admission, ENABLE_TRIVIAL_QUERY_FOR_ADMISSION,   \
       TQueryOptionLevel::REGULAR)                                                        \
@@ -306,13 +324,14 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       large_agg_mem_threshold, LARGE_AGG_MEM_THRESHOLD, TQueryOptionLevel::ADVANCED)     \
   QUERY_OPT_FN(agg_mem_correlation_factor, AGG_MEM_CORRELATION_FACTOR,                   \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(mem_limit_coordinators, MEM_LIMIT_COORDINATORS,                           \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(mem_limit_coordinators, MEM_LIMIT_COORDINATORS,        \
       TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(iceberg_predicate_pushdown_subsetting,                                    \
       ICEBERG_PREDICATE_PUSHDOWN_SUBSETTING, TQueryOptionLevel::DEVELOPMENT)             \
   QUERY_OPT_FN(hdfs_scanner_non_reserved_bytes, HDFS_SCANNER_NON_RESERVED_BYTES,         \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(codegen_opt_level, CODEGEN_OPT_LEVEL, TQueryOptionLevel::ADVANCED)        \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(codegen_opt_level, CODEGEN_OPT_LEVEL,                  \
+      TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(kudu_table_reserve_seconds, KUDU_TABLE_RESERVE_SECONDS,                   \
       TQueryOptionLevel::ADVANCED)                                                       \
   QUERY_OPT_FN(convert_kudu_utc_timestamps,                                              \
@@ -337,7 +356,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       WRITE_KUDU_UTC_TIMESTAMPS, TQueryOptionLevel::ADVANCED)                            \
   QUERY_OPT_FN(disable_optimized_json_count_star, DISABLE_OPTIMIZED_JSON_COUNT_STAR,     \
       TQueryOptionLevel::ADVANCED)                                                       \
-  QUERY_OPT_FN(long_polling_time_ms, LONG_POLLING_TIME_MS, TQueryOptionLevel::REGULAR)   \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(long_polling_time_ms, LONG_POLLING_TIME_MS,            \
+      TQueryOptionLevel::REGULAR)                                                        \
   QUERY_OPT_FN(enable_tuple_cache_verification, ENABLE_TUPLE_CACHE_VERIFICATION,         \
       TQueryOptionLevel::ADVANCED)                                                       \
   ;
@@ -364,8 +384,7 @@ void TQueryOptionsToMap(const TQueryOptions& query_options,
 std::string DebugQueryOptions(const TQueryOptions& query_options);
 
 /// Bitmask for the values of TQueryOptions.
-/// TODO: Find a way to set the size based on the number of fields.
-typedef std::bitset<192> QueryOptionsMask;
+typedef std::bitset<NUM_QUERY_OPTIONS> QueryOptionsMask;
 
 /// Updates the query options in dst from those in src where the query option is set
 /// (i.e. src->__isset.PROPERTY is true) and the corresponding bit in mask is set. If
@@ -406,10 +425,11 @@ Status ParseQueryOptions(const std::string& options, TQueryOptions* query_option
 /// entries.
 void PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels);
 
+/// Returns a hash of query option values that may modify fragment or query level results.
+TQueryOptionsHash QueryOptionsResultHash(const TQueryOptions& query_options);
+
 /// Reset all query options to its default value if they are not equal to default value.
 /// The bit corresponding to query option 'key' in set_query_options_mask is unset.
 Status ResetAllQueryOptions(
     TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask);
 }
-
-#endif

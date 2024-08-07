@@ -209,6 +209,7 @@ enum TImpalaQueryOptions {
   // If true, the planner will not generate plans with streaming preaggregations.
   DISABLE_STREAMING_PREAGGREGATIONS = 35
 
+  // Select between off, local, or global runtime filters.
   RUNTIME_FILTER_MODE = 36
 
   // Size (in bytes) of a runtime Bloom Filter. Will be rounded up to nearest power of
@@ -472,7 +473,7 @@ enum TImpalaQueryOptions {
   // The maximum amount of time, in milliseconds, a fetch rows request (TFetchResultsReq)
   // from the client should spend fetching results (including waiting for results to
   // become available and materialize). When result spooling is enabled, a fetch request
-  // to may read multiple RowBatches, in which case, the timeout controls how long the
+  // may read multiple RowBatches, in which case, the timeout controls how long the
   // client waits for all returned RowBatches to be produced. If the timeout is hit, the
   // client returns whatever rows it has already read. Defaults to 10000 milliseconds. A
   // value of 0 causes fetch requests to wait indefinitely.
@@ -512,7 +513,7 @@ enum TImpalaQueryOptions {
   PREAGG_BYTES_LIMIT = 98
 
   // Indicates whether the FE should rewrite disjunctive predicates to conjunctive
-  // normal form (CNF) for optimization purposes. Default is False.
+  // normal form (CNF) for optimization purposes. Default is true.
   ENABLE_CNF_REWRITES = 99
 
   // The max number of conjunctive normal form (CNF) exprs to create when converting

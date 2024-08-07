@@ -1404,6 +1404,8 @@ void ImpalaServer::PrepareQueryContext(const std::string& hostname,
   query_ctx->__set_status_report_interval_ms(FLAGS_status_report_interval_ms);
   query_ctx->__set_status_report_max_retry_s(FLAGS_status_report_max_retry_s);
   query_ctx->__set_gen_aggregated_profile(FLAGS_gen_experimental_profile);
+  query_ctx->__set_query_options_result_hash(
+      QueryOptionsResultHash(query_ctx->client_request.query_options));
 
   // Creating a random_generator every time is not free, but
   // benchmarks show it to be slightly cheaper than contending for a

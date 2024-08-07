@@ -88,18 +88,15 @@ MURMUR3_FORCE_INLINE uint64_t fmix64 ( uint64_t k )
   return k;
 }
 
-MURMUR3_FORCE_INLINE void MurmurHash3_x64_128(const void* key, int lenBytes, uint64_t seed, HashState& out) {
+MURMUR3_FORCE_INLINE void MurmurHash3_x64_128(const void* key, int lenBytes, HashState& out) {
   static const uint64_t c1 = MURMUR3_BIG_CONSTANT(0x87c37b91114253d5);
   static const uint64_t c2 = MURMUR3_BIG_CONSTANT(0x4cf5ad432745937f);
 
   const uint8_t* data = (const uint8_t*)key;
 
-  out.h1 = seed;
-  out.h2 = seed;
-
   // Number of full 128-bit blocks of 16 bytes.
   // Possible exclusion of a remainder of up to 15 bytes.
-  const int nblocks = lenBytes >> 4; // bytes / 16 
+  const int nblocks = lenBytes >> 4; // bytes / 16
 
   // Process the 128-bit blocks (the body) into the hash
   const uint64_t* blocks = (const uint64_t*)(data);
@@ -160,6 +157,12 @@ MURMUR3_FORCE_INLINE void MurmurHash3_x64_128(const void* key, int lenBytes, uin
 
   out.h1 += out.h2;
   out.h2 += out.h1;
+}
+
+MURMUR3_FORCE_INLINE void MurmurHash3_x64_128(const void* key, int lenBytes, uint64_t seed, HashState& out) {
+  out.h1 = seed;
+  out.h2 = seed;
+  MurmurHash3_x64_128(key, lenBytes, out);
 }
 
 //-----------------------------------------------------------------------------

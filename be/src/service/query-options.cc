@@ -21,8 +21,10 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 
 #include <boost/algorithm/string.hpp>
+#include <gutil/strings/split.h>
 #include <gutil/strings/strip.h>
 #include <gutil/strings/substitute.h>
 
@@ -31,6 +33,7 @@
 #include "gen-cpp/Query_constants.h"
 #include "runtime/runtime-filter.h"
 #include "service/query-option-parser.h"
+#include "thirdparty/datasketches/MurmurHash3.h"
 #include "util/debug-util.h"
 #include "util/parse-util.h"
 
@@ -46,12 +49,24 @@ using std::to_string;
 using namespace impala;
 using namespace strings;
 
+DEFINE_bool_hidden(tuple_cache_ignore_query_options, false,
+    "If true, don't compute TQueryOptionsHash for tuple caching to allow testing tuple "
+    "caching failure modes.");
+
+DEFINE_string_hidden(tuple_cache_exempt_query_options, "",
+    "A comma-separated list of additional query options to exclude from the tuple cache "
+    "key. Option names must be lower-case.");
+DEFINE_validator(tuple_cache_exempt_query_options, [](const char* name,
+    const string& val) { return none_of(val.begin(), val.end(), isupper); });
+
 DECLARE_int32(idle_session_timeout);
 DECLARE_bool(allow_tuple_caching);
 
+#define TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(NAME, ENUM, LEVEL) QUERY_OPT_FN(NAME, ENUM, LEVEL)
+
 void impala::OverlayQueryOptions(
     const TQueryOptions& src, const QueryOptionsMask& mask, TQueryOptions* dst) {
-  DCHECK_GT(mask.size(), _TImpalaQueryOptions_VALUES_TO_NAMES.size())
+  DCHECK_GE(mask.size(), _TImpalaQueryOptions_VALUES_TO_NAMES.size())
       << "Size of QueryOptionsMask must be increased.";
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL) \
   if (src.__isset.NAME && mask[TImpalaQueryOptions::ENUM]) dst->__set_##NAME(src.NAME);
@@ -63,20 +78,20 @@ void impala::OverlayQueryOptions(
 
 // Choose different print function based on the type.
 template <typename T, typename std::enable_if_t<std::is_enum<T>::value>* = nullptr>
-string PrintQueryOptionValue(const T& option) {
+static string PrintQueryOptionValue(const T& option) {
   return PrintValue(option);
 }
 
 template <typename T, typename std::enable_if_t<std::is_arithmetic<T>::value>* = nullptr>
-string PrintQueryOptionValue(const T& option) {
+static string PrintQueryOptionValue(const T& option) {
   return std::to_string(option);
 }
 
-const string& PrintQueryOptionValue(const std::string& option) {
+static const string& PrintQueryOptionValue(const string& option) {
   return option;
 }
 
-const string PrintQueryOptionValue(const impala::TCompressionCodec& compression_codec) {
+static string PrintQueryOptionValue(const impala::TCompressionCodec& compression_codec) {
   if (compression_codec.codec != THdfsCompression::ZSTD) {
     return Substitute("$0", PrintValue(compression_codec.codec));
   } else {
@@ -85,10 +100,10 @@ const string PrintQueryOptionValue(const impala::TCompressionCodec& compression_
   }
 }
 
-std::ostream& impala::operator<<(
-    std::ostream& out, const std::set<impala::TRuntimeFilterType::type>& filter_types) {
+template <typename T>
+static std::ostream& printSet(std::ostream& out, const std::set<T>& things) {
   bool first = true;
-  for (const auto& t : filter_types) {
+  for (const T& t : things) {
     if (!first) out << ",";
     out << t;
     first = false;
@@ -96,26 +111,19 @@ std::ostream& impala::operator<<(
   return out;
 }
 
-const string PrintQueryOptionValue(
-    const std::set<impala::TRuntimeFilterType::type>& filter_types) {
-  std::stringstream val;
-  val << filter_types;
-  return val.str();
+std::ostream& impala::operator<<(
+    std::ostream& out, const std::set<impala::TRuntimeFilterType::type>& filter_types) {
+  return printSet(out, filter_types);
 }
 
 std::ostream& impala::operator<<(std::ostream& out, const std::set<int32_t>& filter_ids) {
-  bool first = true;
-  for (const auto& t : filter_ids) {
-    if (!first) out << ",";
-    out << t;
-    first = false;
-  }
-  return out;
+  return printSet(out, filter_ids);
 }
 
-const string PrintQueryOptionValue(const std::set<int32_t>& filter_ids) {
+template <typename T>
+static string PrintQueryOptionValue(const std::set<T>& things) {
   std::stringstream val;
-  val << filter_ids;
+  val << things;
   return val.str();
 }
 
@@ -158,7 +166,7 @@ static TQueryOptions DefaultQueryOptions() {
   return defaults;
 }
 
-inline bool operator!=(const TCompressionCodec& a, const TCompressionCodec& b) {
+static inline bool operator!=(const TCompressionCodec& a, const TCompressionCodec& b) {
   return (a.codec != b.codec || a.compression_level != b.compression_level);
 }
 
@@ -179,7 +187,7 @@ string impala::DebugQueryOptions(const TQueryOptions& query_options) {
   return ss.str();
 }
 
-inline void TrimAndRemoveEmptyString(vector<string>& values) {
+static inline void TrimAndRemoveEmptyString(vector<string>& values) {
   int i = 0;
   while (i < values.size()) {
     trim(values[i]);
@@ -1392,7 +1400,7 @@ Status impala::ValidateQueryOptions(TQueryOptions* query_options) {
   return Status::OK();
 }
 
-void impala::PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels){
+void impala::PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels) {
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL) \
   { (*query_option_levels)[#ENUM] = LEVEL; }
 #define REMOVED_QUERY_OPT_FN(NAME, ENUM) \
@@ -1403,19 +1411,71 @@ void impala::PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels){
 #undef REMOVED_QUERY_OPT_FN
 }
 
+template<typename T, typename std::enable_if_t<std::is_enum<T>::value ||
+    std::is_arithmetic<T>::value>* = nullptr>
+static void HashQueryOptionValue(const T& option, HashState& hash) {
+  MurmurHash3_x64_128(&option, sizeof(option), hash);
+}
+
+static void HashQueryOptionValue(const string& option, HashState& hash) {
+  MurmurHash3_x64_128(option.c_str(), option.length(), hash);
+}
+
+static void HashQueryOptionValue(
+    const TCompressionCodec& compression_codec, HashState& hash) {
+  HashQueryOptionValue(compression_codec.codec, hash);
+  if (compression_codec.codec == THdfsCompression::ZSTD) {
+    HashQueryOptionValue(compression_codec.compression_level, hash);
+  }
+}
+
+template<typename T>
+static void HashQueryOptionValue(const std::set<T>& things, HashState& hash) {
+  for (const T& thing : things) {
+    HashQueryOptionValue(thing, hash);
+  }
+}
+
+constexpr uint64_t QUERY_OPTION_HASH_SEED = 0x9b8b4467323b23cf;
+
+TQueryOptionsHash impala::QueryOptionsResultHash(const TQueryOptions& query_options) {
+  if (UNLIKELY(FLAGS_tuple_cache_ignore_query_options)) return TQueryOptionsHash();
+
+  std::unordered_set<StringPiece> exempt;
+  if (!FLAGS_tuple_cache_exempt_query_options.empty()) {
+    exempt = Split(FLAGS_tuple_cache_exempt_query_options, ",", SkipEmpty());
+  }
+
+  HashState hash{QUERY_OPTION_HASH_SEED, QUERY_OPTION_HASH_SEED};
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL) \
+  if (query_options.__isset.NAME && exempt.count(#NAME) == 0) \
+    HashQueryOptionValue(query_options.NAME, hash);
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
+#undef TUPLE_CACHE_EXEMPT_QUERY_OPT_FN
+#define TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(NAME, ENUM, LEVEL)
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
+#undef TUPLE_CACHE_EXEMPT_QUERY_OPT_FN
+#define TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(NAME, ENUM, LEVEL) QUERY_OPT_FN(NAME, ENUM, LEVEL)
+  TQueryOptionsHash thash;
+  thash.__set_hi(hash.h1);
+  thash.__set_lo(hash.h2);
+  return thash;
+}
+
 Status impala::ResetAllQueryOptions(
     TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask) {
   static const TQueryOptions defaults = DefaultQueryOptions();
-#define QUERY_OPT_FN(NAME, ENUM, LEVEL)                  \
-  if (query_options->NAME != defaults.NAME) {            \
-    query_options->__isset.NAME = defaults.__isset.NAME; \
-    query_options->NAME = defaults.NAME;                 \
-    int option = GetQueryOptionForKey(#NAME);            \
-    DCHECK_GE(option, 0);                                \
-    if (set_query_options_mask != nullptr) {             \
-      DCHECK_LT(option, set_query_options_mask->size()); \
-      set_query_options_mask->reset(option);             \
-    }                                                    \
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)                           \
+  if (query_options->NAME != defaults.NAME) {                     \
+    query_options->__isset.NAME = defaults.__isset.NAME;          \
+    query_options->NAME = defaults.NAME;                          \
+    TImpalaQueryOptions::type option = TImpalaQueryOptions::ENUM; \
+    if (set_query_options_mask != nullptr) {                      \
+      DCHECK_LT(option, set_query_options_mask->size());          \
+      set_query_options_mask->reset(option);                      \
+    }                                                             \
   }
 #define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
