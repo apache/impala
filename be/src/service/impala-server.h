@@ -36,6 +36,7 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/control_service.pb.h"
 #include "gen-cpp/Query_types.h"
+#include "gen-cpp/TCLIService_types.h"
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
 #include "runtime/types.h"
@@ -415,16 +416,19 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual Status ExecuteIgnoreResults(const std::string& user_name,
       const std::string& sql, const QueryOptionMap& query_opts = {},
       const bool persist_in_db = true, TUniqueId* query_id = nullptr);
-  virtual Status ExecuteAndFetchAllText(const std::string& user_name,
-      const std::string& sql, query_results& results, results_columns* columns = nullptr,
-      TUniqueId* query_id = nullptr);
+  virtual Status ExecuteAndFetchAllHS2(const std::string& user_name,
+      const std::string& sql,
+      std::vector<apache::hive::service::cli::thrift::TRow>& results,
+      const QueryOptionMap& query_opts = {}, const bool persist_in_db = true,
+      results_columns* columns = nullptr, TUniqueId* query_id = nullptr);
   virtual Status SubmitAndWait(const std::string& user_name, const std::string& sql,
       TUniqueId& new_session_id, TUniqueId& new_query_id,
       const QueryOptionMap& query_opts = {}, const bool persist_in_db = true);
   virtual Status WaitForResults(TUniqueId& query_id);
   virtual Status SubmitQuery(const std::string& sql, const impala::TUniqueId& session_id,
       TUniqueId& new_query_id, const bool persist_in_db = true);
-  virtual Status FetchAllRows(const TUniqueId& query_id, query_results& results,
+  virtual Status FetchAllRowsHS2(const TUniqueId& query_id,
+      std::vector<apache::hive::service::cli::thrift::TRow>& results,
       results_columns* columns = nullptr);
   virtual void CloseQuery(const TUniqueId& query_id);
   virtual void GetConnectionContextList(

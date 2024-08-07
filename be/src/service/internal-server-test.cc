@@ -23,6 +23,7 @@
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "common/thread-debug-info.h"
+#include "gen-cpp/TCLIService_types.h"
 #include "gtest/gtest.h"
 #include "gutil/strings/strcat.h"
 #include "gutil/walltime.h"
@@ -39,6 +40,7 @@
 #include "testutil/scoped-flag-setter.h"
 #include "util/debug-util.h"
 #include "util/jni-util.h"
+#include "util/string-util.h"
 
 DECLARE_string(log_dir);
 DECLARE_string(debug_actions);
@@ -59,6 +61,7 @@ DECLARE_int32(webserver_port);
 using namespace std;
 using namespace impala;
 using namespace rapidjson;
+using namespace apache::hive::service::cli::thrift;
 
 shared_ptr<ImpalaServer> impala_server_;
 
@@ -110,7 +113,7 @@ void assertQueryState(const TUniqueId& query_id, const string expected_state) {
 } // assertQueryState
 
 // Helper class to set up a uniquely named database. Not every test will need its own
-// database, thus an instance of this class must be instantiated in every that that needs
+// database, thus an instance of this class must be instantiated in every test that needs
 // its own database.
 //
 // Upon construction, instances of this class create a database consisting of the
@@ -259,7 +262,7 @@ TEST(InternalServerTest, InvalidQueryOption) {
 // Asserts that executing multiple queries over multiple sessions against the same
 // internal server instance works correctly.
 TEST(InternalServerTest, MultipleQueriesMultipleSessions) {
-  query_results results = make_shared<vector<string>>();
+  vector<TRow> results;
   InternalServer* fixture = impala_server_.get();
   DatabaseTest db_test = DatabaseTest(impala_server_,
       "multiple_queries_multiple_sessions");
@@ -267,11 +270,11 @@ TEST(InternalServerTest, MultipleQueriesMultipleSessions) {
 
   // Set up a test table using a new session.
   TUniqueId query_id;
-  ASSERT_OK(fixture->ExecuteAndFetchAllText("impala",
-      StrCat("create table if not exists ", test_table_name,
-      "(id INT, first_name STRING, last_name STRING)"), results, nullptr, &query_id));
-  ASSERT_EQ(1, results->size());
-  ASSERT_EQ(results->at(0), "Table has been created.");
+  ASSERT_OK(fixture->ExecuteAndFetchAllHS2("impala", StrCat("create table if not exists ",
+      test_table_name, "(id INT, first_name STRING, last_name STRING)"), results, {},
+      false, nullptr, &query_id));
+  ASSERT_EQ(1, results.size());
+  ASSERT_EQ(results[0].colVals[0].stringVal.value, "Table has been created.");
   assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
   // Insert a record into the test table using a new session.
@@ -281,10 +284,10 @@ TEST(InternalServerTest, MultipleQueriesMultipleSessions) {
   assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
   // Select a record from the test table using a new session.
-  results->clear();
+  results.clear();
   results_columns columns;
-  ASSERT_OK(fixture->ExecuteAndFetchAllText("impala", StrCat("select id,first_name,"
-      "last_name FROM ", test_table_name), results, &columns, &query_id));
+  ASSERT_OK(fixture->ExecuteAndFetchAllHS2("impala", StrCat("select id,first_name,"
+      "last_name FROM ", test_table_name), results, {}, false, &columns, &query_id));
   assertQueryState(query_id, QUERY_STATE_SUCCESS);
 
   ASSERT_EQ(3, columns.size());
@@ -295,8 +298,10 @@ TEST(InternalServerTest, MultipleQueriesMultipleSessions) {
   EXPECT_EQ("last_name", columns.at(2).first);
   EXPECT_EQ("string", columns.at(2).second);
 
-  ASSERT_EQ(1, results->size());
-  EXPECT_EQ(results->at(0), "1\ttest\tperson1");
+  ASSERT_EQ(1, results.size());
+  EXPECT_EQ(results[0].colVals[0].i32Val.value, 1);
+  EXPECT_EQ(results[0].colVals[1].stringVal.value, "test");
+  EXPECT_EQ(results[0].colVals[2].stringVal.value, "person1");
 } // MultipleQueriesMultipleSessions
 
 // Simulates an RPC failure which causes the coordinator to automatically retry the query.
@@ -334,7 +339,7 @@ TEST(InternalServerTest, RetryFailedQuery) {
 // Asserts that executing multiple queries in one session against the same internal
 // server instance works correctly.
 TEST(InternalServerTest, MultipleQueriesOneSession) {
-  query_results results = make_shared<vector<string>>();
+  vector<TRow> results;
   InternalServer* fixture = impala_server_.get();
   DatabaseTest db_test = DatabaseTest(impala_server_, "multiple_queries_one_session");
   const string test_table_name = StrCat(db_test.GetDbName(), ".test_table_1");
@@ -348,12 +353,12 @@ TEST(InternalServerTest, MultipleQueriesOneSession) {
   ASSERT_OK(fixture->SubmitQuery(StrCat("create table if not exists ", test_table_name,
       "(id INT,name STRING)"), session_id, query_id1));
   ASSERT_OK(fixture->WaitForResults(query_id1));
-  ASSERT_OK(fixture->FetchAllRows(query_id1, results));
+  ASSERT_OK(fixture->FetchAllRowsHS2(query_id1, results));
 
   // Assert the test table was created.
-  ASSERT_EQ(1, results->size());
-  EXPECT_EQ(results->at(0), "Table has been created.");
-  results->clear();
+  ASSERT_EQ(1, results.size());
+  EXPECT_EQ(results[0].colVals[0].stringVal.value, "Table has been created.");
+  results.clear();
   fixture->CloseQuery(query_id1);
 
   // In the same session, insert into the newly created test table.
@@ -361,10 +366,10 @@ TEST(InternalServerTest, MultipleQueriesOneSession) {
   ASSERT_OK(fixture->SubmitQuery(StrCat("insert into ", test_table_name,
       " (id, name) VALUES (1, 'one'), (2, 'two')"), session_id, query_id2));
   ASSERT_OK(fixture->WaitForResults(query_id2));
-  ASSERT_OK(fixture->FetchAllRows(query_id2, results));
+  ASSERT_OK(fixture->FetchAllRowsHS2(query_id2, results));
 
   // Assert the insert succeeded.
-  ASSERT_EQ(0, results->size());
+  ASSERT_EQ(0, results.size());
   fixture->CloseQuery(query_id2);
 
   // Still in the same session, select from the test table.
@@ -374,7 +379,7 @@ TEST(InternalServerTest, MultipleQueriesOneSession) {
   ASSERT_OK(fixture->SubmitQuery(StrCat("select name,id,name from ", test_table_name,
       " order by id asc"), session_id, query_id3));
   ASSERT_OK(fixture->WaitForResults(query_id3));
-  ASSERT_OK(fixture->FetchAllRows(query_id3, results, &columns));
+  ASSERT_OK(fixture->FetchAllRowsHS2(query_id3, results, &columns));
 
   // Assert the expected number of columns were returned from the select statement.
   ASSERT_EQ(3, columns.size());
@@ -386,9 +391,15 @@ TEST(InternalServerTest, MultipleQueriesOneSession) {
   EXPECT_EQ("string", columns.at(2).second);
 
   // Assert the expected number of rows were returned from the select statement.
-  ASSERT_EQ(2, results->size());
-  EXPECT_EQ(results->at(0), "one\t1\tone");
-  EXPECT_EQ(results->at(1), "two\t2\ttwo");
+  ASSERT_EQ(2, results.size());
+  EXPECT_EQ(results[0].colVals[0].stringVal.value, "one");
+  EXPECT_EQ(results[0].colVals[1].i32Val.value, 1);
+  EXPECT_EQ(results[0].colVals[2].stringVal.value, "one");
+
+  EXPECT_EQ(results[1].colVals[0].stringVal.value, "two");
+  EXPECT_EQ(results[1].colVals[1].i32Val.value, 2);
+  EXPECT_EQ(results[1].colVals[2].stringVal.value, "two");
+
   fixture->CloseQuery(query_id3);
   assertQueryState(query_id3, QUERY_STATE_SUCCESS);
 
@@ -503,6 +514,54 @@ TEST(InternalServerTest, SimultaneousMultipleQueriesOneSession) {
 
   fixture->CloseSession(session_id);
 } // TEST SimultaneousMultipleQueriesOneSession
+
+TEST(InternalServerTest, ExecuteAndFetchAllHS2) {
+  vector<apache::hive::service::cli::thrift::TRow> results_hs2;
+  InternalServer* fixture = impala_server_.get();
+  DatabaseTest db_test = DatabaseTest(impala_server_, "execute_and_fetch_all_hs2");
+  const string test_table_name = StrCat(db_test.GetDbName(), ".test_table_1");
+  const string name_prefix = StrCat("tv_", GetCurrentTimeMicros() / 1000000, "_");
+  const int num_test_rows = 10000;
+
+  // Create a test table.
+  ASSERT_OK(fixture->ExecuteIgnoreResults("impala", StrCat("create table ",
+      test_table_name, "(id INT,name STRING)")));
+
+  // In the same session, insert into the newly created test table.
+  StringStreamPop sql;
+  sql << StrCat("insert into ", test_table_name, " (id,name) VALUES ");
+  for (int i=0; i<num_test_rows; i++) {
+    sql << "(" << i << ",'" << name_prefix << i << "'),";
+  }
+
+  sql.move_back();
+  sql << " ";
+
+  ASSERT_OK(fixture->ExecuteIgnoreResults("impala", sql.str()));
+
+  // select from the test table.
+  TUniqueId query_id3;
+  results_columns columns;
+
+  ASSERT_OK(fixture->ExecuteAndFetchAllHS2("impala", StrCat("select id, name from ",
+      test_table_name, " order by id asc"), results_hs2, {}, false, &columns));
+
+  // Assert the expected number of columns were returned from the select statement.
+  ASSERT_EQ(2, columns.size());
+  EXPECT_EQ("id", columns.at(0).first);
+  EXPECT_EQ("int", columns.at(0).second);
+  EXPECT_EQ("name", columns.at(1).first);
+  EXPECT_EQ("string", columns.at(1).second);
+
+  // Assert the expected number of rows were returned from the select statement.
+  ASSERT_EQ(num_test_rows, results_hs2.size());
+
+  for (int i=0; i<num_test_rows; i++) {
+    ASSERT_EQ(2, results_hs2[i].colVals.size());
+    EXPECT_EQ(i, results_hs2[i].colVals[0].i32Val.value);
+    EXPECT_EQ(StrCat(name_prefix, i), results_hs2[i].colVals[1].stringVal.value);
+  }
+} // TEST ExecuteAndFetchAllHS2
 
 } // namespace internalservertest
 } // namespace impala

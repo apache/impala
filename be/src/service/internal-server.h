@@ -18,18 +18,17 @@
 #pragma once
 
 #include <map>
-#include <memory>
 #include <string>
 #include <vector>
 
 #include "common/status.h"
 #include "gen-cpp/Query_types.h"
+#include "gen-cpp/TCLIService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "rpc/thrift-server.h"
 
 namespace impala {
 
-  typedef std::shared_ptr<std::vector<std::string>> query_results;
   typedef std::vector<std::pair<std::string, std::string>> results_columns;
 
   /// Enables Impala coordinators to submit queries to themselves.
@@ -43,7 +42,7 @@ namespace impala {
   /// methods.
   ///
   /// Usage:
-  ///   The easiest way to use this class is to call the `ExecuteAndFetchAllText` function
+  ///   The easiest way to use this class is to call the `ExecuteAndFetchAllHS2` function
   ///   which runs the provided sql, returns all the results, and closes the query and
   ///   session. This function is useful for running create/insert/update queries that do
   ///   not return many results.
@@ -115,30 +114,37 @@ namespace impala {
       /// session. No authentication is performed. Blocks until result rows are available.
       /// Then, populates all result rows. Finally, cleans up the query and session.
       ///
-      /// Intended for use as a convenience method when query results are small.
-      ///
       /// Parameters:
-      ///   `user_name` Specifies the username that will be reported as running this
-      ///               query.
-      ///   `sql`       Text of the sql query/ddl/dml to run.
-      ///   `results`   Output parameter containing all result rows from the query. If
-      ///               this vector has existing elements, they will be left in place with
-      ///               result rows added at the end of the vector.
-      ///   `columns`   Optional output parameter where each element is a pair with the
-      ///               first element being the name of the column and the second element
-      ///               being the column type. Existing elements in the vector will be
-      ///               left in place with column pairs appended to the end of the vector.
-      ///               If this parameter is `nullptr`, then the list of columns is not
-      ///               generated and this parameter's value will remain `nullptr`.
-      ///   `query_id`  Optional output parameter, if specified, it will be overwritten
-      ///               with the id of the query that was executed. Since the query is
-      ///               closed by this function, the query id is informational only.
+      ///   `user_name`     Specifies the username that will be reported as running this
+      ///                   query.
+      ///   `sql`           Text of the sql query/ddl/dml to run.
+      ///   `results`       Output parameter containing all result rows from the query.
+      ///                   If this vector has existing elements, they will be left in
+      ///                   place with result rows added at the end of the vector.
+      ///   `query_opts`    Optional, contains query options that will apply to all
+      ///                   queries executed by this session opened by this function.
+      ///   `persist_in_db` Optional boolean indicating if the query data should be
+      ///                   written to the completed queries table after it is closed.
+      ///                   Defaults to `true`.
+      ///   `columns`       Optional output parameter where each element is a pair with
+      ///                   the first element being the name of the column and the second
+      ///                   element being the column type. Existing elements in the vector
+      ///                   will be left in place with column pairs appended to the end of
+      ///                   the vector. If this parameter is `nullptr`, then the list of
+      ///                   columns is not generated and this parameter's value will
+      ///                   remain `nullptr`.
+      ///   `query_id`      Optional output parameter, if specified, it will be
+      ///                   overwritten with the id of the query that was executed. Since
+      ///                   the query is closed by this function, the query id is
+      ///                   informational only.
       ///
       /// Return:
       ///   `impala::Status` indicating the result of submitting the query and waiting for
       ///   it to return.
-      virtual Status ExecuteAndFetchAllText(const std::string& user_name,
-          const std::string& sql, query_results& results,
+      virtual Status ExecuteAndFetchAllHS2(const std::string& user_name,
+          const std::string& sql,
+          std::vector<apache::hive::service::cli::thrift::TRow>& results,
+          const QueryOptionMap& query_opts = {}, const bool persist_in_db = true,
           results_columns* columns = nullptr, TUniqueId* query_id = nullptr) = 0;
 
       /// Creates a new session under the specified user and submits a query under that
@@ -152,9 +158,9 @@ namespace impala {
       ///                    query.
       ///   `sql`            Text of the sql query/ddl/dml to run.
       ///   `new_session_id` Output parameter that will be set to the id of the
-      ///                          newly created session.
+      ///                    newly created session.
       ///   `new_query_id`   Output parameter that will be set to the id of the
-      ///                          newly started query.
+      ///                    newly started query.
       ///   `query_opts`     Optional, contains query options that will apply to all
       ///                    queries executed by this session opened by this function.
       ///   `persist_in_db`  Optional boolean indicating if the query data should be
@@ -193,9 +199,10 @@ namespace impala {
           const impala::TUniqueId& session_id, TUniqueId& new_query_id,
           const bool persist_in_db = true) = 0;
 
-      /// Retrieves all result rows for a given query. The query must have already been
-      /// submitted and one of the Wait methods called on the query to ensure results are
-      /// available.
+      /// Retrieves all result rows for a given query. The rows are retrieved using HS2
+      /// objects. Thus, each row and column is stored within its own object. The query
+      /// must have already been submitted and one of the Wait methods called on the query
+      /// to ensure results are available.
       ///
       /// Note: Assumes the query represented by `query_id` was successful as this
       ///       function does not check that the query status is a successful status.
@@ -214,7 +221,8 @@ namespace impala {
       ///                   remain `nullptr`.
       /// Return:
       ///   `impala::Status` Indicates the result of fetching rows.
-      virtual Status FetchAllRows(const TUniqueId& query_id, query_results& results,
+      virtual Status FetchAllRowsHS2(const TUniqueId& query_id,
+          std::vector<apache::hive::service::cli::thrift::TRow>& query_results,
           results_columns* columns = nullptr) = 0;
 
       /// Closes and cleans up the query and its associated session.
@@ -231,7 +239,6 @@ namespace impala {
       ///                         server connections added to the end.
       virtual void GetConnectionContextList(
         ThriftServer::ConnectionContextList* connection_contexts) = 0;
-
   }; // InternalServer class
 
 } // namespace impala
