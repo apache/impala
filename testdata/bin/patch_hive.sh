@@ -75,7 +75,8 @@ done
 # 3. Repackage the hive submodules affected by the patch
 if [[ "${HIVE_REBUILD}" = "true" ]]; then
   echo "Repackage the hive-exec module"
-  ${IMPALA_HOME}/bin/mvn-quiet.sh -pl ql clean package -Dmaven.test.skip
+  ${IMPALA_HOME}/bin/mvn-quiet.sh -pl ql,standalone-metastore clean package \
+      -Dmaven.test.skip
   cp $HIVE_SRC_DIR/ql/target/hive-exec-${APACHE_HIVE_VERSION}.jar $HIVE_HOME/lib/
 fi
 popd

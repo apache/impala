@@ -94,7 +94,6 @@ LOCATION '/test-warehouse/chars_formats_text';
 DROP TABLE IF EXISTS functional_json.chars_formats;
 CREATE EXTERNAL TABLE functional_json.chars_formats
 (cs CHAR(5), cl CHAR(140), vc VARCHAR(32))
-ROW FORMAT delimited fields terminated by ','  escaped by '\\'
 STORED AS JSONFILE
 LOCATION '/test-warehouse/chars_formats_json';
 

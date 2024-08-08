@@ -1025,6 +1025,13 @@ export HIVE_CONF_DIR="$IMPALA_FE_DIR/./src/test/resources"
 export POSTGRES_JDBC_DRIVER="${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jar"
 
 export HIVE_AUX_JARS_PATH="$POSTGRES_JDBC_DRIVER"
+# Add the jar of iceberg-hive-runtime to have HiveIcebergStorageHandler.
+# Only needed by Apache Hive3 since CDP Hive3 has the jar of hive-iceberg-handler in its
+# lib folder.
+if $USE_APACHE_HIVE; then
+  export HIVE_AUX_JARS_PATH="$HIVE_AUX_JARS_PATH:\
+$IMPALA_HOME/fe/target/dependency/iceberg-hive-runtime-${IMPALA_ICEBERG_VERSION}.jar"
+fi
 export AUX_CLASSPATH=""
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true

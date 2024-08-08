@@ -1,0 +1,46 @@
+diff --git a/ql/src/test/queries/clientpositive/mm_all.q b/ql/src/test/queries/clientpositive/mm_all.q
+index 61dd3e7475..a524c29ef5 100644
+--- a/ql/src/test/queries/clientpositive/mm_all.q
++++ b/ql/src/test/queries/clientpositive/mm_all.q
+@@ -3,6 +3,7 @@
+ 
+ -- MASK_LINEAGE
+ 
++set hive.metastore.dml.events=true;
+ set hive.mapred.mode=nonstrict;
+ set hive.explain.user=false;
+ set hive.fetch.task.conversion=none;
+diff --git a/standalone-metastore/src/main/java/org/apache/hadoop/hive/metastore/events/InsertEvent.java b/standalone-metastore/src/main/java/org/apache/hadoop/hive/metastore/events/InsertEvent.java
+index aa014e9317..60ad7db60e 100644
+--- a/standalone-metastore/src/main/java/org/apache/hadoop/hive/metastore/events/InsertEvent.java
++++ b/standalone-metastore/src/main/java/org/apache/hadoop/hive/metastore/events/InsertEvent.java
+@@ -18,7 +18,9 @@
+ 
+ package org.apache.hadoop.hive.metastore.events;
+ 
+-import com.google.common.collect.Lists;
++import java.util.ArrayList;
++import java.util.List;
++
+ import org.apache.hadoop.classification.InterfaceAudience;
+ import org.apache.hadoop.classification.InterfaceStability;
+ import org.apache.hadoop.hive.metastore.IHMSHandler;
+@@ -33,8 +35,7 @@
+ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+ import org.apache.thrift.TException;
+ 
+-import java.util.ArrayList;
+-import java.util.List;
++import com.google.common.collect.Lists;
+ 
+ @InterfaceAudience.Public
+ @InterfaceStability.Stable
+@@ -65,7 +66,7 @@ public InsertEvent(String catName, String db, String table, List<String> partVal
+     // TODO MS-SPLIT Switch this back once HiveMetaStoreClient is moved.
+     //req.setCapabilities(HiveMetaStoreClient.TEST_VERSION);
+     req.setCapabilities(new ClientCapabilities(
+-      Lists.newArrayList(ClientCapability.TEST_CAPABILITY)));
++        Lists.newArrayList(ClientCapability.TEST_CAPABILITY, ClientCapability.INSERT_ONLY_TABLES)));
+     try {
+       this.tableObj = handler.get_table_req(req).getTable();
+       if (partVals != null) {

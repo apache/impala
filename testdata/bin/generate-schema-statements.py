@@ -232,7 +232,7 @@ HINT_SHUFFLE = "/* +shuffle, clustered */"
 
 def build_create_statement(table_template, table_name, db_name, db_suffix,
                            file_format, compression, hdfs_location,
-                           force_reload):
+                           force_reload, is_hive_stmt):
   create_stmt = ''
   if (force_reload):
     tbl_type = 'TABLE'
@@ -247,12 +247,34 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
     # Remove location part from the format string
     table_template = table_template.replace("LOCATION '{hdfs_location}'", "")
 
-  create_stmt += table_template.format(
+  stmt = table_template.format(
     db_name=db_name,
     db_suffix=db_suffix,
     table_name=table_name,
     file_format=FILE_FORMAT_TO_STORED_AS_MAP[file_format],
     hdfs_location=hdfs_location)
+  # Apache Hive 3.1 doesn't support "STORED BY ICEBERG STORED AS AVRO" and
+  # "STORED AS JSONFILE" (HIVE-25162, HIVE-19899)
+  if is_hive_stmt and os.environ['USE_APACHE_HIVE'] == "true":
+    if "STORED AS JSONFILE" in stmt:
+      stmt = stmt.replace("STORED AS JSONFILE",
+                          "ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.JsonSerDe'")
+    elif "STORED BY ICEBERG" in stmt:
+      if "STORED AS" not in stmt:
+        stmt = stmt.replace(
+            "STORED BY ICEBERG",
+            "STORED BY 'org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'")
+      else:
+        assert "TBLPROPERTIES" not in stmt,\
+            ("Cannot convert STORED BY ICEBERG STORED AS file_format with TBLPROPERTIES "
+             "also in the statement:\n" + stmt)
+        iceberg_file_format = re.search(r"STORED AS (\w+)", stmt).group(1)
+        stmt = re.sub(r"STORED BY ICEBERG\s+STORED AS \w+",
+                      ("STORED BY 'org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'"
+                       " TBLPROPERTIES('write.format.default'='{}')").format(
+                            iceberg_file_format),
+                      stmt)
+  create_stmt += stmt
   return create_stmt
 
 
@@ -835,7 +857,8 @@ def generate_statements(output_name, test_vectors, sections,
 
       if table_template:
         output.create.append(build_create_statement(table_template, table_name, db_name,
-            db_suffix, create_file_format, create_codec, data_path, force_reload))
+            db_suffix, create_file_format, create_codec, data_path, force_reload,
+            create_hive))
       # HBASE create table
       if file_format == 'hbase':
         # If the HBASE_COLUMN_FAMILIES section does not exist, default to 'd'

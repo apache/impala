@@ -382,8 +382,15 @@ function copy-and-load-dependent-tables {
 
   # For tables that rely on loading data from local fs test-wareload-house
   # TODO: Find a good way to integrate this with the normal data loading scripts
-  beeline -n $USER -u "${JDBC_URL}" -f\
-    ${IMPALA_HOME}/testdata/bin/load-dependent-tables.sql
+  SQL_FILE=${IMPALA_HOME}/testdata/bin/load-dependent-tables.sql
+  if $USE_APACHE_HIVE; then
+    # Apache Hive 3.1 doesn't support "STORED AS JSONFILE" (HIVE-19899)
+    NEW_SQL_FILE=${IMPALA_HOME}/testdata/bin/load-dependent-tables-hive3.sql
+    sed "s/STORED AS JSONFILE/ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.JsonSerDe'"\
+      $SQL_FILE > $NEW_SQL_FILE
+    SQL_FILE=$NEW_SQL_FILE
+  fi
+  beeline -n $USER -u "${JDBC_URL}" -f $SQL_FILE
 }
 
 function create-internal-hbase-table {

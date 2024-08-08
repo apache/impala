@@ -10,3 +10,6 @@ Bump guava version to 28.1-jre. Fix HIVE-22717.
 
 patch2-HIVE-20038.diff:
 Update queries on non-bucketed + partitioned tables throws NPE
+
+patch3-HIVE-20067.diff:
+Fix failures in firing InsertEvent for on insert-only tables

@@ -2620,7 +2620,10 @@ materialized_view
 -- The create materialized view command is moved down so that the database's
 -- managed directory has been created. Otherwise the command would fail. This
 -- is a bug in Hive.
-CREATE MATERIALIZED VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+-- Always drop the view first since IF NOT EXISTS is ignored in CREATE VIEW
+-- in Apache Hive3 (HIVE-20462, HIVE-21675).
+DROP MATERIALIZED VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE MATERIALIZED VIEW {db_name}{db_suffix}.{table_name}
   AS SELECT * FROM {db_name}{db_suffix}.insert_only_transactional_table;
 =====
 ---- DATASET
@@ -3840,6 +3843,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 )
 STORED BY ICEBERG STORED AS AVRO
 LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_avro_format';
+---- DEPENDENT_LOAD_HIVE
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(1, 'A', 0.5, true),(2, 'B', 1.5, true),(3, 'C', 2.5, false);
 ====
 ---- DATASET
@@ -3887,7 +3891,7 @@ functional
 ---- BASE_TABLE_NAME
 iceberg_view
 ---- CREATE
-CREATE VIEW {db_name}{db_suffix}.{table_name} AS
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name} AS
 SELECT * FROM  {db_name}{db_suffix}.iceberg_query_metadata;
 ====
 ---- DATASET
@@ -3995,7 +3999,7 @@ functional
 ---- BASE_TABLE_NAME
 iceberg_lineitem_sixblocks
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 LIKE PARQUET '/test-warehouse/lineitem_sixblocks_iceberg/lineitem_sixblocks.parquet'
 STORED AS PARQUET
 LOCATION '/test-warehouse/lineitem_sixblocks_iceberg/';
