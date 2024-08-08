@@ -138,13 +138,14 @@ class TestExprLimits(ImpalaTestSuite):
   def test_under_statement_expression_limit(self):
     """Generate a huge case statement that barely fits within the statement expression
        limit and verify that it runs."""
-    # This takes 20+ minutes, so only run it on exhaustive.
-    # TODO: Determine whether this needs to run serially. It use >5 GB of memory.
+    # IMPALA-13280: Disable codegen because it will take 2GB+ of memory
+    # and over 30 minutes for doing codegen.
     if self.exploration_strategy() != 'exhaustive':
-      pytest.skip("Only test limit of codegen on exhaustive")
+      pytest.skip("Only test limit of expression on exhaustive")
     case = self.__gen_huge_case("int_col", 32, 2, "  ")
     query = "select {0} as huge_case from functional_parquet.alltypes".format(case)
-    self.__exec_query(query)
+    options = {'disable_codegen': True}
+    self.execute_query_expect_success(self.client, query, options)
 
   def test_max_statement_size(self):
     """Generate a huge case statement that exceeds the default 16MB limit and verify
@@ -187,7 +188,9 @@ class TestExprLimits(ImpalaTestSuite):
       divisor = randint(1, 10000000)
       mod = randint(0, divisor)
       # Generate a mathematical expr that can't be easily optimised out.
-      when_expr = "{0} + {1} % {2} = {3}".format(col_name, add, divisor, mod)
+      # IMPALA-13280: The parentheses in when_expr is needed to disable constant folding
+      # that can take over 7 minutes to complete by Planner.
+      when_expr = "({0} + {1}) % {2} = {3}".format(col_name, add, divisor, mod)
       if depth == 0:
         then_expr = "{0}".format(i)
       else:
