@@ -1148,9 +1148,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// current query ids to the admissiond.
   [[noreturn]] void AdmissionHeartbeatThread();
 
-  /// If workload management is enabled, starts workload management threads.
-  /// (implemented in workload-management.cc)
-  Status InitWorkloadManagement();
+  /// Checks if workload management is enabled, and starts the init process if it is
+  /// enabled. Does not return until coordinator shutdown. Returns immediately if
+  /// workload management is not enabled.
+  /// (implemented in workload-management-init.cc)
+  void InitWorkloadManagement();
 
   /// Blocks until running workload management threads are shut down.
   /// (implemented in workload-management.cc)
@@ -1158,7 +1160,8 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Periodically writes out completed queries (if configured)
   /// (implemented in workload-management.cc)
-  void CompletedQueriesThread();
+  void WorkloadManagementWorker(InternalServer::QueryOptionMap& insert_query_opts,
+      const std::string log_table_name);
 
   /// Returns a list of completed queries that have not yet been written to storage.
   /// Acquires completed_queries_lock_ to make a copy of completed_queries_ state.
@@ -1693,12 +1696,11 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Tracks the state of the thread that drains the completed queries queue to the table.
   /// The associated lock must be held before reading/modifying this variable.
-  impala::workload_management::ThreadState completed_queries_thread_state_ =
-      impala::workload_management::NOT_STARTED;
-  std::mutex completed_queries_threadstate_mu_;
+  ThreadState workload_mgmt_thread_state_ = NOT_STARTED;
+  std::mutex workload_mgmt_threadstate_mu_;
 
-  /// Thread that runs CompletedQueriesThread().
-  std::unique_ptr<Thread> completed_queries_thread_;
+  /// Thread that runs Workload Management.
+  std::unique_ptr<Thread> workload_management_thread_;
 
   /// Ticker that wakes up the completed_queried_thread at set intervals to process the
   /// queued completed queries. Uses the completed_queries_lock_ to synchonize access to
@@ -1706,7 +1708,7 @@ class ImpalaServer : public ImpalaServiceIf,
   std::unique_ptr<TickerSecondsBool> completed_queries_ticker_;
 
   /// Queue of completed queries and the lock to synchronize access to it.
-  std::list<impala::workload_management::CompletedQuery> completed_queries_;
+  std::list<CompletedQuery> completed_queries_;
   std::mutex completed_queries_lock_;
 
 };

@@ -59,12 +59,8 @@ class TestQueryLogTableBase(CustomClusterTestSuite):
     # These tests run very quickly and can actually complete before Impala has finished
     # creating the completed queries table. Thus, to make these tests more robust, this
     # code checks to make sure the table create has finished before returning.
-    create_match = self.assert_impalad_log_contains("INFO", r'\]\s+(\w+:\w+)\]\s+'
-        r'Analyzing query: CREATE TABLE IF NOT EXISTS {}'.format(self.QUERY_TBL),
-        timeout_s=60)
-    self.assert_impalad_log_contains("INFO", r'Query successfully unregistered: '
-        r'query_id={}'.format(create_match.group(1)),
-        timeout_s=60)
+    self.assert_impalad_log_contains("INFO", r'Completed workload management '
+        r'initialization', timeout_s=120)
 
   def get_client(self, protocol):
     """Retrieves the default Impala client for the specified protocol. This client is
@@ -314,7 +310,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     impalad_graceful_shutdown=True)
   def test_flush_on_queued_count_exceeded(self, vector):
     """Asserts that queries that have completed are written to the query log table when
-       the maximum number of queued records it reached. Also verifies that writing
+       the maximum number of queued records is reached. Also verifies that writing
        completed queries is not limited by default statement_expression_limit."""
 
     impalad = self.cluster.get_first_impalad()

@@ -45,6 +45,7 @@ add_library(Service
   query-result-set.cc
   query-state-record.cc
   workload-management.cc
+  workload-management-init.cc
   workload-management-fields.cc
   workload-management-flags.cc
 )
@@ -140,6 +141,7 @@ add_library(ServiceTests STATIC
   impala-server-test.cc
   query-options-test.cc
   query-state-record-test.cc
+  workload-management-test.cc
 )
 add_dependencies(ServiceTests gen-deps)
 
@@ -149,4 +151,5 @@ ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.
 ADD_UNIFIED_BE_LSAN_TEST(query-options-test QueryOptions.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-server-test ImpalaServerTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(query-state-record-test QueryStateRecordTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(workload-management-test WorkloadManagementTest.*)
 ADD_BE_LSAN_TEST(internal-server-test)

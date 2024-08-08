@@ -25,18 +25,16 @@
 
 #include <algorithm>
 #include <string>
-#include <utility>
 
-#include <boost/algorithm/string.hpp>
 #include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <gutil/strings/substitute.h>
 
 #include "common/compiler-util.h"
+#include "gen-cpp/SystemTables_types.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/exec-env.h"
 #include "service/query-options.h"
-#include "service/query-state-record.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/sql-util.h"
@@ -48,8 +46,6 @@ using namespace std;
 using strings::Substitute;
 
 namespace impala {
-
-namespace workload_management {
 
 /// Helper type for event timeline timestamp functions.
 using _event_compare_pred = function<bool(const string& comp)>;
@@ -98,25 +94,25 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
     FieldDefinition(TQueryTableColumn::CLUSTER_ID, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.cluster_id << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Query Id
     FieldDefinition(TQueryTableColumn::QUERY_ID, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << PrintId(ctx.record->base_state->id) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Session Id
     FieldDefinition(TQueryTableColumn::SESSION_ID, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << PrintId(ctx.record->session_id) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Session Type
     FieldDefinition(TQueryTableColumn::SESSION_TYPE, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->session_type << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Hiveserver2 Protocol Version
     FieldDefinition(TQueryTableColumn::HIVESERVER2_PROTOCOL_VERSION,
@@ -126,32 +122,32 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
             ctx.sql << ctx.record->hiveserver2_protocol_version;
           }
           ctx.sql << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Effective User
     FieldDefinition(TQueryTableColumn::DB_USER, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->base_state->effective_user << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // DB User
     FieldDefinition(TQueryTableColumn::DB_USER_CONNECTION, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->db_user_connection << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Default DB
     FieldDefinition(TQueryTableColumn::DB_NAME, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->base_state->default_db << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Impala Coordinator
     FieldDefinition(TQueryTableColumn::IMPALA_COORDINATOR, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" <<TNetworkAddressToString(
               ExecEnv::GetInstance()->configured_backend_address()) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Query Status
     FieldDefinition(TQueryTableColumn::QUERY_STATUS, TPrimitiveType::STRING,
@@ -163,31 +159,31 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
             ctx.sql << EscapeSql(ctx.record->base_state->query_status.msg().msg());
           }
           ctx.sql << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Query State
     FieldDefinition(TQueryTableColumn::QUERY_STATE, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->base_state->query_state << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Impala Query End State
     FieldDefinition(TQueryTableColumn::IMPALA_QUERY_END_STATE, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->impala_query_end_state << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Query Type
     FieldDefinition(TQueryTableColumn::QUERY_TYPE, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->base_state->stmt_type << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Client Network Address
     FieldDefinition(TQueryTableColumn::NETWORK_ADDRESS, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << TNetworkAddressToString(ctx.record->client_address) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Query Start Time in UTC
     // Required
@@ -195,39 +191,39 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
         [](FieldParserContext& ctx){
           ctx.sql << "UNIX_MICROS_TO_UTC_TIMESTAMP(" <<
               ctx.record->base_state->start_time_us << ")";
-        }),
+        }, VERSION_1_0_0),
 
     // Query Duration
     FieldDefinition(TQueryTableColumn::TOTAL_TIME_MS, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_decimal(ctx, (ctx.record->base_state->end_time_us -
               ctx.record->base_state->start_time_us), MICROS_TO_MILLIS);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Query Options set by Configuration
     FieldDefinition(TQueryTableColumn::QUERY_OPTS_CONFIG, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           const string opts_str = DebugQueryOptions(ctx.record->query_options);
           ctx.sql << "'" << EscapeSql(opts_str) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Resource Pool
     FieldDefinition(TQueryTableColumn::RESOURCE_POOL, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << EscapeSql(ctx.record->base_state->resource_pool) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Per-host Memory Estimate
     FieldDefinition(TQueryTableColumn::PER_HOST_MEM_ESTIMATE, TPrimitiveType::BIGINT,
         [](FieldParserContext& ctx){
           ctx.sql << ctx.record->per_host_mem_estimate;
-        }),
+        }, VERSION_1_0_0),
 
     // Dedicated Coordinator Memory Estimate
     FieldDefinition(TQueryTableColumn::DEDICATED_COORD_MEM_ESTIMATE,
         TPrimitiveType::BIGINT, [](FieldParserContext& ctx){
           ctx.sql << ctx.record->dedicated_coord_mem_estimate;
-        }),
+        }, VERSION_1_0_0),
 
     // Per-Host Fragment Instances
     FieldDefinition(TQueryTableColumn::PER_HOST_FRAGMENT_INSTANCES,
@@ -243,7 +239,7 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
           }
 
           ctx.sql << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Backends Count
     FieldDefinition(TQueryTableColumn::BACKENDS_COUNT, TPrimitiveType::INT,
@@ -253,133 +249,133 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
           } else {
             ctx.sql << ctx.record->per_host_state.size();
           }
-        }),
+        }, VERSION_1_0_0),
 
     // Admission Result
     FieldDefinition(TQueryTableColumn::ADMISSION_RESULT, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->admission_result << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Cluster Memory Admitted
     FieldDefinition(TQueryTableColumn::CLUSTER_MEMORY_ADMITTED, TPrimitiveType::BIGINT,
         [](FieldParserContext& ctx){
           ctx.sql << ctx.record->base_state->cluster_mem_est;
-        }),
+        }, VERSION_1_0_0),
 
     // Executor Group
     FieldDefinition(TQueryTableColumn::EXECUTOR_GROUP, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << ctx.record->executor_group << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Executor Groups
     FieldDefinition(TQueryTableColumn::EXECUTOR_GROUPS, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << EscapeSql(ctx.record->executor_groups) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Exec Summary (also known as the operator summary)
     FieldDefinition(TQueryTableColumn::EXEC_SUMMARY, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << EscapeSql(ctx.record->exec_summary) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Number of rows fetched
     FieldDefinition(TQueryTableColumn::NUM_ROWS_FETCHED, TPrimitiveType::BIGINT,
         [](FieldParserContext& ctx){
           ctx.sql << ctx.record->base_state->num_rows_fetched;
-        }),
+        }, VERSION_1_0_0),
 
     // Row Materialization Rate
     FieldDefinition(TQueryTableColumn::ROW_MATERIALIZATION_ROWS_PER_SEC,
         TPrimitiveType::BIGINT, [](FieldParserContext& ctx){
           ctx.sql << ctx.record->row_materialization_rate;
-        }),
+        }, VERSION_1_0_0),
 
     // Row Materialization Time
     FieldDefinition(TQueryTableColumn::ROW_MATERIALIZATION_TIME_MS,
         TPrimitiveType::DECIMAL, [](FieldParserContext& ctx){
           _write_decimal(ctx, ctx.record->row_materialization_time, NANOS_TO_MILLIS);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Compressed Bytes Spilled to Disk
     FieldDefinition(TQueryTableColumn::COMPRESSED_BYTES_SPILLED, TPrimitiveType::BIGINT,
         [](FieldParserContext& ctx){
           ctx.sql << ctx.record->compressed_bytes_spilled;
-        }),
+        }, VERSION_1_0_0),
 
     // Events Timeline Planning Finished
     FieldDefinition(TQueryTableColumn::EVENT_PLANNING_FINISHED, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_event(ctx, PLANNING_FINISHED);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Events Timeline Submit for Admission
     FieldDefinition(TQueryTableColumn::EVENT_SUBMIT_FOR_ADMISSION,
         TPrimitiveType::DECIMAL, [](FieldParserContext& ctx){
           _write_event(ctx, SUBMIT_FOR_ADMISSION);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Events Timeline Completed Admission
     FieldDefinition(TQueryTableColumn::EVENT_COMPLETED_ADMISSION,
         TPrimitiveType::DECIMAL, [](FieldParserContext& ctx){
           _write_event(ctx, COMPLETED_ADMISSION);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Events Timeline All Execution Backends Started
     FieldDefinition(TQueryTableColumn::EVENT_ALL_BACKENDS_STARTED,
         TPrimitiveType::DECIMAL, [](FieldParserContext& ctx){
           _write_event(ctx, ALL_BACKENDS_STARTED);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Events Timeline Rows Available
     FieldDefinition(TQueryTableColumn::EVENT_ROWS_AVAILABLE, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_event(ctx, ROWS_AVAILABLE);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Events Timeline First Row Fetched
     FieldDefinition(TQueryTableColumn::EVENT_FIRST_ROW_FETCHED, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_event(ctx, FIRST_ROW_FETCHED);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Events Timeline Last Row Fetched
     FieldDefinition(TQueryTableColumn::EVENT_LAST_ROW_FETCHED, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_event(ctx, LAST_ROW_FETCHED);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Events Timeline Unregister Query
     FieldDefinition(TQueryTableColumn::EVENT_UNREGISTER_QUERY, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_event(ctx, UNREGISTER_QUERY);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Read IO Wait Time Total
     FieldDefinition(TQueryTableColumn::READ_IO_WAIT_TOTAL_MS, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_decimal(ctx, ctx.record->read_io_wait_time_total, NANOS_TO_MILLIS);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Read IO Wait Time Mean
     FieldDefinition(TQueryTableColumn::READ_IO_WAIT_MEAN_MS, TPrimitiveType::DECIMAL,
         [](FieldParserContext& ctx){
           _write_decimal(ctx, ctx.record->read_io_wait_time_mean, NANOS_TO_MILLIS);
-        }, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
+        }, VERSION_1_0_0, DURATION_DECIMAL_PRECISION, DURATION_DECIMAL_SCALE),
 
     // Bytes Read from the Data Cache Total
     FieldDefinition(TQueryTableColumn::BYTES_READ_CACHE_TOTAL, TPrimitiveType::BIGINT,
         [](FieldParserContext& ctx){
           ctx.sql << ctx.record->bytes_read_cache_total;
-        }),
+        }, VERSION_1_0_0),
 
     // Bytes Read Total
     FieldDefinition(TQueryTableColumn::BYTES_READ_TOTAL, TPrimitiveType::BIGINT,
         [](FieldParserContext& ctx){
           ctx.sql << ctx.record->bytes_read_total;
-        }),
+        }, VERSION_1_0_0),
 
     // Per-Node Peak Memory Usage Min
     FieldDefinition(TQueryTableColumn::PERNODE_PEAK_MEM_MIN, TPrimitiveType::BIGINT,
@@ -392,7 +388,7 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
           } else {
             ctx.sql << 0;
           }
-        }),
+        }, VERSION_1_0_0),
 
     // Per-Node Peak Memory Usage Max
     FieldDefinition(TQueryTableColumn::PERNODE_PEAK_MEM_MAX, TPrimitiveType::BIGINT,
@@ -405,7 +401,7 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
           } else {
             ctx.sql << max_elem->second.peak_memory_usage;
           }
-        }),
+        }, VERSION_1_0_0),
 
     // Per-Node Peak Memory Usage Mean
     FieldDefinition(TQueryTableColumn::PERNODE_PEAK_MEM_MEAN, TPrimitiveType::BIGINT,
@@ -421,14 +417,14 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
           }
 
           ctx.sql << calc_mean;
-        }),
+        }, VERSION_1_0_0),
 
     // SQL Statement
     FieldDefinition(TQueryTableColumn::SQL, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" <<
               EscapeSql(ctx.record->redacted_sql, FLAGS_query_log_max_sql_length) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Query Plan
     FieldDefinition(TQueryTableColumn::PLAN, TPrimitiveType::STRING,
@@ -436,16 +432,14 @@ const array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS{{
           ctx.sql << "'"
               << EscapeSql(ctx.record->base_state->plan, FLAGS_query_log_max_plan_length)
               << "'";
-        }),
+        }, VERSION_1_0_0),
 
     // Tables Queried
     FieldDefinition(TQueryTableColumn::TABLES_QUERIED, TPrimitiveType::STRING,
         [](FieldParserContext& ctx){
           ctx.sql << "'" << PrintTableList(ctx.record->tables) << "'";
-        }),
+        }, VERSION_1_0_0),
 
     }}; // FIELDS_PARSERS const array
-
-} //namespace workload_management
 
 } // namespace impala
