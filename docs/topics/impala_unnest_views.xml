@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_unnest_views" rev="4.1.0">
+  <title>Zipping unnest on arrays from views (<keyword keyref="impala41"/> or higher only)</title>
+  <titlealts audience="PDF">
+    <navtitle>Zipping unnest on arrays from views</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p rev="4.1.0">
+      <indexterm audience="hidden">Zipping unnest on arrays from views</indexterm>
+      <keyword keyref="impala41"/>, the zipping unnest functionality works for arrays in both tables
+      and
+      views.<codeblock id="codeblock_nwz_lyc_3cc">SELECT UNNSET(arr1) FROM view_name;</codeblock>
+    </p>
+    <section id="section_irf_rrb_3cc">
+      <title>UNNEST() on array columns</title>
+      <p>You can use <codeph>UNNEST()</codeph> on array columns in two ways. Using one of these two
+        ways results in the items of the arrays being zipped together instead of joining.</p>
+      <ul id="ul_jrf_rrb_3cc">
+        <li>ISO:SQL 2016 compliant syntax</li>
+      </ul>
+      <codeblock id="codeblock_krf_rrb_3cc">SELECT a1.item, a2.item
+FROM complextypes_arrays t, UNNEST(t.arr1, t.arr2) AS (a1, a2);
+</codeblock>
+      <ul id="ul_lrf_rrb_3cc">
+        <li>Postgres compatible syntax</li>
+      </ul>
+      <codeblock id="codeblock_mrf_rrb_3cc">SELECT UNNEST(arr1), UNNEST(arr2) FROM complextypes_arrays;</codeblock>
+      <p>When unnesting multiple arrays with zipping unnest, the i'th item of one array will be
+        placed next to the i'th item of the other arrays in the results. If the size of the arrays
+        is not equal then the shorter arrays will be filled with NULL values up to the size of the
+        longest array as shown in the following example:</p>
+      <p>The test data used in this example is arr1: {1, 2, 3}, arr2: {11, 12}</p>
+      <p>After running any of the queries listed in the examples, the result will be as shown
+        here:</p>
+      <p>
+        <codeblock id="codeblock_n5z_cjq_mtb">arr1 arr2
+[1, 11]
+[2, 12]
+[3, NULL]
+</codeblock>
+      </p>
+    </section>
+    <section id="section_ifc_trb_3cc">
+      <title>Example of an UNNEST() in an inline view using SELECT/FILTER of the inline view</title>
+      <p>In the following example the filter is not in the <codeph>SELECT</codeph> query that
+        creates the inline view but a level above that.</p>
+      <codeblock id="codeblock_jfc_trb_3cc">SELECT id, ac1, ac2 FROM (SELECT id, UNNEST(array_col1) AS ac1, UNNEST(array_col2) AS ac2 FROM some_view) WHERE id &lt;10;
+</codeblock>
+    </section>
+  </conbody>
+</concept>

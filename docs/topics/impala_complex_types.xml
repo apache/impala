@@ -45,8 +45,6 @@ under the License.
       and higher. The Hive <codeph>UNION</codeph> type is not currently supported.
     </p>
 
-    <p outputclass="toc inpage"/>
-
     <p>
       Once you understand the basics of complex types, refer to the individual type topics when you need to refresh your memory about syntax
       and examples:
@@ -65,6 +63,9 @@ under the License.
         <xref href="impala_map.xml#map"/>
       </li>
     </ul>
+    <p outputclass="toc inpage"/>
+    <p>For information on querying arrays and improvements to zipping unnest functionality, refer to
+      the following:</p>
 
   </conbody>
 
