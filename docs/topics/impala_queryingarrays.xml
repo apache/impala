@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_queryingarrays" rev="4.1.0">
+  <title>Querying arrays (<keyword keyref="impala41"/> or higher only)</title>
+  <titlealts audience="PDF">
+    <navtitle>Querying arrays</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p rev="4.1.0">
+      <indexterm audience="hidden">Querying arrays</indexterm> Describes how to use UNNEST function
+      to query arrays. ARRAY data types represent collections with arbitrary numbers of elements,
+      where each element is the same type.</p>
+    <section id="section_yl4_2qb_3cc">
+      <title>Querying arrays using JOIN and UNNEST</title>
+      <p>You can query arrays by making a join between the table and the array inside the table.
+        This approach is improved with the introduction of the <codeph>UNNEST</codeph> function in
+        the <codeph>SELECT</codeph> list or in the <codeph>FROM</codeph> clause in the
+          <codeph>SELECT</codeph> statement. When you use <codeph>UNNEST</codeph>, you can provide
+        more than one array in the <codeph>SELECT</codeph> statement. If you use JOINs for querying
+        arrays it will yield a <term>joining unnest</term> however the latter will provide a
+          <term>zipping unnest</term>.</p>
+    </section>
+    <section id="section_hmf_hqb_3cc">
+      <title>Example of querying arrays using JOIN</title>
+      <p>Use <codeph>JOIN</codeph> in cases where you must join unnest of multiple arrays. However
+        if you must zip unnest then use the newly implemented <codeph>UNNEST</codeph> function.</p>
+      <p>Here is an example of a <codeph>SELECT</codeph> statement that uses JOINs to query an
+        array.</p>
+      <codeblock id="codeblock_uqy_rqb_3cc">SELECT id, arr1.item, arr2.item FROM tbl_name tbl, tbl.arr1, tbl.arr2;
+
+ID, ARR1.ITEM, ARR2.ITEM
+[1, 1, 10]
+[1, 1, 11]
+[1, 2, 10]
+[1, 2, 11]
+[1, 3, 10]
+[1, 3, 11]
+</codeblock>
+      <note id="note_tpb_wln_htb">
+        <p>The test data used in this example is ID: 1, arr1: {1, 2, 3}, arr2: {10, 11}</p>
+      </note>
+    </section>
+    <section id="section_ipq_tqb_3cc">
+      <title>Examples of querying arrays using UNNEST</title>
+      <p>You can use one of the two different syntaxes shown here to unnest multiple arrays in one
+        query. This results in the items of the arrays being zipped together instead of joining.</p>
+      <ul id="ul_jpq_tqb_3cc">
+        <li>ISO:SQL 2016 compliant syntax:
+          <codeblock id="codeblock_kpq_tqb_3cc">SELECT a1.item, a2.item
+FROM complextypes_arrays t, UNNEST(t.arr1, t.arr2) AS (a1, a2);
+</codeblock></li>
+        <li>Postgres compatible
+          syntax:<codeblock id="codeblock_yl5_3mn_htb">SELECT UNNEST(arr1), UNNEST(arr2) FROM complextypes_arrays;</codeblock></li>
+      </ul>
+      <p><b>Unnest operator in SELECT list</b></p>
+      <codeblock id="codeblock_lpq_tqb_3cc">SELECT id, unnest(arr1), unnest(arr2) FROM tbl_name;</codeblock>
+      <p><b>Unnest operator in FROM clause</b></p>
+      <codeblock id="codeblock_mpq_tqb_3cc">SELECT id, arr1.item, arr2.item FROM tbl_name tbl_alias, UNNEST(tbl_alias.arr1, tbl_alias.arr2);</codeblock>
+      <p>This new functionality would zip the arrays next to each other as shown here. </p>
+      <codeblock id="codeblock_npq_tqb_3cc">ID, ARR1.ITEM, ARR2.ITEM
+[1, 1, 10]
+[1, 2, 11]
+[1, 3, NULL]
+</codeblock>
+      <p>Note, that arr2 is shorter than arr1 so the "missing" items in its column will be filled
+        with NULLs.</p>
+      <note id="note_opq_tqb_3cc">The test data used in this example is ID: 1, arr1: {1, 2, 3},
+        arr2: {10, 11}</note>
+    </section>
+    <section id="section_i1g_wqb_3cc">
+      <title>Limitations in Using UNNEST</title>
+      <p>
+        <ul id="ul_j1g_wqb_3cc">
+          <li>Only arrays from the same table can be zipping unnested</li>
+          <li>The old (joining) and the new (zipping) unnests cannot be used together</li>
+          <li>You can add a <codeph>WHERE</codeph> filter on an unnested item only if you add a
+            wrapper <codeph>SELECT</codeph> and do the filtering
+            <p>Example:</p><codeblock id="codeblock_k1g_wqb_3cc">SELECT id, arr1_unnest FROM (SELECT id, unnest(arr1) as arr1_unnest FROM tbl_name) WHERE arr1_unnest &lt; 10;</codeblock></li>
+        </ul>
+      </p>
+    </section>
+    <section id="section_ewb_yqb_3cc">
+      <title>Using ARRAY columns in the SELECT list</title>
+      <!--Removing this since zipping unnest for arrays (IMPALA-10920) and allow array type in SELECT list (IMPALA-9498) are all added in the same upstream release (Impala 4.1)
+      <p>Prior to this release to look into the content of an array you had to unnest the array
+        either by the joining syntax or by using the zipping <codeph>UNNEST</codeph> operator as
+        shown in the following example:</p>
+      <codeblock id="codeblock_fwb_yqb_3cc">SELECT unnest(IDs), unnest(NAMES) FROM table_name;</codeblock>
+      -->
+      <p rev="4.1">Impala 4.1 adds support to return <codeph>ARRAYs</codeph> as
+          <codeph>STRINGs</codeph> (<term>JSON arrays</term>) in the <codeph>SELECT</codeph> list,
+        for example: </p>
+      <codeblock id="codeblock_gwb_yqb_3cc">select id, int_array from functional_parquet.complextypestbl where id = 1;
+returns: 1, “[1,2,3]”
+</codeblock>
+      <p>Returning <codeph>ARRAYs</codeph> from inline or Hive Metastore views is also supported.
+        These arrays can be used both in the select list or as relative table references.</p>
+      <codeblock id="codeblock_hwb_yqb_3cc">select id, int_array from (select id, int_array from complextypestbl) s;</codeblock>
+      <p>Though <codeph>STRUCTs</codeph> are already supported, <codeph>ARRAYs</codeph> and
+          <codeph>STRUCTs</codeph> nested within each other are not supported yet. Using them as
+        non-relative table references is also not supported yet.</p>
+    </section>
+  </conbody>
+</concept>

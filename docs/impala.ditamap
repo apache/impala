@@ -108,7 +108,10 @@ under the License.
       </topicref>
       <topicref href="topics/impala_tinyint.xml"/>
       <topicref href="topics/impala_varchar.xml"/>
-      <topicref href="topics/impala_complex_types.xml"/>
+      <topicref href="topics/impala_complex_types.xml">
+        <topicref href="topics/impala_queryingarrays.xml"/>
+        <topicref href="topics/impala_unnest_views.xml"/>
+      </topicref>
     </topicref>
     <topicref href="topics/impala_literals.xml"/>
     <topicref href="topics/impala_operators.xml"/>
