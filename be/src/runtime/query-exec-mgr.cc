@@ -267,7 +267,7 @@ void QueryExecMgr::CancelQueriesForFailedCoordinators(
 
 void QueryExecMgr::CancelFromThreadPool(const QueryCancellationTask& cancellation_task) {
   QueryState* qs = cancellation_task.GetQueryState();
-  VLOG(1) << "CancelFromThreadPool(): cancel query " << qs->query_id();
+  VLOG(1) << "CancelFromThreadPool(): cancel query " << PrintId(qs->query_id());
   qs->Cancel();
   qs->is_coord_active_.Store(false);
   ReleaseQueryState(qs);
