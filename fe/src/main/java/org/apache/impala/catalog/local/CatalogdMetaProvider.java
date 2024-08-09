@@ -342,6 +342,10 @@ public class CatalogdMetaProvider implements MetaProvider {
   private TUniqueId catalogServiceId_ = Catalog.INITIAL_CATALOG_SERVICE_ID;
   private final Object catalogServiceIdLock_ = new Object();
 
+  /**
+   * Object that is used to synchronize on and signal when the catalog is ready for use.
+   */
+  private final Object catalogReadyNotifier_ = new Object();
 
   /**
    * Cache of authorization policy metadata. Populated from data pushed from the
@@ -408,6 +412,18 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public AuthorizationPolicy getAuthPolicy() {
     return authPolicy_;
+  }
+
+  @Override
+  public void waitForIsReady(long timeoutMs) {
+    if (isReady()) return;
+    synchronized (catalogReadyNotifier_) {
+      try {
+        catalogReadyNotifier_.wait(timeoutMs);
+      } catch (InterruptedException e) {
+        // Ignore
+      }
+    }
   }
 
   @Override
@@ -1473,6 +1489,9 @@ public class CatalogdMetaProvider implements MetaProvider {
     // the update.
     if (nextCatalogVersion != null) {
       lastSeenCatalogVersion_.set(nextCatalogVersion);
+      synchronized (catalogReadyNotifier_) {
+        catalogReadyNotifier_.notifyAll();
+      }
     }
 
     // NOTE: the return value is ignored when this function is called by a DDL

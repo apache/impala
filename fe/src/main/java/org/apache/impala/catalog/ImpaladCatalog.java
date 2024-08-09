@@ -305,6 +305,16 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   }
 
   /**
+   * Called by FeCatalogManager when new ImpalaCatalog is created and this one is
+   * no longer used. Wakes up all threads that wait for catalogUpdateEventNotifier_.
+   */
+  public void release() {
+    synchronized (catalogUpdateEventNotifier_) {
+      catalogUpdateEventNotifier_.notifyAll();
+    }
+  }
+
+  /**
    *  Adds the given TCatalogObject to the catalog cache. The update may be ignored
    *  (considered out of date) if:
    *  1) An item exists in the catalog cache with a version > than the given

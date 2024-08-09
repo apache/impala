@@ -292,13 +292,7 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public void waitForCatalogUpdate(long timeoutMs) {
-    if (isReady()) return;
-    // Sleep here to avoid log spew from the retry loop in Frontend.
-    try {
-      Thread.sleep(timeoutMs);
-    } catch (InterruptedException e) {
-      // Ignore
-    }
+    metaProvider_.waitForIsReady(timeoutMs);
   }
 
   @Override

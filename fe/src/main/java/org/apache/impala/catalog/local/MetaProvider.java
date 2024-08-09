@@ -68,6 +68,12 @@ public interface MetaProvider {
    */
   boolean isReady();
 
+  /**
+   * Allows waiting for isReady() to become true. May return early, so
+   * it needs to be called in a loop.
+   */
+  void waitForIsReady(long timeoutMs);
+
   ImmutableList<String> loadDbList() throws TException;
 
   Database loadDb(String dbName) throws TException;

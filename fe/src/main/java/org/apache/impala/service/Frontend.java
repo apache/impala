@@ -1875,24 +1875,28 @@ public class Frontend {
   }
 
   /**
-   * Waits indefinitely for the local catalog to be ready. The catalog is "ready" after
-   * the first catalog update with a version > INITIAL_CATALOG_VERSION is received from
-   * the statestore.
+   * Waits indefinitely for the local catalog to be ready. Normally the catalog is
+   * "ready" after the first catalog update with a version > INITIAL_CATALOG_VERSION is
+   * received from the statestore. During some tests the catalog is forced to ready state
+   * with JniCatalog.setCatalogIsReady().
    *
-   * @see ImpaladCatalog#isReady()
+   * @see ImpaladCatalog#isReady(), CatalogdMetaProvider#isReady()
    */
   public void waitForCatalog() {
     LOG.info("Waiting for first catalog update from the statestore.");
     int numTries = 0;
     long startTimeMs = System.currentTimeMillis();
     while (true) {
-      if (getCatalog().isReady()) {
+      // Avoid calling getCatalog again in this attempt as it may return a different
+      // ImpaladCatalog if a full topic update has arrived.
+      FeCatalog catalog = getCatalog();
+      if (catalog.isReady()) {
         LOG.info("Local catalog initialized after: " +
             (System.currentTimeMillis() - startTimeMs) + " ms.");
         return;
       }
       LOG.info("Waiting for local catalog to be initialized, attempt: " + numTries);
-      getCatalog().waitForCatalogUpdate(MAX_CATALOG_UPDATE_WAIT_TIME_MS);
+      catalog.waitForCatalogUpdate(MAX_CATALOG_UPDATE_WAIT_TIME_MS);
       ++numTries;
     }
   }

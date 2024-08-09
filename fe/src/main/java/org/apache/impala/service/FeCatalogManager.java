@@ -115,6 +115,7 @@ public abstract class FeCatalogManager {
 
       // If this is not a delta, this update should replace the current
       // Catalog contents so create a new catalog and populate it.
+      ImpaladCatalog oldCatalog = catalog;
       catalog = createNewCatalog();
 
       TUpdateCatalogCacheResponse response = catalog.updateCatalog(req);
@@ -124,6 +125,8 @@ public abstract class FeCatalogManager {
       // disappear. The catalog is guaranteed to be ready since updateCatalog() has a
       // postcondition of isReady() == true.
       catalog_.set(catalog);
+      if (oldCatalog != null) oldCatalog.release();
+
       return response;
     }
 

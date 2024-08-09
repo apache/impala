@@ -118,6 +118,11 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
+  public void waitForIsReady(long timeoutMs) {
+    // NOOP
+  }
+
+  @Override
   public ImmutableList<String> loadDbList() throws TException {
     try (MetaStoreClient c = msClientPool_.getClient()) {
       return ImmutableList.copyOf(c.getHiveClient().getAllDatabases());
