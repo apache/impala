@@ -1159,7 +1159,7 @@ if __name__ == "__main__":
       cluster_ops.start_impalads(options.cluster_size, options.num_coordinators,
                                  options.use_exclusive_coordinators)
     # Sleep briefly to reduce log spam: the cluster takes some time to start up.
-    sleep(3)
+    sleep(2)
 
     impala_cluster = cluster_ops.get_cluster()
     expected_catalog_delays = 0

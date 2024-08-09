@@ -104,7 +104,7 @@ class ImpalaCluster(object):
     the environment."""
     return ImpalaCluster(docker_network=tests.common.environ.docker_network)
 
-  def refresh(self):
+  def refresh(self, silent=False):
     """ Re-loads the impalad/statestored/catalogd processes if they exist.
 
     Helpful to confirm that processes have been killed.
@@ -119,9 +119,10 @@ class ImpalaCluster(object):
     if self.use_admission_service:
       admissiond_str = "/%d admissiond" % (1 if self.__admissiond else 0)
 
-    LOG.debug("Found %d impalad/%d statestored/%d catalogd%s process(es)" %
-        (len(self.__impalads), len(self.__statestoreds), len(self.__catalogds),
-         admissiond_str))
+    if not silent:
+      LOG.debug("Found %d impalad/%d statestored/%d catalogd%s process(es)" %
+          (len(self.__impalads), len(self.__statestoreds), len(self.__catalogds),
+           admissiond_str))
 
   @property
   def statestored(self):
@@ -201,8 +202,10 @@ class ImpalaCluster(object):
           one impalad is up).
         - expected_num_ready_impalads backends are registered with the statestore.
           expected_num_ready_impalads defaults to expected_num_impalads.
+        - Each impalad's debug webserver is ready.
+        - Each coordinator impalad's hs2/beeswax port is open (this happens after catalog
+          cache is ready).
         - All impalads knows about all other ready impalads.
-        - Each coordinator impalad's catalog cache is ready.
       This information is retrieved by querying the statestore debug webpage
       and each individual impalad's metrics webpage.
     """
@@ -215,20 +218,35 @@ class ImpalaCluster(object):
     def check_processes_still_running():
       """Check that the processes we waited for above (i.e. impalads, statestored,
       catalogd) are still running. Throw an exception otherwise."""
-      self.refresh()
+      self.refresh(silent=True)
       # The number of impalad processes may temporarily increase if breakpad forked a
       # process to write a minidump.
       assert len(self.impalads) >= expected_num_impalads
       assert self.statestored is not None
       assert self.catalogd is not None
 
+    sleep_interval = 0.5
+    # Wait for each webserver to be ready.
+    for impalad in self.impalads:
+      impalad.wait_for_webserver(sleep_interval, check_processes_still_running)
+
+    # Wait for coordinators to start.
+    for impalad in self.impalads:
+      if impalad._get_arg_value("is_coordinator", default="true") != "true": continue
+      if impalad._get_arg_value("stress_catalog_init_delay_ms", default=0) != 0: continue
+      impalad.wait_for_coordinator_services(sleep_interval, check_processes_still_running)
+      # Decrease sleep_interval after first coordinator ready as the others are also
+      # likely to be (nearly) ready.
+      sleep_interval = 0.2
+
+    # Restore sleep interval to avoid potential log spew. At this point it is unlikely
+    # that any more sleeps are actually needed.
+    sleep_interval = 0.5
+    # Wait till all impalads consider all backends ready.
     for impalad in self.impalads:
       impalad.service.wait_for_num_known_live_backends(expected_num_ready_impalads,
-          timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2,
+          timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=sleep_interval,
           early_abort_fn=check_processes_still_running)
-      if (impalad._get_arg_value("is_coordinator", default="true") == "true"
-         and impalad._get_arg_value("stress_catalog_init_delay_ms", default=0) == 0):
-        impalad.wait_for_catalog()
 
   def wait_for_num_impalads(self, num_impalads, retries=10):
     """Checks that at least 'num_impalads' impalad processes are running, along with
@@ -589,32 +607,41 @@ class ImpaladProcess(BaseImpalaProcess):
       self.service.wait_for_metric_value('impala-server.ready',
                                          expected_value=1, timeout=timeout)
 
-  def wait_for_catalog(self):
-    """Waits for a catalog copy to be received by the impalad. When its received,
-       additionally waits for client ports to be opened."""
+  def wait_for_webserver(self, sleep_interval, early_abort_fn):
     start_time = time.time()
-    beeswax_port_is_open = False
-    hs2_port_is_open = False
-    num_dbs = 0
-    num_tbls = 0
-    while ((time.time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS)
-        and not (beeswax_port_is_open and hs2_port_is_open)):
-      try:
-        num_dbs, num_tbls = self.service.get_metric_values(
-            ["catalog.num-databases", "catalog.num-tables"])
-        beeswax_port_is_open = self.service.beeswax_port_is_open()
-        hs2_port_is_open = self.service.hs2_port_is_open()
-      except Exception:
-        LOG.exception(("Client services not ready. Waiting for catalog cache: "
-            "({num_dbs} DBs / {num_tbls} tables). Trying again ...").format(
-                num_dbs=num_dbs,
-                num_tbls=num_tbls))
-      sleep(0.5)
+    while time.time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS:
+      LOG.info("Waiting for Impalad webserver port %s", self.service.webserver_port)
+      if self.service.webserver_port_is_open(): return
+      early_abort_fn()
+      sleep(sleep_interval)
 
-    if not hs2_port_is_open or not beeswax_port_is_open:
-      raise RuntimeError(
-          "Unable to open client ports within {num_seconds} seconds.".format(
-              num_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS))
+  def wait_for_coordinator_services(self, sleep_interval, early_abort_fn):
+    """Waits for client ports to be opened. Assumes that the webservice ports are open."""
+    start_time = time.time()
+    LOG.info(
+        "Waiting for coordinator client services " +
+        "- hs2 port: %d hs2-http port: %d beeswax port: %d",
+        self.service.hs2_port, self.service.hs2_http_port, self.service.beeswax_port)
+    while time.time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS:
+      beeswax_port_is_open = self.service.beeswax_port_is_open()
+      hs2_port_is_open = self.service.hs2_port_is_open()
+      hs2_http_port_is_open = self.service.hs2_http_port_is_open()
+      if beeswax_port_is_open and hs2_port_is_open and hs2_http_port_is_open:
+        return
+      early_abort_fn()
+      # The coordinator is likely to wait for the catalog update. Fetch the number
+      # of catalog objects.
+      num_dbs, num_tbls = self.service.get_metric_values(
+          ["catalog.num-databases", "catalog.num-tables"])
+      LOG.info(("Client services not ready. Waiting for catalog cache: "
+          "({num_dbs} DBs / {num_tbls} tables). Trying again ...").format(
+              num_dbs=num_dbs,
+              num_tbls=num_tbls))
+      sleep(sleep_interval)
+
+    raise RuntimeError(
+        "Unable to open client ports within {num_seconds} seconds.".format(
+            num_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS))
 
   def set_jvm_log_level(self, class_name, level):
     """Helper method to set JVM log level for certain class name."""

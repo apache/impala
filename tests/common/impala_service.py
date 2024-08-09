@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import requests
+import socket
 import subprocess
 from datetime import datetime
 from time import sleep, time
@@ -370,7 +371,7 @@ class ImpaladService(BaseImpalaService):
       else:
         LOG.info("Waiting for num_known_live_backends=%s. Current value: %s" %
             (expected_value, value))
-      sleep(1)
+      sleep(interval)
     assert 0, 'num_known_live_backends did not reach expected value in time'
 
   def read_query_profile_page(self, query_id, timeout=10, interval=1):
@@ -425,6 +426,17 @@ class ImpaladService(BaseImpalaService):
       sleep(interval)
     return False
 
+  def is_port_open(self, port):
+    try:
+      sock = socket.create_connection((self.hostname, port), timeout=1)
+      sock.close()
+      return True
+    except Exception:
+      return False
+
+  def webserver_port_is_open(self):
+    return self.is_port_open(self.webserver_port)
+
   def create_beeswax_client(self, use_kerberos=False):
     """Creates a new beeswax client connection to the impalad"""
     client = create_connection('%s:%d' % (self.hostname, self.beeswax_port),
@@ -434,12 +446,16 @@ class ImpaladService(BaseImpalaService):
 
   def beeswax_port_is_open(self):
     """Test if the beeswax port is open. Does not need to authenticate."""
+    # Check if the port is open first to avoid chatty logging of Thrift connection.
+    if not self.is_port_open(self.beeswax_port): return False
+
     try:
       # The beeswax client will connect successfully even if not authenticated.
       client = self.create_beeswax_client()
       client.close()
       return True
-    except Exception:
+    except Exception as e:
+      LOG.info(e)
       return False
 
   def create_ldap_beeswax_client(self, user, password, use_ssl=False):
@@ -456,11 +472,14 @@ class ImpaladService(BaseImpalaService):
 
   def hs2_port_is_open(self):
     """Test if the HS2 port is open. Does not need to authenticate."""
+    # Check if the port is open first to avoid chatty logging of Thrift connection.
+    if not self.is_port_open(self.hs2_port): return False
+
     # Impyla will try to authenticate as part of connecting, so preserve previous logic
     # that uses the HS2 thrift code directly.
     try:
-      socket = TSocket(self.hostname, self.hs2_port)
-      transport = TBufferedTransport(socket)
+      sock = TSocket(self.hostname, self.hs2_port)
+      transport = TBufferedTransport(sock)
       transport.open()
       transport.close()
       return True
@@ -468,6 +487,9 @@ class ImpaladService(BaseImpalaService):
       LOG.info(e)
       return False
 
+  def hs2_http_port_is_open(self):
+    # Only check if the port is open, do not create Thrift transport.
+    return self.is_port_open(self.hs2_http_port)
 
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
