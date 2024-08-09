@@ -22,6 +22,9 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
+# Start time of run.
+START_TIME=$(date +"%Y-%m-%d %H:%M:%S")
+
 cd "${IMPALA_HOME}"
 
 export IMPALA_MAVEN_OPTIONS="-U"
@@ -90,5 +93,5 @@ fi
 
 # Always shutdown minicluster at the end and run finalize.sh
 testdata/bin/kill-all.sh
-bin/jenkins/finalize.sh
+bin/jenkins/finalize.sh "${START_TIME}"
 exit $RET_CODE

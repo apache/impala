@@ -21,6 +21,13 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
+START_TIME=""
+if [ "$#" -eq 1 ]
+then
+  # START_TIME is an optional parameter which gives the start time of the test run.
+  START_TIME="$1"
+fi
+
 if test -v CMAKE_BUILD_TYPE && [[ "${CMAKE_BUILD_TYPE}" =~ 'UBSAN' ]] \
     && [ "${UBSAN_FAIL}" = "error" ] \
     && { grep -rI ": runtime error: " "${IMPALA_HOME}/logs" 2>&1 | sort | uniq \
@@ -32,17 +39,30 @@ fi
 
 rm -rf "${IMPALA_HOME}"/logs_system
 mkdir -p "${IMPALA_HOME}"/logs_system
-# Tolerate dmesg failures. dmesg can fail if there are insufficient permissions.
-if dmesg > "${IMPALA_HOME}"/logs_system/dmesg 2>/dev/null ||
-    sudo dmesg > "${IMPALA_HOME}"/logs_system/dmesg; then
 
-  # Check dmesg for OOMs and generate a symptom if present.
-  if [[ $(grep "Out of memory" "${IMPALA_HOME}"/logs_system/dmesg) ]]; then
-    "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step dmesg \
-        --stdout "${IMPALA_HOME}"/logs_system/dmesg --error "Process was OOM killed."
+# Check dmesg output for OOMs and generate a symptom if present.
+DID_JOURNALCTL=false
+if [ -n "${START_TIME}" ]
+then
+  # Restrict the dmesg output by the start time of the test run.
+  if sudo journalctl --dmesg --since="${START_TIME}" > \
+    "${IMPALA_HOME}"/logs_system/journalctl 2>/dev/null; then
+      DID_JOURNALCTL=true
   fi
 else
-  echo "Failed to run dmesg, not checking for OOMs"
+  if sudo journalctl --dmesg > \
+    "${IMPALA_HOME}"/logs_system/journalctl 2>/dev/null; then
+      DID_JOURNALCTL=true
+  fi
+fi
+
+if [[ "${DID_JOURNALCTL}" == "true" ]]; then
+  if [[ $(grep "Out of memory" "${IMPALA_HOME}"/logs_system/journalctl) ]]; then
+    "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step dmesg \
+        --stdout "${IMPALA_HOME}"/logs_system/journalctl --error "Process was OOM killed."
+  fi
+else
+  echo "Failed to run journalctl, not checking for OOMs"
 fi
 
 # Check for any minidumps and symbolize and dump them.
