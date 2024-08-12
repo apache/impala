@@ -272,7 +272,7 @@ def assert_query(query_tbl, client, expected_cluster_id, raw_profile=None, impal
     expected = ",".join(sorted(perhost_frags.group(1).replace("(", "=")
         .replace(")", "").split(" ")))
     assert value == expected, ('per-host fragment instances incorrect.'
-        ' expected="{0}" actual="{1}"').format(expected, data[index])
+        ' expected="{0}" actual="{1}"').format(expected, value)
 
   # Backends Count
   value = column_val(TQueryTableColumn.BACKENDS_COUNT)
