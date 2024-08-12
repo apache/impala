@@ -1357,6 +1357,31 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     EventProcessorUtils.wait_for_event_processing(self)
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--enable_reload_events=true "
+                  "--invalidate_metadata_on_event_processing_failure=false")
+  def test_reload_events_modified_concurrently(self):
+    """IMPALA-13126: This test verifies that the event processor successfully consumes or
+    ignores the RELOAD event triggered by refresh operation on a partitioned table if the
+    partitions are modified concurrently on the table."""
+    tbl = "scale_db.num_partitions_1234_blocks_per_partition_1"
+    refresh_stmt = "refresh {} partition(j=0)".format(tbl)
+    for _ in range(32):
+      self.client.execute_async(refresh_stmt)
+    for _ in range(100):
+      self.client.execute(
+        "alter table {} add if not exists partition(j=-1)".format(tbl))
+      self.client.execute(
+        "alter table {} drop partition(j=-1)".format(tbl))
+
+    try:
+      EventProcessorUtils.wait_for_event_processing(self, 1000)  # bigger timeout required
+      assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    finally:
+      # Make sure the table doesn't change after this test
+      self.execute_query("alter table {} drop if exists partition(j=-1)".format(tbl))
+
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):

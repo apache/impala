@@ -1297,19 +1297,29 @@ public class MetastoreEvents {
           return true;
         }
         // Always check the lastRefreshEventId on the table first for table level refresh
-        if (tbl.getLastRefreshEventId() > getEventId() || (partitionEventObj != null &&
-            catalog_.isPartitionLoadedAfterEvent(dbName_, tblName_,
-                partitionEventObj, getEventId()))) {
-          metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
-              .inc(getNumberOfEvents());
-          String messageStr = partitionEventObj == null ? "Skipping the event since the" +
-              " table " + dbName_+ "." + tblName_ + " has last refresh id as " +
-              tbl.getLastRefreshEventId() + ". Comparing it with current event " +
-              getEventId() + ". " : "";
-          infoLog("{}Incremented events skipped counter to {}", messageStr,
-              metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
-                  .getCount());
-          return true;
+        boolean canSkip = tbl.getLastRefreshEventId() >= getEventId();
+        try {
+          if (!canSkip && partitionEventObj != null) {
+            tbl.takeReadLock();
+            canSkip = catalog_.isPartitionLoadedAfterEvent(dbName_, tblName_,
+                partitionEventObj, getEventId());
+          }
+          if (canSkip) {
+            metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                .inc(getNumberOfEvents());
+            String messageStr = partitionEventObj == null ? "Skipping the event since " +
+                "the table " + dbName_ + "." + tblName_ + " has last refresh id as " +
+                tbl.getLastRefreshEventId() + ". Comparing it with current event " +
+                getEventId() + ". " : "";
+            infoLog("{}Incremented events skipped counter to {}", messageStr,
+                metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                    .getCount());
+            return true;
+          }
+        } finally {
+          if (tbl.isReadLockedByCurrentThread()) {
+            tbl.releaseReadLock();
+          }
         }
       } catch (CatalogException e) {
         debugLog("ignoring exception while checking if it is an older event "
@@ -1805,12 +1815,6 @@ public class MetastoreEvents {
         return;
       }
 
-      if (isOlderEvent(null)) {
-        infoLog("Not processing the alter table event {} as it is an older event",
-            getEventId());
-        return;
-      }
-
       // Determine whether this is an event which we have already seen or if it is a new
       // event
       if (isSelfEvent()) {
@@ -1823,6 +1827,12 @@ public class MetastoreEvents {
         metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         infoLog("Not processing this event as it only modifies some table parameters "
             + "which can be ignored.");
+        return;
+      }
+
+      if (isOlderEvent(null)) {
+        infoLog("Not processing the alter table event {} as it is an older event",
+            getEventId());
         return;
       }
       skipFileMetadataReload_ = !isTruncateOp_ && canSkipFileMetadataReload(tableBefore_,
@@ -2640,18 +2650,18 @@ public class MetastoreEvents {
         return;
       }
 
-      if (isOlderEvent(partitionBefore_)) {
-        infoLog("Not processing the alter partition event {} as it is an older event",
-            getEventId());
-        return;
-      }
-
       // Ignore the event if this is a trivial event. See javadoc for
       // isTrivialAlterPartitionEvent() for examples.
       if (canBeSkipped()) {
         metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         infoLog("Not processing this event as it only modifies some partition "
             + "parameters which can be ignored.");
+        return;
+      }
+
+      if (isOlderEvent(partitionBefore_)) {
+        infoLog("Not processing the alter partition event {} as it is an older event",
+            getEventId());
         return;
       }
       // Reload the whole table if it's a transactional table or materialized view.
@@ -3133,13 +3143,19 @@ public class MetastoreEvents {
       org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
       if (tbl == null || tbl instanceof IncompleteTable) { return false; }
       // Always check the lastRefreshEventId on the table first for table level refresh
-      if (tbl.getLastRefreshEventId() >= getEventId()
-          || (reloadPartition_ != null
-                 && catalog_.isPartitionLoadedAfterEvent(
-                        dbName_, tblName_, reloadPartition_, getEventId()))) {
-        return true;
+      boolean canSkip = tbl.getLastRefreshEventId() >= getEventId();
+      try {
+        if (!canSkip && reloadPartition_ != null) {
+          tbl.takeReadLock();
+          canSkip = catalog_.isPartitionLoadedAfterEvent(dbName_, tblName_,
+              reloadPartition_, getEventId());
+        }
+        return canSkip;
+      } finally {
+        if (tbl.isReadLockedByCurrentThread()) {
+          tbl.releaseReadLock();
+        }
       }
-      return false;
     }
 
     /**
