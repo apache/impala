@@ -347,7 +347,8 @@ public class CatalogOpExecutor {
   // Error string for inconsistent blacklisted dbs/tables configs between catalogd and
   // coordinators.
   private final static String BLACKLISTED_DBS_INCONSISTENT_ERR_STR =
-      "--blacklisted_dbs may be inconsistent between catalogd and coordinators";
+      "--blacklisted_dbs or --enable_workload_mgmt may be inconsistent between "
+          + "catalogd and coordinators";
   private final static String BLACKLISTED_TABLES_INCONSISTENT_ERR_STR =
       "--blacklisted_tables may be inconsistent between catalogd and coordinators";
   private final static String ALTER_TBL_UNSET_NON_EXIST_PROPERTY =
@@ -1191,7 +1192,7 @@ public class CatalogOpExecutor {
           params.getRename_params().getNew_table_name());
       Preconditions.checkState(!catalog_.isBlacklistedTable(newTableName),
           String.format("Can't rename to blacklisted table name: %s. %s", newTableName,
-              BLACKLISTED_DBS_INCONSISTENT_ERR_STR));
+              BLACKLISTED_TABLES_INCONSISTENT_ERR_STR));
     }
     tryWriteLock(tbl, catalogTimeline);
     // get table's catalogVersion before altering it
