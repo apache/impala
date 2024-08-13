@@ -971,7 +971,9 @@ public class HdfsPartition extends CatalogObjectImpl implements FeFsPartition {
     }
 
     public Builder setLastRefreshEventId(long eventId) {
-      lastRefreshEventId_ = eventId;
+      if (eventId > lastRefreshEventId_) {
+        lastRefreshEventId_ = eventId;
+      }
       return this;
     }
 

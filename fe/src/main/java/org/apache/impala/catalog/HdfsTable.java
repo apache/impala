@@ -1045,6 +1045,8 @@ public class HdfsTable extends Table implements FeFsTable {
     boolean partitionNotChanged = partBuilder.equalsToOriginal(oldPartition);
     LOG.trace("Partition {} {}", oldPartition.getName(),
         partitionNotChanged ? "changed" : "unchanged");
+    // for partitioned refresh, partition should be updated whether the partition is
+    // changed or not.
     if (partitionNotChanged) return false;
     HdfsPartition newPartition = partBuilder.build();
     // Partition is reloaded and hence cache directives are not dropped.

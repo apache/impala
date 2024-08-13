@@ -1534,6 +1534,8 @@ public class MetastoreEvents {
                   .getCount());
           return true;
         }
+        DebugUtils.executeDebugAction(BackendConfig.INSTANCE.debugActions(),
+            DebugUtils.IS_OLDER_EVENT_CHECK_DELAY);
         // Always check the lastRefreshEventId on the table first for table level refresh
         boolean canSkip = tbl.getLastRefreshEventId() >= getEventId();
         try {
@@ -3280,6 +3282,7 @@ public class MetastoreEvents {
       List<Long> eventIds = new ArrayList<>();
       // We treat insert event as a special case since the self-event context for an
       // insert event is generated differently using the eventIds.
+      boolean isReloadEvent = baseEvent_ instanceof ReloadEvent;
       boolean isInsertEvent = baseEvent_ instanceof InsertEvent;
       for (T event : batchedEvents_) {
         partitionKeyValues.add(
@@ -3288,7 +3291,8 @@ public class MetastoreEvents {
         eventIds.add(event.getEventId());
       }
       return new SelfEventContext(dbName_, tblName_, partitionKeyValues,
-          baseEvent_.getPartitionForBatching().getParameters(),
+          isReloadEvent ? msTbl_.getParameters() :
+              baseEvent_.getPartitionForBatching().getParameters(),
           isInsertEvent ? eventIds : null);
     }
   }
@@ -3483,12 +3487,21 @@ public class MetastoreEvents {
 
     @Override
     public SelfEventContext getSelfEventContext() {
-      throw new UnsupportedOperationException("Self-event evaluation is unnecessary for"
-          + " this event type");
+      if (reloadPartition_ == null) {
+        return new SelfEventContext(msTbl_.getDbName(), msTbl_.getTableName(),
+            msTbl_.getParameters());
+      }
+      return new SelfEventContext(msTbl_.getDbName(), msTbl_.getTableName(),
+          Arrays.asList(getTPartitionSpecFromHmsPartition(msTbl_, reloadPartition_)),
+          msTbl_.getParameters());
     }
 
     @Override
     public void processTableEvent() throws MetastoreNotificationException {
+      if (isSelfEvent()) {
+        infoLog("Not processing the event as it is a self-event");
+        return;
+      }
       if (isOlderEvent()) {
         metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .inc(getNumberOfEvents());

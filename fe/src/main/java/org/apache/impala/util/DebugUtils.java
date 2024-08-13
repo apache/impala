@@ -131,6 +131,12 @@ public class DebugUtils {
   public static final String RESET_METADATA_LOOP_UNLOCKED =
       "reset_metadata_loop_unlocked";
 
+  // debug action label to inject a delay when firing reload events
+  public static final String FIRE_RELOAD_EVENT_DELAY = "fire_reload_event_delay";
+
+  // debug action label to inject a delay when checking for older event
+  public static final String IS_OLDER_EVENT_CHECK_DELAY = "older_event_check_delay";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */

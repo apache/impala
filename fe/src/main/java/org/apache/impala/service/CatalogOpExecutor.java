@@ -7452,7 +7452,7 @@ public class CatalogOpExecutor {
         }
         Preconditions.checkNotNull(tbl, "tbl is null in " + cmdString);
         // fire event for refresh event and update the last refresh event id
-        fireReloadEventAndUpdateRefreshEventId(req, tblName, tbl);
+        fireReloadEventAndUpdateRefreshEventId(req, tblName, tbl, eventId);
         catalogTimeline.markEvent("Fired reload events in Metastore");
       }
 
@@ -7515,7 +7515,7 @@ public class CatalogOpExecutor {
    * and update the last refresh event id in the cache
    */
   private void fireReloadEventAndUpdateRefreshEventId(
-      TResetMetadataRequest req, TableName tblName, Table tbl) {
+      TResetMetadataRequest req, TableName tblName, Table tbl, long currentHMSEventId) {
     // Partition spec (List<TPartitionKeyValue>) for each partition
     List<List<TPartitionKeyValue>> partSpecList = null;
     // Partition values (List<String>) for each partition
@@ -7532,10 +7532,18 @@ public class CatalogOpExecutor {
               .collect(Collectors.toList()))
           .collect(Collectors.toList());
     }
+    DebugUtils.executeDebugAction(
+        BackendConfig.INSTANCE.debugActions(), DebugUtils.FIRE_RELOAD_EVENT_DELAY);
+    long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     try {
+      Map<String, String> selfEventProps = new HashMap<>();
+      selfEventProps.put(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
+          catalog_.getCatalogServiceId());
+      selfEventProps.put(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
+          String.valueOf(newCatalogVersion));
       List<Long> eventIds = MetastoreShim.fireReloadEventHelper(
           catalog_.getMetaStoreClient(), req.isIs_refresh(), partValsList,
-          tblName.getDb(), tblName.getTbl(), Collections.emptyMap());
+          tblName.getDb(), tblName.getTbl(), selfEventProps);
       LOG.info("Fired {} RELOAD events for table {}: {}", eventIds.size(),
           tbl.getFullName(), StringUtils.join(",", eventIds));
       // Update the lastRefreshEventId accordingly
@@ -7548,6 +7556,10 @@ public class CatalogOpExecutor {
       }
 
       // tbl lock is held at this point.
+      // It is possible that some operations might have modified the metadata externally
+      // while refresh operation is still in-progress, so it is safe to set the latest
+      // HMS notification event id before refresh operation, on the metadata object as
+      // lastRefreshEventId
       if (partSpecList != null) {
         Preconditions.checkNotNull(partValsList);
         boolean partitionChanged = false;
@@ -7555,11 +7567,20 @@ public class CatalogOpExecutor {
           HdfsTable hdfsTbl = (HdfsTable) tbl;
           HdfsPartition partition = hdfsTbl
               .getPartitionFromThriftPartitionSpec(partSpecList.get(i));
+          if (currentHMSEventId + 1 == eventIds.get(i)) {
+            currentHMSEventId = eventIds.get(i);
+          }
           if (partition != null) {
             HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
             // use last event id, so that batch partition events will not reloaded again
-            partBuilder.setLastRefreshEventId(eventIds.get(eventIds.size() - 1));
-            partitionChanged |= hdfsTbl.updatePartition(partBuilder);
+            partBuilder.setLastRefreshEventId(currentHMSEventId);
+            if (hdfsTbl.updatePartition(partBuilder)) {
+              partitionChanged = true;
+              partition = hdfsTbl.getPartitionFromThriftPartitionSpec(
+                  partSpecList.get(i));
+              Preconditions.checkNotNull(partition, "Partition is null after update");
+            }
+            partition.addToVersionsForInflightEvents(false, newCatalogVersion);
           } else {
             LOG.warn("Partition {} no longer exists in table {}. It might be " +
                     "dropped by a concurrent operation.",
@@ -7572,8 +7593,14 @@ public class CatalogOpExecutor {
           tbl.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
         }
       } else {
-        tbl.setLastRefreshEventId(eventIds.get(0));
+        if (currentHMSEventId + 1 == eventIds.get(0)) {
+          currentHMSEventId = eventIds.get(0);
+        }
+        tbl.setLastRefreshEventId(currentHMSEventId);
+        // Add inflight event at table level
+        catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
       }
+
     } catch (TException | CatalogException e) {
       LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR,
           "fireReloadEvent") + e.getMessage());
