@@ -50,7 +50,9 @@ under the License.
             {% if not post.meta('nocomments') and site_has_comments %}
                 <p class="commentline">{{ comments.comment_link(post.permalink(), post._base_path) }}
             {% endif %}
-            {{ html_sourcelink() }}
+            {% if html_sourcelink() %}
+              {{ html_sourcelink() }}
+            {% endif %}
             {% if post.meta('link') %}
                     <p class="linkline"><a href="{{ post.meta('link') }}">{{ messages("Original site") }}</a></p>
             {% endif %}

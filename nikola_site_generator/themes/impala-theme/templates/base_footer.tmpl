@@ -41,8 +41,8 @@ under the License.
 
     <div class="footer">
       <center>
-        <a href="http://www.apache.org/events/current-event.html">
-          <img src="http://www.apache.org/events/current-event-234x60.png"/>
+        <a href="https://www.apache.org/events/current-event.html">
+          <img src="https://www.apache.org/events/current-event-234x60.png"/>
         </a>
       </center>
       <p>Apache Impala, Impala, Apache, the Apache feather logo, and the Apache
@@ -53,7 +53,9 @@ under the License.
 
     {% if content_footer %}
       <p>{{ content_footer }}</p>
-      {{ template_hooks['page_footer']() }}
+      {% if template_hooks['page_footer']() %}
+        {{ template_hooks['page_footer']() }}
+      {% endif %}
     {% endif %}
   </footer>
 {% endmacro %}
