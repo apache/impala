@@ -283,8 +283,8 @@ command line parameter.</p>
   var dbOpenReq = indexedDB.open("imported_queries");
   var db;
 
-  const profileParseWorker = new Worker("{{ __common__.host-url }}"
-      + "/www/scripts/queries/profileParseWorker.js");
+  const profileParseWorker = new Worker(
+      "{{ __common__.host-url }}/www/scripts/queries/profileParseWorker.js");
   var query_processor_start_time, raw_total_size, compressed_total_size, upload_count;
 
   function insertRowVal(row, val) {
@@ -394,7 +394,7 @@ command line parameter.</p>
         var query = cursor.value;
         var row = imported_queries_table.insertRow();
         var query_link = document.createElement("a");
-        query_link.href = `/query_timeline?query_id=${query.id}&imported=true`;
+        query_link.href = `{{ __common__.host-url }}/query_timeline?query_id=${query.id}&imported=true`;
         query_link.innerHTML = query.id;
         insertRowVal(row, query_link.outerHTML);
         insertRowVal(row, query.user);

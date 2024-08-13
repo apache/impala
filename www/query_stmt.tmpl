@@ -36,7 +36,8 @@ under the License.
 <script type="module">
 $("#stmt-tab").addClass("active");
 
-import {inflateParseJSON} from "./www/scripts/compression_util.js";
+import {inflateParseJSON}
+    from "{{ __common__.host-url }}/www/scripts/compression_util.js";
 
 var dbOpenReq = indexedDB.open("imported_queries");
 var db;

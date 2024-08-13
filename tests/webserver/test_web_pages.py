@@ -894,8 +894,14 @@ class TestWebPage(ImpalaTestSuite):
     javascript_regex = "open\(['\"]GET['\"], (?!make_url)"
     # Matches urls in json parameters passed to DataTables.
     datatables_regex = "url: ['\"](?!make_url)"
-    regex = "(%s)|(%s)|(%s)|(%s)|(%s)" % \
-        (href_regex, script_regex, form_regex, javascript_regex, datatables_regex)
+    # Matches all references of paths that contain '/www/' but are not fully qualified.
+    path_regex = r"((?<!{{ __common__.host-url }})(?<!make_url\(\")/www/.*)"
+    # Matches all links with an 'href' attribute that doesn't start with 'URL', or '`$',
+    # or '`{{ __common__.host-url }}'.
+    link_regex = r"(.*link.*\.href[\s]=[\s](?!(`{{ __common__.host-url }})|(`\$)|URL))"
+    regex = "(%s)|(%s)|(%s)|(%s)|(%s)|(%s)|(%s)" % \
+        (href_regex, script_regex, form_regex, javascript_regex, datatables_regex,
+         path_regex, link_regex)
     results = grep_dir(os.path.join(os.environ['IMPALA_HOME'], "www"), regex, ".*\.tmpl")
     assert len(results) == 0, \
         "All links on the webui must include the webserver host: %s" % results
