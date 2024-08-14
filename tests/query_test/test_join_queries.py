@@ -118,6 +118,12 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/empty-build-joins', new_vector)
 
+  def test_miss_tuple_joins(self, vector, unique_database):
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/miss-tuple-joins', new_vector, unique_database)
+
 class TestTPCHJoinQueries(ImpalaTestSuite):
   # Uses the TPC-H dataset in order to have larger joins. Needed for example to test
   # the repartitioning codepaths.

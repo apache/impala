@@ -28,6 +28,7 @@ import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
@@ -191,6 +192,38 @@ public abstract class JoinNode extends PlanNode {
       nullableTupleIds_.addAll(inner.getTupleIds());
     } else if (joinOp_.equals(JoinOperator.RIGHT_OUTER_JOIN)) {
       nullableTupleIds_.addAll(outer.getTupleIds());
+    }
+  }
+
+  @Override
+  public ExprSubstitutionMap getOutputSmap() {
+    // Filter out illegal output for certain join nodes, including those with
+    // join operators LEFT_ANTI_JOIN, LEFT_SEMI_JOIN, NULL_AWARE_LEFT_ANTI_JOIN,
+    // and ICEBERG_DELETE_JOIN.
+    switch (joinOp_) {
+      case LEFT_ANTI_JOIN:
+      case LEFT_SEMI_JOIN:
+      case NULL_AWARE_LEFT_ANTI_JOIN:
+      case ICEBERG_DELETE_JOIN: {
+        ExprSubstitutionMap result = new ExprSubstitutionMap();
+        List<Expr> lhs = Expr.cloneList(outputSmap_.getLhs());
+        List<Expr> rhs = Expr.cloneList(outputSmap_.getRhs());
+        for (int i = 0; i < rhs.size(); i++) {
+          if (rhs.get(i) instanceof SlotRef) {
+            SlotRef slotRef = (SlotRef) rhs.get(i);
+            TupleId tid = slotRef.getDesc().getParent().getId();
+            // If the tid is not in the current node's tuple ids, skip it.
+            if (!tupleIds_.contains(tid)) {
+              continue;
+            }
+          }
+          result.put(lhs.get(i), rhs.get(i));
+        }
+        return result;
+      }
+      default: {
+        return outputSmap_;
+      }
     }
   }
 

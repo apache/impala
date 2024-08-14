@@ -1,0 +1,116 @@
+====
+---- QUERY
+CREATE TABLE test_miss_tuple_1 (
+  f0 INT
+)
+STORED AS PARQUET;
+====
+---- QUERY
+CREATE TABLE test_miss_tuple_2 (
+  f0 INT
+)
+STORED AS PARQUET;
+====
+---- QUERY
+INSERT INTO test_miss_tuple_1 VALUES (1);
+====
+---- QUERY
+INSERT INTO test_miss_tuple_1 VALUES (2);
+====
+---- QUERY
+INSERT INTO test_miss_tuple_1 VALUES (3);
+====
+---- QUERY
+INSERT INTO test_miss_tuple_2 VALUES (1);
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1
+WHERE f0 NOT IN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY rand() LIMIT 10000)
+ORDER BY f0, rand() LIMIT 200000;
+---- TYPES
+int
+---- RESULTS
+2
+3
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1
+WHERE f0 NOT IN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY abs(1) LIMIT 10000)
+ORDER BY f0, abs(1) LIMIT 200000;
+---- TYPES
+int
+---- RESULTS
+2
+3
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1
+WHERE f0 IN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY rand() LIMIT 10000)
+ORDER BY f0, rand() LIMIT 200000;
+---- TYPES
+int
+---- RESULTS
+1
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1
+WHERE f0 IN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY abs(1) LIMIT 10000)
+ORDER BY f0, abs(1) LIMIT 200000;
+---- TYPES
+int
+---- RESULTS
+1
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1 t1
+LEFT SEMI JOIN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY rand() LIMIT 10000) t2
+ON t1.f0 = t2.f0
+ORDER BY f0, rand() LIMIT 10000;
+---- TYPES
+int
+---- RESULTS
+1
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1 t1
+LEFT ANTI JOIN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY rand() LIMIT 10000) t2
+ON t1.f0 = t2.f0
+ORDER BY f0, rand() LIMIT 10000;
+---- TYPES
+int
+---- RESULTS
+2
+3
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1 t1
+RIGHT SEMI JOIN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY rand() LIMIT 10000) t2
+ON t1.f0 = t2.f0
+ORDER BY f0, rand() LIMIT 10000;
+---- TYPES
+int
+---- RESULTS
+1
+====
+---- QUERY
+SELECT *
+  FROM test_miss_tuple_1 t1
+RIGHT ANTI JOIN
+  (SELECT f0 FROM test_miss_tuple_2 ORDER BY rand() LIMIT 10000) t2
+ON t1.f0 = t2.f0
+ORDER BY f0, rand() LIMIT 10000;
+====
