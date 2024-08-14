@@ -341,18 +341,19 @@ redhat sudo yum install -y ccache
 redhat sudo yum clean all
 
 # Download Maven since the packaged version is pretty old.
-if [ ! -d /usr/local/apache-maven-3.9.6 ]; then
+MVN_VERSION="3.9.8"
+if [ ! -d "/usr/local/apache-maven-${MVN_VERSION}" ]; then
   sudo wget -nv \
-    https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz
-  sha512sum -c - <<< '706f01b20dec0305a822ab614d51f32b07ee11d0218175e55450242e49d2156386483b506b3a4e8a03ac8611bae96395fd5eec15f50d3013d5deed6d1ee18224  apache-maven-3.9.6-bin.tar.gz'
-  sudo tar -C /usr/local -xzf apache-maven-3.9.6-bin.tar.gz
+    "https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz"
+  sha512sum -c - <<< "7d171def9b85846bf757a2cec94b7529371068a0670df14682447224e57983528e97a6d1b850327e4ca02b139abaab7fcb93c4315119e6f0ffb3f0cbc0d0b9a2 apache-maven-${MVN_VERSION}-bin.tar.gz"
+  sudo tar -C /usr/local -xzf "apache-maven-${MVN_VERSION}-bin.tar.gz"
   # Ensure that Impala's preferred version is installed locally,
   # even if a previous version exists there.
-  sudo ln -s -f /usr/local/apache-maven-3.9.6/bin/mvn /usr/local/bin
+  sudo ln -s -f "/usr/local/apache-maven-${MVN_VERSION}/bin/mvn" "/usr/local/bin"
 
   # reset permissions on redhat8
   # TODO: figure out why this is necessary for redhat8
-  MAVEN_DIRECTORY="/usr/local/apache-maven-3.9.6"
+  MAVEN_DIRECTORY="/usr/local/apache-maven-${MVN_VERSION}"
   redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
   redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
   redhat9 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
