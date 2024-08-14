@@ -1447,14 +1447,11 @@
 
       <div class="body conbody">
 
-        <p class="p">
-          URIs represent the file paths you specify as part of statements such as <code class="ph codeph">CREATE
-          EXTERNAL TABLE</code> and <code class="ph codeph">LOAD DATA</code>. Typically, you specify what
-          look like UNIX paths, but these locations can also be prefixed with
-          <code class="ph codeph">hdfs://</code> to make clear that they are really URIs. To set privileges
-          for a URI, specify the name of a directory, and the privilege applies to all the files
-          in that directory and any directories underneath it.
-        </p>
+        <p class="p"> URIs represent the file paths you specify as part of statements such as <code class="ph codeph">CREATE
+            EXTERNAL TABLE</code> and <code class="ph codeph">LOAD DATA</code>. Typically, you specify what look
+          like UNIX paths, but these locations can also be prefixed with <code class="ph codeph">hdfs://</code> to
+          make clear that they are really URIs. To set privileges for a URI, specify the name of a
+          directory, and the privilege applies to all the files in that directory. </p>
 
 
         <div class="p">
@@ -1715,103 +1712,103 @@ GRANT SELECT ON TABLE training.course1 TO ROLE student;</code></pre>
         a policy using the Ranger REST API. 
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="sec_ranger_col_masking__table_mask_types" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /><col /></colgroup><thead class="thead" style="text-align:left;">
               <tr class="row">
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d21259e1712">Type</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d21304e1712">Type</th>
 
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d21259e1715">Name</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d21304e1715">Name</th>
 
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d21259e1718">Description</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d21304e1718">Description</th>
 
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d21259e1721">Transformer</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d21304e1721">Transformer</th>
 
               </tr>
 
             </thead>
 <tbody class="tbody">
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">MASK</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">MASK</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Redact</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Redact</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">Replace lowercase with 'x', uppercase with 'X', digits with '0'</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">Replace lowercase with 'x', uppercase with 'X', digits with '0'</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 ">mask({col})</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">MASK_SHOW_LAST_4</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Partial mask: show last 4</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">Show last 4 characters; replace rest with 'x'</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 ">mask_show_last_n({col}, 4, 'x', 'x', 'x', -1, '1')</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 ">mask({col})</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">MASK_SHOW_FIRST_4</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">MASK_SHOW_LAST_4</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Partial mask: show first 4</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Partial mask: show last 4</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">Show first 4 characters; replace rest with 'x'</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">Show last 4 characters; replace rest with 'x'</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 ">mask_show_first_n({col}, 4, 'x', 'x', 'x', -1, '1')</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">MASK_HASH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Hash</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">Hash the value</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 ">mask_hash({col})</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 ">mask_show_last_n({col}, 4, 'x', 'x', 'x', -1, '1')</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">MASK_NULL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">MASK_SHOW_FIRST_4</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Nullify</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Partial mask: show first 4</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">Replace with NULL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">Show first 4 characters; replace rest with 'x'</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 "> N/A</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">MASK_NONE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Unmasked (retain original value)</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">No masking</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 "> N/A</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 ">mask_show_first_n({col}, 4, 'x', 'x', 'x', -1, '1')</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">MASK_DATE_SHOW_YEAR</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">MASK_HASH</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Date: show only year</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Hash</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">Date: show only year</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">Hash the value</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 ">mask({col}, 'x', 'x', 'x', -1, '1', 1, 0, -1)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 ">mask_hash({col})</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1712 ">CUSTOM</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">MASK_NULL</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1715 ">Custom</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Nullify</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1718 ">Custom</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">Replace with NULL</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21259e1721 ">N/A</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 "> N/A</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">MASK_NONE</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Unmasked (retain original value)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">No masking</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 "> N/A</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">MASK_DATE_SHOW_YEAR</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Date: show only year</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">Date: show only year</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 ">mask({col}, 'x', 'x', 'x', -1, '1', 1, 0, -1)</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1712 ">CUSTOM</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1715 ">Custom</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1718 ">Custom</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d21304e1721 ">N/A</td>
 
               </tr>
 

@@ -1073,14 +1073,11 @@ Toolkit code.
 
       <div class="body conbody">
 
-        <p class="p">
-          URIs represent the file paths you specify as part of statements such as <code class="ph codeph">CREATE
-          EXTERNAL TABLE</code> and <code class="ph codeph">LOAD DATA</code>. Typically, you specify what
-          look like UNIX paths, but these locations can also be prefixed with
-          <code class="ph codeph">hdfs://</code> to make clear that they are really URIs. To set privileges
-          for a URI, specify the name of a directory, and the privilege applies to all the files
-          in that directory and any directories underneath it.
-        </p>
+        <p class="p"> URIs represent the file paths you specify as part of statements such as <code class="ph codeph">CREATE
+            EXTERNAL TABLE</code> and <code class="ph codeph">LOAD DATA</code>. Typically, you specify what look
+          like UNIX paths, but these locations can also be prefixed with <code class="ph codeph">hdfs://</code> to
+          make clear that they are really URIs. To set privileges for a URI, specify the name of a
+          directory, and the privilege applies to all the files in that directory. </p>
 
         <div class="p">
           URIs must start with <code class="ph codeph">hdfs://</code>, <code class="ph codeph">s3a://</code>,

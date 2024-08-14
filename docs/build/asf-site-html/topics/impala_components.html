@@ -134,20 +134,25 @@ Toolkit code.
 
     <div class="body conbody">
 
-      <p class="p"> The Impala component known as the Catalog Service relays the metadata
-        changes from Impala SQL statements to all the Impala daemons in a
-        cluster. It is physically represented by a daemon process named
-          <code class="ph codeph">catalogd</code>. You only need such a process on one host in
-        a cluster. Because the requests are passed through the StateStore
-        daemon, it makes sense to run the <span class="keyword cmdname">statestored</span> and
-          <span class="keyword cmdname">catalogd</span> services on the same host. </p>
+      <p class="p"> The Impala component known as the Catalog Service relays the metadata changes from Impala
+        SQL statements to all the Impala coordinators in a cluster. It is physically represented by
+        a daemon process named <code class="ph codeph">catalogd</code>. You only need such a process on one host
+        in a cluster. Because the requests are passed through the StateStore daemon, it makes sense
+        to run the <span class="keyword cmdname">statestored</span> and <span class="keyword cmdname">catalogd</span> services on the
+        same host. </p>
 
-      <p class="p"> The catalog service avoids the need to issue <code class="ph codeph">REFRESH</code>
-        and <code class="ph codeph">INVALIDATE METADATA</code> statements when the metadata
-        changes are performed by statements issued through Impala. When you
-        create a table, load data, and so on through Hive, you do need to issue
-          <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code> on an
-        Impala daemon before executing a query there. </p>
+      <p class="p"> The catalog service avoids the need to issue <code class="ph codeph">REFRESH</code> and
+          <code class="ph codeph">INVALIDATE METADATA</code> statements when the metadata changes are performed by
+        statements issued through Impala.
+      </p> 
+      <div class="p"> When you create a table, load data, and so on through Hive, you do need to issue
+          <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code> on an Impala daemon
+        before executing a query. Performing <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE
+          METADATA</code> is not required when <cite class="cite">Automatic Invalidation/Refresh of
+          Metadata</cite> is enabled. See <a class="xref" href="impala_metadata.html#impala_metadata">Automatic
+          Invalidation/Refresh of Metadata</a> also known as the Hive Metastore (HMS) event
+          processor.<div class="note note note_note" id="intro_catalogd__note_eyx_qcp_fcc"><span class="note__title notetitle">Note:</span> From Impala 4.1, Automatic
+          Invalidation/Refresh of Metadata is enabled by default.</div></div>
 
       <p class="p">
         This feature touches a number of aspects of Impala:

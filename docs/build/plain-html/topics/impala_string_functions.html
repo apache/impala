@@ -761,7 +761,7 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
         different results depending on the type of the argument and the presence of trailing
         spaces for <code class="ph codeph">CHAR</code> values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code>
         values are displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2695"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2710"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -1410,7 +1410,7 @@ select instr('foo bar bletch', 'b', 1, 2);
         different results depending on the type of the argument and the presence of trailing
         spaces for <code class="ph codeph">CHAR</code> values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code>
         values are displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2695"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2710"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),

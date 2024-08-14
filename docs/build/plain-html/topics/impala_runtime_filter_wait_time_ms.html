@@ -34,6 +34,13 @@
       adjusts the settings for the runtime filtering feature.
       It specifies a time in milliseconds that each scan node waits for
       runtime filters to be produced by other plan fragments.
+      Note that the wait time for a runtime filter is with respect to the start of
+      processing the query in the given executor instead of the beginning of the Open
+      phase of a scan node. For instance, a scan node could start so late that at the
+      beginning of the Open phase of the scan node, the amount of time passed since the
+      start of query processing was already greater than the value of
+      <code class="ph codeph">RUNTIME_FILTER_WAIT_TIME_MS</code>. In such a case, even though the
+      runtime filter has not arrived yet, the scan node will not wait any longer.
     </p>
 
 

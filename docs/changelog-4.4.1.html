@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Impala 4.4.1 Change Log</title>
+</head>
+<body>
+<h1>Impala 4.4.1 Change Log</h1>
+<h2>        Bug
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-10451'>IMPALA-10451</a>] -         TestAvroSchemaResolution.test_avro_schema_resolution fails when bumping Hive to have HIVE-24157
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12680'>IMPALA-12680</a>] -         NullPointerException in addHmsPartitions() during MetastoreEventsProcessor switch state from PAUSED to ACTIVE
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12712'>IMPALA-12712</a>] -         INVALIDATE METADATA &lt;table&gt; should set a better createEventId
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13028'>IMPALA-13028</a>] -         libkudu_client.so is not stripped in the DEB/RPM packages
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13034'>IMPALA-13034</a>] -         Add logs for slow HTTP requests dumping the profile
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13035'>IMPALA-13035</a>] -         Querying metadata tables from non-Iceberg tables throws IllegalArgumentException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13040'>IMPALA-13040</a>] -         SIGSEGV in  QueryState::UpdateFilterFromRemote
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13057'>IMPALA-13057</a>] -         Incorporate tuple/slot information into the tuple cache key
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13058'>IMPALA-13058</a>] -         TestRuntimeFilters.test_basic_filters failed in exhaustive mode on ARM builds 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13076'>IMPALA-13076</a>] -         Add pstack and jstack to Impala docker images
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13077'>IMPALA-13077</a>] -         Equality predicate on partition column and uncorrelated subquery doesn&#39;t reduce the cardinality estimate
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13107'>IMPALA-13107</a>] -         Invalid TExecPlanFragmentInfo received by executor with instance number as 0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13119'>IMPALA-13119</a>] -         CostingSegment.java is initialized with wrong cost
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13129'>IMPALA-13129</a>] -         Hit DCHECK when skipping MIN_MAX runtime filter
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13130'>IMPALA-13130</a>] -         Under heavy load, Impala does not prioritize data stream operations
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13134'>IMPALA-13134</a>] -         DDL hang with SYNC_DDL enabled when Catalogd is changed to standby status
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13138'>IMPALA-13138</a>] -         Never smallify existing StringValue objects, only new ones during DeepCopy
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13143'>IMPALA-13143</a>] -         TestCatalogdHA.test_catalogd_failover_with_sync_ddl times out expecting query failure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13150'>IMPALA-13150</a>] -         Possible buffer overflow in StringVal::CopyFrom()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13152'>IMPALA-13152</a>] -         IllegalStateException in computing processing cost when there are predicates on analytic output columns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13159'>IMPALA-13159</a>] -         Running queries been cancelled after statestore failover
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13161'>IMPALA-13161</a>] -         impalad crash -- impala::DelimitedTextParser&lt;true&gt;::ParseFieldLocations
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13167'>IMPALA-13167</a>] -         Impala&#39;s coordinator could not be connected after a restart in custom cluster test in the ASAN build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13170'>IMPALA-13170</a>] -         InconsistentMetadataFetchException due to database dropped when showing databases
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13203'>IMPALA-13203</a>] -          ExprRewriter did not rewrite &#39;id = 0 OR false&#39; as expected
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13252'>IMPALA-13252</a>] -         Filter update log message prints TUniqueId in non-standard format
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13270'>IMPALA-13270</a>] -         Bug when comparing ExprSubstitutionMap.size()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13272'>IMPALA-13272</a>] -         Analytic function of collections can lead to crash
+</li>
+</ul>
+<h2>        Improvement
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8042'>IMPALA-8042</a>] -         Better selectivity estimate for BETWEEN
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-12800'>IMPALA-12800</a>] -         Queries with many nested inline views see performance issues with ExprSubstitutionMap
+</li>
+</ul>
+<h2>        Documentation
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-11328'>IMPALA-11328</a>] -         Mistmatch on max_errors documentation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13036'>IMPALA-13036</a>] -         Document Iceberg metadata tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13071'>IMPALA-13071</a>] -         Update the doc of Impala components
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13250'>IMPALA-13250</a>] -         Document ENABLED_RUNTIME_FILTER_TYPES query option
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13257'>IMPALA-13257</a>] -         Add doc for unnest() function and querying arrays
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13271'>IMPALA-13271</a>] -         Ranger Impala Authorization | Non-recursive policy
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13276'>IMPALA-13276</a>] -         Revise the documentation of query option &#39;RUNTIME_FILTER_WAIT_TIME_MS&#39;
+</li>
+</ul>
+<h2>        Sub-task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13018'>IMPALA-13018</a>] -         Fix test_tpcds_queries.py/TestTpcdsQueryForJdbcTables.test_tpcds-decimal_v2-q80a failure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-13256'>IMPALA-13256</a>] -         SQLDataException in external JDBC table query request
+</li>
+</ul>
+</body>
+</html>

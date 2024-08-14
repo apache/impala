@@ -1895,7 +1895,21 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
           animated demo</a>.
       </p>
 
-      
+
+      <p class="p" id="common__comma_separated_values_blurb">
+        Impala backend expects comma separated values to be in quotes when executing the
+        <code class="ph codeph">SET</code> statement.
+        This is usually the case when running SET statement like
+        <code class="ph codeph">SET ENABLED_RUNTIME_FILTER_TYPES="value1,value2"</code> using a JDBC
+        driver. When using Impala-shell client, the <code class="ph codeph">SET</code> statement is not
+        executed immediately but query options are updated in the client and applied as
+        part of the following statement, so no quotes are required for Impala-shell. That
+        is, we use SET statement like
+        <code class="ph codeph">SET ENABLED_RUNTIME_FILTER_TYPES=value1,value2</code> when
+        submitting the query to Impala backend via Impala-shell client.
+      </p>
+
+
       <p class="p" id="common__runtime_filter_mode_blurb">
         Because the runtime filtering feature is
         enabled by default only for local processing, the other filtering-related query options have
@@ -3971,6 +3985,11 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
       <p class="p" id="common__internals_min_bytes">
         <strong class="ph b">Internal details:</strong> Represented in memory as a byte array with the minimum size
         needed to represent each value.
+      </p>
+
+
+      <p class="p" id="common__added_in_400">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 4.0</span>
       </p>
 
 

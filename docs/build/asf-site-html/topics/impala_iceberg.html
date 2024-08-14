@@ -679,8 +679,80 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title17" id="impala_iceberg__iceberg_table_cloning">
-    <h2 class="title topictitle2" id="ariaid-title17">Cloning Iceberg tables (LIKE clause)</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title17" id="impala_iceberg__iceberg_metadata_tables">
+    <h2 class="title topictitle2" id="ariaid-title17">Iceberg metadata tables</h2>
+    <div class="body conbody">
+      <p class="p">
+        Iceberg stores extensive metadata for each table (e.g. snapshots, manifests, data
+        and delete files etc.), which is accessible in Impala in the form of virtual
+        tables called metadata tables.
+      </p>
+      <p class="p">
+        Metadata tables can be queried just like regular tables, including filtering,
+        aggregation and joining with other metadata and regular tables. On the other hand,
+        they are read-only, so it is not possible to change, add or remove records from
+        them, they cannot be dropped and new metadata tables cannot be created. Metadata
+        changes made in other ways (not through metadata tables) are reflected in the
+        tables.
+      </p>
+      <div class="p">
+        To list the metadata tables available for an Iceberg table, use the <code class="ph codeph">SHOW
+        METADATA TABLES</code> command:
+
+        <pre class="pre codeblock"><code>
+SHOW METADATA TABLES IN [db.]tbl [[LIKE] “pattern”]
+        </code></pre>
+
+        It is possible to filter the result using <code class="ph codeph">pattern</code>. All Iceberg
+        tables have the same metadata tables, so this command is mostly for convenience.
+        Using <code class="ph codeph">SHOW METADATA TABLES</code> on a non-Iceberg table results in an
+        error.
+      </div>
+      <p class="p">
+        Just like regular tables, metadata tables have schemas that can be queried with
+        the <code class="ph codeph">DESCRIBE</code> command. Note, however, that <code class="ph codeph">DESCRIBE
+        FORMATTED|EXTENDED</code> are not available for metadata tables.
+      </p>
+      <div class="p">
+        Example:
+        <pre class="pre codeblock"><code>
+DESCRIBE functional_parquet.iceberg_alltypes_part.history;
+        </code></pre>
+      </div>
+      <p class="p">
+        To retrieve information from metadata tables, use the usual
+        <code class="ph codeph">SELECT</code> statement. You can select any subset of the columns or all
+        of them using ‘*’. Note that in contrast to regular tables, <code class="ph codeph">SELECT
+        *</code> on metadata tables always includes complex-typed columns in the result.
+        Therefore, the query option <code class="ph codeph">EXPAND_COMPLEX_TYPES</code> only applies to
+        regular tables. This holds also in queries that mix metadata tables and regular
+        tables: for <code class="ph codeph">SELECT *</code> expressions from metadata tables, complex
+        types will always be included, and for <code class="ph codeph">SELECT *</code> expressions from
+        regular tables, complex types will be included if and only if
+        <code class="ph codeph">EXPAND_COMPLEX_TYPES</code> is true.
+      </p>
+      <p class="p">
+        Note that unnesting collections from metadata tables is not supported.
+      </p>
+      <div class="p">
+        Example:
+        <pre class="pre codeblock"><code>
+SELECT
+    s.operation,
+    h.is_current_ancestor,
+    s.summary
+FROM functional_parquet.iceberg_alltypes_part.history h
+JOIN functional_parquet.iceberg_alltypes_part.snapshots s
+  ON h.snapshot_id = s.snapshot_id
+WHERE s.operation = 'append'
+ORDER BY made_current_at;
+        </code></pre>
+      </div>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title18" id="impala_iceberg__iceberg_table_cloning">
+    <h2 class="title topictitle2" id="ariaid-title18">Cloning Iceberg tables (LIKE clause)</h2>
     <div class="body conbody">
       <div class="p">
         Use <code class="ph codeph">CREATE TABLE ... LIKE ...</code> to create an empty Iceberg table
@@ -697,8 +769,8 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title18" id="impala_iceberg__iceberg_table_properties">
-    <h2 class="title topictitle2" id="ariaid-title18">Iceberg table properties</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title19" id="impala_iceberg__iceberg_table_properties">
+    <h2 class="title topictitle2" id="ariaid-title19">Iceberg table properties</h2>
     <div class="body conbody">
       <div class="p">
         We can set the following table properties for Iceberg tables:
@@ -746,8 +818,8 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
     </div>
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title19" id="impala_iceberg__iceberg_manifest_caching">
-    <h2 class="title topictitle2" id="ariaid-title19">Iceberg manifest caching</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title20" id="impala_iceberg__iceberg_manifest_caching">
+    <h2 class="title topictitle2" id="ariaid-title20">Iceberg manifest caching</h2>
     <div class="body conbody">
       <div class="p">
         Starting from version 1.1.0, Apache Iceberg provides a mechanism to cache the
