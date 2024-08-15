@@ -22,6 +22,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfBuildType, SkipIfFS
+from tests.common.test_result_verifier import error_msg_expected
 from tests.verifiers.metric_verifier import MetricVerifier
 
 # The BE krpc port of the impalad to simulate rpc errors in tests.
@@ -228,7 +229,8 @@ class TestRPCTimeout(CustomClusterTestSuite):
     debug_action = 'IMPALA_MISS_EXEC_COMPLETE_CB:FAIL@1.0'
     ex = self.execute_query_expect_failure(self.client, query,
         query_options={'retry_failed_queries': 'false', 'debug_action': debug_action})
-    assert "Query aborted" in str(ex)
+    assert error_msg_expected(str(ex), "Remote error: Runtime error: Debug Action: "
+        "IMPALA_SERVICE_POOL:FAIL")
 
 class TestCatalogRPCTimeout(CustomClusterTestSuite):
   """"Tests RPC timeout and retry handling for catalogd operations."""
