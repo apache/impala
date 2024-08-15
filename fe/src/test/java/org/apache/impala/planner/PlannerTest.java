@@ -492,6 +492,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testRewrite() {
+    runPlannerTestFile("rewrite");
+  }
+
+  @Test
   public void testValues() {
     runPlannerTestFile("values");
   }

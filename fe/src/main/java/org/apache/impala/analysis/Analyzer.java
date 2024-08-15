@@ -1972,8 +1972,11 @@ public class Analyzer {
     boolean foundConstantFalse = false;
     for (Expr conjunct : e.getConjuncts()) {
       registerConjunct(conjunct);
-      foundConstantFalse = markConstantConjunct(conjunct, fromHavingClause);
-      if (foundConstantFalse) break;
+      // IMPALA-13302 TODO: review whether markConstantConjunct can be skipped once
+      // foundConstantFalse=true.
+      if (markConstantConjunct(conjunct, fromHavingClause)) {
+        foundConstantFalse = true;
+      }
     }
     // If a constant FALSE conjunct is found, we don't need to evaluate the other
     // conjuncts in the same list. By marking the conjunct as assigned, the
@@ -2050,8 +2053,8 @@ public class Analyzer {
     }
 
     if (LOG.isTraceEnabled()) {
-      LOG.trace("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())
-          + " " + e.toSql() + " " + e.debugString());
+      LOG.trace("register tuple/slotConjunct: {} {} {}", e.getId(),
+          e.toSql(), e.debugString());
     }
 
     if (!(e instanceof BinaryPredicate)) return;
@@ -2081,7 +2084,8 @@ public class Analyzer {
           globalState_.eqJoinConjuncts.get(tupleIds.get(0)).add(e.getId());
         }
         binaryPred.setIsEqJoinConjunct(true);
-        LOG.trace("register eqJoinConjunct: " + Integer.toString(e.getId().asInt()));
+        LOG.trace("register eqJoinConjunct {} with tuple id {}",
+            e.getId(), tupleIds.get(0));
       }
     }
   }
@@ -3344,6 +3348,17 @@ public class Analyzer {
    * Mark predicate as assigned.
    */
   public void markConjunctAssigned(Expr conjunct) {
+    // If the supplied conjunct is not registered with globalState_, it was created
+    // earlier and this is re-analysis. If we're marking it now, that can cause conflicts
+    // with an Expr that gets assigned the same ID, usually skipping slot materialization.
+    // Detect that early; it usually means a new predicate was created but not analyzed.
+    // TODO IMPALA-13365: switch to
+    //   conjunct.equals(globalState_.conjuncts.get(conjunct.getId()))
+    // and figure out why we get conjuncts that don't satisfy that condition.
+    Preconditions.checkArgument(
+        conjunct.getId() == null || globalState_.conjuncts.containsKey(conjunct.getId()),
+        "conjunct is not registered in current analyzer: %s", conjunct);
+
     globalState_.assignedConjuncts.add(conjunct.getId());
     if (Predicate.isEquivalencePredicate(conjunct)) {
       BinaryPredicate binaryPred = (BinaryPredicate) conjunct;

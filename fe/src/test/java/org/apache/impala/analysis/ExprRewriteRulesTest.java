@@ -451,6 +451,43 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("true AND id = 0 OR false", rules, "id = 0");
   }
 
+  /**
+   * Sets up a framework for re-analysis that triggers conjunct ID conflicts if rewrite
+   * rules don't analyze new predicates. It requires a union of SELECT WHERE clauses,
+   * with one of the clauses requiring multiple rewrite passes.
+   */
+  private String rewriteTemplate(String whereClause) {
+    return "SELECT 1 FROM functional.alltypes t WHERE t.id = 1 UNION ALL " +
+        "SELECT 1 FROM functional.alltypes t WHERE " + whereClause;
+  }
+
+  /**
+   * IMPALA-13302: Test that compound predicate rewrites - combined with rewrites that
+   * produce a simplifiable predicate - don't leave unanalyzed conjuncts for re-analysis.
+   */
+  @Test
+  public void testCompoundPredicateWithRewriteAndReanalyze() throws ImpalaException {
+    AnalysisContext ctx = createAnalysisCtx();
+    ctx.getQueryOptions().setEnable_expr_rewrites(true);
+
+    String[] cases = {
+      // NormalizeExprsRule should simplify to FALSE AND ...
+      rewriteTemplate("t.id = 1 AND t.id = 1 AND false"),
+      // ExtractCommonConjunctRule subset should simplify to FALSE AND ...
+      rewriteTemplate("((t.id = 1 AND false) or (t.id = 1 AND false)) AND t.id = 1"),
+      // ExtractCommonConjunctRule distjunct should simplify to FALSE AND ...
+      rewriteTemplate("((t.id = 1 AND false) or (t.id = 2 AND false)) AND t.id = 1"),
+      // BetweenToCompoundRule should simplify to FALSE AND ...
+      rewriteTemplate("(1 BETWEEN 2 AND 3) AND t.id = 1 AND t.id = 1"),
+      // SimplifyDistinctFromRule should simplify to FALSE AND ...
+      rewriteTemplate("t.id IS DISTINCT FROM t.id AND t.id = 1")
+    };
+
+    for (String sql : cases) {
+      AnalyzesOk(sql, ctx);
+    }
+  }
+
   @Test
   public void testCaseWithExpr() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;

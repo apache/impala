@@ -1,0 +1,129 @@
+# IMPALA-13302: ExtractCommonConjunctRule led to non-materialized slot
+WITH v AS (SELECT 1 FROM functional.alltypes t
+    WHERE ((t.id = 1 and false)
+        or (t.id = 1 and false))
+      AND t.id = 1
+      AND t.id = 1),
+  w AS (SELECT 1 FROM functional.alltypes t1 JOIN functional.alltypes t2 ON t1.id = t2.id)
+SELECT 1 FROM v UNION ALL SELECT 1 FROM v
+UNION ALL SELECT 1 FROM w UNION ALL SELECT 1 FROM w
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  row-size=1B cardinality=12.25K
+|
+|--08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t1.id = t2.id
+|  |  runtime filters: RF002 <- t2.id
+|  |  row-size=8B cardinality=6.12K
+|  |
+|  |--07:SCAN HDFS [functional.alltypes t2]
+|  |     HDFS partitions=24/24 files=24 size=478.45KB
+|  |     row-size=4B cardinality=6.12K
+|  |
+|  06:SCAN HDFS [functional.alltypes t1]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF002 -> t1.id
+|     row-size=4B cardinality=6.12K
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=8B cardinality=6.12K
+|
+|--04:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=6.12K
+|
+03:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=6.12K
+====
+# IMPALA-13203: NormalizeExprsRule led to non-materialized slot
+WITH v AS (SELECT 1 FROM functional.alltypes t
+    WHERE t.id = 1
+      AND t.id = 1
+      AND t.id = 1
+      AND false),
+  w AS (SELECT 1 FROM functional.alltypes t1 JOIN functional.alltypes t2 ON t1.id = t2.id)
+SELECT 1 FROM v UNION ALL SELECT 1 FROM v
+UNION ALL SELECT 1 FROM w UNION ALL SELECT 1 FROM w
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  row-size=1B cardinality=12.25K
+|
+|--08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t1.id = t2.id
+|  |  runtime filters: RF002 <- t2.id
+|  |  row-size=8B cardinality=6.12K
+|  |
+|  |--07:SCAN HDFS [functional.alltypes t2]
+|  |     HDFS partitions=24/24 files=24 size=478.45KB
+|  |     row-size=4B cardinality=6.12K
+|  |
+|  06:SCAN HDFS [functional.alltypes t1]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF002 -> t1.id
+|     row-size=4B cardinality=6.12K
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=8B cardinality=6.12K
+|
+|--04:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=6.12K
+|
+03:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=6.12K
+====
+# IMPALA-13203: NormalizeExprsRule led to non-materialized slot
+WITH v AS (SELECT 1 FROM functional.alltypes t
+    WHERE false
+      AND t.id = 1
+      AND t.id = 1
+      AND t.id = 1),
+  w AS (SELECT 1 FROM functional.alltypes t1 JOIN functional.alltypes t2 ON t1.id = t2.id)
+SELECT 1 FROM v UNION ALL SELECT 1 FROM v
+UNION ALL SELECT 1 FROM w UNION ALL SELECT 1 FROM w
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  row-size=1B cardinality=12.25K
+|
+|--08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t1.id = t2.id
+|  |  runtime filters: RF002 <- t2.id
+|  |  row-size=8B cardinality=6.12K
+|  |
+|  |--07:SCAN HDFS [functional.alltypes t2]
+|  |     HDFS partitions=24/24 files=24 size=478.45KB
+|  |     row-size=4B cardinality=6.12K
+|  |
+|  06:SCAN HDFS [functional.alltypes t1]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF002 -> t1.id
+|     row-size=4B cardinality=6.12K
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=8B cardinality=6.12K
+|
+|--04:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=6.12K
+|
+03:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=6.12K
+====

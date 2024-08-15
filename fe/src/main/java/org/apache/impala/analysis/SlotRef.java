@@ -328,9 +328,8 @@ public class SlotRef extends Expr {
     msg.node_type = TExprNodeType.SLOT_REF;
     msg.slot_ref = new TSlotRef(serialCtx.translateSlotId(desc_.getId()).asInt());
     // we shouldn't be sending exprs over non-materialized slots
-    Preconditions.checkState(desc_.isMaterialized(), String.format(
-        "Illegal reference to non-materialized slot: tid=%s sid=%s",
-        desc_.getParent().getId(), desc_.getId()));
+    Preconditions.checkState(desc_.isMaterialized(),
+        "Illegal reference to non-materialized slot: %s", this);
     Preconditions.checkState(desc_.getByteOffset() >= 0);
     // check that the tuples associated with this slot are executable
     desc_.getParent().checkIsExecutable();
