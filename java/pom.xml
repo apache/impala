@@ -82,6 +82,7 @@ under the License.
     <commons-dbcp2.version>${env.IMPALA_DBCP2_VERSION}</commons-dbcp2.version>
     <log4j2.version>${env.IMPALA_LOG4J2_VERSION}</log4j2.version>
     <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
+    <aircompressor.version>${env.IMPALA_AIRCOMPRESSOR_VERSION}</aircompressor.version>
   </properties>
 
   <repositories>
@@ -406,6 +407,14 @@ under the License.
         <groupId>io.dropwizard.metrics</groupId>
         <artifactId>metrics-json</artifactId>
         <version>${dropwizard-metrics.version}</version>
+      </dependency>
+
+      <!-- Pin aircompressor version. Orc depends on this, but Orc upgrade will be
+          planned separately. Remove once Orc is upgraded to 1.9.4+. -->
+      <dependency>
+        <groupId>io.airlift</groupId>
+        <artifactId>aircompressor</artifactId>
+        <version>${aircompressor.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
