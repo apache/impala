@@ -34,13 +34,13 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergTable;
-import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TConvertTableRequest;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.MigrateTableUtil;
 
@@ -107,6 +107,8 @@ public class ConvertTableToIcebergStmt extends StatementBase {
           sd.getInputFormat());
     }
 
+    checkColumnTypeCompatibility(table);
+
     if (properties_.size() > 1 ||
         properties_.keySet().stream().anyMatch(
             key -> !key.equalsIgnoreCase(IcebergTable.ICEBERG_CATALOG)) ) {
@@ -121,6 +123,15 @@ public class ConvertTableToIcebergStmt extends StatementBase {
     }
 
     createSubQueryStrings((FeFsTable) table);
+  }
+
+  private void checkColumnTypeCompatibility(FeTable table) throws AnalysisException {
+    try {
+      IcebergSchemaConverter.convertToIcebergSchema(table.getMetaStoreTable());
+    } catch (IllegalArgumentException e) {
+      throw new AnalysisException("Incompatible column type in source table. " +
+          e.getMessage());
+    }
   }
 
   private void createSubQueryStrings(FeFsTable table)  {

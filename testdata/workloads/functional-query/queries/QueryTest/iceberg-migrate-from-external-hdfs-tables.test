@@ -204,7 +204,7 @@ AnalysisException: CONVERT TO ICEBERG is not supported for transactional tables
 create table hdfs_table2 (col tinyint) stored as parquet;
 alter table hdfs_table2 convert to iceberg;
 ---- CATCH
-Unsupported Hive type: BYTE, use integer instead
+AnalysisException: Incompatible column type in source table. Unsupported Hive type: BYTE, use integer instead
 ====
 ---- QUERY
 # Test table migration for decimal partitioned table.

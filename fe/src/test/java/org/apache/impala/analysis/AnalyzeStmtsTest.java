@@ -5196,20 +5196,22 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestConvertTable() {
-    AnalyzesOk("alter table functional_parquet.alltypes convert to iceberg");
-    AnalyzesOk("alter table functional_parquet.alltypes convert to iceberg"
+    AnalyzesOk("alter table functional_parquet.tinytable convert to iceberg");
+    AnalyzesOk("alter table functional_parquet.tinytable convert to iceberg"
             + " tblproperties('iceberg.catalog'='hadoop.tables')");
-    AnalyzesOk("alter table functional_parquet.alltypes convert to iceberg"
+    AnalyzesOk("alter table functional_parquet.tinytable convert to iceberg"
             + " tblproperties('iceberg.catalog'='hive.catalog')");
-    AnalysisError("alter table functional_parquet.alltypes convert to iceberg"
+    AnalysisError("alter table functional_parquet.alltypes convert to iceberg",
+        "Incompatible column type in source table. Unsupported Hive type: BYTE");
+    AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
             + " tblproperties('iceberg.catalog'='hadoop.catalog')",
         "The Hadoop Catalog is not supported because the location may change");
-    AnalysisError("alter table functional_kudu.alltypes convert to iceberg",
+    AnalysisError("alter table functional_kudu.tinytable convert to iceberg",
         "CONVERT TO ICEBERG is not supported for KuduTable");
-    AnalysisError("alter table functional.alltypes convert to iceberg",
+    AnalysisError("alter table functional.tinytable convert to iceberg",
         "CONVERT TO ICEBERG is not supported for " +
         "org.apache.hadoop.mapred.TextInputFormat");
-    AnalysisError("alter table functional_parquet.alltypes convert to iceberg"
+    AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
             + " tblproperties('metadata.generator.threads'='a1')",
         "CONVERT TO ICEBERG only accepts 'iceberg.catalog' as TBLPROPERTY.");
   }
