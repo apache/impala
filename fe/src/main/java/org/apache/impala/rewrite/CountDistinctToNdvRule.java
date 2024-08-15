@@ -56,11 +56,6 @@ public class CountDistinctToNdvRule implements ExprRewriteRule{
         }
 
         // Create a new function `ndv(<expr>)` to substitute the `count(distinct <expr>)`
-        FunctionCallExpr ndvFunc = new FunctionCallExpr("ndv",
-                oldFunctionCallExpr.getParams().exprs());
-
-        // Analyze the newly added FunctionCall, otherwise follow-up rules won't fire.
-        ndvFunc.analyze(analyzer);
-        return ndvFunc;
+        return new FunctionCallExpr("ndv", oldFunctionCallExpr.getParams().exprs());
     }
 }

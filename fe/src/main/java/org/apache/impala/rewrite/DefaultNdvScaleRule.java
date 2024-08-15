@@ -65,9 +65,6 @@ public class DefaultNdvScaleRule implements ExprRewriteRule{
         // Do substitution
         List<Expr> params = oldFunctionCallExpr.getParams().exprs();
         params.add(new NumericLiteral(BigDecimal.valueOf(scale), Type.INT));
-        FunctionCallExpr functionCall =  new FunctionCallExpr("ndv", params);
-        functionCall.analyze(analyzer);
-
-        return functionCall;
+        return new FunctionCallExpr("ndv", params);
     }
 }

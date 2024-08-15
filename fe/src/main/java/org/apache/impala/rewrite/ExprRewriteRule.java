@@ -38,7 +38,8 @@ public interface ExprRewriteRule {
    * Applies this rewrite rule to the given analyzed Expr. Returns the transformed and
    * analyzed Expr or the original unmodified Expr if no changes were made. If any
    * changes were made, the transformed Expr is guaranteed to be a different Expr object,
-   * so callers can rely on object reference comparison for change detection.
+   * so callers can rely on object reference comparison for change detection. The caller
+   * is expected to analyze any transformed Expr.
    */
   public abstract Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException;
 }

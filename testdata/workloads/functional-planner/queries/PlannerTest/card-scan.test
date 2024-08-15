@@ -132,8 +132,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch.customer c]
    HDFS partitions=1/1 files=1 size=23.08MB
-   predicates: c.c_custkey IN (10, 10)
-   row-size=218B cardinality=2
+   predicates: c.c_custkey = 10
+   row-size=218B cardinality=1
 ====
 # AND'ed predicate, card = 0
 select *

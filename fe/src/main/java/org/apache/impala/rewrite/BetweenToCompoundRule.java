@@ -72,20 +72,14 @@ public class BetweenToCompoundRule implements ExprRewriteRule {
     BinaryPredicate lower = new BinaryPredicate(lowerOperator, value, lowerBound);
     BinaryPredicate upper = new BinaryPredicate(upperOperator, clonedValue, upperBound);
     double sel = computeBetweenSelectivity(analyzer, compoundOperator, lower, upper);
-    CompoundPredicate pred;
     if (sel > 0) {
       lower.setBetweenSelectivity(bp.getId(), sel);
       upper.setBetweenSelectivity(bp.getId(), sel);
-      pred = CompoundPredicate.createFromBetweenPredicate(
+      return CompoundPredicate.createFromBetweenPredicate(
           compoundOperator, lower, upper, sel);
     } else {
-      pred = new CompoundPredicate(compoundOperator, lower, upper);
+      return new CompoundPredicate(compoundOperator, lower, upper);
     }
-
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Transformed " + bp.debugString() + " to " + pred.debugString());
-    }
-    return pred;
   }
 
   private static double computeBetweenSelectivity(Analyzer analyzer,

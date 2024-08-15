@@ -80,8 +80,7 @@ public class ExtractCommonConjunctRule implements ExprRewriteRule {
     // (a AND b AND c) OR (c) ==> c
     if (child0Conjuncts.isEmpty() || child1Conjuncts.isEmpty()) {
       Preconditions.checkState(!commonConjuncts.isEmpty());
-      Expr result = CompoundPredicate.createConjunctivePredicate(commonConjuncts);
-      return result;
+      return CompoundPredicate.createConjunctivePredicate(commonConjuncts);
     }
 
     // Re-assemble disjunctive predicate.
@@ -92,9 +91,8 @@ public class ExtractCommonConjunctRule implements ExprRewriteRule {
     List<Expr> newDisjuncts = Lists.newArrayList(child0Disjunct, child1Disjunct);
     Expr newDisjunction = CompoundPredicate.createDisjunctivePredicate(newDisjuncts);
     newDisjunction.setPrintSqlInParens(true);
-    Expr result = CompoundPredicate.createConjunction(newDisjunction,
+    return CompoundPredicate.createConjunction(newDisjunction,
         CompoundPredicate.createConjunctivePredicate(commonConjuncts));
-    return result;
   }
 
   private ExtractCommonConjunctRule() {}

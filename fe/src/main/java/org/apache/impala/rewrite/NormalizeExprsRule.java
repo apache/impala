@@ -38,20 +38,17 @@ public class NormalizeExprsRule implements ExprRewriteRule {
 
     // TODO: add normalization for other expr types.
     if (expr instanceof CompoundPredicate) {
-      return normalizeCompoundPredicate((CompoundPredicate) expr, analyzer);
+      return normalizeCompoundPredicate((CompoundPredicate) expr);
     }
     return expr;
   }
 
-  private Expr normalizeCompoundPredicate(CompoundPredicate expr, Analyzer analyzer) {
+  private Expr normalizeCompoundPredicate(CompoundPredicate expr) {
     if (expr.getOp() == CompoundPredicate.Operator.NOT) return expr;
 
     if (!(expr.getChild(0) instanceof BoolLiteral)
         && expr.getChild(1) instanceof BoolLiteral) {
-      CompoundPredicate newExpr = new CompoundPredicate(expr.getOp(), expr.getChild(1),
-          expr.getChild(0));
-      newExpr.analyzeNoThrow(analyzer);
-      return newExpr;
+      return new CompoundPredicate(expr.getOp(), expr.getChild(1), expr.getChild(0));
     }
     return expr;
   }

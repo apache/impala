@@ -92,14 +92,14 @@ PLAN-ROOT SINK
 |
 |--00:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
 |     runtime filters: RF003[min_max] -> i_item_sk, RF002[bloom] -> i_item_sk
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|     parquet statistics predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
-|     parquet dictionary predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     parquet statistics predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     parquet dictionary predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=0 row-size=153B cardinality=476 cost=697007
 |     in pipelines: 00(GETNEXT)
@@ -277,14 +277,14 @@ max-parallelism=70 segment-costs=[629576044]
 |  max-parallelism=4 segment-costs=[697213]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
 |     runtime filters: RF003[min_max] -> i_item_sk, RF002[bloom] -> i_item_sk
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|     parquet statistics predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
-|     parquet dictionary predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     parquet statistics predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     parquet dictionary predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=0 row-size=153B cardinality=476 cost=697007
 |     in pipelines: 00(GETNEXT)
@@ -462,14 +462,14 @@ max-parallelism=70 segment-costs=[629576044]
 |  max-parallelism=4 segment-costs=[697213]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
 |     runtime filters: RF003[min_max] -> i_item_sk, RF002[bloom] -> i_item_sk
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|     parquet statistics predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
-|     parquet dictionary predicates: i_current_price <= CAST(112 AS DECIMAL(3,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     parquet statistics predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
+|     parquet dictionary predicates: i_current_price <= CAST(112 AS DECIMAL(5,0)), i_current_price >= CAST(82 AS DECIMAL(3,0)), i_manufact_id IN (CAST(941 AS INT), CAST(920 AS INT), CAST(105 AS INT), CAST(693 AS INT))
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=0 row-size=153B cardinality=476 cost=697007
 |     in pipelines: 00(GETNEXT)

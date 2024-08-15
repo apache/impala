@@ -22,6 +22,8 @@ import java.util.List;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.common.AnalysisException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.collect.Lists;
 
 /**
@@ -34,6 +36,7 @@ import com.google.common.collect.Lists;
  * Keeps track of how many transformations were applied.
  */
 public class ExprRewriter {
+  private final static Logger LOG = LoggerFactory.getLogger(ExprRewriter.class);
   private int numChanges_ = 0;
   private final List<ExprRewriteRule> rules_;
 
@@ -83,7 +86,15 @@ public class ExprRewriter {
       expr.setChild(i, applyRuleBottomUp(expr.getChild(i), rule, analyzer));
     }
     Expr rewrittenExpr = rule.apply(expr, analyzer);
-    if (rewrittenExpr != expr) ++numChanges_;
+    if (rewrittenExpr != expr) {
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("{} transformed {} to {}", rule.getClass().getSimpleName(),
+            expr.debugString(), rewrittenExpr.debugString());
+      }
+      // Ensure the new expression is analyzed, so later rules will evaluate it
+      rewrittenExpr.analyze(analyzer);
+      ++numChanges_;
+    }
     return rewrittenExpr;
   }
 
