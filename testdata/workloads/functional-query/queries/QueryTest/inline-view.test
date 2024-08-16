@@ -593,3 +593,115 @@ select distinct a,b,c from v;
 ---- TYPES
 TINYINT, SMALLINT, SMALLINT
 ====
+---- QUERY
+# IMPALA-13262: Do not migrate an inferred predicate into an inline view if both sides of
+# the inferred predicate reference the same TupleId.
+# Note that the following are the rows in the inline view 'iv' that satisfy
+# 'iv.id = iv.int_col'.
+# If the predicate 'id = int_col' was pushed down to the scan node of the table
+# 'functional.alltypes', Impala would have produced 0 row, which is the wrong result.
+# +------+------+---------+------+
+# | year | id   | int_col | rn   |
+# +------+------+---------+------+
+# | 2009 | 9    | 9       | 3641 |
+# | 2009 | 8    | 8       | 3642 |
+# | 2009 | 7    | 7       | 3643 |
+# | 2009 | 6    | 6       | 3644 |
+# | 2009 | 5    | 5       | 3645 |
+# | 2009 | 4    | 4       | 3646 |
+# | 2009 | 3    | 3       | 3647 |
+# | 2009 | 2    | 2       | 3648 |
+# | 2009 | 1    | 1       | 3649 |
+# | 2009 | 0    | 0       | 3650 |
+SELECT * FROM
+(
+SELECT year, id, int_col, ROW_NUMBER() over(PARTITION BY year ORDER BY id DESC) rn
+FROM functional.alltypes
+) iv
+WHERE rn = 3650 AND iv.id = iv.int_col;
+---- RESULTS
+2009,0,0,3650
+---- TYPES
+INT, INT, INT, BIGINT
+====
+---- QUERY
+# IMPALA-13262: This is a variant of the query above to show the rows satisfying
+# 'rn = 3650' but not necessarily 'iv.id = iv.int_col'.
+SELECT * FROM
+(
+SELECT year, id, int_col, ROW_NUMBER() over(PARTITION BY year ORDER BY id DESC) rn
+FROM functional.alltypes
+) iv
+WHERE rn = 3650;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2009,0,0,3650
+2010,3650,0,3650
+---- TYPES
+INT, INT, INT, BIGINT
+====
+---- QUERY
+# IMPALA-13262: This is a variant of the query above to verify we won't get any row if
+# we apply 'id = int_col' to the base table 'functional.alltypes' before the application
+# of the analytic predicate 'rn = 3650'.
+SELECT * FROM
+(
+SELECT year, id, int_col, ROW_NUMBER() over(PARTITION BY year ORDER BY id DESC) rn
+FROM functional.alltypes WHERE id = int_col
+) iv
+WHERE rn = 3650;
+---- RESULTS
+---- TYPES
+INT, INT, INT, BIGINT
+====
+---- QUERY
+# IMPALA-13262: This is the query that shows the results of the inline view 'iv' above.
+SELECT year, id, int_col, ROW_NUMBER() over(PARTITION BY year ORDER BY id DESC) rn
+FROM functional.alltypes WHERE id = int_col;
+---- RESULTS
+2009,9,9,1
+2009,8,8,2
+2009,7,7,3
+2009,6,6,4
+2009,5,5,5
+2009,4,4,6
+2009,3,3,7
+2009,2,2,8
+2009,1,1,9
+2009,0,0,10
+---- TYPES
+INT, INT, INT, BIGINT
+====
+---- QUERY
+# IMPALA-13262: This query shows that the inferred predicate 'iv_1.id = iv_1.int_col'
+# won't be migrated into the inline view 'iv_2' so that 'id = int_col' won't be pushed
+# to the scan node of the table 'functional.alltypes'.
+SELECT * FROM
+(
+SELECT year, id, int_col, ROW_NUMBER() over(PARTITION BY year ORDER BY id DESC) rn
+FROM (SELECT * FROM functional.alltypes UNION ALL SELECT * FROM functional.alltypes) iv_2
+) iv_1
+WHERE rn > 7200 and iv_1.id = iv_1.int_col;
+---- RESULTS
+2009,9,9,7281
+2009,9,9,7282
+2009,8,8,7283
+2009,8,8,7284
+2009,7,7,7285
+2009,7,7,7286
+2009,6,6,7287
+2009,6,6,7288
+2009,5,5,7289
+2009,5,5,7290
+2009,4,4,7291
+2009,4,4,7292
+2009,3,3,7293
+2009,3,3,7294
+2009,2,2,7295
+2009,2,2,7296
+2009,1,1,7297
+2009,1,1,7298
+2009,0,0,7299
+2009,0,0,7300
+---- TYPES
+INT, INT, INT, BIGINT
+====

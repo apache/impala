@@ -1520,8 +1520,8 @@ public class SingleNodePlanner {
     List<Expr> viewPredicates =
         Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer, false);
 
-    // perform any post-processing of the predicates before registering
-    removeDisqualifyingInferredPreds(inlineViewRef.getAnalyzer(), viewPredicates);
+    // Perform any post-processing of the predicates before registering.
+    removeDisqualifyingInferredPreds(inlineViewRef, viewPredicates);
 
     // Unset the On-clause flag of the migrated conjuncts because the migrated conjuncts
     // apply to the post-join/agg/analytic result of the inline view.
@@ -1538,7 +1538,15 @@ public class SingleNodePlanner {
    * (in the Analyzer), we do this check here anyways as a safety in case any such
    * predicate 'fell through' to this stage.
    */
-  private void removeDisqualifyingInferredPreds(Analyzer analyzer, List<Expr> preds) {
+  private void removeDisqualifyingInferredPreds(InlineViewRef inlineViewRef,
+      List<Expr> preds) {
+    Analyzer analyzer = inlineViewRef.getAnalyzer();
+    String WARN_MESSAGE_HEADER = "Removed inferred predicate %s from the list of " +
+        "predicates considered for inline view because %s.";
+    // If !canMigrateConjuncts(inlineViewRef) evaluates to true, then that means we are
+    // calling addConjunctsIntoInlineView() to migrate some analytic conjuncts into
+    // 'inlineViewRef'. Refer to migrateConjunctsToInlineView() for more details.
+    boolean isAnalytic = !canMigrateConjuncts(inlineViewRef);
     ListIterator<Expr> iter = preds.listIterator();
     while (iter.hasNext()) {
       Expr e = iter.next();
@@ -1548,16 +1556,28 @@ public class SingleNodePlanner {
         if (slots == null) continue;
         TupleId leftParent = analyzer.getTupleId(slots.first);
         TupleId rightParent = analyzer.getTupleId(slots.second);
-        // check if either the left parent or right parent is an outer joined tuple
-        // Note: strictly, we may be ok to check only for the null producing
-        // side but we are being conservative here to check both sides. With
-        // additional testing we could potentially relax this.
         if (analyzer.isOuterJoined(leftParent) ||
                 analyzer.isOuterJoined(rightParent)) {
+          // check if either the left parent or right parent is an outer joined tuple
+          // Note: strictly, we may be ok to check only for the null producing
+          // side but we are being conservative here to check both sides. With
+          // additional testing we could potentially relax this.
           iter.remove();
-          LOG.warn("Removed inferred predicate " + p.toSql() + " from the list of " +
-                  "predicates considered for inline view because either the left " +
-                  "or right side is derived from an outer join output.");
+          LOG.warn(String.format(WARN_MESSAGE_HEADER, p.toSql(), "either the left " +
+              "or right side is derived from an outer join output"));
+        } else if (isAnalytic && leftParent.equals(rightParent)) {
+          // We do not require that both 'leftParent' and 'rightParent' resolve to the
+          // same base table because in the case where we migrate an inferred binary
+          // predicate from an outer inline view into an inner inline view, none of
+          // 'leftParent' and 'rightParent' could resolve to a base table, although they
+          // correspond to the same TupleId (of the inner inline view). In such a case,
+          // we still have to remove this inferred binary predicate to prevent it from
+          // being pushed to the scan node of the base table.
+          iter.remove();
+          LOG.warn(String.format(WARN_MESSAGE_HEADER, p.toSql(), "both sides " +
+              "of the predicate reference the same TupleId " + leftParent + " which " +
+              "could result in pushing the conjunct to the scan node before the " +
+              "analytic function is applied"));
         }
       }
     }

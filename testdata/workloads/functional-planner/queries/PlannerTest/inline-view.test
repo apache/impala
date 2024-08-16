@@ -2664,3 +2664,72 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> other_table.id
    row-size=4B cardinality=7.30K
 ====
+# IMPALA-13262: Do not migrate an inferred predicate into an inline view if both sides of
+# the inferred predicate reference the same TupleId.
+SELECT * FROM
+(
+SELECT year, id, int_col, ROW_NUMBER() over(PARTITION BY year ORDER BY id DESC) rn
+FROM functional.alltypes
+) iv
+WHERE rn = 3650 AND iv.id = iv.int_col;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: id = int_col, row_number() = 3650
+|  row-size=20B cardinality=730
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: `year`
+|  order by: id DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=20B cardinality=7.30K
+|
+01:SORT
+|  order by: year ASC NULLS LAST, id DESC
+|  row-size=12B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
+====
+# IMPALA-13262: This query shows that the inferred predicate 'iv_1.id = iv_1.int_col'
+# won't be migrated into the inline view 'iv_2' so that 'id = int_col' won't be pushed
+# to the scan node of the table 'functional.alltypes'.
+SELECT * FROM
+(
+SELECT year, id, int_col, ROW_NUMBER() over(PARTITION BY year ORDER BY id DESC) rn
+FROM (SELECT * FROM functional.alltypes UNION ALL SELECT * FROM functional.alltypes) iv_2
+) iv_1
+WHERE rn > 7200 and iv_1.id = iv_1.int_col;
+---- PLAN
+PLAN-ROOT SINK
+|
+05:SELECT
+|  predicates: id = int_col, row_number() > 7200
+|  row-size=20B cardinality=1.46K
+|
+04:ANALYTIC
+|  functions: row_number()
+|  partition by: `year`
+|  order by: id DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=20B cardinality=14.60K
+|
+03:SORT
+|  order by: year ASC NULLS LAST, id DESC
+|  row-size=12B cardinality=14.60K
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=12B cardinality=14.60K
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=12B cardinality=7.30K
+|
+01:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
+====
