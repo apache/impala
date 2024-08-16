@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <mutex>
 #include <numeric>
 #include <type_traits>
@@ -61,6 +62,14 @@ DECLARE_int32(periodic_system_counter_update_period_ms);
 DEFINE_bool_hidden(gen_experimental_profile, false,
     "(Experimental) when set on coordinator, generate a new aggregated runtime profile "
     "layout. Format is subject to change.");
+
+DEFINE_uint64_hidden(json_profile_event_timestamp_limit, 5,
+    "Sets the number of spans / buckets for grouping of event timestamps within"
+    " the aggregated JSON profile. For example, if the number of fragment"
+    " instances(N) reporting an event is more than the set limit(M),"
+    " the timestamps are aggregated into M evenly distributed spans / buckets"
+    " within the respective plan node's profile. If N <= M or M = 0,"
+    " the actual timestamp values are grouped without aggregation.");
 
 using boost::algorithm::to_lower_copy;
 using namespace rapidjson;
@@ -2919,13 +2928,13 @@ void AggregatedRuntimeProfile::ToJsonSubclass(
   // The following information is omitted deliberately:
   // * Time series counters from time_series_counter_map_ are not included - they would
   //    simply be too large for queries with 100s or 1000s of instances.
-  // * Event sequences from event_sequence_map_ are not included for the same reason.
   // * Per-instance summary stat values are omitted (although we include the aggregates).
   // * Per-instance values for regular counters.
 
-  // SummaryStatsCounter
-  // Only include the aggregated summary stats, not the per-instance values to avoid
-  // blowing up profile size.
+  // Only include the aggregated summary stats and event sequences,
+  // not all per-instance values to avoid blowing up the profile size.
+
+  // 1. SummaryStatsCounter
   {
     lock_guard<SpinLock> l(summary_stats_map_lock_);
     if (!summary_stats_map_.empty()) {
@@ -2941,6 +2950,247 @@ void AggregatedRuntimeProfile::ToJsonSubclass(
       }
       parent->AddMember("summary_stats_counters", summary_stats_counters_json, allocator);
     }
+  }
+
+  // 2. Events
+  {
+    // Create working copies of event sequences to minimize the time spin lock is held.
+    vector<AggEventSequence> agg_event_sequences;
+
+    size_t es_count = 0;
+    {
+      lock_guard<SpinLock> l(event_sequence_lock_);
+      if (!event_sequence_map_.empty()) {
+        es_count = event_sequence_map_.size();
+        agg_event_sequences.reserve(es_count);
+        std::transform(event_sequence_map_.begin(), event_sequence_map_.end(),
+            std::back_inserter(agg_event_sequences),
+            [](const std::pair<string, AggEventSequence>& pair) { return pair.second; });
+      }
+    }
+
+    if (es_count > 0) {
+      Value event_sequences_json(kArrayType);
+      Value* event_sequence_json;
+      for (AggEventSequence& agg_event_sequence : agg_event_sequences) {
+        agg_event_sequence.ToJson(event_sequence_json, d);
+        event_sequences_json.PushBack(*event_sequence_json, allocator);
+      }
+      parent->AddMember("event_sequences", event_sequences_json, allocator);
+    }
+  }
+
+  // 3. Info strings
+  {
+    lock_guard<SpinLock> l(agg_info_strings_lock_);
+    Value info_strings_json;
+
+    if (parent->HasMember("info_strings")) {
+      info_strings_json = (*parent)["info_strings"];
+    } else {
+      info_strings_json = Value(kArrayType);
+    }
+
+    // Collect only the required info strings
+    CollectInfoStringIntoJson("Table Name", &info_strings_json, d);
+
+    if (info_strings_json.Size() > 0) {
+      parent->AddMember("info_strings", info_strings_json, allocator);
+    }
+  }
+}
+
+void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value*& val,
+    rapidjson::Document* d) {
+  Document::AllocatorType& allocator = d->GetAllocator();
+
+  size_t events_count = labels.size();
+  vector<Value> label_vals(events_count);
+  // Index event labels with their associated value
+  for (const auto& label_item : labels) {
+    label_vals[label_item.second] = Value(label_item.first.c_str(), allocator);
+    // Note: The value part of 'labels' map is being used to order events initially.
+  }
+
+  // Order labels chronologically, while mantaining a reference to the previous order
+  // Note: Only if a complete order is available from an instance
+  vector<Value> labels_ordered(events_count);
+  vector<int32_t> labels_order(events_count);
+  bool order_found = false;
+  for (const vector<int32_t>& idxs : label_idxs) {
+    if (idxs.size() == events_count) {
+      for (int32_t i = 0; i < events_count; ++i) {
+        labels_ordered[i] = label_vals[idxs[i]];
+        labels_order[idxs[i]] = i;
+      }
+      order_found = true;
+      break;
+    }
+  }
+
+  // In case of missing event timestamps, order them according to 'labels_ordered',
+  // mantain alignment by substituting zeros, for skipping them later
+  size_t num_instances = timestamps.size();
+  std::unordered_set<size_t> missing_event_instances;
+  if (order_found) {
+    // Order and align timestamps using stored index references
+    for (size_t instance_idx = 0; instance_idx < num_instances; ++instance_idx) {
+      if (timestamps[instance_idx].size() < events_count) {
+        vector<int64_t>& inst_timestamps = timestamps[instance_idx];
+        timestamps[instance_idx] = vector<int64_t>(events_count);
+        const vector<int32_t>& idxs = label_idxs[instance_idx];
+        int32_t inst_event_count = idxs.size();
+        for (int32_t i = 0; i < inst_event_count; ++i) {
+          timestamps[instance_idx][labels_order[idxs[i]]] = inst_timestamps[i];
+        }
+        // Record instances with missing events
+        missing_event_instances.insert(instance_idx);
+      }
+    }
+  } else {
+    // When all instances contain missing events, supplement with zeros to maintain
+    // a consistent number of timestamps
+    for (size_t instance_idx = 0; instance_idx < num_instances; ++instance_idx) {
+      if (timestamps[instance_idx].size() < events_count) {
+        timestamps[instance_idx].resize(events_count, 0);
+        // Record instances with missing events
+        missing_event_instances.insert(instance_idx);
+      }
+    }
+  }
+
+  // Statically allocate vectors for reuse
+  const size_t BUCKET_SIZE = FLAGS_json_profile_event_timestamp_limit;
+  static vector<int64_t> min_ts_list(BUCKET_SIZE);
+  static vector<int64_t> max_ts_list(BUCKET_SIZE);
+  static vector<double> avg_ts_list(BUCKET_SIZE);
+  static vector<size_t> inst_count_list(BUCKET_SIZE);
+
+  // Perform aggregation to limit the size and complexity of event sequences JSON
+  Value event_sequence_json(kObjectType);
+  Value events_json(kArrayType);
+  if (num_instances <= BUCKET_SIZE || BUCKET_SIZE == 0) {
+    // Group event timestamps, when number of instances is less than bucket size
+    for (size_t event_idx = 0; event_idx < events_count; ++event_idx) {
+      // For each event collect timestamps across all instances
+      Value ts_list(kArrayType);
+      for (const vector<int64_t>& inst_timestamps : timestamps) {
+        if (inst_timestamps[event_idx] != 0) {
+          ts_list.PushBack(inst_timestamps[event_idx], allocator);
+        }
+      }
+      Value event(kObjectType);
+      event.AddMember("label", labels_ordered[event_idx], allocator);
+      event.AddMember("ts_list", ts_list, allocator);
+      events_json.PushBack(event, allocator);
+    }
+  } else {
+    // Aggregate event timestamps, when number of instances is more than bucket size
+    int64_t min_ts, max_ts, ts;
+    for (size_t event_idx = 0; event_idx < events_count; ++event_idx) {
+      // For each event, aggregate timestamps bucketed into set number of spans
+      // between minimum and maximum
+      min_ts = numeric_limits<int64_t>::max();
+      max_ts = 0;
+      for (const vector<int64_t>& inst_timestamps : timestamps) {
+        ts = inst_timestamps[event_idx];
+        if (ts == 0) continue;
+        if (ts < min_ts) min_ts = ts;
+        if (ts > max_ts) max_ts = ts;
+      }
+      // Find entire span of the event
+      int64_t ev_ts_span = max_ts - min_ts;
+      // Ensure a non-zero value to avoid arithmetic exception
+      if (ev_ts_span == 0) ev_ts_span = 1;
+      min_ts_list.assign(BUCKET_SIZE, max_ts);
+      max_ts_list.assign(BUCKET_SIZE, 0);
+      avg_ts_list.assign(BUCKET_SIZE, 0);
+      inst_count_list.assign(BUCKET_SIZE, 0);
+      size_t division_idx;
+      // Perform streaming computation of timestamps "in-place" to find aggregates
+      for (const vector<int64_t>& inst_timestamps : timestamps) {
+        ts = inst_timestamps[event_idx];
+        if (ts == 0) continue;
+        division_idx = (ts - min_ts) * BUCKET_SIZE / ev_ts_span;
+        if (division_idx >= BUCKET_SIZE) division_idx = BUCKET_SIZE - 1;
+        if (ts < min_ts_list[division_idx]) min_ts_list[division_idx] = ts;
+        if (ts > max_ts_list[division_idx]) max_ts_list[division_idx] = ts;
+        avg_ts_list[division_idx] += ts;
+        inst_count_list[division_idx] += 1;
+      }
+      Value min_ts_stat(kArrayType);
+      Value max_ts_stat(kArrayType);
+      Value avg_ts_stat(kArrayType);
+      Value inst_count_stat(kArrayType);
+      // Pre-allocate memory for efficient insertion
+      min_ts_stat.SetArray().Reserve(BUCKET_SIZE, allocator);
+      max_ts_stat.SetArray().Reserve(BUCKET_SIZE, allocator);
+      avg_ts_stat.SetArray().Reserve(BUCKET_SIZE, allocator);
+      inst_count_stat.SetArray().Reserve(BUCKET_SIZE, allocator);
+      // Serialize aggregate values into the JSON
+      for (division_idx = 0; division_idx < BUCKET_SIZE; ++division_idx) {
+        // Fill empty divisions with zeros
+        if (inst_count_list[division_idx] == 0) {
+          min_ts_stat.PushBack(0, allocator);
+          max_ts_stat.PushBack(0, allocator);
+          avg_ts_stat.PushBack(0, allocator);
+          inst_count_stat.PushBack(0, allocator);
+        } else {
+          avg_ts_list[division_idx] /= inst_count_list[division_idx];
+          min_ts_stat.PushBack(min_ts_list[division_idx], allocator);
+          max_ts_stat.PushBack(max_ts_list[division_idx], allocator);
+          avg_ts_stat.PushBack(avg_ts_list[division_idx], allocator);
+          inst_count_stat.PushBack(inst_count_list[division_idx], allocator);
+        }
+      }
+      Value ts_stat(kObjectType);
+      ts_stat.AddMember("min", min_ts_stat, allocator);
+      ts_stat.AddMember("max", max_ts_stat, allocator);
+      ts_stat.AddMember("avg", avg_ts_stat, allocator);
+      ts_stat.AddMember("count", inst_count_stat, allocator);
+      Value event(kObjectType);
+      event.AddMember("label", labels_ordered[event_idx], allocator);
+      event.AddMember("ts_stat", ts_stat, allocator);
+      events_json.PushBack(event, allocator);
+    }
+  }
+  event_sequence_json.AddMember("events", events_json, allocator);
+  // Add indexes of instances with missing / unreported events
+  if (missing_event_instances.size() > 0) {
+    // Instance indexes are as per exec_params_
+    Value missing_event_instance_idxs(kArrayType);
+    for (size_t instance_idx : missing_event_instances) {
+      missing_event_instance_idxs.PushBack(instance_idx, allocator);
+    }
+    // This field is only included in case of missing events
+    event_sequence_json.AddMember("unreported_event_instance_idxs",
+        missing_event_instance_idxs, allocator);
+  }
+  val = &event_sequence_json;
+}
+
+void AggregatedRuntimeProfile::CollectInfoStringIntoJson(const string& info_string_name,
+    Value* parent, Document* d) const {
+  Document::AllocatorType& allocator = d->GetAllocator();
+
+  // Check for the existence of provided info string key
+  AggInfoStrings::const_iterator it = agg_info_strings_.find(info_string_name);
+  if (it != agg_info_strings_.end()) {
+    Value info_string_json(kObjectType);
+    Value info_string_key((info_string_name).c_str(), allocator);
+    Value info_values_json(kArrayType);
+
+    // Group info string values into "values" field
+    map<string, vector<int32_t>> distinct_values = GroupDistinctInfoStrings(
+        it->second);
+    for (auto& info_value : distinct_values) {
+      info_values_json.PushBack(Value(info_value.first.c_str(), allocator),
+          allocator);
+    }
+
+    info_string_json.AddMember("key", info_string_key, allocator);
+    info_string_json.AddMember("values", info_values_json, allocator);
+    parent->PushBack(info_string_json, allocator);
   }
 }
 

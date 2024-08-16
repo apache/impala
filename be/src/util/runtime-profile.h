@@ -235,6 +235,7 @@ class RuntimeProfileBase {
 
  protected:
   FRIEND_TEST(CountersTest, AggregateEventSequences);
+  friend class AggregatedEventSequenceToJsonTest;
 
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;
@@ -784,6 +785,8 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// sampling and time series counters.
   bool has_active_periodic_counters_ = false;
 
+  // Map containing event sequences, with its type in string format as the key
+  // i.e. "Node Lifecycle Event Timeline", "Fragment Instance Lifecycle Event Timeline"
   typedef std::map<std::string, EventSequence*> EventSequenceMap;
   EventSequenceMap event_sequence_map_;
 
@@ -874,6 +877,8 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
       const TRuntimeProfileTree& src, int start_idx, bool add_default_counters = true);
 
  protected:
+  FRIEND_TEST(ToJson, AggregatedInfoStringsToJsonTest);
+
   virtual int GetNumInputProfiles() const override { return num_input_profiles_; }
 
   /// Adds subclass-specific state to 'out_node'. 'counter_map_entries' is a snapshot
@@ -909,7 +914,8 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
 
   /// Aggregated info strings from the input profile. The key is the info string name.
   /// The value vector contains an entry for every input profile.
-  std::map<std::string, std::vector<std::string>> agg_info_strings_;
+  typedef std::map<std::string, std::vector<std::string>> AggInfoStrings;
+  AggInfoStrings agg_info_strings_;
 
   /// Protects 'agg_info_strings_'.
   mutable SpinLock agg_info_strings_lock_;
@@ -936,9 +942,15 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
     // One entry per instance. Each entry contains the timestamps for that instance's
     // event sequence.
     std::vector<std::vector<int64_t>> timestamps;
+
+    // Builds the JSON for the aggregate event sequence's metrics into the provided 'val'
+    void ToJson(rapidjson::Value*& val, rapidjson::Document* d);
   };
 
-  std::map<std::string, AggEventSequence> event_sequence_map_;
+  // Map containing event sequences, with its type in string format as the key
+  // i.e. "Node Lifecycle Event Timeline", "Fragment Instance Lifecycle Event Timeline"
+  typedef std::map<std::string, AggEventSequence> AggEventSequenceMap;
+  AggEventSequenceMap event_sequence_map_;
 
   /// Protects event_sequence_map_ and event_sequence_labels_.
   mutable SpinLock event_sequence_lock_;
@@ -953,6 +965,10 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   /// that value appears. 'info_string_values' must be a value from 'info_strings_'.
   std::map<std::string, std::vector<int32_t>> GroupDistinctInfoStrings(
       const std::vector<std::string>& info_string_values) const;
+
+  // Collect and add the required info string values into rapidjson::kArrayType
+  void CollectInfoStringIntoJson(const std::string& info_string_name,
+      rapidjson::Value* parent, rapidjson::Document* d) const;
 
   /// Helper for UpdateAggregatedFromInstance() that are invoked recursively on 'src'.
   void UpdateAggregatedFromInstanceRecursive(
