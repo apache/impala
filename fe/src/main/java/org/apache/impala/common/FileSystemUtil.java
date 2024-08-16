@@ -929,9 +929,11 @@ public class FileSystemUtil {
       // survive from transient sub-directories.
       if (hasRecursiveListFiles(fs)) {
         baseIterator = fs.listFiles(p, recursive);
-      } else {
+      } else if (recursive) {
         baseIterator = new RecursingIterator<>(fs, p, debugAction,
             FileSystemUtil::listLocatedStatusIterator);
+      } else {
+        baseIterator = listLocatedStatusIterator(fs, p);
       }
       return new FilterIterator(p, baseIterator);
     } catch (FileNotFoundException e) {

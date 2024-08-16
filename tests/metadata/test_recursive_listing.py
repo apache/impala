@@ -126,6 +126,11 @@ class TestRecursiveListing(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
+    # Also test initial metadata loading
+    self.execute_query_expect_success(
+        self.client, "invalidate metadata {0}".format(fq_tbl_name))
+    assert len(self._show_files(fq_tbl_name)) == 1
+    assert len(self._get_rows(fq_tbl_name)) == 1
     # Re-enable.
     self.execute_query_expect_success(self.client, ("alter table {0} set tblproperties(" +
         "'impala.disable.recursive.listing'='false')").format(fq_tbl_name))
