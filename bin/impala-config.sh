@@ -267,8 +267,8 @@ export APACHE_ORC_JAVA_VERSION=1.8.3
 export APACHE_PARQUET_VERSION=1.12.3
 export APACHE_RANGER_VERSION=2.4.0
 export APACHE_TEZ_VERSION=0.10.2
-export APACHE_HIVE_VERSION=3.1.3
-export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
+export APACHE_HIVE_3_VERSION=3.1.3
+export APACHE_HIVE_3_STORAGE_API_VERSION=2.7.0
 export APACHE_OZONE_VERSION=1.4.0
 
 # Java dependencies that are not also runtime components. Declaring versions here allows
@@ -377,8 +377,8 @@ export CDP_ICEBERG_URL=${CDP_ICEBERG_URL-}
 export CDP_RANGER_URL=${CDP_RANGER_URL-}
 export CDP_TEZ_URL=${CDP_TEZ_URL-}
 
-export APACHE_HIVE_URL=${APACHE_HIVE_URL-}
-export APACHE_HIVE_SOURCE_URL=${APACHE_HIVE_SOURCE_URL-}
+export APACHE_HIVE_3_URL=${APACHE_HIVE_3_URL-}
+export APACHE_HIVE_3_SOURCE_URL=${APACHE_HIVE_3_SOURCE_URL-}
 export APACHE_OZONE_URL=${APACHE_OZONE_URL-}
 
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
@@ -396,7 +396,7 @@ if ${USE_APACHE_COMPONENTS:=false}; then
   export IMPALA_TEZ_VERSION=${APACHE_TEZ_VERSION}
   export USE_APACHE_HADOOP=true
   export USE_APACHE_HBASE=true
-  export USE_APACHE_HIVE=true
+  export USE_APACHE_HIVE_3=true
   export USE_APACHE_TEZ=true
   export USE_APACHE_RANGER=true
   export USE_APACHE_OZONE=true
@@ -418,7 +418,7 @@ else
   export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
   export USE_APACHE_HADOOP=${USE_APACHE_HADOOP:=false}
   export USE_APACHE_HBASE=${USE_APACHE_HBASE:=false}
-  export USE_APACHE_HIVE=${USE_APACHE_HIVE:=false}
+  export USE_APACHE_HIVE_3=${USE_APACHE_HIVE_3:=false}
   export USE_APACHE_TEZ=${USE_APACHE_TEZ:=false}
   export USE_APACHE_RANGER=${USE_APACHE_RANGER:=false}
   export USE_APACHE_OZONE=${USE_APACHE_OZONE:=false}
@@ -432,18 +432,18 @@ else
   export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}"
 fi
 
-if $USE_APACHE_HIVE; then
-  # When USE_APACHE_HIVE is set we use the apache hive version to build as well as deploy
-  # in the minicluster
-  export IMPALA_HIVE_DIST_TYPE="apache-hive"
-  export IMPALA_HIVE_VERSION=${APACHE_HIVE_VERSION}
-  export IMPALA_HIVE_URL=${APACHE_HIVE_URL-}
-  export IMPALA_HIVE_SOURCE_URL=${APACHE_HIVE_SOURCE_URL-}
-  export IMPALA_HIVE_STORAGE_API_VERSION=${APACHE_HIVE_STORAGE_API_VERSION}
+if $USE_APACHE_HIVE_3; then
+  # When USE_APACHE_HIVE_3 is set we use the apache hive version to build as well as
+  # deploy in the minicluster
+  export IMPALA_HIVE_DIST_TYPE="apache-hive-3"
+  export IMPALA_HIVE_VERSION=${APACHE_HIVE_3_VERSION}
+  export IMPALA_HIVE_URL=${APACHE_HIVE_3_URL-}
+  export IMPALA_HIVE_SOURCE_URL=${APACHE_HIVE_3_SOURCE_URL-}
+  export IMPALA_HIVE_STORAGE_API_VERSION=${APACHE_HIVE_3_STORAGE_API_VERSION}
 else
-  # CDP hive version is used to build and deploy in minicluster when USE_APACHE_HIVE is
+  # CDP hive version is used to build and deploy in minicluster when USE_APACHE_HIVE_* is
   # false
-  export IMPALA_HIVE_DIST_TYPE="hive"
+  export IMPALA_HIVE_DIST_TYPE="hive-3"
   export IMPALA_HIVE_VERSION=${HIVE_VERSION_OVERRIDE:-"$CDP_HIVE_VERSION"}
   export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
   export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
@@ -461,7 +461,7 @@ fi
 # infra/python/deps/requirements.txt.
 export IMPALA_THRIFT_CPP_VERSION=0.16.0-p7
 unset IMPALA_THRIFT_CPP_URL
-if $USE_APACHE_HIVE; then
+if $USE_APACHE_HIVE_3; then
   # Apache Hive 3 clients can't run on thrift versions >= 0.14 (IMPALA-11801)
   export IMPALA_THRIFT_POM_VERSION=0.11.0
   export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p5
@@ -707,7 +707,7 @@ DEFAULT_NODES_DIR="$IMPALA_HOME/testdata/cluster/cdh$CDH_MAJOR_VERSION$UNIQUE_FS
 export IMPALA_CLUSTER_NODES_DIR="${IMPALA_CLUSTER_NODES_DIR-$DEFAULT_NODES_DIR}"
 
 ESCAPED_DB_UID=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$UNIQUE_FS_LABEL$IMPALA_HOME")
-if $USE_APACHE_HIVE; then
+if $USE_APACHE_HIVE_3; then
   export HIVE_HOME="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
   export HIVE_SRC_DIR="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-src"
   # if apache hive is being used change the metastore db name, so we don't have to
@@ -1080,7 +1080,7 @@ export HIVE_AUX_JARS_PATH="$POSTGRES_JDBC_DRIVER"
 # Add the jar of iceberg-hive-runtime to have HiveIcebergStorageHandler.
 # Only needed by Apache Hive3 since CDP Hive3 has the jar of hive-iceberg-handler in its
 # lib folder.
-if $USE_APACHE_HIVE; then
+if $USE_APACHE_HIVE_3; then
   export HIVE_AUX_JARS_PATH="$HIVE_AUX_JARS_PATH:\
 $IMPALA_HOME/fe/target/dependency/iceberg-hive-runtime-${IMPALA_ICEBERG_VERSION}.jar"
 fi

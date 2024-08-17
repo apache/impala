@@ -48,7 +48,7 @@ CONFIGS=(
   "-skiptests -noclean -asan"
   "-skiptests -noclean -tsan"
   "-skiptests -noclean -ubsan -so -ninja"
-  # USE_APACHE_HIVE=true build:
+  # USE_APACHE_HIVE_3=true build:
   "-skiptests -noclean -use_apache_components"
   "-notests -noclean -use_apache_components -package"
 )

@@ -168,7 +168,7 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
       file_data = file_data.decode(encoding)
     else:
       file_data = file_data.decode('utf-8')
-    if os.environ["USE_APACHE_HIVE"] == "true":
+    if os.environ["USE_APACHE_HIVE_3"] == "true":
       # Remove Hive 4.0 feature for tpcds_schema_template.sql
       if "tpcds_schema_template" in test_file_name:
         # HIVE-20703

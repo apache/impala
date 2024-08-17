@@ -28,7 +28,7 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
-if [[ "${USE_APACHE_HIVE}" != true ]]; then
+if [[ "${USE_APACHE_HIVE_3}" != true ]]; then
   exit 0
 fi
 
@@ -77,6 +77,6 @@ if [[ "${HIVE_REBUILD}" = "true" ]]; then
   echo "Repackage the hive-exec module"
   ${IMPALA_HOME}/bin/mvn-quiet.sh -pl ql,standalone-metastore clean package \
       -Dmaven.test.skip
-  cp $HIVE_SRC_DIR/ql/target/hive-exec-${APACHE_HIVE_VERSION}.jar $HIVE_HOME/lib/
+  cp $HIVE_SRC_DIR/ql/target/hive-exec-${APACHE_HIVE_3_VERSION}.jar $HIVE_HOME/lib/
 fi
 popd

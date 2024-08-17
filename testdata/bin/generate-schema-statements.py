@@ -303,7 +303,7 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
   stmt = table_template.format(**params)
   # Apache Hive 3.1 doesn't support "STORED BY ICEBERG STORED AS AVRO" and
   # "STORED AS JSONFILE" (HIVE-25162, HIVE-19899)
-  if is_hive_stmt and os.environ['USE_APACHE_HIVE'] == "true":
+  if is_hive_stmt and os.environ['USE_APACHE_HIVE_3'] == "true":
     if "STORED AS JSONFILE" in stmt:
       stmt = stmt.replace("STORED AS JSONFILE",
                           "ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.JsonSerDe'")
@@ -630,7 +630,7 @@ def build_hbase_insert(db_name, db_suffix, table_name):
   hbase_insert = SET_HIVE_HBASE_BULK_LOAD + ';\n'
   # For Apache Hive, "hive.hbase.bulk does not exist" exception will be thrown and there
   # is only warning in cdp
-  if os.environ['USE_APACHE_HIVE'] == "true":
+  if os.environ['USE_APACHE_HIVE_3'] == "true":
     hbase_insert = ""
   params = build_replacement_params(db_name, db_suffix, table_name)
   hbase_insert += ("INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}"

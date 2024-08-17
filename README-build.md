@@ -39,7 +39,7 @@ can do so through the environment variables and scripts listed below.
 | USE_APACHE_COMPONENTS | false | Use Apache components for Hadoop, HBase, Hive, Tez, Ranger. It will set USE_APACHE_{HADOOP,HBASE,HIVE,TEZ,RANGER} variable as true if not set false. |
 | USE_APACHE_HADOOP | false | Use Apache Hadoop |
 | USE_APACHE_HBASE | false | Use Apache HBase |
-| USE_APACHE_HIVE | false | Use Apache Hive |
+| USE_APACHE_HIVE_3 | false | Use Apache Hive-3 |
 | USE_APACHE_TEZ | false | Use Apache Tez |
 | USE_APACHE_RANGER | false | Use Apache Ranger |
 | DOWNLOAD_CDH_COMPONENTS | true | Download CDH components |

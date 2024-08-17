@@ -457,7 +457,7 @@ bootstrap_dependencies() {
     cp $IMPALA_TOOLCHAIN_PACKAGES_HOME/hadoop-client-$IMPALA_HADOOP_CLIENT_VERSION/lib/* \
         $HADOOP_HOME/lib/native/
   fi
-  if [[ "${USE_APACHE_HIVE}" = true ]]; then
+  if [[ "${USE_APACHE_HIVE_3}" = true ]]; then
     "$IMPALA_HOME/testdata/bin/patch_hive.sh"
   fi
 }

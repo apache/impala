@@ -95,7 +95,7 @@ if impala_iceberg_version:
       # If we can't parse the version, default to format version 1
       pass
 
-IS_APACHE_HIVE = os.environ.get("USE_APACHE_HIVE", False) == 'true'
+IS_APACHE_HIVE = os.environ.get("USE_APACHE_HIVE_3", False) == 'true'
 
 # Resolve any symlinks in the path.
 impalad_basedir = \
