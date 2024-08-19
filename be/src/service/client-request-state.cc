@@ -175,6 +175,11 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   summary_profile_->AddInfoString("Delegated User", do_as_user());
   summary_profile_->AddInfoString("Network Address",
       TNetworkAddressToString(session_->network_address));
+  if (!session_->http_origin.empty()) {
+    /// If using hs2-http protocol, this is the origin of the session
+    /// as recorded in the X-Forwarded-For http message header.
+    summary_profile_->AddInfoString("Http Origin", session_->http_origin);
+  }
   summary_profile_->AddInfoString("Default Db", default_db());
   summary_profile_->AddInfoStringRedacted(
       "Sql Statement", query_ctx_.client_request.stmt);

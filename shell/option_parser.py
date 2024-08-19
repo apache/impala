@@ -352,6 +352,10 @@ def get_option_parser(defaults):
                     "values when using the HS2 protocol. The default behaviour makes the "
                     "values handled by Python's str() built-in method. Use '16G' to "
                     "match the Beeswax protocol's floating-point output format.")
+  parser.add_option("--hs2_x_forward", type="str",
+                    dest="hs2_x_forward", default=None,
+                    help="When using the hs2-http protocol, set this value in the "
+                    "X-Forwarded-For header. This is primarily for testing purposes.")
 
   # add default values to the help text
   for option in parser.option_list:

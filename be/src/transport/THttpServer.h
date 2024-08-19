@@ -106,6 +106,11 @@ public:
     std::function<bool(const std::string&, std::string)> trusted_domain_check_fn =
         [&](const std::string&, std::string) { return false; };
 
+    // Function that stores the connection's 'X-Forwarded-For' header in the Connection
+    // Context so that it can be tracked.
+    std::function<bool(std::string)> set_http_origin_fn =
+        [&](const std::string) { return false; };
+
     // Function that takes the connection's 'Authorization' header and returns true if
     // the basic auth header contains a valid username.
     std::function<bool(std::string)> trusted_auth_header_handle_fn = [&](std::string) {
@@ -248,6 +253,10 @@ protected:
 
   // The value from the 'X-Impala-Query-Id' header.
   std::string header_x_query_id_ = "";
+
+  // The maximum length of the 'X-Forwarded-For' header that will be stored in the runtime
+  // Profile.
+  static const int MAX_X_FORWARDED_HEADER_LENGTH = 8096;
 };
 
 /**

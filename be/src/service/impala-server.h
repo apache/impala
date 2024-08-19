@@ -619,6 +619,10 @@ class ImpalaServer : public ImpalaServiceIf,
     /// Client network address.
     TNetworkAddress network_address;
 
+    /// If using hs2-http protocol, this is the origin of the session
+    /// as recorded in the X-Forwarded-For http message header.
+    std::string http_origin;
+
     /// Protects all fields below. See "Locking" in the class comment for lock
     /// acquisition order.
     std::mutex lock;

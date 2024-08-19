@@ -137,7 +137,7 @@ class ImpalaClient(object):
                verbose=True, use_http_base_transport=False, http_path=None,
                http_cookie_names=None, http_socket_timeout_s=None, value_converter=None,
                connect_max_tries=4, rpc_stdout=False, rpc_file=None, http_tracing=True,
-               jwt=None):
+               jwt=None, hs2_x_forward=None):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -172,6 +172,8 @@ class ImpalaClient(object):
     self.value_converter = value_converter
     self.rpc_stdout = rpc_stdout
     self.rpc_file = rpc_file
+    # In h2s-http clients only, the value of the X-Forwarded-For http header.
+    self.hs2_x_forward = hs2_x_forward
 
   def connect(self):
     """Creates a connection to an Impalad instance. Returns a tuple with the impala
@@ -748,6 +750,8 @@ class ImpalaHS2Client(ImpalaClient):
       assert getattr(self, "_current_request_id", None) is not None, \
         "request id was not set"
       headers["X-Request-Id"] = self._current_request_id
+    if self.hs2_x_forward:
+      headers["X-Forwarded-For"] = self.hs2_x_forward
 
     return headers
 

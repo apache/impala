@@ -1553,6 +1553,36 @@ class TestImpalaShell(ImpalaTestSuite):
 
     assert expected_py2 in result.stdout or expected_py3 in result.stdout
 
+  def test_hs2_x_forward(self, vector):
+    """Test that when we use the --hs2_x_forward flag with hs2-http
+    protocol then the X-Forwarded-For http header is set, and this
+    value is reported in the 'Http Origin' field of the profile."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Skip as no profile with strict protocol.")
+    expect_header = vector.get_value('protocol') == 'hs2-http'
+    args = ['-q', 'select 1;profile;',
+            '--hs2_x_forward=a_forwarded_origin_header b_forwarded_origin_header']
+    result = run_impala_shell_cmd(vector, args)
+    found_http_origin = ("Http Origin: a_forwarded_origin_header "
+                         "b_forwarded_origin_header") in result.stdout
+    assert found_http_origin == expect_header
+
+  def test_hs2_x_forward_long(self, vector):
+    """Test that when we use the --hs2_x_forward flag with hs2-http
+    protocol then when passing a very long string, the 'Http Origin'
+    field of the profile is truncated."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Skip as no profile with strict protocol.")
+    expect_header = vector.get_value('protocol') == 'hs2-http'
+    long_string = 'a' * 10000
+    expected_string = 'a' * 8096
+    args = ['-q', 'select 1;profile;',
+            '--hs2_x_forward={0}'.format(long_string)]
+    result = run_impala_shell_cmd(vector, args)
+    found_http_origin = ("Http Origin: {0}".format(expected_string)) in result.stdout
+    assert found_http_origin == expect_header
+    assert long_string not in result.stdout
+
   def test_output_rpc_to_screen_and_file(self, vector, populated_table, tmp_file):
     """Tests the flags that output hs2 rpc call details to both stdout
     and a file.  Asserts the expected text is written."""

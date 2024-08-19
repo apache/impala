@@ -258,7 +258,7 @@ class ImpalaShell(cmd.Cmd, object):
     self.orig_cmd = None
 
     # Tracks query handle of the last query executed. Used by the 'profile' command.
-    self.last_query_handle = None;
+    self.last_query_handle = None
 
     # live_summary and live_progress are turned off in strict_hs2_protocol mode
     if options.strict_hs2_protocol:
@@ -282,6 +282,7 @@ class ImpalaShell(cmd.Cmd, object):
     self.fetch_size = options.fetch_size
     self.http_cookie_names = options.http_cookie_names
     self.http_tracing = not options.no_http_tracing
+    self.hs2_x_forward = options.hs2_x_forward
 
     # Due to a readline bug in centos/rhel7, importing it causes control characters to be
     # printed. This breaks any scripting against the shell in non-interactive mode. Since
@@ -647,7 +648,7 @@ class ImpalaShell(cmd.Cmd, object):
                           http_cookie_names=self.http_cookie_names,
                           value_converter=value_converter, rpc_stdout=self.rpc_stdout,
                           rpc_file=self.rpc_file, http_tracing=self.http_tracing,
-                          jwt=self.jwt)
+                          jwt=self.jwt, hs2_x_forward=self.hs2_x_forward)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -668,7 +669,8 @@ class ImpalaShell(cmd.Cmd, object):
                           value_converter=value_converter,
                           connect_max_tries=self.connect_max_tries,
                           rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
-                          http_tracing=self.http_tracing, jwt=self.jwt)
+                          http_tracing=self.http_tracing, jwt=self.jwt,
+                          hs2_x_forward=self.hs2_x_forward)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,

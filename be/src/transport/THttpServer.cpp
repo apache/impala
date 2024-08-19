@@ -267,6 +267,15 @@ void THttpServer::headersDone() {
         << (header_x_query_id_.empty() ? "" : " x-query-id=" + header_x_query_id_);
   }
 
+  // Trim and truncate the value of the 'X-Forwarded-For' header.
+  string origin = origin_;
+  StripWhiteSpace(&origin);
+  if (origin.length() > MAX_X_FORWARDED_HEADER_LENGTH) {
+    origin = origin.substr(0, MAX_X_FORWARDED_HEADER_LENGTH);
+  }
+  // Store the truncated value of the 'X-Forwarded-For' header in the Connection Context.
+  callbacks_.set_http_origin_fn(origin);
+
   if (!has_ldap_ && !has_kerberos_ && !has_saml_ && !has_jwt_) {
     // We don't need to authenticate.
     resetAuthState();
@@ -350,7 +359,7 @@ void THttpServer::headersDone() {
 
     if (!authorized && !fallback_to_other_auths) {
       // Do not fallback to other auth mechanisms, as the client probably expects
-      // only SAML related respsonses.
+      // only SAML related responses.
       if (metrics_enabled_) http_metrics_->total_saml_auth_failure_->Increment(1);
       resetAuthState();
       returnUnauthorized();
