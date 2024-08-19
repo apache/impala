@@ -36,6 +36,20 @@
     <category rdf:resource="https://projects.apache.org/category/big-data" />
     <release>
       <Version>
+        <name>Apache Impala 4.4.1</name>
+        <created>2024-08-19</created>
+        <revision>4.4.1</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
+        <name>Apache Impala 3.4.2</name>
+        <created>2024-06-20</created>
+        <revision>3.4.2</revision>
+      </Version>
+    </release>
+    <release>
+      <Version>
         <name>Apache Impala 4.4.0</name>
         <created>2024-05-25</created>
         <revision>4.4.0</revision>
@@ -108,7 +122,7 @@
       <Version>
         <name>Apache Impala 3.2.0</name>
         <created>2019-03-28</created>
-        <revision></revision>
+        <revision>3.2.0</revision>
       </Version>
     </release>
     <release>
