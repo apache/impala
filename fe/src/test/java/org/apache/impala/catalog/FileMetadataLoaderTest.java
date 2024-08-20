@@ -163,8 +163,8 @@ public class FileMetadataLoaderTest {
         "functional_parquet", "iceberg_partitioned",
         /* oldFds = */ fml1.getLoadedFds(),
         /* canDataBeOutsideOfTableLocation = */ false);
-    assertTrue(fml1Refresh.shouldReuseOldFds());
     fml1Refresh.load();
+    assertFalse(fml1Refresh.useParallelListing());
     assertEquals(0, fml1Refresh.getStats().loadedFiles);
     assertEquals(20, fml1Refresh.getStats().skippedFiles);
     assertEquals(20, fml1Refresh.getLoadedFds().size());
@@ -186,8 +186,8 @@ public class FileMetadataLoaderTest {
         "functional_parquet", "iceberg_non_partitioned",
         /* oldFds = */ fml2.getLoadedFds(),
         /* canDataBeOutsideOfTableLocation = */ false);
-    assertTrue(fml2Refresh.shouldReuseOldFds());
     fml2Refresh.load();
+    assertFalse(fml2Refresh.useParallelListing());
     assertEquals(0, fml2Refresh.getStats().loadedFiles);
     assertEquals(20, fml2Refresh.getStats().skippedFiles);
     assertEquals(20, fml2Refresh.getLoadedFds().size());
@@ -213,8 +213,8 @@ public class FileMetadataLoaderTest {
         "functional_parquet", "iceberg_partitioned",
         /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
         /* canDataBeOutsideOfTableLocation = */ false);
-    assertTrue(fml1Refresh.shouldReuseOldFds());
     fml1Refresh.load();
+    assertFalse(fml1Refresh.useParallelListing());
     assertEquals(10, fml1Refresh.getStats().loadedFiles);
     assertEquals(10, fml1Refresh.getStats().skippedFiles);
     assertEquals(20, fml1Refresh.getLoadedFds().size());
@@ -229,8 +229,8 @@ public class FileMetadataLoaderTest {
         "functional_parquet", "iceberg_non_partitioned",
         /* oldFds = */ fml2.getLoadedFds().subList(0, 10),
         /* canDataBeOutsideOfTableLocation = */ false);
-    assertTrue(fml2Refresh.shouldReuseOldFds());
     fml2Refresh.load();
+    assertFalse(fml2Refresh.useParallelListing());
     assertEquals(10, fml2Refresh.getStats().loadedFiles);
     assertEquals(10, fml2Refresh.getStats().skippedFiles);
     assertEquals(20, fml2Refresh.getLoadedFds().size());
@@ -245,26 +245,34 @@ public class FileMetadataLoaderTest {
         /* canDataBeOutsideOfTableLocation = */ false);
     fml1.load();
 
+    IcebergFileMetadataLoader fml1ForceRefresh = getLoaderForIcebergTable(catalog,
+        "functional_parquet", "iceberg_partitioned",
+        /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
+        /* canDataBeOutsideOfTableLocation = */ false, 10);
+    fml1ForceRefresh.setForceRefreshBlockLocations(true);
+    fml1ForceRefresh.load();
+    assertTrue(fml1ForceRefresh.useParallelListing());
+
     IcebergFileMetadataLoader fml1Refresh = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
         /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
-        /* canDataBeOutsideOfTableLocation = */ false);
-    assertTrue(fml1Refresh.shouldReuseOldFds());
-    fml1Refresh.setForceRefreshBlockLocations(true);
-    assertFalse(fml1Refresh.shouldReuseOldFds());
+        /* canDataBeOutsideOfTableLocation = */ false, 10);
     fml1Refresh.setForceRefreshBlockLocations(false);
-    assertTrue(fml1Refresh.shouldReuseOldFds());
+    fml1Refresh.load();
+    assertFalse(fml1Refresh.useParallelListing());
 
     IcebergFileMetadataLoader fml1Refresh10 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
         /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
         /* canDataBeOutsideOfTableLocation = */ false, 10);
-    assertTrue(fml1Refresh10.shouldReuseOldFds());
+    fml1Refresh10.load();
+    assertFalse(fml1Refresh10.useParallelListing());
     IcebergFileMetadataLoader fml1Refresh9 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
         /* oldFds = */ fml1.getLoadedFds().subList(0, 10),
         /* canDataBeOutsideOfTableLocation = */ false, 9);
-    assertFalse(fml1Refresh9.shouldReuseOldFds());
+    fml1Refresh9.load();
+    assertTrue(fml1Refresh9.useParallelListing());
 
 
     IcebergFileMetadataLoader fml2 = getLoaderForIcebergTable(catalog,
@@ -281,12 +289,14 @@ public class FileMetadataLoaderTest {
         "functional_parquet", "iceberg_non_partitioned",
         /* oldFds = */ fml2.getLoadedFds().subList(0, 10),
         /* canDataBeOutsideOfTableLocation = */ false, 10);
-    assertTrue(fml2Refresh10.shouldReuseOldFds());
+    fml2Refresh10.load();
+    assertFalse(fml2Refresh10.useParallelListing());
     IcebergFileMetadataLoader fml2Refresh9 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_non_partitioned",
         /* oldFds = */ fml2.getLoadedFds().subList(0, 10),
         /* canDataBeOutsideOfTableLocation = */ false, 9);
-    assertFalse(fml2Refresh9.shouldReuseOldFds());
+    fml2Refresh9.load();
+    assertTrue(fml2Refresh9.useParallelListing());
   }
 
   @Test
@@ -303,8 +313,8 @@ public class FileMetadataLoaderTest {
         "functional_parquet", "iceberg_multiple_storage_locations",
         /* oldFds = */ fml1.getLoadedFds().subList(0, 1),
         /* canDataBeOutsideOfTableLocation = */ true);
-    assertTrue(fml1Refresh1.shouldReuseOldFds());
     fml1Refresh1.load();
+    assertFalse(fml1Refresh1.useParallelListing());
     assertEquals(5, fml1Refresh1.getStats().loadedFiles);
     assertEquals(1, fml1Refresh1.getStats().skippedFiles);
     assertEquals(6, fml1Refresh1.getLoadedFds().size());
@@ -313,8 +323,8 @@ public class FileMetadataLoaderTest {
         "functional_parquet", "iceberg_multiple_storage_locations",
         /* oldFds = */ fml1.getLoadedFds().subList(0, 5),
         /* canDataBeOutsideOfTableLocation = */ true);
-    assertTrue(fml1Refresh5.shouldReuseOldFds());
     fml1Refresh5.load();
+    assertFalse(fml1Refresh5.useParallelListing());
     assertEquals(1, fml1Refresh5.getStats().loadedFiles);
     assertEquals(5, fml1Refresh5.getStats().skippedFiles);
     assertEquals(6, fml1Refresh5.getLoadedFds().size());

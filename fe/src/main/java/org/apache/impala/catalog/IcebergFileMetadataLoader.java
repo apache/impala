@@ -23,23 +23,22 @@ import static org.apache.impala.catalog.ParallelFileMetadataLoader.getPoolSize;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -53,10 +52,10 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
+import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
-
 import org.apache.impala.util.ThreadNameAnnotator;
 
 import org.slf4j.Logger;
@@ -69,8 +68,6 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   private final static Logger LOG = LoggerFactory.getLogger(
       IcebergFileMetadataLoader.class);
 
-  private static final Configuration CONF = new Configuration();
-
   // Default value of 'newFilesThreshold_' if the given parameter or startup flag have
   // invalid value.
   private final int NEW_FILES_THRESHOLD_DEFAULT = 100;
@@ -81,6 +78,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
 
   private final GroupedContentFiles icebergFiles_;
   private final boolean canDataBeOutsideOfTableLocation_;
+  private boolean useParallelListing_;
 
   public IcebergFileMetadataLoader(Path partDir, boolean recursive,
       List<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
@@ -111,146 +109,144 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
 
   @Override
   public void load() throws CatalogException, IOException {
-    if (!shouldReuseOldFds()) {
-      super.load();
-    } else {
-      try {
-        reloadWithOldFds();
-      } finally {
-        FileMetadataLoader.TOTAL_TASKS.decrementAndGet();
+    String msg = String.format("Refreshing Iceberg file metadata from path %s", partDir_);
+    LOG.trace(msg);
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(msg)) {
+      loadInternal();
+    } finally {
+      FileMetadataLoader.TOTAL_TASKS.decrementAndGet();
+    }
+  }
+
+  private void loadInternal() throws CatalogException, IOException {
+    loadedFds_ = new ArrayList<>();
+    loadStats_ = new LoadStats(partDir_);
+
+    // Process the existing Fd ContentFile and return the newly added ContentFile
+    Iterable<ContentFile<?>> newContentFiles = loadContentFilesWithOldFds();
+    // Iterate through all the newContentFiles, determine if StorageIds are supported,
+    // and use different handling methods accordingly.
+    // This considers that different ContentFiles are on different FileSystems
+    List<Pair<FileSystem, ContentFile<?>>> filesSupportsStorageIds = Lists.newArrayList();
+    FileSystem fsForTable = FileSystemUtil.getFileSystemForPath(partDir_);
+    FileSystem defaultFs = FileSystemUtil.getDefaultFileSystem();
+    for (ContentFile<?> contentFile : newContentFiles) {
+      FileSystem fsForPath = fsForTable;
+      // If canDataBeOutsideOfTableLocation is not true, we assume that the file system
+      // for all ContentFiles is the same as fsForTable
+      if (canDataBeOutsideOfTableLocation_) {
+        Path path = new Path(contentFile.path().toString());
+        fsForPath = path.toUri().getScheme() != null ?
+            FileSystemUtil.getFileSystemForPath(path) : defaultFs;
+      }
+      // If the specific fs does not support StorageIds, then
+      // we create FileDescriptor directly
+      if (FileSystemUtil.supportsStorageIds(fsForPath)) {
+        filesSupportsStorageIds.add(Pair.create(fsForPath, contentFile));
+      } else {
+        loadedFds_.add(createFd(fsForPath, contentFile, null, null));
+        ++loadStats_.loadedFiles;
       }
     }
+    // If the number of filesSupportsStorageIds are greater than newFilesThreshold,
+    // we will use a recursive file listing to load file metadata. If number of new
+    // files are less or equal to this, we will load the metadata of the newly added
+    // files one by one
+    useParallelListing_ = filesSupportsStorageIds.size() > newFilesThreshold_;
+    Reference<Long> numUnknownDiskIds = new Reference<>(0L);
+    Map<Path, FileStatus> nameToFileStatus = Collections.emptyMap();
+    if (useParallelListing_) {
+      nameToFileStatus = parallelListing(filesSupportsStorageIds);
+    }
+    for (Pair<FileSystem, ContentFile<?>> contentFileInfo : filesSupportsStorageIds) {
+      Path path = FileSystemUtil.createFullyQualifiedPath(
+          new Path(contentFileInfo.getSecond().path().toString()));
+      FileStatus stat = nameToFileStatus.get(path);
+      loadedFds_.add(createFd(contentFileInfo.getFirst(), contentFileInfo.getSecond(),
+          stat, numUnknownDiskIds));
+    }
+    loadStats_.loadedFiles += filesSupportsStorageIds.size();
+    loadStats_.unknownDiskIds += numUnknownDiskIds.getRef();
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(loadStats_.debugString());
+    }
+  }
+
+  @VisibleForTesting
+  boolean useParallelListing() {
+    return useParallelListing_;
   }
 
   /**
    *  Iceberg tables are a collection of immutable, uniquely identifiable data files,
    *  which means we can safely reuse the old FDs.
    */
-  private void reloadWithOldFds() throws IOException {
-    loadStats_ = new LoadStats(partDir_);
-    FileSystem fs = partDir_.getFileSystem(CONF);
-
-    String msg = String.format("Refreshing Iceberg file metadata from path %s " +
-        "while reusing old file descriptors", partDir_);
-    LOG.trace(msg);
-    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(msg)) {
-      loadedFds_ = new ArrayList<>();
-      Reference<Long> numUnknownDiskIds = new Reference<>(0L);
-      for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
-        FileDescriptor fd = getOldFd(contentFile);
-        if (fd == null) {
-          fd = getFileDescriptor(fs, contentFile, numUnknownDiskIds);
-        } else {
-          ++loadStats_.skippedFiles;
-        }
+  private Iterable<ContentFile<?>> loadContentFilesWithOldFds() throws IOException {
+    if (forceRefreshLocations || oldFdsByPath_.isEmpty()) {
+      return icebergFiles_.getAllContentFiles();
+    }
+    List<ContentFile<?>> newContentFiles = Lists.newArrayList();
+    for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
+      FileDescriptor fd = getOldFd(contentFile);
+      if (fd == null) {
+        newContentFiles.add(contentFile);
+      } else {
+        ++loadStats_.skippedFiles;
         loadedFds_.add(Preconditions.checkNotNull(fd));
       }
-      Preconditions.checkState(loadStats_.loadedFiles <= newFilesThreshold_);
-      loadStats_.unknownDiskIds += numUnknownDiskIds.getRef();
-      if (LOG.isTraceEnabled()) {
-        LOG.trace(loadStats_.debugString());
+    }
+    return newContentFiles;
+  }
+
+  private FileDescriptor createFd(FileSystem fs, ContentFile<?> contentFile,
+      FileStatus stat, Reference<Long> numUnknownDiskIds) throws IOException {
+    if (stat == null) {
+      Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
+          new Path(contentFile.path().toString()));
+      if (FileSystemUtil.supportsStorageIds(fs)) {
+        stat = Utils.createLocatedFileStatus(fileLoc, fs);
+      } else {
+        // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
+        stat = Utils.createFileStatus(contentFile, fileLoc);
       }
     }
-  }
 
-  private FileDescriptor getFileDescriptor(FileSystem fs, ContentFile<?> contentFile,
-        Reference<Long> numUnknownDiskIds) throws IOException {
-    Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
-        new Path(contentFile.path().toString()));
-    FileStatus stat;
-    if (FileSystemUtil.supportsStorageIds(fs)) {
-      stat = Utils.createLocatedFileStatus(fileLoc, fs);
-    } else {
-      // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
-      stat = Utils.createFileStatus(contentFile, fileLoc);
-    }
-    return getFileDescriptor(fs, FileSystemUtil.supportsStorageIds(fs),
-        numUnknownDiskIds, stat);
-  }
-
-  /**
-   * Throw exception if the path fails to relativize based on the location of the Iceberg
-   * tables, and files is not allowed outside the table location.
-   */
-  @Override
-  protected FileDescriptor getFileDescriptor(FileSystem fs, boolean listWithLocations,
-      Reference<Long> numUnknownDiskIds, FileStatus fileStatus) throws IOException {
     String absPath = null;
-    String relPath = FileSystemUtil.relativizePathNoThrow(fileStatus.getPath(), partDir_);
+    String relPath = FileSystemUtil.relativizePathNoThrow(stat.getPath(), partDir_);
     if (relPath == null) {
       if (canDataBeOutsideOfTableLocation_) {
-        absPath = fileStatus.getPath().toString();
+        absPath = stat.getPath().toString();
       } else {
         throw new IOException(String.format("Failed to load Iceberg datafile %s, because "
-            + "it's outside of the table location", fileStatus.getPath().toUri()));
+            + "it's outside of the table location", stat.getPath().toUri()));
       }
     }
-
-    String path = Strings.isNullOrEmpty(relPath) ? absPath : relPath;
-    FileDescriptor fd = oldFdsByPath_.get(path);
-    if (listWithLocations || forceRefreshLocations || fd == null ||
-        fd.isChanged(fileStatus)) {
-      fd = createFd(fs, fileStatus, relPath, numUnknownDiskIds, absPath);
-      ++loadStats_.loadedFiles;
-    } else {
-      ++loadStats_.skippedFiles;
-    }
-    return fd;
+    return createFd(fs, stat, relPath, numUnknownDiskIds, absPath);
   }
 
   /**
-   * Return file status list based on the data and delete files of the Iceberg tables.
+   * Using a thread pool to perform parallel List operations on the FileSystem, this takes
+   * into account the situation where multiple FileSystems exist within the ContentFiles.
    */
-  @Override
-  protected List<FileStatus> getFileStatuses(FileSystem fs, boolean listWithLocations)
-      throws IOException {
-    if (icebergFiles_.isEmpty()) return null;
-    // For the FSs in 'FileSystemUtil#SCHEME_SUPPORT_STORAGE_IDS' (e.g. HDFS, Ozone,
-    // Alluxio, etc.) we ensure the file with block location information, so we're going
-    // to get the block information through 'FileSystemUtil.listFiles'.
-    Map<Path, FileStatus> nameToFileStatus = Collections.emptyMap();
-    if (listWithLocations) nameToFileStatus = parallelListing(fs);
-    List<FileStatus> stats = Lists.newLinkedList();
-    for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
-      Path path = FileSystemUtil.createFullyQualifiedPath(
-          new Path(contentFile.path().toString()));
-      // If data is in the table location, then we can get LocatedFileStatus from
-      // 'nameToFileStatus'. If 'nameToFileStatus' does not include the ContentFile, we
-      // try to get LocatedFileStatus based on the specific fs(StorageIds are supported)
-      // of the actual ContentFile. If the specific fs does not support StorageIds, then
-      // we create FileStatus directly by the method
-      // 'org.apache.impala.catalog.IcebergFileMetadataLoader.createFileStatus'.
-      if (nameToFileStatus.containsKey(path)) {
-        stats.add(nameToFileStatus.get(path));
-      } else {
-        FileSystem fsForPath = FileSystemUtil.getFileSystemForPath(path);
-        if (FileSystemUtil.supportsStorageIds(fsForPath)) {
-          stats.add(Utils.createLocatedFileStatus(path, fsForPath));
-        } else {
-          // To avoid the cost of directory listing on OSS service (e.g. S3A, COS, OSS,
-          // etc), we create FileStatus ourselves.
-          stats.add(Utils.createFileStatus(contentFile, path));
-        }
-      }
-    }
-    return stats;
-  }
-
-  private Map<Path, FileStatus> parallelListing(FileSystem fs) throws IOException {
+  private Map<Path, FileStatus> parallelListing(
+      Iterable<Pair<FileSystem, ContentFile<?>>> contentFiles) throws IOException {
+    final Set<Path> partitionPaths = collectPartitionPaths(contentFiles);
+    if (partitionPaths.size() == 0) return Collections.emptyMap();
     String logPrefix = "Parallel Iceberg file metadata listing";
-    int poolSize = getPoolSize(icebergFiles_.size(), fs);
+    // Use the file system type of the table's root path as
+    // the basis for determining the pool size.
+    int poolSize = getPoolSize(partitionPaths.size(),
+        FileSystemUtil.getFileSystemForPath(partDir_));
     ExecutorService pool = createPool(poolSize, logPrefix);
     TOTAL_THREADS.addAndGet(poolSize);
-    final Set<Path> partitionPaths;
     Map<Path, FileStatus> nameToFileStatus = Maps.newConcurrentMap();
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(logPrefix)) {
-      partitionPaths = icebergFilesByPartition();
       TOTAL_TASKS.addAndGet(partitionPaths.size());
       List<Future<Void>> tasks =
           partitionPaths.stream()
               .map(path -> pool.submit(() -> {
                 try {
-                  return listingTask(fs, path, nameToFileStatus);
+                  return listingTask(path, nameToFileStatus);
                 } finally {
                   TOTAL_TASKS.decrementAndGet();
                 }
@@ -266,14 +262,17 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     return nameToFileStatus;
   }
 
-  private Set<Path> icebergFilesByPartition() {
-    return StreamSupport.stream(icebergFiles_.getAllContentFiles().spliterator(), false)
-        .map(contentFile -> new Path(String.valueOf(contentFile.path())).getParent())
+  private Set<Path> collectPartitionPaths(
+      Iterable<Pair<FileSystem, ContentFile<?>>> contentFiles) {
+    return StreamSupport.stream(contentFiles.spliterator(), false)
+        .map(contentFile ->
+            new Path(String.valueOf(contentFile.getSecond().path())).getParent())
         .collect(Collectors.toSet());
   }
 
-  private Void listingTask(FileSystem fs, Path partitionPath,
+  private Void listingTask(Path partitionPath,
       Map<Path, FileStatus> nameToFileStatus) throws IOException {
+    FileSystem fs = FileSystemUtil.getFileSystemForPath(partitionPath);
     RemoteIterator<? extends FileStatus> remoteIterator =
         FileSystemUtil.listFiles(fs, partitionPath, recursive_, debugAction_);
     Map<Path, FileStatus> perThreadMapping = new HashMap<>();
@@ -283,34 +282,6 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     }
     nameToFileStatus.putAll(perThreadMapping);
     return null;
-  }
-
-  @VisibleForTesting
-  boolean shouldReuseOldFds() throws IOException {
-    if (oldFdsByPath_ == null || oldFdsByPath_.isEmpty()) return false;
-    if (forceRefreshLocations) return false;
-
-    int oldFdsSize = oldFdsByPath_.size();
-    int iceContentFilesSize = icebergFiles_.size();
-
-    if (iceContentFilesSize - oldFdsSize > newFilesThreshold_) {
-      LOG.trace("There are at least {} new files under path {}.",
-          iceContentFilesSize - oldFdsSize, partDir_);
-      return false;
-    }
-
-    int newFiles = 0;
-    for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
-      if (getOldFd(contentFile) == null) {
-        ++newFiles;
-        if (newFiles > newFilesThreshold_) {
-          LOG.trace("There are at least {} new files under path {}.", newFiles, partDir_);
-          return false;
-        }
-      }
-    }
-    LOG.trace("There are only {} new files under path {}.", newFiles, partDir_);
-    return true;
   }
 
   FileDescriptor getOldFd(ContentFile<?> contentFile) throws IOException {

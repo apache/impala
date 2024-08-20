@@ -417,9 +417,9 @@ DEFINE_int64(update_catalogd_rpc_resend_interval_ms, 100, "(Advanced) Interval (
     "statestore has failed to send the RPC to the subscriber.");
 
 DEFINE_int32(iceberg_reload_new_files_threshold, 100, "(Advanced) If during a table "
-    "refresh the number of new files are greater than this, catalogd will completely "
-    "reload all file metadata. If number of new files are less or equal to this, "
-    "catalogd will only load the metadata of the newly added files.");
+    "refresh the number of new files are greater than this, catalogd will use a "
+    "recursive file listing to load file metadata. If number of new files are less or "
+    "equal to this, catalogd will load the file metadata one by one.");
 
 DEFINE_bool(iceberg_allow_datafiles_in_table_location_only, true, "If true, Impala "
     "does not allow Iceberg data file locations outside of the table directory during "
