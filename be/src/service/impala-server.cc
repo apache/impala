@@ -1455,30 +1455,33 @@ Status ImpalaServer::SetQueryInflight(
     shared_ptr<SessionState> session_state, const QueryHandle& query_handle) {
   DebugActionNoFail(query_handle->query_options(), "SET_QUERY_INFLIGHT");
   const TUniqueId& query_id = query_handle->query_id();
-  lock_guard<mutex> l(session_state->lock);
-  // The session wasn't expired at the time it was checked out and it isn't allowed to
-  // expire while checked out, so it must not be expired.
-  DCHECK_GT(session_state->ref_count, 0);
-  DCHECK(!session_state->expired);
-  // The session may have been closed after it was checked out.
-  if (session_state->closed) {
-    VLOG(1) << "Session closed: cannot set " << PrintId(query_id) << " in-flight";
-    return Status::Expected("Session closed");
-  }
+  {
+    // Take session state lock while operating on the state.
+    lock_guard<mutex> l(session_state->lock);
+    // The session wasn't expired at the time it was checked out and it isn't allowed to
+    // expire while checked out, so it must not be expired.
+    DCHECK_GT(session_state->ref_count, 0);
+    DCHECK(!session_state->expired);
+    // The session may have been closed after it was checked out.
+    if (session_state->closed) {
+      VLOG(1) << "Session closed: cannot set " << PrintId(query_id) << " in-flight";
+      return Status::Expected("Session closed");
+    }
 
-  // Acknowledge the query by incrementing total_queries.
-  ++session_state->total_queries;
-  // If the query was already closed - only possible by query retry logic - skip
-  // scheduling it to be unregistered with the session and adding timeouts checks.
-  if (session_state->prestopped_queries.erase(query_id) > 0) {
-    VLOG_QUERY << "Query " << PrintId(query_id) << " closed, skipping in-flight.";
-    return Status::OK();
-  }
-  // Add query to the set that will be unregistered if session is closed.
-  auto inflight_it = session_state->inflight_queries.insert(query_id);
-  if (UNLIKELY(!inflight_it.second)) {
-    LOG(WARNING) << "Query " << PrintId(query_id) << " is already in-flight.";
-    DCHECK(false) << "SetQueryInflight called twice for query_id=" << PrintId(query_id);
+    // Acknowledge the query by incrementing total_queries.
+    ++session_state->total_queries;
+    // If the query was already closed - only possible by query retry logic - skip
+    // scheduling it to be unregistered with the session and adding timeouts checks.
+    if (session_state->prestopped_queries.erase(query_id) > 0) {
+      VLOG_QUERY << "Query " << PrintId(query_id) << " closed, skipping in-flight.";
+      return Status::OK();
+    }
+    // Add query to the set that will be unregistered if session is closed.
+    auto inflight_it = session_state->inflight_queries.insert(query_id);
+    if (UNLIKELY(!inflight_it.second)) {
+      LOG(WARNING) << "Query " << PrintId(query_id) << " is already in-flight.";
+      DCHECK(false) << "SetQueryInflight called twice for query_id=" << PrintId(query_id);
+    }
   }
 
   // If the query has a timeout or time limit, schedule checks.
@@ -1490,6 +1493,7 @@ Status ImpalaServer::SetQueryInflight(
       query_handle->query_options().join_rows_produced_limit;
   if (idle_timeout_s > 0 || exec_time_limit_s > 0 || cpu_limit_s > 0
       || scan_bytes_limit > 0 || join_rows_produced_limit > 0) {
+    DebugActionNoFail(query_handle->query_options(), "SET_QUERY_INFLIGHT_EXPIRATION");
     lock_guard<mutex> l2(query_expiration_lock_);
     int64_t now = UnixMillis();
     if (idle_timeout_s > 0) {
@@ -2867,6 +2871,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
           const Status status = Status::Expected(TErrorCode::INACTIVE_QUERY_EXPIRED,
               PrintId(expiration_event->query_id),
               PrettyPrinter::Print(idle_timeout_s, TUnit::TIME_S));
+          DebugActionNoFail(crs->query_options(), "EXPIRE_INACTIVE_QUERY");
 
           // Save status so we can report it for unregistered queries.
           Status preserved_status;

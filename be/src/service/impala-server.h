@@ -184,8 +184,8 @@ class TQueryExecRequest;
 /// locks are acquired, lower-numbered locks must be acquired before higher-numbered
 /// locks:
 /// 1. session_state_map_lock_
-/// 2. SessionState::lock
-/// 3. query_expiration_lock_
+/// 2. query_expiration_lock_
+/// 3. SessionState::lock
 /// 4. idle_query_statuses_lock_
 /// 5. ClientRequestState::fetch_rows_lock
 /// 6. ClientRequestState::lock

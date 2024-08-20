@@ -302,3 +302,31 @@ class TestQueryExpiration(CustomClusterTestSuite):
     for t in non_expiring_time_limit_threads:
       assert t.success
       assert t.data[0] == '7300' # Number of rows in alltypes.
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args()
+  def test_query_expiration_no_deadlock(self):
+    """Regression test for IMPALA-13313: Confirm that queries do not deadlock when one is
+    expiring while another starts."""
+    impalad = self.cluster.get_first_impalad()
+    num_expired = impalad.service.get_metric_value('impala-server.num-queries-expired')
+
+    handle = self.execute_query_async("SELECT SLEEP(1000000)",
+        {'query_timeout_s': '1', 'debug_action': 'EXPIRE_INACTIVE_QUERY:SLEEP@3000'})
+
+    before = time()
+
+    # Prior to fixing IMPALA-13313, this query would enter a deadlock with the expiration
+    # for the previous query, and both would be unable to finish.
+    result = self.execute_query("SELECT 1", {
+        'query_timeout_s': '10',
+        'debug_action': 'SET_QUERY_INFLIGHT_EXPIRATION:SLEEP@5000'})
+    assert result.success
+
+    impalad.service.wait_for_metric_value('impala-server.num-queries-expired',
+                                          num_expired + 1)
+
+    assert time() - before < 10
+
+    self.__expect_client_state(self.client, handle,
+                               self.client.QUERY_STATES['EXCEPTION'])
