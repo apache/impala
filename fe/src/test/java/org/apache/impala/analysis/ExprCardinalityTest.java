@@ -531,7 +531,8 @@ public class ExprCardinalityTest {
     // Chain of OR rewritten to IN
     verifySelectExpr("alltypes", "int_col = 10 or int_col = 20", 3, 2.0/10);
     // Or with literals
-    verifySelectExpr("alltypes", "int_col = 10 or true", 3, 1.0);
+    // 'int_col = 10 or true' rewritten to 'true', expected NDV = 1
+    verifySelectExpr("alltypes", "int_col = 10 or true", 1, 1.0);
     verifySelectExpr("alltypes", "int_col = 10 or false", 3, 0.1);
     verifySelectExpr("alltypes", "int_col = 10 or null", 3, 0.1);
   }

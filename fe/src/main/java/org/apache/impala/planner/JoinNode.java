@@ -755,15 +755,11 @@ public abstract class JoinNode extends PlanNode {
   }
 
   /**
-   * Unwraps the SlotRef in expr and returns the NDVs of it.
-   * Returns -1 if the NDVs are unknown or if expr is not a SlotRef.
+   * Returns the NDVs of a given expression.
+   * Returns -1 if the NDVs are unknown.
    */
   public static long getNdv(Expr expr) {
-    SlotRef slotRef = expr.unwrapSlotRef(false);
-    if (slotRef == null) return -1;
-    SlotDescriptor slotDesc = slotRef.getDesc();
-    if (slotDesc == null) return -1;
-    ColumnStats stats = slotDesc.getStats();
+    ColumnStats stats = ColumnStats.fromExpr(expr);
     if (!stats.hasNumDistinctValues()) return -1;
     return stats.getNumDistinctValues();
   }

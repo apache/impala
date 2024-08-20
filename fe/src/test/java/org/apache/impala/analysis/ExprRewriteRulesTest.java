@@ -440,12 +440,15 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
   @Test
   public void testCompoundPredicate() throws ImpalaException {
-    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+    List<ExprRewriteRule> rules = Lists.newArrayList(NormalizeExprsRule.INSTANCE,
+        SimplifyConditionalsRule.INSTANCE);
 
-    RewritesOk("false OR id = 0", rule, "id = 0");
-    RewritesOk("true OR id = 0", rule, "TRUE");
-    RewritesOk("false && id = 0", rule, "FALSE");
-    RewritesOk("true && id = 0", rule, "id = 0");
+    RewritesOk("id = 0 OR false", rules, "id = 0");
+    RewritesOk("id = 0 OR true", rules, "TRUE");
+    RewritesOk("id = 0 && false", rules, "FALSE");
+    RewritesOk("id = 0 && true", rules, "id = 0");
+    RewritesOk("false OR id = 0 AND true", rules, "id = 0");
+    RewritesOk("true AND id = 0 OR false", rules, "id = 0");
   }
 
   @Test

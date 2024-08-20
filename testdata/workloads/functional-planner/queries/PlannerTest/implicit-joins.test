@@ -481,3 +481,61 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> t1.id
    row-size=89B cardinality=7.30K
 ====
+# IMPALA-13077: leftmost scan cardinality should be reduced to avg rows per partition.
+select count(*) from tpcds.store_sales
+where ss_sold_date_sk=(
+  select min(d_date_sk) + 1000 from tpcds.date_dim)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: ss_sold_date_sk = min(d_date_sk) + 1000
+|  runtime filters: RF000 <- min(d_date_sk) + 1000
+|  row-size=4B cardinality=1.58K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(d_date_sk)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     row-size=4B cardinality=73.05K
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_sold_date_sk
+   row-size=4B cardinality=1.58K(filtered from 2.88M)
+====
+# IMPALA-13077: leftmost scan cardinality should be reduced following cardinality
+# reduction from the build side, even when the join predicate is not
+# SlotRef vs SlotRef equality.
+select count(*) from tpcds.store_sales ss
+where exists (
+  select 1 from tpcds.date_dim
+  where d_year = 2100 and ss.ss_sold_date_sk = d_date_sk + 1000)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d_date_sk + 1000
+|  runtime filters: RF000 <- d_date_sk + 1000
+|  row-size=4B cardinality=589.03K
+|
+|--01:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 2100
+|     row-size=8B cardinality=373
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss.ss_sold_date_sk
+   row-size=4B cardinality=589.03K(filtered from 2.88M)
+====

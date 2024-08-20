@@ -206,10 +206,11 @@ public class TestUtils {
   public static final IgnoreValueFilter ROW_SIZE_FILTER =
       new IgnoreValueFilter("row-size", "\\S+");
 
-  // Ignore cardinality=27.30K or cardinality=unavailable
-  // entries
-  public static final IgnoreValueFilter CARDINALITY_FILTER =
-      new IgnoreValueFilter("cardinality", "\\S+");
+  // Ignore 'cardinality=27.30K' or 'cardinality=unavailable' or
+  // 'cardinality=1.58K(filtered from 2.88M)' entries.
+  // See PlanNode.getExplainString().
+  public static final IgnoreValueFilter CARDINALITY_FILTER = new IgnoreValueFilter(
+      "cardinality", "(unavailable|[0-9\\.KMGT]+(\\(filtered from [0-9\\.KMGT]+\\))?)");
 
   public static final IgnoreValueFilter ICEBERG_SNAPSHOT_ID_FILTER =
       new IgnoreValueFilter("Iceberg snapshot id", " \\d+", ':');

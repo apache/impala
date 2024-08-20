@@ -45,9 +45,9 @@ limit 100;
 # end query 59 in stream 0 using template query59.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=131.02MB Threads=1
-Per-Host Resource Estimates: Memory=2.30GB
+Per-Host Resource Estimates: Memory=2.23GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=2.30GB mem-reservation=131.02MB thread-reservation=1 runtime-filters-memory=8.00MB
+|  Per-Instance Resources: mem-estimate=2.23GB mem-reservation=131.02MB thread-reservation=1 runtime-filters-memory=8.00MB
 |  max-parallelism=1 segment-costs=[20807146710, 20807146710, 667717443159, 1000]
 PLAN-ROOT SINK
 |  output exprs: s_store_name1, s_store_id1, d_week_seq1, sun_sales1 / sun_sales2, mon_sales1 / mon_sales2, tue_sales1 / tue_sales2, wed_sales1 / wed_sales2, thu_sales1 / thu_sales2, fri_sales1 / fri_sales2, sat_sales1 / sat_sales2
@@ -63,7 +63,7 @@ PLAN-ROOT SINK
 |  hash predicates: d_week_seq = d_week_seq - 52, s_store_id = s_store_id
 |  fk/pk conjuncts: none
 |  runtime filters: RF000[bloom] <- d_week_seq - 52, RF001[bloom] <- s_store_id, RF002[min_max] <- d_week_seq - 52, RF003[min_max] <- s_store_id
-|  mem-estimate=896.65MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=823.87MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2,5,4,9,12,11 row-size=336B cardinality=33.56G cost=6087277948
 |  in pipelines: 03(GETNEXT), 11(OPEN)
 |
