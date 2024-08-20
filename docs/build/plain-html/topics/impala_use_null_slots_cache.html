@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="USE_NULL_SLOTS_CACHE Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_set.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="use_null_slots_cache" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>USE_NULL_SLOTS_CACHE Query Option</title>
+</head>
+<body id="use_null_slots_cache">
+
+
+ <h1 class="title topictitle1" id="ariaid-title1">USE_NULL_SLOTS_CACHE Query Option</h1>
+
+ 
+ 
+
+ <div class="body conbody">
+  <p class="p">
+    Impala
+   optimizes expressions that contain null-rejecting conjuncts - expressions that are
+   false if all "slots" (values returned from a table) are <code class="ph codeph">NULL</code>.
+   Evaluating whether a conjunct is null-rejecting can be expensive when performed over a
+   lot of expressions. The "null slots cache" speeds analysis of generated queries with
+   many similar expressions by caching the result of evaluating an expression after slots
+   have been replaced with <code class="ph codeph">NULL</code>s.
+  </p>
+
+
+  <p class="p">
+   If query analysis uses a lot of memory, performance of the "null slots cache" can be
+   reviewed by enabling logging <code class="ph codeph">org.apache.impala.analysis.Analyzer=DEBUG</code>
+   and searching coordinator logs for messages like
+  </p>
+
+
+<pre class="pre codeblock"><code>
+null slots cache size: 286, median entry: 4416.0, 99th entry: 252688.88, hit rate: 0.99456364
+</code></pre>
+
+  <p class="p"><strong class="ph b">Type: </strong>BOOLEAN</p>
+
+  <p class="p"><strong class="ph b">Default: </strong>TRUE</p>
+
+  <p class="p"><strong class="ph b">Added in: </strong>Impala 4.5</p>
+
+ </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_set.html">SET Statement</a></div>
+</div>
+</div></body>
+</html>

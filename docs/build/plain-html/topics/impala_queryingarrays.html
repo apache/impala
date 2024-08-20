@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Querying arrays (Impala 4.1 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_complex_types.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_queryingarrays" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Querying arrays (Impala 4.1 or higher only)</title>
+</head>
+<body id="impala_queryingarrays">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Querying arrays (<span class="keyword">Impala 4.1</span> or higher only)</h1>
+
+  
+  
+  <div class="body conbody">
+    <p class="p">
+       Describes how to use UNNEST function
+      to query arrays. ARRAY data types represent collections with arbitrary numbers of elements,
+      where each element is the same type.</p>
+
+    <div class="section" id="impala_queryingarrays__section_yl4_2qb_3cc"><h2 class="title sectiontitle">Querying arrays using JOIN and UNNEST</h2>
+      
+      <p class="p">You can query arrays by making a join between the table and the array inside the table.
+        This approach is improved with the introduction of the <code class="ph codeph">UNNEST</code> function in
+        the <code class="ph codeph">SELECT</code> list or in the <code class="ph codeph">FROM</code> clause in the
+          <code class="ph codeph">SELECT</code> statement. When you use <code class="ph codeph">UNNEST</code>, you can provide
+        more than one array in the <code class="ph codeph">SELECT</code> statement. If you use JOINs for querying
+        arrays it will yield a <dfn class="term">joining unnest</dfn> however the latter will provide a
+          <dfn class="term">zipping unnest</dfn>.</p>
+
+    </div>
+
+    <div class="section" id="impala_queryingarrays__section_hmf_hqb_3cc"><h2 class="title sectiontitle">Example of querying arrays using JOIN</h2>
+      
+      <p class="p">Use <code class="ph codeph">JOIN</code> in cases where you must join unnest of multiple arrays. However
+        if you must zip unnest then use the newly implemented <code class="ph codeph">UNNEST</code> function.</p>
+
+      <p class="p">Here is an example of a <code class="ph codeph">SELECT</code> statement that uses JOINs to query an
+        array.</p>
+
+      <pre class="pre codeblock" id="impala_queryingarrays__codeblock_uqy_rqb_3cc"><code>SELECT id, arr1.item, arr2.item FROM tbl_name tbl, tbl.arr1, tbl.arr2;
+
+ID, ARR1.ITEM, ARR2.ITEM
+[1, 1, 10]
+[1, 1, 11]
+[1, 2, 10]
+[1, 2, 11]
+[1, 3, 10]
+[1, 3, 11]
+</code></pre>
+      <div class="note note" id="impala_queryingarrays__note_tpb_wln_htb"><span class="notetitle">Note:</span> 
+        <p class="p">The test data used in this example is ID: 1, arr1: {1, 2, 3}, arr2: {10, 11}</p>
+
+      </div>
+
+    </div>
+
+    <div class="section" id="impala_queryingarrays__section_ipq_tqb_3cc"><h2 class="title sectiontitle">Examples of querying arrays using UNNEST</h2>
+      
+      <p class="p">You can use one of the two different syntaxes shown here to unnest multiple arrays in one
+        query. This results in the items of the arrays being zipped together instead of joining.</p>
+
+      <ul class="ul" id="impala_queryingarrays__ul_jpq_tqb_3cc">
+        <li class="li">ISO:SQL 2016 compliant syntax:
+          <pre class="pre codeblock" id="impala_queryingarrays__codeblock_kpq_tqb_3cc"><code>SELECT a1.item, a2.item
+FROM complextypes_arrays t, UNNEST(t.arr1, t.arr2) AS (a1, a2);
+</code></pre></li>
+
+        <li class="li">Postgres compatible
+          syntax:<pre class="pre codeblock" id="impala_queryingarrays__codeblock_yl5_3mn_htb"><code>SELECT UNNEST(arr1), UNNEST(arr2) FROM complextypes_arrays;</code></pre></li>
+
+      </ul>
+
+      <p class="p"><strong class="ph b">Unnest operator in SELECT list</strong></p>
+
+      <pre class="pre codeblock" id="impala_queryingarrays__codeblock_lpq_tqb_3cc"><code>SELECT id, unnest(arr1), unnest(arr2) FROM tbl_name;</code></pre>
+      <p class="p"><strong class="ph b">Unnest operator in FROM clause</strong></p>
+
+      <pre class="pre codeblock" id="impala_queryingarrays__codeblock_mpq_tqb_3cc"><code>SELECT id, arr1.item, arr2.item FROM tbl_name tbl_alias, UNNEST(tbl_alias.arr1, tbl_alias.arr2);</code></pre>
+      <p class="p">This new functionality would zip the arrays next to each other as shown here. </p>
+
+      <pre class="pre codeblock" id="impala_queryingarrays__codeblock_npq_tqb_3cc"><code>ID, ARR1.ITEM, ARR2.ITEM
+[1, 1, 10]
+[1, 2, 11]
+[1, 3, NULL]
+</code></pre>
+      <p class="p">Note, that arr2 is shorter than arr1 so the "missing" items in its column will be filled
+        with NULLs.</p>
+
+      <div class="note note" id="impala_queryingarrays__note_opq_tqb_3cc"><span class="notetitle">Note:</span> The test data used in this example is ID: 1, arr1: {1, 2, 3},
+        arr2: {10, 11}</div>
+
+    </div>
+
+    <div class="section" id="impala_queryingarrays__section_i1g_wqb_3cc"><h2 class="title sectiontitle">Limitations in Using UNNEST</h2>
+      
+      <div class="p">
+        <ul class="ul" id="impala_queryingarrays__ul_j1g_wqb_3cc">
+          <li class="li">Only arrays from the same table can be zipping unnested</li>
+
+          <li class="li">The old (joining) and the new (zipping) unnests cannot be used together</li>
+
+          <li class="li">You can add a <code class="ph codeph">WHERE</code> filter on an unnested item only if you add a
+            wrapper <code class="ph codeph">SELECT</code> and do the filtering
+            <p class="p">Example:</p>
+<pre class="pre codeblock" id="impala_queryingarrays__codeblock_k1g_wqb_3cc"><code>SELECT id, arr1_unnest FROM (SELECT id, unnest(arr1) as arr1_unnest FROM tbl_name) WHERE arr1_unnest &lt; 10;</code></pre></li>
+
+        </ul>
+
+      </div>
+
+    </div>
+
+    <div class="section" id="impala_queryingarrays__section_ewb_yqb_3cc"><h2 class="title sectiontitle">Using ARRAY columns in the SELECT list</h2>
+      
+      
+      <p class="p">Impala 4.1 adds support to return <code class="ph codeph">ARRAYs</code> as
+          <code class="ph codeph">STRINGs</code> (<dfn class="term">JSON arrays</dfn>) in the <code class="ph codeph">SELECT</code> list,
+        for example: </p>
+
+      <pre class="pre codeblock" id="impala_queryingarrays__codeblock_gwb_yqb_3cc"><code>select id, int_array from functional_parquet.complextypestbl where id = 1;
+returns: 1, “[1,2,3]”
+</code></pre>
+      <p class="p">Returning <code class="ph codeph">ARRAYs</code> from inline or Hive Metastore views is also supported.
+        These arrays can be used both in the select list or as relative table references.</p>
+
+      <pre class="pre codeblock" id="impala_queryingarrays__codeblock_hwb_yqb_3cc"><code>select id, int_array from (select id, int_array from complextypestbl) s;</code></pre>
+      <p class="p">Though <code class="ph codeph">STRUCTs</code> are already supported, <code class="ph codeph">ARRAYs</code> and
+          <code class="ph codeph">STRUCTs</code> nested within each other are not supported yet. Using them as
+        non-relative table references is also not supported yet.</p>
+
+    </div>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_complex_types.html">Complex Types (Impala 2.3 or higher only)</a></div>
+</div>
+</div></body>
+</html>

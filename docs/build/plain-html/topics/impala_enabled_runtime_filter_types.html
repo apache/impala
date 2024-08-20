@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="ENABLED_RUNTIME_FILTER_TYPES Query Option (Impala 4.0 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_set.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="enabled_runtime_filter_types" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>ENABLED_RUNTIME_FILTER_TYPES Query Option (Impala 4.0 or higher only)</title>
+</head>
+<body id="enabled_runtime_filter_types">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">ENABLED_RUNTIME_FILTER_TYPES Query Option (<span class="keyword">Impala 4.0</span> or higher only)</h1>
+
+  
+  
+
+  <div class="body conbody">
+
+    <div class="p">
+      
+      The <code class="ph codeph">ENABLED_RUNTIME_FILTER_TYPES</code> query option
+      sets enabled runtime filter types to be applied to scanners.
+      This option only applies to HDFS scan nodes and Kudu scan nodes.
+      The following types are supported.
+      Specify the enabled types by a comma-separated list of the following values
+      or enable all types by "<code class="ph codeph">ALL</code>".
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">BLOOM</code>
+        </li>
+
+        <li class="li">
+          <code class="ph codeph">MIN_MAX</code>
+        </li>
+
+        <li class="li">
+          <code class="ph codeph">IN_LIST</code>
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">"BLOOM,MIN_MAX"</code>
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> string
+      </p>
+
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 4.0</span>
+      </p>
+
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+
+    <p class="p">
+        Impala backend expects comma separated values to be in quotes when executing the
+        <code class="ph codeph">SET</code> statement.
+        This is usually the case when running SET statement like
+        <code class="ph codeph">SET ENABLED_RUNTIME_FILTER_TYPES="value1,value2"</code> using a JDBC
+        driver. When using Impala-shell client, the <code class="ph codeph">SET</code> statement is not
+        executed immediately but query options are updated in the client and applied as
+        part of the following statement, so no quotes are required for Impala-shell. That
+        is, we use SET statement like
+        <code class="ph codeph">SET ENABLED_RUNTIME_FILTER_TYPES=value1,value2</code> when
+        submitting the query to Impala backend via Impala-shell client.
+      </p>
+
+
+    <div class="p">
+      Depending on the scan node type, Planner can schedule compatible runtime filter
+      types as follows.
+      <ul class="ul">
+        <li class="li">Kudu scan: <code class="ph codeph">BLOOM</code>, <code class="ph codeph">MIN_MAX</code></li>
+
+        <li class="li">
+          HDFS scan on Parquet files: <code class="ph codeph">BLOOM</code>, <code class="ph codeph">MIN_MAX</code>
+        </li>
+
+        <li class="li">HDFS scan on ORC files: <code class="ph codeph">BLOOM</code>, <code class="ph codeph">IN_LIST</code></li>
+
+        <li class="li">HDFS scan on other kinds of files: <code class="ph codeph">BLOOM</code></li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_runtime_filtering.html">Runtime Filtering for Impala Queries (Impala 2.5 or higher only)</a>,
+      <a class="xref" href="impala_runtime_filter_mode.html#runtime_filter_mode">RUNTIME_FILTER_MODE Query Option (Impala 2.5 or higher only)</a>
+    </p>
+
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_set.html">SET Statement</a></div>
+</div>
+</div></body>
+</html>

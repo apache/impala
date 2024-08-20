@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2024" />
+<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Zipping unnest on arrays from views (Impala 4.1 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_complex_types.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_unnest_views" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Zipping unnest on arrays from views (Impala 4.1 or higher only)</title>
+</head>
+<body id="impala_unnest_views">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Zipping unnest on arrays from views (<span class="keyword">Impala 4.1</span> or higher only)</h1>
+
+  
+  
+  <div class="body conbody">
+    <div class="p">
+      
+      <span class="keyword">Impala 4.1</span>, the zipping unnest functionality works for arrays in both tables
+      and
+      views.<pre class="pre codeblock" id="impala_unnest_views__codeblock_nwz_lyc_3cc"><code>SELECT UNNSET(arr1) FROM view_name;</code></pre>
+    </div>
+
+    <div class="section" id="impala_unnest_views__section_irf_rrb_3cc"><h2 class="title sectiontitle">UNNEST() on array columns</h2>
+      
+      <p class="p">You can use <code class="ph codeph">UNNEST()</code> on array columns in two ways. Using one of these two
+        ways results in the items of the arrays being zipped together instead of joining.</p>
+
+      <ul class="ul" id="impala_unnest_views__ul_jrf_rrb_3cc">
+        <li class="li">ISO:SQL 2016 compliant syntax</li>
+
+      </ul>
+
+      <pre class="pre codeblock" id="impala_unnest_views__codeblock_krf_rrb_3cc"><code>SELECT a1.item, a2.item
+FROM complextypes_arrays t, UNNEST(t.arr1, t.arr2) AS (a1, a2);
+</code></pre>
+      <ul class="ul" id="impala_unnest_views__ul_lrf_rrb_3cc">
+        <li class="li">Postgres compatible syntax</li>
+
+      </ul>
+
+      <pre class="pre codeblock" id="impala_unnest_views__codeblock_mrf_rrb_3cc"><code>SELECT UNNEST(arr1), UNNEST(arr2) FROM complextypes_arrays;</code></pre>
+      <p class="p">When unnesting multiple arrays with zipping unnest, the i'th item of one array will be
+        placed next to the i'th item of the other arrays in the results. If the size of the arrays
+        is not equal then the shorter arrays will be filled with NULL values up to the size of the
+        longest array as shown in the following example:</p>
+
+      <p class="p">The test data used in this example is arr1: {1, 2, 3}, arr2: {11, 12}</p>
+
+      <p class="p">After running any of the queries listed in the examples, the result will be as shown
+        here:</p>
+
+      <div class="p">
+        <pre class="pre codeblock" id="impala_unnest_views__codeblock_n5z_cjq_mtb"><code>arr1 arr2
+[1, 11]
+[2, 12]
+[3, NULL]
+</code></pre>
+      </div>
+
+    </div>
+
+    <div class="section" id="impala_unnest_views__section_ifc_trb_3cc"><h2 class="title sectiontitle">Example of an UNNEST() in an inline view using SELECT/FILTER of the inline view</h2>
+      
+      <p class="p">In the following example the filter is not in the <code class="ph codeph">SELECT</code> query that
+        creates the inline view but a level above that.</p>
+
+      <pre class="pre codeblock" id="impala_unnest_views__codeblock_jfc_trb_3cc"><code>SELECT id, ac1, ac2 FROM (SELECT id, UNNEST(array_col1) AS ac1, UNNEST(array_col2) AS ac2 FROM some_view) WHERE id &lt;10;
+</code></pre>
+    </div>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_complex_types.html">Complex Types (Impala 2.3 or higher only)</a></div>
+</div>
+</div></body>
+</html>
