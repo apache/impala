@@ -143,7 +143,7 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
     """Queries where a struct column is in the select list"""
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['convert_legacy_hive_parquet_utc_timestamps'] = 1
-    new_vector.get_value('exec_option')['TIMEZONE'] = '"Europe/Budapest"'
+    new_vector.get_value('exec_option')['timezone'] = '"Europe/Budapest"'
     self.run_test_case('QueryTest/struct-in-select-list', new_vector)
 
   @SkipIfFS.hbase
@@ -936,7 +936,7 @@ class TestNestedTypesStarExpansion(ImpalaTestSuite):
             'disable_codegen': ['False', 'True']}))
     cls.ImpalaTestMatrix.add_mandatory_exec_option(
             'convert_legacy_hive_parquet_utc_timestamps', 'true')
-    cls.ImpalaTestMatrix.add_mandatory_exec_option('TIMEZONE', '"Europe/Budapest"')
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('timezone', '"Europe/Budapest"')
 
   def test_star_expansion(self, vector):
     # Queries with star (*) expression on tables with array, map

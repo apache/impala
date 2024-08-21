@@ -614,10 +614,8 @@ class TestKuduOperations(KuduTestSuite):
 class TestKuduPartitioning(KuduTestSuite):
   @classmethod
   def add_test_dimensions(cls):
-    super(TestKuduPartitioning, cls).add_test_dimensions()
-
     # Test both the interpreted and the codegen'd path.
-    add_exec_option_dimension(cls, "disable_codegen", [0, 1])
+    super(TestKuduPartitioning, cls).add_test_dimensions()
 
   def test_partitions_evenly_distributed(self, vector, cursor,
       kudu_client, unique_database):

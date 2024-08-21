@@ -63,6 +63,10 @@ from copy import deepcopy
 EXEC_OPTION_KEY = 'exec_option'
 
 
+def assert_exec_option_key(key):
+  assert key.islower(), "Exec option " + key + " is not in lower case"
+
+
 # A list of test dimension values.
 class ImpalaTestDimension(list):
   def __init__(self, name, *args):
@@ -124,12 +128,31 @@ class ImpalaTestMatrix(object):
 
   def add_dimension(self, dimension):
     self.dimensions[dimension.name] = dimension
+    if dimension.name == EXEC_OPTION_KEY:
+      self.independent_exec_option_names.clear()
 
-  def add_mandatory_exec_option(self, exec_option_key, exec_option_value):
+  def assert_unique_exec_option_key(self, key):
+    """Assert that 'exec_option' dimension exist and 'key' is not exist yet
+    in self.dimension['exec_option']."""
+    assert_exec_option_key(key)
     assert EXEC_OPTION_KEY in self.dimensions, (
-      "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
+        "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
+
     for vector in self.dimensions[EXEC_OPTION_KEY]:
-      vector.value[exec_option_key] = exec_option_value
+      assert key not in vector.value, (
+          "'{}' is already exist in '{}' dimension!".format(key, EXEC_OPTION_KEY))
+
+    # 'key' must not previously declared with add_exec_option_dimension().
+    assert key not in self.independent_exec_option_names, (
+        "['{}']['{}'] was previously declared with non-unique value: {}".format(
+          EXEC_OPTION_KEY, key, [dim.value for dim in self.dimensions[key]]))
+
+  def add_mandatory_exec_option(self, key, value):
+    """Append key=value pair into 'exec_option' dimension."""
+    self.assert_unique_exec_option_key(key)
+
+    for vector in self.dimensions[EXEC_OPTION_KEY]:
+      vector.value[key] = value
 
   def add_exec_option_dimension(self, dimension):
     """
@@ -139,11 +162,11 @@ class ImpalaTestMatrix(object):
     exhaustive combination correct while eliminating the need for individual test method
     to append the custom exec options into 'exec_option' dimension themself.
     """
-    assert EXEC_OPTION_KEY in self.dimensions, (
-      "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
+    self.assert_unique_exec_option_key(dimension.name)
     assert len(dimension) > 1, (
-      "Dimension " + dimension.name + " must have more than 1 possible value! "
-      "Use add_mandatory_exec_option() instead.")
+        "Dimension " + dimension.name + " must have more than 1 possible value! "
+        "Use add_mandatory_exec_option() instead.")
+
     self.add_dimension(dimension)
     self.independent_exec_option_names.add(dimension.name)
 

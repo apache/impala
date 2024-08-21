@@ -224,8 +224,9 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestScannersAllTableFormatsWithLimit, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension(batch_sizes=[100]))
     add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
-    add_mandatory_exec_option(cls, 'batch_size', 100)
 
   def test_limit(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 1

@@ -26,7 +26,7 @@ from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.test_dimensions import (
     add_mandatory_exec_option,
-    create_single_exec_option_dimension,
+    create_exec_option_dimension,
     create_table_format_dimension)
 
 
@@ -246,14 +246,15 @@ class TestExprValueCache(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestExprValueCache, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(
-        create_single_exec_option_dimension())
+    # create_single_exec_option_dimension + batch_size=65536
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+      cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[65536],
+      disable_codegen_rows_threshold_options=[5000]))
     cls.ImpalaTestMatrix.add_dimension(
         create_table_format_dimension(cls.get_workload(), 'parquet/snap/block'))
     add_mandatory_exec_option(cls, 'runtime_filter_mode', 'OFF')
     add_mandatory_exec_option(cls, 'mem_limit', '149mb')
     add_mandatory_exec_option(cls, 'mt_dop', 1)
-    add_mandatory_exec_option(cls, 'batch_size', 65536)
 
   def test_expr_value_cache_fits(self, vector):
     self.run_test_case('tpcds-q97', vector)

@@ -29,7 +29,7 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension, create_uncompressed_json_dimension,
     create_exec_option_dimension_from_dict, create_client_protocol_dimension,
     hs2_parquet_constraint, extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP,
-    add_exec_option_dimension)
+    add_exec_option_dimension, create_exec_option_dimension)
 from tests.util.filesystem_utils import get_fs_path
 from subprocess import check_call
 
@@ -42,6 +42,11 @@ class TestQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueries, cls).add_test_dimensions()
+    single_node_option = ([0, 100] if cls.exploration_strategy() == 'exhaustive'
+        else [0])
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+      exec_single_node_option=single_node_option))
+
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format == 'parquet')
@@ -53,8 +58,7 @@ class TestQueries(ImpalaTestSuite):
 
     # Adding a test dimension here to test the small query opt in exhaustive.
     if cls.exploration_strategy() == 'exhaustive':
-      extend_exec_option_dimension(cls, "exec_single_node_rows_threshold", "100")
-      extend_exec_option_dimension(cls, "ASYNC_CODEGEN", 1)
+      extend_exec_option_dimension(cls, "async_codegen", 1)
       extend_exec_option_dimension(cls, "debug_action", cls.debug_actions)
       cls.ImpalaTestMatrix.add_constraint(cls.debug_action_constraint)
 
@@ -62,7 +66,7 @@ class TestQueries(ImpalaTestSuite):
   def debug_action_constraint(cls, vector):
     exec_option = vector.get_value("exec_option")
 
-    is_async = exec_option.get("ASYNC_CODEGEN") == 1
+    is_async = exec_option.get("async_codegen") == 1
     using_async_debug_actions = exec_option.get("debug_action") == cls.debug_actions
     codegen_enabled = exec_option["disable_codegen"] == 0
 
@@ -321,13 +325,14 @@ class TestHdfsQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsQueries, cls).add_test_dimensions()
+    # Adding a test dimension here to test the small query opt in exhaustive.
+    single_node_option = ([0, 100] if cls.exploration_strategy() == 'exhaustive'
+        else [0])
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+      exec_single_node_option=single_node_option))
     # Kudu doesn't support AllTypesAggMultiFilesNoPart (KUDU-1271, KUDU-1570).
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format != 'kudu')
-
-    # Adding a test dimension here to test the small query opt in exhaustive.
-    if cls.exploration_strategy() == 'exhaustive':
-      extend_exec_option_dimension(cls, "exec_single_node_rows_threshold", "100")
 
   @classmethod
   def get_workload(cls):

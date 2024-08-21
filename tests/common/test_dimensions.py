@@ -23,7 +23,8 @@ import copy
 import os
 from itertools import product
 
-from tests.common.test_vector import ImpalaTestDimension, ImpalaTestVector
+from tests.common.test_vector import (
+    ImpalaTestDimension, ImpalaTestVector, assert_exec_option_key)
 from tests.util.filesystem_utils import (
     IS_HDFS)
 
@@ -257,6 +258,8 @@ def create_exec_option_dimension_from_dict(exec_option_dimensions):
   # Generate the cross product (all combinations) of the exec options specified. Then
   # store them in exec_option dictionary format.
   keys = sorted(exec_option_dimensions)
+  for name in keys:
+    assert_exec_option_key(name)
   combinations = product(*(exec_option_dimensions[name] for name in keys))
   exec_option_dimension_values = [dict(zip(keys, prod)) for prod in combinations]
 
@@ -268,7 +271,11 @@ def add_exec_option_dimension(test_suite, key, values):
   """
   Takes an ImpalaTestSuite object 'test_suite' and register new exec option dimension.
   'key' must be a query option known to Impala, and 'values' must be a list of more than
-  one element.
+  one element. Exec option 'key' must not be declared before.
+  If writing constraint against 'key', the value should be looked up at:
+    vector.get_value('key')
+  instead of:
+    vector.get_value('exec_option')['key']
   """
   test_suite.ImpalaTestMatrix.add_exec_option_dimension(
     ImpalaTestDimension(key, *values))
@@ -277,7 +284,8 @@ def add_exec_option_dimension(test_suite, key, values):
 def add_mandatory_exec_option(test_suite, key, value):
   """
   Takes an ImpalaTestSuite object 'test_suite' and adds 'key=value' to every exec option
-  test dimension, leaving the number of tests that will be run unchanged.
+  test dimension, leaving the number of tests that will be run unchanged. Exec option
+  'key' must not be declared before.
   """
   test_suite.ImpalaTestMatrix.add_mandatory_exec_option(key, value)
 
@@ -286,8 +294,10 @@ def extend_exec_option_dimension(test_suite, key, value):
   """
   Takes an ImpalaTestSuite object 'test_suite' and extends the exec option test dimension
   by creating a copy of each existing exec option value that has 'key' set to 'value',
-  doubling the number of tests that will be run.
+  doubling the number of tests that will be run. Exec option 'key' must not be declared
+  before.
   """
+  test_suite.ImpalaTestMatrix.assert_unique_exec_option_key(key)
   dim = test_suite.ImpalaTestMatrix.dimensions["exec_option"]
   new_value = []
   for v in dim:

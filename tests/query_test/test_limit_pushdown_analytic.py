@@ -20,8 +20,7 @@
 
 from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import (create_single_exec_option_dimension,
-    extend_exec_option_dimension)
+from tests.common.test_dimensions import create_exec_option_dimension
 
 
 class TestLimitPushdownAnalyticTpch(ImpalaTestSuite):
@@ -48,9 +47,12 @@ class TestLimitPushdownAnalyticFunctional(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestLimitPushdownAnalyticFunctional, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Also run with num_nodes=1 because it's easier to reproduce IMPALA-10296.
-    extend_exec_option_dimension(cls, 'num_nodes', 1)
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+      cluster_sizes=[0, 1],
+      disable_codegen_options=[False],
+      disable_codegen_rows_threshold_options=[5000],
+      batch_sizes=[0]))
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
 

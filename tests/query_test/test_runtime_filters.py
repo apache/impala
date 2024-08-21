@@ -262,7 +262,7 @@ class TestMinMaxFilters(ImpalaTestSuite):
     # IMPALA-10715. Enable only min/max since the bloom filters will return
     # rows only satisfying the join predicates. This test requires the return
     # of non-qualifying rows to succeed.
-    add_mandatory_exec_option(cls, "ENABLED_RUNTIME_FILTER_TYPES", "MIN_MAX")
+    add_mandatory_exec_option(cls, "enabled_runtime_filter_types", "MIN_MAX")
 
   def test_min_max_filters(self, vector):
     self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
