@@ -443,21 +443,37 @@ def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=
 
 def tpc_sort_key(s):
     """
-    Sorting key for sorting strings in the format "tpch-qx-y" or "tpch-qx" or "tpch-qxX".
+    Sorting key for sorting strings in the format "tpch-qxX-yY".
+    The valid format is expected to be split into parts by '-'.
+    If the format doesn't match, 0 or an empty string will be returned
+    as appropriate.
     Args:
         s (str): Input string to be sorted.
     Returns:
-        tuple: Tuple of (int, int, str), where the first integer is the value of "x",
-               the second integer is the value of "y" if present, otherwise 0, and the
-               third element is the character of "X" of the string, if present and not
-               numeric, otherwise an empty string ('').
+        tuple: A tuple of (int, int, str, str):
+            - The first integer is the value of "x", if present, otherwise 0.
+            - The second integer is the value of "y",
+              included only if "x" is present, otherwise returns an 0.
+            - The third element is the character "X", not numeric,
+              included only if "x" is present, otherwise returns an empty string ('').
+            - The fourth element is the character "Y", not numeric,
+              included only if "y" is present, otherwise returns an empty string ('').
     """
+    x, y = 0, 0
+    x_char, y_char = '', ''
     parts = s.split("-")
-    match = re.search(r"q(\d+)(\D)?", parts[1])
-    x = int(match.group(1)) if match else 0
-    x_char = match.group(2) if match else ''
-    y = int(parts[2]) if len(parts) > 2 else 0
-    return x, y, x_char
+    if len(parts) < 2:
+      return x, y, x_char, y_char
+    match = re.search(r"^q(\d+)(\D)?", parts[1])
+    if match:
+      x = int(match.group(1)) if match.group(1) else 0
+      x_char = match.group(2) if match.group(2) else ''
+    if len(parts) == 3 and match:
+      match = re.search(r"^(\d+)(\D)?", parts[2])
+      if match:
+        y = int(match.group(1)) if match.group(1) else 0
+        y_char = match.group(2) if match.group(2) else ''
+    return x, y, x_char, y_char
 
 
 def load_tpc_queries_name_sorted(workload):
