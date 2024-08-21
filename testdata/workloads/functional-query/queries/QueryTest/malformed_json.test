@@ -22,11 +22,13 @@ false,9,0.899999976158,'abc123'
 true,10,1.0,'abc123'
 NULL,NULL,NULL,'NULL'
 NULL,NULL,NULL,'abc123'
+NULL,NULL,NaN,'NULL'
+NULL,NULL,Infinity,'NULL'
 ====
 ---- QUERY
 select count(*) from malformed_json
 ---- TYPES
 bigint
 ---- RESULTS
-13
+15
 ====

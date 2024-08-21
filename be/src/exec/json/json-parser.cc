@@ -87,8 +87,8 @@ bool JsonParser<Scanner>::MoveToNextJson() {
 template <class Scanner>
 Status JsonParser<Scanner>::Parse(int max_rows, int* num_rows) {
   while (*num_rows < max_rows) {
-    // TODO: Support Inf and NaN.
-    constexpr auto parse_flags = kParseNumbersAsStringsFlag | kParseStopWhenDoneFlag;
+    constexpr auto parse_flags =
+        kParseNumbersAsStringsFlag | kParseStopWhenDoneFlag | kParseNanAndInfFlag;
     // Reads characters from the stream, parses them and publishes events to this
     // handler (JsonParser).
     reader_.Parse<parse_flags>(stream_, *this);
@@ -339,15 +339,31 @@ bool JsonSkipper<Stream>::SkipNumber() {
   // consistent with the behavior of rapidjson.
   // Despite the fact that special values such as Inf and NaN are not supported in
   // standard JSON (they are considered invalid values), rapidjson does support them.
-  // However, it requires the parsing flag kParseNanAndInfFlag to be enabled. Since this
-  // flag is not enabled in the current JsonParser::Parse(), this function also remains
-  // consistent by not supporting Inf and NaN.
-  // TODO: Support Inf and NaN.
+  // We have already enabled the parsing flag kParseNanAndInfFlag in the
+  // JsonParser::Parse() to support parsing Inf and NaN, so this function also supports
+  // them accordingly.
   Consume('-');
   if (UNLIKELY(s_.Peek() == '0')) {
     s_.Take();
   } else if (LIKELY(s_.Peek() >= '1' && s_.Peek() <= '9')) {
     while (LIKELY(s_.Peek() >= '0' && s_.Peek() <= '9')) s_.Take();
+  } else if (LIKELY(s_.Peek() == 'N')) {
+    s_.Take();
+    ERROR_IF_FALSE(Consume('a'), kParseErrorValueInvalid);
+    ERROR_IF_FALSE(Consume('N'), kParseErrorValueInvalid);
+    return true;
+  } else if (LIKELY(s_.Peek() == 'I')) {
+    s_.Take();
+    ERROR_IF_FALSE(Consume('n'), kParseErrorValueInvalid);
+    ERROR_IF_FALSE(Consume('f'), kParseErrorValueInvalid);
+    if (UNLIKELY(s_.Peek() == 'i')) {
+      s_.Take();
+      ERROR_IF_FALSE(Consume('n'), kParseErrorValueInvalid);
+      ERROR_IF_FALSE(Consume('i'), kParseErrorValueInvalid);
+      ERROR_IF_FALSE(Consume('t'), kParseErrorValueInvalid);
+      ERROR_IF_FALSE(Consume('y'), kParseErrorValueInvalid);
+    }
+    return true;
   } else ERROR_IF_FALSE(false, kParseErrorValueInvalid);
 
   if (Consume('.')) {

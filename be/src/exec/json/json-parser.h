@@ -304,9 +304,11 @@ class SimpleStream {
 public:
   SimpleStream(const char* str) : current_(str) { }
 
+  bool Eos() { return *current_ == '\0'; }
+
   char Peek() { return *current_; }
 
-  char Take() { return *current_ == '\0' ? '\0' : *current_++; }
+  char Take() { return Eos() ? '\0' : *current_++; }
 
 private:
   const char* current_ = nullptr;

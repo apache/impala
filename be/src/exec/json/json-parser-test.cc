@@ -100,6 +100,7 @@ class JsonParserTest : public ::testing::TestWithParam<int> {
     }
     if (e == kParseErrorNone) {
       EXPECT_TRUE(res) << v;
+      EXPECT_TRUE(ss.Eos());
     } else {
       EXPECT_FALSE(res) << v;
       EXPECT_EQ(js.GetErrorCode(), e) << v;
@@ -118,10 +119,10 @@ class JsonParserTest : public ::testing::TestWithParam<int> {
     // Normal Json
     {R"({"name": "Linda", "bool": true, "score": 76.3, "address": "Chicago"})",
         "Linda, true, 76.3, Chicago, "},
-    {R"({"name": "Mike", "bool": null, "score": 82.1, "address": "Dallas"})",
-        "Mike, null, 82.1, Dallas, "},
-    {R"({"name": "Sara", "bool": false, "score": 94.8, "address": "Seattle"})",
-        "Sara, false, 94.8, Seattle, "},
+    {R"({"name": "Mike", "bool": null, "score": NaN, "address": "Dallas"})",
+        "Mike, null, NaN, Dallas, "},
+    {R"({"name": "Sara", "bool": false, "score": Inf, "address": "Seattle"})",
+        "Sara, false, Inf, Seattle, "},
 
     // String with escape or special char.
     {R"({"name": "Joe\nJoe", "bool": null, "score": 100, "address": "{New}\t{York}"})",
@@ -187,6 +188,9 @@ TEST_P(JsonParserTest, JsonSkipperTest) {
   TestSkip("-9.9", TYPE_NUMBER);
   TestSkip("2e10", TYPE_NUMBER);
   TestSkip("-2e-10", TYPE_NUMBER);
+  TestSkip("Inf", TYPE_NUMBER);
+  TestSkip("-Infinity", TYPE_NUMBER);
+  TestSkip("NaN", TYPE_NUMBER);
 
   TestSkip("{}", TYPE_OBJECT);
   TestSkip(R"({"a":null, "b":[1,true,false]})", TYPE_OBJECT);
@@ -213,9 +217,6 @@ TEST_P(JsonParserTest, JsonSkipperTest) {
   TestSkip(R"("你好🙂\")", TYPE_STRING, kParseErrorStringMissQuotationMark);
   TestSkip(R"("\u009f\u0099\u00\")", TYPE_STRING, kParseErrorStringMissQuotationMark);
 
-  TestSkip("Inf", TYPE_NUMBER, kParseErrorValueInvalid);
-  TestSkip("-Infinity", TYPE_NUMBER, kParseErrorValueInvalid);
-  TestSkip("NaN", TYPE_NUMBER, kParseErrorValueInvalid);
   TestSkip("+1", TYPE_NUMBER, kParseErrorValueInvalid);
   TestSkip(".123", TYPE_NUMBER, kParseErrorValueInvalid);
   TestSkip("1.", TYPE_NUMBER, kParseErrorNumberMissFraction);
