@@ -140,7 +140,7 @@ export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${TEZ_HOME}/*
 # So, we'll be a bit choosy about what we add to the classpath here.
 for jar in $TEZ_HOME/lib/* ; do
   case $(basename $jar) in
-    commons-*|RoaringBitmap*)
+    commons-*|RoaringBitmap*|protobuf-java*)
       export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:$jar
       ;;
   esac

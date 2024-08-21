@@ -526,13 +526,6 @@ def get_hadoop_downloads():
                          archive_basename_tmpl="hbase-${version}-bin",
                          unpack_directory_tmpl="hbase-${version}")
 
-  use_apache_ozone = os.environ["USE_APACHE_OZONE"] == "true"
-  if use_apache_ozone:
-    ozone = ApacheComponent("ozone", component_path_tmpl="ozone/${version}")
-  else:
-    ozone = CdpComponent("ozone")
-
-  use_apache_hive = os.environ["USE_APACHE_HIVE"] == "true"
   if use_apache_hive:
     hive = ApacheComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
     hive_src = ApacheComponent("hive", archive_basename_tmpl="apache-hive-${version}-src")
@@ -564,10 +557,12 @@ def get_hadoop_downloads():
                                  template_subs_in=template_subs)
   else:
     ranger = CdpComponent("ranger", archive_basename_tmpl="ranger-${version}-admin")
+
   if use_apache_ozone:
     ozone = ApacheComponent("ozone", component_path_tmpl="ozone/${version}")
   else:
     ozone = CdpComponent("ozone")
+
   use_override_hive = \
       "HIVE_VERSION_OVERRIDE" in os.environ and os.environ["HIVE_VERSION_OVERRIDE"] != ""
   use_override_ranger = \

@@ -13,3 +13,8 @@ Update queries on non-bucketed + partitioned tables throws NPE
 
 patch3-HIVE-20067.diff:
 Fix failures in firing InsertEvent for on insert-only tables
+
+patch4-HIVE-27336.diff:
+Upgrade Tez to 0.10.2 in Hive-3.X
+- https://issues.apache.org/jira/browse/BIGTOP-4022
+- https://issues.apache.org/jira/browse/HIVE-27336
