@@ -60,7 +60,7 @@ from tests.common.test_result_verifier import (
     verify_lineage,
     verify_raw_results,
     verify_runtime_profile)
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_vector import ImpalaTestDimension, EXEC_OPTION_KEY
 from tests.performance.query import Query
 from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.performance.query_executor import JdbcQueryExecConfig
@@ -98,6 +98,9 @@ from tests.util.thrift_util import create_transport
 from hive_metastore import ThriftHiveMetastore
 from thrift.protocol import TBinaryProtocol
 
+# Import to validate query option names
+from ImpalaService.ttypes import TImpalaQueryOptions
+
 # Initializing the logger before conditional imports, since we will need it
 # for them.
 LOG = logging.getLogger('impala_test_suite')
@@ -123,8 +126,8 @@ IMPALAD_HS2_PORT = int(pytest.config.option.impalad_hs2_port)
 IMPALAD_HS2_HOST_PORT = IMPALAD_HOSTNAME + ":" + str(IMPALAD_HS2_PORT)
 # Calculate the hs2 ports based on the first hs2 port and the deltas of the beeswax ports
 IMPALAD_HS2_HOST_PORT_LIST = [
-    IMPALAD_HOSTNAME_LIST[i] + ':' +
-    str(IMPALAD_BEESWAX_PORT_LIST[i] - IMPALAD_BEESWAX_PORT + IMPALAD_HS2_PORT)
+    IMPALAD_HOSTNAME_LIST[i] + ':'
+    + str(IMPALAD_BEESWAX_PORT_LIST[i] - IMPALAD_BEESWAX_PORT + IMPALAD_HS2_PORT)
     for i in range(len(IMPALAD_HOST_PORT_LIST))
 ]
 
@@ -133,8 +136,8 @@ IMPALAD_HS2_HTTP_HOST_PORT = IMPALAD_HOSTNAME + ":" + str(IMPALAD_HS2_HTTP_PORT)
 # Calculate the hs2-http ports based on the first hs2-http port and the deltas of the
 # beeswax ports
 IMPALAD_HS2_HTTP_HOST_PORT_LIST = [
-    IMPALAD_HOSTNAME_LIST[i] + ':' +
-    str(IMPALAD_BEESWAX_PORT_LIST[i] - IMPALAD_BEESWAX_PORT + IMPALAD_HS2_HTTP_PORT)
+    IMPALAD_HOSTNAME_LIST[i] + ':'
+    + str(IMPALAD_BEESWAX_PORT_LIST[i] - IMPALAD_BEESWAX_PORT + IMPALAD_HS2_HTTP_PORT)
     for i in range(len(IMPALAD_HOST_PORT_LIST))
 ]
 
@@ -163,6 +166,10 @@ METRICS_URL = 'http://{0}:25000/metrics?json'.format(IMPALAD_HOSTNAME)
 VARZ_URL = 'http://{0}:25000/varz?json'.format(IMPALAD_HOSTNAME)
 
 GROUP_NAME = grp.getgrgid(pwd.getpwnam(getuser()).pw_gid).gr_name
+
+EXEC_OPTION_NAMES = set([val.lower()
+  for val in TImpalaQueryOptions._VALUES_TO_NAMES.values()])
+
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -426,7 +433,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # Restore all the changed query options.
     for query_option in query_options_changed:
       query_option = query_option.upper()
-      if not query_option in self.default_query_options:
+      if query_option not in self.default_query_options:
         continue
       default_val = self.default_query_options[query_option]
       query_str = 'SET ' + query_option + '="' + default_val + '"'
@@ -535,7 +542,6 @@ class ImpalaTestSuite(BaseTestSuite):
       s = s.replace(k, v)
     return s
 
-
   def __verify_exceptions(self, expected_strs, actual_str, use_db):
     """
     Verifies that at least one of the strings in 'expected_str' is either:
@@ -584,7 +590,8 @@ class ImpalaTestSuite(BaseTestSuite):
                                      .replace('$EXTERNAL_WAREHOUSE_DIR',
                                               EXTERNAL_WAREHOUSE_DIR)
         if use_db:
-          test_section[section_name] = test_section[section_name].replace('$DATABASE', use_db)
+          test_section[section_name] = test_section[section_name].replace(
+              '$DATABASE', use_db)
     result_section, type_section = 'RESULTS', 'TYPES'
     if vector.get_value('protocol').startswith('hs2'):
       # hs2 or hs2-http
@@ -597,7 +604,6 @@ class ImpalaTestSuite(BaseTestSuite):
     verify_raw_results(test_section, result, vector.get_value('table_format').file_format,
                        result_section, type_section, pytest.config.option.update_results,
                        replace_filenames_with_placeholder)
-
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
       encoding=None, test_file_vars=None):
@@ -618,8 +624,9 @@ class ImpalaTestSuite(BaseTestSuite):
     values in queries before they are executed. Callers need to avoid using reserved key
     names, see 'reserved_keywords' below.
     """
+    self.validate_exec_option_dimension(vector)
     table_format_info = vector.get_value('table_format')
-    exec_options = vector.get_value('exec_option')
+    exec_options = vector.get_value(EXEC_OPTION_KEY)
     protocol = vector.get_value('protocol')
 
     target_impalad_clients = list()
@@ -662,11 +669,12 @@ class ImpalaTestSuite(BaseTestSuite):
         for query in query.split(';'):
           set_pattern_match = SET_PATTERN.match(query)
           if set_pattern_match:
-            query_options_changed.append(set_pattern_match.groups()[0])
-            assert set_pattern_match.groups()[0] not in vector.get_value("exec_option"), \
-                "%s cannot be set in  the '.test' file since it is in the test vector. " \
-                "Consider deepcopy()-ing the vector and removing this option in the " \
-                "python test." % set_pattern_match.groups()[0]
+            option_name = set_pattern_match.groups()[0]
+            query_options_changed.append(option_name)
+            assert option_name not in vector.get_value(EXEC_OPTION_KEY), (
+                "{} cannot be set in  the '.test' file since it is in the test vector. "
+                "Consider deepcopy()-ing the vector and removing this option in the "
+                "python test.".format(option_name))
           result = self.__execute_query(target_impalad_client, query, user=user)
       finally:
         if len(query_options_changed) > 0:
@@ -719,9 +727,9 @@ class ImpalaTestSuite(BaseTestSuite):
         query_section = test_section['HIVE_QUERY']
         exec_fn = __exec_in_hive
       else:
-        assert 0, ('Error in test file %s. Test cases require a ' +
-            '-- QUERY or HIVE_QUERY section.\n%s') %\
-            (test_file_name, pprint.pformat(test_section))
+        assert 0, ('Error in test file {}. Test cases require a '
+            '-- QUERY or HIVE_QUERY section.\n{}').format(
+                test_file_name, pprint.pformat(test_section))
 
       # TODO: support running query tests against different scale factors
       query = QueryTestSectionReader.build_query(
@@ -733,9 +741,6 @@ class ImpalaTestSuite(BaseTestSuite):
       result = None
       try:
         result = exec_fn(query, user=test_section.get('USER', '').strip() or None)
-        user = None
-        if 'USER' in test_section:
-          user = test_section['USER'].strip()
       except Exception as e:
         if 'CATCH' in test_section:
           self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
@@ -798,18 +803,18 @@ class ImpalaTestSuite(BaseTestSuite):
           test_section[rt_profile_info] = "".join(rt_profile)
 
       if 'LINEAGE' in test_section:
-         # Lineage flusher thread runs every 5s by default and is not configurable. Wait
-         # for that period. (TODO) Get rid of this for faster test execution.
-         time.sleep(5)
-         current_query_lineage = self.get_query_lineage(result.query_id, lineage_log_dir)
-         assert current_query_lineage is not "",\
-             "No lineage found for query %s in dir %s" %\
-             (result.query_id, lineage_log_dir)
-         if pytest.config.option.update_results:
-           test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
-               separators=(',', ': '))
-         else:
-           verify_lineage(json.loads(test_section['LINEAGE']), current_query_lineage)
+        # Lineage flusher thread runs every 5s by default and is not configurable. Wait
+        # for that period. (TODO) Get rid of this for faster test execution.
+        time.sleep(5)
+        current_query_lineage = self.get_query_lineage(result.query_id, lineage_log_dir)
+        assert current_query_lineage != "", (
+            "No lineage found for query {} in dir {}".format(
+              result.query_id, lineage_log_dir))
+        if pytest.config.option.update_results:
+          test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
+              separators=(',', ': '))
+        else:
+          verify_lineage(json.loads(test_section['LINEAGE']), current_query_lineage)
 
       if 'DML_RESULTS' in test_section:
         assert 'ERRORS' not in test_section
@@ -823,7 +828,7 @@ class ImpalaTestSuite(BaseTestSuite):
             update_section=pytest.config.option.update_results)
     if pytest.config.option.update_results:
       output_file = os.path.join(EE_TEST_LOGS_DIR,
-                                 test_file_name.replace('/','_') + ".test")
+                                 test_file_name.replace('/', '_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)
 
   def get_query_lineage(self, query_id, lineage_dir):
@@ -855,8 +860,8 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def change_database(cls, impala_client, table_format=None,
       db_name=None, scale_factor=None):
-    if db_name == None:
-      assert table_format != None
+    if db_name is None:
+      assert table_format is not None
       db_name = QueryTestSectionReader.get_db_name(table_format,
           scale_factor if scale_factor else '')
     query = 'use %s' % db_name
@@ -932,14 +937,16 @@ class ImpalaTestSuite(BaseTestSuite):
     return end_time - start_time
 
   def execute_query_using_client(self, client, query, vector):
+    self.validate_exec_option_dimension(vector)
     self.change_database(client, vector.get_value('table_format'))
-    query_options = vector.get_value('exec_option')
+    query_options = vector.get_value(EXEC_OPTION_KEY)
     if query_options is not None: client.set_configuration(query_options)
     return client.execute(query)
 
   def execute_query_async_using_client(self, client, query, vector):
+    self.validate_exec_option_dimension(vector)
     self.change_database(client, vector.get_value('table_format'))
-    query_options = vector.get_value('exec_option')
+    query_options = vector.get_value(EXEC_OPTION_KEY)
     if query_options is not None: client.set_configuration(query_options)
     return client.execute_async(query)
 
@@ -971,7 +978,7 @@ class ImpalaTestSuite(BaseTestSuite):
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
-  def exec_and_compare_hive_and_impala_hs2(self, stmt, compare = lambda x, y: x == y):
+  def exec_and_compare_hive_and_impala_hs2(self, stmt, compare=lambda x, y: x == y):
     """Compare Hive and Impala results when executing the same statment over HS2"""
     # execute_using_jdbc expects a Query object. Convert the query string into a Query
     # object
@@ -1025,7 +1032,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def clone_table(self, src_tbl, dst_tbl, recover_partitions, vector):
     src_loc = self._get_table_location(src_tbl, vector)
-    self.client.execute("create external table {0} like {1} location '{2}'"\
+    self.client.execute("create external table {0} like {1} location '{2}'"
         .format(dst_tbl, src_tbl, src_loc))
     if recover_partitions:
       self.client.execute("alter table {0} recover partitions".format(dst_tbl))
@@ -1033,7 +1040,7 @@ class ImpalaTestSuite(BaseTestSuite):
   def appx_equals(self, a, b, diff_perc):
     """Returns True if 'a' and 'b' are within 'diff_perc' percent of each other,
     False otherwise. 'diff_perc' must be a float in [0,1]."""
-    if a == b: return True # Avoid division by 0
+    if a == b: return True  # Avoid division by 0
     assert abs(a - b) / float(max(abs(a), abs(b))) <= diff_perc
 
   def _get_table_location(self, table_name, vector):
@@ -1348,6 +1355,29 @@ class ImpalaTestSuite(BaseTestSuite):
         LOG.info("Expected log lines could not be found, sleeping before retrying: %s",
             str(e))
         time.sleep(1)
+
+  def validate_exec_option_dimension(self, vector):
+    """Validate that test dimension with name matching query option name is
+    also registered in 'exec_option' dimension."""
+    option_dim_names = []
+    exec_option = dict()
+    for vector_value in vector.vector_values:
+      if vector_value.name == EXEC_OPTION_KEY:
+        exec_option = vector.get_value(EXEC_OPTION_KEY)
+      elif vector_value.name.lower() in EXEC_OPTION_NAMES:
+        option_dim_names.append(vector_value.name.lower())
+
+    if not option_dim_names:
+      return
+
+    for name in option_dim_names:
+      # TODO: enforce these warnings by changing them into pytest.fail()
+      if name not in exec_option:
+        LOG.warn("Exec option {} declared as independent dimension but not inserted "
+                 "into {} dimension.".format(name, EXEC_OPTION_KEY))
+      elif vector.get_value(name) != exec_option[name]:
+        LOG.warn("{}[{}]={} does not match against dimension {}={}.".format(
+          EXEC_OPTION_KEY, name, exec_option[name], name, vector.get_value(name)))
 
   @staticmethod
   def get_random_name(prefix='', length=5):
