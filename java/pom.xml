@@ -70,6 +70,7 @@ under the License.
          so it's important to depend on the same one -->
     <guava.version>${env.IMPALA_GUAVA_VERSION}</guava.version>
     <derby.version>${env.IMPALA_DERBY_VERSION}</derby.version>
+    <jackson.version>${env.IMPALA_JACKSON_VERSION}</jackson.version>
     <jackson-databind.version>${env.IMPALA_JACKSON_DATABIND_VERSION}</jackson-databind.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
@@ -373,12 +374,12 @@ under the License.
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
-        <version>${jackson-databind.version}</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
-        <version>${jackson-databind.version}</version>
+        <version>${jackson.version}</version>
       </dependency>
 
       <dependency>
