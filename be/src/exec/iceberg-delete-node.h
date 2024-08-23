@@ -114,16 +114,6 @@ class IcebergDeleteNode : public BlockingJoinNode {
     EOS,
   };
 
-  /// Probes 'current_probe_row_' against the hash tables and append outputs
-  /// to output batch.
-  bool inline ProcessProbeRow(const RoaringBitmap64& deletes,
-      RoaringBitmap64::BulkContext* context, RowBatch::Iterator* out_batch_iterator,
-      int* remaining_capacity) WARN_UNUSED_RESULT;
-
-  /// Append outputs to output batch.
-  bool inline ProcessProbeRowNoCheck(RowBatch::Iterator* out_batch_iterator,
-      int* remaining_capacity) WARN_UNUSED_RESULT;
-
   /// Process probe rows from probe_batch_. Returns either if out_batch is full or
   /// probe_batch_ is entirely consumed.
   /// Returns the number of rows added to out_batch; -1 on error (and *status will
@@ -153,6 +143,12 @@ class IcebergDeleteNode : public BlockingJoinNode {
 
   bool NeedToCheckBatch(const RoaringBitmap64& deletes);
 
+  /// Returns number of rows required to copy from the probe batch to the output batch.
+  /// 'probe_iterator' is modified during the call.
+  int CountRowsToCopy(const RoaringBitmap64* deletes, int remaining_capacity,
+      RoaringBitmap64::Iterator* deletes_iterator,
+      RowBatch::Iterator* probe_iterator);
+
   /// Prepares for probing the next batch. Called after populating 'probe_batch_'
   /// with rows and entering 'probe_state_' PROBING_IN_BATCH.
   inline void ResetForProbe() {
@@ -160,6 +156,8 @@ class IcebergDeleteNode : public BlockingJoinNode {
     probe_batch_pos_ = 0;
     matched_probe_ = true;
   }
+
+  uint64_t ProbeFilePosition(const RowBatch::Iterator& probe_it) const;
 
   std::string NodeDebugString() const;
 

@@ -191,6 +191,11 @@ class RowBatch {
     /// Return the current row pointed to by the row pointer.
     TupleRow* IR_ALWAYS_INLINE Get() { return reinterpret_cast<TupleRow*>(row_); }
 
+    /// Return the current row pointed to by the row pointer.
+    const TupleRow* IR_ALWAYS_INLINE Get() const {
+      return reinterpret_cast<const TupleRow*>(row_);
+    }
+
     /// Increment the row pointer and return the next row.
     TupleRow* IR_ALWAYS_INLINE Next() {
       row_ += num_tuples_per_row_;
@@ -198,14 +203,22 @@ class RowBatch {
       return Get();
     }
 
+    void IR_ALWAYS_INLINE Advance(int n) {
+      row_ += n * num_tuples_per_row_;
+      DCHECK_LE((row_ - parent_->tuple_ptrs_) / num_tuples_per_row_, parent_->capacity_);
+    }
+
     /// Returns the index in the RowBatch of the current row. This does an integer
     /// division and so should not be used in hot inner loops.
     int RowNum() { return (row_ - parent_->tuple_ptrs_) / num_tuples_per_row_; }
 
+    /// Returns number of rows remaining.
+    int RemainingRows() { return (row_batch_end_ - row_) / num_tuples_per_row_; }
+
     /// Returns true if the iterator is beyond the last row for read iterators.
     /// Useful for read iterators to determine the limit. Write iterators should use
     /// RowBatch::AtCapacity() instead.
-    bool IR_ALWAYS_INLINE AtEnd() { return row_ >= row_batch_end_; }
+    bool IR_ALWAYS_INLINE AtEnd() const { return row_ >= row_batch_end_; }
 
     /// Returns the row batch which this iterator is iterating through.
     RowBatch* parent() { return parent_; }

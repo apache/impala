@@ -168,7 +168,6 @@ Status IcebergDeleteNode::NextProbeRowBatchFromChild(
       return Status::OK();
     }
     if (probe_side_eos_) {
-      current_probe_row_ = nullptr;
       probe_batch_pos_ = -1;
       *eos = true;
       return Status::OK();
@@ -218,8 +217,7 @@ Status IcebergDeleteNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool
       case ProbeState::PROBING_IN_BATCH: {
         // Finish processing rows in the current probe batch.
         RETURN_IF_ERROR(ProcessProbeBatch(out_batch));
-        if (probe_batch_pos_ == probe_batch_->num_rows()
-            && current_probe_row_ == nullptr) {
+        if (probe_batch_pos_ == probe_batch_->num_rows()) {
           probe_state_ = ProbeState::PROBING_END_BATCH;
         }
         break;
@@ -290,88 +288,85 @@ string IcebergDeleteNode::NodeDebugString() const {
   return ss.str();
 }
 
-bool IR_ALWAYS_INLINE IcebergDeleteNode::ProcessProbeRow(
-    const RoaringBitmap64& deletes, RoaringBitmap64::BulkContext* context,
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
-  DCHECK(current_probe_row_ != nullptr);
-  uint64_t current_probe_pos = std::make_unsigned_t<int64_t>(
-      *current_probe_row_->GetTuple(0)->GetBigIntSlot(pos_offset_));
-  TupleRow* out_row = out_batch_iterator->Get();
-  if (!deletes.ContainsBulk(current_probe_pos, context)) {
-    out_batch_iterator->parent()->CopyRow(current_probe_row_, out_row);
-    matched_probe_ = true;
-    --(*remaining_capacity);
-    if (*remaining_capacity == 0) return false;
-    out_row = out_batch_iterator->Next();
-  }
-  return true;
+uint64_t IR_ALWAYS_INLINE IcebergDeleteNode::ProbeFilePosition(
+    const RowBatch::Iterator& probe_it) const {
+  DCHECK(!probe_it.AtEnd());
+  const TupleRow* current_probe_row = probe_it.Get();
+  return *current_probe_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
 }
 
-bool IR_ALWAYS_INLINE IcebergDeleteNode::ProcessProbeRowNoCheck(
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
-  DCHECK(current_probe_row_ != nullptr);
-  TupleRow* out_row = out_batch_iterator->Get();
-  out_batch_iterator->parent()->CopyRow(current_probe_row_, out_row);
-  matched_probe_ = true;
-  --(*remaining_capacity);
-  if (*remaining_capacity == 0) return false;
-  out_row = out_batch_iterator->Next();
-  return true;
+int IR_ALWAYS_INLINE IcebergDeleteNode::CountRowsToCopy(const RoaringBitmap64* deletes,
+    int remaining_capacity, RoaringBitmap64::Iterator* deletes_it,
+    RowBatch::Iterator* probe_it) {
+  DCHECK(!probe_it->AtEnd());
+  int rows_to_copy = 0;
+  int rows_to_copy_max = std::min(probe_it->RemainingRows(), remaining_capacity);
+  DCHECK_GT(rows_to_copy_max, 0);
+  if (deletes == nullptr) {
+    probe_it->Advance(rows_to_copy_max);
+    return rows_to_copy_max;
+  }
+
+  uint64_t current_probe_pos = ProbeFilePosition(*probe_it);
+  probe_it->Next();
+  uint64_t next_deleted_pos = deletes_it->GetEqualOrLarger(current_probe_pos);
+  while (current_probe_pos < next_deleted_pos) {
+    ++rows_to_copy;
+    if (rows_to_copy == rows_to_copy_max) break;
+    current_probe_pos = ProbeFilePosition(*probe_it);
+    probe_it->Next();
+    // If the rows are filtered in the SCAN then the position values may increase
+    // by more than one, so let's adjust 'next_deleted_pos'.
+    if (current_probe_pos > next_deleted_pos) {
+      next_deleted_pos = deletes_it->GetEqualOrLarger(current_probe_pos);
+    }
+  }
+  return rows_to_copy;
 }
 
 int IcebergDeleteNode::ProcessProbeBatch(
     TPrefetchMode::type prefetch_mode, RowBatch* out_batch) {
   DCHECK(!out_batch->AtCapacity());
   DCHECK_GE(probe_batch_pos_, 0);
-  RowBatch::Iterator out_batch_iterator(out_batch, out_batch->AddRow());
   const int max_rows = out_batch->capacity() - out_batch->num_rows();
-  // Note that 'probe_batch_pos_' is the row no. of the row after 'current_probe_row_'.
   RowBatch::Iterator probe_batch_iterator(probe_batch_.get(), probe_batch_pos_);
+  RowBatch::Iterator out_batch_iterator(out_batch, out_batch->AddRow());
   if (probe_batch_iterator.AtEnd()) return 0;
 
   int remaining_capacity = max_rows;
 
-  impala::StringValue* file_path =
+  StringValue* file_path =
       probe_batch_iterator.Get()->GetTuple(0)->GetStringSlot(file_path_offset_);
   const IcebergDeleteBuilder::DeleteRowHashTable& delete_rows_table =
       builder_->deleted_rows();
+
+  const RoaringBitmap64* deletes = nullptr;
+  RoaringBitmap64::Iterator deletes_it;
   auto it = delete_rows_table.find(*file_path);
-
-  bool needs_check;
-  if (it == delete_rows_table.end()) {
-    needs_check = false;
-  } else {
-    needs_check = NeedToCheckBatch(it->second);
+  if (it != delete_rows_table.end() && NeedToCheckBatch(it->second)) {
+    deletes = &it->second;
+    deletes_it.Init(*deletes);
   }
 
-  if (!needs_check) {
-    while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0) {
-      current_probe_row_ = probe_batch_iterator.Get();
-      if (!ProcessProbeRowNoCheck(&out_batch_iterator, &remaining_capacity)) {
-        DCHECK_EQ(remaining_capacity, 0);
-      }
-      probe_batch_iterator.Next();
-    }
-  } else {
-    const RoaringBitmap64& deletes = it->second;
-    RoaringBitmap64::BulkContext context;
-    while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0) {
-      current_probe_row_ = probe_batch_iterator.Get();
-      if (!ProcessProbeRow(deletes, &context, &out_batch_iterator, &remaining_capacity)) {
-        DCHECK_EQ(remaining_capacity, 0);
-      }
-      probe_batch_iterator.Next();
-    }
+  while (!probe_batch_iterator.AtEnd() && remaining_capacity > 0) {
+    DCHECK_EQ(*file_path,
+        *probe_batch_iterator.Get()->GetTuple(0)->GetStringSlot(file_path_offset_));
+    int probe_offset = probe_batch_iterator.RowNum();
+    int rows_to_copy = CountRowsToCopy(
+        deletes, remaining_capacity, &deletes_it,
+        &probe_batch_iterator);
+    if (rows_to_copy == 0) continue;
+
+    int dst_offset = out_batch_iterator.RowNum();
+    out_batch->CopyRows(
+        probe_batch_.get(), rows_to_copy, probe_offset, dst_offset);
+    out_batch_iterator.Advance(rows_to_copy);
+    remaining_capacity -= rows_to_copy;
   }
+
   // Update where we are in the probe batch.
-  probe_batch_pos_ = (probe_batch_iterator.Get() - probe_batch_->GetRow(0));
+  probe_batch_pos_ = probe_batch_iterator.RowNum();
   int num_rows_added = max_rows - remaining_capacity;
-
-  // Clear state as ascending order of row ids are not guaranteed between probe row
-  // batches
-  if (probe_batch_iterator.AtEnd()) {
-    current_probe_row_ = nullptr;
-  }
 
   DCHECK_GE(probe_batch_pos_, 0);
   DCHECK_LE(probe_batch_pos_, probe_batch_->capacity());
