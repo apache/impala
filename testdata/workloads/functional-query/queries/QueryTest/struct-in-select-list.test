@@ -472,11 +472,11 @@ INT,STRING
 ====
 ---- QUERY
 # CREATE VIEW AS SELECT where the select returns struct.
-drop view if exists struct_view;
-create view struct_view as
+drop view if exists $UNIQUE_DB.struct_view;
+create view $UNIQUE_DB.struct_view as
     select id, small_struct
     from complextypes_structs;
-select id, small_struct from struct_view;
+select id, small_struct from $UNIQUE_DB.struct_view;
 ---- RESULTS
 1,'NULL'
 2,'{"i":19191,"s":"small_struct_str"}'
@@ -517,10 +517,10 @@ INT,STRING
 ====
 ---- QUERY
 # Create a view containing structs and query the view.
-drop view if exists tmp_view;
-create view tmp_view as
+drop view if exists $UNIQUE_DB.tmp_view;
+create view $UNIQUE_DB.tmp_view as
     select id, str, tiny_struct, alltypes from complextypes_structs;
-select id, alltypes, tiny_struct from tmp_view;
+select id, alltypes, tiny_struct from $UNIQUE_DB.tmp_view;
 ---- RESULTS
 1,'{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}','{"b":true}'
 2,'{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}','{"b":false}'
@@ -567,7 +567,7 @@ INT,STRING
 ---- QUERY
 # It's not supported to create a view with structs from a file format that doesn't
 # support selecting structs.
-create view tmp_view as select id, int_struct_col from functional.allcomplextypes;
+create view $UNIQUE_DB.tmp_view_no_struct_support as select id, int_struct_col from functional.allcomplextypes;
 ---- CATCH
 AnalysisException: Querying STRUCT is only supported for ORC and Parquet file formats.
 ====

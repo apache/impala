@@ -18,16 +18,21 @@
 from __future__ import absolute_import, division, print_function
 import os
 from copy import deepcopy
-import pytest
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfNotHdfsMinicluster
-from tests.common.test_dimensions import (create_exec_option_dimension,
+from tests.common.test_dimensions import (
+    add_exec_option_dimension,
+    create_exec_option_dimension,
     create_exec_option_dimension_from_dict, create_client_protocol_dimension,
-    create_orc_dimension, orc_schema_resolution_constraint)
-from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_HDFS
+    orc_schema_resolution_constraint)
+from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
+
+
+MT_DOP_DIMS = [0, 2]
+ORC_RESOLUTION_DIMS = [0, 1]
+
 
 class TestNestedTypes(ImpalaTestSuite):
   """Functional tests for nested types, run for all file formats that support nested
@@ -36,81 +41,75 @@ class TestNestedTypes(ImpalaTestSuite):
   def get_workload(self):
     return 'functional-query'
 
-  @staticmethod
-  def orc_schema_resolution_constraint(vector):
-    """ Constraint to use multiple orc_schema_resolution only in case of orc files"""
-    file_format = vector.get_value('table_format').file_format
-    orc_schema_resolution = vector.get_value('orc_schema_resolution')
-    return file_format == 'orc' or orc_schema_resolution == 0
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestNestedTypes, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_DIMS)
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('mt_dop', 0, 2))
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
   def test_scanner_basic(self, vector):
     """Queries that do not materialize arrays."""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-basic', vector)
 
   def test_scanner_array_materialization(self, vector):
     """Queries that materialize arrays."""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-array-materialization', vector)
 
   def test_scanner_multiple_materialization(self, vector):
     """Queries that materialize the same array multiple times."""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-multiple-materialization', vector)
 
   def test_scanner_position(self, vector):
     """Queries that materialize the artifical position element."""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-position', vector)
 
   def test_scanner_map(self, vector):
     """Queries that materialize maps. (Maps looks like arrays of key/value structs, so
     most map functionality is already tested by the array tests.)"""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-maps', vector)
 
   def test_runtime(self, vector):
     """Queries that send collections through the execution runtime."""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-runtime', vector)
 
   def test_subplan(self, vector):
     """Test subplans with various exec nodes inside it."""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     db_suffix = vector.get_value('table_format').db_suffix()
     self.run_test_case('QueryTest/nested-types-subplan', vector,
                        use_db='tpch_nested' + db_suffix)
-
-  def test_subplan_single_node(self, vector):
-    """Test subplans with various exec nodes inside it and num_nodes=1."""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
-    new_vector = deepcopy(vector)
-    new_vector.get_value('exec_option')['num_nodes'] = 1
-    self.run_test_case('QueryTest/nested-types-subplan-single-node', new_vector)
 
   def test_with_clause(self, vector):
     """Queries using nested types and with WITH clause."""
     db_suffix = vector.get_value('table_format').db_suffix()
     self.run_test_case('QueryTest/nested-types-with-clause', vector,
                        use_db='tpch_nested' + db_suffix)
+
+
+class TestNestedTypesSingleNode(ImpalaTestSuite):
+  """Functional tests for nested types, run for all file formats that support nested
+  types. All tests here runs with single node only."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNestedTypesSingleNode, cls).add_test_dimensions()
+    # Runs in single node only.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension(cluster_sizes=[1]))
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_DIMS)
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
+    cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
+
+  def test_subplan_single_node(self, vector):
+    """Test subplans with various exec nodes inside it and num_nodes=1."""
+    self.run_test_case('QueryTest/nested-types-subplan-single-node', vector)
 
 
 class TestNestedStructsInSelectList(ImpalaTestSuite):
@@ -122,10 +121,6 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestNestedStructsInSelectList, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('mt_dop', 0, 2))
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
             # Putting 'True' first because this way in non-exhaustive runs there are more
@@ -134,17 +129,23 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
             # The below two options are set to prevent the planner from disabling codegen
             # because of the small data size even when 'disable_codegen' is False.
             'disable_codegen_rows_threshold': [0],
-            'exec_single_node_rows_threshold': [0]}))
+            'exec_single_node_rows_threshold': [0],
+            'mt_dop': MT_DOP_DIMS}))
+    # Must declare 'orc_schema_resolution' using 'add_exec_option_dimension' so that
+    # 'orc_schema_resolution_constraint' can catch it.
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
-  def test_struct_in_select_list(self, vector):
+  def test_struct_in_select_list(self, vector, unique_database):
     """Queries where a struct column is in the select list"""
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['convert_legacy_hive_parquet_utc_timestamps'] = 1
     new_vector.get_value('exec_option')['timezone'] = '"Europe/Budapest"'
-    self.run_test_case('QueryTest/struct-in-select-list', new_vector)
+    self.run_test_case('QueryTest/struct-in-select-list', new_vector,
+                       test_file_vars={'$UNIQUE_DB': unique_database})
 
   @SkipIfFS.hbase
   def test_struct_in_select_list_hbase(self, vector):
@@ -180,34 +181,29 @@ class TestNestedCollectionsInSelectList(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestNestedCollectionsInSelectList, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('mt_dop', 0, 2))
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
             'disable_codegen': ['False', 'True'],
             # The below two options are set to prevent the planner from disabling codegen
             # because of the small data size even when 'disable_codegen' is False.
             'disable_codegen_rows_threshold': [0],
-            'exec_single_node_rows_threshold': [0]}))
+            'exec_single_node_rows_threshold': [0],
+            'mt_dop': MT_DOP_DIMS}))
+    # Must declare 'orc_schema_resolution' using 'add_exec_option_dimension' so that
+    # 'orc_schema_resolution_constraint' can catch it.
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
-  def test_array_in_select_list(self, vector, unique_database):
+  def test_array_in_select_list(self, vector):
     """Queries where an array column is in the select list"""
     self.run_test_case('QueryTest/nested-array-in-select-list', vector)
 
-  def test_map_in_select_list(self, vector, unique_database):
+  def test_map_in_select_list(self, vector):
     """Queries where a map column is in the select list"""
     self.run_test_case('QueryTest/nested-map-in-select-list', vector)
-
-  def test_map_null_keys(self, vector, unique_database):
-    """Queries where a map has null keys. Is only possible in ORC, not Parquet."""
-    if vector.get_value('table_format').file_format == 'parquet':
-      pytest.skip()
-    self.run_test_case('QueryTest/map_null_keys', vector)
 
 
 class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
@@ -220,19 +216,20 @@ class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMixedCollectionsAndStructsInSelectList, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('mt_dop', 0, 2))
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
             'disable_codegen': ['False', 'True'],
             # The below two options are set to prevent the planner from disabling codegen
             # because of the small data size even when 'disable_codegen' is False.
             'disable_codegen_rows_threshold': [0],
-            'exec_single_node_rows_threshold': [0]}))
+            'exec_single_node_rows_threshold': [0],
+            'mt_dop': MT_DOP_DIMS}))
+    # Must declare 'orc_schema_resolution' using 'add_exec_option_dimension' so that
+    # 'orc_schema_resolution_constraint' can catch it.
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
   def test_mixed_complex_types_in_select_list(self, vector, unique_database):
@@ -250,9 +247,9 @@ class TestComputeStatsWithNestedTypes(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestComputeStatsWithNestedTypes, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
   def test_compute_stats_with_structs(self, vector):
@@ -269,9 +266,9 @@ class TestZippingUnnest(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestZippingUnnest, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
   def test_zipping_unnest_in_from_clause(self, vector):
@@ -311,9 +308,9 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestNestedTypesNoMtDop, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
   def test_tpch(self, vector):
@@ -324,9 +321,11 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
 
   def test_tpch_limit(self, vector):
     """Queries over the larger nested TPCH dataset with limits in their subplan."""
-    vector.get_value('exec_option')['batch_size'] = 10
-    db_suffix = vector.get_value('table_format').db_suffix()
-    self.run_test_case('QueryTest/nested-types-tpch-limit', vector,
+    # Override batch_size to 10.
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['batch_size'] = 10
+    db_suffix = new_vector.get_value('table_format').db_suffix()
+    self.run_test_case('QueryTest/nested-types-tpch-limit', new_vector,
                        use_db='tpch_nested' + db_suffix)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
@@ -342,12 +341,6 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     db_suffix = vector.get_value('table_format').db_suffix()
     self.run_test_case('QueryTest/nested-types-tpch-errors',
                        vector, use_db='tpch_nested' + db_suffix)
-
-  def test_parquet_stats(self, vector):
-    """Queries that test evaluation of Parquet row group statistics."""
-    if vector.get_value('table_format').file_format == 'orc':
-      pytest.skip('This test is specific to Parquet')
-    self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
 
   @SkipIfFS.hive
   def test_upper_case_field_name(self, unique_database):
@@ -365,7 +358,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""
     table = "complextypes_partitioned"
     db_table = "{0}.{1}".format(unique_database, table)
-    table_format_info = vector.get_value('table_format')  # type: TableFormatInfo
+    table_format_info = vector.get_value('table_format')  # type is TableFormatInfo
     file_format = table_format_info.file_format
     db_suffix = table_format_info.db_suffix()
     self.client.execute("""
@@ -398,6 +391,27 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
         unique_database)
 
+
+class TestNestedTypesNoMtDopOrc(ImpalaTestSuite):
+  """Functional tests for nested types against ORC format only and not need to be run
+  with mt_dop > 0."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNestedTypesNoMtDopOrc, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['orc'])
+    cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
+
+  def test_map_null_keys(self, vector):
+    """Queries where a map has null keys. Is only possible in ORC, not Parquet.
+    Does not need to exercise MT_DOP>0."""
+    self.run_test_case('QueryTest/map_null_keys', vector)
+
   # Skip this test on non-HDFS filesystems, because the test contains Hive
   # queries that hang in some cases due to IMPALA-9365.
   @SkipIfFS.hive
@@ -406,10 +420,6 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""
     table = "complextypes_partitioned"
     db_table = "{0}.{1}".format(unique_database, table)
-    table_format_info = vector.get_value('table_format')  # type: TableFormatInfo
-    file_format = table_format_info.file_format
-    if file_format != "orc":
-      pytest.skip('Full ACID tables are only supported in ORC format.')
 
     self.client.execute("""
         CREATE TABLE {0} (
@@ -437,7 +447,26 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
         unique_database)
 
-class TestParquetArrayEncodings(ImpalaTestSuite):
+
+class TestNestedTypesNoMtDopParquet(ImpalaTestSuite):
+  """Functional tests for nested types against Parquet format only and not need
+  to be run with mt_dop > 0."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNestedTypesNoMtDopParquet, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet'])
+
+  def test_parquet_stats(self, vector):
+    """Queries that test evaluation of Parquet row group statistics."""
+    self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
+
+
+class TestParquetArrayEncodingsBase(ImpalaTestSuite):
   TESTFILE_DIR = os.path.join(os.environ['IMPALA_HOME'],
                               "testdata/parquet_nested_types_encodings")
 
@@ -449,16 +478,28 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestParquetArrayEncodings, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension(
-      'parquet_array_resolution', *TestParquetArrayEncodings.ARRAY_RESOLUTION_POLICIES))
+    super(TestParquetArrayEncodingsBase, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'parquet_array_resolution',
+                              TestParquetArrayEncodingsBase.ARRAY_RESOLUTION_POLICIES)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
+  @classmethod
+  def _create_test_table(self, dbname, tablename, filename, columns):
+    """Creates a table in the given database with the given name and columns. Copies
+    the file with the given name from TESTFILE_DIR into the table."""
+    location = get_fs_path("/test-warehouse/%s.db/%s" % (dbname, tablename))
+    self.client.execute("create table %s.%s (%s) stored as parquet location '%s'" %
+                        (dbname, tablename, columns, location))
+    local_path = self.TESTFILE_DIR + "/" + filename
+    self.filesystem_client.copy_from_local(local_path, location)
+
+
+class TestParquetArrayEncodings(TestParquetArrayEncodingsBase):
+
   def __init_arr_res(self, vector):
-    arr_res = vector.get_value('parquet_array_resolution')
     qopts = vector.get_value('exec_option')
-    qopts['parquet_array_resolution'] = arr_res
+    arr_res = qopts['parquet_array_resolution']
     return (arr_res, qopts)
 
   # $ parquet-tools schema SingleFieldGroupInList.parquet
@@ -677,7 +718,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
         "select cnt from %s t, (select count(*) cnt from t.col1) v" % full_name, qopts)
       assert result.data == ['3'] * mult
       result = self.execute_query(
-        "select cnt from %s t, t.col1 a1, (select count(*) cnt from a1.item) v"\
+        "select cnt from %s t, t.col1 a1, (select count(*) cnt from a1.item) v"
         % full_name, qopts)
       assert result.data == ['3', '3', '3'] * mult
 
@@ -688,7 +729,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
       except Exception as e:
         assert expected_err in str(e)
       try:
-        self.execute_query("select cnt from %s t, (select count(*) cnt from t.col1) v"\
+        self.execute_query("select cnt from %s t, (select count(*) cnt from t.col1) v"
           % full_name, qopts)
       except Exception as e:
         assert expected_err in str(e)
@@ -746,6 +787,15 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
     result = self.execute_query(
       "select cnt from %s t, (select count(*) cnt from t.col1) v" % full_name, qopts)
     assert result.data == ['2']
+
+
+class TestParquetArrayEncodingsAmbiguous(TestParquetArrayEncodingsBase):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestParquetArrayEncodingsAmbiguous, cls).add_test_dimensions()
+    # Drop 'parquet_array_resolution' dimension. It will be set inside .test files
+    cls.ImpalaTestMatrix.clear_dimension('parquet_array_resolution')
 
   # $ parquet-tools schema AmbiguousList_Modern.parquet
   # message org.apache.impala.nested {
@@ -818,9 +868,6 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
     """
 
     # The Parquet resolution policy is manually set in the .test files.
-    if vector.get_value('parquet_array_resolution') != "three_level":
-      pytest.skip("Test only run with three_level")
-
     ambig_modern_tbl = "ambig_modern"
     self._create_test_table(unique_database, ambig_modern_tbl,
         "AmbiguousList_Modern.parquet",
@@ -835,14 +882,6 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-ambiguous-list-legacy',
                         vector, unique_database)
 
-  def _create_test_table(self, dbname, tablename, filename, columns):
-    """Creates a table in the given database with the given name and columns. Copies
-    the file with the given name from TESTFILE_DIR into the table."""
-    location = get_fs_path("/test-warehouse/%s.db/%s" % (dbname, tablename))
-    self.client.execute("create table %s.%s (%s) stored as parquet location '%s'" %
-                        (dbname, tablename, columns, location))
-    local_path = self.TESTFILE_DIR + "/" + filename
-    self.filesystem_client.copy_from_local(local_path, location)
 
 class TestMaxNestingDepth(ImpalaTestSuite):
   # Should be kept in sync with the FE's Type.MAX_NESTING_DEPTH
@@ -856,9 +895,9 @@ class TestMaxNestingDepth(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMaxNestingDepth, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('orc_schema_resolution', 0, 1))
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
   def test_max_nesting_depth(self, vector, unique_database):

@@ -59,7 +59,10 @@
 from __future__ import absolute_import, division, print_function
 from itertools import product
 from copy import deepcopy
+import logging
 
+
+LOG = logging.getLogger(__name__)
 EXEC_OPTION_KEY = 'exec_option'
 
 
@@ -129,7 +132,11 @@ class ImpalaTestMatrix(object):
   def add_dimension(self, dimension):
     self.dimensions[dimension.name] = dimension
     if dimension.name == EXEC_OPTION_KEY:
-      self.independent_exec_option_names.clear()
+      for name in list(self.independent_exec_option_names):
+        LOG.warn("Reassigning {} dimension will remove exec option {}={} that was "
+            "independently declared through add_exec_option_dimension.".format(
+              EXEC_OPTION_KEY, name, [v.value for v in self.dimensions[name]]))
+        self.clear_dimension(name)
 
   def assert_unique_exec_option_key(self, key):
     """Assert that 'exec_option' dimension exist and 'key' is not exist yet
