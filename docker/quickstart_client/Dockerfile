@@ -35,7 +35,7 @@ RUN apt-get update && \
   apt-get install -y \
   sudo netcat-openbsd less curl iproute2 vim iputils-ping \
   libsasl2-dev libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
-  tzdata krb5-user ${PIP} && \
+  tzdata krb5-user libkrb5-dev ${PIP} && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 

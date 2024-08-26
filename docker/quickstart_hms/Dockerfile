@@ -17,7 +17,7 @@
 
 # Build a base HMS image for quickstart purposes.
 
-ARG BASE_IMAGE=ubuntu:16.04
+ARG BASE_IMAGE=ubuntu:18.04
 FROM ${BASE_IMAGE}
 
 # Common label arguments.

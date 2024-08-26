@@ -169,6 +169,8 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     ADD_DEPENDENCIES(docker_debug_images ${debug_target})
     ADD_DEPENDENCIES(docker_debug_java11_images ${debug_java11_target})
     ADD_DEPENDENCIES(docker_debug_java17_images ${debug_java17_target})
+    # add_daemon_docker_image modifies 'exported_image_names'. Publish it to the parent scope.
+    set(exported_image_names "${exported_image_names}" PARENT_SCOPE)
   endfunction()
 
   # Stamp out image targets for all of the Impala daemons.

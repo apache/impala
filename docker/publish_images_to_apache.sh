@@ -72,6 +72,10 @@ do
   # with a prefix, e.g. IMPALA_QUICKSTART_IMAGE_PREFIX in the quickstart docker compose.
   DST="${TARGET_REPO}:${VERSION}-${IMAGE}"
   DIGEST=$(docker images --no-trunc --quiet "${IMAGE}")
+  if [[ -z $DIGEST ]]; then
+    echo "${IMAGE} image not found"
+    continue
+  fi
   echo "Publishing ${IMAGE} (${DIGEST}) to ${DST}"
   docker tag $IMAGE "$DST"
   docker push "$DST"
