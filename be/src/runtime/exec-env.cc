@@ -60,6 +60,8 @@
 #include "util/default-path-handlers.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/impalad-metrics.h"
+#include "util/jwt-util-internal.h"
+#include "util/jwt-util.h"
 #include "util/mem-info.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
@@ -533,6 +535,9 @@ Status ExecEnv::Init() {
         frontend_->GetSecretFromKeyStore(FLAGS_ai_api_key_jceks_secret, &api_key));
     AiFunctions::set_api_key(api_key);
   }
+
+  jwt_helper_ = new JWTHelper();
+  oauth_helper_ = new JWTHelper();
 
   return Status::OK();
 }

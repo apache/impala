@@ -290,7 +290,7 @@ class ImpalaClient(object):
                verbose=True, use_http_base_transport=False, http_path=None,
                http_cookie_names=None, http_socket_timeout_s=None, value_converter=None,
                connect_max_tries=4, rpc_stdout=False, rpc_file=None, http_tracing=True,
-               jwt=None, hs2_x_forward=None):
+               jwt=None, oauth=None, hs2_x_forward=None):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -314,6 +314,7 @@ class ImpalaClient(object):
     self.http_cookie_names = http_cookie_names
     self.http_tracing = http_tracing
     self.jwt = jwt
+    self.oauth = oauth
     # This is set from ImpalaShell's signal handler when a query is cancelled
     # from command line via CTRL+C. It is used to suppress error messages of
     # query cancellation.
@@ -592,6 +593,8 @@ class ImpalaClient(object):
       transport.setLdapAuth(auth)
     elif self.jwt is not None:
       transport.setJwtAuth(self.jwt)
+    elif self.oauth is not None:
+      transport.setOAuthAuth(self.oauth)
     elif self.use_kerberos or self.kerberos_host_fqdn:
       # Set the Kerberos service
       if self.kerberos_host_fqdn is not None:
@@ -1166,7 +1169,6 @@ class ImpalaHS2Client(ImpalaClient):
 
     self._request_num += 1
     self._current_request_id = "{0}-{1}".format(self._base_request_id, self._request_num)
-
     self._check_connected()
     num_tries = 1
     max_tries = num_tries

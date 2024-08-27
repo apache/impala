@@ -245,6 +245,12 @@ class ImpalaHttpClient(TTransportBase):
     self.__bearer_token = jwt
     self.__get_custom_headers_func = self.getCustomHeadersWithBearerAuth
 
+  # Set function to generate customized HTTP headers for OAuth authorization.
+  def setOAuthAuth(self, oauth):
+    # auth mechanism: Oauth
+    self.__bearer_token = oauth
+    self.__get_custom_headers_func = self.getCustomHeadersWithBearerAuth
+
   # Set function to generate customized HTTP headers for Kerberos authorization.
   def setKerberosAuth(self, kerb_service):
     # auth mechanism: GSSAPI

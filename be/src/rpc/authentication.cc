@@ -218,6 +218,57 @@ DEFINE_bool_hidden(jwt_allow_without_tls, false,
     "When this configuration is set to true, Impala allows JWT authentication on "
     "unsecure channel. This should be only enabled for testing, or development for which "
     "TLS is handled by proxy.");
+
+// OAuth functions
+// If set, Impala will support OAuth based authentication.
+// header.
+DEFINE_bool(oauth_token_auth, false,
+    "When true, read the OAuth token out of the HTTP Header and extract user name from "
+    "the token payload.");
+// The last segment of an OAuth token is the signature, which is used to verify that the
+// token was signed by the sender and not altered in any way. By default, it's required
+// to validate the signature of the OAuth tokens. Otherwise it may expose security issue.
+DEFINE_bool(oauth_jwt_validate_signature, true,
+    "When true, validate the signature of OAuth token with pre-installed JWKS."
+    "This should only be set to false for development / testing");
+// JWKS contains the public keys used by the signing party to the clients that need to
+// validate signatures. It represents cryptographic keys in JSON data structure.
+DEFINE_string(oauth_jwks_file_path, "",
+    "File path of the pre-installed JSON Web Key Set (JWKS) for OAuth verification");
+// This specifies the URL for OAuth to be downloaded.
+DEFINE_string(oauth_jwks_url, "", "URL of the OAuth Endpoint for token verification");
+// Enables retrieving the OAuth JWKS from the specified URL without verifying the
+// presented TLS certificate from the server.
+DEFINE_bool(oauth_jwks_verify_server_certificate, true,
+    "Specifies if the TLS certificate of the JWKS server is verified when retrieving "
+    "the JWKS from the specified JWKS URL.  A certificate is considered valid if a "
+    "trust chain can be established for it, and if the certificate has a common name or "
+    "SAN that matches the server's hostname. This should only be set to false for "
+    "development / testing.");
+// Enables defining a custom pem bundle file containing root certificates to trust.
+DEFINE_string(oauth_jwks_ca_certificate, "", "File path of a pem bundle of root ca "
+    "certificates that will be trusted when retrieving the JWKS from the "
+    "specified JWKS URL.");
+DEFINE_int32(oauth_jwks_update_frequency_s, 60,
+    "(Advanced) The time in seconds to wait for refreshing the OAuth token "
+    "from the OAuth URL.");
+DEFINE_int32(oauth_jwks_pulling_timeout_s, 10,
+    "(Advanced) The time in seconds for connection timed out when verifying OAuth token "
+    "from the specified OAuth server.");
+// This specifies the custom claim in the OAuth token that contains the "username" for
+// the session.
+DEFINE_string(oauth_jwt_custom_claim_username, "username",
+    "Custom claim of the token that "
+    "contains the username");
+// If set, Impala allows OAuth authentication on unsecure channel.
+// OAuth is only secure when used with TLS. But in some deployment scenarios, TLS is
+// handled by proxy so that it does not show up as TLS to Impala.
+DEFINE_bool_hidden(oauth_allow_without_tls, false,
+    "When this configuration is set to true, Impala allows OAuth authentication on "
+    "unsecure channel. This should be only enabled for testing, or development for which "
+    "TLS is handled by proxy.");
+// End OAuth
+
 DEFINE_bool(enable_group_filter_check_for_authenticated_kerberos_user, false,
     "If this configuration is set to true, Impala checks the provided "
     "LDAP group filter, if any, with the authenticated Kerberos user. "
@@ -726,11 +777,14 @@ bool JWTTokenAuth(ThriftServer::ConnectionContext* connection_context,
     return false;
   }
   if (FLAGS_jwt_validate_signature) {
-    status = JWTHelper::GetInstance()->Verify(decoded_token.get());
+    status =  ExecEnv::GetInstance()->GetJWTHelperInstance()->Verify(decoded_token.get());
     if (!status.ok()) {
       LOG(ERROR) << "Error verifying JWT token received from: "
                  << TNetworkAddressToString(connection_context->network_address)
                  << " Error: " << status;
+      connection_context->return_headers.push_back(
+          Substitute("WWW-Authenticate: Bearer error=\"invalid_token\",\
+error_description=\"$0 \"", status.GetDetail()));
       return false;
     }
   }
@@ -747,6 +801,46 @@ bool JWTTokenAuth(ThriftServer::ConnectionContext* connection_context,
   }
   connection_context->username = username;
   // TODO: cookies are not added, but are not needed right now
+  return true;
+}
+
+bool OAuthTokenAuth(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const string& token) {
+  JWTHelper::UniqueJWTDecodedToken decoded_token;
+  Status status = JWTHelper::Decode(token, decoded_token);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error decoding OAuth token received from: "
+               << TNetworkAddressToString(connection_context->network_address)
+               << " Error: " << status;
+    return false;
+  }
+  if (FLAGS_oauth_jwt_validate_signature) {
+    status = ExecEnv::GetInstance()->GetOAuthHelperInstance()->Verify(
+        decoded_token.get());
+    if (!status.ok()) {
+      LOG(ERROR) << "Error verifying OAuth token received from: "
+                 << TNetworkAddressToString(connection_context->network_address)
+                 << " Error: " << status;
+      connection_context->return_headers.push_back(
+          Substitute("WWW-Authenticate: Bearer error=\"invalid_token\",\
+error_description=\"$0 \"", status.GetDetail()));
+      return false;
+    }
+  }
+
+  DCHECK(!FLAGS_oauth_jwt_custom_claim_username.empty());
+  string username;
+  status = JWTHelper::GetCustomClaimUsername(
+      decoded_token.get(), FLAGS_oauth_jwt_custom_claim_username, username);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error extracting username from OAuth token received from: "
+               << TNetworkAddressToString(connection_context->network_address)
+               << " Error: " << status;
+    return false;
+  }
+  connection_context->username = username;
+  // TODO: cookies are not added, but are not needed right now
+
   return true;
 }
 
@@ -1309,7 +1403,7 @@ Status SecureAuthProvider::Start() {
 Status SecureAuthProvider::GetServerTransportFactory(
     ThriftServer::TransportType underlying_transport_type, const std::string& server_name,
     MetricGroup* metrics, std::shared_ptr<TTransportFactory>* factory) {
-  DCHECK(!principal_.empty() || has_ldap_ || has_saml_ || has_jwt_);
+  DCHECK(!principal_.empty() || has_ldap_ || has_saml_ || has_jwt_ || has_oauth_);
 
   if (underlying_transport_type == ThriftServer::HTTP) {
     bool has_kerberos = !principal_.empty();
@@ -1318,7 +1412,7 @@ Status SecureAuthProvider::GetServerTransportFactory(
     bool check_trusted_auth_header = !FLAGS_trusted_auth_header.empty();
     factory->reset(new THttpServerTransportFactory(server_name, metrics, has_ldap_,
         has_kerberos, use_cookies, check_trusted_domain, check_trusted_auth_header,
-        has_saml_, has_jwt_));
+        has_saml_, has_jwt_, has_oauth_));
     return Status::OK();
   }
 
@@ -1451,9 +1545,13 @@ void SecureAuthProvider::SetupConnectionContext(
         callbacks.validate_saml2_bearer_fn =
             std::bind(ValidateSaml2Bearer, connection_ptr.get(), hash_);
       }
-      if (has_jwt_) {
+      if (has_jwt_ ) {
         callbacks.jwt_token_auth_fn =
             std::bind(JWTTokenAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+      }
+      if (has_oauth_) {
+        callbacks.oauth_token_auth_fn =
+            std::bind(OAuthTokenAuth, connection_ptr.get(), hash_, std::placeholders::_1);
       }
       if (!FLAGS_trusted_auth_header.empty()) {
         callbacks.trusted_auth_header_handle_fn = std::bind(
@@ -1581,6 +1679,20 @@ Status AuthManager::Init() {
     }
   }
 
+  if (FLAGS_oauth_token_auth) {
+    if (!IsExternalTlsConfigured()) {
+      if (!FLAGS_oauth_allow_without_tls) {
+        return Status("OAuth authentication should be only used with TLS enabled.");
+      }
+      LOG(WARNING) << "OAuth authentication is used without TLS.";
+    }
+    if (FLAGS_oauth_jwt_custom_claim_username.empty()) {
+      return Status(
+          "OAuth authentication requires oauth_jwt_custom_claim_username to be "
+          "specified.");
+    }
+  }
+
   // Get all of the flag validation out of the way
   if (FLAGS_enable_ldap_auth) {
     RETURN_IF_ERROR(
@@ -1665,6 +1777,10 @@ Status AuthManager::Init() {
       LOG(INFO) << "External communication can be also authenticated with JWT";
       sap->InitJwt();
     }
+    if (FLAGS_oauth_token_auth) {
+      LOG(INFO) << "External communication can be also authenticated with OAuth";
+      sap->InitOauth();
+    }
   } else {
     external_auth_provider_.reset(new NoAuthProvider());
     LOG(INFO) << "External communication is not authenticated for binary protocols";
@@ -1674,6 +1790,12 @@ Status AuthManager::Init() {
       sap->InitSaml();
       LOG(INFO) << "External communication is authenticated for hs2-http protocol with "
                    "SAML2 SSO";
+    } else if (FLAGS_oauth_token_auth) {
+      SecureAuthProvider* sap = nullptr;
+      external_http_auth_provider_.reset(sap = new SecureAuthProvider(false));
+      sap->InitOauth();
+      LOG(INFO)
+          << "External communication is authenticated for hs2-http protocol with Oauth";
     } else if (use_jwt) {
       SecureAuthProvider* sap = nullptr;
       external_http_auth_provider_.reset(sap = new SecureAuthProvider(false));

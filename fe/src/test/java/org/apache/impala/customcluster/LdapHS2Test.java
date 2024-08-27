@@ -150,15 +150,16 @@ public class LdapHS2Test {
     assertEquals(expectedAuthSuccess, actualAuthSuccess);
   }
 
-  private void verifyJwtAuthMetrics(long expectedAuthSuccess, long expectedAuthFailure)
+  private void verifyAuthMetrics(
+      long expectedAuthSuccess, long expectedAuthFailure, String authType)
       throws Exception {
     long actualAuthSuccess =
         (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
-            + "total-jwt-token-auth-success");
+            + "total-" + authType + "-token-auth-success");
     assertEquals(expectedAuthSuccess, actualAuthSuccess);
     long actualAuthFailure =
         (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
-            + "total-jwt-token-auth-failure");
+            + "total-" + authType + "-token-auth-failure");
     assertEquals(expectedAuthFailure, actualAuthFailure);
   }
 
@@ -686,13 +687,13 @@ public class LdapHS2Test {
     TOpenSessionResp openResp = client.OpenSession(openReq);
     // One successful authentication.
     verifyMetrics(0, 0);
-    verifyJwtAuthMetrics(1, 0);
+    verifyAuthMetrics(1, 0, "jwt");
     // Running a query should succeed.
     TOperationHandle operationHandle = execAndFetch(
         client, openResp.getSessionHandle(), "select logged_in_user()", "impala");
     // Two more successful authentications - for the Exec() and the Fetch().
     verifyMetrics(0, 0);
-    verifyJwtAuthMetrics(3, 0);
+    verifyAuthMetrics(3, 0, "jwt");
 
     // case 2: Authenticate fails with invalid JWT token which does not have signature.
     String invalidJwtToken =
@@ -706,7 +707,115 @@ public class LdapHS2Test {
       openResp = client.OpenSession(openReq);
       fail("Exception exception.");
     } catch (Exception e) {
-      verifyJwtAuthMetrics(3, 1);
+      verifyAuthMetrics(3, 1, "jwt");
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+    }
+  }
+
+  /**
+   * Tests if sessions are authenticated by verifying both JWT and OAuth token for
+   * connections to the HTTP hiveserver2 endpoint.
+   */
+  @Test
+  public void testHiveserver2JwtAndOAuthAuth() throws Exception {
+    String jwtJwksFilename =
+        new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_rs256.json").getPath();
+    String oauthJwksFilename =
+        new File(System.getenv("IMPALA_HOME"),
+            "testdata/jwt/jwks_signing.json").getPath();
+    setUp(String.format(
+        "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
+            + "--jwt_allow_without_tls=true --oauth_token_auth=true "
+            + "--oauth_jwt_validate_signature=true --oauth_jwks_file_path=%s "
+            + "--jwt_allow_without_tls=true --oauth_jwt_custom_claim_username=sub "
+            + "--oauth_allow_without_tls=true",
+        jwtJwksFilename, oauthJwksFilename));
+    verifyMetrics(0, 0);
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    // Case 1: Authenticate with valid JWT Token in HTTP header.
+    String jwtToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6InB1YmxpYzpjNDI0YjY3Yi1mZTI4LTQ1ZDctYjAxNS1m"
+        + "NzlkYTUwYjViMjEiLCJ0eXAiOiJKV1MifQ.eyJpc3MiOiJhdXRoMCIsInVzZXJuYW1lIjoia"
+        + "W1wYWxhIn0.OW5H2SClLlsotsCarTHYEbqlbRh43LFwOyo9WubpNTwE7hTuJDsnFoVrvHiWI"
+        + "02W69TZNat7DYcC86A_ogLMfNXagHjlMFJaRnvG5Ekag8NRuZNJmHVqfX-qr6x7_8mpOdU55"
+        + "4kc200pqbpYLhhuK4Qf7oT7y9mOrtNrUKGDCZ0Q2y_mizlbY6SMg4RWqSz0RQwJbRgXIWSgc"
+        + "bZd0GbD_MQQ8x7WRE4nluU-5Fl4N2Wo8T9fNTuxALPiuVeIczO25b5n4fryfKasSgaZfmk0C"
+        + "oOJzqbtmQxqiK9QNSJAiH2kaqMwLNgAdgn8fbd-lB1RAEGeyPH8Px8ipqcKsPk0bg";
+    headers.put("Authorization", "Bearer " + jwtToken);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'impala' from JWT token and use it as
+    // login user.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(0, 0);
+    verifyAuthMetrics(1, 0, "jwt");
+    // Running a query should succeed.
+    TOperationHandle operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "impala");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(0, 0);
+    verifyAuthMetrics(3, 0, "jwt");
+    verifyAuthMetrics(0, 0, "oauth");
+
+    // Authenticate with a valid OAuth token in HTTP header.
+    String oauthToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6IjIwMjMwNTA5LTE2MDQxNSIsInR5cGUiOiJKV1QifQ.eyJ"
+        + "hdWQiOiJpbXBhbGEtdGVzdHMiLCJleHAiOjE5OTkwMDgyNTUsImlhdCI6MTY4MzY0ODI1NSw"
+        + "iaXNzIjoiZmlsZTovL3Rlc3RzL3V0aWwvand0L2p3dF91dGlsLnB5Iiwia2lkIjoiMjAyMzA"
+        + "1MDktMTYwNDE1Iiwic3ViIjoidGVzdC11c2VyIn0.dWMOkcBrwRansZrCZrlbYzr9alIQ23q"
+        + "lnw4t8Kx_v87CBB90qtmTV88nZAh4APtTE8IUnP0e45R2XyDoH3a8UVrrSOkEzI47wJ0I3Gq"
+        + "Sc_R_MsGoeGlKreZmcjGhY_ceOo7RWYaBdzsAZe1YXcKJbq2sQJ3issfjBa_fWt0Qhy0Dvzs"
+        + "sUf3V-g5nQUM3W3pOULiFtMhA8YmIdheHalRz3D_NWMAqe79iUv6tG0Eg08x-cl8GXYsDm45"
+        + "sU4WkP5fZps6Q4Fm05640FWXG8K0PoLzSI_Iac3zzSAPs-iYNeeNE6C9QxBYSLBvQrWL0SET"
+        + "afP82Mo-nEZsAJbMMSqm0cQ";
+
+    transport = new THttpClient("http://localhost:28000");
+    headers = new HashMap<String, String>();
+    headers.put("Authorization", "Bearer " + oauthToken);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'test-user' from OAuth token and use
+    // it as login user.
+    openReq = new TOpenSessionReq();
+    openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(0, 0);
+    verifyAuthMetrics(1, 0, "oauth");
+    // Running a query should succeed.
+    operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "test-user");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(0, 0);
+    verifyAuthMetrics(3, 0, "oauth");
+    verifyAuthMetrics(3, 0, "jwt");
+
+    // case 2: Authenticate fails with invalid token for both JWT and OAuth which does
+    // not have signature.
+    headers.clear();
+    String invalidJwtToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6InB1YmxpYzpjNDI0YjY3Yi1mZTI4LTQ1ZDctYjAxNS1m"
+        + "NzlkYTUwYjViMjEiLCJ0eXAiOiJKV1MifQ.eyJpc3MiOiJhdXRoMCIsInVzZXJuYW1lIjoia"
+        + "W1wYWxhIn0.";
+    headers.put("Authorization", "Bearer " + invalidJwtToken);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    try {
+      openResp = client.OpenSession(openReq);
+      fail("Exception exception.");
+    } catch (Exception e) {
+      // Both JWT and OAuth have 3 successes and 1 failure each.
+      verifyAuthMetrics(3, 1, "jwt");
+      verifyAuthMetrics(3, 1, "oauth");
       assertEquals(e.getMessage(), "HTTP Response code: 401");
     }
   }

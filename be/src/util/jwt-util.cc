@@ -849,8 +849,6 @@ struct JWTHelper::JWTDecodedToken {
   DecodedJWT decoded_jwt_;
 };
 
-JWTHelper* JWTHelper::jwt_helper_ = new JWTHelper();
-
 void JWTHelper::TokenDeleter::operator()(JWTHelper::JWTDecodedToken* token) const {
   if (token != nullptr) delete token;
 };

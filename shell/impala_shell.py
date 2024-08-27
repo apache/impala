@@ -206,16 +206,20 @@ class ImpalaShell(cmd.Cmd, object):
     self.user = options.user
     self.ldap_password_cmd = options.ldap_password_cmd
     self.jwt_cmd = options.jwt_cmd
+    self.oauth_cmd = options.oauth_cmd
     self.strict_hs2_protocol = options.strict_hs2_protocol
     self.ldap_password = options.ldap_password
     self.use_jwt = options.use_jwt
     self.jwt = options.jwt
+    self.use_oauth = options.use_oauth
+    self.oauth = options.oauth
     # When running tests in strict mode, the server uses the ldap
     # protocol but can allow any password.
     if options.use_ldap_test_password:
       self.ldap_password = 'password'
     self.use_ldap = options.use_ldap or \
-        (self.strict_hs2_protocol and not self.use_kerberos and not self.use_jwt)
+        (self.strict_hs2_protocol and not self.use_kerberos and not self.use_jwt
+         and not self.use_oauth)
     self.client_connect_timeout_ms = options.client_connect_timeout_ms
     self.http_socket_timeout_s = None
     if (options.http_socket_timeout_s != 'None'
@@ -649,7 +653,8 @@ class ImpalaShell(cmd.Cmd, object):
                           http_cookie_names=self.http_cookie_names,
                           value_converter=value_converter, rpc_stdout=self.rpc_stdout,
                           rpc_file=self.rpc_file, http_tracing=self.http_tracing,
-                          jwt=self.jwt, hs2_x_forward=self.hs2_x_forward)
+                          jwt=self.jwt, oauth=self.oauth,
+                          hs2_x_forward=self.hs2_x_forward)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -670,7 +675,7 @@ class ImpalaShell(cmd.Cmd, object):
                           value_converter=value_converter,
                           connect_max_tries=self.connect_max_tries,
                           rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
-                          http_tracing=self.http_tracing, jwt=self.jwt,
+                          http_tracing=self.http_tracing, jwt=self.jwt, oauth=self.oauth,
                           hs2_x_forward=self.hs2_x_forward)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
@@ -983,6 +988,9 @@ class ImpalaShell(cmd.Cmd, object):
     if self.use_jwt and self.jwt is None:
       self.jwt = getpass.getpass("Enter JWT: ")
 
+    if self.use_oauth and self.oauth is None:
+      self.oauth = getpass.getpass("Enter OAUTH: ")
+
     if not args: args = socket.getfqdn()
     tokens = args.split(" ")
     # validate the connection string.
@@ -1029,6 +1037,8 @@ class ImpalaShell(cmd.Cmd, object):
           self.ldap_password = None
           self.use_jwt = False
           self.jwt = None
+          self.use_oauth = False
+          self.oauth = None
           self.imp_client = self._new_impala_client()
           self._connect()
       except OSError:
@@ -2015,6 +2025,10 @@ def get_intro(options):
     intro += ("\n\nJWT authentication is enabled, but the connection to Impala is "
               "not secured by TLS.\nALL JWTs WILL BE SENT IN THE CLEAR TO IMPALA.")
 
+  if not options.ssl and options.creds_ok_in_clear and options.use_oauth:
+    intro += ("\n\nOAUTH authentication is enabled, but the connection to Impala is "
+              "not secured by TLS.\nALL OAUTHs WILL BE SENT IN THE CLEAR TO IMPALA.")
+
   if options.protocol == 'beeswax':
     intro += ("\n\nWARNING: The beeswax protocol is deprecated and will be removed in a "
               "future version of Impala.")
@@ -2156,6 +2170,9 @@ def impala_shell_main():
   if options.use_jwt:
     auth_method_count += 1
 
+  if options.use_oauth:
+    auth_method_count += 1
+
   if auth_method_count > 1:
     print("Please specify at most one authentication mechanism (-k, -l, or -j)",
           file=sys.stderr)
@@ -2188,6 +2205,25 @@ def impala_shell_main():
 
   if not options.use_jwt and options.jwt_cmd:
     print("Option --jwt_cmd requires using JWT authentication mechanism (-j)",
+          file=sys.stderr)
+    raise FatalShellException()
+
+  if options.use_oauth and options.protocol.lower() != 'hs2-http':
+    print("Invalid protocol '{0}'. OAUTH authentication requires using the 'hs2-http' "
+          "protocol".format(options.protocol), file=sys.stderr)
+    raise FatalShellException()
+
+  if options.use_oauth and options.strict_hs2_protocol:
+    print("OAUTH authentication is not supported when using strict hs2.", file=sys.stderr)
+    raise FatalShellException()
+
+  if options.use_oauth and not options.ssl and not options.creds_ok_in_clear:
+    print("OAUTHs may not be sent over insecure connections. Enable SSL or "
+          "set --auth_creds_ok_in_clear", file=sys.stderr)
+    raise FatalShellException()
+
+  if not options.use_oauth and options.oauth_cmd:
+    print("Option --oauth_cmd requires using OAUTH authentication mechanism (-a)",
           file=sys.stderr)
     raise FatalShellException()
 
@@ -2230,6 +2266,10 @@ def impala_shell_main():
     if options.verbose:
       ldap_msg = "with JWT-based authentication"
       print("{0} {1} {2}".format(start_msg, ldap_msg, py_version_msg), file=sys.stderr)
+  elif options.use_oauth:
+    if options.verbose:
+      ldap_msg = "with OAUTH-based authentication"
+      print("{0} {1} {2}".format(start_msg, ldap_msg, py_version_msg), file=sys.stderr)
   else:
     if options.verbose:
       no_auth_msg = "with no authentication"
@@ -2242,6 +2282,10 @@ def impala_shell_main():
   options.jwt = None
   if options.use_jwt and options.jwt_cmd:
     options.jwt = read_password_cmd(options.jwt_cmd, "JWT", True)
+
+  options.oauth = None
+  if options.use_oauth and options.oauth_cmd:
+    options.oauth = read_password_cmd(options.oauth_cmd, "OAUTH", True)
 
   if options.ssl:
     if options.ca_cert is None:

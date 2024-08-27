@@ -209,6 +209,11 @@ class Webserver {
   bool JWTTokenAuth(const std::string& jwt_token, struct sq_connection* connection,
       struct sq_request_info* request_info);
 
+  /// Checks and returns true if the OAuth token in Authorization header could be verified
+  /// and the token has a valid username.
+  bool OAuthTokenAuth(const std::string& oauth_token, struct sq_connection* connection,
+      struct sq_request_info* request_info);
+
   // Handle Basic authentication for this request. Returns an error if authentication was
   // unsuccessful.
   Status HandleBasic(struct sq_connection* connection,
@@ -290,6 +295,10 @@ class Webserver {
   /// An incoming connection will be accepted if the JWT token could be verified.
   bool use_jwt_ = false;
 
+  /// If true, the OAuth token in Authorization header will be used for authentication.
+  /// An incoming connection will be accepted if the OAuth token could be verified.
+  bool use_oauth_ = false;
+
   /// Used to validate usernames/passwords If LDAP authentication is in use.
   std::unique_ptr<ImpalaLdap> ldap_;
 
@@ -320,6 +329,11 @@ class Webserver {
   /// attempts.
   IntCounter* total_jwt_token_auth_success_ = nullptr;
   IntCounter* total_jwt_token_auth_failure_ = nullptr;
+
+  /// If 'use_oauth_' is true, metrics for the number of successful and failed OAuth auth
+  /// attempts.
+  IntCounter* total_oauth_token_auth_success_ = nullptr;
+  IntCounter* total_oauth_token_auth_failure_ = nullptr;
 };
 
 }

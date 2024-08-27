@@ -52,7 +52,7 @@ using strings::Substitute;
 THttpServerTransportFactory::THttpServerTransportFactory(const std::string& server_name,
     impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos, bool use_cookies,
     bool check_trusted_domain, bool check_trusted_auth_header, bool has_saml,
-    bool has_jwt)
+    bool has_jwt, bool has_oauth)
   : has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     use_cookies_(use_cookies),
@@ -60,6 +60,7 @@ THttpServerTransportFactory::THttpServerTransportFactory(const std::string& serv
     check_trusted_auth_header_(check_trusted_auth_header),
     has_saml_(has_saml),
     has_jwt_(has_jwt),
+    has_oauth_(has_oauth),
     metrics_enabled_(metrics != nullptr) {
   if (metrics_enabled_) {
     if (has_ldap_) {
@@ -100,12 +101,18 @@ THttpServerTransportFactory::THttpServerTransportFactory(const std::string& serv
       http_metrics_.total_jwt_token_auth_failure_ = metrics->AddCounter(
           Substitute("$0.total-jwt-token-auth-failure", server_name), 0);
     }
+    if (has_oauth_) {
+      http_metrics_.total_oauth_token_auth_success_ = metrics->AddCounter(
+          Substitute("$0.total-oauth-token-auth-success", server_name), 0);
+      http_metrics_.total_oauth_token_auth_failure_ = metrics->AddCounter(
+          Substitute("$0.total-oauth-token-auth-failure", server_name), 0);
+    }
   }
 }
 
 THttpServer::THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap,
     bool has_kerberos, bool has_saml, bool use_cookies, bool check_trusted_domain,
-    bool check_trusted_auth_header, bool has_jwt, bool metrics_enabled,
+    bool check_trusted_auth_header, bool has_jwt, bool has_oauth, bool metrics_enabled,
     HttpMetrics* http_metrics)
   : THttpTransport(move(transport)),
     has_ldap_(has_ldap),
@@ -115,6 +122,7 @@ THttpServer::THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap,
     check_trusted_domain_(check_trusted_domain),
     check_trusted_auth_header_(check_trusted_auth_header),
     has_jwt_(has_jwt),
+    has_oauth_(has_oauth),
     metrics_enabled_(metrics_enabled),
     http_metrics_(http_metrics) {}
 
@@ -167,7 +175,7 @@ void THttpServer::parseHeader(char* header) {
     contentLength_ = atoi(value);
   } else if (MatchesHeader(header, HEADER_X_FORWARDED_FOR, sz)) {
     origin_ = value;
-  } else if ((has_ldap_ || has_kerberos_ || has_saml_ || has_jwt_)
+  } else if ((has_ldap_ || has_kerberos_ || has_saml_ || has_jwt_ || has_oauth_)
       && MatchesHeader(header, HEADER_AUTHORIZATION, sz)) {
     auth_value_ = string(value);
   } else if (use_cookies_ && MatchesHeader(header, HEADER_COOKIE, sz)) {
@@ -278,7 +286,7 @@ void THttpServer::headersDone() {
   // Store the truncated value of the 'X-Forwarded-For' header in the Connection Context.
   callbacks_.set_http_origin_fn(origin);
 
-  if (!has_ldap_ && !has_kerberos_ && !has_saml_ && !has_jwt_) {
+  if (!has_ldap_ && !has_kerberos_ && !has_saml_ && !has_jwt_ && !has_oauth_) {
     // We don't need to authenticate.
     resetAuthState();
     return;
@@ -309,7 +317,7 @@ void THttpServer::headersDone() {
     }
   }
 
-  if (!authorized && has_jwt_ && !auth_value_.empty()
+  if (!authorized && (has_jwt_ || has_oauth_) && !auth_value_.empty()
       && auth_value_.find('.') != string::npos) {
     // Check Authorization header with the Bearer authentication scheme as:
     // Authorization: Bearer <token>
@@ -319,11 +327,21 @@ void THttpServer::headersDone() {
     string jwt_token;
     bool got_bearer_auth = TryStripPrefixString(auth_value_, "Bearer ", &jwt_token);
     if (got_bearer_auth) {
-      if (callbacks_.jwt_token_auth_fn(jwt_token)) {
+      if (has_jwt_ && callbacks_.jwt_token_auth_fn(jwt_token)) {
         authorized = true;
-        if (metrics_enabled_) http_metrics_->total_jwt_token_auth_success_->Increment(1);
-      } else {
-        if (metrics_enabled_) http_metrics_->total_jwt_token_auth_failure_->Increment(1);
+        if (metrics_enabled_)
+          http_metrics_->total_jwt_token_auth_success_->Increment(1);
+      }
+      if (!authorized && has_oauth_ && callbacks_.oauth_token_auth_fn(jwt_token)) {
+        authorized = true;
+        if (metrics_enabled_)
+          http_metrics_->total_oauth_token_auth_success_->Increment(1);
+      }
+      if (!authorized) {
+        if (has_jwt_ && metrics_enabled_)
+          http_metrics_->total_jwt_token_auth_failure_->Increment(1);
+        if (has_oauth_ && metrics_enabled_)
+          http_metrics_->total_oauth_token_auth_failure_->Increment(1);
       }
     }
   }

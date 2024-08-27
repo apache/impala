@@ -232,6 +232,10 @@ def get_option_parser(defaults):
                     action="store_true",
                     help="Use JWT to authenticate with Impala. Impala must be configured"
                     " to allow JWT authentication. \t\t")
+  parser.add_option("-a", "--oauth", dest="use_oauth",
+                    action="store_true",
+                    help="Use OAuth to authenticate with Impala. Impala must be"
+                    "configured to allow Oauth authentication. \t\t")
   parser.add_option("-u", "--user", dest="user",
                     help="User to authenticate with.")
   parser.add_option("--ssl", dest="ssl",
@@ -273,6 +277,8 @@ def get_option_parser(defaults):
                     help="Shell command to run to retrieve the LDAP password")
   parser.add_option("--jwt_cmd", dest="jwt_cmd",
                     help="Shell command to run to retrieve the JWT")
+  parser.add_option("--oauth_cmd", dest="oauth_cmd",
+                    help="Shell command to run to retrieve the Oauth Token")
   parser.add_option("--var", dest="keyval", action="append",
                     help="Defines a variable to be used within the Impala session."
                          " Can be used multiple times to set different variables."

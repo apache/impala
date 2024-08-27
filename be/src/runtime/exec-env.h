@@ -30,6 +30,8 @@
 #include "common/status.h"
 #include "runtime/client-cache-types.h"
 #include "testutil/gtest-util.h"
+#include "util/jwt-util-internal.h"
+#include "util/jwt-util.h"
 #include "util/hdfs-bulk-ops-defs.h" // For declaration of HdfsOpThreadPool
 #include "util/network-util.h"
 #include "util/spinlock.h"
@@ -101,6 +103,10 @@ class ExecEnv {
   /// the only instance. In test setups with multiple ExecEnv's per process,
   /// we return the most recently created instance.
   static ExecEnv* GetInstance() { return exec_env_; }
+
+  // Returns JWT and OAuth Helper instances.
+  JWTHelper* GetJWTHelperInstance() { return jwt_helper_; }
+  JWTHelper* GetOAuthHelperInstance() { return oauth_helper_; }
 
   /// Destructor - only used in backend tests that create new environment per test.
   ~ExecEnv();
@@ -291,6 +297,8 @@ class ExecEnv {
   FRIEND_TEST(HdfsUtilTest, CheckFilesystemsAndBucketsMatch);
 
   static ExecEnv* exec_env_;
+  JWTHelper* jwt_helper_;
+  JWTHelper* oauth_helper_;
   bool is_fe_tests_ = false;
 
   /// The network address that the backend KRPC service is listening on:

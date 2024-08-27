@@ -491,7 +491,9 @@ error_codes = (
 
   ("JDBC_CONFIGURATION_ERROR", 159, "Error in JDBC table configuration: $0."),
 
-  ("TUPLE_CACHE_INCONSISTENCY", 160, "Inconsistent tuple cache found: $0.")
+  ("TUPLE_CACHE_INCONSISTENCY", 160, "Inconsistent tuple cache found: $0."),
+
+  ("OAUTH_VERIFY_FAILED", 161, "Error verifying OAuth Token: $0.")
 )
 
 import sys

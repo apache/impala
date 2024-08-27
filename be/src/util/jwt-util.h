@@ -51,9 +51,6 @@ class JWTHelper {
   /// facilitate automatic reference counting.
   typedef std::unique_ptr<JWTDecodedToken, TokenDeleter> UniqueJWTDecodedToken;
 
-  /// Return the single instance.
-  static JWTHelper* GetInstance() { return jwt_helper_; }
-
   /// Load JWKS from a given local JSON file. Returns an error if problems were
   /// encountered.
   Status Init(const std::string& jwks_file_path);
@@ -82,9 +79,6 @@ class JWTHelper {
   std::shared_ptr<const JWKSSnapshot> GetJWKS() const;
 
  private:
-  /// Single instance.
-  static JWTHelper* jwt_helper_;
-
   /// Set it as TRUE when Init() is called.
   bool initialized_ = false;
 
