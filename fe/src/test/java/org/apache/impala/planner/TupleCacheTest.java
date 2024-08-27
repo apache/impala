@@ -65,6 +65,47 @@ public class TupleCacheTest extends PlannerTestBase {
         "select id from functional.alltypes where id = 2");
   }
 
+  @Test
+  public void testRuntimeFilterCacheKeys() {
+    String basicJoinTmpl = "select straight_join probe.id from functional.alltypes " +
+        "probe, functional.alltypestiny build where %s";
+    verifyIdenticalCacheKeys(
+        String.format(basicJoinTmpl, "probe.id = build.id"),
+        String.format(basicJoinTmpl, "probe.id = build.id"));
+    // Trivial rewrite produces same plan
+    verifyIdenticalCacheKeys(
+        String.format(basicJoinTmpl, "probe.id = build.id"),
+        String.format(basicJoinTmpl, "build.id = probe.id"));
+    // Larger join with same subquery. Cache keys match because cache is disabled when
+    // the build side is too complex.
+    verifyIdenticalCacheKeys(
+        String.format(basicJoinTmpl, "probe.id = build.id"),
+        "select straight_join p.id from functional.alltypes p, (" +
+        String.format(basicJoinTmpl, "probe.id = build.id") + ") b where p.id = b.id");
+    // Different filter slot
+    verifyOverlappingCacheKeys(
+        String.format(basicJoinTmpl, "probe.id = build.id"),
+        String.format(basicJoinTmpl, "probe.id + 1 = build.id"));
+    // Different target expression
+    verifyOverlappingCacheKeys(
+        String.format(basicJoinTmpl, "probe.id + 1 = build.id"),
+        String.format(basicJoinTmpl, "probe.id + 2 = build.id"));
+    // Larger join with similar subquery and simpler plan tree.
+    verifyOverlappingCacheKeys(
+        String.format(basicJoinTmpl, "probe.id = build.id"),
+        "select straight_join a.id from functional.alltypes a, functional.alltypes b, " +
+        "functional.alltypestiny c where a.id = b.id and b.id = c.id");
+    // Different build-side source table
+    verifyDifferentCacheKeys(
+        String.format(basicJoinTmpl, "probe.id = build.id"),
+        "select straight_join a.id from functional.alltypes a, functional.alltypes b " +
+        "where a.id = b.id");
+    // Different build-side predicates
+    verifyDifferentCacheKeys(
+        String.format(basicJoinTmpl, "probe.id = build.id"),
+        String.format(basicJoinTmpl, "probe.id = build.id and build.id < 100"));
+  }
+
   /**
    * Test cases that rely on masking out unnecessary data to have cache hits.
    */
@@ -86,6 +127,10 @@ public class TupleCacheTest extends PlannerTestBase {
     // Tuple caching not implemented for Kudu or HBase
     verifyCacheIneligible("select id from functional_kudu.alltypes");
     verifyCacheIneligible("select id from functional_hbase.alltypes");
+
+    // Runtime filter produced by Kudu table is not implemented
+    verifyCacheIneligible("select a.id from functional.alltypes a, " +
+        "functional_kudu.alltypes b where a.id = b.id");
 
     // TODO: Random functions should make a location ineligible
     // rand()/random()/uuid()
@@ -149,6 +194,17 @@ public class TupleCacheTest extends PlannerTestBase {
         "where probe1.id = probe2.id and probe2.id = build.id",
         "select straight_join probe1.id from functional.alltypes probe1, " +
         "functional.alltypes build where probe1.id = build.id");
+
+    // This query has a tuple cache location for the build-side scan that feeds into the
+    // join on the build side. If we add a bunch of additional filters on the probe side
+    // table, that changes the slot ids, but we should still get identical keys for the
+    // build-side caching location.
+    verifyOverlappingCacheKeys(
+        "select straight_join probe.id from functional.alltypes probe, (select " +
+        "build1.id from functional.alltypes build1) build where probe.id = build.id",
+        "select straight_join probe.id from functional.alltypes probe, (select " +
+        "build1.id from functional.alltypes build1) build where probe.id = build.id " +
+        "and probe.bool_col = true and probe.int_col = 100");
   }
 
   @Test
@@ -278,6 +334,14 @@ public class TupleCacheTest extends PlannerTestBase {
     if (keyIntersection.size() == 0 || hashTraceIntersection.size() == 0) {
       StringBuilder errorLog = new StringBuilder();
       errorLog.append("Expected overlapping cache keys. Instead found:\n");
+      printQueryCacheEligibleNodes(query1, cacheEligibleNodes1, errorLog);
+      printQueryCacheEligibleNodes(query2, cacheEligibleNodes2, errorLog);
+      fail(errorLog.toString());
+    }
+
+    if (cacheKeys1.equals(cacheKeys2) || cacheHashTraces1.equals(cacheHashTraces2)) {
+      StringBuilder errorLog = new StringBuilder();
+      errorLog.append("Expected some cache keys to differ. Instead found:\n");
       printQueryCacheEligibleNodes(query1, cacheEligibleNodes1, errorLog);
       printQueryCacheEligibleNodes(query2, cacheEligibleNodes2, errorLog);
       fail(errorLog.toString());

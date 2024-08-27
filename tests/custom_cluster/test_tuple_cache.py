@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 
 import pytest
 import random
+import re
 import string
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -27,6 +28,11 @@ from tests.common.test_dimensions import (
 
 TABLE_LAYOUT = 'name STRING, age INT, address STRING'
 CACHE_START_ARGS = "--tuple_cache_dir=/tmp --log_level=2"
+NUM_HITS = 'NumTupleCacheHits'
+NUM_HALTED = 'NumTupleCacheHalted'
+NUM_SKIPPED = 'NumTupleCacheSkipped'
+# Indenation used for TUPLE_CACHE_NODE in specific fragments (not averaged fragment).
+NODE_INDENT = '           - '
 
 
 # Generates a random table entry of at least 15 bytes.
@@ -39,19 +45,40 @@ def table_value(seed):
   return '"{0}", {1}, "{2}"'.format(name, age, address)
 
 
-def assertCounters(profile, num_hits, num_halted, num_skipped):
-  assert "NumTupleCacheHits: {0} ".format(num_hits) in profile
-  assert "NumTupleCacheHalted: {0} ".format(num_halted) in profile
-  assert "NumTupleCacheSkipped: {0} ".format(num_skipped) in profile
+def assertCounter(profile, key, val, num_matches):
+  if not isinstance(num_matches, list):
+    num_matches = [num_matches]
+  assert profile.count("{0}{1}: {2} ".format(NODE_INDENT, key, val)) in num_matches, \
+      re.findall(r"{0}{1}: .*".format(NODE_INDENT, key), profile)
+
+
+def assertCounters(profile, num_hits, num_halted, num_skipped, num_matches=1):
+  assertCounter(profile, NUM_HITS, num_hits, num_matches)
+  assertCounter(profile, NUM_HALTED, num_halted, num_matches)
+  assertCounter(profile, NUM_SKIPPED, num_skipped, num_matches)
 
 
 def get_cache_keys(profile):
-  cache_keys = []
+  cache_keys = {}
+  last_node_id = -1
+  matcher = re.compile(r'TUPLE_CACHE_NODE \(id=([0-9]*)\)')
   for line in profile.splitlines():
     if "Combined Key:" in line:
       key = line.split(":")[1].strip()
-      cache_keys.append(key)
-  return cache_keys
+      cache_keys[last_node_id].append(key)
+      continue
+
+    match = matcher.search(line)
+    if match:
+      last_node_id = int(match.group(1))
+      if last_node_id not in cache_keys:
+        cache_keys[last_node_id] = []
+
+  # Sort cache keys: with multiple nodes, order in the profile may change.
+  for _, val in cache_keys.items():
+    val.sort()
+
+  return next(iter(cache_keys.values())) if len(cache_keys) == 1 else cache_keys
 
 
 def assert_deterministic_scan(vector, profile):
@@ -204,6 +231,142 @@ class TestTupleCache(TestTupleCacheBase):
       hit_error = True
 
     assert hit_error
+
+  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
+  @pytest.mark.execute_serially
+  def test_runtime_filters(self, vector, unique_database):
+    """
+    This tests that adding files to a table results in different runtime filter keys.
+    """
+    self.client.set_configuration(vector.get_value('exec_option'))
+    fq_table = "{0}.runtime_filters".format(unique_database)
+    # A query containing multiple runtime filters
+    # - scan of A receives runtime filters from B and C, so it depends on contents of B/C
+    # - scan of B receives runtime filter from C, so it depends on contents of C
+    query = "select straight_join a.id from functional.alltypes a, functional.alltypes" \
+        " b, {0} c where a.id = b.id and a.id = c.age order by a.id".format(fq_table)
+    query_a_id = 10
+    query_b_id = 11
+    query_c_id = 12
+
+    # Create an empty table
+    self.create_table(fq_table, scale=0)
+
+    # Establish a baseline
+    empty_result = self.execute_query(query)
+    empty_cache_keys = get_cache_keys(empty_result.runtime_profile)
+    # Tables a and b have multiple files, so they are distributed across all 3 nodes.
+    # Table c has one file, so it has a single entry.
+    assert len(empty_cache_keys) == 3
+    assert len(empty_cache_keys[query_c_id]) == 1
+    empty_c_compile_key, empty_c_finst_key = empty_cache_keys[query_c_id][0].split("_")
+    assert empty_c_finst_key == "0"
+    assert len(empty_result.data) == 0
+
+    # Insert a row, which creates a file / scan range
+    self.execute_query("INSERT INTO {0} VALUES ({1})".format(fq_table, table_value(0)))
+
+    # Now, there is a scan range, so the fragment instance key should be non-zero.
+    one_file_result = self.execute_query(query)
+    one_cache_keys = get_cache_keys(one_file_result.runtime_profile)
+    assert len(one_cache_keys) == 3
+    assert len(empty_cache_keys[query_c_id]) == 1
+    one_c_compile_key, one_c_finst_key = one_cache_keys[query_c_id][0].split("_")
+    assert one_c_finst_key != "0"
+    # This should be a cache miss
+    assertCounters(one_file_result.runtime_profile, 0, 0, 0, 7)
+    assert len(one_file_result.data) == 1
+
+    # The new scan range did not change the compile-time key, but did change the runtime
+    # filter keys.
+    for id in [query_a_id, query_b_id]:
+      assert len(empty_cache_keys[id]) == len(one_cache_keys[id])
+      for empty, one in zip(empty_cache_keys[id], one_cache_keys[id]):
+        assert empty != one
+    assert empty_c_compile_key == one_c_compile_key
+
+    # Insert another row, which creates a file / scan range
+    self.execute_query("INSERT INTO {0} VALUES ({1})".format(fq_table, table_value(1)))
+
+    # There is a second scan range, so the fragment instance key should change again
+    two_files_result = self.execute_query(query)
+    two_cache_keys = get_cache_keys(two_files_result.runtime_profile)
+    assert len(two_cache_keys) == 3
+    assert len(two_cache_keys[query_c_id]) == 2
+    two_c1_compile_key, two_c1_finst_key = two_cache_keys[query_c_id][0].split("_")
+    two_c2_compile_key, two_c2_finst_key = two_cache_keys[query_c_id][1].split("_")
+    assert two_c1_finst_key != "0"
+    assert two_c2_finst_key != "0"
+    # There may be a cache hit for the prior "c" scan range (if scheduled to the same
+    # instance), and the rest cache misses.
+    assertCounter(two_files_result.runtime_profile, NUM_HITS, 0, num_matches=[7, 8])
+    assertCounter(two_files_result.runtime_profile, NUM_HITS, 1, num_matches=[0, 1])
+    assertCounter(two_files_result.runtime_profile, NUM_HALTED, 0, num_matches=8)
+    assertCounter(two_files_result.runtime_profile, NUM_SKIPPED, 0, num_matches=8)
+    assert len(two_files_result.data) == 2
+    # Ordering can vary by environment. Ensure one matches and one differs.
+    assert one_c_finst_key == two_c1_finst_key or one_c_finst_key == two_c2_finst_key
+    assert one_c_finst_key != two_c1_finst_key or one_c_finst_key != two_c2_finst_key
+    overlapping_rows = set(one_file_result.data).intersection(set(two_files_result.data))
+    assert len(overlapping_rows) == 1
+
+    # The new scan range did not change the compile-time key, but did change the runtime
+    # filter keys.
+    for id in [query_a_id, query_b_id]:
+      assert len(empty_cache_keys[id]) == len(one_cache_keys[id])
+      for empty, one in zip(empty_cache_keys[id], one_cache_keys[id]):
+        assert empty != one
+    assert one_c_compile_key == two_c1_compile_key
+    assert one_c_compile_key == two_c2_compile_key
+
+    # Invalidate metadata and rerun the last query. The keys should stay the same.
+    self.execute_query("invalidate metadata")
+    rerun_two_files_result = self.execute_query(query)
+    # Verify that this is a cache hit
+    assertCounters(rerun_two_files_result.runtime_profile, 1, 0, 0, num_matches=8)
+    rerun_cache_keys = get_cache_keys(rerun_two_files_result.runtime_profile)
+    assert rerun_cache_keys == two_cache_keys
+    assert rerun_two_files_result.data == two_files_result.data
+
+  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
+  @pytest.mark.execute_serially
+  def test_runtime_filter_reload(self, vector, unique_database):
+    """
+    This tests that reloading files to a table results in matching runtime filter keys.
+    """
+    self.client.set_configuration(vector.get_value('exec_option'))
+    fq_table = "{0}.runtime_filter_genspec".format(unique_database)
+    # Query where fq_table generates a runtime filter.
+    query = "select straight_join a.id from functional.alltypes a, {0} b " \
+        "where a.id = b.age order by a.id".format(fq_table)
+
+    # Create a partitioned table with 3 partitions
+    self.execute_query("CREATE EXTERNAL TABLE {0} (name STRING) "
+                       "PARTITIONED BY (age INT)".format(fq_table))
+    self.execute_query(
+        "INSERT INTO {0} PARTITION(age=4) VALUES (\"Vanessa\")".format(fq_table))
+    self.execute_query(
+        "INSERT INTO {0} PARTITION(age=5) VALUES (\"Carl\")".format(fq_table))
+    self.execute_query(
+        "INSERT INTO {0} PARTITION(age=6) VALUES (\"Cleopatra\")".format(fq_table))
+
+    # Prime the cache
+    base_result = self.execute_query(query)
+    base_cache_keys = get_cache_keys(base_result.runtime_profile)
+    assert len(base_cache_keys) == 2
+
+    # Drop and reload the table
+    self.execute_query("DROP TABLE {0}".format(fq_table))
+    self.execute_query("CREATE EXTERNAL TABLE {0} (name STRING, address STRING) "
+                       "PARTITIONED BY (age INT)".format(fq_table))
+    self.execute_query("ALTER TABLE {0} RECOVER PARTITIONS".format(fq_table))
+
+    # Verify we reuse the cache
+    reload_result = self.execute_query(query)
+    reload_cache_keys = get_cache_keys(reload_result.runtime_profile)
+    assert base_result.data == reload_result.data
+    assert base_cache_keys == reload_cache_keys
+    # Skips verifying cache hits as fragments may not be assigned to the same nodes.
 
 
 class TestTupleCacheRuntimeKeysBasic(TestTupleCacheBase):

@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
@@ -90,7 +91,8 @@ public class JoinBuildSink extends DataSink {
       tBuildSink.setHash_seed(joinNode_.getFragment().getHashSeed());
     }
     for (RuntimeFilter filter : runtimeFilters_) {
-      tBuildSink.addToRuntime_filters(filter.toThrift());
+      tBuildSink.addToRuntime_filters(
+          filter.toThrift(new ThriftSerializationCtx(), null));
     }
     tBuildSink.setShare_build(joinNode_.canShareBuild());
     tsink.setJoin_build_sink(tBuildSink);

@@ -33,6 +33,10 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ThriftSerializationCtx;
+import org.apache.impala.thrift.TFileSplitGeneratorSpec;
+import org.apache.impala.thrift.TScanRange;
+import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TSlotDescriptor;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTupleDescriptor;
@@ -176,13 +180,77 @@ public class TupleCacheInfo {
    * Pull in a child's TupleCacheInfo into this TupleCacheInfo. If the child is
    * ineligible, then this is marked ineligible and there is no need to calculate
    * a hash. If the child is eligible, it incorporates the child's hash into this
-   * hash.
+   * hash. Returns true if the child was merged, false if it was ineligible.
    */
-  public void mergeChild(TupleCacheInfo child) {
+  public boolean mergeChild(TupleCacheInfo child) {
+    if (!mergeChildImpl(child)) {
+      return false;
+    }
+
+    // Merge the child's inputScanNodes_
+    inputScanNodes_.addAll(child.inputScanNodes_);
+    return true;
+  }
+
+  /**
+   * Pull in a child's TupleCacheInfo into this TupleCacheInfo. If the child is
+   * ineligible, then this is marked ineligible and there is no need to calculate
+   * a hash. If the child is eligible, it incorporates the child's hash into this
+   * hash. Returns true if the child was merged, false if it was ineligible.
+   *
+   * Resolves scan ranges statically for cases where results depend on all scan ranges.
+   */
+  public boolean mergeChildWithScans(TupleCacheInfo child) {
+    if (!mergeChildImpl(child)) {
+      return false;
+    }
+
+    // Add all scan range specs to the hash. Copy only the relevant fields, primarily:
+    // filename, mtime, size, and offset. Others like partition_id may change after
+    // reloading metadata.
+    for (HdfsScanNode scanNode: child.inputScanNodes_) {
+      TScanRangeSpec orig = scanNode.getScanRangeSpecs();
+      TScanRangeSpec spec = new TScanRangeSpec();
+      if (orig.isSetConcrete_ranges()) {
+        for (TScanRangeLocationList origLocList: orig.concrete_ranges) {
+          // We only need the TScanRange, which provides the file segment info.
+          TScanRangeLocationList locList = new TScanRangeLocationList();
+          TScanRange scanRange = origLocList.scan_range.deepCopy();
+          if (scanRange.isSetHdfs_file_split()) {
+            // Zero out partition_id, it's not stable.
+            scanRange.hdfs_file_split.partition_id = 0;
+          }
+          locList.setScan_range(scanRange);
+          spec.addToConcrete_ranges(locList);
+        }
+        // Reloaded partitions may have a different order. Sort for stability.
+        spec.concrete_ranges.sort(null);
+      }
+      if (orig.isSetSplit_specs()) {
+        for (TFileSplitGeneratorSpec origSplitSpec: orig.split_specs) {
+          TFileSplitGeneratorSpec splitSpec = origSplitSpec.deepCopy();
+          // Zero out partition_id, it's not stable.
+          splitSpec.partition_id = 0;
+          spec.addToSplit_specs(splitSpec);
+        }
+        // Reloaded partitions may have a different order. Sort for stability.
+        spec.split_specs.sort(null);
+      }
+      hashThrift(spec);
+    }
+    return true;
+  }
+
+  /**
+   * Pull in a child's TupleCacheInfo that can be exhaustively determined during planning.
+   * Public interfaces may add additional info that is more dynamic, such as scan ranges.
+   */
+  private boolean mergeChildImpl(TupleCacheInfo child) {
     Preconditions.checkState(!finalized_,
         "TupleCacheInfo is finalized and can't be modified");
     if (!child.isEligible()) {
       ineligibilityReasons_.add(IneligibilityReason.CHILDREN_INELIGIBLE);
+      return false;
     } else {
       // The child is eligible, so incorporate its hash into our hasher.
       hasher_.putBytes(child.getHashString().getBytes());
@@ -192,9 +260,6 @@ public class TupleCacheInfo {
       // and each contribution would be clear.
       hashTraceBuilder_.append(child.getHashTrace());
 
-      // Merge the child's inputScanNodes_
-      inputScanNodes_.addAll(child.inputScanNodes_);
-
       // Incorporate the child's tuple references. This is creating a new translation
       // of TupleIds, because it will be incorporating multiple children.
       for (TupleId id : child.tupleTranslationMap_.keySet()) {
@@ -203,6 +268,7 @@ public class TupleCacheInfo {
         // id translation maps.
         registerTupleHelper(id, false);
       }
+      return true;
     }
   }
 

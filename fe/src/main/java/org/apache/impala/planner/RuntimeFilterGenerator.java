@@ -58,6 +58,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.JoinNode.EqJoinConjunctScanSlots;
 import org.apache.impala.service.BackendConfig;
@@ -285,14 +286,19 @@ public final class RuntimeFilterGenerator {
         this.highValue = highValue;
       }
 
-      public TRuntimeFilterTargetDesc toThrift() {
+      public TRuntimeFilterTargetDesc toThrift(ThriftSerializationCtx serialCtx) {
         TRuntimeFilterTargetDesc tFilterTarget = new TRuntimeFilterTargetDesc();
-        tFilterTarget.setNode_id(node.getId().asInt());
-        tFilterTarget.setTarget_expr(expr.treeToThrift());
+        if (serialCtx.isTupleCache()) {
+          // Target PlanNodeId is global and not useful for tuple caching.
+          tFilterTarget.setNode_id(0);
+        } else {
+          tFilterTarget.setNode_id(node.getId().asInt());
+        }
+        tFilterTarget.setTarget_expr(expr.treeToThrift(serialCtx));
         List<SlotId> sids = new ArrayList<>();
         expr.getIds(null, sids);
         List<Integer> tSlotIds = Lists.newArrayListWithCapacity(sids.size());
-        for (SlotId sid: sids) tSlotIds.add(sid.asInt());
+        for (SlotId sid: sids) tSlotIds.add(serialCtx.translateSlotId(sid).asInt());
         tFilterTarget.setTarget_expr_slotids(tSlotIds);
         tFilterTarget.setIs_bound_by_partition_columns(isBoundByPartitionColumns);
         tFilterTarget.setIs_local_target(isLocalTarget);
@@ -373,23 +379,45 @@ public final class RuntimeFilterGenerator {
     /**
      * Serializes a runtime filter to Thrift.
      */
-    public TRuntimeFilterDesc toThrift() {
+    public TRuntimeFilterDesc toThrift(ThriftSerializationCtx serialCtx,
+        PlanNode cacheTarget) {
       TRuntimeFilterDesc tFilter = new TRuntimeFilterDesc();
-      tFilter.setFilter_id(id_.asInt());
-      tFilter.setSrc_expr(srcExpr_.treeToThrift());
-      tFilter.setSrc_node_id(src_.getId().asInt());
+      // Omit properties that don't affect tuple caching.
+      if (serialCtx.isTupleCache()) {
+        // Required property; RuntimeFilterId is irrelevant to tuple cache results.
+        tFilter.setFilter_id(0);
+        // The target plan is already serialized as part of the calling context. targets_
+        // may reference multiple target nodes; the others are irrelevent for tuple
+        // caching.
+        tFilter.setTargets(new ArrayList<>());
+        // Target PlanNodeId is global and not useful for tuple caching.
+        tFilter.setPlanid_to_target_ndx(new HashMap<>());
+        // Incorporate the source plan TRuntimeFilterTargetDesc. targets_ may include
+        // other targets that are not relevant to the PlanNode we're caching.
+        for (RuntimeFilterTarget target: targets_) {
+          if (target.node == cacheTarget) {
+            tFilter.addToTargets(target.toThrift(serialCtx));
+            break;
+          }
+        }
+      } else {
+        tFilter.setFilter_id(id_.asInt());
+        tFilter.setSrc_node_id(src_.getId().asInt());
+        tFilter.setNdv_estimate(ndvEstimate_);
+        for (int i = 0; i < targets_.size(); ++i) {
+          RuntimeFilterTarget target = targets_.get(i);
+          tFilter.addToTargets(target.toThrift(serialCtx));
+          tFilter.putToPlanid_to_target_ndx(target.node.getId().asInt(), i);
+        }
+      }
+      tFilter.setSrc_expr(srcExpr_.treeToThrift(serialCtx));
       tFilter.setIs_broadcast_join(isBroadcastJoin_);
-      tFilter.setNdv_estimate(ndvEstimate_);
       tFilter.setHas_local_targets(hasLocalTargets_);
       tFilter.setHas_remote_targets(hasRemoteTargets_);
       tFilter.setCompareOp(exprCmpOp_.getThriftOp());
       boolean appliedOnPartitionColumns = true;
-      for (int i = 0; i < targets_.size(); ++i) {
-        RuntimeFilterTarget target = targets_.get(i);
-        tFilter.addToTargets(target.toThrift());
-        tFilter.putToPlanid_to_target_ndx(target.node.getId().asInt(), i);
-        appliedOnPartitionColumns =
-            appliedOnPartitionColumns && target.isBoundByPartitionColumns;
+      for (RuntimeFilterTarget target: targets_) {
+        appliedOnPartitionColumns &= target.isBoundByPartitionColumns;
       }
       tFilter.setApplied_on_partition_columns(appliedOnPartitionColumns);
       tFilter.setType(type_);
@@ -664,7 +692,7 @@ public final class RuntimeFilterGenerator {
     public long getFilterSize() { return filterSizeBytes_; }
     public boolean isTimestampTruncation() { return isTimestampTruncation_; }
     public boolean isBroadcast() { return isBroadcastJoin_; }
-    public PlanNode getSrc() { return src_; }
+    public JoinNode getSrc() { return src_; }
 
     private long getBuildKeyNumRowStats() {
       long minNumRows = src_.getChild(1).getCardinality();

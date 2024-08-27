@@ -546,7 +546,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
     // Serialize any runtime filters
     for (RuntimeFilter filter : runtimeFilters_) {
-      msg.addToRuntime_filters(filter.toThrift());
+      msg.addToRuntime_filters(filter.toThrift(serialCtx, this));
     }
     msg.setDisable_codegen(disableCodegen_);
     msg.pipelines = new ArrayList<>();
@@ -1324,15 +1324,25 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * the key if the node is eligible to avoid overhead.
    */
   public void computeTupleCacheInfo(DescriptorTable descTbl) {
+    if (tupleCacheInfo_ != null) {
+      // Already computed.
+      LOG.trace("Tuple cache found for {}", this);
+      return;
+    }
+
+    LOG.trace("Computing tuple cache info for {}", this);
     tupleCacheInfo_ = new TupleCacheInfo(descTbl);
     // computing the tuple cache information is a bottom-up tree traversal,
     // so visit and merge the children before processing this node's contents
-    for (int i = 0; i < getChildCount(); i++) {
-      getChild(i).computeTupleCacheInfo(descTbl);
-      tupleCacheInfo_.mergeChild(getChild(i).getTupleCacheInfo());
+    for (PlanNode child : getChildren()) {
+      child.computeTupleCacheInfo(descTbl);
+      if (!tupleCacheInfo_.mergeChild(child.getTupleCacheInfo())) {
+        LOG.trace("{} ineligible for caching due to {}", this, child);
+      }
     }
 
     if (!isTupleCachingImplemented()) {
+      LOG.trace("{} is ineligible for caching", this);
       tupleCacheInfo_.setIneligible(TupleCacheInfo.IneligibilityReason.NOT_IMPLEMENTED);
     }
 
@@ -1340,6 +1350,29 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     if (!tupleCacheInfo_.isEligible()) {
       tupleCacheInfo_.finalizeHash();
       return;
+    }
+
+    // Include the build-side of a RuntimeFilter; look past the 1st ExchangeNode.
+    // If the build-side is hashable, merge the hash. Otherwise mark this node as
+    // ineligible because the RuntimeFilter is too complex to reason about.
+    for (RuntimeFilter filter : runtimeFilters_) {
+      // We want the build side of the join.
+      PlanNode build = filter.getSrc().getBuildNode();
+      Preconditions.checkState(!build.contains(this),
+          "Build-side contains current node, so cache info cannot be initialized");
+
+      if (build instanceof ExchangeNode && build.getChildCount() == 1) {
+        // We only look past ExchangeNodes with 1 child. IcebergDeleteNode has 2.
+        build = build.getChild(0);
+      }
+
+      // Build may not have been visited yet.
+      build.computeTupleCacheInfo(descTbl);
+      if (!tupleCacheInfo_.mergeChildWithScans(build.getTupleCacheInfo())) {
+        LOG.trace("{} on {} ineligible for caching due to {}", filter, this, build);
+        tupleCacheInfo_.finalizeHash();
+        return;
+      }
     }
 
     // Incorporate this node's information
@@ -1351,6 +1384,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     toThrift(msg, serialCtx);
     tupleCacheInfo_.hashThrift(msg);
     tupleCacheInfo_.finalizeHash();
+    LOG.trace("Hash for {}: {}", this, tupleCacheInfo_.getHashTrace());
   }
 
   /**

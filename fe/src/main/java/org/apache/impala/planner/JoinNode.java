@@ -1016,6 +1016,11 @@ public abstract class JoinNode extends PlanNode {
     }
   }
 
+  public PlanNode getBuildNode() {
+    Preconditions.checkState(getChildCount() == 2);
+    return getChild(1);
+  }
+
   /**
    * Helper method to compute the resource requirements for the join that can be
    * called from the builder or the join node. Returns a pair of the probe
