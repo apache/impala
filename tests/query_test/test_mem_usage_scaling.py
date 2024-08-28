@@ -31,7 +31,9 @@ from tests.common.skip import (
   SkipIfFS,
   SkipIf,
   SkipIfDockerizedCluster)
-from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.test_dimensions import (
+    add_exec_option_dimension,
+    create_single_exec_option_dimension)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -40,6 +42,7 @@ MEM_LIMIT_EXCEEDED_MSG = "Memory limit exceeded"
 MEM_LIMIT_TOO_LOW_FOR_RESERVATION = ("minimum memory reservation is greater than memory "
   "available to the query for buffer reservations")
 MEM_LIMIT_ERROR_MSGS = [MEM_LIMIT_EXCEEDED_MSG, MEM_LIMIT_TOO_LOW_FOR_RESERVATION]
+
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestQueryMemLimitScaling(ImpalaTestSuite):
@@ -61,20 +64,16 @@ class TestQueryMemLimitScaling(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestQueryMemLimitScaling, cls).add_test_dimensions()
     # add mem_limit as a test dimension.
-    new_dimension = ImpalaTestDimension('mem_limit',
-                                        *TestQueryMemLimitScaling.MEM_LIMITS)
-    cls.ImpalaTestMatrix.add_dimension(new_dimension)
+    add_exec_option_dimension(cls, 'mem_limit', TestQueryMemLimitScaling.MEM_LIMITS)
     if cls.exploration_strategy() != 'exhaustive':
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format in ['parquet'])
 
   # Test running with different mem limits to exercise the dynamic memory
   # scaling functionality.
   def test_mem_usage_scaling(self, vector):
-    mem_limit = copy(vector.get_value('mem_limit'))
     table_format = vector.get_value('table_format')
     exec_options = copy(vector.get_value('exec_option'))
-    exec_options['mem_limit'] = mem_limit
     for query in self.QUERY:
       self.execute_query(query, exec_options, table_format=table_format)
 
@@ -91,7 +90,7 @@ class TestExprMemUsage(ImpalaTestSuite):
     super(TestExprMemUsage, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     if cls.exploration_strategy() != 'exhaustive':
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format in ['parquet'])
 
   def test_scanner_mem_usage(self, vector):
@@ -102,11 +101,13 @@ class TestExprMemUsage(ImpalaTestSuite):
       "select count(*) from lineitem where lower(l_comment) = 'hello'", exec_options,
       table_format=vector.get_value('table_format'))
 
+
 class TestLowMemoryLimits(ImpalaTestSuite):
   '''Super class for the memory limit tests with the TPC-H and TPC-DS queries'''
 
   def low_memory_limit_test(self, vector, tpch_query, limit):
-    mem = vector.get_value('mem_limit')
+    # 'test_mem_limit' dimension is defined by subclasses of TestLowMemoryLimits.
+    mem = vector.get_value('test_mem_limit')
     # Mem consumption can be +-30MBs, depending on how many scanner threads are
     # running. Adding this extra mem in order to reduce false negatives in the tests.
     limit = limit + 30
@@ -155,9 +156,9 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
     super(TestTpchMemLimitError, cls).add_test_dimensions()
 
     cls.ImpalaTestMatrix.add_dimension(
-      ImpalaTestDimension('mem_limit', *TestTpchMemLimitError.MEM_IN_MB))
+      ImpalaTestDimension('test_mem_limit', *TestTpchMemLimitError.MEM_IN_MB))
 
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_low_mem_limit_q1(self, vector):
@@ -247,8 +248,8 @@ class TestTpchPrimitivesMemLimitError(TestLowMemoryLimits):
 
   # Different values of mem limits and minimum mem limit (in MBs) each query is expected
   # to run without problem. Determined by manual binary search.
-  MIN_MEM = { 'primitive_broadcast_join_3': 115, 'primitive_groupby_bigint_highndv': 110,
-              'primitive_orderby_all': 120}
+  MIN_MEM = {'primitive_broadcast_join_3': 115, 'primitive_groupby_bigint_highndv': 110,
+      'primitive_orderby_all': 120}
 
   @classmethod
   def get_workload(self):
@@ -261,9 +262,9 @@ class TestTpchPrimitivesMemLimitError(TestLowMemoryLimits):
     super(TestTpchPrimitivesMemLimitError, cls).add_test_dimensions()
 
     cls.ImpalaTestMatrix.add_dimension(
-      ImpalaTestDimension('mem_limit', *cls.MEM_IN_MB))
+      ImpalaTestDimension('test_mem_limit', *cls.MEM_IN_MB))
 
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
 
   def run_primitive_query(self, vector, query_name):
@@ -289,7 +290,7 @@ class TestTpcdsMemLimitError(TestLowMemoryLimits):
 
   # Different values of mem limits and minimum mem limit (in MBs) each query is expected
   # to run without problem. Those values were determined by manual testing.
-  MIN_MEM_FOR_TPCDS = { 'q53' : 116}
+  MIN_MEM_FOR_TPCDS = {'q53': 116}
 
   @classmethod
   def get_workload(self):
@@ -302,9 +303,9 @@ class TestTpcdsMemLimitError(TestLowMemoryLimits):
     super(TestTpcdsMemLimitError, cls).add_test_dimensions()
 
     cls.ImpalaTestMatrix.add_dimension(
-      ImpalaTestDimension('mem_limit', *TestTpcdsMemLimitError.MEM_IN_MB))
+      ImpalaTestDimension('test_mem_limit', *TestTpcdsMemLimitError.MEM_IN_MB))
 
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_low_mem_limit_q53(self, vector):

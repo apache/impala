@@ -24,7 +24,7 @@ from multiprocessing import Value
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_dimensions import create_exec_option_dimension
 from tests.stress.stress_util import run_tasks, Task
 from tests.util.filesystem_utils import IS_HDFS
 
@@ -45,13 +45,11 @@ class TestIcebergV2UpdateStress(ImpalaTestSuite):
     super(TestIcebergV2UpdateStress, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
-    if cls.exploration_strategy() == 'core':
-      cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('batch_size', *TestIcebergV2UpdateStress.BATCH_SIZES))
-    else:
-      cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('batch_size',
-            *TestIcebergV2UpdateStress.EXHAUSTIVE_BATCH_SIZES))
+    batch_sizes = (TestIcebergV2UpdateStress.BATCH_SIZES
+        if cls.exploration_strategy() == 'core'
+        else TestIcebergV2UpdateStress.EXHAUSTIVE_BATCH_SIZES)
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+      batch_sizes=batch_sizes))
 
   def test_update_stress(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-update-stress', vector,

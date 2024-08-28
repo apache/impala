@@ -1376,7 +1376,7 @@ class ImpalaTestSuite(BaseTestSuite):
         LOG.warn("Exec option {} declared as independent dimension but not inserted "
                  "into {} dimension.".format(name, EXEC_OPTION_KEY))
       elif vector.get_value(name) != exec_option[name]:
-        LOG.warn("{}[{}]={} does not match against dimension {}={}.".format(
+        pytest.fail("{}[{}]={} does not match against dimension {}={}.".format(
           EXEC_OPTION_KEY, name, exec_option[name], name, vector.get_value(name)))
 
   @staticmethod
