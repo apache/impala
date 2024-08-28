@@ -520,7 +520,7 @@ def get_hadoop_downloads():
     hbase = ApacheComponent("hbase",
                             component_path_tmpl="${name}/${version}/",
                             archive_basename_tmpl="${name}-${version}-hadoop3-bin",
-                            unpack_directory_tmpl="${name}-${version}")
+                            unpack_directory_tmpl="${name}-${version}-hadoop3")
   else:
     hbase = CdpComponent("hbase",
                          archive_basename_tmpl="hbase-${version}-bin",
