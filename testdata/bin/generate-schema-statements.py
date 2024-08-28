@@ -269,11 +269,22 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
             ("Cannot convert STORED BY ICEBERG STORED AS file_format with TBLPROPERTIES "
              "also in the statement:\n" + stmt)
         iceberg_file_format = re.search(r"STORED AS (\w+)", stmt).group(1)
-        stmt = re.sub(r"STORED BY ICEBERG\s+STORED AS \w+",
-                      ("STORED BY 'org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'"
-                       " TBLPROPERTIES('write.format.default'='{}')").format(
-                            iceberg_file_format),
-                      stmt)
+        # TBLPROPERTIES should be put after LOCATION
+        if "LOCATION" not in stmt:
+          stmt = re.sub(
+              r"STORED BY ICEBERG\s+STORED AS \w+",
+              ("STORED BY 'org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'"
+               " TBLPROPERTIES('write.format.default'='{}')").format(iceberg_file_format),
+              stmt)
+        else:
+          stmt = re.sub(
+              r"STORED BY ICEBERG\s+STORED AS \w+",
+              "STORED BY 'org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'",
+              stmt)
+          loc_clause = re.search(r"LOCATION ['\"][^\s]+['\"]", stmt).group(0)
+          stmt = stmt.replace(loc_clause,
+                              loc_clause + " TBLPROPERTIES('write.format.default'='{}')"
+                              .format(iceberg_file_format))
   create_stmt += stmt
   return create_stmt
 
