@@ -175,8 +175,9 @@ class TestTPCHJoinQueries(TestJoinBase):
     cls.client.execute('set mem_limit = 0')
     super(TestTPCHJoinQueries, cls).teardown_class()
 
-  def test_outer_joins(self, vector):
-    self.run_test_case('tpch-outer-joins', vector)
+  def test_outer_joins(self, vector, unique_database):
+    self.run_test_case('tpch-outer-joins', vector,
+        test_file_vars={'$UNIQUE_DB': unique_database})
 
 
 class TestSemiJoinQueries(TestJoinBase):

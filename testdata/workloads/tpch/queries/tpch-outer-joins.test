@@ -63,20 +63,20 @@ BIGINT
 # Regression test for IMPALA-9338. The following query uses reserved key as columns,
 # and duplicates the same condition with different letter cases, should provide a
 # correct plan after the fix.
-drop table if exists default.t1;
-drop table if exists default.t2;
-create table default.t1(`insert` bigint);
-create table default.t2(`select` bigint);
-insert into default.t1(`insert`)
+drop table if exists $UNIQUE_DB.t1;
+drop table if exists $UNIQUE_DB.t2;
+create table $UNIQUE_DB.t1(`insert` bigint);
+create table $UNIQUE_DB.t2(`select` bigint);
+insert into $UNIQUE_DB.t1(`insert`)
 select c_custkey
 from tpch_parquet.customer
 limit 100;
-insert into default.t2(`select`)
+insert into $UNIQUE_DB.t2(`select`)
 select o_custkey
 from tpch_parquet.orders
 limit 100000;
-explain select * from default.t1 b
-left join default.t2 a
+explain select * from $UNIQUE_DB.t1 b
+left join $UNIQUE_DB.t2 a
 ON b.`insert` = a.`select`
 AND a.`SELECT` = b.`INSERT`;
 ---- RESULTS: VERIFY_IS_SUBSET
@@ -84,7 +84,7 @@ AND a.`SELECT` = b.`INSERT`;
 '05:EXCHANGE [UNPARTITIONED]'
 '02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]'
 '|--04:EXCHANGE [HASH(b.`INSERT`,b.`insert`)]'
-'|  00:SCAN $FILESYSTEM_NAME [default.t1 b]'
+'|  00:SCAN $FILESYSTEM_NAME [$UNIQUE_DB.t1 b]'
 '03:EXCHANGE [HASH(a.`SELECT`,a.`select`)]'
-'01:SCAN $FILESYSTEM_NAME [default.t2 a]'
+'01:SCAN $FILESYSTEM_NAME [$UNIQUE_DB.t2 a]'
 ====
