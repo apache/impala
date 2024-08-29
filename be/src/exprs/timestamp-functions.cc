@@ -84,6 +84,19 @@ const map<string, int> TimestampFunctions::DAYNAME_MAP = {
     {"sat", 6}, {"saturday", 6},
 };
 
+void TimestampFunctions::FromUtcAndToUtcPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::THREAD_LOCAL) return;
+  const Timezone* timezone = nullptr;
+  if (context->IsArgConstant(1)) {
+    StringVal tz_string_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
+    const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
+    timezone = TimezoneDatabase::FindTimezone(
+      string(tz_string_value.Ptr(), tz_string_value.Len()));
+  }
+  context->SetFunctionState(scope, (void *)(timezone));
+}
+
 TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
@@ -91,8 +104,14 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
   if (UNLIKELY(!ts_value.HasDateAndTime())) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
-  const Timezone* timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.Ptr(), tz_string_value.Len()));
+  const Timezone* timezone = nullptr;
+  if (context->IsArgConstant(1)) {
+    void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+    timezone = reinterpret_cast<Timezone*>(state);
+  } else {
+    timezone = TimezoneDatabase::FindTimezone(
+        string(tz_string_value.Ptr(), tz_string_value.Len()));
+  }
   if (UNLIKELY(timezone == nullptr)) {
     // Although this is an error, Hive ignores it. We will issue a warning but otherwise
     // ignore the error too.
@@ -124,8 +143,14 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
   if (!ts_value.HasDateAndTime()) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
-  const Timezone* timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.Ptr(), tz_string_value.Len()));
+  const Timezone* timezone = nullptr;
+  if (context->IsArgConstant(1)) {
+    void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+    timezone = reinterpret_cast<Timezone*>(state);
+  } else {
+    timezone = TimezoneDatabase::FindTimezone(
+        string(tz_string_value.Ptr(), tz_string_value.Len()));
+  }
   if (UNLIKELY(timezone == nullptr)) {
     // Although this is an error, Hive ignores it. We will issue a warning but otherwise
     // ignore the error too.
@@ -148,6 +173,13 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
   TimestampVal ts_val_ret;
   ts_value_ret.ToTimestampVal(&ts_val_ret);
   return ts_val_ret;
+}
+
+void TimestampFunctions::FromUtcAndToUtcClose(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+      context->SetFunctionState(scope, nullptr);
+  }
 }
 
 TimestampVal TimestampFunctions::ToUtcUnambiguous(FunctionContext* context,
