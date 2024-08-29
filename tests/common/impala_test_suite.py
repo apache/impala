@@ -21,6 +21,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import range, round
 import glob
 import grp
+import hashlib
 import json
 import logging
 import os
@@ -38,6 +39,7 @@ from getpass import getuser
 from impala.hiveserver2 import HiveServer2Cursor
 from random import choice
 from subprocess import check_call
+import tests.common
 from tests.common.base_test_suite import BaseTestSuite
 from tests.common.environ import (
     HIVE_MAJOR_VERSION,
@@ -155,6 +157,7 @@ INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST")
 # Some tests use the IP instead of the host.
 INTERNAL_LISTEN_IP = socket.gethostbyname_ex(INTERNAL_LISTEN_HOST)[2][0]
 EE_TEST_LOGS_DIR = os.getenv("IMPALA_EE_TEST_LOGS_DIR")
+IMPALA_LOGS_DIR = os.getenv("IMPALA_LOGS_DIR")
 # Match any SET statement. Assume that query options' names
 # only contain alphabets, underscores and digits after position 1.
 # The statement may include SQL line comments starting with --, which we need to
@@ -725,132 +728,173 @@ class ImpalaTestSuite(BaseTestSuite):
         encoding=encoding)
     # Assumes that it is same across all the coordinators.
     lineage_log_dir = self.get_var_current_val('lineage_event_log_dir')
+    failed_count = 0
+    total_count = 0
+    result_list = []
     for test_section in sections:
-      if 'HIVE_MAJOR_VERSION' in test_section:
-        needed_hive_major_version = int(test_section['HIVE_MAJOR_VERSION'])
-        assert needed_hive_major_version in [2, 3]
-        assert HIVE_MAJOR_VERSION in [2, 3]
-        if needed_hive_major_version != HIVE_MAJOR_VERSION:
-          continue
-
-      if 'IS_HDFS_ONLY' in test_section and not IS_HDFS:
-        continue
-
-      if 'SHELL' in test_section:
-        assert len(test_section) == 1, \
-            "SHELL test sections can't contain other sections"
-        cmd = self.__do_replacements(test_section['SHELL'], use_db=use_db,
-            extra=test_file_vars)
-        LOG.info("Shell command: " + cmd)
-        check_call(cmd, shell=True)
-        continue
-
-      if 'QUERY' in test_section:
-        query_section = test_section['QUERY']
-        exec_fn = __exec_in_impala
-      elif 'HIVE_QUERY' in test_section:
-        query_section = test_section['HIVE_QUERY']
-        exec_fn = __exec_in_hive
-      else:
-        assert 0, ('Error in test file {}. Test cases require a '
-            '-- QUERY or HIVE_QUERY section.\n{}').format(
-                test_file_name, pprint.pformat(test_section))
-
-      # TODO: support running query tests against different scale factors
-      query = QueryTestSectionReader.build_query(
-          self.__do_replacements(query_section, use_db=use_db, extra=test_file_vars))
-
-      if 'QUERY_NAME' in test_section:
-        LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
-
-      result = None
+      current_error = None
       try:
-        result = exec_fn(query, user=test_section.get('USER', '').strip() or None)
-      except Exception as e:
-        if 'CATCH' in test_section:
-          self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
-          assert error_msg_expected(str(e))  # Only checks if message contains query id
-          continue
-        raise
+        if 'HIVE_MAJOR_VERSION' in test_section:
+          needed_hive_major_version = int(test_section['HIVE_MAJOR_VERSION'])
+          assert needed_hive_major_version in [2, 3]
+          assert HIVE_MAJOR_VERSION in [2, 3]
+          if needed_hive_major_version != HIVE_MAJOR_VERSION:
+            continue
 
-      if 'CATCH' in test_section and '__NO_ERROR__' not in test_section['CATCH']:
-        expected_str = self.__do_replacements(" or ".join(test_section['CATCH']).strip(),
+        if 'IS_HDFS_ONLY' in test_section and not IS_HDFS:
+          continue
+
+        if 'SHELL' in test_section:
+          assert len(test_section) == 1, \
+              "SHELL test sections can't contain other sections"
+          cmd = self.__do_replacements(test_section['SHELL'], use_db=use_db,
+              extra=test_file_vars)
+          LOG.info("Shell command: " + cmd)
+          check_call(cmd, shell=True)
+          continue
+
+        if 'QUERY' in test_section:
+          query_section = test_section['QUERY']
+          exec_fn = __exec_in_impala
+        elif 'HIVE_QUERY' in test_section:
+          query_section = test_section['HIVE_QUERY']
+          exec_fn = __exec_in_hive
+        else:
+          assert 0, ('Error in test file {}. Test cases require a '
+              '-- QUERY or HIVE_QUERY section.\n{}').format(
+                  test_file_name, pprint.pformat(test_section))
+
+        # TODO: support running query tests against different scale factors
+        query = QueryTestSectionReader.build_query(
+            self.__do_replacements(query_section, use_db=use_db, extra=test_file_vars))
+
+        if 'QUERY_NAME' in test_section:
+          LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
+
+        result = None
+        try:
+          result = exec_fn(query, user=test_section.get('USER', '').strip() or None)
+        except Exception as e:
+          if 'CATCH' in test_section:
+            self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
+            assert error_msg_expected(str(e))
+            continue
+          raise
+
+        if 'CATCH' in test_section and '__NO_ERROR__' not in test_section['CATCH']:
+          expected_str = self.__do_replacements(
+              " or ".join(test_section['CATCH']).strip(),
               use_db=use_db,
               extra=test_file_vars)
-        assert False, "Expected exception: {0}\n\nwhen running:\n\n{1}".format(
-            expected_str, query)
+          assert False, "Expected exception: {0}\n\nwhen running:\n\n{1}".format(
+              expected_str, query)
 
-      assert result is not None
-      assert result.success, "Query failed: {0}".format(result.data)
+        assert result is not None
+        assert result.success, "Query failed: {0}".format(result.data)
 
-      # Decode the results read back if the data is stored with a specific encoding.
-      if encoding: result.data = [row.decode(encoding) for row in result.data]
-      # Replace $NAMENODE in the expected results with the actual namenode URI.
-      if 'RESULTS' in test_section:
-        # Combining 'RESULTS' with 'DML_RESULTS" is currently unsupported because
-        # __verify_results_and_errors calls verify_raw_results which always checks
-        # ERRORS, TYPES, LABELS, etc. which doesn't make sense if there are two
-        # different result sets to consider (IMPALA-4471).
-        assert 'DML_RESULTS' not in test_section
-        test_section['RESULTS'] = self.__do_replacements(
-            test_section['RESULTS'], use_db=use_db, extra=test_file_vars)
-        self.__verify_results_and_errors(vector, test_section, result, use_db)
-      else:
-        # TODO: Can't validate errors without expected results for now.
-        assert 'ERRORS' not in test_section,\
-          "'ERRORS' sections must have accompanying 'RESULTS' sections"
-      # If --update_results, then replace references to the namenode URI with $NAMENODE.
-      # TODO(todd) consider running do_replacements in reverse, though that may cause
-      # some false replacements for things like username.
-      if pytest.config.option.update_results and 'RESULTS' in test_section:
-        test_section['RESULTS'] = test_section['RESULTS'] \
-            .replace(NAMENODE, '$NAMENODE') \
-            .replace(IMPALA_HOME, '$IMPALA_HOME') \
-            .replace(INTERNAL_LISTEN_HOST, '$INTERNAL_LISTEN_HOST') \
-            .replace(INTERNAL_LISTEN_IP, '$INTERNAL_LISTEN_IP')
-      rt_profile_info = None
-      if 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
-        # If this table format has a RUNTIME_PROFILE section specifically for it, evaluate
-        # that section and ignore any general RUNTIME_PROFILE sections.
-        rt_profile_info = 'RUNTIME_PROFILE_%s' % table_format_info.file_format
-      elif 'RUNTIME_PROFILE' in test_section:
-        rt_profile_info = 'RUNTIME_PROFILE'
-
-      if rt_profile_info is not None:
-        if test_file_vars:
-          # only do test_file_vars replacement if it exist.
-          test_section[rt_profile_info] = self.__do_replacements(
-              test_section[rt_profile_info], extra=test_file_vars)
-        rt_profile = verify_runtime_profile(test_section[rt_profile_info],
-                               result.runtime_profile,
-                               update_section=pytest.config.option.update_results)
-        if pytest.config.option.update_results:
-          test_section[rt_profile_info] = "".join(rt_profile)
-
-      if 'LINEAGE' in test_section:
-        # Lineage flusher thread runs every 5s by default and is not configurable. Wait
-        # for that period. (TODO) Get rid of this for faster test execution.
-        time.sleep(5)
-        current_query_lineage = self.get_query_lineage(result.query_id, lineage_log_dir)
-        assert current_query_lineage != "", (
-            "No lineage found for query {} in dir {}".format(
-              result.query_id, lineage_log_dir))
-        if pytest.config.option.update_results:
-          test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
-              separators=(',', ': '))
+        # Decode the results read back if the data is stored with a specific encoding.
+        if encoding: result.data = [row.decode(encoding) for row in result.data]
+        # Replace $NAMENODE in the expected results with the actual namenode URI.
+        if 'RESULTS' in test_section:
+          # Combining 'RESULTS' with 'DML_RESULTS" is currently unsupported because
+          # __verify_results_and_errors calls verify_raw_results which always checks
+          # ERRORS, TYPES, LABELS, etc. which doesn't make sense if there are two
+          # different result sets to consider (IMPALA-4471).
+          assert 'DML_RESULTS' not in test_section
+          test_section['RESULTS'] = self.__do_replacements(
+              test_section['RESULTS'], use_db=use_db, extra=test_file_vars)
+          self.__verify_results_and_errors(vector, test_section, result, use_db)
         else:
-          verify_lineage(json.loads(test_section['LINEAGE']), current_query_lineage)
+          # TODO: Can't validate errors without expected results for now.
+          assert 'ERRORS' not in test_section,\
+            "'ERRORS' sections must have accompanying 'RESULTS' sections"
+        # If --update_results, then replace references to the namenode URI with $NAMENODE.
+        # TODO(todd) consider running do_replacements in reverse, though that may cause
+        # some false replacements for things like username.
+        if pytest.config.option.update_results and 'RESULTS' in test_section:
+          test_section['RESULTS'] = test_section['RESULTS'] \
+              .replace(NAMENODE, '$NAMENODE') \
+              .replace(IMPALA_HOME, '$IMPALA_HOME') \
+              .replace(INTERNAL_LISTEN_HOST, '$INTERNAL_LISTEN_HOST') \
+              .replace(INTERNAL_LISTEN_IP, '$INTERNAL_LISTEN_IP')
+        rt_profile_info = None
+        if 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
+          # If this table format has a RUNTIME_PROFILE section specifically for it,
+          # evaluate that section and ignore any general RUNTIME_PROFILE sections.
+          rt_profile_info = 'RUNTIME_PROFILE_%s' % table_format_info.file_format
+        elif 'RUNTIME_PROFILE' in test_section:
+          rt_profile_info = 'RUNTIME_PROFILE'
 
-      if 'DML_RESULTS' in test_section:
-        assert 'ERRORS' not in test_section
-        # The limit is specified to ensure the queries aren't unbounded. We shouldn't have
-        # test files that are checking the contents of tables larger than that anyways.
-        dml_results_query = "select * from %s limit 1000" % \
-            test_section['DML_RESULTS_TABLE']
-        dml_result = exec_fn(dml_results_query)
-        verify_raw_results(test_section, dml_result,
-            vector.get_value('table_format').file_format, result_section='DML_RESULTS',
-            update_section=pytest.config.option.update_results)
+        if rt_profile_info is not None:
+          if test_file_vars:
+            # only do test_file_vars replacement if it exist.
+            test_section[rt_profile_info] = self.__do_replacements(
+                test_section[rt_profile_info], extra=test_file_vars)
+          rt_profile = verify_runtime_profile(test_section[rt_profile_info],
+              result.runtime_profile,
+              update_section=pytest.config.option.update_results)
+          if pytest.config.option.update_results:
+            test_section[rt_profile_info] = "".join(rt_profile)
+
+        if 'LINEAGE' in test_section:
+          # Lineage flusher thread runs every 5s by default and is not configurable. Wait
+          # for that period. (TODO) Get rid of this for faster test execution.
+          time.sleep(5)
+          current_query_lineage = self.get_query_lineage(result.query_id, lineage_log_dir)
+          assert current_query_lineage != "", (
+              "No lineage found for query {} in dir {}".format(
+                result.query_id, lineage_log_dir))
+          if pytest.config.option.update_results:
+            test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
+                separators=(',', ': '))
+          else:
+            verify_lineage(json.loads(test_section['LINEAGE']), current_query_lineage)
+
+        if 'DML_RESULTS' in test_section:
+          assert 'ERRORS' not in test_section
+          # The limit is specified to ensure the queries aren't unbounded. We shouldn't
+          # have test files that are checking the contents of tables larger than that
+          # anyways.
+          dml_results_query = "select * from %s limit 1000" % \
+              test_section['DML_RESULTS_TABLE']
+          dml_result = exec_fn(dml_results_query)
+          verify_raw_results(test_section, dml_result,
+              vector.get_value('table_format').file_format, result_section='DML_RESULTS',
+              update_section=pytest.config.option.update_results)
+      except Exception as e:
+        # When the calcite report mode is off, fail fast when hitting an error.
+        if not pytest.config.option.calcite_report_mode:
+          raise
+        current_error = str(e)
+        failed_count += 1
+      finally:
+        if pytest.config.option.calcite_report_mode:
+          result_list.append({"section": test_section, "error": current_error})
+        total_count += 1
+
+    # Write out the output information
+    if pytest.config.option.calcite_report_mode:
+      report = {}
+      report["test_node_id"] = tests.common.nodeid
+      report["test_file"] = os.path.join("testdata", "workloads", self.get_workload(),
+          'queries', test_file_name + '.test')
+      report["results"] = result_list
+      # The node ids are unique, so there should not be hash collisions
+      nodeid_hash = hashlib.sha256(tests.common.nodeid.encode()).hexdigest()
+      output_file = "output_{0}.json".format(nodeid_hash)
+      output_directory = pytest.config.option.calcite_report_output_dir
+      if output_directory is None:
+        output_directory = os.path.join(IMPALA_LOGS_DIR, "calcite_report")
+      if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+      with open(os.path.join(output_directory, output_file), "w") as f:
+        json.dump(report, f, indent=2)
+
+      # Since the report mode continues after error, we should return an error at
+      # the end if it hit failures
+      if failed_count != 0:
+        raise Exception("{0} out of {1} tests failed".format(failed_count, total_count))
+
     if pytest.config.option.update_results:
       # Print updated test results to path like
       # $EE_TEST_LOGS_DIR/impala_updated_results/tpcds/queries/tpcds-decimal_v2-q98.test

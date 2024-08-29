@@ -175,6 +175,16 @@ def pytest_addoption(parser):
                    "version used to execute the tests. "
                    "(See $IMPALA_HOME/bin/set-pythonpath.sh.)")
 
+  parser.addoption("--calcite_report_mode", action="store_true", default=False,
+                   help="Mode designed to provide coverage for the Calcite planner. "
+                   "Produces a JSON file for each run_test_case() invocation and "
+                   "continues past errors. These JSON files can be processed to produce "
+                   "a report to detect improvements and protect against regressions.")
+
+  parser.addoption("--calcite_report_output_dir", default=None,
+                   help="Location to store the output JSON files for "
+                   "calcite_report_mode. Defaults to ${IMPALA_LOGS_DIR}/calcite_report.")
+
 
 def pytest_assertrepr_compare(op, left, right):
   """
@@ -694,3 +704,6 @@ def pytest_runtest_logstart(nodeid, location):
   # than being elided.
   tests.common.current_node = \
       nodeid.replace(",", ";").replace(" ", "").replace("=", "-")[0:255]
+
+  # Store the unaltered nodeid as well
+  tests.common.nodeid = nodeid
