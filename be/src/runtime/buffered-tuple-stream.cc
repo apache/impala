@@ -832,8 +832,13 @@ Status BufferedTupleStream::GetNextInternal(ReadIterator* RESTRICT read_iter,
   DCHECK(read_iter->read_page_->is_pinned()) << DebugString();
   DCHECK_GE(read_iter->read_page_rows_returned_, 0);
 
-  int rows_left_in_page = read_iter->GetRowsLeftInPage();
-  int rows_to_fill = std::min(batch->capacity() - batch->num_rows(), rows_left_in_page);
+  int64_t rows_left_in_page = read_iter->GetRowsLeftInPage();
+  // We are casting an int64_t to int here but this is OK because rows_to_fill is
+  // no greater than batch->capacity(), which in turn is no greater than INT_MAX.
+  int64_t rows_to_fill_temp = std::min(
+      static_cast<int64_t>(batch->capacity() - batch->num_rows()), rows_left_in_page);
+  DCHECK_LE(rows_to_fill_temp, INT_MAX);
+  int rows_to_fill = static_cast<int>(rows_to_fill_temp);
   DCHECK_GE(rows_to_fill, 1);
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(batch->GetRow(batch->num_rows()));
 
@@ -1034,6 +1039,8 @@ bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) noexcept {
   if (UNLIKELY(write_page_ == nullptr || !DeepCopy(row, &write_ptr_, write_end_ptr_))) {
     return AddRowSlow(row, status);
   }
+  DCHECK_LT(num_rows_, INT64_MAX);
+  DCHECK_LT(write_page_->num_rows, INT64_MAX);
   ++num_rows_;
   ++write_page_->num_rows;
   return true;

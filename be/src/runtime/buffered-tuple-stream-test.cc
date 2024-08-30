@@ -91,6 +91,12 @@ class SimpleTupleStreamTest : public testing::Test {
     string_desc_ =
         pool_.Add(new RowDescriptor(*string_builder.Build(), tuple_ids, nullable_tuples));
 
+    DescriptorTblBuilder zero_sized_row_builder(
+        test_env_->exec_env()->frontend(), &pool_);
+    zero_sized_row_builder.DeclareTuple();
+    zero_sized_row_desc_ = pool_.Add(
+        new RowDescriptor(*zero_sized_row_builder.Build(), tuple_ids, nullable_tuples));
+
     // Construct descriptors for big rows with and without nullable tuples.
     // Each tuple contains 8 slots of TYPE_INT and a single byte for null indicator.
     DescriptorTblBuilder big_row_builder(test_env_->exec_env()->frontend(), &pool_);
@@ -454,6 +460,7 @@ class SimpleTupleStreamTest : public testing::Test {
   ObjectPool pool_;
   RowDescriptor* int_desc_;
   RowDescriptor* string_desc_;
+  RowDescriptor* zero_sized_row_desc_;
 
   static const int64_t BIG_ROW_BYTES = 16 * 1024;
   RowDescriptor* big_row_desc_;
@@ -601,6 +608,15 @@ class StreamStateTest : public SimpleTupleStreamTest {
   // Test that stream's debug string is capped only for the first
   // BufferedTupleStream::MAX_PAGE_ITER_DEBUG.
   void TestShortDebugString();
+
+  // Helper method to add one zero-sized row to the stream.
+  void TestAddOneZeroSizedRow(BufferedTupleStream& stream, RowBatch& batch);
+
+  // Helper method to get one zero-sized row from the stream.
+  void TestGetOneZeroSizedRow(BufferedTupleStream& stream);
+
+  // Test adding more than INT_MAX or UINT_MAX zero-size rows to a stream.
+  void TestAddAndGetZeroSizedRows();
 };
 
 // Basic API test. No data should be going to disk.
@@ -2242,6 +2258,86 @@ TEST_F(StreamStateTest, UnpinFullyExhaustedReadPageOnReadOnlyStreamNoAttach) {
 
 TEST_F(StreamStateTest, ShortDebugString) {
   TestShortDebugString();
+}
+
+void StreamStateTest::TestAddOneZeroSizedRow(
+    BufferedTupleStream& stream, RowBatch& batch) {
+  Status status;
+  uint8_t* write_ptr_before = stream.write_ptr_;
+  int64_t num_rows_before =
+      stream.write_page_ == nullptr ? 0 : stream.write_page_->num_rows;
+  bool b = stream.AddRow(batch.GetRow(0), &status);
+  ASSERT_OK(status);
+  ASSERT_TRUE(b);
+  if (write_ptr_before != nullptr) {
+    ASSERT_EQ(stream.write_ptr_, write_ptr_before);
+  }
+  ASSERT_EQ(stream.write_page_->num_rows, num_rows_before + 1);
+}
+
+void StreamStateTest::TestGetOneZeroSizedRow(BufferedTupleStream& stream) {
+  RowBatch read_batch(zero_sized_row_desc_, 1, &tracker_);
+  uint8_t* read_ptr_before = stream.read_it_.read_ptr_;
+  int64_t num_rows_before = stream.read_it_.read_page_rows_returned_;
+  bool eos = false;
+  Status status = stream.GetNext(&read_batch, &eos);
+  ASSERT_OK(status);
+  if (read_ptr_before != nullptr) {
+    ASSERT_EQ(stream.read_it_.read_ptr_, read_ptr_before);
+  }
+  ASSERT_EQ(stream.read_it_.read_page_rows_returned_, num_rows_before + 1);
+}
+
+void StreamStateTest::TestAddAndGetZeroSizedRows() {
+  Init(BUFFER_POOL_LIMIT);
+  BufferedTupleStream stream(
+      runtime_state_, zero_sized_row_desc_, &client_, PAGE_LEN, PAGE_LEN);
+  ASSERT_OK(stream.Init("StreamStateTest::TestAddAndGetZeroSizedRows", false));
+  bool got_reservation = false;
+  ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
+  ASSERT_TRUE(got_reservation);
+
+  RowBatch write_batch(zero_sized_row_desc_, 1, &tracker_);
+  write_batch.CommitRows(1);
+
+  // Adding 1 row to initialize the row counters
+  TestAddOneZeroSizedRow(stream, write_batch);
+
+  // Set the row counters to mock a stream with INT_MAX rows
+  stream.num_rows_ = INT_MAX;
+  stream.write_page_->num_rows = INT_MAX;
+
+  // Test if the stream can hold more than INT_MAX rows.
+  TestAddOneZeroSizedRow(stream, write_batch);
+
+  // Set the row counters to mock a stream with UINT_MAX rows
+  stream.num_rows_ = UINT_MAX;
+  stream.write_page_->num_rows = UINT_MAX;
+
+  // Test if the stream can hold more than UINT_MAX rows.
+  TestAddOneZeroSizedRow(stream, write_batch);
+
+  stream.DoneWriting();
+
+  // Test if we can get 1 row after getting 0 rows.
+  TestGetOneZeroSizedRow(stream);
+
+  // Test if we can get 1 row after getting INT_MAX rows.
+  stream.read_it_.IncrRowsReturned(INT_MAX - 1);
+  ASSERT_EQ(stream.read_it_.read_page_rows_returned_, INT_MAX);
+  TestGetOneZeroSizedRow(stream);
+
+  // Test if we can get 1 row after getting UINT_MAX rows.
+  stream.read_it_.IncrRowsReturned(UINT_MAX - INT_MAX - 1);
+  ASSERT_EQ(stream.read_it_.read_page_rows_returned_, UINT_MAX);
+  TestGetOneZeroSizedRow(stream);
+
+  ASSERT_EQ(stream.read_it_.GetRowsLeftInPage(), 0);
+  stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+}
+
+TEST_F(StreamStateTest, AddAndGetZeroSizedRows) {
+  TestAddAndGetZeroSizedRows();
 }
 }
 

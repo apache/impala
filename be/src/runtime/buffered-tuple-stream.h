@@ -450,8 +450,10 @@ class BufferedTupleStream {
 
     BufferPool::PageHandle handle;
 
-    /// Number of rows written to the page.
-    int num_rows = 0;
+    /// Number of rows written to the page. Its type is int64_t since when the row size
+    /// is zero, all rows will be added to one page. And the number of rows in the whole
+    /// stream can exceed INT_MAX.
+    int64_t num_rows = 0;
 
     /// Whether we called GetBuffer() on the page since it was last pinned. This means
     /// that GetBuffer() and ExtractBuffer() cannot fail and that GetNext() may have
@@ -506,8 +508,9 @@ class BufferedTupleStream {
     /// Total number of rows returned via this read iterator since Init() was called.
     int64_t rows_returned_ = 0;
 
-    /// Number of rows returned from the current 'read_page_'.
-    uint32_t read_page_rows_returned_ = -1;
+    /// Number of rows returned from the current 'read_page_'. The type needs to be
+    /// compatible with 'Page::num_rows' for them to compare.
+    int64_t read_page_rows_returned_ = -1;
 
     /// Pointer into 'read_page_' to the byte after the last row read.
     uint8_t* read_ptr_ = nullptr;
