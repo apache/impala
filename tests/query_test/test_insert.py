@@ -29,6 +29,7 @@ from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfHive2,
     SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (
+    add_exec_option_dimension,
     create_exec_option_dimension,
     create_uncompressed_text_dimension,
     create_single_exec_option_dimension,
@@ -36,24 +37,22 @@ from tests.common.test_dimensions import (
 from tests.common.test_result_verifier import (
     QueryTestResult,
     parse_result_rows)
-from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
+
 
 PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd', 'lz4']
 
-class TestInsertQueries(ImpalaTestSuite):
+
+class TestInsertBase(ImpalaTestSuite):
+  """All tests based on this class should run with 'unique_database' fixture."""
+
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestInsertQueries, cls).add_test_dimensions()
-    # Fix the exec_option vector to have a single value. This is needed should we decide
-    # to run the insert tests in parallel (otherwise there will be two tests inserting
-    # into the same table at the same time for the same file format).
-    # TODO: When we do decide to run these tests in parallel we could create unique temp
-    # tables for each test case to resolve the concurrency problems.
+    super(TestInsertBase, cls).add_test_dimensions()
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
           cluster_sizes=[0], disable_codegen_options=[True, False], batch_sizes=[0],
@@ -62,26 +61,32 @@ class TestInsertQueries(ImpalaTestSuite):
           create_uncompressed_text_dimension(cls.get_workload()))
     else:
       cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-          cluster_sizes=[0], disable_codegen_options=[True, False], batch_sizes=[0, 1, 16],
-          sync_ddl=[0, 1]))
-      cls.ImpalaTestMatrix.add_dimension(
-          ImpalaTestDimension("compression_codec", *PARQUET_CODECS));
+          cluster_sizes=[0], disable_codegen_options=[True, False],
+          batch_sizes=[0, 1, 16], sync_ddl=[0, 1]))
+      add_exec_option_dimension(cls, "compression_codec", PARQUET_CODECS)
       # Insert is currently only supported for text and parquet
       # For parquet, we want to iterate through all the compression codecs
       # TODO: each column in parquet can have a different codec.  We could
       # test all the codecs in one table/file with some additional flags.
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format == 'parquet' or \
-            (v.get_value('table_format').file_format == 'text' and \
-            v.get_value('compression_codec') == 'none'))
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('table_format').file_format == 'parquet'
+          or (v.get_value('table_format').file_format == 'text'
+              and v.get_value('compression_codec') == 'none'))
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').compression_codec == 'none')
       # Only test other batch sizes for uncompressed parquet to keep the execution time
       # within reasonable bounds.
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
-          v.get_value('exec_option')['batch_size'] == 0 or \
-            (v.get_value('table_format').file_format == 'parquet' and \
-            v.get_value('compression_codec') == 'none'))
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('exec_option')['batch_size'] == 0
+          or (v.get_value('table_format').file_format == 'parquet'
+              and v.get_value('compression_codec') == 'none'))
+
+  @classmethod
+  def is_sync_ddl(cls, vector):
+    return vector.get_value('exec_option')['sync_ddl'] == 1
+
+
+class TestInsertQueries(TestInsertBase):
 
   @pytest.mark.execute_serially
   def test_insert_large_string(self, vector, unique_database):
@@ -128,55 +133,21 @@ class TestInsertQueries(ImpalaTestSuite):
     except Exception as e:
       assert "Memory limit exceeded" in str(e)
 
-
-  @classmethod
-  def setup_class(cls):
-    super(TestInsertQueries, cls).setup_class()
-
   @UniqueDatabase.parametrize(sync_ddl=True)
   # ABFS partition names cannot end in periods
   @SkipIfFS.file_or_folder_name_ends_with_period
   def test_insert(self, vector, unique_database):
-    if (vector.get_value('table_format').file_format == 'parquet'):
-      vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
-          vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+        multiple_impalad=self.is_sync_ddl(vector),
         test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
         .get_db_name_from_format(vector.get_value('table_format'))})
-
-  @SkipIfHive2.acid
-  @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_acid_insert(self, vector, unique_database):
-    exec_options = vector.get_value('exec_option')
-    file_format = vector.get_value('table_format').file_format
-    if (file_format == 'parquet'):
-      exec_options['COMPRESSION_CODEC'] = vector.get_value('compression_codec')
-    exec_options['DEFAULT_FILE_FORMAT'] = file_format
-    self.run_test_case('QueryTest/acid-insert', vector, unique_database,
-        multiple_impalad=exec_options['sync_ddl'] == 1)
-
-  @SkipIfHive2.acid
-  @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_acid_nonacid_insert(self, vector, unique_database):
-    self.run_test_case('QueryTest/acid-nonacid-insert', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
-
-  @SkipIfHive2.acid
-  @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_acid_insert_fail(self, vector, unique_database):
-    self.run_test_case('QueryTest/acid-insert-fail', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_insert_mem_limit(self, vector, unique_database):
-    if (vector.get_value('table_format').file_format == 'parquet'):
-      vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
-          vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert-mem-limit', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+        multiple_impalad=self.is_sync_ddl(vector),
         test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
         .get_db_name_from_format(vector.get_value('table_format'))})
     # IMPALA-7023: These queries can linger and use up memory, causing subsequent
@@ -190,7 +161,7 @@ class TestInsertQueries(ImpalaTestSuite):
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_overwrite(self, vector, unique_database):
     self.run_test_case('QueryTest/insert_overwrite', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+        multiple_impalad=self.is_sync_ddl(vector),
         test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
         .get_db_name_from_format(vector.get_value('table_format'))})
 
@@ -200,16 +171,48 @@ class TestInsertQueries(ImpalaTestSuite):
     # the output expression of the table sink.
     if vector.get_value('exec_option')['disable_codegen']:
       self.run_test_case('QueryTest/insert_bad_expr', vector, unique_database,
-          multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+          multiple_impalad=self.is_sync_ddl(vector),
           test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
           .get_db_name_from_format(vector.get_value('table_format'))})
+
+
+class TestInsertQueriesWithDefaultFormat(TestInsertBase):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertQueriesWithDefaultFormat, cls).add_test_dimensions()
+    # Declare 'default_file_format' option and match it against table_format.
+    # This is needed because CREATE queries inside .test files are often not CTAS,
+    # not CREATE TABLE LIKE, and do not have STORED AS clause.
+    add_exec_option_dimension(cls, "default_file_format", ['text', 'parquet'])
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == v.get_value('default_file_format'))
+
+  @SkipIfHive2.acid
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_acid_insert(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-insert', vector, unique_database,
+        multiple_impalad=self.is_sync_ddl(vector))
+
+  @SkipIfHive2.acid
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_acid_nonacid_insert(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-nonacid-insert', vector, unique_database,
+        multiple_impalad=self.is_sync_ddl(vector))
+
+  @SkipIfHive2.acid
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_acid_insert_fail(self, vector, unique_database):
+    self.run_test_case('QueryTest/acid-insert-fail', vector, unique_database,
+        multiple_impalad=self.is_sync_ddl(vector))
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_random_partition(self, vector, unique_database):
     """Regression test for IMPALA-402: partitioning by rand() leads to strange behaviour
     or crashes."""
     self.run_test_case('QueryTest/insert-random-partition', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+        multiple_impalad=self.is_sync_ddl(vector))
+
 
 class TestInsertWideTable(ImpalaTestSuite):
   @classmethod
@@ -226,16 +229,16 @@ class TestInsertWideTable(ImpalaTestSuite):
 
     # Inserts only supported on text and parquet
     # TODO: Enable 'text'/codec once the compressed text writers are in.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'parquet' or \
-        v.get_value('table_format').file_format == 'text')
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet'
+        or v.get_value('table_format').file_format == 'text')
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').compression_codec == 'none')
 
     # Don't run on core. This test is very slow (IMPALA-864) and we are unlikely to
     # regress here.
     if cls.exploration_strategy() == 'core':
-      cls.ImpalaTestMatrix.add_constraint(lambda v: False);
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False)
 
   @SkipIfLocal.parquet_file_size
   def test_insert_wide_table(self, vector, unique_database):
@@ -266,8 +269,10 @@ class TestInsertWideTable(ImpalaTestSuite):
     types = result.column_types
     labels = result.column_labels
     expected = QueryTestResult([col_vals], types, labels, order_matters=False)
-    actual = QueryTestResult(parse_result_rows(result), types, labels, order_matters=False)
+    actual = QueryTestResult(
+      parse_result_rows(result), types, labels, order_matters=False)
     assert expected == actual
+
 
 class TestInsertPartKey(ImpalaTestSuite):
   """Regression test for IMPALA-875"""
@@ -285,7 +290,7 @@ class TestInsertPartKey(ImpalaTestSuite):
 
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format == 'text'))
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').compression_codec == 'none')
 
   @pytest.mark.execute_serially
@@ -375,9 +380,9 @@ class TestInsertNullQueries(ImpalaTestSuite):
 
     # These tests only make sense for inserting into a text table with special
     # logic to handle all the possible ways NULL needs to be written as ascii
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-          (v.get_value('table_format').file_format == 'text' and \
-           v.get_value('table_format').compression_codec == 'none'))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+          (v.get_value('table_format').file_format == 'text'
+           and v.get_value('table_format').compression_codec == 'none'))
 
   @classmethod
   def setup_class(cls):

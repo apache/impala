@@ -30,8 +30,10 @@ from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder, Convert
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfEC, SkipIfFS, SkipIfLocal
-from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.skip import SkipIfFS, SkipIfLocal
+from tests.common.test_dimensions import (
+    add_exec_option_dimension,
+    create_exec_option_dimension)
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
@@ -115,10 +117,8 @@ class TestInsertParquetQueries(ImpalaTestSuite):
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
         sync_ddl=[1]))
 
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension("compression_codec", *PARQUET_CODECS))
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension("file_size", *PARQUET_FILE_SIZES))
+    add_exec_option_dimension(cls, 'compression_codec', PARQUET_CODECS)
+    add_exec_option_dimension(cls, 'parquet_file_size', PARQUET_FILE_SIZES)
 
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
@@ -128,10 +128,6 @@ class TestInsertParquetQueries(ImpalaTestSuite):
   @SkipIfLocal.multiple_impalad
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_parquet(self, vector, unique_database):
-    vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = \
-        vector.get_value('file_size')
-    vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
-        vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, unique_database, multiple_impalad=True)
 
 
@@ -177,8 +173,6 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
         sync_ddl=[1]))
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension("compression_codec", 'bzip2'))
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
     cls.ImpalaTestMatrix.add_constraint(
@@ -186,6 +180,7 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
 
   @SkipIfLocal.multiple_impalad
   def test_insert_parquet_invalid_codec(self, vector, unique_database):
+    """compression_codec option is set inside the .test file."""
     self.run_test_case('QueryTest/insert_parquet_invalid_codec', vector, unique_database)
 
 
@@ -218,7 +213,7 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
     location = get_fs_path("test-warehouse/{0}.db/{1}/"
                            .format(unique_database, tbl_name))
     create = ("create table {0} like tpch_parquet.orders stored as parquet"
-              .format(fq_tbl_name, location))
+              .format(fq_tbl_name))
     query = "insert overwrite {0} select * from tpch.orders".format(fq_tbl_name)
     block_size = 40 * 1024 * 1024
 
@@ -340,8 +335,8 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     file has the same column type metadata as the generated one."""
     hdfs_path = "{1}/{0}.db/signed_integer_logical_types.parquet".\
         format(unique_database, WAREHOUSE)
-    self.filesystem_client.copy_from_local(os.environ['IMPALA_HOME'] +
-        '/testdata/data/signed_integer_logical_types.parquet', hdfs_path)
+    self.filesystem_client.copy_from_local(os.environ['IMPALA_HOME']
+        + '/testdata/data/signed_integer_logical_types.parquet', hdfs_path)
     # Create table with signed integer logical types
     src_tbl = "{0}.{1}".format(unique_database, "read_write_logical_type_src")
     create_tbl_stmt = """create table {0} like parquet "{1}"
@@ -349,7 +344,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     result = self.execute_query_expect_success(self.client, create_tbl_stmt)
     # Check to see if the src_tbl column types matches the schema of the parquet
     # file from which it was generated
-    result_src = self.execute_query_expect_success(self.client, "describe %s" %src_tbl)
+    result_src = self.execute_query_expect_success(self.client, "describe %s" % src_tbl)
     for line in result_src.data:
       line_split = line.split()
       if line_split[0] == "id":
@@ -373,7 +368,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     #      them.
     #   2. Ensuring that the column types in dst_tbl matches the column types in the
     #      schema of the parquet file that was used to generate the src_tbl
-    result = self.execute_query_expect_success(self.client, "show files in %s" %src_tbl)
+    result = self.execute_query_expect_success(self.client, "show files in %s" % src_tbl)
     hdfs_path = result.data[0].split("\t")[0]
     dst_tbl = "{0}.{1}".format(unique_database, "read_write_logical_type_dst")
     create_tbl_stmt = 'create table {0} like parquet "{1}"'.format(dst_tbl, hdfs_path)
@@ -625,7 +620,7 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     return row_group_stats
 
   def _validate_parquet_stats(self, hdfs_path, tmp_dir, expected_values,
-                              skip_col_idxs = None):
+                              skip_col_idxs=None):
     """Validates that 'hdfs_path' contains exactly one parquet file and that the rowgroup
     statistics in that file match the values in 'expected_values'. Columns indexed by
     'skip_col_idx' are excluded from the verification of the expected values. 'tmp_dir'
@@ -847,9 +842,9 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
     # Make sure that they don't overlap by ordering by the min value, then looking at
     # boundaries.
-    orderkey_stats.sort(key = lambda s: s.min)
-    for l, r in zip(orderkey_stats, orderkey_stats[1:]):
-      assert l.max <= r.min
+    orderkey_stats.sort(key=lambda s: s.min)
+    for left, right in zip(orderkey_stats, orderkey_stats[1:]):
+      assert left.max <= right.min
 
   def test_write_statistics_float_infinity(self, vector, unique_database, tmpdir):
     """Test that statistics for -inf and inf are written correctly."""

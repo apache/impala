@@ -26,7 +26,9 @@ import subprocess
 from os.path import join
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.test_dimensions import (
+    add_exec_option_dimension,
+    create_single_exec_option_dimension)
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
@@ -189,8 +191,8 @@ class TestUnsupportedTableWriters(ImpalaTestSuite):
     # This class tests different formats, but doesn't use constraints.
     # The constraint added below is only to make sure that the test file runs once.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'none'))
+        (v.get_value('table_format').file_format == 'text'
+         and v.get_value('table_format').compression_codec == 'none'))
 
   def test_error_message(self, vector, unique_database):
     # Tests that an appropriate error message is displayed for unsupported writers like
@@ -229,8 +231,8 @@ class TestLargeCompressedFile(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip("skipping if it's not exhaustive test.")
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'snap'))
+        (v.get_value('table_format').file_format == 'text'
+         and v.get_value('table_format').compression_codec == 'snap'))
 
   def teardown_method(self, method):
     self.__drop_test_table()
@@ -307,11 +309,11 @@ class TestBzip2Streaming(ImpalaTestSuite):
 
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip("skipping if it's not exhaustive test.")
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('max_scan_range_length', *cls.MAX_SCAN_RANGE_LENGTHS))
+    add_exec_option_dimension(
+      cls, 'max_scan_range_length', cls.MAX_SCAN_RANGE_LENGTHS)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'bzip')
+        v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'bzip')
 
   def test_bzip2_streaming(self, vector):
     self.run_test_case('QueryTest/text-bzip-scan', vector)
@@ -341,8 +343,8 @@ class TestReadZtsdLibCompressedFile(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'zstd'))
+        (v.get_value('table_format').file_format == 'text'
+         and v.get_value('table_format').compression_codec == 'zstd'))
 
   def __generate_file(self, local_file_location, table_location):
     """

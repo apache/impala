@@ -16,23 +16,21 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-import os
-import pytest
-import shlex
 from copy import deepcopy
-from subprocess import check_call
 
 from tests.common.file_utils import (
   create_table_from_parquet, create_table_and_copy_files)
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_dimensions import (
+    add_exec_option_dimension,
+    create_exec_option_dimension)
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.util.filesystem_utils import get_fs_path
 
 MT_DOP_VALUES = [0, 1, 2, 8]
 
-class TestParquetStats(ImpalaTestSuite):
+
+class TestParquetStatsSingleNode(ImpalaTestSuite):
   """
-  This suite tests runtime optimizations based on Parquet statistics.
+  This suite tests runtime optimizations based on Parquet statistics with num_nodes=1.
   """
 
   @classmethod
@@ -41,15 +39,15 @@ class TestParquetStats(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestParquetStats, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
+    super(TestParquetStatsSingleNode, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(cluster_sizes=[1]))
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_parquet_stats(self, vector, unique_database):
     # The test makes assumptions about the number of row groups that are processed and
     # skipped inside a fragment, so we ensure that the tests run in a single fragment.
-    vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/parquet-stats', vector, use_db=unique_database)
 
   def test_deprecated_stats(self, vector, unique_database):
@@ -66,8 +64,26 @@ class TestParquetStats(ImpalaTestSuite):
                                 ['testdata/data/deprecated_statistics.parquet'])
     # The test makes assumptions about the number of row groups that are processed and
     # skipped inside a fragment, so we ensure that the tests run in a single fragment.
-    vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/parquet-deprecated-stats', vector, unique_database)
+
+
+class TestParquetStats(ImpalaTestSuite):
+  """
+  This suite tests runtime optimizations based on Parquet statistics.
+  """
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestParquetStats, cls).add_test_dimensions()
+    # Fix batch_size to the default value.
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(batch_sizes=[0]))
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_invalid_stats(self, vector, unique_database):
     """IMPALA-6538" Test that reading parquet files with statistics with invalid

@@ -17,14 +17,18 @@
 
 from __future__ import absolute_import, division, print_function
 import re
-from copy import copy, deepcopy
+from copy import copy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_dimensions import (
+    # TODO: uncomment once IMPALA-13334 resolved.
+    # add_exec_option_dimension,
+    create_exec_option_dimension)
 
 # Run sizes (number of pages per run) in sorter
-MAX_SORT_RUN_SIZE = [0, 2, 20]
+# TODO: uncomment once IMPALA-13334 resolved.
+# MAX_SORT_RUN_SIZE = [0, 2, 20]
 
 
 def split_result_rows(result):
@@ -50,7 +54,8 @@ def transpose_results(result, map_fn=lambda x: x):
 
 
 class TestQueryFullSort(ImpalaTestSuite):
-  """Test class to do functional validation of sorting when data is spilled to disk."""
+  """Test class to do functional validation of sorting when data is spilled to disk.
+  All tests under this class run with num_nodes=1."""
 
   @classmethod
   def get_workload(self):
@@ -59,11 +64,12 @@ class TestQueryFullSort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryFullSort, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
-        *MAX_SORT_RUN_SIZE))
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(cluster_sizes=[1]))
+    # TODO: uncomment once IMPALA-13334 resolved.
+    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
 
     if cls.exploration_strategy() == 'core':
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format == 'parquet')
 
   def test_multiple_buffer_pool_limits(self, vector):
@@ -73,7 +79,6 @@ class TestQueryFullSort(ImpalaTestSuite):
             from lineitem order by l_comment limit 100000"""
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
-    exec_option['num_nodes'] = 1
     table_format = vector.get_value('table_format')
 
     """The first run should fit in memory, the second run is a 2-phase disk sort,
@@ -92,7 +97,6 @@ class TestQueryFullSort(ImpalaTestSuite):
             from lineitem order by l_comment limit 100000"""
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
-    exec_option['num_nodes'] = 1
     table_format = vector.get_value('table_format')
 
     """The first sort run is given a privilege to ignore sort_run_bytes_limit, except
@@ -153,7 +157,6 @@ class TestQueryFullSort(ImpalaTestSuite):
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     exec_option['mem_limit'] = "134m"
-    exec_option['num_nodes'] = 1
     table_format = vector.get_value('table_format')
 
     query_result = self.execute_query(query, exec_option, table_format=table_format)
@@ -192,7 +195,6 @@ class TestQueryFullSort(ImpalaTestSuite):
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     # Run with a single scanner thread so that the input doesn't get reordered.
-    exec_option['num_nodes'] = "1"
     exec_option['num_scanner_threads'] = "1"
     table_format = vector.get_value('table_format')
 
@@ -217,7 +219,6 @@ class TestQueryFullSort(ImpalaTestSuite):
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     exec_option['buffer_pool_limit'] = "256m"
-    exec_option['num_nodes'] = "1"
     table_format = vector.get_value('table_format')
 
     result = transpose_results(self.execute_query(
@@ -226,11 +227,10 @@ class TestQueryFullSort(ImpalaTestSuite):
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_sort_reservation_usage(self, vector):
-    """Tests for sorter reservation usage."""
-    new_vector = deepcopy(vector)
-    # Run with num_nodes=1 to make execution more deterministic.
-    new_vector.get_value('exec_option')['num_nodes'] = 1
-    self.run_test_case('sort-reservation-usage-single-node', new_vector)
+    """Tests for sorter reservation usage.
+    Run with num_nodes=1 to make execution more deterministic."""
+    self.run_test_case('sort-reservation-usage-single-node', vector)
+
 
 class TestRandomSort(ImpalaTestSuite):
   @classmethod
@@ -240,8 +240,8 @@ class TestRandomSort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestRandomSort, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
-        *MAX_SORT_RUN_SIZE))
+    # TODO: uncomment once IMPALA-13334 resolved.
+    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
 
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -286,7 +286,6 @@ class TestRandomSort(ImpalaTestSuite):
     assert (results == sorted(results))
 
 
-
 class TestPartialSort(ImpalaTestSuite):
   """Test class to do functional validation of partial sorts."""
 
@@ -297,8 +296,8 @@ class TestPartialSort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestPartialSort, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
-        *MAX_SORT_RUN_SIZE))
+    # TODO: uncomment once IMPALA-13334 resolved.
+    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
 
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -344,7 +343,8 @@ class TestPartialSort(ImpalaTestSuite):
 
 
 class TestArraySort(ImpalaTestSuite):
-  """Tests where there are arrays in the sorting tuple."""
+  """Tests where there are arrays in the sorting tuple.
+  These tests run with num_nodes=1."""
 
   @classmethod
   def get_workload(self):
@@ -353,8 +353,10 @@ class TestArraySort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestArraySort, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('max_sort_run_size',
-        *MAX_SORT_RUN_SIZE))
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(cluster_sizes=[1]))
+    # TODO: uncomment once IMPALA-13334 resolved.
+    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
+
     # The table we use is a parquet table.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
@@ -378,7 +380,6 @@ class TestArraySort(ImpalaTestSuite):
 
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
-    exec_option['num_nodes'] = 1
     exec_option['buffer_pool_limit'] = '44m'
     table_format = vector.get_value('table_format')
 

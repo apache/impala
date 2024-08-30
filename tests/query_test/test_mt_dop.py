@@ -27,7 +27,9 @@ from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_dimensions import (
+    add_exec_option_dimension,
+    add_mandatory_exec_option)
 from tests.util.filesystem_utils import IS_HDFS
 
 LOG = logging.getLogger('test_mt_dop')
@@ -43,7 +45,7 @@ class TestMtDop(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMtDop, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
 
   @classmethod
   def get_workload(cls):
@@ -51,12 +53,10 @@ class TestMtDop(ImpalaTestSuite):
 
   def test_mt_dop(self, vector):
     new_vector = deepcopy(vector)
-    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     del new_vector.get_value('exec_option')['batch_size']  # .test file sets batch_size
     self.run_test_case('QueryTest/mt-dop', new_vector)
 
   def test_compute_stats(self, vector, unique_database):
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     file_format = vector.get_value('table_format').file_format
     fq_table_name = "%s.mt_dop" % unique_database
 
@@ -107,48 +107,57 @@ class TestMtDopParquet(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMtDopParquet, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_parquet(self, vector):
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet', vector)
 
   @pytest.mark.xfail(ImpalaTestClusterProperties.get_instance().is_remote_cluster(),
                      reason='IMPALA-4641')
   def test_parquet_nested(self, vector):
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet-nested', vector)
 
   @SkipIfEC.parquet_file_size
   def test_parquet_filtering(self, vector):
     """IMPALA-4624: Test that dictionary filtering eliminates row groups correctly."""
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    new_vector = deepcopy(vector)
     # Disable min-max stats to prevent interference with directionary filtering.
-    vector.get_value('exec_option')['parquet_read_statistics'] = '0'
-    self.run_test_case('QueryTest/parquet-filtering', vector)
+    new_vector.get_value('exec_option')['parquet_read_statistics'] = '0'
+    self.run_test_case('QueryTest/parquet-filtering', new_vector)
+
+
+class TestMtDopNonZeroParquet(ImpalaTestSuite):
+  """Test against parquet and MT_DOP > 0."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMtDopNonZeroParquet, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('mt_dop') > 0)
 
   @pytest.mark.execute_serially
   @SkipIfFS.file_or_folder_name_ends_with_period
   def test_mt_dop_insert(self, vector, unique_database):
     """Basic tests for inserts with mt_dop > 0"""
-    mt_dop = vector.get_value('mt_dop')
-    if mt_dop == 0:
-      pytest.skip("Non-mt inserts tested elsewhere")
     self.run_test_case('QueryTest/insert', vector, unique_database,
         test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
         .get_db_name_from_format(vector.get_value('table_format'))})
 
   def test_mt_dop_only_joins(self, vector, unique_database):
     """MT_DOP specific tests for joins."""
-    mt_dop = vector.get_value('mt_dop')
-    if mt_dop == 0:
-      pytest.skip("Test requires mt_dop > 0")
-    vector = deepcopy(vector)
+    new_vector = deepcopy(vector)
     # Allow test to override num_nodes.
-    del vector.get_value('exec_option')['num_nodes']
-    self.run_test_case('QueryTest/joins_mt_dop', vector,
+    del new_vector.get_value('exec_option')['num_nodes']
+    self.run_test_case('QueryTest/joins_mt_dop', new_vector,
        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
 
@@ -156,10 +165,9 @@ class TestMtDopKudu(KuduTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMtDopKudu, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
+    add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
 
   def test_kudu(self, vector, unique_database):
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-kudu', vector, use_db=unique_database)
 
 
@@ -176,10 +184,9 @@ class TestMtDopScheduling(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMtDopScheduling, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', 4))
+    add_mandatory_exec_option(cls, 'mt_dop', 4)
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_scheduling(self, vector):
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet-scheduling', vector)

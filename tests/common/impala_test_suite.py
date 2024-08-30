@@ -1373,8 +1373,10 @@ class ImpalaTestSuite(BaseTestSuite):
     for name in option_dim_names:
       # TODO: enforce these warnings by changing them into pytest.fail()
       if name not in exec_option:
-        LOG.warn("Exec option {} declared as independent dimension but not inserted "
-                 "into {} dimension.".format(name, EXEC_OPTION_KEY))
+        pytest.fail("Exec option {} declared as independent dimension but not inserted "
+            "into {} dimension. Consider using helper function "
+            "add_exec_option_dimension or add_mandatory_exec_option "
+            "to declare it.".format(name, EXEC_OPTION_KEY))
       elif vector.get_value(name) != exec_option[name]:
         pytest.fail("{}[{}]={} does not match against dimension {}={}.".format(
           EXEC_OPTION_KEY, name, exec_option[name], name, vector.get_value(name)))
