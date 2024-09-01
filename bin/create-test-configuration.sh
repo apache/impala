@@ -201,7 +201,7 @@ if [ $CREATE_METASTORE -eq 1 ]; then
 
   # Use schematool to initialize the metastore db schema. It detects the Hive
   # version and invokes the appropriate scripts
-  CLASSPATH={$CLASSPATH}:${CONFIG_DIR} ${HIVE_HOME}/bin/schematool -initSchema -dbType \
+  CLASSPATH=${CLASSPATH}:${CONFIG_DIR} ${HIVE_HOME}/bin/schematool -initSchema -dbType \
 postgres 1>${IMPALA_CLUSTER_LOGS_DIR}/schematool.log 2>&1
   # TODO: We probably don't need to do this anymore
   # Increase the size limit of PARAM_VALUE from SERDE_PARAMS table to be able to create
@@ -213,7 +213,7 @@ fi
 if [ $UPGRADE_METASTORE_DB -eq 1 ]; then
   echo "Upgrading the schema of metastore db ${METASTORE_DB}. Check \
 ${IMPALA_CLUSTER_LOGS_DIR}/schematool.log for details."
-  CLASSPATH={$CLASSPATH}:${CONFIG_DIR} ${HIVE_HOME}/bin/schematool -upgradeSchema \
+  CLASSPATH=${CLASSPATH}:${CONFIG_DIR} ${HIVE_HOME}/bin/schematool -upgradeSchema \
 -dbType postgres 1>${IMPALA_CLUSTER_LOGS_DIR}/schematool.log 2>&1
 fi
 

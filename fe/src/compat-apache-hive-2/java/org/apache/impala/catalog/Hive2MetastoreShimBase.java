@@ -30,6 +30,9 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidTxnList;
@@ -40,8 +43,8 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.LockRequestBuilder;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
-import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Decimal;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
@@ -59,9 +62,7 @@ import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
-import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
-import org.apache.hadoop.hive.metastore.utils.FileUtils;
-import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
 import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
@@ -69,6 +70,7 @@ import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.events.MetastoreEventProcessorConfig;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.TransactionException;
@@ -85,13 +87,12 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 
 /**
- * Base class for Hive 3 MetastoreShim.
+ * Base class for Hive 2 MetastoreShim.
  */
-public class Hive3MetastoreShimBase {
-  private static final Logger LOG = LoggerFactory.getLogger(Hive3MetastoreShimBase.class);
+public class Hive2MetastoreShimBase {
+  private static final Logger LOG = LoggerFactory.getLogger(Hive2MetastoreShimBase.class);
 
   protected static final String EXTWRITE = "EXTWRITE";
   protected static final String EXTREAD = "EXTREAD";
@@ -105,7 +106,7 @@ public class Hive3MetastoreShimBase {
   protected static final String HIVEMQT = "HIVEMQT";
   // Virtual View
   protected static final String HIVESQL = "HIVESQL";
-  protected static final long MAJOR_VERSION = 3;
+  protected static final long MAJOR_VERSION = 2;
   protected static boolean capabilitiestSet_ = false;
 
   // Max sleep interval during acquiring an ACID lock.
@@ -118,8 +119,7 @@ public class Hive3MetastoreShimBase {
   // Not final, as it makes sense to set it based on role + instance, see IMPALA-8853.
   public static String TRANSACTION_USER_ID = "Impala";
 
-  public static String HIVE_METASTORE_WAREHOUSE_EXTERNAL =
-      HiveConf.ConfVars.HIVE_METASTORE_WAREHOUSE_EXTERNAL.varname;
+  public static String HIVE_METASTORE_WAREHOUSE_EXTERNAL = "";
 
   /**
    * Initializes and returns a TblTransaction object for table 'tbl'. Opens a new
@@ -128,39 +128,17 @@ public class Hive3MetastoreShimBase {
   public static TblTransaction createTblTransaction(
       IMetaStoreClient client, Table tbl, long txnId)
       throws TransactionException {
-    TblTransaction tblTxn = new TblTransaction();
-    try {
-      if (txnId <= 0) {
-        txnId = openTransaction(client);
-        tblTxn.ownsTxn = true;
-      }
-      tblTxn.txnId = txnId;
-      tblTxn.writeId =
-          allocateTableWriteId(client, txnId, tbl.getDbName(), tbl.getTableName());
-      tblTxn.validWriteIds =
-          getValidWriteIdListInTxn(client, tbl.getDbName(), tbl.getTableName(), txnId);
-      return tblTxn;
-    } catch (TException e) {
-      if (tblTxn.ownsTxn) {
-        abortTransactionNoThrow(client, tblTxn.txnId);
-      }
-      throw new TransactionException(
-          String.format(HMS_RPC_ERROR_FORMAT_STR, "createTblTransaction"), e);
-    }
+    throw new UnsupportedOperationException("createTblTransaction");
   }
 
   static public void commitTblTransactionIfNeeded(IMetaStoreClient client,
       TblTransaction tblTxn) throws TransactionException {
-    if (tblTxn.ownsTxn) {
-      commitTransaction(client, tblTxn.txnId);
-    }
+    throw new UnsupportedOperationException("commitTblTransactionIfNeeded");
   }
 
   static public void abortTblTransactionIfNeeded(IMetaStoreClient client,
       TblTransaction tblTxn) {
-    if (tblTxn.ownsTxn) {
-      abortTransactionNoThrow(client, tblTxn.txnId);
-    }
+    throw new UnsupportedOperationException("abortTblTransactionIfNeeded");
   }
 
   /**
@@ -202,8 +180,7 @@ public class Hive3MetastoreShimBase {
   public static void createTableWithConstraints(IMetaStoreClient client,
       Table newTbl, List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
       throws InvalidOperationException, MetaException, TException {
-    client.createTableWithConstraints(newTbl, primaryKeys, foreignKeys, null, null,
-        null, null);
+    client.createTableWithConstraints(newTbl, primaryKeys, foreignKeys);
   }
 
   /**
@@ -212,16 +189,14 @@ public class Hive3MetastoreShimBase {
    */
   public static void updatePartitionStatsFast(Partition partition, Table tbl,
       Warehouse warehouse) throws MetaException {
-    MetaStoreUtils.updatePartitionStatsFast(partition, tbl, warehouse, /*madeDir*/false,
-        /*forceRecompute*/false,
-        /*environmentContext*/null, /*isCreate*/false);
+    MetaStoreUtils.updatePartitionStatsFast(partition, warehouse, null);
   }
 
   /**
    * Return the maximum number of Metastore objects that should be retrieved in a batch.
    */
   public static String metastoreBatchRetrieveObjectsMaxConfigKey() {
-    return MetastoreConf.ConfVars.BATCH_RETRIEVE_OBJECTS_MAX.toString();
+    return "metastore.batch.retrieve.table.partition.max";
   }
 
   /**
@@ -308,10 +283,7 @@ public class Hive3MetastoreShimBase {
     }
   }
 
-  // hive-3 introduces a catalog object in hive
-  // Impala only supports the default catalog of hive
-  private static final String DEFAULT_CATALOG_NAME = MetaStoreUtils
-      .getDefaultCatalog(MetastoreConf.newMetastoreConf());
+  private static final String DEFAULT_CATALOG_NAME = "hive";
 
   /**
    * Gets the name of the default catalog from metastore configuration.
@@ -571,18 +543,8 @@ public class Hive3MetastoreShimBase {
   private static String getValidWriteIdListInTxn(IMetaStoreClient client, String dbName,
       String tblName, long txnId)
       throws TException {
-    ValidTxnList txns = client.getValidTxns(txnId);
-    String tableFullName = dbName + "." + tblName;
-    List<TableValidWriteIds> writeIdsObj = client.getValidWriteIds(
-        Lists.newArrayList(tableFullName), txns.toString());
-    ValidTxnWriteIdList validTxnWriteIdList = new ValidTxnWriteIdList(txnId);
-    for (TableValidWriteIds tableWriteIds : writeIdsObj) {
-      validTxnWriteIdList.addTableValidWriteIdList(
-          createValidReaderWriteIdList(tableWriteIds));
-    }
-    String validWriteIds =
-        validTxnWriteIdList.getTableValidWriteIdList(tableFullName).writeToString();
-    return validWriteIds;
+    throw new UnsupportedOperationException(
+        "getValidWriteIdListInTxn is not supported.");
   }
 
   /**
@@ -778,11 +740,7 @@ public class Hive3MetastoreShimBase {
    */
   public static long allocateTableWriteId(IMetaStoreClient client, long txnId,
       String dbName, String tableName) throws TransactionException {
-    try {
-      return client.allocateTableWriteId(txnId, dbName, tableName);
-    } catch (Exception e) {
-      throw new TransactionException(e.getMessage());
-    }
+    throw new UnsupportedOperationException("allocateTableWriteId is not supported.");
   }
 
   /**
@@ -801,22 +759,8 @@ public class Hive3MetastoreShimBase {
    */
   private static ValidReaderWriteIdList createValidReaderWriteIdList(
       TableValidWriteIds tableWriteIds) {
-    String fullTableName = tableWriteIds.getFullTableName();
-    long highWater = tableWriteIds.getWriteIdHighWaterMark();
-    List<Long> invalids = tableWriteIds.getInvalidWriteIds();
-    BitSet abortedBits = BitSet.valueOf(tableWriteIds.getAbortedBits());
-    long[] exceptions = new long[invalids.size()];
-    int i = 0;
-    for (long writeId : invalids) {
-      exceptions[i++] = writeId;
-    }
-    if (tableWriteIds.isSetMinOpenWriteId()) {
-      return new ValidReaderWriteIdList(fullTableName, exceptions, abortedBits,
-          highWater, tableWriteIds.getMinOpenWriteId());
-    } else {
-      return new ValidReaderWriteIdList(fullTableName, exceptions, abortedBits,
-          highWater);
-    }
+    throw new UnsupportedOperationException(
+        "createValidReaderWriteIdList is not supported.");
   }
 
   /**
@@ -830,18 +774,7 @@ public class Hive3MetastoreShimBase {
    */
   public static String getPathForNewTable(Database db, Table tbl)
       throws MetaException {
-    Warehouse wh = new Warehouse(new HiveConf());
-    // Non transactional tables are all translated to external tables by HMS's default
-    // transformer (HIVE-22158). Note that external tables can't be transactional.
-    // So the request and result of the default transformer is:
-    //     non transactional managed table => external table
-    //     non transactional external table => external table
-    //     transactional managed table => managed table
-    //     transactional external table (not allowed)
-    boolean isExternal = !AcidUtils.isTransactionalTable(tbl.getParameters());
-    // TODO(IMPALA-9088): deal with customized transformer in HMS.
-    return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
-        .toString();
+    return new Path(db.getLocationUri(), tbl.getTableName().toLowerCase()).toString();
   }
 
   /**
@@ -852,70 +785,43 @@ public class Hive3MetastoreShimBase {
   }
 
   /**
-   * Constructs a new AlterPartitionsInfo object.
-   */
-  public static class AlterPartitionsInfo {
-    private final org.apache.hadoop.hive.metastore.api.Table msTable;
-    private final List<org.apache.hadoop.hive.metastore.api.Partition> partitions;
-    private final boolean isTruncate;
-
-    public AlterPartitionsInfo(org.apache.hadoop.hive.metastore.api.Table msTable,
-        List<org.apache.hadoop.hive.metastore.api.Partition> partitions,
-        boolean isTruncate) {
-      this.msTable = msTable;
-      this.partitions = partitions;
-      this.isTruncate = isTruncate;
-    }
-
-    /**
-     * Returns the Thrift representation of the table.
-     */
-    public org.apache.hadoop.hive.metastore.api.Table getMsTable() {
-      return msTable;
-    }
-
-    /**
-     * Returns the list of Thrift partition objects affected by the reload.
-     * Can be null or empty if not applicable.
-     */
-    public List<org.apache.hadoop.hive.metastore.api.Partition> getPartitions() {
-      return partitions;
-    }
-
-    /**
-     * Returns true if the reload operation was due to a TRUNCATE TABLE.
-     */
-    public boolean isTruncate() {
-      return isTruncate;
-    }
-  }
-
-  /**
-   * Wrapper around MetaStoreUtils.isExternalTable
+   * Wrapper around MetaStoreUtils.isExternalTable()
    */
   public static boolean isExternalTable(Table table) {
     return MetaStoreUtils.isExternalTable(table);
   }
 
   public static Decimal newDecimal(short scale, ByteBuffer unscaled) {
-    return new Decimal(scale, unscaled);
+    return new Decimal(unscaled, scale);
   }
 
+  /**
+   * Used for hive-3 only
+   */
   public static PrincipalType getTableOwnerType(Table table) {
-    return table.getOwnerType();
+    return null;
   }
 
+  /**
+   * Used for hive-3 only
+   */
   public static void setInsertEventRequestDataReplace(
       InsertEventRequestData insertEventRequestData, boolean isInsertOverwrite) {
-    insertEventRequestData.setReplace(isInsertOverwrite);
   }
 
+  /**
+   * Used for hive-3 only
+   */
   public static void setTableOwnerType(Table table, PrincipalType principalType) {
-    table.setOwnerType(principalType);
   }
 
   public static String getMetastoreConfigValue(
       IMetaStoreClient client, String config, String defaultVal) throws TException {
+    String metastoreDefaultCatalogNameKey = MetastoreEventProcessorConfig
+        .METASTORE_DEFAULT_CATALOG_NAME.getValidator().getConfigKey();
+    if (StringUtils.equals(config, metastoreDefaultCatalogNameKey)) {
+      return DEFAULT_CATALOG_NAME;
+    }
     return MetaStoreUtil.getMetastoreConfigValue(client, config, defaultVal);
   }
 }

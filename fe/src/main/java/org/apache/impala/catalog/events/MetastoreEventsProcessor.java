@@ -939,7 +939,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       throws TException {
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       IMetaStoreClient iMetaStoreClient = metaStoreClient.getHiveClient();
-      return MetaStoreUtil.getMetastoreConfigValue(iMetaStoreClient, config, defaultVal);
+      return MetastoreShim.getMetastoreConfigValue(iMetaStoreClient, config, defaultVal);
     }
   }
 

@@ -506,7 +506,8 @@ def get_hadoop_downloads():
   cluster_components = []
   use_apache_hadoop = os.environ["USE_APACHE_HADOOP"] == "true"
   use_apache_hbase = os.environ["USE_APACHE_HBASE"] == "true"
-  use_apache_hive = os.environ["USE_APACHE_HIVE_3"] == "true"
+  use_apache_hive = (os.environ["USE_APACHE_HIVE_3"] == "true"
+                     or os.environ["USE_APACHE_HIVE_2"] == "true")
   use_apache_tez = os.environ["USE_APACHE_TEZ"] == "true"
   use_apache_ranger = os.environ["USE_APACHE_RANGER"] == "true"
   use_apache_ozone = os.environ["USE_APACHE_OZONE"] == "true"

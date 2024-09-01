@@ -46,6 +46,7 @@ import org.apache.impala.catalog.local.LocalView;
 import org.apache.impala.catalog.local.MetaProvider;
 import org.apache.impala.catalog.local.MultiMetaProvider;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
@@ -275,6 +276,21 @@ public abstract class FeCatalogUtils {
         .map(l -> PartitionKeyValue.getPartitionKeyValueString(
              l, MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE))
         .collect(Collectors.toList());
+    return FileUtils.makePartName(partitionKeys, partitionValues);
+  }
+
+  public static String getPartitionName(List<String> partitionKeys,
+      Map<String, String> partitionColNameToValue) throws CatalogException {
+    List<String> partitionValues = new ArrayList<>();
+    for (String partitionColName : partitionKeys) {
+      String partitionValue = partitionColNameToValue.get(partitionColName);
+      if (partitionValue == null) {
+        String errorMessage = String.format("Can't find column %s in %s",
+            partitionColName, partitionColNameToValue);
+        throw new CatalogException(errorMessage);
+      }
+      partitionValues.add(partitionValue);
+    }
     return FileUtils.makePartName(partitionKeys, partitionValues);
   }
 

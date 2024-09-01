@@ -40,6 +40,61 @@ the same dependencies
       <artifactId>hive-exec</artifactId>
     </dependency>
   </dependencies>
+
+  <!-- For different major versions of Hive, some classes have differences
+    in namespaces. -->
+  <profiles>
+    <profile>
+      <id>hive-major-version-3</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>3</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <configuration>
+              <relocations>
+                <relocation>
+                  <pattern>com.google</pattern>
+                  <shadedPattern>hiveexec.com.google</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>hive-major-version-2</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>2</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <configuration>
+              <relocations>
+                <relocation>
+                  <pattern>org.apache.hive.com.google</pattern>
+                  <shadedPattern>hiveexec.com.google</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
   <build>
     <plugins>
       <plugin>
@@ -51,10 +106,6 @@ the same dependencies
             </includes>
           </artifactSet>
           <relocations>
-            <relocation>
-              <pattern>com.google</pattern>
-              <shadedPattern>hiveexec.com.google</shadedPattern>
-            </relocation>
             <relocation>
               <pattern>org.joda.time</pattern>
               <shadedPattern>hiveexec.org.joda.time</shadedPattern>

@@ -237,7 +237,8 @@ abstract class LocalTable implements FeTable {
       LOG.warn("Owner of {} is unknown due to msTable is unloaded", getFullName());
       return null;
     }
-    return msTable_.getOwnerType() == PrincipalType.USER ? msTable_.getOwner() : null;
+    return MetastoreShim.getTableOwnerType(msTable_) == PrincipalType.USER ?
+        msTable_.getOwner() : null;
   }
 
   @Override

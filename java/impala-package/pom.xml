@@ -76,4 +76,41 @@ under the License.
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>hive-major-version-2</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>2</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>1.8</version>
+            <executions>
+              <execution>
+                <id>copy-hive-metastore-2-dep</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <echo message="Copying hive-metastore-2.x.jar"/>
+                    <copy file="${hive.home}/lib/hive-metastore-${hive.version}.jar"
+                          tofile="${project.build.directory}/dependency/hive-metastore-${hive.version}.jar"/>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

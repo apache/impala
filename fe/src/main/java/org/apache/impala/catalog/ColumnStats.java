@@ -38,6 +38,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TColumnValue;
@@ -933,11 +934,11 @@ public class ColumnStats {
           Decimal highValue = null;
           ScalarType colTypeScalar = (ScalarType) colType;
           if (isLowValueSet && colStats.low_value.isSetDecimal_val()) {
-            lowValue = new Decimal((short) colTypeScalar.decimalScale(),
+            lowValue = MetastoreShim.newDecimal((short) colTypeScalar.decimalScale(),
                 colStats.low_value.bufferForDecimal_val());
           }
           if (isHighValueSet && colStats.high_value.isSetDecimal_val()) {
-            highValue = new Decimal((short) colTypeScalar.decimalScale(),
+            highValue = MetastoreShim.newDecimal((short) colTypeScalar.decimalScale(),
                 colStats.high_value.bufferForDecimal_val());
           }
           updateLowAndHighForHiveColumnStatsData(lowValue, highValue, decimalStatsData);

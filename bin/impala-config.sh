@@ -272,6 +272,8 @@ export APACHE_RANGER_VERSION=2.4.0
 export APACHE_TEZ_VERSION=0.10.2
 export APACHE_HIVE_3_VERSION=3.1.3
 export APACHE_HIVE_3_STORAGE_API_VERSION=2.7.0
+export APACHE_HIVE_2_VERSION=2.3.9
+export APACHE_HIVE_2_STORAGE_API_VERSION=2.4.0
 export APACHE_OZONE_VERSION=1.4.0
 
 # Java dependencies that are not also runtime components. Declaring versions here allows
@@ -400,7 +402,18 @@ if ${USE_APACHE_COMPONENTS:=false}; then
   export IMPALA_TEZ_VERSION=${APACHE_TEZ_VERSION}
   export USE_APACHE_HADOOP=true
   export USE_APACHE_HBASE=true
-  export USE_APACHE_HIVE_3=true
+  export USE_APACHE_HIVE_3=${USE_APACHE_HIVE_3:-false}
+  export USE_APACHE_HIVE_2=${USE_APACHE_HIVE_2:-false}
+  if [[ "${USE_APACHE_HIVE_3,,}" != "true" && "${USE_APACHE_HIVE_2,,}" != "true" ]]; then
+    echo "ERROR: The major version of Apache Hive must be specified:"
+    echo "  Apache Hive 2.x: export USE_APACHE_HIVE_2=true"
+    echo "  Apache Hive 3.x: export USE_APACHE_HIVE_3=true"
+    return 1
+  fi
+  if [[ "${USE_APACHE_HIVE_3,,}" == "true" && "${USE_APACHE_HIVE_2,,}" == "true" ]]; then
+    echo "ERROR: The major version of Apache Hive is ambiguous."
+    return 1
+  fi
   export USE_APACHE_TEZ=true
   export USE_APACHE_RANGER=true
   export USE_APACHE_OZONE=true
@@ -423,6 +436,7 @@ else
   export USE_APACHE_HADOOP=${USE_APACHE_HADOOP:=false}
   export USE_APACHE_HBASE=${USE_APACHE_HBASE:=false}
   export USE_APACHE_HIVE_3=${USE_APACHE_HIVE_3:=false}
+  export USE_APACHE_HIVE_2=${USE_APACHE_HIVE_2:=false}
   export USE_APACHE_TEZ=${USE_APACHE_TEZ:=false}
   export USE_APACHE_RANGER=${USE_APACHE_RANGER:=false}
   export USE_APACHE_OZONE=${USE_APACHE_OZONE:=false}
@@ -444,6 +458,14 @@ if $USE_APACHE_HIVE_3; then
   export IMPALA_HIVE_URL=${APACHE_HIVE_3_URL-}
   export IMPALA_HIVE_SOURCE_URL=${APACHE_HIVE_3_SOURCE_URL-}
   export IMPALA_HIVE_STORAGE_API_VERSION=${APACHE_HIVE_3_STORAGE_API_VERSION}
+elif $USE_APACHE_HIVE_2; then
+  # When USE_APACHE_HIVE_2 is set we use the apache hive version to build as well
+  # as deploy in the minicluster
+  export IMPALA_HIVE_DIST_TYPE="apache-hive-2"
+  export IMPALA_HIVE_VERSION=${APACHE_HIVE_2_VERSION}
+  export IMPALA_HIVE_URL=${APACHE_HIVE_2_URL-}
+  export IMPALA_HIVE_SOURCE_URL=${APACHE_HIVE_2_SOURCE_URL-}
+  export IMPALA_HIVE_STORAGE_API_VERSION=${APACHE_HIVE_2_STORAGE_API_VERSION}
 else
   # CDP hive version is used to build and deploy in minicluster when USE_APACHE_HIVE_* is
   # false
@@ -465,7 +487,7 @@ fi
 # infra/python/deps/requirements.txt.
 export IMPALA_THRIFT_CPP_VERSION=0.16.0-p7
 unset IMPALA_THRIFT_CPP_URL
-if $USE_APACHE_HIVE_3; then
+if $USE_APACHE_HIVE_3 || $USE_APACHE_HIVE_2; then
   # Apache Hive 3 clients can't run on thrift versions >= 0.14 (IMPALA-11801)
   export IMPALA_THRIFT_POM_VERSION=0.11.0
   export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p5
@@ -483,10 +505,9 @@ unset IMPALA_THRIFT_PY_URL
 # disable tests and functionality.
 export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
 
-# Hive 1 and 2 are no longer supported.
-if [[ "${IMPALA_HIVE_MAJOR_VERSION}" == "1" ||
-      "${IMPALA_HIVE_MAJOR_VERSION}" == "2" ]]; then
-  echo "Hive 1 and 2 are no longer supported"
+# Hive 1 is no longer supported.
+if [[ "${IMPALA_HIVE_MAJOR_VERSION}" == "1" ]]; then
+  echo "Hive 1 is no longer supported"
   return 1
 fi
 
@@ -718,7 +739,7 @@ DEFAULT_NODES_DIR="$IMPALA_HOME/testdata/cluster/cdh$CDH_MAJOR_VERSION$UNIQUE_FS
 export IMPALA_CLUSTER_NODES_DIR="${IMPALA_CLUSTER_NODES_DIR-$DEFAULT_NODES_DIR}"
 
 ESCAPED_DB_UID=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$UNIQUE_FS_LABEL$IMPALA_HOME")
-if $USE_APACHE_HIVE_3; then
+if $USE_APACHE_HIVE_3 || $USE_APACHE_HIVE_2; then
   export HIVE_HOME="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
   export HIVE_SRC_DIR="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-src"
   # if apache hive is being used change the metastore db name, so we don't have to
@@ -734,8 +755,12 @@ else
   export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_DB_UID)_cdp"}
 fi
 # Set the path to the hive_metastore.thrift which is used to build thrift code
-export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
+if $USE_APACHE_HIVE_2; then
+  export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/metastore/if
+else
+  export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
 "$HIVE_SRC_DIR/standalone-metastore/src/main/thrift"}
+fi
 if $USE_APACHE_TEZ; then
   export TEZ_HOME="$APACHE_COMPONENTS_HOME/apache-tez-${IMPALA_TEZ_VERSION}-bin"
 else

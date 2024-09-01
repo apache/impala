@@ -223,6 +223,7 @@ tests/shell/test_close_queries.sql
 tests/shell/test_file_comments.sql
 tests/shell/test_file_no_comments.sql
 tests/shell/test_var_substitution.sql
+testdata/cluster/hive2/*.diff
 
 # symlink to testdata/workloads/tpcds/queries
 testdata/workloads/tpcds_partitioned/queries

@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.analysis.QueryStringBuilder.Create;
 import org.apache.impala.analysis.QueryStringBuilder.Drop;
 import org.apache.impala.analysis.QueryStringBuilder.Invalidate;
@@ -39,6 +38,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TConvertTableRequest;
@@ -108,9 +108,9 @@ public class ConvertTableToIcebergStmt extends StatementBase implements SingleTa
           "CONVERT TO ICEBERG is not supported for transactional tables");
     }
 
-    if (!MetaStoreUtils.isExternalTable(table.getMetaStoreTable())) {
+    if (!MetastoreShim.isExternalTable(table.getMetaStoreTable())) {
       throw new AnalysisException(
-              "CONVERT TO ICEBERG is not supported for managed tables");
+          "CONVERT TO ICEBERG is not supported for managed tables");
     }
 
     StorageDescriptor sd = table.getMetaStoreTable().getSd();

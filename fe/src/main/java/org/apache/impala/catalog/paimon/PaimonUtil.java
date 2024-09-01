@@ -255,9 +255,14 @@ public class PaimonUtil {
       }
       case HIVE_CATALOG: {
         try {
-          String location = isExternal ?
-              hiveConf_.get(HiveConf.ConfVars.HIVE_METASTORE_WAREHOUSE_EXTERNAL.varname) :
-              hiveConf_.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname);
+          String location = "";
+          if (MetastoreShim.getMajorVersion() == 2) {
+            location = hiveConf_.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname);
+          } else {
+            location = isExternal ?
+                hiveConf_.get(MetastoreShim.HIVE_METASTORE_WAREHOUSE_EXTERNAL) :
+                hiveConf_.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname);
+          }
           Path path = new Path(location);
           Options catalogOptions = new Options();
           catalogOptions.set(CatalogOptions.WAREHOUSE, location);

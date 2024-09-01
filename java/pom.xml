@@ -40,6 +40,7 @@ under the License.
     <hive.storage.api.version>${env.IMPALA_HIVE_STORAGE_API_VERSION}</hive.storage.api.version>
     <hive.major.version>${env.IMPALA_HIVE_MAJOR_VERSION}</hive.major.version>
     <hive.dist.type>${env.IMPALA_HIVE_DIST_TYPE}</hive.dist.type>
+    <hive.home>${env.HIVE_HOME}</hive.home>
     <hudi.version>${env.IMPALA_HUDI_VERSION}</hudi.version>
     <paimon.version>${env.IMPALA_PAIMON_VERSION}</paimon.version>
     <arrow.version>${env.IMPALA_ARROW_VERSION}</arrow.version>
@@ -239,6 +240,21 @@ under the License.
       <releases>
         <enabled>false</enabled>
       </releases>
+    </repository>
+    <repository>
+      <!--
+      When compiling with Apache Hive 2.x, it is necessary to get the
+      pentaho-aggdesigner-algorithm dependency. This Maven repository address from Alibaba
+      Cloud can be used to stably get it.
+      -->
+      <id>spring-plugins-release</id>
+      <url>https://maven.aliyun.com/repository/spring-plugin</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
     </repository>
   </repositories>
   <pluginRepositories>

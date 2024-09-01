@@ -463,6 +463,9 @@ bootstrap_dependencies() {
   if [[ "${USE_APACHE_HIVE_3}" = true ]]; then
     "$IMPALA_HOME/testdata/bin/patch_hive.sh"
   fi
+  if [[ "${USE_APACHE_HIVE_2}" = true ]]; then
+    "$IMPALA_HOME/testdata/bin/patch_hive2.sh"
+  fi
 }
 
 # Build the Impala frontend and its dependencies.

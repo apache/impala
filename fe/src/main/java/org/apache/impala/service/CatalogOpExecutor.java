@@ -3382,8 +3382,8 @@ public class CatalogOpExecutor {
           authzManager_.updateTableOwnerPrivilege(params.server_name,
               table.getDb().getName(), table.getName(),
               table.getMetaStoreTable().getOwner(),
-              table.getMetaStoreTable().getOwnerType(), /* newOwner */ null,
-              /* newOwnerType */ null, resp);
+              MetastoreShim.getTableOwnerType(table.getMetaStoreTable()),
+              /* newOwner */ null, /* newOwnerType */ null, resp);
         }
       }
     } finally {
@@ -3699,8 +3699,8 @@ public class CatalogOpExecutor {
           // We will issue an HMS API call. Register in-flight event before we do.
           modification.registerInflightEvent();
           String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
-          client.getHiveClient()
-              .truncateTable(dbName, hdfsTable.getName(), null);
+          MetastoreShim.truncateTable(client.getHiveClient(), dbName,
+              hdfsTable.getName(), null, null, -1L);
           catalogTimeline.markEvent("Truncated table in Metastore");
           LOG.trace("Time elapsed after truncating table {} using HMS API: {} msec",
               hdfsTable.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
@@ -4187,8 +4187,8 @@ public class CatalogOpExecutor {
       if (authzConfig_.isEnabled()) {
         authzManager_.updateTableOwnerPrivilege(serverName, msTable.getDbName(),
             msTable.getTableName(), /* oldOwner */ null,
-            /* oldOwnerType */ null, msTable.getOwner(), msTable.getOwnerType(),
-            response);
+            /* oldOwnerType */ null, msTable.getOwner(),
+            MetastoreShim.getTableOwnerType(msTable), response);
       }
     } finally {
       getMetastoreDdlLock().unlock();
@@ -6714,9 +6714,10 @@ public class CatalogOpExecutor {
       InProgressTableModification modification) throws ImpalaException {
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     String oldOwner = msTbl.getOwner();
-    PrincipalType oldOwnerType = msTbl.getOwnerType();
+    PrincipalType oldOwnerType = MetastoreShim.getTableOwnerType(msTbl);
     msTbl.setOwner(params.owner_name);
-    msTbl.setOwnerType(PrincipalType.valueOf(params.owner_type.name()));
+    MetastoreShim.setTableOwnerType(msTbl,
+        PrincipalType.valueOf(params.owner_type.name()));
 
     // A KuduTable is synchronized if it is a managed KuduTable, or an external table
     // with the property of 'external.table.purge' being true.
@@ -6737,7 +6738,7 @@ public class CatalogOpExecutor {
     if (authzConfig_.isEnabled()) {
       authzManager_.updateTableOwnerPrivilege(params.server_name, msTbl.getDbName(),
           msTbl.getTableName(), oldOwner, oldOwnerType, msTbl.getOwner(),
-          msTbl.getOwnerType(), response);
+          MetastoreShim.getTableOwnerType(msTbl), response);
     }
   }
 
@@ -8213,7 +8214,8 @@ public class CatalogOpExecutor {
       new ArrayList<>(newFiles.size()));
     boolean isTransactional = AcidUtils.isTransactionalTable(tbl);
     MetastoreShim.setPartitionVal(insertEventRequestData, partVals);
-    insertEventRequestData.setReplace(isInsertOverwrite);
+    MetastoreShim.setInsertEventRequestDataReplace(insertEventRequestData,
+        isInsertOverwrite);
     for (FileMetadata metadata : newFiles) {
       insertEventRequestData.addToFilesAdded(metadata.filename);
       insertEventRequestData.addToFilesAddedChecksum(metadata.getChecksum());

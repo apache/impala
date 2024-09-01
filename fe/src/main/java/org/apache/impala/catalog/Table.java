@@ -954,7 +954,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       LOG.warn("Owner of {} is unknown due to table is unloaded", getFullName());
       return null;
     }
-    return msTable_.getOwnerType() == PrincipalType.USER ? msTable_.getOwner() : null;
+    return MetastoreShim.getTableOwnerType(msTable_) == PrincipalType.USER ?
+        msTable_.getOwner() : null;
   }
 
   public void setMetaStoreTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {

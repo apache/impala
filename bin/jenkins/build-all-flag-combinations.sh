@@ -49,8 +49,11 @@ CONFIGS=(
   "-skiptests -noclean -tsan"
   "-skiptests -noclean -ubsan -so -ninja"
   # USE_APACHE_HIVE_3=true build:
-  "-skiptests -noclean -use_apache_components"
-  "-notests -noclean -use_apache_components -package"
+  "-skiptests -noclean -use_apache_components -use_apache_hive_3"
+  "-notests -noclean -use_apache_components -use_apache_hive_3 -package"
+  # USE_APACHE_HIVE_2=true build:
+  "-skiptests -noclean -use_apache_components -use_apache_hive_2"
+  "-notests -noclean -use_apache_components -use_apache_hive_2 -package"
 )
 
 FAILED=""
@@ -78,6 +81,22 @@ for CONFIG in "${CONFIGS[@]}"; do
     export USE_APACHE_COMPONENTS=false
   fi
   DESCRIPTION="Options $CONFIG USE_APACHE_COMPONENTS=$USE_APACHE_COMPONENTS"
+
+  CONFIG2=${CONFIG/-use_apache_hive_3/}
+  if [[ "$CONFIG" != "$CONFIG2" ]]; then
+    CONFIG=$CONFIG2
+    export USE_APACHE_HIVE_3=true
+    export USE_APACHE_HIVE_2=false
+  fi
+  DESCRIPTION="Options $CONFIG USE_APACHE_HIVE_3=$USE_APACHE_HIVE_3"
+
+  CONFIG2=${CONFIG/-use_apache_hive_2/}
+  if [[ "$CONFIG" != "$CONFIG2" ]]; then
+    CONFIG=$CONFIG2
+    export USE_APACHE_HIVE_2=true
+    export USE_APACHE_HIVE_3=false
+  fi
+  DESCRIPTION="Options $CONFIG USE_APACHE_HIVE_2=$USE_APACHE_HIVE_2"
 
   if [[ $# == 1 && $1 == "--dryrun" ]]; then
     echo $DESCRIPTION

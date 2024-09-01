@@ -61,7 +61,7 @@ add_custom_command(
 
 add_custom_target(function-registry ALL DEPENDS ${CODE_GEN_OUTPUT})
 
-if($ENV{USE_APACHE_HIVE_3} STREQUAL "false")
+if($ENV{USE_APACHE_HIVE_3} STREQUAL "false" AND $ENV{USE_APACHE_HIVE_2} STREQUAL "false")
   add_custom_target(geospatial-udf-wrappers ALL DEPENDS ${GEOSPATIAL_CODE_GEN_OUTPUT})
   add_dependencies(geospatial-udf-wrappers function-registry)
 else()

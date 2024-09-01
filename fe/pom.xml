@@ -362,102 +362,6 @@ under the License.
       <artifactId>datasketches-java</artifactId>
     </dependency>
 
-    <!-- Needed for tests like JdbcTest which instantiates HiveDriver -->
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-jdbc</artifactId>
-      <version>${hive.version}</version>
-      <scope>test</scope>
-      <exclusions>
-        <!-- Exclusions needed for Hive 3.1.3 -->
-        <exclusion>
-          <groupId>org.apache.hbase</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-        <!-- We should exclude hive-serde since it brings along a
-           different version of flatbuffers causing problems for loading tables -->
-        <exclusion>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-serde</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-metastore</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive.shims</groupId>
-          <artifactId>hive-shims-0.20</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.ant</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
-          <groupId>org.fusesource.leveldbjni</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.cloudera</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-classification</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-standalone-metastore</artifactId>
-      <version>${hive.version}</version>
-      <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-serde</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-shims</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.cloudera</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
     <!-- needed for JobConf, which HiveConf inherits from -->
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -1105,6 +1009,367 @@ under the License.
   </build>
 
   <profiles>
+    <!--
+    Select the dependencies related to Hive based on the
+    environment variable IMPALA_HIVE_MAJOR_VERSION.
+    -->
+    <profile>
+      <id>hive-major-version-3</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>3</value>
+        </property>
+      </activation>
+      <dependencies>
+        <!-- Needed for tests like JdbcTest which instantiates HiveDriver -->
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-jdbc</artifactId>
+          <version>${hive.version}</version>
+          <scope>test</scope>
+          <exclusions>
+            <!-- Exclusions needed for Hive 3.1.3 -->
+            <exclusion>
+              <groupId>org.apache.hbase</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-1.2-api</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+            <!-- We should exclude hive-serde since it brings along a
+               different version of flatbuffers causing problems for loading tables -->
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-serde</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-metastore</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive.shims</groupId>
+              <artifactId>hive-shims-0.20</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+              <groupId>org.fusesource.leveldbjni</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>com.cloudera</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-classification</artifactId>
+          <version>${hive.version}</version>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-standalone-metastore</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-1.2-api</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-serde</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-shims</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hadoop</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>com.cloudera</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </profile>
+
+    <profile>
+      <id>hive-major-version-2</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>2</value>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-service</artifactId>
+          <version>${hive.version}</version>
+          <!--
+              hive-service pulls in an incoherent (not ${hadoop.version}) version of
+              hadoop-client via this dependency, which we don't need.
+          -->
+          <exclusions>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-llap-server</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-exec</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.calcite.avatica</groupId>
+              <artifactId>avatica</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.calcite</groupId>
+              <artifactId>calcite-core</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.calcite</groupId>
+              <artifactId>calcite-avatica</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.calcite</groupId>
+              <artifactId>calcite-linq4j</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+              <groupId>io.netty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-serde</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+              <groupId>org.fusesource.leveldbjni</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+              <groupId>io.netty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-common</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses reload4j v1; avoid pulling in log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+              <groupId>io.netty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.commons</groupId>
+              <artifactId>commons-lang3</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-jdbc</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+            <!-- Impala uses reload4j v1; avoid pulling in log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+              <groupId>io.netty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+              <groupId>org.fusesource.leveldbjni</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.commons</groupId>
+              <artifactId>commons-lang3</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-metastore</artifactId>
+          <version>${hive.version}</version>
+          <scope>system</scope>
+          <systemPath>${hive.home}/lib/hive-metastore-${hive.version}.jar</systemPath>
+          <exclusions>
+            <!-- Impala uses reload4j v1; avoid pulling in log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+              <groupId>io.netty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.commons</groupId>
+              <artifactId>commons-lang3</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+
+        <dependency>
+          <groupId>org.apache.hive.shims</groupId>
+          <artifactId>hive-shims-common</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses reload4j v1; avoid pulling in log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+              <groupId>org.fusesource.leveldbjni</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+              <groupId>io.netty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.commons</groupId>
+              <artifactId>commons-lang3</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>log4j</groupId>
+              <artifactId>log4j</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </profile>
+
     <profile>
       <id>thrift-home-defined</id>
       <activation>
@@ -1195,6 +1460,80 @@ under the License.
                 <testExclude>**/org/apache/impala/testutil/Catalog*.java</testExclude>
               </testExcludes>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>apache-hive-2</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_DIST_TYPE</name>
+          <value>apache-hive-2</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>1.8</version>
+            <executions>
+              <!-- Deleting the implementation of MetastoreEvents.java in hive3 -->
+              <execution>
+                <id>delete-hive3-metastore-events</id>
+                <phase>process-sources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <echo message="Deleting the MetastoreEvents.java used for adapting to hive-3.x"/>
+                    <delete file="${project.basedir}/src/main/java/org/apache/impala/catalog/events/MetastoreEvents.java"/>
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>copy-hive-metastore-2-dep</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <echo message="Copying hive-metastore-2.x.jar"/>
+                    <copy file="${hive.home}/lib/hive-metastore-${hive.version}.jar"
+                          tofile="${project.build.directory}/dependency/hive-metastore-${hive.version}.jar"/>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <excludes>
+                <exclude>**/org/apache/impala/catalog/metastore/*.java</exclude>
+                <exclude>**/org/apache/impala/catalog/CatalogHmsAPIHelper.java</exclude>
+                <exclude>**/org/apache/impala/catalog/CompactionInfoLoader.java</exclude>
+                <exclude>**/org/apache/impala/catalog/Hive3MetastoreShimBase.java</exclude>
+              </excludes>
+            </configuration>
+            <executions>
+              <execution>
+                <id>default-testCompile</id>
+                <phase>test-compile</phase>
+                <goals>
+                  <goal>testCompile</goal>
+                </goals>
+                <configuration>
+                  <skip>true</skip>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>
