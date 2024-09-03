@@ -48,7 +48,6 @@ using boost::algorithm::trim_copy;
 using kudu::Version;
 using kudu::ParseVersion;
 
-DECLARE_bool(enable_workload_mgmt);
 DECLARE_int32(query_log_write_interval_s);
 DECLARE_int32(query_log_write_timeout_s);
 DECLARE_string(query_log_request_pool);
@@ -197,10 +196,6 @@ static void _errorIfDowngrade(const Version target_ver, const Version actual_ver
 } // _errorIfDowngrade
 
 void ImpalaServer::InitWorkloadManagement() {
-  if (!FLAGS_enable_workload_mgmt) {
-    return;
-  }
-
   // Fully qualified table name based on startup flags.
   const string log_table_name = StrCat(DB, ".", FLAGS_query_log_table_name);
 

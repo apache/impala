@@ -134,6 +134,7 @@ DECLARE_string(debug_actions);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
 DECLARE_bool(enable_ldap_auth);
+DECLARE_bool(enable_workload_mgmt);
 DECLARE_bool(gen_experimental_profile);
 DECLARE_bool(use_local_catalog);
 
@@ -3217,9 +3218,21 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
 
     internal_server_ = shared_from_this();
 
-    ABORT_IF_ERROR(Thread::Create("impala-server", "completed-queries",
-      bind<void>(&ImpalaServer::InitWorkloadManagement, this),
-    &workload_management_thread_));
+    // Initialize workload management (if enabled).
+    {
+      lock_guard<mutex> l(workload_mgmt_threadstate_mu_);
+
+      // Skip starting workload management if workload management is not enabled or the
+      // coordinator shutdown has run before this code runs.
+      if (FLAGS_enable_workload_mgmt && workload_mgmt_thread_state_ == NOT_STARTED) {
+
+        ABORT_IF_ERROR(Thread::Create("impala-server", "completed-queries",
+          bind<void>(&ImpalaServer::InitWorkloadManagement, this),
+        &workload_management_thread_));
+
+        workload_mgmt_thread_state_ = STARTED;
+      }
+    }
   }
   LOG(INFO) << "Initialized coordinator/executor Impala server on "
             << TNetworkAddressToString(exec_env_->configured_backend_address());
@@ -3403,7 +3416,9 @@ Status ImpalaServer::StartShutdown(
   }
 
   // Drain the completed queries queue to the query log table.
-  ShutdownWorkloadManagement();
+  if (FLAGS_enable_workload_mgmt) {
+    ShutdownWorkloadManagement();
+  }
 
   LOG(INFO) << "Shutdown complete, going down.";
   // Use _exit here instead since exit() does cleanup which interferes with the shutdown

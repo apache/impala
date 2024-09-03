@@ -690,7 +690,9 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=9999 "
                                                  "--shutdown_grace_period_s=0 "
-                                                 "--shutdown_deadline_s=15",
+                                                 "--shutdown_deadline_s=15 "
+                                                 "--debug_actions="
+                                                 "WM_SHUTDOWN_DELAY:SLEEP@5000",
                                     catalogd_args="--enable_workload_mgmt")
   def test_flush_on_shutdown(self, vector):
     """Asserts that queries that have completed but are not yet written to the query
@@ -714,6 +716,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
         60)
 
     impalad.kill_and_wait_for_exit(SIGRTMIN)
+    self.assert_impalad_log_contains("INFO", r'Workload management shutdown successful',
+      timeout_s=60)
 
     client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
 
@@ -732,6 +736,40 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
       assert retry(func=assert_func, max_attempts=5, sleep_time_s=3)
     finally:
       client2.close()
+
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+                                                 "--query_log_write_interval_s=9999 "
+                                                 "--shutdown_grace_period_s=0 "
+                                                 "--query_log_shutdown_timeout_s=3 "
+                                                 "--shutdown_deadline_s=15 "
+                                                 "--debug_actions="
+                                                 "WM_SHUTDOWN_DELAY:SLEEP@10000",
+                                    catalogd_args="--enable_workload_mgmt")
+  def test_shutdown_flush_timed_out(self, vector):
+    """Asserts that queries that have completed but are not yet written to the query
+       log table are lost if the completed queries queue drain takes too long and that
+       the coordinator logs the estimated number of queries lost."""
+
+    impalad = self.cluster.get_first_impalad()
+    client = self.get_client(vector.get_value('protocol'))
+
+    # Execute sql statements to ensure all get written to the query log table.
+    sql1 = client.execute("select 1")
+    assert sql1.success
+
+    sql2 = client.execute("select 2")
+    assert sql2.success
+
+    sql3 = client.execute("select 3")
+    assert sql3.success
+
+    impalad.service.wait_for_metric_value("impala-server.completed-queries.queued", 3,
+        60)
+
+    impalad.kill_and_wait_for_exit(SIGRTMIN)
+    self.assert_impalad_log_contains("INFO", r"Workload management shutdown timed out. "
+      r"Up to '3' queries may have been lost",
+      timeout_s=60)
 
 
 class TestQueryLogTableAll(TestQueryLogTableBase):

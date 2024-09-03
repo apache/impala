@@ -53,11 +53,12 @@ using namespace std;
 
 DECLARE_bool(enable_workload_mgmt);
 DECLARE_int32(query_log_write_interval_s);
-DECLARE_int32(query_log_max_queued);
-DECLARE_string(workload_mgmt_user);
-DECLARE_int32(query_log_shutdown_timeout_s);
-DECLARE_string(cluster_id);
 DECLARE_int32(query_log_max_insert_attempts);
+DECLARE_int32(query_log_max_queued);
+DECLARE_int32(query_log_shutdown_timeout_s);
+DECLARE_string(debug_actions);
+DECLARE_string(workload_mgmt_user);
+DECLARE_string(cluster_id);
 
 namespace impala {
 
@@ -109,6 +110,16 @@ size_t ImpalaServer::NumLiveQueries() {
 
 void ImpalaServer::ShutdownWorkloadManagement() {
   unique_lock<mutex> l(workload_mgmt_threadstate_mu_);
+
+  // Handle the situation where this function runs before the workload management process
+  // has been started and thus workload_management_thread_ holds a nullptr.
+  if (workload_mgmt_thread_state_ == NOT_STARTED) {
+    workload_mgmt_thread_state_ = SHUTDOWN;
+    return;
+  }
+
+  DCHECK_NE(nullptr, workload_management_thread_.get());
+
   // If the completed queries thread is not yet running, then we don't need to give it a
   // chance to flush the in-memory queue to the completed queries table.
   if (workload_mgmt_thread_state_ == RUNNING) {
@@ -117,6 +128,22 @@ void ImpalaServer::ShutdownWorkloadManagement() {
     completed_queries_shutdown_cv_.wait_for(l,
         chrono::seconds(FLAGS_query_log_shutdown_timeout_s),
         [this]{ return workload_mgmt_thread_state_ == SHUTDOWN; });
+  }
+
+  switch (workload_mgmt_thread_state_) {
+    case SHUTDOWN:
+      // Safe to join the thread here because the workload managmenent processing loop
+      // sets the thread state to ThreadState::SHUTDOWN immediately before it returns.
+      LOG(INFO) << "Workload management shutdown successful";
+      workload_management_thread_->Join();
+      break;
+    default:
+      // The shutdown timeout expired without the completed queries queue draining.
+      LOG(INFO) << "Workload management shutdown timed out. Up to '"
+      << ImpaladMetrics::COMPLETED_QUERIES_QUEUED->GetValue() << "' queries may have "
+      << "been lost";
+      workload_management_thread_->Detach();
+      break;
   }
 } // ImpalaServer::ShutdownWorkloadManagement
 
@@ -255,6 +282,8 @@ void ImpalaServer::WorkloadManagementWorker(
               || UNLIKELY(workload_mgmt_thread_state_ == SHUTTING_DOWN);
         });
     completed_queries_ticker_->ResetWakeupGuard();
+
+    DebugActionNoFail(FLAGS_debug_actions, "WM_SHUTDOWN_DELAY");
 
     if (completed_queries_.empty()) continue;
 

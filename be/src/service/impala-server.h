@@ -1148,9 +1148,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// current query ids to the admissiond.
   [[noreturn]] void AdmissionHeartbeatThread();
 
-  /// Checks if workload management is enabled, and starts the init process if it is
-  /// enabled. Does not return until coordinator shutdown. Returns immediately if
-  /// workload management is not enabled.
+  /// Starts the workload management init process. Does not return until coordinator
+  /// shutdown.  DOES NOT check if workload management is enabled.
   /// (implemented in workload-management-init.cc)
   void InitWorkloadManagement();
 

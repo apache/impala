@@ -92,10 +92,25 @@ extern const std::array<FieldDefinition, NumQueryTableColumns> FIELD_DEFINITIONS
 /// the ThreadState variable must only happen after taking a lock on the associated mutex.
 /// Can be used to track the lifecycle of a thread.
 enum ThreadState {
+  // Workload management has not started.
   NOT_STARTED,
+
+  // Thread has started and initial checks in ImpalaServer::InitWorkloadManagement(),
+  // implemented in workload-management-init.cc, are running.
+  STARTED,
+
+  // Initial checks have passed, workload management initial setup can run.
   INITIALIZING,
+
+  // Initial setup of the workload management db tables is done, completed queries queue
+  // is now being processed.
   RUNNING,
+
+  // Coordinator graceful shutdown initiated, and all running queries have finished or
+  // been cancelled. The completed queries queue can now be drained.
   SHUTTING_DOWN,
+
+  // In-memory completed queries queue drained, coordinator shutdown can finish.
   SHUTDOWN
 };
 
