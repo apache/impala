@@ -110,12 +110,7 @@ public abstract class VirtualTable implements FeTable {
   @Override
   public List<Column> getColumnsInHiveOrder() {
     List<Column> columns = Lists.newArrayList(getNonClusteringColumns());
-    if (getMetaStoreTable() != null &&
-        AcidUtils.isFullAcidTable(getMetaStoreTable().getParameters())) {
-      // Remove synthetic "row__id" column.
-      Preconditions.checkState(columns.get(0).getName().equals("row__id"));
-      columns.remove(0);
-    }
+    columns = filterColumnsNotStoredInHms(columns);
     columns.addAll(getClusteringColumns());
     return Collections.unmodifiableList(columns);
   }

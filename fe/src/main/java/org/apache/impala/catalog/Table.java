@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -479,9 +480,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // stats. This method allows each table type to volunteer the set of columns we should
   // ask the metastore for in loadAllColumnStats().
   protected List<String> getColumnNamesWithHmsStats() {
-    List<String> ret = new ArrayList<>();
-    for (String name: colsByName_.keySet()) ret.add(name);
-    return ret;
+    List<Column> columns = filterColumnsNotStoredInHms(getColumns());
+    return columns.stream()
+        .map(col->col.getName().toLowerCase())
+        .collect(Collectors.toList());
   }
 
   /**
@@ -498,15 +500,18 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       List<ColumnStatisticsObj> colStats;
 
       // We need to only query those columns which may have stats; asking HMS for other
-      // columns causes loadAllColumnStats() to return nothing.
-      // TODO(todd): this no longer seems to be true - asking for a non-existent column
-      // is just ignored, and the columns that do exist are returned.
+      // columns can cause get_table_statistics_req to throw an exception.
+      // The exact HMS behavior depends on hive.metastore.try.direct.sql, see HIVE-28498.
       List<String> colNames = getColumnNamesWithHmsStats();
 
       try {
         colStats = MetastoreShim.getTableColumnStatistics(client, db_.getName(), name_,
             colNames);
       } catch (Exception e) {
+        // TODO: Catching all exceptions and ignoring it makes it harder to detect errors.
+        //       At least during testing it would be good to treat this as error, but
+        //       it is hard to report this well if the function is called during
+        //       HMS event processing.
         LOG.warn("Could not load column statistics for: " + getFullName(), e);
         return;
       }
@@ -904,12 +909,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   @Override // FeTable
   public List<Column> getColumnsInHiveOrder() {
     List<Column> columns = Lists.newArrayList(getNonClusteringColumns());
-    if (getMetaStoreTable() != null &&
-        AcidUtils.isFullAcidTable(getMetaStoreTable().getParameters())) {
-      // Remove synthetic "row__id" column.
-      Preconditions.checkState(columns.get(0).getName().equals("row__id"));
-      columns.remove(0);
-    }
+    columns = filterColumnsNotStoredInHms(columns);
     columns.addAll(getClusteringColumns());
     return Collections.unmodifiableList(columns);
   }

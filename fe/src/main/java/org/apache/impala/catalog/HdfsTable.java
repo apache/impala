@@ -2071,9 +2071,11 @@ public class HdfsTable extends Table implements FeFsTable {
 
   @Override
   protected List<String> getColumnNamesWithHmsStats() {
+    List<Column> columns = Lists.newArrayList(getNonClusteringColumns());
+    columns = filterColumnsNotStoredInHms(columns);
     List<String> ret = new ArrayList<>();
     // Only non-partition columns have column stats in the HMS.
-    for (Column column: getColumns().subList(numClusteringCols_, getColumns().size())) {
+    for (Column column: columns) {
       ret.add(column.getName().toLowerCase());
     }
     return ret;

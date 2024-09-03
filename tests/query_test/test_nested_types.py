@@ -232,7 +232,7 @@ class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['parquet', 'orc'])
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
-  def test_mixed_complex_types_in_select_list(self, vector, unique_database):
+  def test_mixed_complex_types_in_select_list(self, vector):
     """Queries where structs and collections are embedded into one another."""
     self.run_test_case('QueryTest/mixed-collections-and-structs', vector)
 
@@ -252,9 +252,22 @@ class TestComputeStatsWithNestedTypes(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['parquet', 'orc'])
     cls.ImpalaTestMatrix.add_constraint(orc_schema_resolution_constraint)
 
-  def test_compute_stats_with_structs(self, vector):
+  @SkipIfFS.hive
+  def test_compute_stats_with_structs(self, vector, unique_database):
     """COMPUTE STATS and SHOW COLUMN STATS for tables with structs"""
-    self.run_test_case('QueryTest/compute-stats-with-structs', vector)
+    file_format = vector.get_value('table_format').file_format
+    src_db = ImpalaTestSuite.get_db_name_from_format(vector.get_value('table_format'))
+    tbl_spec = "STORED AS " + file_format
+    if file_format == "orc":
+      # Create a full ACID copy for the ORC table to cover IMPALA-11431.
+      tbl_spec += " TBLPROPERTIES('transactional'='true')"
+    ctas = "CREATE TABLE {0}.{1} {2} AS SELECT * FROM {3}.{1}"
+    ctas1 = ctas.format(unique_database, "complextypes_structs", tbl_spec, src_db)
+    ctas2 = ctas.format(unique_database, "complextypes_nested_structs", tbl_spec, src_db)
+    self.run_stmt_in_hive(ctas1)
+    self.run_stmt_in_hive(ctas2)
+    self.run_test_case('QueryTest/compute-stats-with-structs', vector,
+                       use_db=unique_database)
 
 
 class TestZippingUnnest(ImpalaTestSuite):

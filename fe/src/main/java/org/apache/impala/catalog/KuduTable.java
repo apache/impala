@@ -180,7 +180,9 @@ public class KuduTable extends Table implements FeKuduTable {
    * Returns the columns in the order they have been created
    */
   @Override
-  public List<Column> getColumnsInHiveOrder() { return getColumns(); }
+  public List<Column> getColumnsInHiveOrder() {
+    return filterColumnsNotStoredInHms(getColumns());
+  }
 
   public static boolean isKuduStorageHandler(String handler) {
     return handler != null && (handler.equals(KUDU_LEGACY_STORAGE_HANDLER) ||

@@ -1,5 +1,6 @@
 ====
 ---- QUERY
+INVALIDATE METADATA complextypes_structs;
 COMPUTE STATS complextypes_structs
 ---- RESULTS
 'Updated 1 partition(s) and 2 column(s).'
@@ -19,6 +20,7 @@ SHOW COLUMN STATS complextypes_structs
 STRING,STRING,BIGINT,BIGINT,BIGINT,DOUBLE,BIGINT,BIGINT
 ====
 ---- QUERY
+INVALIDATE METADATA complextypes_nested_structs;
 COMPUTE STATS complextypes_nested_structs
 ---- RESULTS
 'Updated 1 partition(s) and 1 column(s).'

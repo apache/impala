@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -28,6 +29,7 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.AcidUtils;
 
 /**
  * Frontend interface for interacting with a table.
@@ -115,7 +117,7 @@ public interface FeTable {
   /**
    * @return an unmodifiable list of all columns, but with partition columns at the end of
    * the list rather than the beginning. This is equivalent to the order in
-   * which Hive enumerates columns.
+   * which Hive enumerates columns. Removes columns that are not in the HMS schema.
    */
   List<Column> getColumnsInHiveOrder();
 
@@ -138,6 +140,19 @@ public interface FeTable {
    * @return an unmodifiable list of all columns excluding any partition columns.
    */
   List<Column> getNonClusteringColumns();
+
+  /**
+   * Filter columns not stored in HMS (currently row__id in full ACID tables).
+   */
+  default List<Column> filterColumnsNotStoredInHms(List<Column> columns) {
+    Table tbl = getMetaStoreTable();
+    boolean isFullAcid = tbl != null && AcidUtils.isFullAcidTable(tbl.getParameters());
+    if (!isFullAcid) return columns;
+    // Filter out row__id as it doesn't exist in HMS.
+    return columns.stream()
+        .filter(c -> !c.getName().equals("row__id"))
+        .collect(Collectors.toList());
+  }
 
   int getNumClusteringCols();
 
