@@ -682,10 +682,10 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
       res = client.execute("select sleep(1000)")
       assert res.success
 
-    # At least 10 seconds have already elapsed, wait up to 10 more seconds for the
-    # queries to be written to the completed queries table.
+    # Wait for at least one iteration of the workload management processing loop to write
+    # to the completed queries table.
     self.cluster.get_first_impalad().service.wait_for_metric_value(
-      "impala-server.completed-queries.written", query_count, 10)
+      "impala-server.completed-queries.written", query_count, 20)
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=9999 "
