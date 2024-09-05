@@ -113,9 +113,11 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TImpalaQueryOptions;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPoolConfig;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.AcidUtils;
@@ -128,6 +130,7 @@ import org.apache.impala.util.IntIterator;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.impala.util.RequestPoolService;
 import org.apache.impala.util.TSessionStateUtil;
 import org.apache.kudu.client.KuduClient;
 import org.github.jamm.CannotAccessFieldException;
@@ -626,6 +629,16 @@ public class Analyzer {
     // Set by Frontend.java.
     private int availableCoresPerNode_ = -1;
 
+    // The following properties are parsed from TExecutorGroupSet selected by Frontend.
+    // They are set by Frontend.java via setPoolMemLimit().
+    //
+    // Value of impala.admission-control.clamp-mem-limit-query-option.<pool_name>.
+    private boolean poolHasMemLimitClamp_ = false;
+    // Value of impala.admission-control.max-query-mem-limit.<pool_name>,
+    // which is the maximum memory limit of destination request pool for this query in
+    // bytes. Value 0 or less means unknown.
+    private long poolMaxMemLimit_ = -1;
+
     // Cache of KuduTables opened for this query. (map from table name to kudu table)
     // This cache prevent multiple openTable calls for a given table in the same query.
     public final Map<String, org.apache.kudu.client.KuduTable> kuduTables =
@@ -744,6 +757,70 @@ public class Analyzer {
     Preconditions.checkArgument(x > 0);
     globalState_.availableCoresPerNode_ =
         Math.min(QueryConstants.MAX_FRAGMENT_INSTANCES_PER_NODE, x);
+  }
+
+  /**
+   * Return maximum memory limit per executor host, in bytes unit, that will be enforced
+   * by the Admission Controller. PlanNodes can use this information to lower
+   * its memory estimates since Admission Controller will not allow query
+   * to grow its memory usage in single executor host beyond the value returned here.
+   * This method is maintained to match order in ScheduleState::UpdateMemoryRequirements.
+   */
+  public long getMaxMemLimitPerHost(boolean isCoordinatorFragment) {
+    TQueryOptions opts = getQueryOptions();
+
+    if (opts.isSetMem_limit() && opts.getMem_limit() > 0) {
+      // MEM_LIMIT
+      long mem_limit = opts.getMem_limit();
+      if (globalState_.poolHasMemLimitClamp_ && globalState_.poolMaxMemLimit_ > 0) {
+        // clamp-mem-limit-query-option is True and max-query-mem-limit is set.
+        // max-query-mem-limit take precedence over MEM_LIMIT if it is lower.
+        mem_limit = Math.min(mem_limit, globalState_.poolMaxMemLimit_);
+      }
+      return mem_limit;
+    } else if (isCoordinatorFragment && opts.isSetMem_limit_coordinators()
+        && opts.getMem_limit_coordinators() > 0) {
+      // MEM_LIMIT_COORDINATORS
+      return opts.getMem_limit_coordinators();
+    } else if (!isCoordinatorFragment && opts.isSetMem_limit_executors()
+        && opts.getMem_limit_executors() > 0) {
+      // MEM_LIMIT_EXECUTORS
+      return opts.getMem_limit_executors();
+    } else if (globalState_.poolMaxMemLimit_ > 0) {
+      // No MEM_LIMIT* option is set and max-query-mem-limit is set.
+      // Return the max-query-mem-limit regardless of clamp-mem-limit-query-option value.
+      return globalState_.poolMaxMemLimit_;
+    } else if (opts.isSetMax_mem_estimate_for_admission()
+        && opts.getMax_mem_estimate_for_admission() > 0) {
+      // MAX_MEM_ESTIMATE_FOR_ADMISSION
+      return opts.getMax_mem_estimate_for_admission();
+    }
+    return Long.MAX_VALUE;
+  }
+
+  /**
+   * Update 'poolHasMemLimitClamp_' and 'poolMaxMemLimit_' for this query if TPoolConfig
+   * for a given 'groupSet' has
+   * impala.admission-control.clamp-mem-limit-query-option.<pool_name> and
+   * impala.admission-control.max-query-mem-limit.<pool_name> set in llama file.
+   */
+  public void setPoolMemLimit(TExecutorGroupSet groupSet) {
+    Preconditions.checkNotNull(groupSet);
+    // Only respect max_mem_limit from groupSet if RequestPoolService is configured
+    // (fair_scheduler_allocation_path flag is not empty) and
+    // impala.admission-control.clamp-mem-limit-query-option.<pool_name> is True and
+    // impala.admission-control.max-query-mem-limit.<pool_name> is set.
+    RequestPoolService poolService = RequestPoolService.getInstance();
+    if (poolService != null) {
+      TPoolConfig poolConfig =
+          poolService.getPoolConfig(groupSet.getExec_group_name_prefix());
+      if (poolConfig.isSetClamp_mem_limit_query_option()) {
+        globalState_.poolHasMemLimitClamp_ = poolConfig.isClamp_mem_limit_query_option();
+      }
+      if (poolConfig.isSetMax_query_mem_limit()) {
+        globalState_.poolMaxMemLimit_ = poolConfig.getMax_query_mem_limit();
+      }
+    }
   }
 
   public int getMinParallelismPerNode() {

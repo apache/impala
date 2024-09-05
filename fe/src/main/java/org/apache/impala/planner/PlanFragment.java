@@ -464,8 +464,21 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   private void computeRuntimeFilterResources(Analyzer analyzer) {
     Map<RuntimeFilterId, RuntimeFilter> consumedFilters = new HashMap<>();
     Map<RuntimeFilterId, RuntimeFilter> producedFilters = new HashMap<>();
+    TQueryOptions queryOptions = analyzer.getQueryOptions();
+    boolean biasToSpill = PlanNode.shouldComputeResourcesWithSpill(queryOptions);
+    long maxMemPerInstance = Long.MAX_VALUE;
+    if (biasToSpill) {
+      boolean isCoordinator = (sink_ instanceof PlanRootSink);
+      maxMemPerInstance = analyzer.getMaxMemLimitPerHost(isCoordinator)
+          / getNumInstancesPerHost(queryOptions);
+    }
     // Visit all sinks and nodes to identify filters produced or consumed by fragment.
-    sink_.computeResourceProfile(analyzer.getQueryOptions());
+    if (biasToSpill && sink_ instanceof SpillableOperator) {
+      ((SpillableOperator) sink_)
+          .computeResourceProfileIfSpill(queryOptions, maxMemPerInstance);
+    } else {
+      sink_.computeResourceProfile(queryOptions);
+    }
     Preconditions.checkState(
         sink_.getRuntimeFilters().isEmpty() || sink_ instanceof JoinBuildSink);
     for (RuntimeFilter filter : sink_.getRuntimeFilters()) {
@@ -473,7 +486,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       producedFilters.put(filter.getFilterId(), filter);
     }
     for (PlanNode node : collectPlanNodes()) {
-      node.computeNodeResourceProfile(analyzer.getQueryOptions());
+      if (biasToSpill && node instanceof SpillableOperator) {
+        ((SpillableOperator) node)
+            .computeResourceProfileIfSpill(queryOptions, maxMemPerInstance);
+      } else {
+        node.computeNodeResourceProfile(queryOptions);
+      }
       boolean isFilterProducer = node instanceof JoinNode;
       for (RuntimeFilter filter : node.getRuntimeFilters()) {
         if (isFilterProducer) {
@@ -485,8 +503,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
     for (RuntimeFilter f : producedFilters.values()) {
       producedRuntimeFiltersMemReservationBytes_ += f.getFilterSize();
-      if (analyzer.getQueryOptions().max_num_filters_aggregated_per_host > 1
-          && !f.isBroadcast()) {
+      if (queryOptions.max_num_filters_aggregated_per_host > 1 && !f.isBroadcast()) {
         // If distributed aggregation is enabled, any backend can be selected as
         // an intermediate aggregator. Add the same amount of memory per backend to
         // anticipate for it.
@@ -1009,7 +1026,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
   /**
    * Only valid to call after calling {@link #traverseEffectiveParallelism(int, int,
-   * PlanFragment)}.
+   * PlanFragment, TQueryOptions)}.
    */
   protected int getAdjustedInstanceCount() {
     Preconditions.checkState(adjustedInstanceCount_ > -1);
@@ -1018,7 +1035,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
   /**
    * Only valid to call after calling {@link #traverseEffectiveParallelism(int, int,
-   * PlanFragment)}.
+   * PlanFragment, TQueryOptions)}.
    */
   protected int getMaxParallelism() {
     Preconditions.checkState(maxParallelism_ > -1);
@@ -1363,7 +1380,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Override parallelism of this fragment with adjusted parallelism from CPU costing
    * algorithm.
-   * <p>Only valid after {@link #traverseEffectiveParallelism(int, int, int)}
+   * <p>Only valid after {@link #traverseEffectiveParallelism(int, int, PlanFragment,
+   * TQueryOptions)}
    * called.
    */
   protected void setEffectiveNumInstance() {

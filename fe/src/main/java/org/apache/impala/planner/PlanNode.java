@@ -48,6 +48,7 @@ import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
@@ -1420,5 +1421,20 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       return cardinality1;
     }
     return Math.max(-1, cardinality2);
+  }
+
+  /**
+   * Return True if Impala Coordinator node has scratch_dirs flag configured and
+   * given 'queryOptions' allows taking spilling to disk into account [when calculating
+   * memory requirements].
+   * Otherwise, return False.
+   * Note that this method does not validate if all backend executors also have
+   * scratch_dirs flag set up.
+   */
+  public static boolean shouldComputeResourcesWithSpill(TQueryOptions queryOptions) {
+    long scratchLimit = queryOptions.getScratch_limit();
+    double memScale = queryOptions.getMem_estimate_scale_for_spilling_operator();
+    String scratchDirs = BackendConfig.INSTANCE.getScratchDirs();
+    return scratchLimit != 0 && !scratchDirs.isEmpty() && memScale > 0.0;
   }
 }

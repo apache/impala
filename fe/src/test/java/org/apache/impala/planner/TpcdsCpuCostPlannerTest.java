@@ -17,14 +17,29 @@
 
 package org.apache.impala.planner;
 
+import com.google.common.collect.Sets;
+import com.google.common.io.Files;
+
 import org.apache.impala.catalog.SideloadTableStats;
+import org.apache.impala.common.ByteUnits;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TReplicaPreference;
+import org.apache.impala.thrift.TSlotCountStrategy;
+import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
+import org.apache.impala.util.RequestPoolService;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -39,11 +54,28 @@ import java.util.Set;
  * remain unchanged.
  */
 public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
+  // Pool definitions and includes memory resource limits, copied to a temporary file
+  private static final String ALLOCATION_FILE = "fair-scheduler-3-groups.xml";
+
+  // Contains per-pool configurations for maximum number of running queries and queued
+  // requests.
+  private static final String LLAMA_CONFIG_FILE = "llama-site-3-groups.xml";
+
   // Planner test option to run each planner test.
   private static Set<PlannerTestOption> testOptions = tpcdsParquetTestOptions();
 
   // Query option to run each planner test.
-  private static TQueryOptions options = tpcdsParquetCpuCostQueryOptions();
+  private static TQueryOptions options =
+      tpcdsParquetQueryOptions()
+          .setCompute_processing_cost(true)
+          .setMax_fragment_instances_per_node(12)
+          .setReplica_preference(TReplicaPreference.REMOTE)
+          .setSlot_count_strategy(TSlotCountStrategy.PLANNER_CPU_ASK)
+          .setMem_estimate_scale_for_spilling_operator(1.0)
+          .setPlanner_testcase_mode(true)
+          // Required so that output doesn't vary by whether scanned tables have stats &
+          // numRows property or not.
+          .setDisable_hdfs_num_rows_estimate(true);
 
   // Database name to run this test.
   private static String testDb = "tpcds_partitioned_parquet_snap";
@@ -55,21 +87,54 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
   private static Map<String, Long> scanRangeLimit = new HashMap<String, Long>() {
     {
       // split a 5752989 bytes file to 10 ranges.
-      put("customer", 580 * 1024L);
+      put("customer", 580 * ByteUnits.KILOBYTE);
       // split a 1218792 bytes file to 10 ranges.
-      put("customer_address", 125 * 1024L);
+      put("customer_address", 125 * ByteUnits.KILOBYTE);
       // split a 7848768 bytes file to 10 ranges.
-      put("customer_demographics", 790 * 1024L);
+      put("customer_demographics", 790 * ByteUnits.KILOBYTE);
       // split a 1815300 bytes file to 4 ranges.
-      put("item", 500L * 1024L);
+      put("item", 500L * ByteUnits.KILOBYTE);
     }
   };
 
+  // Temporary folder to copy admission control files into.
+  // Do not annotate with JUnit @Rule because we want to keep the tempFolder the same
+  // for entire lifetime of test class.
+  private static TemporaryFolder tempFolder;
+
+  /**
+   * Returns a {@link File} for the file on the classpath.
+   */
+  private static File getClasspathFile(String filename) throws URISyntaxException {
+    return new File(
+        TpcdsCpuCostPlannerTest.class.getClassLoader().getResource(filename).toURI());
+  }
+
+  private static void setupAdmissionControl() throws IOException, URISyntaxException {
+    // Start admission control with config file fair-scheduler-3-groups.xml
+    // and llama-site-3-groups.xml
+    tempFolder = new TemporaryFolder();
+    tempFolder.create();
+    File allocationConfFile = tempFolder.newFile(ALLOCATION_FILE);
+    Files.copy(getClasspathFile(ALLOCATION_FILE), allocationConfFile);
+
+    File llamaConfFile = tempFolder.newFile(LLAMA_CONFIG_FILE);
+    Files.copy(getClasspathFile(LLAMA_CONFIG_FILE), llamaConfFile);
+    // Intentionally mark isTest = false to cache poolService as a singleton.
+    RequestPoolService poolService =
+        RequestPoolService.getInstance(allocationConfFile.getAbsolutePath(),
+            llamaConfFile.getAbsolutePath(), /* isTest */ false);
+    poolService.start();
+  }
+
   @BeforeClass
   public static void setUp() throws Exception {
-    // Mimic the 10 node test mini-cluster.
-    // 20 is the default num_expected_executors startup flag.
-    PlannerTestBase.setUpWithSize(10, 20);
+    // Mimic the 10 node test mini-cluster with admission control enabled.
+    setupAdmissionControl();
+    // Add 10 node executor group set root.large. This group set also set with
+    // impala.admission-control.max-query-mem-limit.root.large = 50GB.
+    setUpTestCluster(10, 10, "root.large");
+    setUpKuduClientAndLogDir();
     Paths.get(outDir_.toString(), "tpcds_cpu_cost").toFile().mkdirs();
 
     // Sideload stats through RuntimeEnv.
@@ -87,10 +152,13 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
   }
 
   @AfterClass
-  public static void unsetMetadataScale() {
+  public static void unsetMetadataScaleAndStopPoolService() {
     RuntimeEnv.INSTANCE.dropSideloadStats();
     RuntimeEnv.INSTANCE.dropTableScanRangeLimit();
     invalidateTables();
+
+    RequestPoolService.getInstance().stop();
+    tempFolder.delete();
   }
 
   /**
@@ -652,5 +720,73 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
   @Test
   public void testTpcdsDdlIceberg() {
     runPlannerTestFile("tpcds_cpu_cost/tpcds-ddl-iceberg", testDb, options, testOptions);
+  }
+
+  /**
+   * Return TQueryOptions with both MEM_LIMIT_EXECUTORS and MEM_LIMIT_COORDINATORS
+   * set to 'bytes_limit'.
+   */
+  private TQueryOptions coordExecMemLimitOptions(long bytes_limit) {
+    TQueryOptions optsWithLimit = new TQueryOptions(options);
+    optsWithLimit.setMem_limit_executors(bytes_limit);
+    optsWithLimit.setMem_limit_coordinators(bytes_limit);
+    return optsWithLimit;
+  }
+
+  @Test
+  public void testSortNodeMemLimitExecutors() {
+    // Test that MEM_LIMIT_EXECUTORS & MEM_LIMIT_COORDINATORS (20GB) override
+    // impala.admission-control.max-query-mem-limit.root.large (50GB) for SortNode.
+    runPlannerTestFile("tpcds_cpu_cost/tpcds-q64-mem_limit_executors-20g", testDb,
+        coordExecMemLimitOptions(20 * ByteUnits.GIGABYTE), testOptions);
+  }
+
+  @Test
+  public void testSortNodeMemLimit() {
+    // Test that MEM_LIMIT (10GB) override MEM_LIMIT_EXECUTORS/MEM_LIMIT_COORDINATORS
+    // (20GB) and impala.admission-control.max-query-mem-limit.root.large (50GB) for
+    // SortNode.
+    TQueryOptions optsWithLimit = coordExecMemLimitOptions(20 * ByteUnits.GIGABYTE);
+    optsWithLimit.setMem_limit(10 * ByteUnits.GIGABYTE);
+    runPlannerTestFile(
+        "tpcds_cpu_cost/tpcds-q64-mem_limit-10g", testDb, optsWithLimit, testOptions);
+  }
+
+  @Test
+  public void testAggregationNodeMemLimitExecutors() {
+    // Test that MEM_LIMIT_EXECUTORS & MEM_LIMIT_COORDINATORS (20GB) override
+    // impala.admission-control.max-query-mem-limit.root.large (50GB) for AggregationNode.
+    runPlannerTestFile("tpcds_cpu_cost/tpcds-q67-mem_limit_executors-20g", testDb,
+        coordExecMemLimitOptions(20 * ByteUnits.GIGABYTE), testOptions);
+  }
+
+  @Test
+  public void testAggregationNodeMemLimit() {
+    // Test that MEM_LIMIT (10GB) override MEM_LIMIT_EXECUTORS/MEM_LIMIT_COORDINATORS
+    // (20GB) and impala.admission-control.max-query-mem-limit.root.large (50GB) for
+    // AggregationNode.
+    TQueryOptions optsWithLimit = coordExecMemLimitOptions(20 * ByteUnits.GIGABYTE);
+    optsWithLimit.setMem_limit(10 * ByteUnits.GIGABYTE);
+    runPlannerTestFile(
+        "tpcds_cpu_cost/tpcds-q67-mem_limit-10g", testDb, optsWithLimit, testOptions);
+  }
+
+  @Test
+  public void testHashJoinNodeMemLimitExecutors() {
+    // Test that MEM_LIMIT_EXECUTORS & MEM_LIMIT_COORDINATORS (20GB) override
+    // impala.admission-control.max-query-mem-limit.root.large (50GB) for HashJoinNode.
+    runPlannerTestFile("tpcds_cpu_cost/tpcds-q97-mem_limit_executors-20g", testDb,
+        coordExecMemLimitOptions(20 * ByteUnits.GIGABYTE), testOptions);
+  }
+
+  @Test
+  public void testHashJoinNodeMemLimit() {
+    // Test that MEM_LIMIT (10GB) override MEM_LIMIT_EXECUTORS/MEM_LIMIT_COORDINATORS
+    // (20GB) and impala.admission-control.max-query-mem-limit.root.large (50GB) for
+    // HashJoinNode.
+    TQueryOptions optsWithLimit = coordExecMemLimitOptions(20 * ByteUnits.GIGABYTE);
+    optsWithLimit.setMem_limit(10 * ByteUnits.GIGABYTE);
+    runPlannerTestFile(
+        "tpcds_cpu_cost/tpcds-q97-mem_limit-10g", testDb, optsWithLimit, testOptions);
   }
 }

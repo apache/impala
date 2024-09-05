@@ -49,9 +49,9 @@ with v1 as(
 # end query 57 in stream 0 using template query57.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=243.62MB Threads=1
-Per-Host Resource Estimates: Memory=192.76GB
+Per-Host Resource Estimates: Memory=189.05GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=192.76GB mem-reservation=243.62MB thread-reservation=1 runtime-filters-memory=9.00MB
+|  Per-Instance Resources: mem-estimate=189.05GB mem-reservation=243.62MB thread-reservation=1 runtime-filters-memory=9.00MB
 |  max-parallelism=1 segment-costs=[4679833259, 1710158229, 4679833259, 1710158229, 2214045214, 4679833259, 1710158229, 5732824810256569220, 900]
 PLAN-ROOT SINK
 |  output exprs: i_category, i_brand, cc_name, d_year, d_moy, avg_monthly_sales, sum_sales, psum, nsum
@@ -66,7 +66,7 @@ PLAN-ROOT SINK
 34:HASH JOIN [INNER JOIN]
 |  hash predicates: rank() = rank() - 1, i_category = i_category, cc_name = cc_name, i_brand = i_brand
 |  fk/pk conjuncts: none
-|  mem-estimate=53.71GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=44,43,36,31,52,51 row-size=327B cardinality=176488.93T cost=31979878532739128
 |  in pipelines: 21(GETNEXT), 31(OPEN)
 |

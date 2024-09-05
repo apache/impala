@@ -55,8 +55,8 @@
   </property>
   <property>
     <name>impala.admission-control.max-query-mem-limit.root.large</name>
-   <!-- 8 PB -->
-    <value>9007199254740992</value>
+   <!-- 50 GB -->
+    <value>53687091200</value>
   </property>
   <property>
     <name>impala.admission-control.min-query-mem-limit.root.large</name>

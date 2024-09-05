@@ -30,9 +30,9 @@ limit 100;
 # end query 72 in stream 0 using template query72.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=197.25MB Threads=1
-Per-Host Resource Estimates: Memory=2.50TB
+Per-Host Resource Estimates: Memory=116.95GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=2.50TB mem-reservation=197.25MB thread-reservation=1 runtime-filters-memory=9.00MB
+|  Per-Instance Resources: mem-estimate=116.95GB mem-reservation=197.25MB thread-reservation=1 runtime-filters-memory=9.00MB
 |  max-parallelism=1 segment-costs=[1946370237431, 1196340444652, 600]
 PLAN-ROOT SINK
 |  output exprs: i_item_desc, w_warehouse_name, d1.d_week_seq, sum(CASE WHEN p_promo_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN p_promo_sk IS NOT NULL THEN 1 ELSE 0 END), count(*)
@@ -47,7 +47,7 @@ PLAN-ROOT SINK
 21:AGGREGATE [FINALIZE]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=2.44TB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=169B cardinality=59.29G cost=1111641993133
 |  in pipelines: 21(GETNEXT), 00(OPEN)
 |
@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  other predicates: inv_quantity_on_hand < cs_quantity
 |  runtime filters: RF002[bloom] <- inv_item_sk, RF003[bloom] <- inv_date_sk, RF004[min_max] <- inv_item_sk, RF005[min_max] <- inv_date_sk
-|  mem-estimate=53.40GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=0,5,4,6,3,8,7,1 row-size=241B cardinality=556.85G cost=101985452242
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
@@ -259,7 +259,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=2.66GB Threads=79
-Per-Host Resource Estimates: Memory=1.99TB
+Per-Host Resource Estimates: Memory=127.17GB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=5.98MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[659] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
@@ -275,7 +275,7 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=21.19GB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=4.20GB mem-reservation=34.00MB thread-reservation=1
 max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, i_item_desc ASC, w_warehouse_name ASC, d1.d_week_seq ASC
@@ -286,7 +286,7 @@ max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-com
 35:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN p_promo_sk IS NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN p_promo_sk IS NOT NULL THEN 1 ELSE 0 END), count:merge(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=21.16GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=4.17GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=169B cardinality=59.29G cost=1079491668669
 |  in pipelines: 35(GETNEXT), 00(OPEN)
 |
@@ -296,12 +296,12 @@ max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-com
 |  in pipelines: 00(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=146.88GB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=4.28GB mem-reservation=34.00MB thread-reservation=1
 max-parallelism=609330 segment-costs=[4101117248955, 6093265120169] cpu-comparison-result=360 [max(240 (self) vs 360 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=146.76GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=4.17GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=169B cardinality=535.62G cost=3268693778097
 |  in pipelines: 00(GETNEXT)
 |
@@ -696,7 +696,7 @@ max-parallelism=374 segment-costs=[4303039497]
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=2.66GB Threads=79
-Per-Host Resource Estimates: Memory=1.99TB
+Per-Host Resource Estimates: Memory=127.17GB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=5.98MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[659] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
@@ -712,7 +712,7 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=21.19GB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=4.20GB mem-reservation=34.00MB thread-reservation=1
 max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, i_item_desc ASC, w_warehouse_name ASC, d1.d_week_seq ASC
@@ -723,7 +723,7 @@ max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-com
 35:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN p_promo_sk IS NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN p_promo_sk IS NOT NULL THEN 1 ELSE 0 END), count:merge(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=21.16GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=4.17GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=169B cardinality=59.29G cost=1079491668669
 |  in pipelines: 35(GETNEXT), 00(OPEN)
 |
@@ -733,12 +733,12 @@ max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-com
 |  in pipelines: 00(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=146.88GB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=4.28GB mem-reservation=34.00MB thread-reservation=1
 max-parallelism=609330 segment-costs=[4101117248955, 6093265120169] cpu-comparison-result=360 [max(240 (self) vs 360 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=146.76GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=4.17GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=169B cardinality=535.62G cost=3268693778097
 |  in pipelines: 00(GETNEXT)
 |

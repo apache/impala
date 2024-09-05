@@ -51,9 +51,9 @@ from
  limit 100;
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=301.31MB Threads=1
-Per-Host Resource Estimates: Memory=69.83GB
+Per-Host Resource Estimates: Memory=53.71GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=69.83GB mem-reservation=301.31MB thread-reservation=1 runtime-filters-memory=70.00MB
+|  Per-Instance Resources: mem-estimate=53.71GB mem-reservation=301.31MB thread-reservation=1 runtime-filters-memory=70.00MB
 |  max-parallelism=1 segment-costs=[48663212322, 207415777, 7394305285, 9711133854, 2100000, 48663212322, 207415777, 7394305285, 9711133854, 2100000, 722596118, 0]
 PLAN-ROOT SINK
 |  output exprs: sum(sales)
@@ -202,7 +202,7 @@ PLAN-ROOT SINK
 |  |  |  output: count(*)
 |  |  |  group by: substr(i_item_desc, CAST(1 AS BIGINT), CAST(30 AS BIGINT)), i_item_sk, d_date
 |  |  |  having: count(*) > CAST(4 AS BIGINT)
-|  |  |  mem-estimate=66.12GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=27 row-size=28B cardinality=705.90M cost=41666743099
 |  |  |  in pipelines: 32(GETNEXT), 27(OPEN)
 |  |  |
@@ -421,7 +421,7 @@ PLAN-ROOT SINK
 |  |  output: count(*)
 |  |  group by: substr(i_item_desc, CAST(1 AS BIGINT), CAST(30 AS BIGINT)), i_item_sk, d_date
 |  |  having: count(*) > CAST(4 AS BIGINT)
-|  |  mem-estimate=66.12GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=5 row-size=28B cardinality=705.90M cost=41666743099
 |  |  in pipelines: 08(GETNEXT), 03(OPEN)
 |  |

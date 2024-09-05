@@ -74,6 +74,61 @@ order by c_customer_id
 limit 100
 """
 
+# TPC-DS Q67 to test memory bounding against big memory estimation.
+TPCDS_Q67 = """
+select  *
+from (select i_category
+            ,i_class
+            ,i_brand
+            ,i_product_name
+            ,d_year
+            ,d_qoy
+            ,d_moy
+            ,s_store_id
+            ,sumsales
+            ,rank() over (partition by i_category order by sumsales desc) rk
+      from (select i_category
+                  ,i_class
+                  ,i_brand
+                  ,i_product_name
+                  ,d_year
+                  ,d_qoy
+                  ,d_moy
+                  ,s_store_id
+                  ,sum(coalesce(ss_sales_price*ss_quantity,0)) sumsales
+            from tpcds_partitioned_parquet_snap.store_sales
+                ,tpcds_partitioned_parquet_snap.date_dim
+                ,tpcds_partitioned_parquet_snap.store
+                ,tpcds_partitioned_parquet_snap.item
+       where  ss_sold_date_sk=d_date_sk
+          and ss_item_sk=i_item_sk
+          and ss_store_sk = s_store_sk
+          and d_month_seq between 1196 and 1196+11
+       group by rollup(
+         i_category,
+         i_class,
+         i_brand,
+         i_product_name,
+         d_year,
+         d_qoy,
+         d_moy,
+         s_store_id)
+      ) dw1
+) dw2
+where rk <= 100
+order by i_category
+        ,i_class
+        ,i_brand
+        ,i_product_name
+        ,d_year
+        ,d_qoy
+        ,d_moy
+        ,s_store_id
+        ,sumsales
+        ,rk
+limit 100;
+"""
+
 DEFAULT_RESOURCE_POOL = "default-pool"
 
 DEBUG_ACTION_DELAY_SCAN = "HDFS_SCANNER_THREAD_OBTAINED_RANGE:SLEEP@1000"
@@ -920,9 +975,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Add an exec group with 8 admission slots and 2 executors.
     self._add_executor_group("group", 2, admission_control_slots=8,
                              resource_pool="root.small", extra_args="-mem_limit=2g")
-    # Add another exec group with 64 admission slots and 3 executors.
+    # Add another exec group with 64 admission slots, 3 executors, and 4g mem_limit.
     self._add_executor_group("group", 3, admission_control_slots=64,
-                             resource_pool="root.large", extra_args="-mem_limit=2g")
+                             resource_pool="root.large", extra_args="-mem_limit=4g")
     assert self._get_num_executor_groups(only_healthy=True) == 3
     assert self._get_num_executor_groups(only_healthy=True,
                                          exec_group_set_prefix="root.tiny") == 1
@@ -1034,14 +1089,22 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._set_query_options({'MT_DOP': '0'})
 
     # Create small table based on tpcds_parquet.store_sales that will be used later
-    # for COMPUTE STATS test.
+    # for COMPUTE STATS test. Forcing large parallelism to speed up CTAS.
+    # Otherwise, query will go to tiny pool.
+    self.client.set_configuration({
+      'REQUEST_POOL': 'root.large',
+      'PROCESSING_COST_MIN_THREADS': '4'})
     self._run_query_and_verify_profile(
       ("create table {0}.{1} partitioned by (ss_sold_date_sk) as "
        "select ss_sold_time_sk, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk "
        "from tpcds_parquet.store_sales where ss_sold_date_sk < 2452184"
        ).format(unique_database, "store_sales_subset"),
-      ["Executor Group: root.tiny", "ExecutorGroupsConsidered: 1",
-       "Verdict: Match", "CpuAsk: 1", "AvgAdmissionSlotsPerExecutor: 1"])
+      ["Executor Group: root.large", "ExecutorGroupsConsidered: 1",
+       "Verdict: query option REQUEST_POOL=root.large is set. "
+       "Memory and cpu limit checking is skipped."])
+    self.client.set_configuration({
+      'REQUEST_POOL': '',
+      'PROCESSING_COST_MIN_THREADS': ''})
 
     compute_stats_query = ("compute stats {0}.{1}").format(
         unique_database, "store_sales_subset")
@@ -1050,18 +1113,18 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # parent query. Currently both child query assign to root.tiny.
     # TODO: Revise the CTAS query above such that the two child queries assigned to
     # distinct executor group set.
-    self._verify_total_admitted_queries("root.tiny", 4)
+    self._verify_total_admitted_queries("root.tiny", 3)
     self._verify_total_admitted_queries("root.small", 0)
-    self._verify_total_admitted_queries("root.large", 1)
+    self._verify_total_admitted_queries("root.large", 2)
     self._run_query_and_verify_profile(compute_stats_query,
         ["ExecutorGroupsConsidered: 1",
          "Verdict: Assign to first group because query is not auto-scalable"],
         ["Query Options (set by configuration): REQUEST_POOL=",
          "EffectiveParallelism:", "CpuAsk:", "AvgAdmissionSlotsPerExecutor:",
          "Executor Group:"])
-    self._verify_total_admitted_queries("root.tiny", 6)
+    self._verify_total_admitted_queries("root.tiny", 5)
     self._verify_total_admitted_queries("root.small", 0)
-    self._verify_total_admitted_queries("root.large", 1)
+    self._verify_total_admitted_queries("root.large", 2)
 
     # Test that child queries follow REQUEST_POOL that is set through client
     # configuration. Two child queries should all run in root.small.
@@ -1082,7 +1145,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
          "ExecutorGroupsConsidered: 1",
          "Verdict: Assign to first group because query is not auto-scalable"],
         ["EffectiveParallelism:", "CpuAsk:", "AvgAdmissionSlotsPerExecutor:"])
-    self._verify_total_admitted_queries("root.large", 3)
+    self._verify_total_admitted_queries("root.large", 4)
 
     # Test that REQUEST_POOL will override executor group selection
     self._run_query_and_verify_profile(CPU_TEST_QUERY,
@@ -1249,13 +1312,80 @@ class TestExecutorGroups(CustomClusterTestSuite):
        ])
     # END test slot count strategy
 
+    # BEGIN test memory capping.
+    # Set MAX_FRAGMENT_INSTANCES_PER_NODE=4 and
+    # disable MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR.
+    self._set_query_options({
+      'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.0,
+      'MAX_FRAGMENT_INSTANCES_PER_NODE': 4})
+    self._run_query_and_verify_profile(
+      TPCDS_Q67,
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Per-Host Resource Estimates: Memory=9.25GB",
+       "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
+       "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
+       "Cluster Memory Admitted: 10.90 GB",
+       "MemoryAsk: 27.76 GB"])
+
+    # Set very low MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR.
+    self._set_query_options({'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.00001})
+    self._run_query_and_verify_profile(
+      TPCDS_Q67,
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Per-Host Resource Estimates: Memory=1.86GB",
+       "mem-estimate=210.92MB",  # memory estimate of 17:AGGREGATE.
+       "mem-estimate=211.13MB",  # memory estimate of 07:AGGREGATE.
+       "Cluster Memory Admitted: 6.07 GB",
+       "MemoryAsk: 5.57 GB"])
+
+    # Set MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR to maximum.
+    self._set_query_options({'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 1.0})
+    self._run_query_and_verify_profile(
+      TPCDS_Q67,
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Per-Host Resource Estimates: Memory=9.25GB",
+       "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
+       "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
+       "Cluster Memory Admitted: 10.90 GB",
+       "MemoryAsk: 27.76 GB"])
+
+    # Set MEM_LIMIT_EXECUTORS to 3GB, lower than --mem_limit=4g of root.large's
+    # backend executors.
+    self._set_query_options({'MEM_LIMIT_EXECUTORS': '3GB'})
+    self._run_query_and_verify_profile(
+      TPCDS_Q67,
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Per-Host Resource Estimates: Memory=6.68GB",
+       "mem-estimate=1.00GB",  # memory estimate of 17:AGGREGATE.
+       "mem-estimate=768.00MB",  # memory estimate of 07:AGGREGATE.
+       "Cluster Memory Admitted: 9.10 GB",
+       "MemoryAsk: 20.03 GB"])
+
+    # Set MEM_LIMIT to 2GB, lower than MEM_LIMIT_EXECUTORS.
+    self._set_query_options({'MEM_LIMIT': '2GB'})
+    self._run_query_and_verify_profile(
+      TPCDS_Q67,
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Per-Host Resource Estimates: Memory=4.68GB",
+       "mem-estimate=682.67MB",  # memory estimate of 17:AGGREGATE.
+       "mem-estimate=512.00MB",  # memory estimate of 07:AGGREGATE.
+       "Cluster Memory Admitted: 8.00 GB",
+       "MemoryAsk: 14.03 GB"])
+
+    self._set_query_options({
+      'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.0,
+      'MAX_FRAGMENT_INSTANCES_PER_NODE': '',
+      'MEM_LIMIT_EXECUTORS': '',
+      'MEM_LIMIT': ''})
+    # END test memory capping.
+
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.tiny", 18)
+    self._verify_query_num_for_resource_pool("root.tiny", 17)
     self._verify_query_num_for_resource_pool("root.small", 3)
-    self._verify_query_num_for_resource_pool("root.large", 7)
-    self._verify_total_admitted_queries("root.tiny", 18)
+    self._verify_query_num_for_resource_pool("root.large", 13)
+    self._verify_total_admitted_queries("root.tiny", 17)
     self._verify_total_admitted_queries("root.small", 3)
-    self._verify_total_admitted_queries("root.large", 7)
+    self._verify_total_admitted_queries("root.large", 13)
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially

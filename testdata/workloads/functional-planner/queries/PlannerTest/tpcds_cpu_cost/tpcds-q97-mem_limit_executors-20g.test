@@ -26,9 +26,9 @@ limit 100;
 # end query 97 in stream 0 using template query97.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=113.94MB Threads=1
-Per-Host Resource Estimates: Memory=140.56GB
+Per-Host Resource Estimates: Memory=60.02GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=140.56GB mem-reservation=113.94MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  Per-Instance Resources: mem-estimate=60.02GB mem-reservation=113.94MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  max-parallelism=1 segment-costs=[56272781729, 28137119708, 11606178508, 0]
 PLAN-ROOT SINK
 |  output exprs: sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
@@ -44,13 +44,13 @@ PLAN-ROOT SINK
 08:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: ss_customer_sk = cs_bill_customer_sk, ss_item_sk = cs_item_sk
 |  fk/pk conjuncts: ss_customer_sk = cs_bill_customer_sk, ss_item_sk = cs_item_sk
-|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=20.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2N,6N row-size=16B cardinality=12.96G cost=8884575742
 |  in pipelines: 03(GETNEXT), 07(OPEN)
 |
 |--07:AGGREGATE [FINALIZE]
 |  |  group by: cs_bill_customer_sk, cs_item_sk
-|  |  mem-estimate=40.54GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=20.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=6 row-size=8B cardinality=4.32G cost=25499692278
 |  |  in pipelines: 07(GETNEXT), 04(OPEN)
 |  |
@@ -89,7 +89,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  group by: ss_customer_sk, ss_item_sk
-|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=20.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=8.64G cost=50998081470
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |

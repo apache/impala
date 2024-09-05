@@ -1005,6 +1005,23 @@ enum TImpalaQueryOptions {
   // given value, then no filtering is done.
   // Set it non-positive to turn this feature off completely.
   SKIP_UNNEEDED_UPDATES_COL_LIMIT = 189
+
+  // A scale between (0.0, 1.0] (not including 0.0) to control estimate peak memory of
+  // query operators that have spill-to-disk capabilities. Setting value closer to 1.0
+  // will make Planner bias towards keeping as much rows as possible in memory, while
+  // setting value closer to 0.0 will make Planner bias towards spilling rows to disk
+  // under memory pressure.
+  // Resulting memory estimate will never be less than minimum memory required for
+  // a query operator to start execution. MEM_LIMIT, MEM_LIMIT_COORDINATORS,
+  // MEM_LIMIT_EXECUTORS, per-pool memory clamping configuration, and
+  // MAX_MEM_ESTIMATE_FOR_ADMISSION will be considered into peak memory estimation if any
+  // of them is set.
+  // Setting to 0.0 or unsetting scratch_dirs flag will revert Planner to old behavior
+  // where it assumes that all rows must be held in memory, regardless of any memory
+  // limit configurations mentioned above. It is recommended to set this query option
+  // to either 1.0 (enabled) or 0.0 (disabled) and only set value in between for
+  // experimental purpose.
+  MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR = 190
 }
 
 // The summary of a DML statement.

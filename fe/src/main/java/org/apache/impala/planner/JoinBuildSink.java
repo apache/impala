@@ -29,8 +29,6 @@ import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinBuildSink;
 import org.apache.impala.thrift.TQueryOptions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -39,9 +37,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 /**
  * Sink to materialize the build side of a join.
  */
-public class JoinBuildSink extends DataSink {
-  private final static Logger LOG = LoggerFactory.getLogger(JoinBuildSink.class);
-
+public class JoinBuildSink extends DataSink implements SpillableOperator {
   // id of join's build-side table assigned during planning
   private final JoinTableId joinTableId_;
 
@@ -166,6 +162,20 @@ public class JoinBuildSink extends DataSink {
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     resourceProfile_ = joinNode_.computeJoinResourceProfile(queryOptions).second;
+  }
+
+  @Override
+  public void computeResourceProfileIfSpill(
+      TQueryOptions queryOptions, long maxMemoryEstimatePerInstance) {
+    if (joinNode_ instanceof HashJoinNode) {
+      // Only HashJoinNode implements SpillableOperator.
+      resourceProfile_ =
+          ((HashJoinNode) joinNode_)
+              .computeJoinResourceProfile(queryOptions, maxMemoryEstimatePerInstance)
+              .second;
+    } else {
+      computeResourceProfile(queryOptions);
+    }
   }
 
   @Override

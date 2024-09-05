@@ -324,6 +324,7 @@ TEST(QueryOptions, SetFractionalOptions) {
       {MAKE_OPTIONDEF(join_selectivity_correlation_factor), true},
       {MAKE_OPTIONDEF(agg_mem_correlation_factor), true},
       {MAKE_OPTIONDEF(runtime_filter_cardinality_reduction_scale), true},
+      {MAKE_OPTIONDEF(mem_estimate_scale_for_spilling_operator), true},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<double>& option_def = test_case.first;

@@ -33,9 +33,9 @@ limit 100;
 # end query 95 in stream 0 using template query95.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=278.25MB Threads=1
-Per-Host Resource Estimates: Memory=218.14GB
+Per-Host Resource Estimates: Memory=114.74GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=218.14GB mem-reservation=278.25MB thread-reservation=1 runtime-filters-memory=53.00MB
+|  Per-Instance Resources: mem-estimate=114.74GB mem-reservation=278.25MB thread-reservation=1 runtime-filters-memory=53.00MB
 |  max-parallelism=1 segment-costs=[16453556987, 30961638418, 979524347, 43005, 0, 0]
 PLAN-ROOT SINK
 |  output exprs: count(ws_order_number), sum(ws_ext_ship_cost), sum(ws_net_profit)
@@ -160,7 +160,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: none
 |  |  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
 |  |  runtime filters: RF008[bloom] <- ws2.ws_order_number, RF009[min_max] <- ws2.ws_order_number
-|  |  mem-estimate=101.70GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=4,5 row-size=24B cardinality=26.46G cost=7508259980
 |  |  in pipelines: 04(GETNEXT), 05(OPEN)
 |  |
@@ -219,7 +219,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
 |  runtime filters: RF004[bloom] <- ws2.ws_order_number, RF005[min_max] <- ws2.ws_order_number
-|  mem-estimate=101.70GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=9,10 row-size=24B cardinality=26.46G cost=7508259980
 |  in pipelines: 08(GETNEXT), 09(OPEN)
 |

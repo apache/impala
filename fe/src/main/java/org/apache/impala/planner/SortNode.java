@@ -50,7 +50,7 @@ import com.google.common.base.Preconditions;
  *
  * Will always materialize the new tuple info_.sortTupleDesc_.
  */
-public class SortNode extends PlanNode {
+public class SortNode extends PlanNode implements SpillableOperator {
   private final static Logger LOG = LoggerFactory.getLogger(SortNode.class);
 
   // Coefficiencts for estimating scan processing cost. Derived from benchmarking.
@@ -500,10 +500,29 @@ public class SortNode extends PlanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
+    computeResourceProfileIfSpill(queryOptions, Long.MAX_VALUE);
+  }
+
+  @Override
+  public void computeResourceProfileIfSpill(
+      TQueryOptions queryOptions, long maxMemoryEstimatePerInstance) {
     Preconditions.checkState(hasValidStats());
+    boolean biasToSpill = shouldComputeResourcesWithSpill(queryOptions);
+    if (!biasToSpill) {
+      Preconditions.checkArgument(maxMemoryEstimatePerInstance == Long.MAX_VALUE);
+    }
+
     if (type_ == TSortType.TOPN) {
-      nodeResourceProfile_ = ResourceProfile.noReservation(
-          getSortInfo().estimateTopNMaterializedSize(cardinality_, offset_));
+      long memEstimate =
+          getSortInfo().estimateTopNMaterializedSize(cardinality_, offset_);
+      ResourceProfileBuilder builder =
+          new ResourceProfileBuilder().setMemEstimateBytes(memEstimate);
+      if (biasToSpill) {
+        builder.setMemEstimateScale(
+            queryOptions.getMem_estimate_scale_for_spilling_operator(),
+            maxMemoryEstimatePerInstance);
+      }
+      nodeResourceProfile_ = builder.build();
       return;
     }
 
@@ -553,10 +572,20 @@ public class SortNode extends PlanNode {
         perInstanceMemEstimate = Math.min(perInstanceMemEstimate, totalHeapBytes);
       }
     }
-    nodeResourceProfile_ = new ResourceProfileBuilder()
-        .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinMemReservationBytes(perInstanceMinMemReservation)
-        .setSpillableBufferBytes(bufferSize).setMaxRowBufferBytes(bufferSize).build();
+    ResourceProfileBuilder builder =
+        new ResourceProfileBuilder()
+            .setMemEstimateBytes(perInstanceMemEstimate)
+            .setMinMemReservationBytes(perInstanceMinMemReservation)
+            .setSpillableBufferBytes(bufferSize)
+            .setMaxRowBufferBytes(bufferSize);
+    if (type_ != TSortType.PARTIAL && biasToSpill) {
+      // PartialSortNode use Sorter that does not support spill.
+      // Other sort node use Sorter that support spill.
+      builder.setMemEstimateScale(
+          queryOptions.getMem_estimate_scale_for_spilling_operator(),
+          maxMemoryEstimatePerInstance);
+    }
+    nodeResourceProfile_ = builder.build();
   }
 
   private static String getDisplayName(TSortType type) {

@@ -729,16 +729,20 @@ public class DistributedPlanner {
          ctx_.getQueryOptions().getDefault_join_distribution_mode());
    }
 
-   // Decide the distribution mode based on the estimated costs, the mem limit and
-   // the broadcast bytes limit. The last value is a safety check to ensure we
-   // don't broadcast very large inputs (for example in case the broadcast cost was
-   // not computed correctly and the query mem limit has not been set or set too high)
+   // Decide the distribution mode based on the estimated costs, the mem_limit /
+   // mem_limit_executors option, the max-query-mem-limit config of the request pool
+   // (if exist), and the broadcast bytes limit.
+   // The last value is a safety check to ensure we don't broadcast very large inputs
+   // (for example in case the broadcast cost was not computed correctly and the query
+   // mem limit has not been set or set too high).
+   // mem_limit_coordinators option is not considered because it is unknown if the
+   // resulting HashJoin fragment is the final plan's root or not.
    long htSize = Math.round(rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
-   long memLimit = ctx_.getQueryOptions().mem_limit;
+   long memLimit = ctx_.getRootAnalyzer().getMaxMemLimitPerHost(false);
    long broadcast_bytes_limit = ctx_.getQueryOptions().getBroadcast_bytes_limit();
 
-   if (broadcastCost <= partitionCost && (memLimit == 0 || htSize <= memLimit) &&
-           (broadcast_bytes_limit == 0 || htSize <= broadcast_bytes_limit)) {
+   if (broadcastCost <= partitionCost && htSize <= memLimit
+       && (broadcast_bytes_limit == 0 || htSize <= broadcast_bytes_limit)) {
      return DistributionMode.BROADCAST;
    }
    // Partitioned was cheaper or the broadcast HT would not fit within the mem limit.

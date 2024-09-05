@@ -1351,6 +1351,13 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_skip_unneeded_updates_col_limit(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR: {
+        double double_val = 0.0f;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(
+            option, value, 0.0, 1.0, &double_val));
+        query_options->__set_mem_estimate_scale_for_spilling_operator(double_val);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

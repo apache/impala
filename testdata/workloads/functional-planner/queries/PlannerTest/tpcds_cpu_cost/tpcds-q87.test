@@ -24,9 +24,9 @@ from ((select distinct c_last_name, c_first_name, d_date
 # end query 87 in stream 0 using template query87.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=265.94MB Threads=1
-Per-Host Resource Estimates: Memory=536.66GB
+Per-Host Resource Estimates: Memory=224.72GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=536.66GB mem-reservation=265.94MB thread-reservation=1 runtime-filters-memory=51.00MB
+|  Per-Instance Resources: mem-estimate=224.72GB mem-reservation=265.94MB thread-reservation=1 runtime-filters-memory=51.00MB
 |  max-parallelism=1 segment-costs=[54790085460, 27414203232, 13758375736, 13451593165, 0]
 PLAN-ROOT SINK
 |  output exprs: count(*)
@@ -40,7 +40,7 @@ PLAN-ROOT SINK
 |
 19:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: d_date IS NOT DISTINCT FROM d_date, c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name
-|  mem-estimate=121.99GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=40B cardinality=7.93G cost=5459196418
 |  in pipelines: 05(GETNEXT), 17(OPEN)
 |
@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 |
 18:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: d_date IS NOT DISTINCT FROM d_date, c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name
-|  mem-estimate=243.61GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=40B cardinality=7.93G cost=7437210998
 |  in pipelines: 05(GETNEXT), 11(OPEN)
 |
@@ -166,7 +166,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  group by: c_last_name, c_first_name, d_date
-|  mem-estimate=96.34GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=40B cardinality=7.93G cost=46814848608
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |

@@ -33,8 +33,10 @@ public class ResourceProfile {
   private final boolean isValid_;
 
   // Estimated memory consumption in bytes. Guaranteed to be >= minReservationBytes_ if
-  // both are set and guaranteed to be <= maxMemReservationBytes_ if both are set (the
-  // constructor ensures both of these conditions).
+  // both are set. It is, however, not guaranteed to be <= maxMemReservationBytes_ if
+  // this ResourceProfile is not instantiated from the public constructor.
+  // See other instantiation in sum(), max(), combine(), multiply() method below where
+  // memEstimateBytes_ <= maxMemReservationBytes_ is not guaranteed.
   private final long memEstimateBytes_;
 
   // Minimum memory reservation required to execute in bytes.
@@ -60,16 +62,30 @@ public class ResourceProfile {
   // -1 if the profile is invalid (i.e. isValid_ is false).
   private final long threadReservation_;
 
-  ResourceProfile(boolean isValid, long memEstimateBytes, long minMemReservationBytes,
-      long maxMemReservationBytes, long spillableBufferBytes,
-      long maxRowBufferBytes, long threadReservation) {
+  /**
+   * Construct a ResourceProfile with given parameters.
+   * Do several parameter validation to make sure that the numbers are OK.
+   * If 'maxMemReservationBytes' is set (greater than 0) and 'isStrictMaxMemory' is True,
+   * also validate that 'memEstimateBytes' <= 'maxMemReservationBytes'.
+   */
+  private ResourceProfile(boolean isValid, long memEstimateBytes,
+      long minMemReservationBytes, long maxMemReservationBytes, long spillableBufferBytes,
+      long maxRowBufferBytes, long threadReservation, boolean isStrictMaxMemory) {
     Preconditions.checkArgument(spillableBufferBytes == -1 || maxRowBufferBytes != -1);
     Preconditions.checkArgument(spillableBufferBytes == -1
         || LongMath.isPowerOfTwo(spillableBufferBytes));
     Preconditions.checkArgument(maxRowBufferBytes == -1
         || LongMath.isPowerOfTwo(maxRowBufferBytes));
     Preconditions.checkArgument(!isValid || threadReservation >= 0, threadReservation);
-    Preconditions.checkArgument(maxMemReservationBytes >= minMemReservationBytes);
+    Preconditions.checkState(minMemReservationBytes <= maxMemReservationBytes,
+        "minMemReservationBytes (%s) is greater than maxMemReservationBytes (%s)!",
+        minMemReservationBytes, maxMemReservationBytes);
+    if (maxMemReservationBytes > 0 && isStrictMaxMemory) {
+      Preconditions.checkState(memEstimateBytes <= maxMemReservationBytes,
+          "memEstimateBytes (%s) is greater than maxMemReservationBytes (%s)!",
+          memEstimateBytes, maxMemReservationBytes);
+    }
+
     isValid_ = isValid;
     memEstimateBytes_ = (minMemReservationBytes != -1) ?
         Math.max(memEstimateBytes, minMemReservationBytes) : memEstimateBytes;
@@ -80,14 +96,21 @@ public class ResourceProfile {
     threadReservation_ = threadReservation;
   }
 
+  public ResourceProfile(boolean isValid, long memEstimateBytes,
+      long minMemReservationBytes, long maxMemReservationBytes, long spillableBufferBytes,
+      long maxRowBufferBytes, long threadReservation) {
+    this(isValid, memEstimateBytes, minMemReservationBytes, maxMemReservationBytes,
+        spillableBufferBytes, maxRowBufferBytes, threadReservation, true);
+  }
+
   // Create a resource profile with zero min or max reservation and zero required
   // threads.
   public static ResourceProfile noReservation(long memEstimateBytes) {
-    return new ResourceProfile(true, memEstimateBytes, 0, 0, -1, -1, 0);
+    return new ResourceProfile(true, memEstimateBytes, 0, 0, -1, -1, 0, false);
   }
 
   public static ResourceProfile invalid() {
-    return new ResourceProfile(false, -1, -1, -1, -1, -1, -1);
+    return new ResourceProfile(false, -1, -1, -1, -1, -1, -1, false);
   }
 
   public boolean isValid() { return isValid_; }
@@ -133,9 +156,8 @@ public class ResourceProfile {
     return new ResourceProfile(true,
         Math.max(getMemEstimateBytes(), other.getMemEstimateBytes()),
         Math.max(getMinMemReservationBytes(), other.getMinMemReservationBytes()),
-        Math.max(getMaxMemReservationBytes(), other.getMaxMemReservationBytes()),
-        -1, -1,
-        Math.max(getThreadReservation(), other.getThreadReservation()));
+        Math.max(getMaxMemReservationBytes(), other.getMaxMemReservationBytes()), -1, -1,
+        Math.max(getThreadReservation(), other.getThreadReservation()), false);
   }
 
   // Returns a profile with the sum of each aggregate value in 'this' and 'other'.
@@ -146,10 +168,12 @@ public class ResourceProfile {
     return new ResourceProfile(true,
         MathUtil.saturatingAdd(getMemEstimateBytes(), other.getMemEstimateBytes()),
         MathUtil.saturatingAdd(
-            getMinMemReservationBytes(),other.getMinMemReservationBytes()),
+            getMinMemReservationBytes(), other.getMinMemReservationBytes()),
         MathUtil.saturatingAdd(
-            getMaxMemReservationBytes(), other.getMaxMemReservationBytes()), -1, -1,
-        MathUtil.saturatingAdd(getThreadReservation(), other.getThreadReservation()));
+            getMaxMemReservationBytes(), other.getMaxMemReservationBytes()),
+        -1, -1,
+        MathUtil.saturatingAdd(getThreadReservation(), other.getThreadReservation()),
+        false);
   }
 
   // Returns a profile with the sum of each aggregate value in 'this' and 'other'.
@@ -160,12 +184,13 @@ public class ResourceProfile {
     return new ResourceProfile(true,
         MathUtil.saturatingAdd(getMemEstimateBytes(), other.getMemEstimateBytes()),
         MathUtil.saturatingAdd(
-            getMinMemReservationBytes(),other.getMinMemReservationBytes()),
+            getMinMemReservationBytes(), other.getMinMemReservationBytes()),
         MathUtil.saturatingAdd(
             getMaxMemReservationBytes(), other.getMaxMemReservationBytes()),
         Math.max(getSpillableBufferBytes(), other.getSpillableBufferBytes()),
         Math.max(getMaxRowBufferBytes(), other.getMaxRowBufferBytes()),
-        MathUtil.saturatingAdd(getThreadReservation(), other.getThreadReservation()));
+        MathUtil.saturatingAdd(getThreadReservation(), other.getThreadReservation()),
+        false);
   }
 
   // Returns a profile with each aggregate value multiplied by 'factor'.
@@ -177,7 +202,7 @@ public class ResourceProfile {
         MathUtil.saturatingMultiply(memEstimateBytes_, factor),
         MathUtil.saturatingMultiply(minMemReservationBytes_, factor),
         MathUtil.saturatingMultiply(maxMemReservationBytes_, factor), -1, -1,
-        MathUtil.saturatingMultiply(threadReservation_, factor));
+        MathUtil.saturatingMultiply(threadReservation_, factor), false);
   }
 
   public TBackendResourceProfile toThrift() {

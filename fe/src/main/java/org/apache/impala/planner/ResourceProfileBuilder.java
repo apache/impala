@@ -17,8 +17,9 @@
 
 package org.apache.impala.planner;
 
-import org.apache.impala.planner.ResourceProfile;
 import com.google.common.base.Preconditions;
+
+import org.apache.impala.util.MathUtil;
 
 /**
  * Utility class to help set up the various parameters of a ResourceProfile.
@@ -37,6 +38,13 @@ public class ResourceProfileBuilder {
 
   // Must be set if spillableBufferBytes_ is set.
   private long maxRowBufferBytes_= -1;
+
+  // If set, attempt to scale down memEstimateBytes_ to value between
+  // minMemReservationBytes_ and maxMemEstimateBytesAfterScaling_ at build().
+  // memEstimateBytes_ will stay unchanged if scaled memory estimate is still higher
+  // or maxMemEstimateBytesAfterScaling_ is less than minMemReservationBytes_.
+  private double scale_ = 0.0;
+  private long maxMemEstimateBytesAfterScaling_ = -1;
 
   // Defaults to zero, because most ExecNodes do not create additional threads.
   private long threadReservation_ = 0;
@@ -75,8 +83,30 @@ public class ResourceProfileBuilder {
     return this;
   }
 
+  public ResourceProfileBuilder setMemEstimateScale(double scale, long maxMemBound) {
+    Preconditions.checkArgument(scale > 0.0 && scale <= 1.0, "invalid scale %s", scale);
+    Preconditions.checkArgument(maxMemBound > 0, "invalid maxMemBound %s", maxMemBound);
+    scale_ = scale;
+    maxMemEstimateBytesAfterScaling_ = maxMemBound;
+    return this;
+  }
+
   ResourceProfile build() {
     Preconditions.checkState(memEstimateBytes_ >= 0, "Mem estimate must be set");
+
+    if (scale_ > 0.0 && maxMemEstimateBytesAfterScaling_ > 0) {
+      long scaleBasedMemEstimate = minMemReservationBytes_;
+      if (minMemReservationBytes_ <= maxMemEstimateBytesAfterScaling_) {
+        scaleBasedMemEstimate = MathUtil.saturatingAdd(minMemReservationBytes_,
+            (long) ((maxMemEstimateBytesAfterScaling_ - minMemReservationBytes_)
+                * scale_));
+        memEstimateBytes_ = Math.min(memEstimateBytes_, scaleBasedMemEstimate);
+      }
+      if (maxMemReservationBytes_ > 0) {
+        memEstimateBytes_ = Math.min(memEstimateBytes_, maxMemReservationBytes_);
+      }
+    }
+
     return new ResourceProfile(true, memEstimateBytes_, minMemReservationBytes_,
         maxMemReservationBytes_, spillableBufferBytes_, maxRowBufferBytes_,
         threadReservation_);

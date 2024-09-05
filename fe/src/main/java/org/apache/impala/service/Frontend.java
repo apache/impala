@@ -2065,7 +2065,6 @@ public class Frontend {
   public static List<TExecutorGroupSet> setupThresholdsForExecutorGroupSets(
       List<TExecutorGroupSet> executorGroupSets, String request_pool,
       boolean default_executor_group, boolean test_replan) throws ImpalaException {
-    RequestPoolService poolService = RequestPoolService.getInstance();
 
     List<TExecutorGroupSet> result = Lists.newArrayList();
     if (default_executor_group) {
@@ -2116,6 +2115,7 @@ public class Frontend {
     }
 
     // Executor groups exist in the cluster. Identify those that can be used.
+    RequestPoolService poolService = RequestPoolService.getInstance();
     for (TExecutorGroupSet e : executorGroupSets) {
       // If defined, request_pool can be a suffix of the group name prefix. For example
       //   group_set_prefix = root.queue1
@@ -2773,6 +2773,7 @@ public class Frontend {
         expectedNumExecutor(planCtx.compilationState_.getGroupSet()));
     analysisResult.getAnalyzer().setAvailableCoresPerNode(
         Math.max(1, planCtx.compilationState_.getAvailableCoresPerNode()));
+    analysisResult.getAnalyzer().setPoolMemLimit(planCtx.compilationState_.getGroupSet());
 
     try {
       TQueryOptions queryOptions = queryCtx.client_request.query_options;

@@ -34,7 +34,6 @@ import org.apache.impala.thrift.TPoolConfigParams;
 import org.apache.impala.thrift.TPoolConfig;
 import org.apache.impala.thrift.TResolveRequestPoolParams;
 import org.apache.impala.thrift.TResolveRequestPoolResult;
-import org.apache.impala.thrift.TStatus;
 
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;

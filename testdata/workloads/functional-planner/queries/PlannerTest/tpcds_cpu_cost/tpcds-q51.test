@@ -46,9 +46,9 @@ limit 100;
 # end query 51 in stream 0 using template query51.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=97.94MB Threads=1
-Per-Host Resource Estimates: Memory=3.68PB
+Per-Host Resource Estimates: Memory=198.29GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=3.68PB mem-reservation=97.94MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  Per-Instance Resources: mem-estimate=198.29GB mem-reservation=97.94MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  max-parallelism=1 segment-costs=[56515568116, 12537410622, 14128806498, 3134329462, 210805767343546, 278820518032917, 600]
 PLAN-ROOT SINK
 |  output exprs: item_sk, d_date, web_sales, store_sales, web_cumulative, store_cumulative
@@ -77,14 +77,14 @@ PLAN-ROOT SINK
 |
 13:SORT
 |  order by: CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END ASC NULLS LAST, CASE WHEN d_date IS NOT NULL THEN d_date ELSE d_date END ASC
-|  mem-estimate=3.68PB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=25 row-size=80B cardinality=51.81T cost=201402086378006
 |  in pipelines: 13(GETNEXT), 10(OPEN)
 |
 12:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: d_date = d_date, ss_item_sk = ws_item_sk
 |  fk/pk conjuncts: none
-|  mem-estimate=128.47GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=22N,21N,17N,16N row-size=80B cardinality=51.81T cost=9392881062052
 |  in pipelines: 10(GETNEXT), 04(OPEN)
 |
@@ -156,14 +156,14 @@ PLAN-ROOT SINK
 |
 10:SORT
 |  order by: ss_item_sk ASC NULLS LAST, d_date ASC
-|  mem-estimate=193.12GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=22 row-size=24B cardinality=8.64G cost=12537410622
 |  in pipelines: 10(GETNEXT), 09(OPEN)
 |
 09:AGGREGATE [FINALIZE]
 |  output: sum(ss_sales_price)
 |  group by: ss_item_sk, d_date
-|  mem-estimate=145.09GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=24B cardinality=8.64G cost=50998081470
 |  in pipelines: 09(GETNEXT), 06(OPEN)
 |
@@ -203,7 +203,7 @@ PLAN-ROOT SINK
    in pipelines: 06(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=2.47GB Threads=87
-Per-Host Resource Estimates: Memory=377.07TB
+Per-Host Resource Estimates: Memory=132.30GB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.73MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[639] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
@@ -219,7 +219,7 @@ PLAN-ROOT SINK
 |  in pipelines: 16(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END)] hosts=10 instances=100 (adjusted from 120)
-Per-Instance Resources: mem-estimate=37.70TB mem-reservation=10.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=5.02GB mem-reservation=10.00MB thread-reservation=1
 max-parallelism=27882060 segment-costs=[231945815232544, 278820518032917, 220] cpu-comparison-result=240 [max(220 (self) vs 240 (sum children))]
 16:TOP-N [LIMIT=100]
 |  order by: item_sk ASC, d_date ASC
@@ -244,7 +244,7 @@ max-parallelism=27882060 segment-costs=[231945815232544, 278820518032917, 220] c
 |
 13:SORT
 |  order by: CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END ASC NULLS LAST, CASE WHEN d_date IS NOT NULL THEN d_date ELSE d_date END ASC
-|  mem-estimate=37.70TB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=5.00GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=25 row-size=80B cardinality=51.81T cost=201402086378006
 |  in pipelines: 13(GETNEXT), 10(OPEN)
 |
@@ -469,7 +469,7 @@ max-parallelism=1824 segment-costs=[56515544083, 17805178445] cpu-comparison-res
    in pipelines: 06(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=2.47GB Threads=87
-Per-Host Resource Estimates: Memory=377.07TB
+Per-Host Resource Estimates: Memory=132.30GB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.73MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[639] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
@@ -485,7 +485,7 @@ PLAN-ROOT SINK
 |  in pipelines: 16(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END)] hosts=10 instances=100 (adjusted from 120)
-Per-Instance Resources: mem-estimate=37.70TB mem-reservation=10.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=5.02GB mem-reservation=10.00MB thread-reservation=1
 max-parallelism=27882060 segment-costs=[231945815232544, 278820518032917, 220] cpu-comparison-result=240 [max(220 (self) vs 240 (sum children))]
 16:TOP-N [LIMIT=100]
 |  order by: item_sk ASC, d_date ASC
@@ -510,7 +510,7 @@ max-parallelism=27882060 segment-costs=[231945815232544, 278820518032917, 220] c
 |
 13:SORT
 |  order by: CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END ASC NULLS LAST, CASE WHEN d_date IS NOT NULL THEN d_date ELSE d_date END ASC
-|  mem-estimate=37.70TB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=5.00GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=25 row-size=80B cardinality=51.81T cost=201402086378006
 |  in pipelines: 13(GETNEXT), 10(OPEN)
 |

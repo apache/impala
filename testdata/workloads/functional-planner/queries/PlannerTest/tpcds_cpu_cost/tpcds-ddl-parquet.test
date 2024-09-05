@@ -125,9 +125,9 @@ stored as parquet as
 select * from store_sales
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=168.00MB Threads=24
-Per-Host Resource Estimates: Memory=89.98GB
+Per-Host Resource Estimates: Memory=62.74GB
 F01:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk)] hosts=10 instances=120
-|  Per-Instance Resources: mem-estimate=7.44GB mem-reservation=6.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=5.17GB mem-reservation=6.00MB thread-reservation=1
 |  max-parallelism=120 segment-costs=[44372981821, 97047706322]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_duplicate, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
 |  partitions=1824
@@ -136,7 +136,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_duplicate, OVERWRITE=f
 |
 02:SORT
 |  order by: ss_sold_date_sk ASC NULLS LAST
-|  mem-estimate=6.44GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=4.17GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=96B cardinality=8.64G cost=39597689640
 |  in pipelines: 02(GETNEXT), 00(OPEN)
 |
@@ -451,9 +451,9 @@ select a.*, a.ca_country as part_col
 from customer_address as a, customer_address as b
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=12.25MB Threads=3
-Per-Host Resource Estimates: Memory=4.63PB
+Per-Host Resource Estimates: Memory=51.02GB
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  Per-Instance Resources: mem-estimate=4.63PB mem-reservation=12.12MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=51.00GB mem-reservation=12.12MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[2393532728547225, 2622165786501232] cpu-comparison-result=20 [max(10 (self) vs 20 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.customer_address_1_huge_part, OVERWRITE=false, PARTITION-KEYS=(ca_country)]
 |  partitions=1
@@ -462,7 +462,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.customer_address_1_huge_part, OVER
 |
 04:SORT
 |  order by: ca_country ASC NULLS LAST
-|  mem-estimate=4.63PB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=50.00GB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=232B cardinality=225.00T cost=2358455207032019
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
@@ -580,9 +580,9 @@ select a.*, (a.ss_sold_date_sk % 4) as part_col
 from store_sales a, store_sales b;
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=168.25MB Threads=27
-Per-Host Resource Estimates: Memory=8192.00PB
+Per-Host Resource Estimates: Memory=62.79GB
 F02:PLAN FRAGMENT [HASH((a.ss_sold_date_sk % 4))] hosts=10 instances=120
-|  Per-Instance Resources: mem-estimate=6553.60PB mem-reservation=6.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=5.17GB mem-reservation=6.00MB thread-reservation=1
 |  max-parallelism=120 segment-costs=[9223372036854775807, 1079134528315963008] cpu-comparison-result=240 [max(240 (self) vs 30 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_4_huge_part, OVERWRITE=false, PARTITION-KEYS=((ss_sold_date_sk % 4))]
 |  partitions=1824
@@ -591,7 +591,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_4_huge_part, OVERWRITE
 |
 05:SORT
 |  order by: (ss_sold_date_sk % 4) ASC NULLS LAST
-|  mem-estimate=6553.60PB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=4.17GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=96B cardinality=9223372.04T cost=9223372036854775807
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -655,9 +655,9 @@ select a.*, a.cs_ship_mode_sk as part_col
 from catalog_sales a, catalog_sales b;
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=24.12MB Threads=16
-Per-Host Resource Estimates: Memory=8192.00PB
+Per-Host Resource Estimates: Memory=52.34GB
 F02:PLAN FRAGMENT [HASH(a.cs_ship_mode_sk)] hosts=10 instances=20
-|  Per-Instance Resources: mem-estimate=8192.00PB mem-reservation=6.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=26.00GB mem-reservation=6.00MB thread-reservation=1
 |  max-parallelism=20 segment-costs=[9223372036854775807, 1079134528315963008] cpu-comparison-result=140 [max(140 (self) vs 20 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.catalog_sales_20_huge_part, OVERWRITE=false, PARTITION-KEYS=(cs_ship_mode_sk)]
 |  partitions=20
@@ -666,7 +666,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.catalog_sales_20_huge_part, OVERWR
 |
 05:SORT
 |  order by: cs_ship_mode_sk ASC NULLS LAST
-|  mem-estimate=8192.00PB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=25.00GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=140B cardinality=9223372.04T cost=9223372036854775807
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |

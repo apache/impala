@@ -37,7 +37,6 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.BitUtil;
-import org.apache.impala.util.ExprUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +49,7 @@ import com.google.common.base.Preconditions;
  * plan generated for a table ref. Typically, that is the right child, but due to join
  * inversion (for outer/semi/cross joins) it could also be the left child.
  */
-public class HashJoinNode extends JoinNode {
+public class HashJoinNode extends JoinNode implements SpillableOperator {
   private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
 
   // Coefficients for estimating hash join CPU processing cost.  Derived from
@@ -231,14 +230,38 @@ public class HashJoinNode extends JoinNode {
     return output.toString();
   }
 
+  @Override
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
+    computeResourceProfileIfSpill(queryOptions, Long.MAX_VALUE);
+  }
+
+  @Override
+  public void computeResourceProfileIfSpill(
+      TQueryOptions queryOptions, long maxMemoryEstimatePerInstance) {
+    Pair<ResourceProfile, ResourceProfile> profiles =
+        computeJoinResourceProfile(queryOptions, maxMemoryEstimatePerInstance);
+    if (hasSeparateBuild()) {
+      // All build resource consumption is accounted for in the separate builder.
+      nodeResourceProfile_ = profiles.first;
+    } else {
+      // Both build and profile resources are accounted for in the node.
+      nodeResourceProfile_ = profiles.first.combine(profiles.second);
+    }
+  }
+
+  @Override
+  public Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
+      TQueryOptions queryOptions) {
+    return computeJoinResourceProfile(queryOptions, Long.MAX_VALUE);
+  }
+
   /**
    * Helper method to compute the resource requirements for the join that can be
    * called from the builder or the join node. Returns a pair of the probe
    * resource requirements and the build resource requirements.
    */
-  @Override
   public Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
-      TQueryOptions queryOptions) {
+      TQueryOptions queryOptions, long maxMemoryEstimatePerInstance) {
     long perBuildInstanceMemEstimate;
     long perBuildInstanceDataBytes;
     int numInstances = fragment_.getNumInstances();
@@ -326,11 +349,20 @@ public class HashJoinNode extends JoinNode {
         .setMinMemReservationBytes(perInstanceProbeMinMemReservation)
         .setSpillableBufferBytes(bufferSize)
         .setMaxRowBufferBytes(maxRowBufferSize).build();
-    ResourceProfile buildProfile = new ResourceProfileBuilder()
-        .setMemEstimateBytes(perBuildInstanceMemEstimate)
-        .setMinMemReservationBytes(perInstanceBuildMinMemReservation)
-        .setSpillableBufferBytes(bufferSize)
-        .setMaxRowBufferBytes(maxRowBufferSize).build();
+    ResourceProfileBuilder buildProfileBuilder =
+        new ResourceProfileBuilder()
+            .setMemEstimateBytes(perBuildInstanceMemEstimate)
+            .setMinMemReservationBytes(perInstanceBuildMinMemReservation)
+            .setSpillableBufferBytes(bufferSize)
+            .setMaxRowBufferBytes(maxRowBufferSize);
+    if (shouldComputeResourcesWithSpill(queryOptions)) {
+      buildProfileBuilder.setMemEstimateScale(
+          queryOptions.getMem_estimate_scale_for_spilling_operator(),
+          maxMemoryEstimatePerInstance);
+    } else {
+      Preconditions.checkArgument(maxMemoryEstimatePerInstance == Long.MAX_VALUE);
+    }
+    ResourceProfile buildProfile = buildProfileBuilder.build();
     return Pair.create(probeProfile, buildProfile);
   }
 

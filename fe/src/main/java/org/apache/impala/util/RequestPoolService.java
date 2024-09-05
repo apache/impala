@@ -288,6 +288,9 @@ public class RequestPoolService {
   public void stop() {
     Preconditions.checkState(running_.get());
     stopInternal();
+
+    // For test only, unset single_instance_ if this RequestPoolService is the singleton.
+    if (single_instance_ == this) { single_instance_ = null; }
   }
 
   public boolean isRunning() { return running_.get(); }

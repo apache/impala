@@ -295,6 +295,7 @@ void ScheduleState::CompareMinCoordinatorMemToAdmit(
   }
 }
 
+// Please update Analyzer.getMaxMemLimitPerHost() in Analyzer.java if updating this.
 void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg,
     int64_t coord_mem_limit_admission, int64_t executor_mem_limit_admission) {
   // If the min_query_mem_limit and max_query_mem_limit are not set in the pool config
