@@ -84,6 +84,38 @@ const map<string, int> TimestampFunctions::DAYNAME_MAP = {
     {"sat", 6}, {"saturday", 6},
 };
 
+void TimestampFunctions::FromUtcAndToUtcPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  const Timezone* timezone = nullptr;
+  if (context->IsArgConstant(1)) {
+    StringVal tz_string_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
+    const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
+    timezone = TimezoneDatabase::FindTimezone(
+        string(tz_string_value.Ptr(), tz_string_value.Len()));
+  }
+  context->SetFunctionState(scope, (void *)(timezone));
+}
+
+const Timezone* GetTimezone(FunctionContext* context,
+    const StringValue& tz_string_value) {
+  void* state = context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL);
+  const Timezone* timezone = reinterpret_cast<Timezone*>(state);
+  DCHECK(timezone == nullptr || context->IsArgConstant(1));
+  if (timezone == nullptr) {
+    timezone = TimezoneDatabase::FindTimezone(
+        string(tz_string_value.Ptr(), tz_string_value.Len()));
+  }
+  if (UNLIKELY(timezone == nullptr)) {
+    // Although this is an error, Hive ignores it. We will issue a warning but otherwise
+    // ignore the error too.
+    stringstream ss;
+    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
+    context->AddWarning(ss.str().c_str());
+  }
+  return timezone;
+}
+
 TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
@@ -91,16 +123,8 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
   if (UNLIKELY(!ts_value.HasDateAndTime())) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
-  const Timezone* timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.Ptr(), tz_string_value.Len()));
-  if (UNLIKELY(timezone == nullptr)) {
-    // Although this is an error, Hive ignores it. We will issue a warning but otherwise
-    // ignore the error too.
-    stringstream ss;
-    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
-    context->AddWarning(ss.str().c_str());
-    return ts_val;
-  }
+  const Timezone* timezone = GetTimezone(context, tz_string_value);
+  if (UNLIKELY(timezone == nullptr)) return ts_val;
 
   TimestampValue ts_value_ret = ts_value;
   ts_value_ret.UtcToLocal(*timezone);
@@ -124,16 +148,8 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
   if (!ts_value.HasDateAndTime()) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
-  const Timezone* timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.Ptr(), tz_string_value.Len()));
-  if (UNLIKELY(timezone == nullptr)) {
-    // Although this is an error, Hive ignores it. We will issue a warning but otherwise
-    // ignore the error too.
-    stringstream ss;
-    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
-    context->AddWarning(ss.str().c_str());
-    return ts_val;
-  }
+  const Timezone* timezone = GetTimezone(context, tz_string_value);
+  if (UNLIKELY(timezone == nullptr)) return ts_val;
 
   TimestampValue ts_value_ret = ts_value;
   ts_value_ret.LocalToUtc(*timezone);
@@ -148,6 +164,13 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
   TimestampVal ts_val_ret;
   ts_value_ret.ToTimestampVal(&ts_val_ret);
   return ts_val_ret;
+}
+
+void TimestampFunctions::FromUtcAndToUtcClose(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::FRAGMENT_LOCAL) {
+    context->SetFunctionState(scope, nullptr);
+  }
 }
 
 TimestampVal TimestampFunctions::ToUtcUnambiguous(FunctionContext* context,

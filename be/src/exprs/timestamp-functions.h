@@ -153,6 +153,12 @@ class TimestampFunctions {
   static TimestampVal UnixMicrosToUtcTimestamp(FunctionContext* context,
       const BigIntVal& unix_time_micros);
 
+  // Find and initialize timezone object if it's name is a constant.
+  static void FromUtcAndToUtcPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+  static void FromUtcAndToUtcClose(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+
   /// Convert a timestamp to or from a particular timezone based time.
   static TimestampVal FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val);
