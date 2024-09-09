@@ -446,6 +446,16 @@ TEST(QueryOptions, SetSpecialOptions) {
     TestError("-0.1");
     TestError("Not a number!");
   }
+  // MAX_SORT_RUN_SIZE should not be 1.
+  {
+    OptionDef<int32_t> key_def = MAKE_OPTIONDEF(max_sort_run_size);
+    auto TestOk = MakeTestOkFn(options, key_def);
+    auto TestError = MakeTestErrFn(options, key_def);
+    TestOk("-1", -1);
+    TestOk("0", 0);
+    TestError("1");
+    TestOk("2", 2);
+  }
 }
 
 void VerifyFilterTypes(const set<TRuntimeFilterType::type>& types,

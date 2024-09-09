@@ -335,6 +335,12 @@ class Sorter::Run {
   bool ConvertOffsetsForCollectionChildren(const CollectionValue& cv,
       const SlotDescriptor& slot_desc) WARN_UNUSED_RESULT;
 
+  /// Only initial in-memory runs' size can be limited by the 'MAX_SORT_RUN_SIZE' query
+  /// option. Returns true if the initial in-memory run reached its maximum capacity in
+  /// pages (fixed-len + var-len pages).
+  template <bool INITIAL_RUN>
+  bool IR_ALWAYS_INLINE MaxSortRunSizeReached();
+
   int NumOpenPages(const vector<Page>& pages);
 
   /// Close all open pages and clear vector.

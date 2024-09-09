@@ -1168,10 +1168,8 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
       }
       case TImpalaQueryOptions::MAX_SORT_RUN_SIZE: {
         int32_t int32_t_val = 0;
-        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckNonNegative<int32_t>(
-            option, value, &int32_t_val));
-        RETURN_IF_ERROR(
-            QueryOptionValidator<int32_t>::NotEquals(option, int32_t_val, 1));
+        RETURN_IF_ERROR(QueryOptionParser::Parse<int32_t>(option, value, &int32_t_val));
+        RETURN_IF_ERROR(QueryOptionValidator<int32_t>::NotEquals(option, int32_t_val, 1));
         query_options->__set_max_sort_run_size(int32_t_val);
         break;
       }

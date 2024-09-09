@@ -305,3 +305,8 @@ set PARQUET_LATE_MATERIALIZATION_THRESHOLD=0;
 ---- CATCH
 Invalid value for query option PARQUET_LATE_MATERIALIZATION_THRESHOLD: Value can't be 0
 ====
+---- QUERY
+set MAX_SORT_RUN_SIZE=1;
+---- CATCH
+Invalid value for query option MAX_SORT_RUN_SIZE: Value can't be 1, actual value: 1
+====

@@ -125,8 +125,8 @@ Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc, bool initial_
     max_num_of_pages_(initial_run ? parent->inmem_run_max_pages_ : 0) {}
 
 Status Sorter::Run::Init() {
-  int num_to_create = 1 + has_var_len_slots_ + (has_var_len_slots_ && initial_run_ &&
-      (sorter_->enable_spilling_ && max_num_of_pages_ == 0));
+  int num_to_create = 1 + has_var_len_slots_
+      + (has_var_len_slots_ && initial_run_ && sorter_->enable_spilling_);
   int64_t required_mem = num_to_create * sorter_->page_len_;
   if (!sorter_->buffer_pool_client_->IncreaseReservationToFit(required_mem)) {
     return Status(Substitute(
@@ -243,8 +243,14 @@ Status Sorter::Run::AddBatchInternal(
         DCHECK_GT(var_len_pages_.size(), 0);
         Page* cur_var_len_page = &var_len_pages_.back();
         if (cur_var_len_page->BytesRemaining() < total_var_len) {
-          bool added;
-          RETURN_IF_ERROR(TryAddPage(add_mode, &var_len_pages_, &added));
+          bool added = false;
+          if (MaxSortRunSizeReached<INITIAL_RUN>()) {
+            cur_fixed_len_page->FreeBytes(sort_tuple_size_);
+            *allocation_failed = false;
+            return Status::OK();
+          } else {
+            RETURN_IF_ERROR(TryAddPage(add_mode, &var_len_pages_, &added));
+          }
           if (added) {
             cur_var_len_page = &var_len_pages_.back();
           } else {
@@ -272,7 +278,7 @@ Status Sorter::Run::AddBatchInternal(
 
     // If there are still rows left to process, get a new page for the fixed-length
     // tuples. If the run is already too long, return.
-    if (INITIAL_RUN && max_num_of_pages_ > 0 && run_size() >= max_num_of_pages_){
+    if (MaxSortRunSizeReached<INITIAL_RUN>()) {
       *allocation_failed = false;
       return Status::OK();
     }
@@ -288,6 +294,13 @@ Status Sorter::Run::AddBatchInternal(
   }
   *allocation_failed = false;
   return Status::OK();
+}
+
+template <bool INITIAL_RUN>
+bool Sorter::Run::MaxSortRunSizeReached() {
+  DCHECK_EQ(INITIAL_RUN, initial_run_);
+  DCHECK(!INITIAL_RUN || max_num_of_pages_ == 0 || run_size() <= max_num_of_pages_);
+  return (INITIAL_RUN && max_num_of_pages_ > 0 && run_size() == max_num_of_pages_);
 }
 
 bool IsValidStructInSortingTuple(const ColumnType& struct_type) {
@@ -1016,8 +1029,7 @@ Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     in_mem_sort_timer_(nullptr),
     in_mem_merge_timer_(nullptr),
     sorted_data_size_(nullptr),
-    run_sizes_(nullptr),
-    inmem_run_max_pages_(state->query_options().max_sort_run_size) {
+    run_sizes_(nullptr) {
   switch (tuple_row_comparator_config.sorting_order_) {
     case TSortingOrder::LEXICAL:
       compare_less_than_.reset(
@@ -1029,6 +1041,8 @@ Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     default:
       DCHECK(false);
   }
+  int max_sort_run_size = state->query_options().max_sort_run_size;
+  inmem_run_max_pages_ = max_sort_run_size >= 2 ? max_sort_run_size : 0;
   if (estimated_input_size > 0) ComputeSpillEstimate(estimated_input_size);
 }
 

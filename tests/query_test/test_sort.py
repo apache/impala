@@ -22,13 +22,20 @@ from copy import copy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
-    # TODO: uncomment once IMPALA-13334 resolved.
-    # add_exec_option_dimension,
+    add_exec_option_dimension,
     create_exec_option_dimension)
 
-# Run sizes (number of pages per run) in sorter
-# TODO: uncomment once IMPALA-13334 resolved.
-# MAX_SORT_RUN_SIZE = [0, 2, 20]
+"""Run sizes (number of pages per run) in sorter.
+Values:
+  0: there is no limit on the size of an in-memory run. The sorter will allocate memory
+    to fit the data until it encounters some memory limit.
+  2: an in-memory run can be at most 2 pages. This is the smallest possible size of a run:
+    at least 1 page for fix-len data and 1 page for var-len data.
+  20: an in-memory run can be at most 20 pages.
+Too small in-memory runs with var-len data can cause memory fragmentation, therefore
+different memory or spilling limits are needed to trigger the same scenarios in some test
+cases."""
+MAX_SORT_RUN_SIZE = [0, 2, 20]
 
 
 def split_result_rows(result):
@@ -65,8 +72,7 @@ class TestQueryFullSort(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestQueryFullSort, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(cluster_sizes=[1]))
-    # TODO: uncomment once IMPALA-13334 resolved.
-    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
+    add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
 
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -104,9 +110,11 @@ class TestQueryFullSort(ImpalaTestSuite):
        a query is, the more sort runs are likely to be produced and spilled.
        Case 1 : 0 SpilledRuns, because all rows fit within the maximum reservation.
                 sort_run_bytes_limit is not enforced.
-       Case 2 : 4 SpilledRuns, because sort node estimate that spill is inevitable.
+       Case 2 : 4 or 5 SpilledRuns, because sort node estimates that spill is inevitable.
                 So all runs are capped to 130m, including the first one."""
-    options = [('2g', '100m', '0'), ('400m', '130m', '4')]
+    # max_sort_run_size > 0 will spill more in Case 2.
+    options = [('2g', '100m', '0'),
+           ('400m', '130m', ('5' if exec_option['max_sort_run_size'] > 0 else '4'))]
     for (mem_limit, sort_run_bytes_limit, spilled_runs) in options:
       exec_option['mem_limit'] = mem_limit
       exec_option['sort_run_bytes_limit'] = sort_run_bytes_limit
@@ -156,7 +164,12 @@ class TestQueryFullSort(ImpalaTestSuite):
 
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
-    exec_option['mem_limit'] = "134m"
+    # With max_sort_run_size=2 (2 pages per run) the varlen data is more fragmented and
+    # requires a higher limit to maintain "TotalMergesPerformed: 1" assertion.
+    if exec_option['max_sort_run_size'] == 2:
+      exec_option['mem_limit'] = "144m"
+    else:
+      exec_option['mem_limit'] = "134m"
     table_format = vector.get_value('table_format')
 
     query_result = self.execute_query(query, exec_option, table_format=table_format)
@@ -228,8 +241,15 @@ class TestQueryFullSort(ImpalaTestSuite):
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_sort_reservation_usage(self, vector):
     """Tests for sorter reservation usage.
-    Run with num_nodes=1 to make execution more deterministic."""
-    self.run_test_case('sort-reservation-usage-single-node', vector)
+    If max_sort_run_size > 0, the larger the run size, the sooner the sorter can give up
+    memory to the next node."""
+    if vector.get_value('exec_option')['max_sort_run_size'] == 2:
+      # Increase buffer_limit to maintain such that query never spill.
+      buffer_pool_limit = '27m'
+    else:
+      buffer_pool_limit = '14m'
+    self.run_test_case('sort-reservation-usage-single-node', vector,
+                       test_file_vars={'$BUFFER_POOL_LIMIT': buffer_pool_limit})
 
 
 class TestRandomSort(ImpalaTestSuite):
@@ -240,8 +260,7 @@ class TestRandomSort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestRandomSort, cls).add_test_dimensions()
-    # TODO: uncomment once IMPALA-13334 resolved.
-    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
+    add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
 
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -296,8 +315,7 @@ class TestPartialSort(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestPartialSort, cls).add_test_dimensions()
-    # TODO: uncomment once IMPALA-13334 resolved.
-    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
+    add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
 
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -354,8 +372,7 @@ class TestArraySort(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestArraySort, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(cluster_sizes=[1]))
-    # TODO: uncomment once IMPALA-13334 resolved.
-    # add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
+    add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
 
     # The table we use is a parquet table.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -384,7 +401,8 @@ class TestArraySort(ImpalaTestSuite):
     table_format = vector.get_value('table_format')
 
     query_result = self.execute_query(query, exec_option, table_format=table_format)
-    assert "SpilledRuns: 3" in query_result.runtime_profile
+    # Check that spilling was successful.
+    assert re.search(r'\s+\- SpilledRuns: [1-9]', query_result.runtime_profile)
 
     # Split result rows (strings) into columns.
     result = split_result_rows(query_result.data)

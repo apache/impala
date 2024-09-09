@@ -797,13 +797,13 @@ enum TImpalaQueryOptions {
   // Valid values are in [1, 128]. Default to 128.
   MAX_FRAGMENT_INSTANCES_PER_NODE = 156
 
-  // Configures the in-memory sort algorithm used in the sorter. Determines the
-  // maximum number of pages in an initial in-memory run (fixed + variable length).
-  // 0 means unlimited, which will create 1 big run with no in-memory merge phase.
-  // Setting any other other value can create multiple miniruns which leads to an
-  // in-memory merge phase. The minimum value in that case is 2.
-  // Generally, with larger workloads the recommended value is 10 or more to avoid
-  // high fragmentation of variable length data.
+  // Configures the in-memory sort algorithm used in the sorter. Determines the maximum
+  // number of pages in an initial in-memory run (fixed + variable length).
+  // Maximizing the sort run size can help mitigate back-pressure in the sorter. It
+  // creates multiple miniruns and merges them in-memory. The run size must be at least 2,
+  // but 10 or more are recommended to avoid high fragmentation of variable length data.
+  // Setting 0 or a negative value disables the run size limitation.
+  // Defaults to 0 (disabled).
   MAX_SORT_RUN_SIZE = 157;
 
   // Allowing implicit casts with loss of precision, adds the capability to use

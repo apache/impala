@@ -5,8 +5,10 @@
 # does not give up memory to the second sort. Scans the text formatted file so that
 # the scan uses less reservation.
 # num_nodes = 1 is set for this file by the python test.
+set mt_dop=1;
+set max_scan_range_length=2MB;
 set scratch_limit=0;
-set buffer_pool_limit=35m;
+set buffer_pool_limit=$BUFFER_POOL_LIMIT;
 set default_spillable_buffer_size=64kb;
 SELECT *
 FROM   (SELECT
