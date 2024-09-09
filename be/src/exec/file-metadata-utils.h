@@ -35,6 +35,7 @@ class MemPool;
 class RuntimeState;
 class ScannerContext;
 class SlotDescriptor;
+class Status;
 class Tuple;
 class TupleDescriptor;
 
@@ -63,6 +64,12 @@ public:
   /// partition columns, virtual columns.
   bool NeedDataInFile(const SlotDescriptor* slot_desc);
 
+  /// Adjusts the file-level fieldID for data files residing in migrated partitioned
+  /// Iceberg tables. It is OK to have none of the partition columns in the data
+  /// file, or to have all of the partition columns, in any other case this method
+  /// returns an error.
+  Status AdjustFieldIdForMigratedPartitionedTables(int *fieldID) const;
+
 private:
   void AddFileLevelVirtualColumns(MemPool* mem_pool, Tuple* template_tuple);
 
@@ -76,6 +83,10 @@ private:
   void AddVirtualIcebergColumn(MemPool* mem_pool, Tuple* template_tuple,
       const org::apache::impala::fb::FbIcebergMetadata& ice_metadata,
       const SlotDescriptor* slot_desc);
+
+  /// Returns a pointer to the container of partition transforms. Only valid to call
+  /// for Iceberg tables.
+  auto IcebergPartitionTransforms() const;
 
   HdfsScanNodeBase* const scan_node_;
 

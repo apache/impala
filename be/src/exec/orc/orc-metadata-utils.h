@@ -23,6 +23,8 @@
 
 namespace impala {
 
+class FileMetadataUtils;
+
 // Key of Hive ACID version in ORC metadata.
 const string HIVE_ACID_VERSION_KEY = "hive.acid.version";
 
@@ -40,9 +42,13 @@ constexpr int CURRENT_TRANSCACTION_TYPE_ID = 5;
 /// Util class to resolve SchemaPaths of TupleDescriptors/SlotDescriptors into orc::Type.
 class OrcSchemaResolver {
  public:
-  OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc, const orc::Type* root,
+  OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc,
+      const FileMetadataUtils& file_metadata_utils,
+      const orc::Type* root,
       const char* filename, bool is_table_acid,
       TSchemaResolutionStrategy::type schema_resolution);
+
+  Status Init();
 
   /// Resolve SchemaPath into orc::Type (ORC column representation)
   /// 'pos_field' is set to true if 'col_path' reference the index field of an array
@@ -114,7 +120,7 @@ class OrcSchemaResolver {
   /// Generates field ids for the columns in the same order as Iceberg. The traversal is
   /// preorder, but the assigned field IDs are not in that order. When a node is
   /// processed, its child nodes are assigned an ID, hence the difference.
-  void GenerateFieldIDs();
+  Status GenerateFieldIDs();
 
   inline int GetGeneratedFieldID(const orc::Type* type) const;
 
@@ -124,6 +130,7 @@ class OrcSchemaResolver {
   void DetermineFullAcidSchema();
 
   const HdfsTableDescriptor& tbl_desc_;
+  const FileMetadataUtils& file_metadata_utils_;
   const orc::Type* const root_;
   const char* const filename_ = nullptr;
   const bool is_table_full_acid_;

@@ -363,8 +363,10 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
 
   bool is_table_full_acid = scan_node_->hdfs_table()->IsTableFullAcid();
   schema_resolver_.reset(
-      new OrcSchemaResolver(*scan_node_->hdfs_table(), &reader_->getType(), filename(),
-          is_table_full_acid, state_->query_options().orc_schema_resolution));
+      new OrcSchemaResolver(*scan_node_->hdfs_table(), file_metadata_utils_,
+          &reader_->getType(), filename(), is_table_full_acid,
+          state_->query_options().orc_schema_resolution));
+  RETURN_IF_ERROR(schema_resolver_->Init());
   bool is_file_full_acid = schema_resolver_->HasFullAcidV2Schema();
   acid_original_file_ = is_table_full_acid && !is_file_full_acid;
   if (is_table_full_acid) {

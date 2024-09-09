@@ -21,6 +21,7 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include "exec/file-metadata-utils.h"
 #include "util/debug-util.h"
 #include "common/names.h"
 
@@ -39,22 +40,28 @@ inline int GetFieldIdFromStr(const std::string& str) {
 }
 
 OrcSchemaResolver::OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc,
+    const FileMetadataUtils& file_metadata_utils,
     const orc::Type* root, const char* filename, bool is_table_acid,
     TSchemaResolutionStrategy::type schema_resolution)
   : schema_resolution_strategy_(schema_resolution),
     tbl_desc_(tbl_desc),
+    file_metadata_utils_(file_metadata_utils),
     root_(root),
     filename_(filename),
-    is_table_full_acid_(is_table_acid) {
+    is_table_full_acid_(is_table_acid) {}
+
+
+Status OrcSchemaResolver::Init() {
   DetermineFullAcidSchema();
   if (tbl_desc_.IsIcebergTable()) {
     schema_resolution_strategy_ = TSchemaResolutionStrategy::FIELD_ID;
 
     if (root_->getSubtypeCount() > 0
         && !root_->getSubtype(0)->hasAttributeKey(ICEBERG_FIELD_ID)) {
-      GenerateFieldIDs();
+      RETURN_IF_ERROR(GenerateFieldIDs());
     }
   }
+  return Status::OK();
 }
 
 Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
@@ -320,7 +327,7 @@ const orc::Type* OrcSchemaResolver::FindChildWithFieldId(const orc::Type* node,
   return nullptr;
 }
 
-void OrcSchemaResolver::GenerateFieldIDs() {
+Status OrcSchemaResolver::GenerateFieldIDs() {
   std::stack<const orc::Type*> nodes;
 
   nodes.push(root_);
@@ -343,7 +350,16 @@ void OrcSchemaResolver::GenerateFieldIDs() {
       // order
       nodes.push(current->getSubtype(size - i - 1));
     }
+
+    if (current == root_ && !nodes.empty()) {
+      // Partition columns are not stored in file metadata, but they get field IDs
+      // from Iceberg. Check if there are partition columns and adjust field ID
+      // generation. It is only relevant for tables that have complex types.
+      RETURN_IF_ERROR(
+          file_metadata_utils_.AdjustFieldIdForMigratedPartitionedTables(&fieldID));
+    }
   }
+  return Status::OK();
 }
 
 int OrcSchemaResolver::GetGeneratedFieldID(const orc::Type* type) const {

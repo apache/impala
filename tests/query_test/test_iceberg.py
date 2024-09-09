@@ -45,7 +45,7 @@ from tests.common.file_utils import (
   create_iceberg_table_from_directory,
   create_table_from_parquet)
 from tests.shell.util import run_impala_shell_cmd
-from tests.util.filesystem_utils import get_fs_path, IS_HDFS
+from tests.util.filesystem_utils import get_fs_path, IS_HDFS, WAREHOUSE
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.iceberg_util import cast_ts, quote, get_snapshots, IcebergCatalogs
 
@@ -269,6 +269,63 @@ class TestIcebergTable(IcebergTestSuite):
     create_iceberg_table_from_directory(self.client, unique_database,
                                         "iceberg_migrated_complex_test_orc", "orc")
     self.run_test_case('QueryTest/iceberg-migrated-table-field-id-resolution',
+                       vector, unique_database)
+
+  @SkipIfFS.hive
+  def test_migrated_table_field_id_resolution_complex(self, vector, unique_database):
+    def get_table_loc(tbl_name):
+      return '%s/%s.db/%s/' % (WAREHOUSE, unique_database, tbl_name)
+
+    def create_table(tbl_name, file_format, partition_cols):
+      self.execute_query("""CREATE TABLE IF NOT EXISTS {}.{} (
+            id INT,
+            name STRING,
+            teststeps array<struct<step_number:int,step_description:string>>)
+          PARTITIONED BY ({})
+          STORED AS {}
+          """.format(unique_database, tbl_name, partition_cols, file_format))
+
+    def add_file_to_table_partition(tbl_name, part_dir, local_filename):
+      tbl_loc = get_table_loc(tbl_name)
+      part_dir = os.path.join(tbl_loc, part_dir)
+      self.filesystem_client.make_dir(part_dir)
+      data_file_path = os.path.join(os.environ['IMPALA_HOME'], "testdata",
+          "migrated_iceberg", local_filename)
+      self.filesystem_client.copy_from_local(data_file_path, part_dir)
+
+    def finalize_table(tbl_name):
+      self.execute_query("ALTER TABLE {}.{} RECOVER PARTITIONS".format(
+          unique_database, tbl_name))
+      self.execute_query("ALTER TABLE {}.{} CONVERT TO ICEBERG".format(
+          unique_database, tbl_name))
+
+    def prepare_test_table(tbl_name, file_format, partition_cols, part_dir, datafile):
+      create_table(tbl_name, file_format, partition_cols)
+      add_file_to_table_partition(tbl_name, part_dir, datafile)
+      finalize_table(tbl_name)
+
+    prepare_test_table('all_part_cols_stored_parquet',
+        "PARQUET",
+        "result_date STRING",
+        "result_date=2024-08-26",
+        "complextypes_and_partition_columns_in_data_files.parquet")
+    prepare_test_table('not_all_part_cols_stored_parquet',
+        "PARQUET",
+        "result_date STRING, p INT",
+        "result_date=2024-08-26/p=3",
+        "complextypes_and_partition_columns_in_data_files.parquet")
+    prepare_test_table('all_part_cols_stored_orc',
+        "ORC",
+        "result_date STRING",
+        "result_date=2024-08-26",
+        "complextypes_and_partition_columns_in_data_files.orc")
+    prepare_test_table('not_all_part_cols_stored_orc',
+        "ORC",
+        "result_date STRING, p INT",
+        "result_date=2024-08-26/p=3",
+        "complextypes_and_partition_columns_in_data_files.orc")
+
+    self.run_test_case('QueryTest/iceberg-migrated-table-field-id-resolution-complex',
                        vector, unique_database)
 
   def test_describe_history(self, vector, unique_database):

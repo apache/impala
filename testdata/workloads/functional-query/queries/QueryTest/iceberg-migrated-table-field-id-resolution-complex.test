@@ -1,0 +1,327 @@
+====
+---- HIVE_QUERY
+USE $DATABASE;
+CREATE TABLE array_struct_table_test (id INT, name STRING,
+    teststeps ARRAY<STRUCT<step_number:INT,step_description:STRING>>)
+PARTITIONED BY (result_date STRING)
+STORED AS PARQUET;
+
+INSERT INTO array_struct_table_test VALUES
+(1, 'Test 1', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'),
+                      NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description')),
+    '2024-08-26'),
+(2, 'Test 2', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'),
+                      NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description'),
+                      NAMED_STRUCT('step_number', 3, 'step_description', 'Step 3 description')),
+    '2024-08-26');
+-- Create similar table with ORC.
+CREATE TABLE array_struct_table_test_orc (id INT, name STRING,
+    teststeps ARRAY<STRUCT<step_number:INT,step_description:STRING>>)
+PARTITIONED BY (result_date STRING)
+STORED AS ORC;
+INSERT INTO array_struct_table_test_orc SELECT * FROM array_struct_table_test;
+====
+---- QUERY
+invalidate metadata array_struct_table_test;
+alter table array_struct_table_test convert to iceberg;
+select teststeps.step_description, teststeps.step_number from array_struct_table_test m, m.teststeps;
+---- RESULTS
+'Step 1 description',1
+'Step 2 description',2
+'Step 1 description',1
+'Step 2 description',2
+'Step 3 description',3
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select * from array_struct_table_test;
+---- RESULTS
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from array_struct_table_test;
+---- RESULTS
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- QUERY
+alter table array_struct_table_test set partition spec (id, name);
+====
+---- QUERY
+select teststeps.step_description, teststeps.step_number from array_struct_table_test m, m.teststeps;
+---- RESULTS
+'Step 1 description',1
+'Step 2 description',2
+'Step 1 description',1
+'Step 2 description',2
+'Step 3 description',3
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select * from array_struct_table_test;
+---- RESULTS
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from array_struct_table_test;
+---- RESULTS
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- HIVE_QUERY
+USE $DATABASE;
+INSERT INTO array_struct_table_test VALUES
+(3, 'Test 3', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'),
+                      NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description')),
+    '2024-08-27'),
+(4, 'Test 4', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'),
+                      NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description'),
+                      NAMED_STRUCT('step_number', 3, 'step_description', 'Step 3 description')),
+    '2024-08-27');
+====
+---- QUERY
+refresh array_struct_table_test;
+select m.result_date, teststeps.step_description, teststeps.step_number from array_struct_table_test m, m.teststeps;
+---- RESULTS
+'2024-08-27','Step 1 description',1
+'2024-08-27','Step 2 description',2
+'2024-08-26','Step 1 description',1
+'2024-08-26','Step 2 description',2
+'2024-08-26','Step 1 description',1
+'2024-08-26','Step 2 description',2
+'2024-08-26','Step 3 description',3
+'2024-08-27','Step 1 description',1
+'2024-08-27','Step 2 description',2
+'2024-08-27','Step 3 description',3
+---- TYPES
+STRING, STRING, INT
+====
+---- QUERY
+select * from array_struct_table_test;
+---- RESULTS
+3,'Test 3','2024-08-27'
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+4,'Test 4','2024-08-27'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from array_struct_table_test;
+---- RESULTS
+4,'Test 4','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-27'
+3,'Test 3','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-27'
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- QUERY
+invalidate metadata array_struct_table_test_orc;
+alter table array_struct_table_test_orc convert to iceberg;
+select teststeps.step_description, teststeps.step_number from array_struct_table_test_orc m, m.teststeps;
+---- RESULTS
+'Step 1 description',1
+'Step 2 description',2
+'Step 1 description',1
+'Step 2 description',2
+'Step 3 description',3
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select * from array_struct_table_test_orc;
+---- RESULTS
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from array_struct_table_test_orc;
+---- RESULTS
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- QUERY
+alter table array_struct_table_test_orc set partition spec (id, name);
+====
+---- QUERY
+select teststeps.step_description, teststeps.step_number from array_struct_table_test_orc m, m.teststeps;
+---- RESULTS
+'Step 1 description',1
+'Step 2 description',2
+'Step 1 description',1
+'Step 2 description',2
+'Step 3 description',3
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select * from array_struct_table_test_orc;
+---- RESULTS
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from array_struct_table_test_orc;
+---- RESULTS
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- HIVE_QUERY
+USE $DATABASE;
+INSERT INTO array_struct_table_test_orc VALUES
+(3, 'Test 3', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'),
+                      NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description')),
+    '2024-08-27'),
+(4, 'Test 4', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'),
+                      NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description'),
+                      NAMED_STRUCT('step_number', 3, 'step_description', 'Step 3 description')),
+    '2024-08-27');
+====
+---- QUERY
+refresh array_struct_table_test_orc;
+select m.result_date, teststeps.step_description, teststeps.step_number from array_struct_table_test_orc m, m.teststeps;
+---- RESULTS
+'2024-08-27','Step 1 description',1
+'2024-08-27','Step 2 description',2
+'2024-08-26','Step 1 description',1
+'2024-08-26','Step 2 description',2
+'2024-08-26','Step 1 description',1
+'2024-08-26','Step 2 description',2
+'2024-08-26','Step 3 description',3
+'2024-08-27','Step 1 description',1
+'2024-08-27','Step 2 description',2
+'2024-08-27','Step 3 description',3
+---- TYPES
+STRING, STRING, INT
+====
+---- QUERY
+select * from array_struct_table_test_orc;
+---- RESULTS
+4,'Test 4','2024-08-27'
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+3,'Test 3','2024-08-27'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from array_struct_table_test_orc;
+---- RESULTS
+4,'Test 4','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-27'
+3,'Test 3','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-27'
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- QUERY
+select * from $DATABASE.array_struct_table_test.`partitions`;
+---- RESULTS
+'{"result_date":null,"id":4,"name":"Test 4"}',1,1,1,0,0,0,0
+'{"result_date":"2024-08-26","id":null,"name":null}',0,2,1,0,0,0,0
+'{"result_date":null,"id":3,"name":"Test 3"}',1,1,1,0,0,0,0
+---- TYPES
+STRING, INT, BIGINT, INT, BIGINT, INT, BIGINT, INT
+====
+---- QUERY
+select * from $DATABASE.array_struct_table_test_orc.`partitions`;
+---- RESULTS
+'{"result_date":null,"id":4,"name":"Test 4"}',1,1,1,0,0,0,0
+'{"result_date":"2024-08-26","id":null,"name":null}',0,2,1,0,0,0,0
+'{"result_date":null,"id":3,"name":"Test 3"}',1,1,1,0,0,0,0
+---- TYPES
+STRING, INT, BIGINT, INT, BIGINT, INT, BIGINT, INT
+====
+---- QUERY
+select teststeps.step_description, teststeps.step_number from all_part_cols_stored_parquet m, m.teststeps;
+---- RESULTS
+'Step 1 description',1
+'Step 2 description',2
+'Step 1 description',1
+'Step 2 description',2
+'Step 3 description',3
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select * from all_part_cols_stored_parquet;
+---- RESULTS
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from all_part_cols_stored_parquet;
+---- RESULTS
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- QUERY
+select * from not_all_part_cols_stored_parquet;
+---- CATCH
+has unexpected schema or partitioning
+====
+---- QUERY
+select teststeps.step_description, teststeps.step_number from all_part_cols_stored_orc m, m.teststeps;
+---- RESULTS
+'Step 1 description',1
+'Step 2 description',2
+'Step 1 description',1
+'Step 2 description',2
+'Step 3 description',3
+---- TYPES
+STRING, INT
+====
+---- QUERY
+select * from all_part_cols_stored_orc;
+---- RESULTS
+1,'Test 1','2024-08-26'
+2,'Test 2','2024-08-26'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+set expand_complex_types=true;
+select * from all_part_cols_stored_orc;
+---- RESULTS
+1,'Test 1','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"}]','2024-08-26'
+2,'Test 2','[{"step_number":1,"step_description":"Step 1 description"},{"step_number":2,"step_description":"Step 2 description"},{"step_number":3,"step_description":"Step 3 description"}]','2024-08-26'
+---- TYPES
+INT, STRING, STRING, STRING
+====
+---- QUERY
+select * from not_all_part_cols_stored_orc;
+---- CATCH
+has unexpected schema or partitioning
+====

@@ -28,6 +28,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "exec/file-metadata-utils.h"
 #include "exec/parquet/parquet-column-stats.h"
 #include "exec/parquet/parquet-common.h"
 #include "runtime/runtime-state.h"
@@ -979,7 +980,7 @@ Status ParquetSchemaResolver::ValidateScalarNode(const SchemaNode& node,
   return Status::OK();
 }
 
-void ParquetSchemaResolver::GenerateFieldIDs() {
+Status ParquetSchemaResolver::GenerateFieldIDs() {
   std::stack<SchemaNode*> nodes;
 
   nodes.push(&schema_);
@@ -1017,7 +1018,15 @@ void ParquetSchemaResolver::GenerateFieldIDs() {
         nodes.push(&current_child);
       }
     }
+    if (current == &schema_ && !nodes.empty()) {
+      // Partition columns are not stored in file metadata, but they get field IDs
+      // from Iceberg. Check if there are partition columns and adjust field ID
+      // generation. It is only relevant for tables that have complex types.
+      RETURN_IF_ERROR(
+          file_metadata_utils_.AdjustFieldIdForMigratedPartitionedTables(&fieldID));
+    }
   }
+  return Status::OK();
 }
 
 int ParquetSchemaResolver::GetGeneratedFieldID(SchemaNode* node) const {

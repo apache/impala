@@ -25,6 +25,7 @@
 
 namespace impala {
 
+class FileMetadataUtils;
 class RuntimeState;
 class TQueryOptions;
 
@@ -140,9 +141,11 @@ struct SchemaNode {
 class ParquetSchemaResolver {
  public:
   ParquetSchemaResolver(const HdfsTableDescriptor& tbl_desc,
+      const FileMetadataUtils& file_metadata_utils,
       TSchemaResolutionStrategy::type fallback_schema_resolution,
       TParquetArrayResolution::type array_resolution)
     : tbl_desc_(tbl_desc),
+      file_metadata_utils_(file_metadata_utils),
       fallback_schema_resolution_(fallback_schema_resolution),
       array_resolution_(array_resolution),
       filename_(NULL) {}
@@ -160,7 +163,9 @@ class ParquetSchemaResolver {
       fallback_schema_resolution_ = TSchemaResolutionStrategy::type::FIELD_ID;
 
       // schema[0] is the 'root', schema[1] is the first column.
-      if (schema.size() > 1 && !schema[1].__isset.field_id) GenerateFieldIDs();
+      if (schema.size() > 1 && !schema[1].__isset.field_id) {
+        RETURN_IF_ERROR(GenerateFieldIDs());
+      }
     }
     return status;
   }
@@ -252,11 +257,12 @@ class ParquetSchemaResolver {
   /// Generates field ids for the columns in the same order as Iceberg. The traversal is
   /// preorder, but the assigned field IDs are not. When a node is visited, its child
   /// nodes are assigned an ID, hence the difference.
-  void GenerateFieldIDs();
+  Status GenerateFieldIDs();
 
   inline int GetGeneratedFieldID(SchemaNode* node) const;
 
   const HdfsTableDescriptor& tbl_desc_;
+  const FileMetadataUtils& file_metadata_utils_;
   TSchemaResolutionStrategy::type fallback_schema_resolution_;
   const TParquetArrayResolution::type array_resolution_;
   const char* filename_;

@@ -1,0 +1,18 @@
+iceberg_migrated_complextypes_and_partition_columns_in_data_files.parquet:
+iceberg_migrated_complextypes_and_partition_columns_in_data_files.orc:
+
+The data file in result_date=2024-08-26 was originally part of a non-partitioned
+legacy table, i.e. it includes the column result_date and does not have Iceberg
+field IDs.
+
+They were written via Hive using the following commands:
+
+CREATE TABLE array_struct_table_test_negative (id INT, name STRING, teststeps
+    ARRAY<STRUCT<step_number:INT,step_description:STRING>>, result_date STRING)
+STORED AS PARQUET;
+
+INSERT INTO array_struct_table_test_negative VALUES
+(1, 'Test 1', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'), NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description')), '2024-08-26'),
+(2, 'Test 2', `ARRAY`(NAMED_STRUCT('step_number', 1, 'step_description', 'Step 1 description'), NAMED_STRUCT('step_number', 2, 'step_description', 'Step 2 description'), NAMED_STRUCT('step_number', 3, 'step_description', 'Step 3 description')), '2024-08-26');
+
+Same for ORC.

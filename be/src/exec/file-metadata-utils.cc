@@ -65,7 +65,7 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
       int len = strlen(filename);
       char* filename_copy = reinterpret_cast<char*>(mem_pool->Allocate(len));
       Ubsan::MemCpy(filename_copy, filename, len);
-    slot->Assign(filename_copy, len);
+      slot->Assign(filename_copy, len);
       template_tuple->SetNotNull(slot_desc->null_indicator_offset());
     } else if (slot_desc->virtual_column_type() ==
         TVirtualColumnType::ICEBERG_DATA_SEQUENCE_NUMBER) {
@@ -84,6 +84,18 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
       }
     }
   }
+}
+
+auto FileMetadataUtils::IcebergPartitionTransforms() const {
+  DCHECK(file_desc_ != nullptr);
+  DCHECK(scan_node_->hdfs_table()->IsIcebergTable());
+
+  using namespace org::apache::impala::fb;
+  const FbFileMetadata* file_metadata = file_desc_->file_metadata;
+  DCHECK(file_metadata != nullptr);
+  const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
+  DCHECK(ice_metadata != nullptr);
+  return ice_metadata->partition_keys();
 }
 
 void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple,
@@ -208,9 +220,7 @@ bool FileMetadataUtils::IsValuePartitionCol(const SlotDescriptor* slot_desc) {
   if (path.size() != 1) return false;
 
   int field_id = scan_node_->hdfs_table()->col_descs()[path.front()].field_id();
-  const FbFileMetadata* file_metadata = file_desc_->file_metadata;
-  const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
-  auto transforms = ice_metadata->partition_keys();
+  auto transforms = IcebergPartitionTransforms();
   if (transforms == nullptr) return false;
   for (int i = 0; i < transforms->size(); ++i) {
     auto transform = transforms->Get(i);
@@ -221,6 +231,57 @@ bool FileMetadataUtils::IsValuePartitionCol(const SlotDescriptor* slot_desc) {
     }
   }
   return false;
+}
+
+Status FileMetadataUtils::AdjustFieldIdForMigratedPartitionedTables(int *fieldID) const {
+  DCHECK(file_desc_ != nullptr);
+  DCHECK(scan_node_->hdfs_table()->IsIcebergTable());
+  DCHECK(fieldID != nullptr);
+
+  using namespace org::apache::impala::fb;
+
+  auto transforms = IcebergPartitionTransforms();
+  if (transforms == nullptr || transforms->size() == 0) return Status::OK();
+
+  vector<int> sourceIDs;
+  sourceIDs.reserve(transforms->size());
+  for (auto transform : *transforms) {
+    if (transform->transform_type() !=
+        FbIcebergTransformType::FbIcebergTransformType_IDENTITY) {
+      return Status(Substitute("$0 has invalid partition transform: $1",
+          file_desc_->filename, transform->transform_type()));
+    }
+    sourceIDs.push_back(transform->source_id());
+  }
+
+  DCHECK_EQ(sourceIDs.size(), transforms->size());
+  sort(sourceIDs.begin(), sourceIDs.end());
+
+  string errorMsg = Substitute(
+      "Migrated file $0 has unexpected schema or partitioning.", file_desc_->filename);
+
+  // Field IDs must be consecutive.
+  for (int i = 0; i < sourceIDs.size() - 1; ++i) {
+    if (sourceIDs[i+1] - sourceIDs[i] != 1) {
+      return Status(errorMsg);
+    }
+  }
+
+  int fileFieldID = *fieldID;
+
+  if (sourceIDs.front() == fileFieldID) {
+    // Partition columns are not stored in the data file (as expected).
+    // In this case we need to adjust fieldID (as it was calculated based on
+    // the file schema only).
+    *fieldID += sourceIDs.size();
+  } else if (sourceIDs.back() == fileFieldID - 1) {
+    // Partition columns are stored in the data file, no need to adjust fieldID.
+  } else {
+    // Some partitions are stored, some aren't let's raise an error for this mess.
+    return Status(errorMsg);
+  }
+
+  return Status::OK();
 }
 
 bool FileMetadataUtils::NeedDataInFile(const SlotDescriptor* slot_desc) {
