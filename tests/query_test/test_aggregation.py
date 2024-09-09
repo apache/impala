@@ -41,49 +41,68 @@ DATA_TYPES = ['int', 'bool', 'double', 'bigint', 'tinyint',
 
 # Lookup table for TestAggregation results.
 result_lut = {
+  # tinyint
   'sum-tinyint': 45000, 'avg-tinyint': 5, 'count-tinyint': 9000,
-      'min-tinyint': 1, 'max-tinyint': 9, 'ndv-tinyint': 9,
+  'min-tinyint': 1, 'max-tinyint': 9, 'ndv-tinyint': 9,
+  # smallint
   'sum-smallint': 495000, 'avg-smallint': 50, 'count-smallint': 9900,
-      'min-smallint': 1, 'max-smallint': 99, 'ndv-smallint': 99,
+  'min-smallint': 1, 'max-smallint': 99, 'ndv-smallint': 99,
+  # int
   'sum-int': 4995000, 'avg-int': 500, 'count-int': 9990,
-      'min-int': 1, 'max-int': 999, 'ndv-int': 999,
+  'min-int': 1, 'max-int': 999, 'ndv-int': 999,
+  # bigint
   'sum-bigint': 49950000, 'avg-bigint': 5000, 'count-bigint': 9990,
-      'min-bigint': 10, 'max-bigint' : 9990, 'ndv-bigint': 999,
+  'min-bigint': 10, 'max-bigint': 9990, 'ndv-bigint': 999,
+  # bool
   'sum-bool': 5000, 'count-bool': 10000, 'min-bool': 'false',
-    'max-bool': 'true', 'avg-bool': 0.5, 'ndv-bool': 2,
+  'max-bool': 'true', 'avg-bool': 0.5, 'ndv-bool': 2,
+  # double
   'sum-double': 50449500.0, 'count-double': 9990, 'min-double': 10.1,
-      'max-double': 10089.9, 'avg-double': 5050.0, 'ndv-double': 999,
+  'max-double': 10089.9, 'avg-double': 5050.0, 'ndv-double': 999,
+  # float
   'sum-float': 5494500.0, 'count-float': 9990, 'min-float': 1.10,
-      'max-float': 1098.9, 'avg-float': 550.0, 'ndv-float': 999,
+  'max-float': 1098.9, 'avg-float': 550.0, 'ndv-float': 999,
+  # timestamp
   'count-timestamp': 10000, 'min-timestamp': '2010-01-01 00:00:00',
-      'max-timestamp': '2010-01-10 18:02:05.100000000',
-      'avg-timestamp': '2010-01-05 20:47:11.705080000', 'ndv-timestamp': 10000,
+  'max-timestamp': '2010-01-10 18:02:05.100000000',
+  'avg-timestamp': '2010-01-05 20:47:11.705080000', 'ndv-timestamp': 10000,
+  # string
   'count-string': 10000, 'min-string': '0', 'max-string': '999', 'ndv-string': 999,
+  # distinct-tinyint
   'sum-distinct-tinyint': 45, 'count-distinct-tinyint': 9, 'min-distinct-tinyint': 1,
-      'max-distinct-tinyint': 9, 'avg-distinct-tinyint': 5, 'ndv-distinct-tinyint': 9,
+  'max-distinct-tinyint': 9, 'avg-distinct-tinyint': 5, 'ndv-distinct-tinyint': 9,
+  # distinct-smallint
   'sum-distinct-smallint': 4950, 'count-distinct-smallint': 99,
-      'min-distinct-smallint': 1, 'max-distinct-smallint': 99,
-      'avg-distinct-smallint': 50, 'ndv-distinct-smallint': 99,
+  'min-distinct-smallint': 1, 'max-distinct-smallint': 99,
+  'avg-distinct-smallint': 50, 'ndv-distinct-smallint': 99,
+  # distinct-int
   'sum-distinct-int': 499500, 'count-distinct-int': 999, 'min-distinct-int': 1,
-      'max-distinct-int': 999, 'avg-distinct-int': 500, 'ndv-distinct-int': 999,
+  'max-distinct-int': 999, 'avg-distinct-int': 500, 'ndv-distinct-int': 999,
+  # distinct-bigint
   'sum-distinct-bigint': 4995000, 'count-distinct-bigint': 999, 'min-distinct-bigint': 10,
-      'max-distinct-bigint': 9990, 'avg-distinct-bigint': 5000,
-      'ndv-distinct-bigint': 999,
+  'max-distinct-bigint': 9990, 'avg-distinct-bigint': 5000,
+  'ndv-distinct-bigint': 999,
+  # distinct-bool
   'sum-distinct-bool': 1, 'count-distinct-bool': 2, 'min-distinct-bool': 'false',
-      'max-distinct-bool': 'true', 'avg-distinct-bool': 0.5, 'ndv-distinct-bool': 2,
+  'max-distinct-bool': 'true', 'avg-distinct-bool': 0.5, 'ndv-distinct-bool': 2,
+  # distinct-double
   'sum-distinct-double': 5044950.0, 'count-distinct-double': 999,
-      'min-distinct-double': 10.1, 'max-distinct-double': 10089.9,
-      'avg-distinct-double': 5050.0, 'ndv-distinct-double': 999,
+  'min-distinct-double': 10.1, 'max-distinct-double': 10089.9,
+  'avg-distinct-double': 5050.0, 'ndv-distinct-double': 999,
+  # distinct-float
   'sum-distinct-float': 549450.0, 'count-distinct-float': 999, 'min-distinct-float': 1.1,
-      'max-distinct-float': 1098.9, 'avg-distinct-float': 550.0,
-      'ndv-distinct-float': 999,
+  'max-distinct-float': 1098.9, 'avg-distinct-float': 550.0,
+  'ndv-distinct-float': 999,
+  # distinct-timestamp
   'count-distinct-timestamp': 10000, 'min-distinct-timestamp': '2010-01-01 00:00:00',
-      'max-distinct-timestamp': '2010-01-10 18:02:05.100000000',
-      'avg-distinct-timestamp': '2010-01-05 20:47:11.705080000',
-      'ndv-distinct-timestamp': 10000,
+  'max-distinct-timestamp': '2010-01-10 18:02:05.100000000',
+  'avg-distinct-timestamp': '2010-01-05 20:47:11.705080000',
+  'ndv-distinct-timestamp': 10000,
+  # distinct-string
   'count-distinct-string': 1000, 'min-distinct-string': '0',
-      'max-distinct-string': '999', 'ndv-distinct-string': 999,
+  'max-distinct-string': '999', 'ndv-distinct-string': 999,
 }
+
 
 class TestAggregation(ImpalaTestSuite):
   @classmethod
@@ -92,7 +111,12 @@ class TestAggregation(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestAggregation, cls).add_test_dimensions(cluster_sizes=ALL_CLUSTER_SIZES)
+    super(TestAggregation, cls).add_test_dimensions()
+    # IMPALA-12383: Exercise with both num_nodes=0 (distributed plan) and num_nodes=1
+    # (single node plan).
+    cls.ImpalaTestMatrix.add_dimension(
+      create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES)
+    )
 
     # Add two more dimensions
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('agg_func', *AGG_FUNCTIONS))
@@ -129,7 +153,7 @@ class TestAggregation(ImpalaTestSuite):
     result = self.execute_query(query, exec_option,
        table_format=vector.get_value('table_format'))
     assert len(result.data) == 1
-    self.verify_agg_result(agg_func, data_type, False, result.data[0]);
+    self.verify_agg_result(agg_func, data_type, False, result.data[0])
 
     if not disable_codegen:
       # Verify codegen was enabled for the preaggregation.
@@ -140,7 +164,7 @@ class TestAggregation(ImpalaTestSuite):
         agg_func, data_type)
     result = self.execute_query(query, vector.get_value('exec_option'))
     assert len(result.data) == 1
-    self.verify_agg_result(agg_func, data_type, True, result.data[0]);
+    self.verify_agg_result(agg_func, data_type, True, result.data[0])
 
     if not disable_codegen:
       # Verify codegen was enabled for all stages of the aggregation.
@@ -152,7 +176,7 @@ class TestAggregation(ImpalaTestSuite):
     if agg_func == 'ndv':
       # NDV is inherently approximate. Compare with some tolerance.
       err = abs(result_lut[key] - int(actual_string))
-      rel_err =  err / float(result_lut[key])
+      rel_err = err / float(result_lut[key])
       print(key, result_lut[key], actual_string,
             abs(result_lut[key] - int(actual_string)))
       assert err <= 1 or rel_err < 0.05
@@ -222,7 +246,7 @@ class TestAggregationQueries(ImpalaTestSuite):
     assert(row[0] == '2010')
     delimiter = [', ', '-', '|']
     for i in range(1, 4):
-      assert(set(row[i].split(delimiter[i-1])) == set(['1', '2', '3', '4']))
+      assert(set(row[i].split(delimiter[i - 1])) == set(['1', '2', '3', '4']))
     assert(row[4] == '40')
     assert(row[5] == '4')
     if not disable_codegen:
@@ -234,29 +258,31 @@ class TestAggregationQueries(ImpalaTestSuite):
     from (select * from alltypesagg where id % 100 = day order by id limit 99999) a
     group by day order by day"""
     result = self.execute_query(query, exec_option, table_format=table_format)
-    string_col = []
-    string_col.append(set(['1','101','201','301','401','501','601','701','801','901']))
-    string_col.append(set(['2','102','202','302','402','502','602','702','802','902']))
-    string_col.append(set(['3','103','203','303','403','503','603','703','803','903']))
-    string_col.append(set(['4','104','204','304','404','504','604','704','804','904']))
-    string_col.append(set(['5','105','205','305','405','505','605','705','805','905']))
-    string_col.append(set(['6','106','206','306','406','506','606','706','806','906']))
-    string_col.append(set(['7','107','207','307','407','507','607','707','807','907']))
-    string_col.append(set(['8','108','208','308','408','508','608','708','808','908']))
-    string_col.append(set(['9','109','209','309','409','509','609','709','809','909']))
-    string_col.append(set(['10','110','210','310','410','510','610','710','810','910']))
+    string_col = [
+      set(['1', '101', '201', '301', '401', '501', '601', '701', '801', '901']),
+      set(['2', '102', '202', '302', '402', '502', '602', '702', '802', '902']),
+      set(['3', '103', '203', '303', '403', '503', '603', '703', '803', '903']),
+      set(['4', '104', '204', '304', '404', '504', '604', '704', '804', '904']),
+      set(['5', '105', '205', '305', '405', '505', '605', '705', '805', '905']),
+      set(['6', '106', '206', '306', '406', '506', '606', '706', '806', '906']),
+      set(['7', '107', '207', '307', '407', '507', '607', '707', '807', '907']),
+      set(['8', '108', '208', '308', '408', '508', '608', '708', '808', '908']),
+      set(['9', '109', '209', '309', '409', '509', '609', '709', '809', '909']),
+      set(['10', '110', '210', '310', '410', '510', '610', '710', '810', '910'])
+    ]
     assert(len(result.data) == 10)
     for i in range(10):
       row = (result.data)[i].split("\t")
       assert(len(row) == 2)
-      assert(row[0] == str(i+1))
+      assert(row[0] == str(i + 1))
       assert(set(row[1].split("->")) == string_col[i])
 
     # Test group_concat distinct with merge node
     query = """select group_concat(distinct string_col, ' ') from alltypesagg
     where int_col < 10"""
     result = self.execute_query(query, exec_option, table_format=table_format)
-    assert(set((result.data)[0].split(" ")) == set(['1','2','3','4','5','6','7','8','9']))
+    assert(set((result.data)[0].split(" ")) == set(
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9']))
     if not disable_codegen:
       # Verify codegen was enabled for all four stages of the aggregation.
       assert_codegen_enabled(result.runtime_profile, [1, 2, 4, 6])
@@ -326,42 +352,38 @@ class TestAggregationQueries(ImpalaTestSuite):
     assert len(result.data) == 10
 
 
-class TestAggregationQueriesRunOnce(ImpalaTestSuite):
-  """Run the aggregation test suite similarly as TestAggregationQueries, but with stricter
-  constraint. Each test in this class only run once by setting uncompressed text dimension
-  for all exploration strategy. However, they may not necessarily target uncompressed text
-  table format. This also run with codegen enabled and disabled to exercise our
-  non-codegen code"""
+class TestAggregationQueriesSingleFormat(ImpalaTestSuite):
+  """Run the aggregation test suite similarly as TestAggregationQueries, but with
+  stricter constraint. Each test in this class only run against one table format by
+  setting uncompressed text dimension for all exploration strategy. However, they
+  may not necessarily target uncompressed text table format. This also run with codegen
+  enabled and disabled to exercise our non-codegen code, default batch_size,
+  and batch_size=1."""
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestAggregationQueriesRunOnce, cls).add_test_dimensions()
+    super(TestAggregationQueriesSingleFormat, cls).add_test_dimensions()
 
     cls.ImpalaTestMatrix.add_dimension(
-      create_exec_option_dimension(disable_codegen_options=[False, True]))
+      create_exec_option_dimension(
+        batch_sizes=[0, 1], disable_codegen_options=[False, True]))
 
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_parquet_count_star_optimization(self, vector, unique_database):
     self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
-    vector.get_value('exec_option')['batch_size'] = 1
-    self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
 
   def test_kudu_count_star_optimization(self, vector):
-    self.run_test_case('QueryTest/kudu-stats-agg', vector)
-    vector.get_value('exec_option')['batch_size'] = 1
     self.run_test_case('QueryTest/kudu-stats-agg', vector)
 
   def test_orc_count_star_optimization(self, vector):
     self.run_test_case('QueryTest/orc-stats-agg', vector)
-    vector.get_value('exec_option')['batch_size'] = 1
-    self.run_test_case('QueryTest/orc-stats-agg', vector)
 
-  def test_sampled_ndv(self, vector):
+  def test_sampled_ndv(self):
     """The SAMPLED_NDV() function is inherently non-deterministic and cannot be
     reasonably made deterministic with existing options so we test it separately.
     The goal of this test is to ensure that SAMPLED_NDV() works on all data types
@@ -441,8 +463,8 @@ class TestDistinctAggregation(ImpalaTestSuite):
 
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(
-        lambda v: v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'none')
+        lambda v: v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'none')
 
   def test_distinct(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
@@ -504,7 +526,7 @@ class TestTPCHAggregationQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTPCHAggregationQueries, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_tpch_aggregations(self, vector):
@@ -516,5 +538,5 @@ class TestTPCHAggregationQueries(ImpalaTestSuite):
   def test_tpch_stress(self, vector):
     self.run_test_case('tpch-stress-aggregations', vector)
 
-  def test_min_multiple_distinct(self, vector, unique_database):
+  def test_min_multiple_distinct(self, vector):
     self.run_test_case('min-multiple-distinct-aggs', vector)

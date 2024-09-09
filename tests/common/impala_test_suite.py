@@ -174,7 +174,7 @@ EXEC_OPTION_NAMES = set([val.lower()
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
   @classmethod
-  def add_test_dimensions(cls, cluster_sizes=None):
+  def add_test_dimensions(cls):
     """
     A hook for adding additional dimensions.
 
@@ -184,10 +184,7 @@ class ImpalaTestSuite(BaseTestSuite):
     super(ImpalaTestSuite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         cls.create_table_info_dimension(cls.exploration_strategy()))
-    if not cluster_sizes:
-      # TODO IMPALA-12394: switch to ALL_CLUSTER_SIZES for exhaustive runs
-      cluster_sizes = ALL_NODES_ONLY
-    cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension(cluster_sizes))
+    cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension())
     # Execute tests through Beeswax by default. Individual tests that have been converted
     # to work with the HS2 client can add HS2 in addition to or instead of beeswax.
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol', 'beeswax'))
@@ -1136,7 +1133,9 @@ class ImpalaTestSuite(BaseTestSuite):
     return tf_dimensions
 
   @classmethod
-  def __create_exec_option_dimension(cls, cluster_sizes):
+  def __create_exec_option_dimension(cls):
+    # TODO IMPALA-12394: switch to ALL_CLUSTER_SIZES for exhaustive runs
+    cluster_sizes = ALL_NODES_ONLY
     disable_codegen_options = ALL_DISABLE_CODEGEN_OPTIONS
     batch_sizes = ALL_BATCH_SIZES
     exec_single_node_option = [0]
