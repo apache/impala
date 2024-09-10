@@ -16,13 +16,13 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+import distro
 import json
 import logging
 import os
 import pytest
 import re
 import requests
-import platform
 
 LOG = logging.getLogger('tests.common.environ')
 test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS", "")
@@ -48,16 +48,11 @@ if os.path.isfile(IMPALA_LOCAL_VERSION_INFO):
     raise Exception("Could not find VERSION in {0}".format(IMPALA_LOCAL_VERSION_INFO))
 
 # Check if it is Red Hat/CentOS/Rocky/AlmaLinux Linux
-distribution = platform.linux_distribution()
-distname = distribution[0].lower()
-version = distribution[1]
-IS_REDHAT_6_DERIVATIVE = False
 IS_REDHAT_DERIVATIVE = False
-if distname.find('centos') or distname.find('rocky') or \
-   distname.find('almalinux') or distname.find('red hat'):
+# Python >= 3.8 removed platform.linux_distribution(). This now uses the 'distro'
+# package, which provides equivalent functionality across Python versions.
+if distro.id() in ['rhel', 'rocky', 'centos', 'almalinux']:
   IS_REDHAT_DERIVATIVE = True
-  if len(re.findall('^6\.*', version)) > 0:
-    IS_REDHAT_6_DERIVATIVE = True
 
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.

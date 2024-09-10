@@ -26,7 +26,7 @@ from functools import partial
 
 from tests.common.environ import (ImpalaTestClusterProperties,
                                   IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL,
-                                  HIVE_MAJOR_VERSION, IS_REDHAT_6_DERIVATIVE,
+                                  HIVE_MAJOR_VERSION,
                                   IS_APACHE_HIVE, IS_TEST_JDK,
                                   IS_TUPLE_CACHE)
 from tests.common.kudu_test_suite import get_kudu_master_flag
@@ -264,10 +264,6 @@ class SkipIfCatalogV2:
     return pytest.mark.skipif(
       not IMPALA_TEST_CLUSTER_PROPERTIES.is_event_polling_enabled(),
       reason="Test expects event polling to be enabled.")
-
-class SkipIfOS:
-  redhat6 = pytest.mark.skipif(IS_REDHAT_6_DERIVATIVE,
-                               reason="Flaky on redhat or centos 6")
 
 
 class SkipIfApacheHive():

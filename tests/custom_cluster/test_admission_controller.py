@@ -41,7 +41,7 @@ from tests.common.custom_cluster_test_suite import (
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
-from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster, SkipIfOS
+from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -2500,7 +2500,6 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         raise thread.error
 
   @pytest.mark.execute_serially
-  @SkipIfOS.redhat6
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=MAX_NUM_CONCURRENT_QUERIES,
         max_queued=MAX_NUM_QUEUED_QUERIES, pool_max_mem=-1, queue_wait_timeout_ms=600000),
@@ -2516,7 +2515,6 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       'mem_limit': sys.maxsize})
 
   @pytest.mark.execute_serially
-  @SkipIfOS.redhat6
   @CustomClusterTestSuite.with_args(
     impalad_args=impalad_admission_ctrl_config_args(
       fs_allocation_file="fair-scheduler-test2.xml",
@@ -2527,7 +2525,6 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     self.run_admission_test(vector, {'request_pool': self.pool_name})
 
   @pytest.mark.execute_serially
-  @SkipIfOS.redhat6
   @CustomClusterTestSuite.with_args(
     impalad_args=impalad_admission_ctrl_config_args(
       fs_allocation_file="fair-scheduler-test2.xml",
@@ -2553,7 +2550,6 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     return limit_metrics[0]
 
   @pytest.mark.execute_serially
-  @SkipIfOS.redhat6
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(
         max_requests=MAX_NUM_CONCURRENT_QUERIES * 30, max_queued=MAX_NUM_QUEUED_QUERIES,
