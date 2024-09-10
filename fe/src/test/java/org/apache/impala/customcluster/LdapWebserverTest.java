@@ -272,7 +272,7 @@ public class LdapWebserverTest {
     verifyTrustedDomainMetrics(Range.closed(1L, 1L));
 
     // Case 2: Authenticate as 'Test1Ldap' without password
-    attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.0.1", false);
+    attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.0.1, 126.5.6.7", false);
     verifyTrustedDomainMetrics(Range.closed(2L, 2L));
 
     // Case 3: Authenticate as 'Test1Ldap' with the right password

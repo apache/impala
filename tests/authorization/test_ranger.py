@@ -26,6 +26,8 @@ import pytest
 import logging
 import requests
 from subprocess import check_call
+import tempfile
+from time import sleep
 
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -33,6 +35,8 @@ from tests.common.file_utils import copy_files_to_hdfs_dir
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIf
 from tests.common.test_dimensions import (create_client_protocol_dimension,
     create_exec_option_dimension, create_orc_dimension)
+from tests.common.test_vector import ImpalaTestVector
+from tests.shell.util import run_impala_shell_cmd
 from tests.util.hdfs_util import NAMENODE
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import WAREHOUSE_PREFIX, WAREHOUSE
@@ -68,6 +72,85 @@ class TestRanger(CustomClusterTestSuite):
   @classmethod
   def get_workload(cls):
     return 'functional-query'
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impala_log_dir=tempfile.mkdtemp(prefix="ranger_audit_xff", dir=os.getenv("LOG_DIR")),
+    impalad_args=(IMPALAD_ARGS + " --use_xff_address_as_origin=true"),
+    catalogd_args=CATALOGD_ARGS)
+  def test_xff_ranger_audit(self):
+    """
+    Tests XFF client IP is included in ranger audit logs when using hs2-http protocol
+    """
+    # Iterate over test vector within test function to avoid restarting cluster.
+    for vector in\
+        [ImpalaTestVector([value]) for value in create_client_protocol_dimension()]:
+      protocol = vector.get_value("protocol")
+      if protocol != "hs2-http":
+        continue
+
+      # Query with XFF header in client request
+      args = ['--protocol=hs2-http',
+              '--hs2_x_forward= 10.20.30.40 ',
+              '-q', 'select count(1) from functional.alltypes']
+      run_impala_shell_cmd(vector, args)
+
+      # Query with XFF header in client request
+      args = ['--protocol=hs2-http',
+              '--hs2_x_forward=10.20.30.40, 1.1.2.3, 127.0.0.6',
+              '-q', 'select count(1) from functional.alltypes']
+      run_impala_shell_cmd(vector, args)
+
+      # Query with XFF header in client request
+      args = ['--protocol=hs2-http',
+              '--hs2_x_forward=10.20.30.40,1.1.2.3,127.0.0.6',
+              '-q', 'select count(1) from functional.alltypes']
+      run_impala_shell_cmd(vector, args)
+
+      # Query without XFF header in client request
+      args = ['--protocol=hs2-http',
+              '-q', 'select count(2) from functional.alltypes']
+      run_impala_shell_cmd(vector, args)
+
+      # Query with empty XFF header in client request
+      args = ['--protocol=hs2-http',
+              '--hs2_x_forward=    ',
+              '-q', 'select count(2) from functional.alltypes']
+      run_impala_shell_cmd(vector, args)
+
+      # Query with invalid XFF header in client request
+      args = ['--protocol=hs2-http',
+              '--hs2_x_forward=foobar',
+              '-q', 'select count(3) from functional.alltypes']
+      run_impala_shell_cmd(vector, args)
+
+      # Shut down cluster to ensure logs flush to disk.
+      sleep(5)
+      self._stop_impala_cluster()
+
+      # Expected audit log string
+      expected_string_valid_xff = (
+        '"access":"select",'
+        '"resource":"functional/alltypes",'
+        '"resType":"@table",'
+        '"action":"select",'
+        '"result":1,'
+        '"agent":"impala",'
+        r'"policy":\d,'
+        '"enforcer":"ranger-acl",'
+        '"cliIP":"%s",'
+        '"reqData":"%s",'
+        '".+":".+","logType":"RangerAudit"'
+      )
+
+      # Ensure audit logs were logged in coordinator logs
+      self.assert_impalad_log_contains("INFO", expected_string_valid_xff %
+          ("10.20.30.40", r"select count\(1\) from functional.alltypes"),
+          expected_count=3)
+      self.assert_impalad_log_contains("INFO", expected_string_valid_xff %
+          ("127.0.0.1", r"select count\(2\) from functional.alltypes"), expected_count=2)
+      self.assert_impalad_log_contains("INFO", expected_string_valid_xff %
+          ("foobar", r"select count\(3\) from functional.alltypes"), expected_count=1)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

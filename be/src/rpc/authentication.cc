@@ -127,17 +127,17 @@ DEFINE_string(trusted_domain, "",
     "<username>:<password> where the password is not used and can be left blank.");
 
 DEFINE_bool(trusted_domain_use_xff_header, false,
-    "If set to true, this uses the 'X-Forwarded-For' HTML header to check for origin "
+    "If set to true, this uses the 'X-Forwarded-For' HTTP header to check for origin "
     "while attempting to verify if the connection request originated from a trusted "
     "domain. Only used if '--trusted_domain' is specified. Warning: Only use this if you "
     "trust the incoming connection to have this set correctly.");
 
 DEFINE_bool(trusted_domain_empty_xff_header_use_origin, false,
-    "If set to true and the 'X-Forwarded-For' HTML header value is empty in the request, "
+    "If set to true and the 'X-Forwarded-For' HTTP header value is empty in the request, "
     "then the origin of the the underlying transport is used while attempting to "
     "verify if the connection request originated from a trusted domain. Only used "
     "if '--trusted_domain' and '--trusted_domain_use_xff_header' flags are specified. "
-    "Warning: In case the 'X-Forwarded-For' HTML header is empty or not in the request, "
+    "Warning: In case the 'X-Forwarded-For' HTTP header is empty or not in the request, "
     "this flag allows a fallback to the default behavior in trusted domain check "
     "(where '--trusted_domain' flag is specified, but '--trusted_domain_use_xff_header' "
     "flag is not set).");
@@ -147,6 +147,14 @@ DEFINE_bool(trusted_domain_strict_localhost, true,
     "determine if something is from localhost. It will only match 127.0.0.1. This is "
     "important for security, because reverse DNS can resolve other non-local addresses "
     "to localhost.");
+
+DEFINE_bool(use_xff_address_as_origin, false,
+    "If set to true use the address in 'X-Forwarded-For' HTTP header as origin of the "
+    "connection. If XFF header is not set then the Peer Address on the underlying socket "
+    "is used as the origin. If XFF header has multiple addresses corresponding to the "
+    "various intermediate proxies, then the first address is used as the origin. XFF "
+    "header with multiple IP addresses must be comma separated. Only use this if you "
+    "trust the incoming connection to have the XFF header set correctly.");
 
 // This flag must be used with caution to avoid security risks.
 DEFINE_string(trusted_auth_header, "",
@@ -639,6 +647,15 @@ bool GetUsernameFromBasicAuthHeader(
 bool SetOrigin(
     ThriftServer::ConnectionContext* connection_context, const std::string& origin) {
   connection_context->http_origin = origin;
+  if (FLAGS_use_xff_address_as_origin) {
+    std::string origin_client;
+    Status status = GetXFFOriginClientAddress(origin, origin_client);
+    if (!status.ok()) {
+      LOG(ERROR) << "Error parsing XFF header: " << status;
+    } else {
+      connection_context->network_address = MakeNetworkAddress(origin_client);
+    }
+  }
   return false;
 }
 

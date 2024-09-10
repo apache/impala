@@ -51,6 +51,11 @@ std::string GetDeleteCookie();
 bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domain,
     bool strict_localhost);
 
+// Returns the origin client address from a comma separated list of addresses. The first
+// address in the comma separated list is considered the origin client address.
+Status GetXFFOriginClientAddress(const std::string_view& xff_addresses,
+    std::string& origin);
+
 // Takes in the base64 encoded token and returns the username and password via the input
 // arguments. Returns an OK status if the token is a valid base64 encoded string of the
 // form <username>:<password>, an error status otherwise.

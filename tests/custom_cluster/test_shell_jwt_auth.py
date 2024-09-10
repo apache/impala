@@ -61,9 +61,10 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    "-log_dir={0} -v 2 -jwks_file_path={1} -jwt_custom_claim_username=sub "
+    impala_log_dir=LOG_DIR_JWT_AUTH_SUCCESS,
+    impalad_args="-v 2 -jwks_file_path={0} -jwt_custom_claim_username=sub "
     "-jwt_token_auth=true -jwt_allow_without_tls=true"
-    .format(LOG_DIR_JWT_AUTH_SUCCESS, JWKS_JSON_PATH))
+    .format(JWKS_JSON_PATH))
   def test_jwt_auth_valid(self, vector):
     """Asserts the Impala shell can authenticate to Impala using JWT authentication.
     Also executes a query to ensure the authentication was successful."""
@@ -82,15 +83,13 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
     # Ensure JWT auth was enabled by checking the coordinator startup flags logged
     # in the coordinator's INFO logfile
-    expected_strings = [
-      '--jwks_file_path={0}'.format(self.JWKS_JSON_PATH),
-      'effective username: test-user',
-      'connected_user (string) = "test-user"',
-    ]
-
+    self.assert_impalad_log_contains("INFO",
+        '--jwks_file_path={0}'.format(self.JWKS_JSON_PATH), expected_count=1)
     # Ensure JWT auth was successful by checking impala coordinator logs
-    self.__assert_log_file(self.LOG_DIR_JWT_AUTH_SUCCESS,
-                           "impalad.INFO", expected_strings)
+    self.assert_impalad_log_contains("INFO",
+        'effective username: test-user', expected_count=1)
+    self.assert_impalad_log_contains("INFO",
+        r'connected_user \(string\) = "test-user"', expected_count=1)
 
     # Ensure the query ran successfully.
     assert "version()" in result.stdout
@@ -98,9 +97,10 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    "-log_dir={0} -v 2 -jwks_file_path={1} -jwt_custom_claim_username=sub "
+    impala_log_dir=LOG_DIR_JWT_AUTH_FAIL,
+    impalad_args="-v 2 -jwks_file_path={0} -jwt_custom_claim_username=sub "
     "-jwt_token_auth=true -jwt_allow_without_tls=true"
-    .format(LOG_DIR_JWT_AUTH_FAIL, JWKS_JSON_PATH))
+    .format(JWKS_JSON_PATH))
   def test_jwt_auth_expired(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""
@@ -119,17 +119,16 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
     # Ensure JWT auth was enabled by checking the coordinator startup flags logged
     # in the coordinator's INFO logfile
-    expected_strings = ['--jwks_file_path={0}'.format(self.JWKS_JSON_PATH)]
-    self.__assert_log_file(self.LOG_DIR_JWT_AUTH_FAIL,
-                           "impalad.INFO", expected_strings)
+    expected_string = '--jwks_file_path={0}'.format(self.JWKS_JSON_PATH)
+    self.assert_impalad_log_contains("INFO", expected_string)
 
     # Ensure JWT auth failed by checking impala coordinator logs
-    expected_strings = [
-      'Error verifying JWT token',
+    expected_string = (
+      'Error verifying JWT token'
+      '.*'
       'Error verifying JWT Token: Verification failed, error: token expired'
-    ]
-    self.__assert_log_file(self.LOG_DIR_JWT_AUTH_FAIL,
-                           "impalad.ERROR", expected_strings)
+    )
+    self.assert_impalad_log_contains("ERROR", expected_string, expected_count=-1)
 
     # Ensure the shell login failed.
     assert "Error connecting: HttpError" in result.stderr
@@ -138,9 +137,10 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    "-log_dir={0} -v 2 -jwks_file_path={1} -jwt_custom_claim_username=sub "
+    impala_log_dir=LOG_DIR_JWT_AUTH_INVALID_JWK,
+    impalad_args="-v 2 -jwks_file_path={0} -jwt_custom_claim_username=sub "
     "-jwt_token_auth=true -jwt_allow_without_tls=true"
-    .format(LOG_DIR_JWT_AUTH_INVALID_JWK, JWKS_JSON_PATH))
+    .format(JWKS_JSON_PATH))
   def test_jwt_auth_invalid_jwk(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""
@@ -159,47 +159,21 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
     # Ensure JWT auth was enabled by checking the coordinator startup flags logged
     # in the coordinator's INFO logfile
-    expected_strings = ['--jwks_file_path={0}'.format(self.JWKS_JSON_PATH)]
-    self.__assert_log_file(self.LOG_DIR_JWT_AUTH_INVALID_JWK,
-                           "impalad.INFO", expected_strings)
+    expected_string = '--jwks_file_path={0}'.format(self.JWKS_JSON_PATH)
+    self.assert_impalad_log_contains("INFO", expected_string)
 
     # Ensure JWT auth failed by checking impala coordinator logs
-    expected_strings = [
-      'Error verifying JWT token',
+    expected_string = (
+      'Error verifying JWT token'
+      '.*'
       'Error verifying JWT Token: Invalid JWK ID in the JWT token'
-    ]
-    self.__assert_log_file(self.LOG_DIR_JWT_AUTH_INVALID_JWK,
-                           "impalad.ERROR", expected_strings)
+    )
+    self.assert_impalad_log_contains("ERROR", expected_string, expected_count=-1)
 
     # Ensure the shell login failed.
     assert "Error connecting: HttpError" in result.stderr
     assert "HTTP code 401: Unauthorized" in result.stderr
     assert "Not connected to Impala, could not execute queries." in result.stderr
-
-  def __assert_log_file(self, log_dir, log_file, expected_strings):
-    """Given a list of strings, searches the specified log file for each of those
-    strings ensuring that at least one instance of each string exists within a
-    line of the log file
-
-    log_dir - path to the directory where the log file exists
-    log_file - name of the file within the specified directory that will be searched
-    expected_strings - list of strings to search for within the log file
-    """
-
-    counter_dict = {}
-    for item in expected_strings:
-      counter_dict[item] = 0
-
-    log_path = os.path.join(log_dir, log_file)
-    with open(log_path) as file:
-      for line in file:
-        for key in counter_dict:
-          if line.find(key) >= 0:
-            counter_dict[key] += 1
-
-    for line, count in counter_dict.items():
-      assert count > 0, "Did not find expected string '{0}' in log file '{1}'" \
-                        .format(line, log_path)
 
   def __assert_success_fail_metric(self, success_count_min=0, success_count_max=0,
                                    failure_count_min=0, failure_count_max=0):

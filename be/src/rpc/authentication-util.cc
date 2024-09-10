@@ -211,6 +211,24 @@ bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domai
   return HasSuffixString(host_name, trusted_domain);
 }
 
+Status GetXFFOriginClientAddress(const std::string_view& xff_addresses,
+    std::string& origin) {
+  if (xff_addresses.empty()) {
+    return Status::Expected("Empty XFF header");
+  }
+  const int pos = xff_addresses.find_first_of(',');
+  if (pos == xff_addresses.npos) {
+    origin = xff_addresses;
+  } else {
+    origin = xff_addresses.substr(0, pos);
+  }
+  StripWhiteSpace(&origin);
+  if (origin.empty()) {
+    return Status::Expected("Empty XFF header");
+  }
+  return Status::OK();
+}
+
 Status BasicAuthExtractCredentials(
     const string& token, string& username, string& password) {
   if (token.empty()) {

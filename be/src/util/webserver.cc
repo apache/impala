@@ -742,10 +742,15 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   // unpredictably costly.
   if (!authenticated && check_trusted_domain_) {
     const char* xff_origin = sq_get_header(connection, "X-Forwarded-For");
-    string xff_origin_string = !xff_origin ? "" : string(xff_origin);
-    string origin = FLAGS_trusted_domain_use_xff_header ?
-        xff_origin_string :
-        GetRemoteAddress(request_info).ToString();
+    std::string_view xff_origin_sv = !xff_origin ? "" : xff_origin;
+    string origin;
+    if (FLAGS_trusted_domain_use_xff_header) {
+      Status status = GetXFFOriginClientAddress(xff_origin_sv, origin);
+      if (!status.ok()) LOG(WARNING) << status.GetDetail();
+    } else {
+      origin = GetRemoteAddress(request_info).ToString();
+    }
+
     StripWhiteSpace(&origin);
     if (origin.empty() && FLAGS_trusted_domain_use_xff_header &&
         FLAGS_trusted_domain_empty_xff_header_use_origin) {

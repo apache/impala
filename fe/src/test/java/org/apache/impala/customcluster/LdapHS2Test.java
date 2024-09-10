@@ -511,7 +511,7 @@ public class LdapHS2Test {
 
     // Case 1: Authenticate as 'Test1Ldap' without password, send X-Forwarded-For header
     headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
-    headers.put("X-Forwarded-For", "127.0.0.1");
+    headers.put("X-Forwarded-For", "127.0.0.1, 120.76.80.91");
     transport.setCustomHeaders(headers);
     transport.open();
     TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
@@ -546,7 +546,7 @@ public class LdapHS2Test {
     // Case 3: Authenticate as 'Test1Ldap' without password, send X-Forwarded-For header
     // that does not match trusted_domain
     headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
-    headers.put("X-Forwarded-For", "126.0.23.1");
+    headers.put("X-Forwarded-For", "126.0.23.1, 127.0.0.1, 127.0.0.6");
     transport.setCustomHeaders(headers);
     try {
       openResp = client.OpenSession(openReq);

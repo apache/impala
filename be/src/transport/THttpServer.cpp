@@ -34,6 +34,8 @@
 #include "gen-cpp/Frontend_types.h"
 #include "util/metrics.h"
 #include "common/logging.h"
+#include "common/status.h"
+#include "rpc/authentication-util.h"
 
 DECLARE_bool(trusted_domain_use_xff_header);
 DECLARE_bool(trusted_domain_empty_xff_header_use_origin);
@@ -374,8 +376,13 @@ void THttpServer::headersDone() {
   // the client started the SAML workflow then it doesn't expect Impala to succeed with
   // another mechanism.
   if (!authorized && check_trusted_domain_) {
-    string origin =
-        FLAGS_trusted_domain_use_xff_header ? origin_ : transport_->getOrigin();
+    string origin;
+    if (FLAGS_trusted_domain_use_xff_header) {
+      impala::Status status = impala::GetXFFOriginClientAddress(origin_, origin);
+      if (!status.ok()) LOG(WARNING) << status.GetDetail();
+    } else {
+      origin = transport_->getOrigin();
+    }
     StripWhiteSpace(&origin);
     if (origin.empty() && FLAGS_trusted_domain_use_xff_header &&
         FLAGS_trusted_domain_empty_xff_header_use_origin) {

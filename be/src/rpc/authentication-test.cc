@@ -20,6 +20,7 @@
 #include "common/logging.h"
 #include "kudu/security/test/mini_kdc.h"
 #include "rpc/authentication.h"
+#include "rpc/authentication-util.h"
 #include "rpc/thrift-server.h"
 #include "util/auth-util.h"
 #include "util/kudu-status-util.h"
@@ -278,6 +279,41 @@ TEST(Auth, LdapKerbAuthCustomFiltersNotAllowed) {
   // Internal auth provider is not secure (NoAuthProvider)
   ap = AuthManager::GetInstance()->GetInternalAuthProvider();
   ASSERT_FALSE(ap->is_secure());
+}
+
+TEST(Auth, GetXFFOriginClientAddress) {
+  // Empty XFF address
+  std::string xff_addresses;
+  std::string origin;
+  Status status = GetXFFOriginClientAddress(xff_addresses, origin);
+  ASSERT_EQ(status.msg().msg(), "Empty XFF header");
+
+  // Empty ',' separated XFF address
+  xff_addresses = " ,";
+  status = GetXFFOriginClientAddress(xff_addresses, origin);
+  ASSERT_EQ(status.msg().msg(), "Empty XFF header");
+
+  // Multiple XFF addresses
+  xff_addresses = "  10.96.11.12, 172.45.88.78, 176.45.88.65";
+  status = GetXFFOriginClientAddress(xff_addresses, origin);
+  ASSERT_EQ(origin, "10.96.11.12");
+  ASSERT_TRUE(status.ok());
+
+  // Single XFF address
+  xff_addresses = "10.95.66.23";
+  status = GetXFFOriginClientAddress(xff_addresses, origin);
+  ASSERT_EQ(origin, "10.95.66.23");
+  ASSERT_TRUE(status.ok());
+
+  xff_addresses = "      10.90.11.23, ";
+  status = GetXFFOriginClientAddress(xff_addresses, origin);
+  ASSERT_EQ(origin, "10.90.11.23");
+  ASSERT_TRUE(status.ok());
+
+  xff_addresses = " 10.90.11.23 , ";
+  status = GetXFFOriginClientAddress(xff_addresses, origin);
+  ASSERT_EQ(origin, "10.90.11.23");
+  ASSERT_TRUE(status.ok());
 }
 
 }
