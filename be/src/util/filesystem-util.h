@@ -95,7 +95,8 @@ class FileSystemUtil {
   /// any files in that directory.
   /// If 'path' ends with a wildcard - as in "/lib/*" - it will treat path as a directory
   /// excluding the wildcard.
-  static std::string FindFileInPath(string path, const std::string& regex);
+  static Status FindFileInPath(string path, const std::string& regex,
+      std::string* result);
 
   /// Ext filesystem on certain kernel versions may result in inconsistent metadata after
   /// punching holes in files. The filesystem may require fsck repair on next reboot.

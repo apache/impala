@@ -352,7 +352,11 @@ static Status JavaAddJammAgent() {
   istringstream classpath {getenv("CLASSPATH")};
   string jamm_path, test_path;
   while (getline(classpath, test_path, ':')) {
-    jamm_path = FileSystemUtil::FindFileInPath(test_path, "jamm-.*.jar");
+    Status status = FileSystemUtil::FindFileInPath(test_path, "jamm-.*.jar", &jamm_path);
+    // Error during FindFileInPath is not fatal if jamm path is found in another path.
+    if (!status.ok()) {
+      LOG(ERROR) << "Error when processing class path: " << status.msg().msg();
+    }
     if (!jamm_path.empty()) break;
   }
   if (jamm_path.empty()) {

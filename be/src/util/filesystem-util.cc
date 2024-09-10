@@ -139,24 +139,31 @@ Status FileSystemUtil::CreateFile(const string& file_path) {
   return Status::OK();
 }
 
-Status FileSystemUtil::VerifyIsDirectory(const string& directory_path) {
+Status IsDirectory(const string& path, bool* is_dir) {
   error_code errcode;
-  bool exists = filesystem::exists(directory_path, errcode);
+  bool exists = filesystem::exists(path, errcode);
   if (errcode != errc::success) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
         "Encountered exception while verifying existence of directory path $0: $1",
-        directory_path, errcode.message())));
+        path, errcode.message())));
   }
   if (!exists) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
-        "Directory path $0 does not exist", directory_path)));
+        "Directory path $0 does not exist", path)));
   }
-  bool is_dir = filesystem::is_directory(directory_path, errcode);
+  DCHECK(is_dir != nullptr);
+  *is_dir = filesystem::is_directory(path, errcode);
   if (errcode != errc::success) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
         "Encountered exception while verifying existence of directory path $0: $1",
-        directory_path, errcode.message())));
+        path, errcode.message())));
   }
+  return Status::OK();
+}
+
+Status FileSystemUtil::VerifyIsDirectory(const string& directory_path) {
+  bool is_dir = false;
+  RETURN_IF_ERROR(IsDirectory(directory_path, &is_dir));
   if (!is_dir) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
         "Path $0 is not a directory", directory_path)));
@@ -264,23 +271,38 @@ bool FileSystemUtil::GetRelativePath(const string& path, const string& start,
   return false;
 }
 
-std::string FileSystemUtil::FindFileInPath(string path, const std::string& regex) {
+Status FileSystemUtil::FindFileInPath(string path, const std::string& regex,
+    std::string* result) {
   // Wildcard at the end matches any file, so trim and treat as a directory.
   boost::algorithm::trim_right_if(path, boost::algorithm::is_any_of("*"));
-  if (path.empty()) return "";
-  if (!filesystem::exists(path)) return "";
+  DCHECK(result != nullptr);
+  *result = "";
+  if (path.empty()) return Status::OK();
+  bool exists = false;
+  RETURN_IF_ERROR(PathExists(path, &exists));
+  if (!exists) return Status::OK();
+  bool is_dir = false;
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   std::regex pattern{regex};
-  if (filesystem::is_directory(path)) {
-    for (filesystem::directory_entry& child : filesystem::directory_iterator(path)) {
+  if (is_dir) {
+    error_code errcode;
+    for (filesystem::directory_entry& child :
+        filesystem::directory_iterator(path, errcode)) {
       // If child matches pattern, use it
       if (std::regex_match(child.path().filename().string(), pattern)) {
-        return child.path().string();
+        *result = child.path().string();
+        break;
       }
     }
+    if (errcode != errc::success) {
+      return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
+          "Encountered exception while iterating over directory path $0: $1",
+          path, errcode.message())));
+    }
   } else if (std::regex_match(filesystem::path(path).filename().string(), pattern)) {
-    return path;
+    *result = path;
   }
-  return "";
+  return Status::OK();
 }
 
 FileSystemUtil::Directory::Directory(const string& path)

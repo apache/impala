@@ -137,38 +137,46 @@ TEST(FilesystemUtil, FindFileInPath) {
   path file3 = subdir1 / "a_file3";
   ASSERT_OK(FileSystemUtil::CreateFile(file3.string()));
 
-  string path = FileSystemUtil::FindFileInPath(dir.string(), "a.*1");
+  // Impala has no permission for /root so these will lead to errors in FindFileInPath().
+  path root_path1 = "/root/"; // permission error in filesystem::directory_iterator()
+  path root_path2 = "/root/a"; // permission error in filesystem::exists()
+
+  string path;
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string(), "a.*1", &path));
   EXPECT_EQ(file1.string(), path);
-  path = FileSystemUtil::FindFileInPath(dir.string(), "a.*2");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string(), "a.*2", &path));
   EXPECT_EQ("", path);
-  path = FileSystemUtil::FindFileInPath(dir.string(), "a.*3");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string(), "a.*3", &path));
   EXPECT_EQ("", path);
-  path = FileSystemUtil::FindFileInPath(dir.string(), "");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string(), "", &path));
   EXPECT_EQ("", path);
 
-  path = FileSystemUtil::FindFileInPath(dir.string() + "/*", "a_file1");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string() + "/*", "a_file1", &path));
   EXPECT_EQ(file1.string(), path);
-  path = FileSystemUtil::FindFileInPath(dir.string(), "a_file2");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string(), "a_file2", &path));
   EXPECT_EQ("", path);
 
-  path = FileSystemUtil::FindFileInPath(dir.string(), "impala1");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string(), "impala1", &path));
   EXPECT_EQ(subdir1.string(), path);
-  path = FileSystemUtil::FindFileInPath(dir.string(), "impala2");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(dir.string(), "impala2", &path));
   EXPECT_EQ("", path);
 
-  path = FileSystemUtil::FindFileInPath(subdir1.string(), "a.*3");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(subdir1.string(), "a.*3", &path));
   EXPECT_EQ(file3.string(), path);
-  path = FileSystemUtil::FindFileInPath(subdir1.string(), "anything");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(subdir1.string(), "anything", &path));
   EXPECT_EQ("", path);
-  path = FileSystemUtil::FindFileInPath(subdir2.string(), ".*");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(subdir2.string(), ".*", &path));
   EXPECT_EQ("", path);
 
-  path = FileSystemUtil::FindFileInPath(file1.string(), "a.*1");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(file1.string(), "a.*1", &path));
   EXPECT_EQ(file1.string(), path);
-  path = FileSystemUtil::FindFileInPath(file1.string(), "a.*2");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(file1.string(), "a.*2", &path));
   EXPECT_EQ("", path);
-  path = FileSystemUtil::FindFileInPath(file2.string(), "a.*2");
+  ASSERT_OK(FileSystemUtil::FindFileInPath(file2.string(), "a.*2", &path));
   EXPECT_EQ("", path);
+
+  EXPECT_FALSE(FileSystemUtil::FindFileInPath(root_path1.string(), "a", &path).ok());
+  EXPECT_FALSE(FileSystemUtil::FindFileInPath(root_path2.string(), "a", &path).ok());
 
   // Cleanup
   filesystem::remove_all(dir);
