@@ -22,11 +22,19 @@ FROM ${BASE_IMAGE}
 # If set to "--install-debug-tools full", then extra utilities will be installed.
 ARG INSTALL_OS_PACKAGES_ARGS="--install-debug-tools full"
 
+# Switch to root. Needed by hardened base images that don't default to the root user.
+USER root
+# Install Bash, if missing from the base image: not all of them have it by default,
+# but Impala scripts require it.
+ADD --chown=root:root --chmod=755 helper/install_bash_if_needed.sh /root
+RUN /root/install_bash_if_needed.sh
+
 # Install dependencies required for Impala utility binaries to run, plus
 # some useful utilities.
 # TODO: ideally we wouldn't depend on the JVM libraries, but currently the JNI code
 # in be/ is not cleanly separated from the code that doesn't use JNI.
-ADD helper/install_os_packages.sh /root
+ADD --chown=root:root --chmod=755 helper/install_os_packages.sh /root
+
 RUN /root/install_os_packages.sh ${INSTALL_OS_PACKAGES_ARGS}
 
 # Use a non-privileged impala user to run the processes in the container.
@@ -43,7 +51,8 @@ COPY --chown=impala lib /opt/impala/lib
 
 WORKDIR /opt/impala/
 
-ENTRYPOINT ["/opt/impala/bin/utility_entrypoint.sh", "/opt/impala/bin/impala-profile-tool",\
+ENTRYPOINT ["/opt/impala/bin/utility_entrypoint.sh", \
+     "/opt/impala/bin/impala-profile-tool",\
      "-logtostderr"]
 
 LABEL name="Apache Impala Profile Tool" \

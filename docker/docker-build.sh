@@ -32,6 +32,7 @@ ARGS+=("--build-arg" 'VCS_TYPE=git')
 ARGS+=("--build-arg" 'VCS_URL=https://gitbox.apache.org/repos/asf/impala.git')
 ARGS+=("--build-arg" "VERSION=$VERSION")
 ARGS+=("--build-arg" "VCS_REF=$VCS_REF")
+ARGS+=("--progress=plain")
 
 # Add caller-provided arguments to end.
 ARGS+=("$@")

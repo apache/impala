@@ -32,40 +32,53 @@ cmake_host_system_information(RESULT OS_DISTRIB_VERSION_ID QUERY DISTRIB_VERSION
 set(QUICKSTART_BASE_IMAGE "UNSUPPORTED")
 set(DISTRO_BASE_IMAGE "UNSUPPORTED")
 
+MESSAGE(STATUS "OS_DISTRIB_ID is: ${OS_DISTRIB_ID}")
+MESSAGE(STATUS "OS_DISTRIB_VERSION_ID is: ${OS_DISTRIB_VERSION_ID}")
+
 # The CMake variables are using information from /etc/os-release.
 # A database of /etc/os-release files is available at
 # https://github.com/chef/os_release
 # These comparisons are based on those values.
-if(${OS_DISTRIB_ID} STREQUAL "ubuntu")
-  if(${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
-     ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04" OR
-     ${OS_DISTRIB_VERSION_ID} STREQUAL "20.04" OR
-     ${OS_DISTRIB_VERSION_ID} STREQUAL "22.04")
-    set(DISTRO_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
-    set(QUICKSTART_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
+# A custom base image can be specified directly in the IMPALA_CUSTOM_DOCKER_BASE
+# environment variable if USE_CUSTOM_IMPALA_BASE_IMAGE to set to true in the environment.
+MESSAGE(STATUS "USE_CUSTOM_IMPALA_BASE_IMAGE is: $ENV{USE_CUSTOM_IMPALA_BASE_IMAGE}")
+if( "$ENV{USE_CUSTOM_IMPALA_BASE_IMAGE}" STREQUAL "true" )
+  set(DISTRO_BASE_IMAGE "$ENV{IMPALA_CUSTOM_DOCKER_BASE}")
+  # Don't publish a QuickStart image on a custom base image: it is unknown if it has
+  # all prerequisites, so don't set QUICKSTART_BASE_IMAGE.
+  MESSAGE(STATUS "Picked custom base image: ${DISTRO_BASE_IMAGE}")
+else()
+  if(${OS_DISTRIB_ID} STREQUAL "ubuntu")
+    if(${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
+       ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04" OR
+       ${OS_DISTRIB_VERSION_ID} STREQUAL "20.04" OR
+       ${OS_DISTRIB_VERSION_ID} STREQUAL "22.04")
+      set(DISTRO_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
+      set(QUICKSTART_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
+    endif()
+    if (${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
+        ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04")
+      set(PIP "python-pip")
+    elseif (${OS_DISTRIB_VERSION_ID} STREQUAL "20.04" OR
+            ${OS_DISTRIB_VERSION_ID} STREQUAL "22.04")
+      set(PIP "python3-pip")
+    endif()
+  elseif(${OS_DISTRIB_ID} STREQUAL "rhel" OR
+         ${OS_DISTRIB_ID} STREQUAL "rocky" OR
+         ${OS_DISTRIB_ID} STREQUAL "almalinux" OR
+         ${OS_DISTRIB_ID} STREQUAL "centos")
+    # The Quickstart images currently don't support using a Redhat
+    # base image, so this doesn't set QUICKSTART_BASE_IMAGE.
+    if(${OS_DISTRIB_VERSION_ID} MATCHES "7.*")
+      set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT7_DOCKER_BASE}")
+    elseif(${OS_DISTRIB_VERSION_ID} MATCHES "8.*")
+      set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT8_DOCKER_BASE}")
+    elseif(${OS_DISTRIB_VERSION_ID} MATCHES "9.*")
+      set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT9_DOCKER_BASE}")
+    endif()
   endif()
-  if (${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
-      ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04")
-    set(PIP "python-pip")
-  elseif (${OS_DISTRIB_VERSION_ID} STREQUAL "20.04" OR
-          ${OS_DISTRIB_VERSION_ID} STREQUAL "22.04")
-    set(PIP "python3-pip")
-  endif()
-elseif(${OS_DISTRIB_ID} STREQUAL "rhel" OR
-       ${OS_DISTRIB_ID} STREQUAL "rocky" OR
-       ${OS_DISTRIB_ID} STREQUAL "almalinux" OR
-       ${OS_DISTRIB_ID} STREQUAL "centos")
-  # The Quickstart images currently don't support using a Redhat
-  # base image, so this doesn't set QUICKSTART_BASE_IMAGE.
-  if(${OS_DISTRIB_VERSION_ID} MATCHES "7.*")
-    set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT7_DOCKER_BASE}")
-  elseif(${OS_DISTRIB_VERSION_ID} MATCHES "8.*")
-    set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT8_DOCKER_BASE}")
-  elseif(${OS_DISTRIB_VERSION_ID} MATCHES "9.*")
-    set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT9_DOCKER_BASE}")
-  endif()
+  MESSAGE(STATUS "Picked docker base image based on host OS: ${DISTRO_BASE_IMAGE}")
 endif()
-MESSAGE(STATUS "Picked docker base image based on host OS: ${DISTRO_BASE_IMAGE}")
 
 
 if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")

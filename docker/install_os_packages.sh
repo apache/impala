@@ -29,7 +29,7 @@ INSTALL_DEBUG_TOOLS=none
 JAVA_VERSION=8
 DRY_RUN=false
 PKG_LIST=""
-NON_PKG_NAMES=(apt-get yum install update)
+NON_PKG_NAMES=(apt-get yum apk install update add)
 
 function print_usage {
     echo "install_os_packages.sh - Helper script to install OS dependencies"
@@ -105,7 +105,7 @@ DISTRIBUTION=Unknown
 if [[ -f /etc/redhat-release ]]; then
   echo "Identified Redhat system."
   DISTRIBUTION=Redhat
-else
+elif [[ -f /etc/lsb-release ]]; then
   source /etc/lsb-release
   if [[ $DISTRIB_ID == Ubuntu ]]; then
     echo "Identified Ubuntu system."
@@ -118,11 +118,18 @@ else
       exit 1
     fi
   fi
+# Check /etc/os-release last: it exists on Red Hat and Ubuntu systems as well
+elif [[ -f /etc/os-release ]]; then
+  source /etc/os-release
+  if [[ $ID == wolfi || $ID == chainguard ]]; then
+    echo "Identified Wolfi-based system."
+    DISTRIBUTION=Chainguard
+  fi
 fi
 
 if [[ $DISTRIBUTION == Unknown ]]; then
   echo "ERROR: Did not detect supported distribution."
-  echo "Only Ubuntu and Redhat-based distributions are supported."
+  echo "Only Ubuntu, Red Hat (or related), or Wolfi base images are supported."
   exit 1
 fi
 
@@ -202,6 +209,49 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
         vim \
         which
   fi
+elif [[ $DISTRIBUTION == Chainguard ]]; then
+  # Package inventory:
+  # glibc-locale-en and posix-libc-utils: for locale and 'locale' tool support
+  # shadow: for groupadd and friends
+  wrap apk add --no-cache --no-interactive \
+    glibc-locale-posix \
+    glibc-locale-en \
+    glibc-iconv \
+    posix-libc-utils \
+    localedef \
+    cyrus-sasl \
+    krb5-libs \
+    openssl \
+    openldap-dev \
+    openjdk-${JAVA_VERSION}-jre \
+    openjdk-${JAVA_VERSION}-default-jvm \
+    shadow \
+    tzdata
+
+  # Set up /etc/localtime so that the container has a default local timezone.
+  # Make this UTC.
+  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+
+  if [[ $INSTALL_DEBUG_TOOLS == basic || $INSTALL_DEBUG_TOOLS == full ]]; then
+    echo "Installing basic debug tools"
+    wrap apk add --no-cache --no-interactive \
+        gdb \
+        openjdk-${JAVA_VERSION}-default-jdk
+  fi
+
+  if [[ $INSTALL_DEBUG_TOOLS == full ]]; then
+    echo "Installing full debug tools"
+    wrap apk add --no-cache --no-interactive \
+        bind-tools \
+        curl \
+        iproute2 \
+        iputils \
+        less \
+        nmap \
+        sudo \
+        tzutils \
+        vim
+  fi
 fi
 
 if $DRY_RUN; then
@@ -227,9 +277,16 @@ if ! command -v pgrep ; then
   exit 1
 fi
 
+# Java must be accessible for both the frontend and the backend. Verify it is present.
+if ! command -v java; then
+  echo "ERROR: Java cannot be found."
+  exit 1
+fi
+
 # Impala will fail to start if the permissions on /var/tmp are not set to include
 # the sticky bit (i.e. +t). Some versions of Redhat UBI images do not have
 # this set by default, so specifically set the sticky bit for both /tmp and /var/tmp.
+mkdir -p /var/tmp
 chmod a=rwx,o+t /var/tmp /tmp
 
 # To minimize the size for the Docker image, clean up any unnecessary files.
@@ -239,4 +296,6 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
 elif [[ $DISTRIBUTION == Redhat ]]; then
   yum clean all
   rm -rf /var/cache/yum/*
+elif [[ $DISTRIBUTION == Chainguard ]]; then
+  rm -rf /var/cache/apk/*
 fi

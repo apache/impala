@@ -131,8 +131,8 @@ def collect_default_query_options(options, name, val, kind):
     return
   name = name.lower()
   val = str(val).strip('"')
-  if ',' in val:
-    # Value is a list. Wrap it with double quote.
+  if ',' in val or '/' in val:
+    # Value is a list or a timezone name containing a slash. Wrap it with double quotes.
     val = '"{}"'.format(val)
   if not val:
     # Value is optional with None as default.

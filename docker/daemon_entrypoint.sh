@@ -36,17 +36,24 @@ DISTRIBUTION=Unknown
 if [[ -f /etc/redhat-release ]]; then
   echo "Identified Redhat image."
   DISTRIBUTION=Redhat
-else
+elif [[ -f /etc/lsb-release ]]; then
   source /etc/lsb-release
   if [[ $DISTRIB_ID == Ubuntu ]]; then
     echo "Identified Ubuntu image."
     DISTRIBUTION=Ubuntu
   fi
+# Check /etc/os-release last: it exists on Red Hat and Ubuntu systems as well
+elif [[ -f /etc/os-release ]]; then
+  source /etc/os-release
+  if [[ $ID == wolfi || $ID == chainguard ]]; then
+    echo "Identified Wolfi-based system."
+    DISTRIBUTION=Chainguard
+  fi
 fi
 
 if [[ $DISTRIBUTION == Unknown ]]; then
   echo "ERROR: Did not detect supported distribution."
-  echo "Only Ubuntu and Redhat-based distributions are supported."
+  echo "Only Ubuntu, Red Hat (or related), or Wolfi distributions are supported."
   exit 1
 fi
 
@@ -77,6 +84,17 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
   elif [[ -d /usr/lib/jvm/jre-1.8.0 ]]; then
     echo "Detected Java 8"
     JAVA_HOME=/usr/lib/jvm/jre-1.8.0
+  fi
+elif [[ $DISTRIBUTION == Chainguard ]]; then
+  if [[ -d /usr/lib/jvm/java-17-openjdk ]] ; then
+    echo "Detected Java 17"
+    JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+  elif [[ -d /usr/lib/jvm/java-11-openjdk ]] ; then
+    echo "Detected Java 11"
+    JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+  elif [[ -d /usr/lib/jvm/java-1.8-openjdk ]] ; then
+    echo "Detected Java 8"
+    JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk
   fi
 fi
 

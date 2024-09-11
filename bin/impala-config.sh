@@ -297,6 +297,15 @@ export IMPALA_DATASKETCHES_VERSION=6.0.0
 export IMPALA_REDHAT7_DOCKER_BASE=${IMPALA_REDHAT7_DOCKER_BASE:-"centos:centos7.9.2009"}
 export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"}
 export IMPALA_REDHAT9_DOCKER_BASE=${IMPALA_REDHAT9_DOCKER_BASE:-"rockylinux:9.2"}
+# Some users may want to use special, hardened base images for increased security.
+# These images are usually not related to the OS where the build is running.
+# The following environment variables allow a specific base image to be specified
+# directly, without relying on the implicit build platform identification in
+# CMakeLists.txt.
+# Images published by Chainguard and the Wolfi project are known to be used, so the
+# publicly available Wolfi base image is used as a default example.
+export IMPALA_CUSTOM_DOCKER_BASE=${IMPALA_CUSTOM_DOCKER_BASE:-"cgr.dev/chainguard/wolfi-base:latest"}
+export USE_CUSTOM_IMPALA_BASE_IMAGE=${USE_CUSTOM_IMPALA_BASE_IMAGE:-false}
 
 # Selects the version of Java to use when start-impala-cluster.py starts with container
 # images (created via e.g. 'make docker_debug_java11_images'). The Java version used in
@@ -1230,6 +1239,8 @@ echo "IMPALA_SYSTEM_PYTHON2   = $IMPALA_SYSTEM_PYTHON2"
 echo "IMPALA_SYSTEM_PYTHON3   = $IMPALA_SYSTEM_PYTHON3"
 echo "IMPALA_BUILD_THREADS    = $IMPALA_BUILD_THREADS"
 echo "NUM_CONCURRENT_TESTS    = $NUM_CONCURRENT_TESTS"
+echo "USE_CUSTOM_IMPALA_BASE_IMAGE = $USE_CUSTOM_IMPALA_BASE_IMAGE"
+echo "IMPALA_CUSTOM_DOCKER_BASE    = $IMPALA_CUSTOM_DOCKER_BASE"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

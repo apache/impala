@@ -179,6 +179,11 @@ for kudu_lib_dir in kudu_lib_dirs:
 if not found_kudu_so:
   raise Exception("No Kudu shared object found in search path: {0}".format(kudu_lib_dirs))
 
+# Add script for installing Bash: Impala scripts need it, but some minimal base images
+# may either omit shells altogether, or contain a simpler, smaller variant, e.g. sh.
+symlink_file_into_dir(
+    os.path.join(IMPALA_HOME, "docker/install_bash_if_needed.sh"), HELPER_DIR)
+
 # Add script for installing OS packages
 symlink_file_into_dir(
     os.path.join(IMPALA_HOME, "docker/install_os_packages.sh"), HELPER_DIR)

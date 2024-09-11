@@ -54,6 +54,7 @@ KUDU_MASTER_HOSTS = os.getenv("KUDU_MASTER_HOSTS", "127.0.0.1")
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get("IMPALA_MAX_LOG_FILES", 10)
 INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST", "localhost")
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
+HOST_TZ = os.getenv("TZ", None)
 
 # Options
 parser = OptionParser()
@@ -133,6 +134,9 @@ parser.add_option("--docker_auto_ports", dest="docker_auto_ports",
                        "(Beewax, HS2, Web UIs, etc), which avoids collisions with other "
                        "running processes. If false, ports are mapped to the same ports "
                        "on localhost as the non-docker impala cluster.")
+parser.add_option("--mount_sources", dest="mount_sources", action="store_true",
+                  help="Mount the $IMPALA_HOME directory as /opt/impala/sources into "
+                       "the containers for easier debugging.")
 parser.add_option("--data_cache_dir", dest="data_cache_dir", default=None,
                   help="This specifies a base directory in which the IO data cache will "
                        "use.")
@@ -254,6 +258,9 @@ def build_java_tool_options(jvm_debug_port=None):
   """Construct the value of the JAVA_TOOL_OPTIONS environment variable to pass to
   daemons."""
   java_tool_options = ""
+  # In a Docker container the Java error file location is always fixed.
+  if options.docker_network is not None:
+    java_tool_options = "-XX:ErrorFile=/opt/impala/java-error/hs_err_pid_%p.log"
   if jvm_debug_port is not None:
     java_tool_options = ("-agentlib:jdwp=transport=dt_socket,address={debug_port}," +
         "server=y,suspend=n ").format(debug_port=jvm_debug_port) + java_tool_options
@@ -988,6 +995,43 @@ class DockerMiniClusterOperations(object):
     env_args = ["-e", "HADOOP_USER_NAME={0}".format(getpass.getuser()),
                 "-e", "JAVA_TOOL_OPTIONS={0}".format(
                     build_java_tool_options(DEFAULT_IMPALAD_JVM_DEBUG_PORT))]
+
+    # Calculate the timezone to pass into the container.
+    # Mounting /etc/localtime into the container does not work when /etc/localtime is a
+    # symbolic link to a real timezone file inside /usr/share/zoneinfo: Linux resolves
+    # the symlink before performing the bind mount, so you can't create a symlink within
+    # the container.
+    # Set the timezone by injecting the TZ environment variable with the desired timezone
+    # string instead. Initialize the env var from the host's TZ variable if it exists,
+    # or calculate the value (the timezone specifier) from the name of the timezone file
+    # pointed to by /etc/localtime, if it is a symlink.
+    # If /etc/localtime is a real file, and TZ is undefined on the host, then mount
+    # /etc/localtime into the container
+    timezone_as_env_var = True
+    timezone_as_mount = False
+
+    if HOST_TZ is None:
+      try:
+        if os.path.islink("/etc/localtime"):
+          # This is a symlink, so figure out where it points, cut the prefix, and hope
+          # we'll get a timezone spec. Don't confuse realpath() and relpath() here!
+          timezone_string = os.path.realpath("/etc/localtime")
+          timezone_string = os.path.relpath(timezone_string, "/usr/share/zoneinfo")
+        elif os.path.isfile("/etc/localtime"):
+          # This is a real file, and we'll just have to mount it into the container
+          timezone_as_env_var = False
+          timezone_as_mount = True
+        else:
+          timezone_as_env_var = False
+          timezone_as_mount = False
+          LOG.warning("Unable to determine local timezone, "
+              "containers will user their default timezones.")
+      except OSError as ex:
+        timezone_as_env_var = False
+        LOG.error("Unable to map /etc/localtime to a timezone name. Reported error"
+                  "is {0}".format(ex))
+    if timezone_as_env_var:
+      env_args += ["-e", "TZ={0}".format(timezone_string)]
     # The container build processes tags the generated image with the daemon name.
     debug_build = options.build_type == "debug" or (options.build_type == "latest" and
         os.path.basename(os.path.dirname(os.readlink("be/build/latest"))) == "debug")
@@ -1009,6 +1053,22 @@ class DockerMiniClusterOperations(object):
     if not os.path.isdir(log_dir):
       os.makedirs(log_dir)
     mount_args += ["--mount", "type=bind,src={0},dst=/opt/impala/logs".format(log_dir)]
+    # Collect Java error files hs_err_pidNNN.log in a unique subdirectory per daemon to
+    # avoid any potential interaction between containers, which should be isolated.
+    java_error_dir = os.path.join(IMPALA_HOME, options.log_dir, host_name, "java-error")
+    if not os.path.isdir(java_error_dir):
+      os.makedirs(java_error_dir)
+    mount_args += ["--mount", "type=bind,src={0},dst=/opt/impala/java-errors".format(
+        java_error_dir)]
+    # If /etc/localtime was found to be a real file instead of a symlink, then mount it
+    # into the container to ensure consistent clocks between the host and the Impala
+    # containers. This is important for logs as well as Iceberg tests.
+    if timezone_as_mount:
+      mount_args += ["--mount",
+          "type=bind,src=/etc/localtime,dst=/etc/localtime,readonly"]
+    if options.mount_sources:
+      mount_args += ["--mount",
+          "type=bind,src={0},dst=/opt/impala/sources,readonly".format(IMPALA_HOME)]
     # Add entries to the container's /etc/hosts file for the Docker host and the
     # gateway from the container to the host. These are needed for stable reverse
     # name resolution of the host's and the gateway's IP addresses

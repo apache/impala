@@ -36,7 +36,8 @@ source ./bin/bootstrap_system.sh
 # to preserve additional variables.
 ./bin/jenkins/dockerized-impala-preserve-vars.py \
     EE_TEST EE_TEST_FILES JDBC_TEST EXPLORATION_STRATEGY CMAKE_BUILD_TYPE \
-    IMPALA_DOCKER_JAVA
+    IMPALA_DOCKER_JAVA IMPALA_CUSTOM_DOCKER_BASE USE_CUSTOM_IMPALA_BASE_IMAGE \
+    IMPALA_TOOLCHAIN_HOST
 
 # Execute the tests using su to re-login so that group change made above
 # setup_docker takes effect. This does a full re-login and does not stay
