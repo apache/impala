@@ -55,7 +55,7 @@ Status SystemTableScanner::CreateScanner(RuntimeState* state, RuntimeProfile* pr
     TSystemTableName::type table_name, std::unique_ptr<SystemTableScanner>* scanner) {
   switch (table_name) {
     case TSystemTableName::IMPALA_QUERY_LIVE:
-      *scanner = make_unique<QueryScanner>(state, profile);
+      *scanner = make_unique<QueryScanner>(state, profile, table_name);
       break;
     default:
       return Status(ErrorMsg(TErrorCode::NOT_IMPLEMENTED_ERROR,
@@ -112,8 +112,9 @@ static void WriteDecimalSlot(
   DCHECK(!overflow);
 }
 
-QueryScanner::QueryScanner(RuntimeState* state, RuntimeProfile* profile)
-    : SystemTableScanner(state, profile),
+QueryScanner::QueryScanner(RuntimeState* state, RuntimeProfile* profile,
+    TSystemTableName::type table_name)
+    : SystemTableScanner(state, profile, table_name),
       active_query_collection_timer_(ADD_TIMER(profile_, "ActiveQueryCollectionTime")),
       pending_query_collection_timer_(ADD_TIMER(profile_, "PendingQueryCollectionTime"))
       {}
@@ -370,7 +371,10 @@ Status QueryScanner::MaterializeNextTuple(
         }
         break;
       default:
-        DCHECK(false) << "Unknown column position " << slot_desc->col_pos();
+        LOG(WARNING) << "Unknown column (position " << slot_desc->col_pos() << ") added"
+            " to table " << table_name_ << "; check if a coordinator was upgraded";
+        tuple->SetNull(slot_desc->null_indicator_offset());
+        break;
     }
   }
 

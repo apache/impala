@@ -37,7 +37,6 @@ import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.TResultRowBuilder;
-import com.google.common.base.Preconditions;
 
 /**
  * Represents a system table reflecting backend internal state.
@@ -99,12 +98,27 @@ public final class SystemTable extends Table implements FeSystemTable {
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl, String reason,
       EventSequence catalogTimeline) throws TableLoadingException {
-    int pos = colsByPos_.size();
-    // Should be no partition columns.
-    Preconditions.checkState(pos == 0);
-    for (FieldSchema s: msTbl.getSd().getCols()) {
-      Type type = FeCatalogUtils.parseColumnType(s, getName());
-      addColumn(new Column(s.getName(), type, s.getComment(), pos++));
+    if (msTbl.getPartitionKeysSize() > 0) {
+      throw new TableLoadingException(
+          "System table cannot contain clustering columns: " + name_);
+    }
+
+    Table.LOADING_TABLES.incrementAndGet();
+    try {
+      // Reload all columns.
+      clearColumns();
+      numClusteringCols_ = 0;
+      int pos = 0;
+      for (FieldSchema s: msTbl.getSd().getCols()) {
+        addColumn(new Column(s.getName(), parseColumnType(s), s.getComment(), pos++));
+      }
+
+      // Ensure table metadata points to the latest version.
+      setMetaStoreTable(msTbl);
+      refreshLastUsedTime();
+    } finally {
+      // Ensure this is decremented in case an exception is thrown.
+      Table.LOADING_TABLES.decrementAndGet();
     }
   }
 

@@ -42,8 +42,9 @@ class SystemTableScanner {
   bool eos() const noexcept { return eos_; }
 
  protected:
-  SystemTableScanner(RuntimeState* state, RuntimeProfile* profile)
-      : state_(state), profile_(profile), eos_(false) {}
+  SystemTableScanner(RuntimeState* state, RuntimeProfile* profile,
+      TSystemTableName::type table_name)
+      : state_(state), profile_(profile), table_name_(table_name), eos_(false) {}
 
   /// Write a string value to a STRING slot, allocating memory from 'pool'. Returns
   /// an error if memory cannot be allocated without exceeding a memory limit.
@@ -54,13 +55,16 @@ class SystemTableScanner {
 
   RuntimeProfile* const profile_;
 
+  const TSystemTableName::type table_name_;
+
   /// if true, nothing left to return in getNext() in SystemTableScanNode
   bool eos_;
 };
 
 class QueryScanner : public SystemTableScanner {
  public:
-  QueryScanner(RuntimeState* state, RuntimeProfile* profile);
+  QueryScanner(RuntimeState* state, RuntimeProfile* profile,
+      TSystemTableName::type table_name);
 
   /// Start scan, load list of query IDs into active_query_ids_.
   virtual Status Open();
