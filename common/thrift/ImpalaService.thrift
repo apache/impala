@@ -847,7 +847,7 @@ enum TImpalaQueryOptions {
   // value means there is high correlation between grouping expressions / columns, while
   // low value means there is low correlation between them. High correlation means
   // aggregation node can be scheduled with lower memory estimation (lower memScale).
-  // Setting value 1.0 will result in an equal memory estimate as the default estimation
+  // Setting value 0.0 will result in an equal memory estimate as the default estimation
   // (no change). Defaults to 0.5.
   AGG_MEM_CORRELATION_FACTOR = 163
 

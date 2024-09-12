@@ -2479,6 +2479,10 @@ PROFILE;
         <b>Type:</b> integer
       </p>
 
+      <p id="type_double">
+        <b>Type:</b> double
+      </p>
+
       <p id="default_blurb">
         <b>Default:</b>
       </p>
@@ -3430,6 +3434,10 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
       <p id="internals_min_bytes">
         <b>Internal details:</b> Represented in memory as a byte array with the minimum size
         needed to represent each value.
+      </p>
+
+      <p rev="4.4.0" id="added_in_440">
+        <b>Added in:</b> <keyword keyref="impala44"/>
       </p>
 
       <p rev="4.0.0" id="added_in_400">
