@@ -863,6 +863,23 @@ bool QueryState::StartFInstances() {
   if (UNLIKELY(!start_finstances_status.ok())) goto error;
   VLOG(2) << "descriptor table for query=" << PrintId(query_id())
           << "\n" << desc_tbl_->DebugString();
+  // IMPALA-13378: Verify that tuple ids in all PlanNode exist in the descriptor table.
+  for (TPlanFragment f : fragment_info_.fragments) {
+    for (TPlanNode node : f.plan.nodes) {
+      for (TTupleId tuple_id : node.row_tuples) {
+        if (UNLIKELY(desc_tbl_->GetTupleDescriptor(tuple_id) == nullptr)) {
+          string msg = Substitute(
+              "Tuple id $0 of PlanNode $1 not found in descriptor table",
+              tuple_id, node.node_id);
+          // It'd be helpful to also print 'fragment_info_' but it might lead to crash
+          // if it's corrupt.
+          LOG(ERROR) << msg << ": " << desc_tbl_->DebugString();
+          start_finstances_status = Status(msg);
+          goto error;
+        }
+      }
+    }
+  }
 
   start_finstances_status = FragmentState::CreateFragmentStateMap(
       fragment_info_, exec_rpc_params_, this, fragment_state_map_);
