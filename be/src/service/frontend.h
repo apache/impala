@@ -57,6 +57,8 @@ class Frontend {
   /// Call FE to get TExecRequest.
   Status GetExecRequest(const TQueryCtx& query_ctx, TExecRequest* result);
 
+  Status CancelExecRequest(const TUniqueId& query_id);
+
   /// Get the metrics from the catalog used by this frontend.
   Status GetCatalogMetrics(TGetCatalogMetricsResult* resp);
 
@@ -301,6 +303,7 @@ class Frontend {
   jmethodID convertTable; // JniFrontend.convertTable
   jmethodID get_secret_from_key_store_; // JniFrontend.getSecretFromKeyStore()
   jmethodID hive_legacy_timezone_convert_; // JniFrontend.hiveLegacyTimezoneConvert()
+  jmethodID cancel_exec_request_id_; // JniFrontend.cancelExecRequest()
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()

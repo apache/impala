@@ -16,8 +16,11 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from multiprocessing import Process, Queue
 import json
+import requests
 
+from tests.util.retry import retry
 
 def get_num_completed_backends(service, query_id):
     """Get the number of completed backends for the given query_id from the
@@ -53,3 +56,60 @@ def get_mem_admitted_backends_debug_page(cluster, ac_process=None):
     else:
       ret['executor'].append(parse_mem_value(backend['mem_admitted']))
   return ret
+
+
+def cancel(impalad, query_id):
+  """Cancel a query via /cancel_query on impalad."""
+  cancel_query_url = "http://{0}:{1}/cancel_query?json&query_id={2}"\
+      .format(impalad.webserver_interface, impalad.webserver_port, query_id)
+  response = requests.post(cancel_query_url)
+  assert response.status_code == requests.codes.ok
+  response_json = json.loads(response.text)
+  assert response_json['contents'] == "Query cancellation successful"
+
+
+def wait_for_state(impalad, state):
+  """Wait for the inflight query to reach 'state' on impalad. If state=None, wait for
+  no inflight queries."""
+  def is_state():
+    in_flight_queries = impalad.get_debug_webpage_json('queries')['in_flight_queries']
+    if state:
+      return len(in_flight_queries) > 0 and in_flight_queries[0]['state'] == state
+    else:
+      return len(in_flight_queries) <= 0
+
+  assert retry(is_state)
+
+
+def assert_query_stopped(impalad, query_id):
+  """Assert all queries are complete, and query_id is in completed_queries, on impalad."""
+  response_json = impalad.get_debug_webpage_json('queries')
+  assert response_json['num_in_flight_queries'] == 0
+  assert response_json['num_waiting_queries'] == 0
+
+  expected_queries = [q for q in response_json['completed_queries']
+                      if q['query_id'] == query_id]
+  assert len(expected_queries) == 1
+
+
+def run(client, query, queue):
+  """Execute query and put results or errors into queue."""
+  try:
+    queue.put(str(client.execute(query)))
+  except Exception as ex:
+    queue.put(str(ex))
+
+
+def start(client, query):
+  """Execute a query in a separate process. Returns (process, queue)."""
+  queue = Queue()
+  proc = Process(target=run, args=(client, query, queue))
+  proc.start()
+  return proc, queue
+
+
+def join(proc, queue):
+  """Returns result from queue returned by 'start', and waits for proc to complete."""
+  result = queue.get()
+  proc.join()
+  return result

@@ -18,17 +18,18 @@
 from __future__ import absolute_import, division, print_function
 from tests.common.environ import ImpalaTestClusterFlagsDetector
 from tests.common.file_utils import grep_dir
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIfBuildType, SkipIfCatalogV2
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.impala_connection import FINISHED, RUNNING, MinimalHS2Connection
-from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
+from tests.common.impala_connection import FINISHED, RUNNING
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_vector import HS2
 from tests.util.filesystem_utils import supports_storage_ids
 from tests.util.parse_util import parse_duration_string_ms
-from tests.common.test_vector import HS2
+from tests.util.web_pages_util import (
+    cancel, wait_for_state, assert_query_stopped, start, join)
 from datetime import datetime
-from multiprocessing import Process, Queue
 from prometheus_client.parser import text_string_to_metric_families
-from time import sleep, time
+from multiprocessing import Process
 import itertools
 import json
 import logging
@@ -1062,134 +1063,75 @@ class TestWebPage(ImpalaTestSuite):
     assert found, "Query {} not found in response_json\n{}".format(
         query_id, json.dumps(response_json, sort_keys=True, indent=4))
 
-  def try_until(self, desc, run, check, timeout=10, interval=0.1):
-    start_time = time()
-    while (time() - start_time < timeout):
-      result = run()
-      if check(result):
-        return result
-      sleep(interval)
-    assert False, "Timed out waiting for " + desc
-
-  def get_queries(self):
-    responses = self.get_and_check_status(
-      self.QUERIES_URL + "?json", ports_to_test=[25000])
-    assert len(responses) == 1
-    response_json = json.loads(responses[0].text)
-    return response_json
-
+  # CatalogV2 doesn't have the delay loading metadata after invalidate, so this test
+  # is only applicable to CatalogV1. test_query_cancel_load_tables is sufficient for V2.
+  @SkipIfCatalogV2.catalog_v1_test()
   @pytest.mark.execute_serially
-  def test_query_cancel_created(self):
-    """Tests that if we cancel a query in the CREATED state, it still finishes and we can
-    cancel it."""
-    # Use MinimalHS2Connection because it has simpler concurrency than hs2_client.
-    with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as client:
-      delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
-      client.set_configuration(dict(debug_action=delay_created_action))
-      self._run_test_query_cancel_created(client)
-
-  def _run_test_query_cancel_created(self, client):
-    query = "select count(*) from functional_parquet.alltypes"
-
-    response_json = self.try_until("test baseline", self.get_queries,
-        lambda resp: resp['num_in_flight_queries'] == 0)
-    # Start the query completely async. The server doesn't return a response until
-    # the query has exited the CREATED state, so we need to get the query ID another way.
-    proc = Process(target=lambda cli, q: cli.execute_async(q), args=(client, query))
-    proc.start()
-
-    response_json = self.try_until("query creation", self.get_queries,
-        lambda resp: resp['num_in_flight_queries'] > 0)
-    assert len(response_json['in_flight_queries']) == 1
-    assert response_json['in_flight_queries'][0]['state'] == 'CREATED'
-    query_id = response_json['in_flight_queries'][0]['query_id']
-
-    cancel_query_url = "{0}cancel_query?json&query_id={1}".format(self.ROOT_URL.format
-      ("25000"), query_id)
-    response = requests.get(cancel_query_url)
-    assert response.status_code == requests.codes.ok
-    response_json = json.loads(response.text)
-    assert response_json['error'] == "Query not yet running\n"
-
-    # Wait for query to start running. It should finish soon after.
-    proc.join()
-    response_json = self.try_until("query finished", self.get_queries,
-        lambda resp: resp['in_flight_queries'][0]['state'] == 'FINISHED')
-    assert response_json['num_in_flight_queries'] == 1
-
-    # We never fetch results for the async query, so it stays in-flight until cancelled.
-    response = requests.get(cancel_query_url)
-    assert response.status_code == requests.codes.ok
-    response_json = json.loads(response.text)
-    assert response_json['contents'] == "Query cancellation successful"
-
-    # Cancel request can return before cancellation is finalized. Retry for slow
-    # environments like ASAN.
-    response_json = self.try_until("query cancellation", self.get_queries,
-        lambda resp: resp['num_in_flight_queries'] == 0)
-    assert response_json['num_waiting_queries'] == 0
-
-    expected_queries = [q for q in response_json['completed_queries']
-                        if q['query_id'] == query_id]
-    assert len(expected_queries) == 1
-
-  @pytest.mark.execute_serially
-  def test_query_cancel_exception(self):
-    """Tests that if we cancel a query in the CREATED state and it has an exception, we
-    can cancel it."""
-    # Use MinimalHS2Connection because it has simpler concurrency than hs2_client.
-    with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as client:
-      delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
-      client.set_configuration(dict(debug_action=delay_created_action))
-      self._test_query_cancel_exception(client)
-
-  def _test_query_cancel_exception(self, client):
-    # Trigger UDF ERROR: Cannot divide decimal by zero
-    query = "select *, 1.0/0 from functional_parquet.alltypes limit 10"
-
-    response_json = self.try_until("test baseline", self.get_queries,
-        lambda resp: resp['num_in_flight_queries'] == 0)
-
-    def run(queue, client, query):
-      queue.put(client.execute_async(query))
+  def test_query_cancel_load_metadata(self):
+    """Tests that we can cancel a query in the CREATED state while catalogd loads
+    metadata. Invalidate metadata introduces a delay while catalogd loads metadata."""
+    impalad = ImpalaCluster.get_e2e_test_cluster().impalads[0].service
+    wait_for_state(impalad, None)
+    result = self.execute_query("invalidate metadata functional_parquet.alltypes")
+    assert result.success
 
     # Start the query completely async. The server doesn't return a response until
     # the query has exited the CREATED state, so we need to get the query ID another way.
-    queue = Queue()
-    proc = Process(target=run, args=(queue, client, query))
-    proc.start()
+    proc, queue = start(self.client, "select count(*) from functional_parquet.alltypes")
+    wait_for_state(impalad, 'CREATED')
 
-    response_json = self.try_until("query creation", self.get_queries,
-        lambda resp: resp['num_in_flight_queries'] > 0)
-    assert len(response_json['in_flight_queries']) == 1
-    assert response_json['in_flight_queries'][0]['state'] == 'CREATED'
-    query_id = response_json['in_flight_queries'][0]['query_id']
+    in_flight_queries = impalad.get_debug_webpage_json('queries')['in_flight_queries']
+    assert len(in_flight_queries) == 1
+    assert in_flight_queries[0]['state'] == 'CREATED'
+    query_id = in_flight_queries[0]['query_id']
+    cancel(impalad, query_id)
 
-    cancel_query_url = "{0}cancel_query?json&query_id={1}".format(self.ROOT_URL.format
-      ("25000"), query_id)
-    response = requests.get(cancel_query_url)
-    assert response.status_code == requests.codes.ok
-    response_json = json.loads(response.text)
-    assert response_json['error'] == "Query not yet running\n"
+    # Verify query was cancelled. Cancel and fetch requests can return before cancellation
+    # is finalized, so wait for the original request to return.
+    assert "UserCancelledException: Query cancelled by user request" in join(proc, queue)
+    wait_for_state(impalad, None)
+    assert_query_stopped(impalad, query_id)
 
-    # Fetch query results.
-    query_handle = queue.get()
-    proc.join()
-    assert query_handle
-    try:
-      client.fetch(query, query_handle)
-    except Exception as e:
-      re.match("UDF ERROR: Cannot divide decimal by zero", str(e))
+    response = impalad.read_debug_webpage(
+        "query_profile_plain_text?query_id={}".format(query_id))
+    assert "Cancelled from Impala&apos;s debug web interface by user: " \
+        "&apos;anonymous&apos; at" in response
 
-    # Cancel and fetch requests can return before cancellation is finalized. Retry for
-    # slow environments like ASAN.
-    response_json = self.try_until("query failure", self.get_queries,
-        lambda resp: resp['num_in_flight_queries'] == 0)
-    assert response_json['num_waiting_queries'] == 0
+  @pytest.mark.execute_serially
+  def test_query_cancel_load_tables(self):
+    """Tests that we can cancel a query in the CREATED state while loading tables."""
+    impalad = ImpalaCluster.get_e2e_test_cluster().impalads[0].service
+    wait_for_state(impalad, None)
+    delay_created_action = "impalad_load_tables_delay:SLEEP@5000"
+    self.client.set_configuration({'debug_action': delay_created_action})
 
-    expected_queries = [q for q in response_json['completed_queries']
-                        if q['query_id'] == query_id]
-    assert len(expected_queries) == 1
+    # Start the query completely async. The server doesn't return a response until
+    # the query has exited the CREATED state, so we need to get the query ID another way.
+    proc, queue = start(self.client, "select count(*) from functional_parquet.alltypes")
+    wait_for_state(impalad, 'CREATED')
+
+    in_flight_queries = impalad.get_debug_webpage_json('queries')['in_flight_queries']
+    assert len(in_flight_queries) == 1
+    assert in_flight_queries[0]['state'] == 'CREATED'
+    query_id = in_flight_queries[0]['query_id']
+
+    # Call cancel multiple times to ensure it's idempotent.
+    procs = [Process(target=cancel, args=(impalad, query_id)) for _ in range(3)]
+    for proc in procs:
+      proc.start()
+    for proc in procs:
+      proc.join()
+
+    # Verify query was cancelled. Cancel and fetch requests can return before cancellation
+    # is finalized, so wait for the original request to return and retry get_queries.
+    assert "UserCancelledException: Query cancelled by user request" in join(proc, queue)
+    wait_for_state(impalad, None)
+    assert_query_stopped(impalad, query_id)
+
+    response = impalad.read_debug_webpage(
+        "query_profile_plain_text?query_id={}".format(query_id))
+    assert "Cancelled from Impala&apos;s debug web interface by user: " \
+        "&apos;anonymous&apos; at" in response
 
   @pytest.mark.execute_serially
   def test_hadoop_varz_page(self):

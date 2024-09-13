@@ -450,6 +450,7 @@ class RuntimeState {
   RuntimeState(const RuntimeState&);
 };
 
+// Helper for any state that implements is_cancelled, such as ClientRequestState.
 #define RETURN_IF_CANCELLED(state) \
   do { \
     if (UNLIKELY((state)->is_cancelled())) return Status::CANCELLED; \

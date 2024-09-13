@@ -154,7 +154,8 @@ Frontend::Frontend() {
     {"validateSaml2Response", "([B)[B", &validate_saml2_response_id_},
     {"validateSaml2Bearer", "([B)Ljava/lang/String;", &validate_saml2_bearer_id_},
     {"abortKuduTransaction", "([B)V", &abort_kudu_txn_},
-    {"commitKuduTransaction", "([B)V", &commit_kudu_txn_}
+    {"commitKuduTransaction", "([B)V", &commit_kudu_txn_},
+    {"cancelExecRequest", "([B)V", &cancel_exec_request_id_}
   };
 
   JniMethodDescriptor staticMethods[] = {
@@ -320,6 +321,10 @@ Status Frontend::GetCatalogTable(const TTableName& table_name, jobject* result) 
 Status Frontend::GetExecRequest(
     const TQueryCtx& query_ctx, TExecRequest* result) {
   return JniUtil::CallJniMethod(fe_, create_exec_request_id_, query_ctx, result);
+}
+
+Status Frontend::CancelExecRequest(const TUniqueId& query_id) {
+  return JniUtil::CallJniMethod(fe_, cancel_exec_request_id_, query_id);
 }
 
 Status Frontend::GetExplainPlan(

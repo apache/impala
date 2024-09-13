@@ -64,17 +64,13 @@ class QueryToKill:
     # will be "Cancelled".
     assert error_msg_startswith(
         str(self.exc),
-        "Invalid or unknown query handle",
-        self.client.handle_id(self.handle),
-    ) or error_msg_startswith(
-        str(self.exc),
-        "Cancelled",
+        ["Invalid or unknown query handle", "Cancelled"],
         self.client.handle_id(self.handle),
     )
     try:
       self.client.fetch(self.sql, self.handle)
     except Exception as ex:
-      assert "Invalid or unknown query handle" in str(ex)
+      assert "Invalid or unknown query handle" in str(ex) or "Cancelled" in str(ex)
     finally:
       self.client.close()
 

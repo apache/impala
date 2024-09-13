@@ -1316,8 +1316,9 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
 
   query_handle->query_driver()->IncludeInQueryLog(include_in_query_log);
 
-  if (!status.ok() && registered_query) {
-    UnregisterQueryDiscardResult((*query_handle)->query_id(), false, &status);
+  // Unregister query if it was registered and not yet finalized.
+  if (!status.ok() && registered_query && !query_handle->query_driver()->finalized()) {
+    UnregisterQueryDiscardResult((*query_handle)->query_id(), &status);
   }
   return status;
 }
@@ -1589,15 +1590,26 @@ void ImpalaServer::UpdateExecSummary(const QueryHandle& query_handle) const {
   query_handle->summary_profile()->AddInfoStringRedacted("Errors", join(errors, "\n"));
 }
 
-Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
-    const Status* cause) {
+Status ImpalaServer::UnregisterQuery(
+    const TUniqueId& query_id, const Status* cause, bool interrupted) {
   VLOG_QUERY << "UnregisterQuery(): query_id=" << PrintId(query_id);
 
   QueryHandle query_handle;
-  RETURN_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle));
+  // Skips updating RPCs since we'll finalize them right after, and this avoids
+  // acquiring a ClientRequestState lock.
+  RETURN_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle, /* skip_rpcs */ true));
 
-  if (check_inflight) {
-    DebugActionNoFail(query_handle->query_options(), "FINALIZE_INFLIGHT_QUERY");
+  DebugActionNoFail(query_handle->query_options(), "FINALIZE_INFLIGHT_QUERY");
+
+  if (interrupted) {
+    // Register interrupted query status with the session.
+    shared_ptr<SessionState> session = query_handle->session();
+    lock_guard<mutex> l(session->lock);
+    if (!session->closed) {
+      lock_guard<mutex> l(interrupted_query_statuses_lock_);
+      interrupted_query_statuses_.emplace(query_id, *cause);
+      session->interrupted_queries.emplace_back(query_id);
+    }
   }
 
   // Do the work of unregistration that needs to be done synchronously. Once
@@ -1606,7 +1618,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   // unregistration work. Finalize() succeeds for the first thread to call it to avoid
   // multiple threads unregistering.
   RETURN_IF_ERROR(
-      query_handle.query_driver()->Finalize(&query_handle, check_inflight, cause));
+      query_handle.query_driver()->Finalize(&query_handle, cause));
 
   // Do the rest of the unregistration work in the background so that the client does
   // not need to wait for profile serialization, etc.
@@ -1634,8 +1646,8 @@ void ImpalaServer::FinishUnregisterQuery(const QueryHandle& query_handle) {
 }
 
 void ImpalaServer::UnregisterQueryDiscardResult(
-    const TUniqueId& query_id, bool check_inflight, const Status* cause) {
-  Status status = UnregisterQuery(query_id, check_inflight, cause);
+    const TUniqueId& query_id, const Status* cause, bool interrupted) {
+  Status status = UnregisterQuery(query_id, cause, interrupted);
   if (!status.ok()) {
     LOG(ERROR) << Substitute("Query de-registration for query_id=$0 failed: $1",
         PrintId(query_id), cause->GetDetail());
@@ -1768,28 +1780,31 @@ shared_ptr<QueryDriver> ImpalaServer::GetQueryDriver(
   return entry->second;
 }
 
+Status ImpalaServer::GetInterruptedStatus(const TUniqueId& query_id) {
+  lock_guard<mutex> l(interrupted_query_statuses_lock_);
+  auto it = interrupted_query_statuses_.find(query_id);
+  if (it != interrupted_query_statuses_.end()) {
+    return it->second;
+  }
+  return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+}
+
 Status ImpalaServer::GetActiveQueryHandle(
-    const TUniqueId& query_id, QueryHandle* query_handle) {
+    const TUniqueId& query_id, QueryHandle* query_handle, bool skip_rpcs) {
   DCHECK(query_handle != nullptr);
   shared_ptr<QueryDriver> query_driver = GetQueryDriver(query_id);
   if (UNLIKELY(query_driver == nullptr)) {
-    {
-      lock_guard<mutex> l(idle_query_statuses_lock_);
-      auto it = idle_query_statuses_.find(query_id);
-      if (it != idle_query_statuses_.end()) {
-        return it->second;
-      }
-    }
-
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    Status err = GetInterruptedStatus(query_id);
     VLOG(1) << err.GetDetail();
     return err;
   }
   query_handle->SetHandle(query_driver, query_driver->GetActiveClientRequestState());
-  // Update RPC Stats before every call. This is done here to minimize the
-  // pending set size and keep the profile updated while the query is executing.
-  (*query_handle)->UnRegisterCompletedRPCs();
-  (*query_handle)->RegisterRPC();
+  if (!skip_rpcs) {
+    // Update RPC Stats before every call. This is done here to minimize the
+    // pending set size and keep the profile updated while the query is executing.
+    (*query_handle)->UnRegisterCompletedRPCs();
+    (*query_handle)->RegisterRPC();
+  }
   return Status::OK();
 }
 
@@ -1798,11 +1813,11 @@ Status ImpalaServer::GetQueryHandle(
   DCHECK(query_handle != nullptr);
   shared_ptr<QueryDriver> query_driver = GetQueryDriver(query_id, return_unregistered);
   if (UNLIKELY(query_driver == nullptr)) {
-    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    return GetInterruptedStatus(query_id);
   }
   ClientRequestState* request_state = query_driver->GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    return GetInterruptedStatus(query_id);
   }
   query_handle->SetHandle(query_driver, request_state);
   return Status::OK();
@@ -1815,7 +1830,7 @@ Status ImpalaServer::GetAllQueryHandles(const TUniqueId& query_id,
   DCHECK(original_query_handle != nullptr);
   shared_ptr<QueryDriver> query_driver = GetQueryDriver(query_id, return_unregistered);
   if (UNLIKELY(query_driver == nullptr)) {
-    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    return GetInterruptedStatus(query_id);
   }
   active_query_handle->SetHandle(query_driver,
       query_driver->GetActiveClientRequestState());
@@ -1828,10 +1843,6 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
   QueryHandle query_handle;
   RETURN_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle));
-  if (!query_handle->is_inflight()) {
-    // Error if the query is not yet inflight as we have no way to cleanly cancel it.
-    return Status("Query not yet running");
-  }
   query_handle->Cancel(/*cause=*/ nullptr);
   return Status::OK();
 }
@@ -1850,7 +1861,7 @@ Status ImpalaServer::KillQuery(
   if (status.code() != TErrorCode::INVALID_QUERY_HANDLE) {
     // The current impalad is the coordinator of the query.
     RETURN_IF_ERROR(status);
-    status = UnregisterQuery(query_id, true, &Status::CANCELLED);
+    status = UnregisterQuery(query_id, &Status::CANCELLED, true);
     if (status.ok() || status.code() == TErrorCode::INVALID_QUERY_HANDLE) {
       // There might be another thread that has already unregistered the query
       // before UnregisterQuery() and after CancelInternal(). In this case we are done.
@@ -1896,7 +1907,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     DecrementSessionCount(session_state->connected_user);
   }
   unordered_set<TUniqueId> inflight_queries;
-  vector<TUniqueId> idled_queries;
+  vector<TUniqueId> interrupted_queries;
   {
     lock_guard<mutex> l(session_state->lock);
     DCHECK(!session_state->closed);
@@ -1904,18 +1915,18 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     // Since closed is true, no more queries will be added to the inflight list.
     inflight_queries.insert(session_state->inflight_queries.begin(),
         session_state->inflight_queries.end());
-    idled_queries.swap(session_state->idled_queries);
+    interrupted_queries.swap(session_state->interrupted_queries);
   }
   // Unregister all open queries from this session.
   Status status = Status::Expected("Session closed");
   for (const TUniqueId& query_id: inflight_queries) {
     // TODO: deal with an error status
-    UnregisterQueryDiscardResult(query_id, false, &status);
+    UnregisterQueryDiscardResult(query_id, &status);
   }
   {
-    lock_guard<mutex> l(idle_query_statuses_lock_);
-    for (const TUniqueId& query_id: idled_queries) {
-      idle_query_statuses_.erase(query_id);
+    lock_guard<mutex> l(interrupted_query_statuses_lock_);
+    for (const TUniqueId& query_id: interrupted_queries) {
+      interrupted_query_statuses_.erase(query_id);
     }
   }
   // Reconfigure the poll period of session_maintenance_thread_ if necessary.
@@ -2129,7 +2140,7 @@ void ImpalaServer::CancelFromThreadPool(const CancellationWork& cancellation_wor
   }
 
   if (cancellation_work.unregister()) {
-    UnregisterQueryDiscardResult(cancellation_work.query_id(), true, &error);
+    UnregisterQueryDiscardResult(cancellation_work.query_id(), &error, true);
   } else {
     // Retry queries that would otherwise be cancelled due to an impalad leaving the
     // cluster. CancellationWorkCause::BACKEND_FAILED indicates that a backend running
@@ -2968,18 +2979,8 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
             preserved_status = crs->query_status();
           }
           preserved_status.MergeStatus(status);
-          {
-            shared_ptr<SessionState> session = crs->session();
-            lock_guard<mutex> l(session->lock);
-            if (!session->closed) {
-              lock_guard<mutex> l(idle_query_statuses_lock_);
-              idle_query_statuses_.emplace(
-                  expiration_event->query_id, move(preserved_status));
-              session->idled_queries.emplace_back(expiration_event->query_id);
-            }
-          }
 
-          ExpireQuery(crs, status, true);
+          ExpireQuery(crs, preserved_status, true);
           expiration_event = queries_by_timestamp_.erase(expiration_event);
         } else {
           // Iterator is moved on in every other branch.

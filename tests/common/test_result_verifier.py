@@ -840,6 +840,9 @@ def error_msg_startswith(actual_msg, expected_msg="", query_id=None):
   - Otherwise, it checks if the `query_id` part in the actual error message matches the
     format using the regular expression.
 
+  `expected_msg` may also be an array of strings, in which case the function checks
+  whether the actual error message starts with any of the strings in the array.
+
   NOTE: Messages of errors such as "Invalid session id" do not contain a query id
   since such an error may occur before a query id is generated.
   """
@@ -848,13 +851,17 @@ def error_msg_startswith(actual_msg, expected_msg="", query_id=None):
     start = actual_msg.find(ERROR_PROMPT)
     if start == -1:
       return False
-    return actual_msg.startswith(expected_msg, start + len(ERROR_PROMPT))
+    start += len(ERROR_PROMPT)
   else:
     ERROR_PROMPT = "Query " + QUERY_ID_REGEX + " failed:\n"
     m = re.search(ERROR_PROMPT, actual_msg)
     if m is None:
       return False
-    return actual_msg.startswith(expected_msg, m.end())
+    start = m.end()
+  for msg in expected_msg if isinstance(expected_msg, list) else [expected_msg]:
+    if actual_msg.startswith(msg, start):
+      return True
+  return False
 
 
 def error_msg_equal(msg1, msg2):

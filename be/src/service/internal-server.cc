@@ -280,7 +280,7 @@ void ImpalaServer::CloseQuery(const TUniqueId& query_id) {
     return;
   }
 
-  UnregisterQueryDiscardResult(query_handle->query_id(), false);
+  UnregisterQueryDiscardResult(query_handle->query_id());
 } // ImpalaServer::CloseQuery
 
 void ImpalaServer::GetConnectionContextList(

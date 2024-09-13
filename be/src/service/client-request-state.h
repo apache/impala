@@ -830,6 +830,9 @@ class ClientRequestState {
   /// actively processed. Takes expiration_data_lock_.
   void MarkActive();
 
+  /// Returns true if request is cancelled. Acquires lock_ to avoid dirty reads.
+  bool is_cancelled();
+
   /// Sets up profile and pre-execution counters, creates the query schedule, and calls
   /// FinishExecQueryOrDmlRequest() which contains the core logic of executing a QUERY or
   /// DML execution request. When 'async' is true, spawn a thread to run

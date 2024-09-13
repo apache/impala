@@ -73,11 +73,11 @@ class TestKillQuery(ImpalaTestSuite):
       assert_kill_ok(client, query_id_to_kill)
       assert_kill_error(
           client,
-          "Could not find query on any coordinator",
+          ["Could not find query on any coordinator", "Cancelled"],
           query_id=query_id_to_kill,
       )
       assert_kill_error(
           client,
-          "Could not find query on any coordinator",
+          ["Could not find query on any coordinator", "Cancelled"],
           query_id=query_id_to_kill,
       )

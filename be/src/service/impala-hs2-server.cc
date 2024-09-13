@@ -172,7 +172,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   Status exec_status = query_handle->Exec(*request);
   if (!exec_status.ok()) {
-    discard_result(UnregisterQuery(query_handle->query_id(), false, &exec_status));
+    discard_result(UnregisterQuery(query_handle->query_id(), &exec_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(Substitute(
         QUERY_ERROR_FORMAT, PrintId(query_handle->query_id()), exec_status.GetDetail()));
@@ -184,7 +184,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   Status inflight_status = SetQueryInflight(session, query_handle);
   if (!inflight_status.ok()) {
-    discard_result(UnregisterQuery(query_handle->query_id(), false, &inflight_status));
+    discard_result(UnregisterQuery(query_handle->query_id(), &inflight_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(Substitute(QUERY_ERROR_FORMAT,
         PrintId(query_handle->query_id()), inflight_status.GetDetail()));
@@ -652,7 +652,7 @@ void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
   return;
 
  return_error:
-  discard_result(UnregisterQuery(query_handle->query_id(), false, &status));
+  discard_result(UnregisterQuery(query_handle->query_id(), &status));
   HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
 }
 
@@ -1003,8 +1003,7 @@ void ImpalaServer::CloseImpalaOperation(TCloseImpalaOperationResp& return_val,
   }
 
   // TODO: use timeout to get rid of unwanted query_handle.
-  HS2_RETURN_IF_ERROR(return_val, UnregisterQuery(query_id, true),
-      SQLSTATE_GENERAL_ERROR);
+  HS2_RETURN_IF_ERROR(return_val, UnregisterQuery(query_id), SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
@@ -1104,7 +1103,7 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
     if (status.IsRecoverableError()) {
       DCHECK(fetch_first);
     } else {
-      discard_result(UnregisterQuery(query_id, false, &status));
+      discard_result(UnregisterQuery(query_id, &status));
     }
     HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
     return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);

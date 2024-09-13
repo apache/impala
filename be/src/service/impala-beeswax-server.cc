@@ -81,14 +81,14 @@ void ImpalaServer::query(beeswax::QueryHandle& beeswax_handle, const Query& quer
   // us to advance query state to FINISHED or EXCEPTION
   Status status = query_handle->WaitAsync();
   if (!status.ok()) {
-    discard_result(UnregisterQuery(query_handle->query_id(), false, &status));
+    discard_result(UnregisterQuery(query_handle->query_id(), &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   status = SetQueryInflight(session, query_handle);
   if (!status.ok()) {
-    discard_result(UnregisterQuery(query_handle->query_id(), false, &status));
+    discard_result(UnregisterQuery(query_handle->query_id(), &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   TUniqueIdToBeeswaxHandle(query_handle->query_id(), &beeswax_handle);
@@ -132,7 +132,7 @@ void ImpalaServer::executeAndWait(beeswax::QueryHandle& beeswax_handle,
   // set of in-flight queries.
   Status status = SetQueryInflight(session, query_handle);
   if (!status.ok()) {
-    discard_result(UnregisterQuery(query_handle->query_id(), false, &status));
+    discard_result(UnregisterQuery(query_handle->query_id(), &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   // block until results are ready
@@ -142,7 +142,7 @@ void ImpalaServer::executeAndWait(beeswax::QueryHandle& beeswax_handle,
     status = query_handle->query_status();
   }
   if (!status.ok()) {
-    discard_result(UnregisterQuery(query_handle->query_id(), false, &status));
+    discard_result(UnregisterQuery(query_handle->query_id(), &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 
@@ -206,7 +206,7 @@ void ImpalaServer::fetch(Results& query_results,
   VLOG_ROW << "fetch result: #results=" << query_results.data.size()
            << " has_more=" << (query_results.has_more ? "true" : "false");
   if (!status.ok()) {
-    discard_result(UnregisterQuery(query_id, false, &status));
+    discard_result(UnregisterQuery(query_id, &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 }
@@ -295,7 +295,7 @@ void ImpalaServer::close(const beeswax::QueryHandle& beeswax_handle) {
   // Make query id available to the following RaiseBeeswaxException().
   ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
 
-  RAISE_IF_ERROR(UnregisterQuery(query_id, true), SQLSTATE_GENERAL_ERROR);
+  RAISE_IF_ERROR(UnregisterQuery(query_id), SQLSTATE_GENERAL_ERROR);
 }
 
 beeswax::QueryState::type ImpalaServer::get_state(
@@ -702,7 +702,7 @@ Status ImpalaServer::CloseInsertInternal(
 
   Status query_status;
   query_handle->GetDmlStats(dml_result, &query_status);
-  RETURN_IF_ERROR(UnregisterQuery(query_id, true));
+  RETURN_IF_ERROR(UnregisterQuery(query_id));
   return query_status;
 }
 }

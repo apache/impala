@@ -183,9 +183,8 @@ class QueryDriver {
   /// This indicates that the query should no longer be considered registered from the
   /// client's point of view. Returns an INVALID_QUERY_HANDLE error if finalization
   /// already started. After this method has been called, finalized() will return true.
-  /// If 'check_inflight' is true and the query is not yet inflight, Finalize will error.
   /// 'cause' is passed to ClientRequestState::Finalize(Status).
-  Status Finalize(QueryHandle* query_handle, bool check_inflight, const Status* cause);
+  Status Finalize(QueryHandle* query_handle, const Status* cause);
 
   /// Delete this query from the given QueryDriverMap.
   Status Unregister(ImpalaServer::QueryDriverMap* query_driver_map) WARN_UNUSED_RESULT;

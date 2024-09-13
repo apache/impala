@@ -167,7 +167,7 @@ void ChildQuery::Cancel() {
   if (!status.ok()) {
     LOG(ERROR) << "Failed to cancel child query: " << status.GetDetail();
   }
-  status = parent_server_->UnregisterQuery(query_id, true, &Status::CANCELLED);
+  status = parent_server_->UnregisterQuery(query_id, &Status::CANCELLED);
   if (!status.ok()) {
     LOG(ERROR) << "Failed to unregister child query: " << status.GetDetail();
   }

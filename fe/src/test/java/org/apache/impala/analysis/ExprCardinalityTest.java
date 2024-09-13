@@ -116,7 +116,7 @@ public class ExprCardinalityTest {
    */
 
   @Test
-  public void testMetadata() throws DatabaseNotFoundException, InternalException {
+  public void testMetadata() throws ImpalaException {
     Catalog catalog = session_.catalog();
     Db db = catalog.getDb("functional");
     StmtMetadataLoader mdLoader =

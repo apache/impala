@@ -137,7 +137,6 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.local.LocalCatalog;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
@@ -149,6 +148,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.UserCancelledException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -168,6 +168,7 @@ import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
+import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TBackendGflags;
@@ -269,9 +270,6 @@ public class Frontend {
 
   // Max time to wait for a catalog update notification.
   public static final long MAX_CATALOG_UPDATE_WAIT_TIME_MS = 2 * 1000;
-
-  // TODO: Make the reload interval configurable.
-  private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
 
   // Maximum number of times to retry a query if it fails due to inconsistent metadata.
   private static final int INCONSISTENT_METADATA_NUM_RETRIES =
@@ -1299,7 +1297,7 @@ public class Frontend {
    * of the pendingCheckTasks.
    */
   private void filterUnaccessibleElements(List<Future<Boolean>> pendingCheckTasks,
-    List<?> checkList) throws InternalException {
+    List<?> checkList) throws UserCancelledException, InternalException {
     int failedCheckTasks = 0;
     int index = 0;
     Iterator<?> iter = checkList.iterator();
@@ -1311,6 +1309,7 @@ public class Frontend {
         if (!pendingCheckTasks.get(index).get()) iter.remove();
         index++;
       } catch (ExecutionException | InterruptedException e) {
+        Canceller.throwIfCancelled();
         failedCheckTasks++;
         LOG.error("Encountered an error checking access", e);
         break;
@@ -1481,7 +1480,7 @@ public class Frontend {
    * accessible to 'user'.
    */
   public List<? extends FeDb> getDbs(PatternMatcher matcher, User user)
-      throws InternalException {
+      throws UserCancelledException, InternalException {
     List<? extends FeDb> dbs = getCatalog().getDbs(matcher);
 
     boolean needsAuthChecks = authzFactory_.getAuthorizationConfig().isEnabled()
@@ -1912,7 +1911,7 @@ public class Frontend {
    *
    * @see ImpaladCatalog#isReady(), CatalogdMetaProvider#isReady()
    */
-  public void waitForCatalog() {
+  public void waitForCatalog() throws UserCancelledException {
     LOG.info("Waiting for first catalog update from the statestore.");
     int numTries = 0;
     long startTimeMs = System.currentTimeMillis();
@@ -2051,7 +2050,8 @@ public class Frontend {
       throws ImpalaException {
     // Timeline of important events in the planning process, used for debugging
     // and profiling.
-    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope();
+         Canceller.Registration reg = Canceller.register(planCtx.queryCtx_.query_id)) {
       EventSequence timeline = new EventSequence("Query Compilation");
       // a wrapper of the getTExecRequest is in the factory so the implementation
       // can handle various planner fallback execution logic (e.g. allowing one
@@ -2402,6 +2402,8 @@ public class Frontend {
     Preconditions.checkState(
         !clientSetRequestPool || !queryOptions.getRequest_pool().isEmpty());
 
+    Canceller.throwIfCancelled();
+
     boolean coordOnlyRequestPool = false;
 
     if (clientSetRequestPool && RequestPoolService.getInstance() != null) {
@@ -2449,6 +2451,8 @@ public class Frontend {
             + executorGroupSetsToUse,
         numExecutorGroupSets);
 
+    Canceller.throwIfCancelled();
+
     TExecRequest req = null;
 
     // Capture the current state.
@@ -2473,6 +2477,7 @@ public class Frontend {
         expectedTotalCores(executorGroupSetsToUse.get(numExecutorGroupSets - 1));
     int i = 0;
     while (i < numExecutorGroupSets) {
+      Canceller.throwIfCancelled();
       boolean isLastEG = (i == numExecutorGroupSets - 1);
       boolean skipResourceCheckingAtLastEG = isLastEG
           && BackendConfig.INSTANCE.isSkipResourceCheckingOnLastExecutorGroupSet();
@@ -2491,6 +2496,7 @@ public class Frontend {
 
       String retryMsg = "";
       while (true) {
+        Canceller.throwIfCancelled();
         try {
           req = doCreateExecRequest(compilerFactory, planCtx, warnings, timeline);
           markTimelineRetries(attempt, retryMsg, timeline);
@@ -2511,6 +2517,7 @@ public class Frontend {
               INCONSISTENT_METADATA_NUM_RETRIES);
         }
       }
+      Canceller.throwIfCancelled();
 
       // Counters about this group set.
       int availableCores = expectedTotalCores(group_set);

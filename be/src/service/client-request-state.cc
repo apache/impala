@@ -252,8 +252,6 @@ void ClientRequestState::SetBlacklistedExecutorAddresses(
 }
 
 Status ClientRequestState::Exec() {
-  MarkActive();
-
   const TExecRequest& exec_req = exec_request();
   profile_->AddChild(server_profile_);
   summary_profile_->AddInfoString("Query Type", PrintValue(stmt_type()));
@@ -288,6 +286,10 @@ Status ClientRequestState::Exec() {
             query_ctx_.overridden_mt_dop_value,
             query_ctx_.client_request.query_options.mt_dop));
   }
+
+  // Don't start executing the query if Cancel() was called between planning and Exec().
+  RETURN_IF_CANCELLED(this);
+  MarkActive();
 
   switch (exec_req.stmt_type) {
     case TStmtType::QUERY:
@@ -619,11 +621,8 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
         PrintTableList(query_exec_request.query_ctx.tables_missing_diskids));
   }
 
-  {
-    lock_guard<mutex> l(lock_);
-    // Don't start executing the query if Cancel() was called concurrently with Exec().
-    if (is_cancelled_) return Status::CANCELLED;
-  }
+  // Don't start executing the query if Cancel() was called concurrently with Exec().
+  RETURN_IF_CANCELLED(this);
   if (isAsync) {
     // Don't transition to PENDING inside the FinishExecQueryOrDmlRequest thread because
     // the query should be in the PENDING state before the Exec RPC returns.
@@ -1121,7 +1120,6 @@ Status ClientRequestState::ExecEventProcessorCmd() {
 }
 
 void ClientRequestState::Finalize(const Status* cause) {
-  UnRegisterCompletedRPCs();
   Cancel(cause, /*wait_until_finalized=*/true);
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
@@ -1295,8 +1293,7 @@ Status ClientRequestState::WaitInternal() {
     // further if the query has been cancelled. If so, return immediately as there will
     // be no query result available (IMPALA-11006).
     if (isCTAS) {
-      lock_guard<mutex> l(lock_);
-      if (is_cancelled_) return Status::CANCELLED;
+      RETURN_IF_CANCELLED(this);
     }
   }
 
@@ -1551,6 +1548,18 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
 }
 
 void ClientRequestState::Cancel(const Status* cause, bool wait_until_finalized) {
+  // If planning is not done, attempt to cancel query in the frontend.
+  if (!is_planning_done_.load()) {
+    Status status = frontend_->CancelExecRequest(query_id());
+    if (!status.ok()) {
+      LOG(ERROR) << "Error cancelling planning for query " << PrintId(query_id())
+                 << ": " << status;
+    }
+  }
+
+  // Clean up completed RPCs before cancelling backends.
+  UnRegisterCompletedRPCs();
+
   {
     lock_guard<mutex> lock(lock_);
     // If the query has reached a terminal state, no need to update the state.
@@ -1867,6 +1876,12 @@ void ClientRequestState::MarkActive() {
   lock_guard<mutex> l(expiration_data_lock_);
   last_active_time_ms_ = UnixMillis();
   ++ref_count_;
+}
+
+// Used by RETURN_IF_CANCELLED.
+bool ClientRequestState::is_cancelled() {
+  lock_guard<mutex> l(lock_);
+  return is_cancelled_;
 }
 
 std::optional<long> getIcebergSnapshotId(const TExecRequest& exec_req) {

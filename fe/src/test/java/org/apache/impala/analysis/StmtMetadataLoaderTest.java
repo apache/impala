@@ -114,7 +114,7 @@ public class StmtMetadataLoaderTest {
   // Assume tables in the stmt are not acid tables.
   private void validateUncached(ParsedStatement stmt, Frontend fe,
       int expectedNumLoadRequests, int expectedNumCatalogUpdates,
-      String[] expectedDbs, String[] expectedTables) throws InternalException {
+      String[] expectedDbs, String[] expectedTables) throws ImpalaException {
     EventSequence timeline = new EventSequence("Test Timeline");
     StmtMetadataLoader mdLoader =
         new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline);
@@ -132,7 +132,7 @@ public class StmtMetadataLoaderTest {
   }
 
   private void validateCached(ParsedStatement stmt, Frontend fe,
-      String[] expectedDbs, String[] expectedTables) throws InternalException {
+      String[] expectedDbs, String[] expectedTables) throws ImpalaException {
     EventSequence timeline = new EventSequence("Test Timeline");
     StmtMetadataLoader mdLoader =
         new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline);

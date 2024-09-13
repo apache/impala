@@ -187,7 +187,7 @@ class TQueryExecRequest;
 /// 1. session_state_map_lock_
 /// 2. query_expiration_lock_
 /// 3. SessionState::lock
-/// 4. idle_query_statuses_lock_
+/// 4. interrupted_query_statuses_lock_
 /// 5. ClientRequestState::fetch_rows_lock
 /// 6. ClientRequestState::lock
 /// 7. ClientRequestState::expiration_data_lock_
@@ -671,8 +671,8 @@ class ImpalaServer : public ImpalaServiceIf,
     /// inflight_queries. In that case we add it to prestopped_queries instead.
     std::set<TUniqueId> prestopped_queries;
 
-    /// Unregistered queries we need to clear from idle_query_statuses_ on closure.
-    std::vector<TUniqueId> idled_queries;
+    /// Unregistered queries we need to clear from interrupted_query_statuses_ on closure.
+    std::vector<TUniqueId> interrupted_queries;
 
     /// Total number of queries run as part of this session.
     int64_t total_queries;
@@ -828,16 +828,15 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Starts the process of unregistering the query. The query is cancelled on the
   /// current thread, then asynchronously the query's entry is removed from
   /// query_driver_map_ and the session state's in-flight query list.
-  /// If check_inflight is true, then return an error if the query
-  /// is not yet in-flight. Otherwise, proceed even if the query isn't yet in-flight (for
-  /// cleaning up after an error on the query issuing path).
-  Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
-      const Status* cause = NULL) WARN_UNUSED_RESULT;
+  /// If a query is interrupted by an external process, set 'interrupted' to save 'cause'
+  /// in the Session so clients can retrieve the cause after the query is unregistered.
+  Status UnregisterQuery(const TUniqueId& query_id, const Status* cause = NULL,
+      bool interrupted = false) WARN_UNUSED_RESULT;
 
   /// Delegates to UnregisterQuery. If UnregisterQuery returns an error Status, the
   /// status is logged and then discarded.
   void UnregisterQueryDiscardResult(
-      const TUniqueId& query_id, bool check_inflight, const Status* cause = NULL);
+      const TUniqueId& query_id, const Status* cause = NULL, bool interrupted = false);
 
   /// Unregisters the provided query, does all required finalization and removes it from
   /// 'query_driver_map_'.
@@ -1004,10 +1003,10 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Returns the active QueryHandle for this query id. The QueryHandle contains the
   /// active ClientRequestState. Returns an error Status if the query id cannot be found.
-  /// If caller is an RPC thread, RPC context will be registered for time tracking
-  /// See QueryDriver for a description of active ClientRequestStates.
+  /// If caller is an RPC thread, RPC context will be registered for time tracking unless
+  /// skip_rpcs is true. See QueryDriver for a description of active ClientRequestStates.
   Status GetActiveQueryHandle(
-      const TUniqueId& query_id, QueryHandle* query_handle);
+      const TUniqueId& query_id, QueryHandle* query_handle, bool skip_rpcs = false);
 
   /// Similar to 'GetActiveQueryHandle' except it does not return the active handle, it
   /// returns the handle directly associated with the given query id. Returns an error
@@ -1031,6 +1030,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// not be returned.
   std::shared_ptr<QueryDriver> GetQueryDriver(
       const TUniqueId& query_id, bool return_unregistered = false);
+
+  /// Returns status from interrupted_query_statuses_, or INVALID_QUERY_HANDLE.
+  Status GetInterruptedStatus(const TUniqueId& query_id);
 
   /// Beeswax private methods
 
@@ -1442,12 +1444,13 @@ class ImpalaServer : public ImpalaServiceIf,
   typedef boost::unordered_map<TUniqueId, std::shared_ptr<SessionState>> SessionStateMap;
   SessionStateMap session_state_map_;
 
-  /// Protects idle_query_statuses_;
-  std::mutex idle_query_statuses_lock_;
+  /// Protects interrupted_query_statuses_;
+  std::mutex interrupted_query_statuses_lock_;
 
-  /// A map of queries that were stopped due to idle timeout and the status they had when
-  /// unregistered. Used to return a more useful error when looking up unregistered IDs.
-  std::map<TUniqueId, Status> idle_query_statuses_;
+  /// A map of queries that were interrupted by an external process and the status they
+  /// had when unregistered. Used to return a more useful error when looking up
+  /// unregistered IDs.
+  std::map<TUniqueId, Status> interrupted_query_statuses_;
 
   /// Protects connection_to_sessions_map_. See "Locking" in the class comment for lock
   /// acquisition order.

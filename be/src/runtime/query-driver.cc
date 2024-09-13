@@ -91,8 +91,8 @@ Status QueryDriver::DoFrontendPlanning(const TQueryCtx& query_ctx, bool use_requ
   TExecRequest exec_request;
   RETURN_IF_ERROR(
       DebugAction(query_ctx.client_request.query_options, "FRONTEND_PLANNER"));
-  RETURN_IF_ERROR(client_request_state_->UpdateQueryStatus(
-      ExecEnv::GetInstance()->frontend()->GetExecRequest(query_ctx, &exec_request)));
+  RETURN_IF_ERROR(
+      ExecEnv::GetInstance()->frontend()->GetExecRequest(query_ctx, &exec_request));
 
   DumpTExecReq(exec_request, "internal", client_request_state_->query_id());
   if (use_request) exec_request_.reset(new TExecRequest(move(exec_request)));
@@ -492,18 +492,11 @@ void QueryDriver::HandleRetryFailure(Status* status, string* error_msg,
       Substitute("Failed to retry query $0", PrintId(request_state->query_id())));
   status->AddDetail(*error_msg);
   discard_result(request_state->UpdateQueryStatus(*status));
-  parent_server_->UnregisterQueryDiscardResult(retry_query_id, false, status);
+  parent_server_->UnregisterQueryDiscardResult(retry_query_id, status);
 }
 
 Status QueryDriver::Finalize(
-    QueryHandle* query_handle, bool check_inflight, const Status* cause) {
-  // If the query's not inflight yet, return an appropriate error. If the query
-  // has been finalized and removed from inflight_queries (but not yet removed
-  // from query_driver_map_) we want to fall-through to the next check.
-  if (check_inflight && !(*query_handle)->is_inflight() && !finalized_.Load()) {
-    return Status("Query not yet running");
-  }
-
+    QueryHandle* query_handle, const Status* cause) {
   if (!finalized_.CompareAndSwap(false, true)) {
     // Return error as-if the query was already unregistered, so that it appears to the
     // client as-if unregistration already happened. We don't need a distinct

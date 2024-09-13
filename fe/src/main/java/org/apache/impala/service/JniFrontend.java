@@ -44,6 +44,7 @@ import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.common.UserCancelledException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -185,6 +186,13 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  public void cancelExecRequest(byte[] thriftQueryId) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TUniqueId queryId = new TUniqueId();
+    JniUtil.deserializeThrift(protocolFactory_, queryId, thriftQueryId);
+    Canceller.cancel(queryId);
   }
 
   // Deserialize and merge each thrift catalog update into a single merged update
@@ -656,7 +664,7 @@ public class JniFrontend {
     frontend_.getCatalog().setIsReady(true);
   }
 
-  public void waitForCatalog() {
+  public void waitForCatalog() throws UserCancelledException {
     Preconditions.checkNotNull(frontend_);
     frontend_.waitForCatalog();
   }
