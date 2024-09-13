@@ -895,7 +895,9 @@ class ImpalaTestSuite(BaseTestSuite):
   @execute_wrapper
   def execute_query_expect_success(cls, impalad_client, query, query_options=None,
       user=None):
-    """Executes a query and asserts if the query fails"""
+    """Executes a query and asserts that the query succeded.
+    Remember to pass vector.get_value('exec_option') as 'query_options' argument
+    if the test has one."""
     result = cls.__execute_query(impalad_client, query, query_options, user)
     assert result.success
     return result
@@ -904,7 +906,9 @@ class ImpalaTestSuite(BaseTestSuite):
   @execute_wrapper
   def execute_query_expect_failure(cls, impalad_client, query, query_options=None,
       user=None):
-    """Executes a query and asserts if the query succeeds"""
+    """Executes a query and asserts that the query failed.
+    Remember to pass vector.get_value('exec_option') as 'query_options' argument
+    if the test has one."""
     result = None
     try:
       result = cls.__execute_query(impalad_client, query, query_options, user)
@@ -916,10 +920,16 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @execute_wrapper
   def execute_query_unchecked(self, impalad_client, query, query_options=None, user=None):
+    """Execute a query against sepecific impalad without checking whether the query
+    succeded or failed. Remember to pass vector.get_value('exec_option') as
+    'query_options' argument if the test has one."""
     return self.__execute_query(impalad_client, query, query_options, user)
 
   @execute_wrapper
   def execute_query(self, query, query_options=None):
+    """Execute a query against the default impalad client without checking whether
+    the query succeded or failed. Remember to pass vector.get_value('exec_option')
+    as 'query_options' argument if the test has one."""
     return self.__execute_query(self.client, query, query_options)
 
   def exec_and_time(self, query, query_options=None, impalad=0):
@@ -961,6 +971,10 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @execute_wrapper
   def execute_scalar(self, query, query_options=None):
+    """Executes a scalar query return the single row result.
+    Only validate that query return just one row.
+    Remember to pass vector.get_value('exec_option') as 'query_options' argument
+    if the test has one."""
     result = self.__execute_query(self.client, query, query_options)
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
@@ -969,7 +983,10 @@ class ImpalaTestSuite(BaseTestSuite):
   @execute_wrapper
   def execute_scalar_expect_success(cls, impalad_client, query, query_options=None,
       user=None):
-    """Executes a query and asserts if the query fails"""
+    """Executes a scalar query return the single row result.
+    Validate that query execution is indeed successful and return just one row.
+    Remember to pass vector.get_value('exec_option') as 'query_options' argument
+    if the test has one."""
     result = cls.__execute_query(impalad_client, query, query_options, user)
     assert result.success
     assert len(result.data) <= 1, 'Multiple values returned from scalar'

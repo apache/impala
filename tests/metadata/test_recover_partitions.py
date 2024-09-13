@@ -24,11 +24,12 @@ import shutil
 from six.moves import urllib
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfFS, SkipIfCatalogV2
-from tests.common.test_dimensions import ALL_NODES_ONLY
-from tests.common.test_dimensions import create_exec_option_dimension
-from tests.util.filesystem_utils import WAREHOUSE, IS_S3
-
+from tests.common.test_dimensions import (
+    ALL_NODES_ONLY,
+    create_exec_option_dimension)
+from tests.util.filesystem_utils import WAREHOUSE
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+
 
 # Validates ALTER TABLE RECOVER PARTITIONS statement
 
@@ -65,6 +66,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     """Test that RECOVER PARTITIONS correctly discovers new partitions added externally
     by the hdfs client.
     """
+    self.client.set_configuration(vector.get_value('exec_option'))
     TBL_NAME = "test_recover_partitions"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
@@ -133,6 +135,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
   def test_nondefault_location_partitions(self, vector, unique_database):
     """If the location of data files in one partition is changed, test that data files
     in the default location will not be loaded after partition recovery."""
+    self.client.set_configuration(vector.get_value('exec_option'))
     TBL_NAME = "test_recover_partitions"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
@@ -170,7 +173,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
   def test_recover_many_partitions(self, vector, unique_database):
     """Test that RECOVER PARTITIONS correctly discovers new partitions added externally
     by the hdfs client, recovered in batches"""
-
+    self.client.set_configuration(vector.get_value('exec_option'))
     TBL_NAME = "test_recover_partitions"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     DB_LOCATION = '%s/%s.db/' % (WAREHOUSE, unique_database)
@@ -211,6 +214,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     """Test that RECOVER PARTITIONS does not recover equivalent partitions. Two partitions
     are considered equivalent if they correspond to distinct paths but can be converted
     to the same partition key values (e.g. "i=0005/p=p2" and "i=05/p=p2")."""
+    self.client.set_configuration(vector.get_value('exec_option'))
     TBL_NAME = "test_recover_partitions"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
@@ -261,6 +265,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
   @SkipIfCatalogV2.impala_8489()
   def test_post_invalidate(self, vector, unique_database):
     """Test that RECOVER PARTITIONS works correctly after invalidate."""
+    self.client.set_configuration(vector.get_value('exec_option'))
     TBL_NAME = "test_recover_partitions"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
@@ -297,6 +302,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
   @SkipIfLocal.hdfs_client
   def test_support_all_types(self, vector, unique_database):
     """Test that RECOVER PARTITIONS works correctly on all supported data types."""
+    self.client.set_configuration(vector.get_value('exec_option'))
     TBL_NAME = "test_recover_partitions"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
@@ -344,6 +350,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
   def test_encoded_partition(self, vector, unique_database):
     """IMPALA-6619: Test that RECOVER PARTITIONS does not create unnecessary partitions
        when dealing with URL encoded partition value."""
+    self.client.set_configuration(vector.get_value('exec_option'))
     TBL_NAME = "test_encoded_partition"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
 
@@ -369,6 +376,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
   def test_unescaped_string_partition(self, vector, unique_database):
     """IMPALA-7784: Test that RECOVER PARTITIONS correctly parses unescaped string
        values"""
+    self.client.set_configuration(vector.get_value('exec_option'))
     tbl_name = "test_unescaped_string_partition"
     fq_tbl_name = unique_database + "." + tbl_name
     tbl_location = self.__get_fs_location(unique_database, tbl_name)
@@ -403,7 +411,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     # Adds partition directories.
     num_partitions = 10
     for i in range(1, num_partitions):
-        PART_DIR = "i=%d/s=part%d" % (i,i)
+        PART_DIR = "i=%d/s=part%d" % (i, i)
         self.filesystem_client.make_dir(TBL_LOCATION + PART_DIR)
 
     # Adds a duplicate directory name.
@@ -429,7 +437,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
        for S3, so enforcing a non-empty directory is less error prone across
        filesystems."""
     partition_dir = os.path.join(root_path, new_dir)
-    self.filesystem_client.make_dir(partition_dir);
+    self.filesystem_client.make_dir(partition_dir)
     self.filesystem_client.create_file(os.path.join(partition_dir, new_file),
                                        value)
 
