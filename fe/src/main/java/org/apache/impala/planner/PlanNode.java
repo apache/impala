@@ -165,6 +165,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Set in computeStats().
   protected float rowPadSize_;
 
+  // Row size without varlen data.
+  protected long getFixedLenRowSize_;
+
   // If true, disable codegen for this plan node.
   protected boolean disableCodegen_;
 
@@ -258,6 +261,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public float getAvgRowSizeWithoutPad() {
     return Math.max(0.0F, avgRowSize_ - rowPadSize_);
   }
+  public long getFixedLenRowSize() { return getFixedLenRowSize_; }
+
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
   public List<Expr> getConjuncts() { return conjuncts_; }
@@ -719,10 +724,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void computeStats(Analyzer analyzer) {
     avgRowSize_ = 0.0F;
     rowPadSize_ = 0.0F;
+    getFixedLenRowSize_ = 0;
     for (TupleId tid: tupleIds_) {
       TupleDescriptor desc = analyzer.getTupleDesc(tid);
       avgRowSize_ += desc.getAvgSerializedSize();
       rowPadSize_ += desc.getSerializedPadSize();
+      getFixedLenRowSize_ += desc.getByteSize();
     }
     if (!children_.isEmpty()) {
       numNodes_ = getChild(0).numNodes_;

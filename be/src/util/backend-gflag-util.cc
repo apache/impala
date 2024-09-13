@@ -274,6 +274,11 @@ DEFINE_double_hidden(query_cpu_root_factor, 1.5,
     "(Advance) The Nth root value to control sublinear scale down of unbounded "
     "cpu requirement for executor group set selection.");
 
+DEFINE_int64_hidden(data_stream_sender_buffer_size_used_by_planner, -1,
+    "Similar to data_stream_sender_buffer_size but used during planning."
+    "With default -1 the planner uses the old logic that is different"
+    "than how the backend actually works (see IMPALA-12594)");
+
 using strings::Substitute;
 
 namespace impala {
@@ -490,6 +495,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_dbcp_max_conn_pool_size(FLAGS_dbcp_max_conn_pool_size);
   cfg.__set_dbcp_max_wait_millis_for_conn(FLAGS_dbcp_max_wait_millis_for_conn);
   cfg.__set_dbcp_data_source_idle_timeout(FLAGS_dbcp_data_source_idle_timeout_s);
+  cfg.__set_data_stream_sender_buffer_size_used_by_planner(
+      FLAGS_data_stream_sender_buffer_size_used_by_planner);
 #ifdef NDEBUG
   cfg.__set_is_release_build(true);
 #else

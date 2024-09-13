@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TDataStreamSink;
@@ -77,13 +78,32 @@ public class DataStreamSink extends DataSink {
    * equal to avgOutboundRowBatchSize. If outputPartiton_ is partitioned, all of the
    * channel's OutboundRowBatches are used. Otherwise, only a pair of OutboundRowBatches
    * in KrpcDataStreamSender class are used.
-   * TODO: this function can both over and under estimate the memory need
-   *       see IMPALA-12594 + IMPALA-12433
+   *
+   * Two different ways are used to calculate the number of rows sent in one
+   * OutboundRowBatch:
+   * If flag data_stream_sender_buffer_size_used_by_planner is set, it is used the
+   * way BE uses data_stream_sender_buffer_size in
+   * KrpcDataStreamSender::Channel::RowBatchCapacity().
+   * Otherwise simply batch_size is used.
+   *
+   * TODO(IMPALA-12594 + IMPALA-12433):
+   *    consider varlen size and max_row_size in BE and update planner
    */
   private long estimateOutboundRowBatchBuffers(TQueryOptions queryOptions) {
+    long beBufferBytes =
+        BackendConfig.INSTANCE.dataStreamSenderBufferSizeUsedByPlanner();
+    // Calculated the rows fitting to buffer without considering var len data
+    // similarly to KrpcDataStreamSender::Channel::RowBatchCapacity().
+    long fixedLenRowSize = exchNode_.getFixedLenRowSize();
+    if (fixedLenRowSize==0) fixedLenRowSize = 1; // avoid division by 0
+    long beRowsPerBuffer =
+        Math.max(1, (long)Math.ceil(beBufferBytes/fixedLenRowSize));
+    // Broadcast sended uses row_batch for buffer capacity.
+    boolean useBeLogic  = beBufferBytes > 0 && outputPartition_.isPartitioned();
     int numChannels =
         outputPartition_.isPartitioned() ? exchNode_.getFragment().getNumInstances() : 1;
-    long rowBatchSize = PlanNode.getRowBatchSize(queryOptions);
+    long rowBatchSize =
+        useBeLogic ?  beRowsPerBuffer : PlanNode.getRowBatchSize(queryOptions);
     long avgOutboundRowBatchSize = Math.min(
         (long) Math.ceil(rowBatchSize * ExchangeNode.getAvgSerializedRowSize(exchNode_)),
         PlanNode.ROWBATCH_MAX_MEM_USAGE);

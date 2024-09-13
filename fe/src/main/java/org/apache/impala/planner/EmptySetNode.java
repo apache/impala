@@ -44,6 +44,7 @@ public class EmptySetNode extends PlanNode {
   public void computeStats(Analyzer analyzer) {
     avgRowSize_ = 0;
     rowPadSize_ = 0;
+    getFixedLenRowSize_ = 0;
     cardinality_ = 0;
     numInstances_ = numNodes_ = 1;
   }

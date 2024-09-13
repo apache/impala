@@ -444,6 +444,10 @@ public class BackendConfig {
     return backendCfg_.iceberg_always_allow_merge_on_read_operations;
   }
 
+  public long dataStreamSenderBufferSizeUsedByPlanner() {
+    return backendCfg_.data_stream_sender_buffer_size_used_by_planner;
+  }
+
   public boolean isJsonScannerEnabled() {
     return backendCfg_.enable_json_scanner;
   }
