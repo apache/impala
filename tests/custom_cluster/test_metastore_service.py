@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import pytest
+
 from hive_metastore.ttypes import Database
 from hive_metastore.ttypes import FieldSchema
 from hive_metastore.ttypes import FindNextCompactRequest
@@ -34,6 +35,7 @@ from tests.util.event_processor_utils import EventProcessorUtils
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.filesystem_utils import IS_HDFS, IS_OZONE
+
 
 class TestMetastoreService(CustomClusterTestSuite):
     """
@@ -182,20 +184,25 @@ class TestMetastoreService(CustomClusterTestSuite):
         cols = [["c1", "int", "col 1"], ["c2", "string", "col 2"]]
         catalog_hms_client.create_table(self.__get_test_tbl(db_name, tbl_name, cols))
 
+        get_table_request = GetTableRequest()
         get_table_request.dbName = db_name
         get_table_request.tblName = tbl_name
         get_table_request.getColumnStats = True
         get_table_request.getFileMetadata = True
 
-        # Engine is not specified, this should throw an exception even if
-        # fallback_to_hms_on_errors is true.
-        expected_exception = "isGetColumnStats() is true in the request but " \
-            "engine is not specified."
+        has_default_engine = False
+        if get_table_request.engine is not None:
+          # After HIVE-27984, if engine is not specified, it defaults to 'hive'.
+          # This should not throw an exception anymore.
+          assert get_table_request.engine == "hive", \
+            "HIVE-27984: Default engine should be 'hive'. Found {} instead.".format(
+                get_table_request.engine)
+          has_default_engine = True
         try:
           catalog_hms_client.get_table_req(get_table_request)
-        except Exception as e:
-          if expected_exception is not None:
-            assert expected_exception in str(e)
+        except Exception:
+          assert not has_default_engine, \
+            "Exception is not expected for this GetTableRequest"
 
         # Set engine and request impala, this should fallback to HMS since
         # the table is not in catalog cache. File metadata should be set even if the
@@ -263,12 +270,19 @@ class TestMetastoreService(CustomClusterTestSuite):
         get_table_request.dbName = db_name
         get_table_request.tblName = tbl_name
         get_table_request.getColumnStats = True
-        # Engine is not set, this should throw an exception without falling
-        # back to HMS.
-        expected_exception_str = "Column stats are requested " \
+        if get_table_request.engine is not None:
+          # After HIVE-27984, if engine is not specified, it defaults to 'hive'.
+          # This should not throw an exception anymore.
+          assert get_table_request.engine == "hive", \
+            "HIVE-27984: Default engine should be 'hive'. Found {} instead.".format(
+                get_table_request.engine)
+        else:
+          # Before HIVE-27984, if engine is not set, this should throw an exception
+          # without falling back to HMS.
+          expected_exception_str = "Column stats are requested " \
             "but engine is not set in the request."
-        self.__call_get_table_req_expect_exception(catalog_hms_client,
-            get_table_request, expected_exception_str)
+          self.__call_get_table_req_expect_exception(
+             catalog_hms_client, get_table_request, expected_exception_str)
         # Verify DB not found exception is thrown. Engine does not matter,
         # we only return Impala table level column stats but this field is
         # required to be consistent with Hive's implementation.
@@ -1009,7 +1023,7 @@ class TestMetastoreService(CustomClusterTestSuite):
             compactRequest = FindNextCompactRequest()
             compactRequest.workerId = "myworker"
             compactRequest.workerVersion = "4.0.0"
-            optionalCi = catalog_hms_client.find_next_compact2(compactRequest)
+            catalog_hms_client.find_next_compact2(compactRequest)
             # If the above call is successful then find_next_compact2 api is reachable.
             # Test 2: verify add_write_notification_log_in_batch api in HMS
             rqstList = list()
@@ -1055,75 +1069,6 @@ class TestMetastoreService(CustomClusterTestSuite):
       self.run_stmt_in_hive(
         "create table default.{0} (c1 int)"
           .format(TestMetastoreService.default_unknowntbl))
-
-    @classmethod
-    def __run_get_table_tests(cls, catalog_hms_client, db_name, tbl_name,
-                              fallback_expected=False):
-      """
-      Issues get_table_req for various cases and validates the response.
-      """
-      # Test simple get_table_req without stats.
-      get_table_request = GetTableRequest()
-      get_table_request.dbName = db_name
-      get_table_request.tblName = tbl_name
-      get_table_response = catalog_hms_client.get_table_req(get_table_request)
-      assert get_table_response.table.dbName == db_name
-      assert get_table_response.table.tableName == tbl_name
-      # Request did not ask for stats, verify colStats are not populated.
-      assert get_table_response.table.colStats is None
-
-      # Test get_table_request with stats and engine set to Impala.
-      get_table_request.getColumnStats = True
-      get_table_request.engine = "impala"
-      get_table_response = catalog_hms_client.get_table_req(get_table_request)
-      assert get_table_response.table.dbName == db_name
-      assert get_table_response.table.tableName == tbl_name
-      assert get_table_response.table.colStats is not None
-      # Verify the column stats objects are populated for
-      # non-clustering columns.
-      assert len(get_table_response.table.colStats.statsObj) > 0
-
-      # We only return Impala table level column stats but engine field is
-      # required to be consistent with Hive's implementation.
-      get_table_request.engine = "hive"
-      get_table_response = catalog_hms_client.get_table_req(get_table_request)
-      assert get_table_response.table.dbName == db_name
-      assert get_table_response.table.tableName == tbl_name
-      assert get_table_response.table.colStats is not None
-      # Verify the column stats objects are populated for
-      # non-clustering columns.
-      assert len(get_table_response.table.colStats.statsObj) > 0
-
-      # request for tables which are unknown to catalogd should fallback to HMS
-      # if fallback_expected if True
-      get_table_request.dbName = TestMetastoreService.test_db_name
-      get_table_request.tblName = TestMetastoreService.unpart_tbl
-      get_table_request.getColumnStats = True
-
-      # Engine is not specified, this should throw an exception even if
-      # fallback_to_hms_on_errors is true.
-      expected_exception = "isGetColumnStats() is true in the request but " \
-                           "engine is not specified."
-      try:
-        catalog_hms_client.get_table_req(get_table_request)
-      except Exception as e:
-        if expected_exception is not None:
-          assert expected_exception in str(e)
-
-      # Set engine and request impala, this should fallback to HMS since
-      # the table is not in catalog cache.
-      get_table_request.engine = "Impala"
-      if fallback_expected:
-        get_table_response = catalog_hms_client.get_table_req(get_table_request)
-        assert get_table_response.table.dbName == db_name
-        assert get_table_response.table.tableName == tbl_name
-      else:
-        expected_exception = None
-        try:
-          catalog_hms_client.get_table_req(get_table_request)
-        except Exception as e:
-          expected_exception = e
-        assert expected_exception is not None
 
     def __run_partitions_by_names_tests(self, catalog_hms_client, db_name, tbl_name,
                                         valid_part_names, expect_fallback=False):
