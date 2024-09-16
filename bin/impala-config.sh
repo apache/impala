@@ -646,7 +646,7 @@ else
   export HIVE_HOME=${HIVE_HOME_OVERRIDE:-\
 "$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"}
   export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-\
-"${CDP_COMPONENTS_HOME}/hive-${IMPALA_HIVE_VERSION}"}
+"${CDP_COMPONENTS_HOME}/apache-hive-${IMPALA_HIVE_VERSION}-src"}
   # Previously, there were multiple configurations and the "_cdp" included below
   # allowed the two to be distinct. We keep this "_cdp" for historical reasons.
   export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_DB_UID)_cdp"}
