@@ -4,12 +4,12 @@
 # it hits the memory limit in the exchange node when allocating receiver-side
 # buffers. It's also possible but less likely that this will hit a memory limit
 # in the scan nodes.
-# IMPALA-9355: An exchange node does not set a memory limit for buffer pool. To
-# hit the memory limit exceeding error reliably, the memory limit for the entire query
-# has to be set to a value less than 171520k (167.5Mb) which is the minimum for the query
-# to be accepted after the result spooling is enabled by default. Disable result spooling
-# here by setting spool_query_results to false, and set the query memory limit to 164Mb.
-set mem_limit=164m;
+# IMPALA-13390: Several improvements have been made in exchange node memory estimate and
+# usage. To hit the memory limit exceeding error reliably, the memory limit for the
+# entire query has to be set to 156MB, the minimum memory needed to pass admission
+# control without result spooling. Disable result spooling here by setting
+# spool_query_results to false and set the query memory limit to 156MB.
+set mem_limit=156m;
 set spool_query_results=false;
 set num_scanner_threads=1;
 select *
