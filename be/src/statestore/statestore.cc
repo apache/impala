@@ -180,6 +180,8 @@ const string STATESTORE_ID = "STATESTORE";
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
 const string STATESTORE_LIVE_SUBSCRIBERS = "statestore.live-backends";
 const string STATESTORE_LIVE_SUBSCRIBERS_LIST = "statestore.live-backends.list";
+const string STATESTORE_SUBSCRIBERS_RECEIVED_HEARTBEAT =
+    "statestore.subscribers-received-heartbeat";
 const string STATESTORE_TOTAL_KEY_SIZE_BYTES = "statestore.total-key-size-bytes";
 const string STATESTORE_TOTAL_VALUE_SIZE_BYTES = "statestore.total-value-size-bytes";
 const string STATESTORE_TOTAL_TOPIC_SIZE_BYTES = "statestore.total-topic-size-bytes";
@@ -566,7 +568,7 @@ Statestore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
   LOG(INFO) << "Subscriber '" << subscriber_id_
             << "' with type " << SubscriberTypeToString(subscriber_type_)
             << " registered (registration id: " << PrintId(registration_id_) << ")";
-  RefreshLastHeartbeatTimestamp();
+  RefreshLastHeartbeatTimestamp(false);
   for (const TTopicRegistration& topic : subscribed_topics) {
     GetTopicsMapForId(topic.topic_name)
         ->emplace(piecewise_construct, forward_as_tuple(topic.topic_name),
@@ -644,9 +646,10 @@ void Statestore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_i
   topic_it->second.last_version.Store(version);
 }
 
-void Statestore::Subscriber::RefreshLastHeartbeatTimestamp() {
+void Statestore::Subscriber::RefreshLastHeartbeatTimestamp(bool received_heartbeat) {
   DCHECK_GE(MonotonicMillis(), last_heartbeat_ts_.Load());
   last_heartbeat_ts_.Store(MonotonicMillis());
+  if (received_heartbeat) received_heartbeat_.Store(true);
 }
 
 void Statestore::Subscriber::UpdateCatalogInfo(
@@ -701,6 +704,8 @@ Statestore::Statestore(MetricGroup* metrics)
   num_subscribers_metric_ = metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0);
   subscriber_set_metric_ = SetMetric<string>::CreateAndRegister(metrics,
       STATESTORE_LIVE_SUBSCRIBERS_LIST, set<string>());
+  num_subscribers_received_heartbeat_metric_ =
+      metrics->AddGauge(STATESTORE_SUBSCRIBERS_RECEIVED_HEARTBEAT, 0);
   key_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_KEY_SIZE_BYTES, 0);
   value_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0);
   topic_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0);
@@ -1372,7 +1377,7 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
   if (is_heartbeat) {
     status = SendHeartbeat(subscriber.get());
     if (status.ok()) {
-      subscriber->RefreshLastHeartbeatTimestamp();
+      subscriber->RefreshLastHeartbeatTimestamp(true);
     } else if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
       // Add details to status to make it more useful, while preserving the stack
       status.AddDetail(Substitute(
@@ -1453,28 +1458,32 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
 [[noreturn]] void Statestore::MonitorSubscriberHeartbeat() {
   while (1) {
     int num_subscribers;
+    int num_subscribers_received_heartbeat = 0;
     vector<SubscriberId> inactive_subscribers;
     SleepForMs(FLAGS_heartbeat_monitoring_frequency_ms);
     {
       lock_guard<mutex> l(subscribers_lock_);
       num_subscribers = subscribers_.size();
       for (const auto& subscriber : subscribers_) {
-        if (subscriber.second->SecondsSinceHeartbeat()
+        if (subscriber.second->MilliSecondsSinceHeartbeat()
             > FLAGS_heartbeat_monitoring_frequency_ms) {
           inactive_subscribers.push_back(subscriber.second->id());
+        } else if (subscriber.second->receivedHeartbeat()) {
+          num_subscribers_received_heartbeat++;
         }
       }
     }
+    num_subscribers_received_heartbeat_metric_->SetValue(
+        num_subscribers_received_heartbeat);
     if (inactive_subscribers.empty()) {
-      LOG(INFO) << "All " << num_subscribers
+      LOG(INFO) << num_subscribers_received_heartbeat << "/" << num_subscribers
                 << " subscribers successfully heartbeat in the last "
                 << FLAGS_heartbeat_monitoring_frequency_ms << "ms.";
     } else {
-      int num_active_subscribers = num_subscribers - inactive_subscribers.size();
-      LOG(WARNING) << num_active_subscribers << "/" << num_subscribers
-                   << " subscribers successfully heartbeat in the last "
-                   << FLAGS_heartbeat_monitoring_frequency_ms << "ms."
-                   << " Slow subscribers: " << boost::join(inactive_subscribers, ", ");
+      LOG(INFO) << num_subscribers_received_heartbeat << "/" << num_subscribers
+                << " subscribers successfully heartbeat in the last "
+                << FLAGS_heartbeat_monitoring_frequency_ms << "ms."
+                << " Slow subscribers: " << boost::join(inactive_subscribers, ", ");
     }
   }
 }

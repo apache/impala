@@ -521,6 +521,15 @@ class Statestore : public CacheLineAligned {
       return (static_cast<double>(MonotonicMillis() - last_heartbeat_ts_.Load()))
           / 1000.0;
     }
+    /// Returns the time elapsed (in milli seconds) since the last heartbeat.
+    int64_t MilliSecondsSinceHeartbeat() const {
+      return MonotonicMillis() - last_heartbeat_ts_.Load();
+    }
+
+    /// Return true if the subscriber received heartbeat.
+    bool receivedHeartbeat() const {
+      return received_heartbeat_.Load();
+    }
 
     /// Get the Topics map that would be used to store 'topic_id'.
     const Topics& GetTopicsMapForId(const TopicId& topic_id) const {
@@ -566,7 +575,7 @@ class Statestore : public CacheLineAligned {
         TopicEntry::Version version);
 
     /// Refresh the subscriber's last heartbeat timestamp to the current monotonic time.
-    void RefreshLastHeartbeatTimestamp();
+    void RefreshLastHeartbeatTimestamp(bool received_heartbeat);
 
     /// Check if the subscriber is Catalog daemon.
     bool IsCatalogd() const {
@@ -613,6 +622,8 @@ class Statestore : public CacheLineAligned {
     /// The timestamp of the last successful heartbeat in milliseconds. A timestamp much
     /// older than the heartbeat frequency implies an unresponsive subscriber.
     AtomicInt64 last_heartbeat_ts_{0};
+    /// True if the subscriber received heartbeat.
+    AtomicBool received_heartbeat_{false};
 
     /// Lock held when adding or deleting transient entries. See class comment for lock
     /// acquisition order.
@@ -849,6 +860,7 @@ class Statestore : public CacheLineAligned {
   /// Metric that track the registered, non-failed subscribers.
   IntGauge* num_subscribers_metric_;
   SetMetric<std::string>* subscriber_set_metric_;
+  IntGauge* num_subscribers_received_heartbeat_metric_;
 
   /// Metrics shared across all topics to sum the size in bytes of keys, values and both
   IntGauge* key_size_metric_;

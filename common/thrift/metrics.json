@@ -2249,6 +2249,16 @@
     "key": "statestore.live-backends.list"
   },
   {
+    "description": "The number of Statestore subscribers received heartbeat in last monitoring interval.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Number of Statestore subscribers received heartbeat",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore.subscribers-received-heartbeat"
+  },
+  {
     "description": "The time (sec) spent sending non-priority topic update RPCs. Includes subscriber-side processing time and network transmission time.",
     "contexts": [
       "STATESTORE"

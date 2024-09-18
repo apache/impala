@@ -23,7 +23,7 @@ import time
 from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.environ import build_flavor_timeout
+from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_cluster import (
     DEFAULT_CATALOG_SERVICE_PORT, DEFAULT_STATESTORE_SERVICE_PORT)
 from tests.common.skip import SkipIfBuildType, SkipIfNotHdfsMinicluster
@@ -137,6 +137,39 @@ class TestStatestoredHA(CustomClusterTestSuite):
     finally:
       self.execute_query_expect_success(
           self.client, "drop table if exists test_statestored_ha")
+
+  # Wait for long enough for the standby statestored to detect the failure of active
+  # statestored and assign itself with active role.
+  def __wait_statestore_to_be_active(self, statestore_service, statestored_index):
+    try:
+      statestore_service.wait_for_metric_value(
+          "statestore.active-status", expected_value=True, timeout=120)
+    except Exception as e:
+      num_subscribers = statestore_service.get_metric_value("statestore.live-backends")
+      num_subscribers_received_heartbeat = statestore_service.get_metric_value(
+          "statestore.subscribers-received-heartbeat")
+      if num_subscribers_received_heartbeat >= num_subscribers / 2:
+        assert False, str(e)
+      else:
+        num_failed = num_subscribers - num_subscribers_received_heartbeat
+        assert_string = "Standby statestored failed to send heartbeats to " +\
+            "{0} out of {1} subscribers due to Thrift RPC failures".format(
+                num_failed, num_subscribers)
+        if ImpalaTestClusterProperties.get_instance().is_ubsan():
+          # IMPALA-13388: Skip this tests for UBSAN build due to Thrift RPC failures.
+          # A following up JIRA IMPALA-13399 was filed to track the very root cause.
+          # Remove this skipping when JIRA IMPALA-13399 is resolved.
+          if statestored_index == 1:
+            daemon_name = "statestored_node1"
+          else:
+            daemon_name = "statestored"
+          # Check log file of statestored that it is indeed a Thrift RPC issue by
+          # verifying existence of the log message with following pattern.
+          log_regex = "Unable to send heartbeat message to subscriber .*, received " +\
+              "error: RPC recv timed out: .*, rpc: N6impala18THeartbeatResponseE.*"
+          self.assert_log_contains(daemon_name, "INFO", log_regex, expected_count=-1)
+          pytest.skip("Skip this tests for UBSAN builds since " + assert_string)
+        assert False, assert_string
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -255,8 +288,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
 
     # Wait for long enough for the standby statestored to detect the failure of active
     # statestored and assign itself with active role.
-    statestore_service_1.wait_for_metric_value(
-        "statestore.active-status", expected_value=True, timeout=120)
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
     assert(statestore_service_1.get_metric_value("statestore.active-status"))
     sleep(1)
 
@@ -331,6 +363,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds=2",
     impalad_args="--statestore_subscriber_timeout_seconds=2",
     catalogd_args="--statestore_subscriber_timeout_seconds=2",
@@ -343,6 +376,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds=2 "
                      "--debug_actions=SEND_UPDATE_STATESTORED_RPC_FIRST_ATTEMPT:FAIL@1.0",
     impalad_args="--statestore_subscriber_timeout_seconds=2",
@@ -356,6 +390,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds=2 "
                      "--use_subscriber_id_as_catalogd_priority=true",
     impalad_args="--statestore_subscriber_timeout_seconds=2",
@@ -374,6 +409,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds=2 ",
     impalad_args="--statestore_subscriber_timeout_seconds=2",
     catalogd_args="--statestore_subscriber_timeout_seconds=2",
@@ -410,8 +446,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
 
     # Wait for long enough for the standby statestored to detect the failure of active
     # statestored and assign itself with active role.
-    statestore_service_1.wait_for_metric_value(
-        "statestore.active-status", expected_value=True, timeout=120)
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
     assert(statestore_service_1.get_metric_value("statestore.active-status"))
     sleep(1)
 
@@ -458,8 +493,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
       self.__disable_statestored_network(disable_network=True)
       # Wait for long enough for the standby statestored to detect the failure of active
       # statestored and assign itself with active role.
-      statestore_service_1.wait_for_metric_value(
-          "statestore.active-status", expected_value=True, timeout=120)
+      self.__wait_statestore_to_be_active(statestore_service_1, 1)
       assert(statestore_service_1.get_metric_value("statestore.active-status"))
       # Verify that original active statestored is in HA recovery mode and is not active.
       statestore_service_0.wait_for_metric_value(
@@ -500,6 +534,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=100 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds=2 "
                      "--debug_actions=DISABLE_STATESTORE_NETWORK",
     impalad_args="--statestore_subscriber_timeout_seconds=2",
@@ -513,6 +548,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=100 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds=2 "
                      "--debug_actions=SEND_UPDATE_STATESTORED_RPC_FIRST_ATTEMPT:FAIL@1.0",
     impalad_args="--statestore_subscriber_timeout_seconds=2",
@@ -559,6 +595,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds=2 "
                      "--debug_actions=DISABLE_STATESTORE_NETWORK",
     impalad_args="--statestore_subscriber_timeout_seconds=2",
@@ -588,8 +625,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
 
     # Wait for long enough for the standby statestored to detect the failure of active
     # statestored and assign itself with active role.
-    statestore_service_1.wait_for_metric_value(
-        "statestore.active-status", expected_value=True, timeout=120)
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
     assert(statestore_service_1.get_metric_value("statestore.active-status"))
     # Verify that original active statestored is in HA recovery mode.
     statestore_service_0.wait_for_metric_value(
@@ -645,6 +681,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
                      "--statestore_peer_timeout_seconds={timeout_s} "
                      "--use_subscriber_id_as_catalogd_priority=true"
                      .format(timeout_s=SS_PEER_TIMEOUT_S),
@@ -684,8 +721,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
       statestoreds[0].kill()
       # Wait for long enough for the standby statestored to detect the failure of active
       # statestored and assign itself in active role.
-      statestore_service_1.wait_for_metric_value(
-          "statestore.active-status", expected_value=True, timeout=120)
+      self.__wait_statestore_to_be_active(statestore_service_1, 1)
       assert (statestore_service_1.get_metric_value("statestore.active-status")), \
           "Second statestored must be active now"
       statestore_service_1.wait_for_live_subscribers(5)
