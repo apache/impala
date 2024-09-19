@@ -18,8 +18,8 @@
 package org.apache.impala.util;
 
 import org.apache.log4j.Logger;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 
 import javax.management.AttributeNotFoundException;
 import javax.management.InstanceNotFoundException;

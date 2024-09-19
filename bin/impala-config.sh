@@ -403,7 +403,7 @@ if $USE_APACHE_HIVE; then
 else
   # CDP hive version is used to build and deploy in minicluster when USE_APACHE_HIVE is
   # false
-  export IMPALA_HIVE_DIST_TYPE="hive"
+  export IMPALA_HIVE_DIST_TYPE="apache-hive"
   export IMPALA_HIVE_VERSION=${HIVE_VERSION_OVERRIDE:-"$CDP_HIVE_VERSION"}
   export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
   export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
