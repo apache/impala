@@ -127,7 +127,11 @@ else
   fi
 
   echo "Building with OPTIONS: $DESCRIPTION"
-  if ! time -p ./buildall.sh -skiptests -noclean ; then
+  # Since this is only testing the version replacements for Java, this uses -notests to
+  # skip building the backend tests. Because everything is already in ccache, building
+  # backend tests does many link invocations simultaneously and the system can run out of
+  # memory.
+  if ! time -p ./buildall.sh -notests -noclean ; then
     echo "Build failed: $DESCRIPTION"
     FAILED="${FAILED}:${DESCRIPTION}"
   fi
