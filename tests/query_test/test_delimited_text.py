@@ -20,6 +20,7 @@
 #
 
 from __future__ import absolute_import, division, print_function
+from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
@@ -77,3 +78,18 @@ class TestDelimitedText(ImpalaTestSuite):
     cleanup/setup"""
     self.run_test_case('QueryTest/delimited-latin-text', vector, unique_database,
       encoding="latin-1")
+
+  def test_large_file_of_field_delimiters(self, vector, unique_database):
+    """IMPALA-13161: Verifies reading a large file which has full of field delimiters
+       won't causing crash due to overflows"""
+    tbl = unique_database + ".tbl"
+    self.execute_query("create table {}(i int)".format(tbl))
+    table_loc = self._get_table_location(tbl, vector)
+    # Generate a 3GB data file that has full of '\x00' (the default field delimiter)
+    with open("data.txt", "wb") as f:
+      long_str = "\x00" * 1024 * 1024 * 3
+      [f.write(long_str) for i in range(1024)]
+    check_call(["hdfs", "dfs", "-put", "data.txt", table_loc])
+    self.execute_query("refresh " + tbl)
+    res = self.execute_query("select count(*) from " + tbl)
+    assert res.data == ["1"]

@@ -273,7 +273,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
-   predicates: int_col = 10, TRUE OR 10 + random() * functional.alltypes.tinyint_col = 100
+   predicates: int_col = 10
    row-size=5B cardinality=231
 ====
 # Collection predicates within HDFS scan nodes get optimized
