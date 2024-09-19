@@ -21,12 +21,10 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 import pytest
 import re
-import shutil
-import tempfile
 
 from beeswaxd.BeeswaxService import QueryState
-from tests.common.skip import SkipIfNotHdfsMinicluster
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfBuildType
+from tests.common.test_dimensions import add_mandatory_exec_option
 from time import sleep
 
 # The BE krpc port of the impalad to simulate disk errors in tests.
@@ -35,6 +33,7 @@ FAILED_KRPC_PORT = 27001
 
 def _get_disk_write_fail_action(port):
   return "IMPALA_TMP_FILE_WRITE:127.0.0.1:{port}:FAIL".format(port=port)
+
 
 # Tests that verify the behavior of the executor blacklist caused by RPC failure.
 # Coordinator adds an executor node to its blacklist if the RPC to that node failed.
@@ -201,6 +200,13 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
       pytest.skip('runs only in exhaustive')
     super(TestBlacklistFaultyDisk, cls).setup_class()
 
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestBlacklistFaultyDisk, cls).add_test_dimensions()
+    # Buffer pool limit that is low enough to force Impala to spill to disk when
+    # executing spill_query.
+    add_mandatory_exec_option(cls, 'buffer_pool_limit', '45m')
+
   # Query with order by requires spill to disk if intermediate results don't fit in mem
   spill_query = """
       select o_orderdate, o_custkey, o_comment
@@ -218,28 +224,23 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
   in_mem_query = """
       select o_orderdate, o_custkey, o_comment from tpch.orders
       """
-  # Buffer pool limit that is low enough to force Impala to spill to disk when executing
-  # spill_query.
-  buffer_pool_limit = "45m"
 
   def __generate_scratch_dir(self, num):
     result = []
     for i in range(num):
-      dir_path = tempfile.mkdtemp()
-      self.created_dirs.append(dir_path)
+      dir_path = self.make_tmp_dir('scratch_dir_{}'.format(i))
       result.append(dir_path)
-      print("Generated dir" + dir_path)
+      print("Generated dir " + dir_path)
     return result
 
   def setup_method(self, method):
     # Don't call the superclass method to prevent starting Impala before each test. In
     # this class, each test is responsible for doing that because we want to generate
     # the parameter string to start-impala-cluster in each test method.
-    self.created_dirs = []
+    pass
 
   def teardown_method(self, method):
-    for dir_path in self.created_dirs:
-      shutil.rmtree(dir_path, ignore_errors=True)
+    self.clear_tmp_dirs()
 
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
@@ -261,7 +262,6 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
         expected_count=2)
 
     # First set debug_action for query as empty.
-    vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     vector.get_value('exec_option')['debug_action'] = ''
     coord_impalad = self.cluster.get_first_impalad()
     client = coord_impalad.service.create_beeswax_client()

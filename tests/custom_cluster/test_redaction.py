@@ -21,10 +21,8 @@ import logging
 import os
 import pytest
 import re
-import shutil
 import unittest
 
-from tempfile import mkdtemp
 from time import sleep
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -32,6 +30,7 @@ from tests.common.file_utils import grep_file, assert_file_in_dir_contains,\
     assert_no_files_in_dir_contain
 
 LOG = logging.getLogger(__name__)
+
 
 # This class needs to inherit from unittest.TestCase otherwise py.test will ignore it
 # because a __init__ method is used.
@@ -75,13 +74,13 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     pass
 
   def teardown_method(self, method):
-    # Parent method would fail, nothing needs to be done. The tests are responsible
-    # for deleting self.tmp_dir after tests pass.
-    pass
+    # Parent method would fail, nothing needs to be done.
+    # Cleanup any temporary dirs.
+    self.clear_tmp_dirs()
 
   def start_cluster_using_rules(self, redaction_rules, log_level=2, vmodule=""):
     '''Start Impala with a custom log dir and redaction rules.'''
-    self.tmp_dir = mkdtemp(prefix="test_redaction_", dir=os.getenv("LOG_DIR"))
+    self.tmp_dir = self.make_tmp_dir('redaction')
     os.chmod(self.tmp_dir, 0o777)
     LOG.info("tmp_dir is " + self.tmp_dir)
     os.mkdir(self.log_dir)
@@ -176,8 +175,6 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     startup_options = dict()
     self.assert_server_fails_to_start('{ "version": 100 }', startup_options,
         'Error parsing redaction rules; only version 1 is supported')
-    # Since the tests passed, the log dir shouldn't be of interest and can be deleted.
-    shutil.rmtree(self.tmp_dir)
 
   @pytest.mark.execute_serially
   def test_very_verbose_logging(self):
@@ -202,15 +199,9 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     error_message = "Redaction cannot be used in combination with log level 3 or " \
         "higher or the -vmodule option"
     self.assert_server_fails_to_start(rules, {"log_level": 3}, error_message)
-    # Since the tests passed, the log dir shouldn't be of interest and can be deleted.
-    shutil.rmtree(self.tmp_dir)
-
     self.assert_server_fails_to_start(rules, {"vmodule": "foo"}, error_message)
-    shutil.rmtree(self.tmp_dir)
-
     self.assert_server_fails_to_start(
         rules, {"log_level": 3, "vmodule": "foo"}, error_message)
-    shutil.rmtree(self.tmp_dir)
 
   @pytest.mark.execute_serially
   def test_unredacted(self):
@@ -236,10 +227,6 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     assert_file_in_dir_contains(self.audit_dir, email)
     # The profile is encoded so the email won't be found.
     assert_no_files_in_dir_contain(self.profile_dir, email)
-
-    # Since all the tests passed, the log dir shouldn't be of interest and can be
-    # deleted.
-    shutil.rmtree(self.tmp_dir)
 
   @pytest.mark.execute_serially
   def test_redacted(self):
@@ -283,7 +270,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     self.assert_query_profile_contains(self.find_last_query_id(), user_profile_pattern)
     # Wait for the logs to be written.
     sleep(5)
-    self.assert_log_redaction(email, "\*email\*")
+    self.assert_log_redaction(email, r"\*email\*")
 
     # Even if the query is invalid, redaction should still be applied.
     credit_card = '1234-5678-1234-5678'
@@ -295,13 +282,9 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     self.assert_query_profile_contains(self.find_last_query_id(), user_profile_pattern)
     sleep(5)
     # Apparently an invalid query doesn't generate an audit log entry.
-    self.assert_log_redaction(credit_card, "\*credit card\*", expect_audit=False)
+    self.assert_log_redaction(credit_card, r"\*credit card\*", expect_audit=False)
 
     # Assert that the username in the query stmt is redacted but not from the user fields.
     self.execute_query_expect_success(self.client, query_template % current_user)
     self.assert_query_profile_contains(self.find_last_query_id(), user_profile_pattern)
     self.assert_query_profile_contains(self.find_last_query_id(), "redacted user")
-
-    # Since all the tests passed, the log dir shouldn't be of interest and can be
-    # deleted.
-    shutil.rmtree(self.tmp_dir)

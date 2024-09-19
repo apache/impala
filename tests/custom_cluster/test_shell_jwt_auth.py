@@ -18,7 +18,6 @@
 from __future__ import absolute_import, division, print_function
 import os
 import pytest
-import tempfile
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import create_client_protocol_http_transport
@@ -39,15 +38,15 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
   should not need to be executed again.
   """
 
-  LOG_DIR_JWT_AUTH_SUCCESS = tempfile.mkdtemp(prefix="jwt_auth_success")
-  LOG_DIR_JWT_AUTH_FAIL = tempfile.mkdtemp(prefix="jwt_auth_fail")
-  LOG_DIR_JWT_AUTH_INVALID_JWK = tempfile.mkdtemp(prefix="jwt_auth_invalid_jwk")
-
   JWKS_JWTS_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata', 'jwt')
   JWKS_JSON_PATH = os.path.join(JWKS_JWTS_DIR, 'jwks_signing.json')
   JWT_SIGNED_PATH = os.path.join(JWKS_JWTS_DIR, 'jwt_signed')
   JWT_EXPIRED_PATH = os.path.join(JWKS_JWTS_DIR, 'jwt_expired')
   JWT_INVALID_JWK = os.path.join(JWKS_JWTS_DIR, 'jwt_signed_untrusted')
+
+  IMPALAD_ARGS = ("-v 2 -jwks_file_path={0} -jwt_custom_claim_username=sub "
+                  "-jwt_token_auth=true -jwt_allow_without_tls=true "
+                  .format(JWKS_JSON_PATH))
 
   @classmethod
   def get_workload(self):
@@ -61,10 +60,9 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impala_log_dir=LOG_DIR_JWT_AUTH_SUCCESS,
-    impalad_args="-v 2 -jwks_file_path={0} -jwt_custom_claim_username=sub "
-    "-jwt_token_auth=true -jwt_allow_without_tls=true"
-    .format(JWKS_JSON_PATH))
+    impalad_args=IMPALAD_ARGS,
+    impala_log_dir="{jwt_auth_success}",
+    tmp_dir_placeholders=["jwt_auth_success"])
   def test_jwt_auth_valid(self, vector):
     """Asserts the Impala shell can authenticate to Impala using JWT authentication.
     Also executes a query to ensure the authentication was successful."""
@@ -97,10 +95,9 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impala_log_dir=LOG_DIR_JWT_AUTH_FAIL,
-    impalad_args="-v 2 -jwks_file_path={0} -jwt_custom_claim_username=sub "
-    "-jwt_token_auth=true -jwt_allow_without_tls=true"
-    .format(JWKS_JSON_PATH))
+    impalad_args=IMPALAD_ARGS,
+    impala_log_dir="{jwt_auth_fail}",
+    tmp_dir_placeholders=["jwt_auth_fail"])
   def test_jwt_auth_expired(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""
@@ -137,10 +134,9 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impala_log_dir=LOG_DIR_JWT_AUTH_INVALID_JWK,
-    impalad_args="-v 2 -jwks_file_path={0} -jwt_custom_claim_username=sub "
-    "-jwt_token_auth=true -jwt_allow_without_tls=true"
-    .format(JWKS_JSON_PATH))
+    impalad_args=IMPALAD_ARGS,
+    impala_log_dir="{jwt_auth_invalid_jwk}",
+    tmp_dir_placeholders=["jwt_auth_invalid_jwk"])
   def test_jwt_auth_invalid_jwk(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""

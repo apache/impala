@@ -25,13 +25,17 @@ import os.path
 import pipes
 import pytest
 import subprocess
+
 from impala_py_lib.helpers import find_all_files, is_core_dump
 from signal import SIGRTMIN
 from subprocess import check_call
+from tests.common.file_utils import cleanup_tmp_test_dir, make_tmp_test_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import IS_LOCAL
 from time import sleep
+
+LOG = logging.getLogger(__name__)
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
 DEFAULT_CLUSTER_SIZE = 3
@@ -63,16 +67,27 @@ RESET_RANGER = 'reset_ranger'
 # this to `True` causes Impalad processes to be sent the SIGRTMIN signal at the end of the
 # test which runs the Impalad shutdown steps instead of abruptly ending the process.
 IMPALAD_GRACEFUL_SHUTDOWN = 'impalad_graceful_shutdown'
+# Decorator key to support temporary dir creation.
+TMP_DIR_PLACEHOLDERS = 'tmp_dir_placeholders'
+
+# Args that accept additional formatting to supply temporary dir path.
+ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
 
 # Run with fast topic updates by default to reduce time to first query running.
-DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
-    --statestore_priority_update_frequency_ms=50 \
-    --statestore_heartbeat_frequency_ms=50'
+DEFAULT_STATESTORE_ARGS = ('--statestore_update_frequency_ms=50 '
+                           '--statestore_priority_update_frequency_ms=50 '
+                           '--statestore_heartbeat_frequency_ms=50')
 
 
 class CustomClusterTestSuite(ImpalaTestSuite):
   """Every test in a test suite deriving from this class gets its own Impala cluster.
   Custom arguments may be passed to the cluster by using the @with_args decorator."""
+
+  # Central place to keep all temporary dirs referred by a custom cluster test method.
+  # setup_method() will populate this using make_tmp_dir(), and then teardown_method()
+  # will clean up using clear_tmp_dirs().
+  TMP_DIRS = dict()
+
   @classmethod
   def get_workload(cls):
     return 'tpch'
@@ -88,12 +103,12 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     # By default, custom cluster tests only run on text/none and with a limited set of
     # exec options. Subclasses may override this to relax these default constraints.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'none')
+        v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'none')
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('exec_option')['batch_size'] == 0 and
-        v.get_value('exec_option')['disable_codegen'] == False and
-        v.get_value('exec_option')['num_nodes'] == 0)
+        v.get_value('exec_option')['batch_size'] == 0
+        and v.get_value('exec_option')['disable_codegen'] is False
+        and v.get_value('exec_option')['num_nodes'] == 0)
 
   @classmethod
   def setup_class(cls):
@@ -117,17 +132,18 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       impala_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
-      impalad_graceful_shutdown=False):
+      impalad_graceful_shutdown=False, tmp_dir_placeholders=[]):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
       if impalad_args is not None:
         func.__dict__[IMPALAD_ARGS] = impalad_args
-      func.__dict__[STATESTORED_ARGS] = statestored_args
+      if statestored_args is not None:
+        func.__dict__[STATESTORED_ARGS] = statestored_args
       if catalogd_args is not None:
         func.__dict__[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
-        func.__dict__[START_ARGS] = start_args.split()
+        func.__dict__[START_ARGS] = start_args
       if jvm_args is not None:
         func.__dict__[JVM_ARGS] = jvm_args
       if hive_conf_dir is not None:
@@ -152,11 +168,44 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.__dict__[RESET_RANGER] = True
       if impalad_graceful_shutdown is not False:
         func.__dict__[IMPALAD_GRACEFUL_SHUTDOWN] = True
+      if tmp_dir_placeholders:
+        func.__dict__[TMP_DIR_PLACEHOLDERS] = tmp_dir_placeholders
       return func
     return decorate
 
+  def make_tmp_dir(self, name):
+    """Create a temporary directory and register it."""
+    assert name not in self.TMP_DIRS
+    self.TMP_DIRS[name] = make_tmp_test_dir(name)
+    LOG.info("Created temporary dir {}".format(self.TMP_DIRS[name]))
+    return self.TMP_DIRS[name]
+
+  def get_tmp_dir(self, name):
+    """Get the path of temporary directory that was registered with given 'name'."""
+    return self.TMP_DIRS[name]
+
+  def clear_tmp_dirs(self):
+    """Clear all temporary dirs."""
+    for tmp_dir in self.TMP_DIRS.values():
+      LOG.info("Removing temporary dir {}".format(tmp_dir))
+      cleanup_tmp_test_dir(tmp_dir)
+    self.TMP_DIRS.clear()
+
+  def clear_tmp_dir(self, name):
+    """Clear temporary dir 'name'."""
+    assert name in self.TMP_DIRS
+    LOG.info("Removing temporary dir {}".format(self.TMP_DIRS[name]))
+    cleanup_tmp_test_dir(self.TMP_DIRS[name])
+    del self.TMP_DIRS[name]
+
   def setup_method(self, method):
     cluster_args = list()
+
+    if TMP_DIR_PLACEHOLDERS in method.__dict__:
+      # Create all requested temporary dirs.
+      for name in method.__dict__[TMP_DIR_PLACEHOLDERS]:
+        self.make_tmp_dir(name)
+
     if method.__dict__.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
       # IMPALA-13051: Add faster default graceful shutdown options before processing
       # explicit args. Impala doesn't start graceful shutdown until the grace period has
@@ -166,9 +215,11 @@ class CustomClusterTestSuite(ImpalaTestSuite):
           "--impalad=--shutdown_grace_period_s=0 --shutdown_deadline_s=15")
     for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS, JVM_ARGS]:
       if arg in method.__dict__:
-        cluster_args.append("--%s=%s " % (arg, method.__dict__[arg]))
+        val = (method.__dict__[arg] if arg not in ACCEPT_FORMATTING
+               else method.__dict__[arg].format(**self.TMP_DIRS))
+        cluster_args.append("--%s=%s " % (arg, val))
     if START_ARGS in method.__dict__:
-      cluster_args.extend(method.__dict__[START_ARGS])
+      cluster_args.extend(method.__dict__[START_ARGS].split())
 
     if HIVE_CONF_DIR in method.__dict__:
       self._start_hive_service(method.__dict__[HIVE_CONF_DIR])
@@ -199,15 +250,15 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       "cluster_size": cluster_size,
       "num_coordinators": num_coordinators,
       "expected_num_impalads": cluster_size,
-      "default_query_options": method.__dict__.get(DEFAULT_QUERY_OPTIONS),
+      DEFAULT_QUERY_OPTIONS: method.__dict__.get(DEFAULT_QUERY_OPTIONS),
       "use_exclusive_coordinators": use_exclusive_coordinators
     }
     if IMPALA_LOG_DIR in method.__dict__:
-      kwargs["impala_log_dir"] = method.__dict__[IMPALA_LOG_DIR]
+      kwargs[IMPALA_LOG_DIR] = method.__dict__[IMPALA_LOG_DIR].format(**self.TMP_DIRS)
     if STATESTORED_TIMEOUT_S in method.__dict__:
-      kwargs["statestored_timeout_s"] = method.__dict__[STATESTORED_TIMEOUT_S]
+      kwargs[STATESTORED_TIMEOUT_S] = method.__dict__[STATESTORED_TIMEOUT_S]
     if IMPALAD_TIMEOUT_S in method.__dict__:
-      kwargs["impalad_timeout_s"] = method.__dict__[IMPALAD_TIMEOUT_S]
+      kwargs[IMPALAD_TIMEOUT_S] = method.__dict__[IMPALAD_TIMEOUT_S]
 
     if method.__dict__.get(EXPECT_CORES, False):
       # Make a note of any core files that already exist
@@ -231,6 +282,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       for impalad in self.cluster.impalads:
         impalad.wait_for_exit()
 
+    self.clear_tmp_dirs()
+
     if HIVE_CONF_DIR in method.__dict__:
       self._start_hive_service(None)  # Restart Hive Service using default configs
 
@@ -240,8 +293,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       post_test_cores = set([f for f in possible_cores if is_core_dump(f)])
 
       for f in (post_test_cores - self.pre_test_cores):
-        logging.info(
-            "Cleaned up {core} created by {name}".format(core=f, name=method.__name__))
+        LOG.info("Cleaned up {core} created by {name}".format(
+          core=f, name=method.__name__))
         os.remove(f)
       # Skip teardown_class as setup was skipped.
     else:
@@ -356,8 +409,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     options.append("--impalad_args=--default_query_options={0}".format(
         ','.join(["{0}={1}".format(k, v) for k, v in default_query_option_kvs])))
 
-    logging.info("Starting cluster with command: %s" %
-                 " ".join(pipes.quote(arg) for arg in cmd + options))
+    LOG.info("Starting cluster with command: %s" %
+        " ".join(pipes.quote(arg) for arg in cmd + options))
     try:
       check_call(cmd + options, close_fds=True)
     finally:

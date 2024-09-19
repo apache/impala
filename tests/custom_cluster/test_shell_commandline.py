@@ -19,7 +19,6 @@ from __future__ import absolute_import, division, print_function
 import os
 import pytest
 import re
-import tempfile
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import create_client_protocol_http_transport
@@ -33,8 +32,8 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
   in a separate process.  Assertions are done by scanning the shell output and Impala
   server logs for expected strings."""
 
-  LOG_DIR_HTTP_TRACING = tempfile.mkdtemp(prefix="http_tracing")
-  LOG_DIR_HTTP_TRACING_OFF = tempfile.mkdtemp(prefix="http_tracing_off")
+  LOG_DIR_HTTP_TRACING = "http_tracing"
+  LOG_DIR_HTTP_TRACING_OFF = "http_tracing_off"
   IMPALA_ID_RE = "([0-9a-f]{16}:[0-9a-f]{16})"
 
   @classmethod
@@ -49,7 +48,10 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_http_transport())
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("-log_dir={0} -v 2".format(LOG_DIR_HTTP_TRACING))
+  @CustomClusterTestSuite.with_args(
+      impalad_args="-v 2",
+      impala_log_dir="{" + LOG_DIR_HTTP_TRACING + "}",
+      tmp_dir_placeholders=[LOG_DIR_HTTP_TRACING])
   def test_http_tracing_headers(self, vector):
     """Asserts that tracing headers are automatically added by the impala shell to
     all calls to the backend impala engine made using the hs2 over http protocol.
@@ -84,7 +86,8 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
                                .format(TestImpalaShellCommandLine.IMPALA_ID_RE))
 
     # Find all HTTP Connection Tracing log lines.
-    with open(os.path.join(self.LOG_DIR_HTTP_TRACING, "impalad.INFO")) as log_file:
+    with open(os.path.join(
+      self.get_tmp_dir(self.LOG_DIR_HTTP_TRACING), "impalad.INFO")) as log_file:
       for line in log_file:
         if line.find("HTTP Connection Tracing Headers") > -1:
           tracing_lines_count += 1
@@ -149,7 +152,10 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
       pytest.fail("did not find Impala query id in shell stdout")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("-log_dir={0} -v 2".format(LOG_DIR_HTTP_TRACING_OFF))
+  @CustomClusterTestSuite.with_args(
+      impalad_args="-v 2",
+      impala_log_dir="{" + LOG_DIR_HTTP_TRACING_OFF + "}",
+      tmp_dir_placeholders=[LOG_DIR_HTTP_TRACING_OFF])
   def test_http_tracing_headers_off(self, vector):
     """Asserts the impala shell command line parameter to prevent the addition of http
     tracing headers actually leaves out those tracing headers."""
@@ -167,7 +173,8 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
     assert result.stdout.find("Query Runtime Profile") > -1
 
     # Find all HTTP Connection Tracing log lines (there should not be any).
-    with open(os.path.join(self.LOG_DIR_HTTP_TRACING_OFF, "impalad.INFO")) as log_file:
+    with open(os.path.join(
+      self.get_tmp_dir(self.LOG_DIR_HTTP_TRACING_OFF), "impalad.INFO")) as log_file:
       for line in log_file:
         if line.find("HTTP Connection Tracing Headers") != -1:
           pytest.fail("found HTTP connection tracing line line: {0}".format(line))

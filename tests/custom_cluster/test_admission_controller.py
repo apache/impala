@@ -33,7 +33,11 @@ from time import sleep, time
 from beeswaxd.BeeswaxService import QueryState
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.custom_cluster_test_suite import (
+    ADMISSIOND_ARGS,
+    IMPALAD_ARGS,
+    START_ARGS,
+    CustomClusterTestSuite)
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
@@ -1632,11 +1636,12 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
 
-    if 'start_args' not in method.__dict__:
-      method.__dict__['start_args'] = list()
-    method.__dict__["start_args"].append("--enable_admission_service")
-    if "impalad_args" in method.__dict__:
-      method.__dict__["admissiond_args"] = method.__dict__["impalad_args"]
+    start_args = "--enable_admission_service"
+    if START_ARGS in method.__dict__:
+      start_args = method.__dict__[START_ARGS] + " " + start_args
+    method.__dict__[START_ARGS] = start_args
+    if IMPALAD_ARGS in method.__dict__:
+      method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
     super(TestAdmissionController, self).setup_method(method)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
@@ -2396,9 +2401,11 @@ class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
   def setup_method(self, method):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
-    if 'start_args' not in method.__dict__:
-      method.__dict__['start_args'] = list()
-    method.__dict__["start_args"].append("--enable_admission_service")
-    if "impalad_args" in method.__dict__:
-      method.__dict__["admissiond_args"] = method.__dict__["impalad_args"]
+
+    start_args = "--enable_admission_service"
+    if START_ARGS in method.__dict__:
+      start_args = method.__dict__[START_ARGS] + " " + start_args
+    method.__dict__[START_ARGS] = start_args
+    if IMPALAD_ARGS in method.__dict__:
+      method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
     super(TestAdmissionControllerStress, self).setup_method(method)

@@ -19,7 +19,6 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import string
-import tempfile
 
 from getpass import getuser
 from ImpalaService import ImpalaHiveServer2Service
@@ -86,9 +85,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
   def get_workload(self):
     return 'functional-query'
 
-  CACHE_DIR = tempfile.mkdtemp(prefix="cache_dir")
   MAX_SQL_PLAN_LEN = 2000
-  LOG_DIR_MAX_WRITES = tempfile.mkdtemp(prefix="max_writes")
+  LOG_DIR_MAX_WRITES = 'max_attempts_exceeded'
   FLUSH_MAX_RECORDS_CLUSTER_ID = "test_query_log_max_records_" + str(int(time()))
   FLUSH_MAX_RECORDS_QUERY_COUNT = 30
 
@@ -211,10 +209,11 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                                  "--query_log_write_interval_s=1 "
                                                  "--cluster_id=test_query_hist_2 "
                                                  "--always_use_data_cache "
-                                                 "--data_cache={0}:5GB".format(CACHE_DIR),
+                                                 "--data_cache={query_data_cache}:5GB",
                                     catalogd_args="--enable_workload_mgmt",
                                     impalad_graceful_shutdown=True,
-                                    cluster_size=1)
+                                    cluster_size=1,
+                                    tmp_dir_placeholders=['query_data_cache'])
   def test_query_data_cache(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile. Specifically focuses on the data cache metrics."""
@@ -253,16 +252,18 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=5",
-                                    impala_log_dir=LOG_DIR_MAX_WRITES,
+                                    impala_log_dir=("{" + LOG_DIR_MAX_WRITES + "}"),
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    tmp_dir_placeholders=[LOG_DIR_MAX_WRITES])
   def test_max_attempts_exceeded(self, vector):
     """Asserts that completed queries are only attempted 3 times to be inserted into the
        completed queries table. This test deletes the completed queries table thus it must
        not come last otherwise the table stays deleted. Subsequent tests will re-create
        the table."""
 
-    print("USING LOG DIRECTORY: {0}".format(self.LOG_DIR_MAX_WRITES))
+    log_dir = self.get_tmp_dir(self.LOG_DIR_MAX_WRITES)
+    print("USING LOG DIRECTORY: {0}".format(log_dir))
 
     impalad = self.cluster.get_first_impalad()
     client = self.get_client(vector.get_value('protocol'))
@@ -279,7 +280,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     # Allow time for logs to be written to disk.
     sleep(5)
 
-    with open(os.path.join(self.LOG_DIR_MAX_WRITES, "impalad.ERROR")) as file:
+    with open(os.path.join(log_dir, "impalad.ERROR")) as file:
       for line in file:
         if line.find('could not write completed query table="{0}" query_id="{1}"'
                           .format(self.QUERY_TBL, res.query_id)) >= 0:
@@ -1037,8 +1038,6 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
 class TestQueryLogTableBufferPool(TestQueryLogTableBase):
   """Base class for all query log tests that set the buffer pool query option."""
 
-  SCRATCH_DIR = tempfile.mkdtemp(prefix="scratch_dir")
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryLogTableBufferPool, cls).add_test_dimensions()
@@ -1048,10 +1047,10 @@ class TestQueryLogTableBufferPool(TestQueryLogTableBase):
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1 "
                                                  "--cluster_id=test_query_hist_1 "
-                                                 "--scratch_dirs={0}:5G"
-                                                 .format(SCRATCH_DIR),
+                                                 "--scratch_dirs={scratch_dir}:5G",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    tmp_dir_placeholders=['scratch_dir'])
   def test_select(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile. If the buffer_pool_limit parameter is not None, then this test

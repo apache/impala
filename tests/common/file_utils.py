@@ -22,6 +22,7 @@
 from __future__ import absolute_import, division, print_function
 import os
 import re
+import shutil
 import tempfile
 from subprocess import check_call
 
@@ -70,6 +71,7 @@ def create_iceberg_table_from_directory(impala_client, unique_database, table_na
   # Automatic clean up after drop table
   impala_client.execute("""alter table {0} set tblproperties ('external.table.purge'=
                         'True');""".format(qualified_table_name))
+
 
 def create_table_from_parquet(impala_client, unique_database, table_name):
   """Utility function to create a database table from a Parquet file. A Parquet file must
@@ -176,3 +178,19 @@ def assert_no_files_in_dir_contain(dir, search):
   assert not results, \
       "%s should not have any file containing '%s' but a file was found" \
       % (dir, search)
+
+
+def make_tmp_test_dir(name):
+  """Create temporary directory with prefix 'impala_test_<name>_'.
+  Return the path of temporary directory as string. Caller is responsible to
+  clean them. If LOG_DIR env var exist, the temporary dir will be placed inside
+  LOG_DIR."""
+  # TODO: Consider using tempfile.TemporaryDirectory from python3 in the future.
+  parent_dir = os.getenv("LOG_DIR", None)
+  return tempfile.mkdtemp(prefix='impala_test_{}_'.format(name), dir=parent_dir)
+
+
+def cleanup_tmp_test_dir(dir_path):
+  """Remove temporary 'dir_path' and its content.
+  Ignore errors upon deletion."""
+  shutil.rmtree(dir_path, ignore_errors=True)

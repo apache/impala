@@ -18,17 +18,10 @@
 # Client tests for SQL statement authorization
 
 from __future__ import absolute_import, division, print_function
-import os
 import pytest
-import tempfile
-import grp
-import re
 import random
-import sys
-import subprocess
 import threading
 import time
-import urllib
 
 from getpass import getuser
 from ImpalaService import ImpalaHiveServer2Service
@@ -37,14 +30,12 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.file_utils import assert_file_in_dir_contains,\
-    assert_no_files_in_dir_contain
+from tests.common.file_utils import assert_file_in_dir_contains
 from tests.common.test_result_verifier import error_msg_equal
-from tests.common.skip import SkipIf
-
 
 PRIVILEGES = ['all', 'alter', 'drop', 'insert', 'refresh', 'select']
 ADMIN = "admin"
+
 
 class TestAuthorization(CustomClusterTestSuite):
   def setup(self):
@@ -96,10 +87,9 @@ class TestAuthorization(CustomClusterTestSuite):
     return resp
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=ignored_file",
-      impala_log_dir=tempfile.mkdtemp(prefix="test_deprecated_",
-      dir=os.getenv("LOG_DIR")))
+  @CustomClusterTestSuite.with_args(
+      "--server_name=server1 --authorization_policy_file=ignored_file",
+      impala_log_dir="{deprecated_flags}", tmp_dir_placeholders=['deprecated_flags'])
   def test_deprecated_flags(self):
     assert_file_in_dir_contains(self.impala_log_dir, "Ignoring removed flag "
                                                      "authorization_policy_file")

@@ -22,17 +22,16 @@ import os
 import psutil
 import pytest
 import shutil
-import tempfile
 import time
 from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
 from signal import SIGSEGV, SIGKILL, SIGUSR1, SIGTERM
 from subprocess import CalledProcessError
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfBuildType
 
 DAEMONS = ['impalad', 'statestored', 'catalogd']
 DAEMON_ARGS = ['impalad_args', 'state_store_args', 'catalogd_args']
+
 
 class TestBreakpadBase(CustomClusterTestSuite):
   """Base class with utility methods for all breakpad tests."""
@@ -43,14 +42,14 @@ class TestBreakpadBase(CustomClusterTestSuite):
   def setup_method(self, method):
     # Override parent
     # The temporary directory gets removed in teardown_method() after each test.
-    self.tmp_dir = tempfile.mkdtemp()
+    self.tmp_dir = self.make_tmp_dir('breakpad')
 
   def teardown_method(self, method):
     # Override parent
     # Stop the cluster to prevent future accesses to self.tmp_dir.
     self.kill_cluster(SIGKILL)
-    assert self.tmp_dir
-    shutil.rmtree(self.tmp_dir)
+    assert len(self.TMP_DIRS) > 0
+    self.clear_tmp_dirs()
 
   @classmethod
   def setup_class(cls):
@@ -259,7 +258,6 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     assert self.get_num_processes('catalogd') == 0
     assert self.get_num_processes('statestored') == 0
     assert self.count_all_minidumps() == 0
-    uid = os.getuid()
     # There should be a SIGTERM message in the log now
     # since we raised one above.
     log_str = 'Caught signal: SIGTERM. Daemon will exit.'

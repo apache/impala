@@ -19,9 +19,8 @@ from __future__ import absolute_import, division, print_function
 import logging
 import os
 import pytest
-import tempfile
+from copy import deepcopy
 from kudu.schema import INT32
-from time import sleep
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -48,9 +47,9 @@ class CustomKuduTest(CustomClusterTestSuite, KuduTestSuite):
     # 'file_format' and 'compression_codec' being "kudu" and "none" respectively will not
     # be skipped.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('exec_option')['batch_size'] == 0 and
-        v.get_value('exec_option')['disable_codegen'] is False and
-        v.get_value('exec_option')['num_nodes'] == 0)
+        v.get_value('exec_option')['batch_size'] == 0
+        and v.get_value('exec_option')['disable_codegen'] is False
+        and v.get_value('exec_option')['num_nodes'] == 0)
 
 
 class TestKuduOperations(CustomKuduTest):
@@ -67,8 +66,8 @@ class TestKuduOperations(CustomKuduTest):
     add_mandatory_exec_option(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args=\
-      "--use_local_tz_for_unix_timestamp_conversions=true")
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_tz_for_unix_timestamp_conversions=true")
   @SkipIfKudu.no_hybrid_clock()
   @SkipIfKudu.hms_integration_enabled()
   def test_local_tz_conversion_ops(self, vector, unique_database):
@@ -142,8 +141,6 @@ class TestKuduClientTimeout(CustomKuduTest):
 
 @SkipIf.is_test_jdk
 class TestKuduHMSIntegration(CustomKuduTest):
-  START_END_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="start_end_time")
-
   # TODO(IMPALA-8614): parameterize the common tests in query_test/test_kudu.py
   # to run with HMS integration enabled. Also avoid restarting Impala to reduce
   # tests time.
@@ -175,18 +172,21 @@ class TestKuduHMSIntegration(CustomKuduTest):
        with the Hive Metastore for managed tables. Increase timeout of individual Kudu
        client rpcs to avoid requests fail due to operation delay in the Hive Metastore
        for managed tables (IMPALA-8856)."""
-    vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
-    self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
+    self.run_test_case('QueryTest/kudu_create', new_vector, use_db=unique_database)
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
-  @CustomClusterTestSuite.with_args(impalad_args="-kudu_client_rpc_timeout_ms=30000 "
-                                    "--lineage_event_log_dir={0}"
-                                    .format(START_END_TIME_LINEAGE_LOG_DIR))
+  @CustomClusterTestSuite.with_args(
+      impalad_args=("-kudu_client_rpc_timeout_ms=30000 "
+        "--lineage_event_log_dir={start_end_time}"),
+      tmp_dir_placeholders=['start_end_time'])
   def test_create_kudu_tables_with_lineage_enabled(self, vector, unique_database):
     """Same as above test_create_managed_kudu_tables, but with lineage enabled."""
-    vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
-    self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database)
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
+    self.run_test_case('QueryTest/kudu_create', new_vector, use_db=unique_database)
 
   @pytest.mark.execute_serially
   def test_implicit_external_table_props(self, cursor, kudu_client):
@@ -358,6 +358,7 @@ class TestKuduHMSIntegration(CustomKuduTest):
       'QueryTest/kudu_create_table_like_table',
       vector,
       use_db=unique_database)
+
 
 class TestKuduTransactionBase(CustomClusterTestSuite):
   """

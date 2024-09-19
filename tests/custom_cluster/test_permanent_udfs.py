@@ -20,13 +20,12 @@ import glob
 import os
 import pytest
 import re
-import shutil
 
-from tempfile import mkdtemp
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.filesystem_utils import get_fs_path
+
 
 class TestUdfPersistence(CustomClusterTestSuite):
   """ Tests the behavior of UDFs and UDAs between catalog restarts. With IMPALA-1748,
@@ -36,9 +35,9 @@ class TestUdfPersistence(CustomClusterTestSuite):
   DATABASE = 'udf_permanent_test'
   JAVA_FN_TEST_DB = 'java_permanent_test'
   HIVE_IMPALA_INTEGRATION_DB = 'hive_impala_integration_db'
-  HIVE_UDF_JAR = os.getenv('DEFAULT_FS') + '/test-warehouse/hive-exec.jar';
-  JAVA_UDF_JAR = os.getenv('DEFAULT_FS') + '/test-warehouse/impala-hive-udfs.jar';
-  LOCAL_LIBRARY_DIR = mkdtemp(dir="/tmp")
+  HIVE_UDF_JAR = os.getenv('DEFAULT_FS') + '/test-warehouse/hive-exec.jar'
+  JAVA_UDF_JAR = os.getenv('DEFAULT_FS') + '/test-warehouse/impala-hive-udfs.jar'
+  LOCAL_LIBRARY_DIR = "udf_persistence"
 
   @classmethod
   def get_workload(cls):
@@ -83,13 +82,13 @@ class TestUdfPersistence(CustomClusterTestSuite):
 
   def teardown_method(self, method):
     self.__cleanup()
+    self.clear_tmp_dirs()
 
   def __cleanup(self):
     self.client.execute("DROP DATABASE IF EXISTS %s CASCADE" % self.DATABASE)
     self.client.execute("DROP DATABASE IF EXISTS %s CASCADE" % self.JAVA_FN_TEST_DB)
     self.client.execute("DROP DATABASE IF EXISTS %s CASCADE"
        % self.HIVE_IMPALA_INTEGRATION_DB)
-    shutil.rmtree(self.LOCAL_LIBRARY_DIR, ignore_errors=True)
 
   def __load_drop_functions(self, template, database, location):
     queries = template.format(database=database, location=location)
@@ -114,20 +113,20 @@ class TestUdfPersistence(CustomClusterTestSuite):
     # Make sure the pre-calculated count tallies with the number of
     # functions shown using "show [aggregate] functions" statement
     self.verify_function_count(
-            "SHOW FUNCTIONS in {0}".format(self.DATABASE), self.udf_count);
+            "SHOW FUNCTIONS in {0}".format(self.DATABASE), self.udf_count)
     self.verify_function_count(
             "SHOW AGGREGATE FUNCTIONS in {0}".format(self.DATABASE), self.uda_count)
     # invalidate metadata and make sure the count tallies
-    result = self.client.execute("INVALIDATE METADATA")
+    self.client.execute("INVALIDATE METADATA")
     self.verify_function_count(
-            "SHOW FUNCTIONS in {0}".format(self.DATABASE), self.udf_count);
+            "SHOW FUNCTIONS in {0}".format(self.DATABASE), self.udf_count)
     self.verify_function_count(
             "SHOW AGGREGATE FUNCTIONS in {0}".format(self.DATABASE), self.uda_count)
     # Restart the cluster, this triggers a full metadata reload
     self.__restart_cluster()
     # Make sure the counts of udfs and udas match post restart
     self.verify_function_count(
-            "SHOW FUNCTIONS in {0}".format(self.DATABASE), self.udf_count);
+            "SHOW FUNCTIONS in {0}".format(self.DATABASE), self.udf_count)
     self.verify_function_count(
             "SHOW AGGREGATE FUNCTIONS in {0}".format(self.DATABASE), self.uda_count)
     # Drop sample udas and verify the count matches pre and post restart
@@ -139,7 +138,6 @@ class TestUdfPersistence(CustomClusterTestSuite):
     self.__restart_cluster()
     self.verify_function_count(
             "SHOW AGGREGATE FUNCTIONS in {0}".format(self.DATABASE), 1)
-
 
   def __verify_udf_in_hive(self, udf):
     (query, result) = self.SAMPLE_JAVA_UDFS_TEST[udf]
@@ -208,7 +206,8 @@ class TestUdfPersistence(CustomClusterTestSuite):
   @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-     catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
+      catalogd_args="--local_library_dir={" + LOCAL_LIBRARY_DIR + "}",
+      tmp_dir_placeholders=[LOCAL_LIBRARY_DIR])
   def test_java_udfs_hive_integration(self):
     ''' This test checks the integration between Hive and Impala on
     CREATE FUNCTION and DROP FUNCTION statements for persistent Java UDFs.
@@ -264,12 +263,13 @@ class TestUdfPersistence(CustomClusterTestSuite):
       self.verify_function_count(
           "SHOW FUNCTIONS in {0}".format(self.HIVE_IMPALA_INTEGRATION_DB), 0)
       # Make sure we deleted all the temporary jars we copied to the local fs
-      assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
+      assert len(glob.glob(self.get_tmp_dir(self.LOCAL_LIBRARY_DIR) + "/*.jar")) == 0
 
   @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-     catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
+      catalogd_args="--local_library_dir={" + LOCAL_LIBRARY_DIR + "}",
+      tmp_dir_placeholders=[LOCAL_LIBRARY_DIR])
   def test_refresh_native(self):
     ''' This test checks that a native function is visible in Impala after a
     REFRESH FUNCTIONS command. We will add the native function through Hive
@@ -323,12 +323,13 @@ class TestUdfPersistence(CustomClusterTestSuite):
         database=self.HIVE_IMPALA_INTEGRATION_DB))
     assert result.data[0] == "10"
     # Make sure we deleted all the temporary jars we copied to the local fs
-    assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
+    assert len(glob.glob(self.get_tmp_dir(self.LOCAL_LIBRARY_DIR) + "/*.jar")) == 0
 
   @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-     catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
+      catalogd_args="--local_library_dir={" + LOCAL_LIBRARY_DIR + "}",
+      tmp_dir_placeholders=[LOCAL_LIBRARY_DIR])
   def test_refresh_replace(self):
     ''' This test checks that if we drop a function and then create a
     different function with the same name in Hive, the new function will
@@ -346,8 +347,8 @@ class TestUdfPersistence(CustomClusterTestSuite):
         database=self.HIVE_IMPALA_INTEGRATION_DB))
     result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
         database=self.HIVE_IMPALA_INTEGRATION_DB))
-    assert (result is not None and len(result.data) == 3 and
-        "test_func" in str(result.data))
+    assert (result is not None and len(result.data) == 3
+            and "test_func" in str(result.data))
     result = self.client.execute("SELECT {database}.test_func(123)".format(
         database=self.HIVE_IMPALA_INTEGRATION_DB))
     assert result.data[0] == "7B"
@@ -365,35 +366,36 @@ class TestUdfPersistence(CustomClusterTestSuite):
         database=self.HIVE_IMPALA_INTEGRATION_DB))
     result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
         database=self.HIVE_IMPALA_INTEGRATION_DB))
-    assert (result is not None and len(result.data) == 1 and
-        "test_func" in str(result.data))
+    assert (result is not None and len(result.data) == 1
+            and "test_func" in str(result.data))
     # Verify that the function has actually been updated.
     result = self.client.execute("SELECT {database}.test_func(123)".format(
         database=self.HIVE_IMPALA_INTEGRATION_DB))
     assert result.data[0] == "1111011"
     # Make sure we deleted all the temporary jars we copied to the local fs
-    assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
+    assert len(glob.glob(self.get_tmp_dir(self.LOCAL_LIBRARY_DIR) + "/*.jar")) == 0
 
   @pytest.mark.execute_serially
   def test_java_udfs_from_impala(self):
     """ This tests checks the behavior of permanent Java UDFs in Impala."""
     self.verify_function_count(
-            "SHOW FUNCTIONS in {0}".format(self.JAVA_FN_TEST_DB), 0);
+            "SHOW FUNCTIONS in {0}".format(self.JAVA_FN_TEST_DB), 0)
     # Create a non persistent Java UDF and make sure we can't create a
     # persistent Java UDF with same name
-    self.client.execute("create function %s.%s(boolean) returns boolean "\
-        "location '%s' symbol='%s'" % (self.JAVA_FN_TEST_DB, "identity",
-        self.JAVA_UDF_JAR, "org.apache.impala.TestUdf"))
+    self.client.execute("create function %s.%s(boolean) returns boolean "
+        "location '%s' symbol='%s'" % (
+          self.JAVA_FN_TEST_DB, "identity", self.JAVA_UDF_JAR,
+          "org.apache.impala.TestUdf"))
     result = self.execute_query_expect_failure(self.client,
         self.CREATE_JAVA_UDF_TEMPLATE.format(db=self.JAVA_FN_TEST_DB,
         function="identity", location=self.JAVA_UDF_JAR,
         symbol="org.apache.impala.TestUdf"))
     assert "Function already exists" in str(result)
     # Test the same with a NATIVE function
-    self.client.execute("create function {database}.identity(int) "\
+    self.client.execute("create function {database}.identity(int) "
         "returns int location '{location}' symbol='Identity'".format(
-        database=self.JAVA_FN_TEST_DB,
-        location="/test-warehouse/libTestUdfs.so"))
+          database=self.JAVA_FN_TEST_DB,
+          location="/test-warehouse/libTestUdfs.so"))
     result = self.execute_query_expect_failure(self.client,
         self.CREATE_JAVA_UDF_TEMPLATE.format(db=self.JAVA_FN_TEST_DB,
         function="identity", location=self.JAVA_UDF_JAR,
@@ -405,19 +407,19 @@ class TestUdfPersistence(CustomClusterTestSuite):
     self.client.execute(self.CREATE_JAVA_UDF_TEMPLATE.format(
         db=self.JAVA_FN_TEST_DB, function="identity_java",
         location=self.JAVA_UDF_JAR, symbol="org.apache.impala.TestUdf"))
-    result = self.execute_query_expect_failure(self.client, "create function "\
+    result = self.execute_query_expect_failure(self.client, "create function "
         "%s.%s(boolean) returns boolean location '%s' symbol='%s'" % (
-        self.JAVA_FN_TEST_DB, "identity_java", self.JAVA_UDF_JAR,
-        "org.apache.impala.TestUdf"))
+          self.JAVA_FN_TEST_DB, "identity_java", self.JAVA_UDF_JAR,
+          "org.apache.impala.TestUdf"))
     assert "Function already exists" in str(result)
-    result = self.execute_query_expect_failure(self.client, "create function "\
-        "{database}.identity_java(int) returns int location '{location}' "\
+    result = self.execute_query_expect_failure(self.client, "create function "
+        "{database}.identity_java(int) returns int location '{location}' "
         "symbol='Identity'".format(database=self.JAVA_FN_TEST_DB,
         location="/test-warehouse/libTestUdfs.so"))
     assert "Function already exists" in str(result)
     # With IF NOT EXISTS, the query shouldn't fail.
-    result = self.execute_query_expect_success(self.client, "create function "\
-        " if not exists {database}.identity_java(int) returns int location "\
+    result = self.execute_query_expect_success(self.client, "create function "
+        " if not exists {database}.identity_java(int) returns int location "
         "'{location}' symbol='Identity'".format(database=self.JAVA_FN_TEST_DB,
         location="/test-warehouse/libTestUdfs.so"))
     result = self.client.execute("SHOW FUNCTIONS in %s" % self.JAVA_FN_TEST_DB)
@@ -446,7 +448,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     # this case, identity(boolean) should be wiped out.
     self.__restart_cluster()
     self.verify_function_count(
-        "SHOW FUNCTIONS IN %s" % self.JAVA_FN_TEST_DB, function_count-1)
+        "SHOW FUNCTIONS IN %s" % self.JAVA_FN_TEST_DB, function_count - 1)
     # Dropping persisted Java UDFs with old syntax should raise an exception
     self.execute_query_expect_failure(self.client,
         "DROP FUNCTION compatibility(smallint)")
@@ -516,7 +518,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
       ('udfconv', 'org.apache.hadoop.hive.ql.udf.UDFConv'),
       ('udflike', 'org.apache.hadoop.hive.ql.udf.UDFLike'),
       ('udfsign', 'org.apache.hadoop.hive.ql.udf.UDFSign'),
-      ('udfascii','org.apache.hadoop.hive.ql.udf.UDFAscii')
+      ('udfascii', 'org.apache.hadoop.hive.ql.udf.UDFAscii')
   ]
 
   # These UDFs are available in Hive 2 but in Hive 3 are now implemented
@@ -528,15 +530,15 @@ class TestUdfPersistence(CustomClusterTestSuite):
 
   # Simple tests to verify java udfs in SAMPLE_JAVA_UDFS
   SAMPLE_JAVA_UDFS_TEST = {
-    'udfpi' : ('{db}.udfpi()', '3.141592653589793'),
-    'udfbin' : ('{db}.udfbin(123)', '1111011'),
-    'udfhex' : ('{db}.udfhex(123)', '7B'),
-    'udfconv'  : ('{db}.udfconv("100", 2, 10)', '4'),
-    'udfhour'  : ('{db}.udfhour("12:55:12")', '12'),
-    'udflike'  : ('{db}.udflike("abc", "def")', 'false'),
-    'udfsign'  : ('{db}.udfsign(0)', '0'),
-    'udfyear' : ('{db}.udfyear("1990-02-06")', '1990'),
-    'udfascii' : ('{db}.udfascii("abc")','97')
+    'udfpi': ('{db}.udfpi()', '3.141592653589793'),
+    'udfbin': ('{db}.udfbin(123)', '1111011'),
+    'udfhex': ('{db}.udfhex(123)', '7B'),
+    'udfconv': ('{db}.udfconv("100", 2, 10)', '4'),
+    'udfhour': ('{db}.udfhour("12:55:12")', '12'),
+    'udflike': ('{db}.udflike("abc", "def")', 'false'),
+    'udfsign': ('{db}.udfsign(0)', '0'),
+    'udfyear': ('{db}.udfyear("1990-02-06")', '1990'),
+    'udfascii': ('{db}.udfascii("abc")', '97')
   }
 
   CREATE_SAMPLE_UDAS_TEMPLATE = """
@@ -697,7 +699,8 @@ class TestUdfPersistence(CustomClusterTestSuite):
     location '{location}' symbol='Count' prepare_fn='CountPrepare' close_fn='CountClose';
 
     create function {database}.constant_arg(int) returns int
-    location '{location}' symbol='ConstantArg' prepare_fn='ConstantArgPrepare' close_fn='ConstantArgClose';
+    location '{location}' symbol='ConstantArg' prepare_fn='ConstantArgPrepare'
+    close_fn='ConstantArgClose';
 
     create function {database}.validate_open(int) returns boolean
     location '{location}' symbol='ValidateOpen'

@@ -18,39 +18,35 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 import os
-import grp
 import time
 import json
-import tempfile
-import shutil
 
-from getpass import getuser
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIf
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
 
-AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv("LOG_DIR"))
+AUDIT_LOG_DIR = 'audit_log_dir'
 
-RANGER_IMPALAD_ARGS = "--server-name=server1 " \
-                      "--ranger_service_type=hive " \
-                      "--ranger_app_id=impala " \
-                      "--authorization_provider=ranger " \
-                      "--abort_on_failed_audit_event=false " \
-                      "--audit_event_log_dir={0}".format(AUDIT_LOG_DIR)
-RANGER_CATALOGD_ARGS = "--server-name=server1 " \
-                       "--ranger_service_type=hive " \
-                       "--ranger_app_id=impala " \
-                       "--authorization_provider=ranger"
+RANGER_IMPALAD_ARGS = ("--server-name=server1 "
+                       "--ranger_service_type=hive "
+                       "--ranger_app_id=impala "
+                       "--authorization_provider=ranger "
+                       "--abort_on_failed_audit_event=false "
+                       "--audit_event_log_dir={" + AUDIT_LOG_DIR + "}")
+RANGER_CATALOGD_ARGS = ("--server-name=server1 "
+                        "--ranger_service_type=hive "
+                        "--ranger_app_id=impala "
+                        "--authorization_provider=ranger")
 RANGER_ADMIN_USER = "admin"
 
 
 class TestAuthorizedProxy(CustomClusterTestSuite):
-  def setup(self):
+  def setup_method(self, method):
+    super(TestAuthorizedProxy, self).setup_method(method)
     host, port = (self.cluster.impalads[0].service.hostname,
                   self.cluster.impalads[0].service.hs2_port)
     self.socket = TSocket(host, port)
@@ -59,10 +55,10 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
     self.hs2_client = ImpalaHiveServer2Service.Client(self.protocol)
 
-  def teardown(self):
+  def teardown_method(self, method):
+    super(TestAuthorizedProxy, self).teardown_method(method)
     if self.socket:
       self.socket.close()
-    shutil.rmtree(AUDIT_LOG_DIR, ignore_errors=True)
 
   def _execute_hs2_stmt(self, statement, verify=True):
     """
@@ -103,7 +99,8 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} --authorized_proxy_user_config=foo=bar;hue=non_owner "
                  .format(RANGER_IMPALAD_ARGS),
-    catalogd_args=RANGER_CATALOGD_ARGS)
+    catalogd_args=RANGER_CATALOGD_ARGS,
+    tmp_dir_placeholders=[AUDIT_LOG_DIR])
   def test_authorized_proxy_user_with_ranger(self):
     """Tests authorized proxy user with Ranger using HS2."""
     self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
@@ -115,7 +112,8 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
                  "--authorized_proxy_group_config=foo=bar;hue=non_owner "
                  "--use_customized_user_groups_mapper_for_ranger"
                  .format(RANGER_IMPALAD_ARGS),
-    catalogd_args=RANGER_CATALOGD_ARGS)
+    catalogd_args=RANGER_CATALOGD_ARGS,
+    tmp_dir_placeholders=[AUDIT_LOG_DIR])
   def test_authorized_proxy_group_with_ranger(self):
     """Tests authorized proxy group with Ranger using HS2."""
     self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
@@ -125,7 +123,8 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} --authorized_proxy_user_config=foo=bar "
                  "--authorized_proxy_group_config=foo=bar".format(RANGER_IMPALAD_ARGS),
-    catalogd_args=RANGER_CATALOGD_ARGS)
+    catalogd_args=RANGER_CATALOGD_ARGS,
+    tmp_dir_placeholders=[AUDIT_LOG_DIR])
   def test_no_matching_user_and_group_authorized_proxy_with_ranger(self):
     self._test_no_matching_user_and_group_authorized_proxy()
 
@@ -137,8 +136,8 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     resp = self.hs2_client.OpenSession(open_session_req)
     assert "User 'hue' is not authorized to delegate to 'abc'" in str(resp)
 
-  def _test_authorized_proxy_with_ranger(self, test_func, delegated_user,
-                                         delegated_to_group):
+  def _test_authorized_proxy_with_ranger(
+      self, test_func, delegated_user, delegated_to_group):
     try:
       self.session_handle = self._open_hs2(RANGER_ADMIN_USER, dict()).sessionHandle
       if not delegated_to_group:
@@ -217,14 +216,16 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     # found.
     start_time = time.time()
     while time.time() - start_time < timeout_secs:
-      for audit_file_name in os.listdir(AUDIT_LOG_DIR):
-        if self._find_matching_audit_record(audit_file_name, user, impersonator):
+      for audit_file_name in os.listdir(self.get_tmp_dir(AUDIT_LOG_DIR)):
+        if self._find_matching_audit_record(
+          audit_file_name, user, impersonator):
           return True
       time.sleep(1)
     return False
 
   def _find_matching_audit_record(self, audit_file_name, user, impersonator):
-    with open(os.path.join(AUDIT_LOG_DIR, audit_file_name)) as audit_log_file:
+    with open(
+      os.path.join(self.get_tmp_dir(AUDIT_LOG_DIR), audit_file_name)) as audit_log_file:
       for line in audit_log_file.readlines():
         json_dict = json.loads(line)
         if len(json_dict) == 0: continue

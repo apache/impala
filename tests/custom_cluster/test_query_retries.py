@@ -25,8 +25,6 @@ from __future__ import absolute_import, division, print_function
 from builtins import map, range
 import pytest
 import re
-import shutil
-import tempfile
 import time
 
 from random import randint
@@ -38,6 +36,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
 from tests.common.skip import (SkipIfEC, SkipIfBuildType, SkipIfFS,
     SkipIfNotHdfsMinicluster)
+from tests.common.test_dimensions import add_mandatory_exec_option
 
 # The BE krpc port of the impalad to simulate rpc or disk errors in tests.
 FAILED_KRPC_PORT = 27001
@@ -621,7 +620,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # PLAN_ROOT_SINK's reservation limit should be set at
     # 2 * DEFAULT_SPILLABLE_BUFFER_SIZE = 16 KB.
-    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: 16.00 KB"
+    plan_root_sink_reservation_limit = r"PLAN_ROOT_SINK[\s\S]*?ReservationLimit: 16.00 KB"
     profile = self.client.get_runtime_profile(handle)
     assert re.search(plan_root_sink_reservation_limit, profile)
 
@@ -1026,7 +1025,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   def __get_query_id_from_profile(self, profile):
     """Extracts and returns the query id of the given profile."""
-    query_id_search = re.search("Query \(id=(.*)\)", profile)
+    query_id_search = re.search(r"Query \(id=(.*)\)", profile)
     assert query_id_search, "Invalid query profile, has no query id:\n{0}".format(
         profile)
     return query_id_search.group(1)
@@ -1077,7 +1076,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   def __get_query_options(self, profile):
     """Returns the query options from the given profile."""
-    query_options_pattern = "Query Options \(set by configuration and planner\): (.*)"
+    query_options_pattern = r"Query Options \(set by configuration and planner\): (.*)"
     query_options = re.search(query_options_pattern, profile)
     assert query_options, profile
     return query_options.group(1)
@@ -1165,7 +1164,7 @@ class TestQueryRetries(CustomClusterTestSuite):
   def __exist_queries_in_web_ui_memz(self):
     memz_breakdown = self.cluster.get_first_impalad() \
       .service.get_debug_webpage_json('memz')['detailed']
-    query = re.compile("Query\([0-9a-f]{16}:[0-9a-f]{16}")
+    query = re.compile(r"Query\([0-9a-f]{16}:[0-9a-f]{16}")
     return query.search(memz_breakdown)
 
   def __validate_memz(self):
@@ -1190,33 +1189,40 @@ class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
       pytest.skip('runs only in exhaustive')
     super(TestQueryRetriesFaultyDisk, cls).setup_class()
 
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestQueryRetriesFaultyDisk, cls).add_test_dimensions()
+    # Buffer pool limit that is low enough to force Impala to spill to disk when
+    # executing spill_query.
+    add_mandatory_exec_option(cls, 'buffer_pool_limit', '45m')
+    add_mandatory_exec_option(cls, 'retry_failed_queries', True)
+    # Set debug_action to inject disk write error for spill-to-disk on impalad for
+    # which krpc port is 27001.
+    add_mandatory_exec_option(
+      cls, 'debug_action', _get_disk_fail_action(FAILED_KRPC_PORT))
+
   # Query with order by requires spill to disk if intermediate results don't fit in mem
   spill_query = """
       select o_orderdate, o_custkey, o_comment
       from tpch.orders
       order by o_orderdate
       """
-  # Buffer pool limit that is low enough to force Impala to spill to disk when executing
-  # spill_query.
-  buffer_pool_limit = "45m"
 
   def setup_method(self, method):
     # Don't call the superclass method to prevent starting Impala before each test. In
     # this class, each test is responsible for doing that because we want to generate
     # the parameter string to start-impala-cluster in each test method.
-    self.created_dirs = []
+    pass
 
   def teardown_method(self, method):
-    for dir_path in self.created_dirs:
-      shutil.rmtree(dir_path, ignore_errors=True)
+    self.clear_tmp_dirs()
 
   def __generate_scratch_dir(self, num):
     result = []
     for i in range(num):
-      dir_path = tempfile.mkdtemp()
-      self.created_dirs.append(dir_path)
+      dir_path = self.make_tmp_dir('scratch_dir_{}'.format(i))
       result.append(dir_path)
-      print("Generated dir" + dir_path)
+      print("Generated dir " + dir_path)
     return result
 
   def __validate_web_ui_state(self):
@@ -1250,12 +1256,6 @@ class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
         expected_count=1)
 
-    # Set debug_action to inject disk write error for spill-to-disk on impalad for which
-    # krpc port is 27001.
-    vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
-    vector.get_value('exec_option')['debug_action'] = \
-        _get_disk_fail_action(FAILED_KRPC_PORT)
-    vector.get_value('exec_option')['retry_failed_queries'] = "true"
     coord_impalad = self.cluster.get_first_impalad()
     client = coord_impalad.service.create_beeswax_client()
 

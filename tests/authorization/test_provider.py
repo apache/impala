@@ -19,8 +19,6 @@
 
 from __future__ import absolute_import, division, print_function
 import pytest
-import os
-import tempfile
 
 from tests.common.file_utils import assert_file_in_dir_contains
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -36,28 +34,29 @@ class TestAuthorizationProvider(CustomClusterTestSuite):
   """
 
   BAD_FLAG = "foobar"
-  LOG_DIR = tempfile.mkdtemp(prefix="test_provider_", dir=os.getenv("LOG_DIR"))
-  MINIDUMP_PATH = tempfile.mkdtemp()
+  LOG_DIR = "invalid_provider_flag"
+  MINIDUMP_PATH = "invalid_provider_flag_minidump"
 
   pre_test_cores = None
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       expect_cores=True,
-      impala_log_dir=LOG_DIR,
-      impalad_args="--minidump_path={0} "
+      impala_log_dir="{" + LOG_DIR + "}",
+      impalad_args="--minidump_path={" + MINIDUMP_PATH + "} "
                    "--server-name=server1 "
                    "--ranger_service_type=hive "
                    "--ranger_app_id=impala "
-                   "--authorization_provider={1}".format(MINIDUMP_PATH, BAD_FLAG),
-      catalogd_args="--minidump_path={0} "
+                   "--authorization_provider=" + BAD_FLAG,
+      catalogd_args="--minidump_path={" + MINIDUMP_PATH + "} "
                     "--server-name=server1 "
                     "--ranger_service_type=hive "
                     "--ranger_app_id=impala "
-                    "--authorization_provider={1}".format(MINIDUMP_PATH, BAD_FLAG))
-  def test_invalid_provider_flag(self, unique_name):
+                    "--authorization_provider=" + BAD_FLAG,
+      tmp_dir_placeholders=[LOG_DIR, MINIDUMP_PATH])
+  def test_invalid_provider_flag(self):
     # parse log file for expected exception
-    assert_file_in_dir_contains(TestAuthorizationProvider.LOG_DIR,
+    assert_file_in_dir_contains(self.get_tmp_dir(self.LOG_DIR),
                                 "InternalException: Could not parse "
                                 "authorization_provider flag: {0}"
-                                .format(TestAuthorizationProvider.BAD_FLAG))
+                                .format(self.BAD_FLAG))
