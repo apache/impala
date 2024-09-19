@@ -183,23 +183,6 @@ under the License.
     </repository>
     <repository>
       <!--
-      This is a transitive dependency from Sentry. Disable downloading snapshots from here
-      since we only want to consume actual releases and we can save Maven from reaching
-      out to this repo unnecessarily to look for snapshot versions. Sentry has been
-      removed, so this may eventually be removed.
-      -->
-      <id>glassfish-repo-archive.repo</id>
-      <name>Glassfish repository - Transitive from Sentry</name>
-      <url>https://mvnrepository.com/artifact/org.glassfish/javax.el/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-    </repository>
-    <repository>
-      <!--
       The Impala development bootstrapping depends on CDH Maven snapshots
       which transitively pull dependencies from other repositories which
       can cause the build to be non-reproducible, e.g. IMPALA-7316. This
@@ -272,20 +255,6 @@ under the License.
         <groupId>net.minidev</groupId>
         <artifactId>json-smart</artifactId>
         <version>${json-smart.version}</version>
-      </dependency>
-
-      <!--
-      Pin org.glassfish:javax.el explicitly.
-
-      HBase depends on this indirectly, and it's configured with
-      a range of versions. This causes Maven to talk to all configured
-      repositories, leading both to a lot of chattiness, and also
-      failures if one of the repositories is unavailable.
-      -->
-      <dependency>
-        <groupId>org.glassfish</groupId>
-        <artifactId>javax.el</artifactId>
-        <version>3.0.1-b08</version>
       </dependency>
 
       <dependency>
