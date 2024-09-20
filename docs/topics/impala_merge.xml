@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="merge">
+
+  <title>MERGE Statement</title>
+  <titlealts audience="PDF"><navtitle>MERGE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Ingest"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Iceberg"/>
+    </metadata>
+  </prolog>
+
+ <conbody>
+
+    <p>
+      <indexterm audience="hidden">MERGE statement</indexterm>
+      The <codeph>MERGE</codeph> statement enables conditional updates, deletes, and inserts, based on the result of a join
+      between a target and a source table. This operation is useful for applying data changes from transactional systems to
+      analytic data warehouses by merging data from two tables with similar structures.
+    </p>
+
+    <p>
+      The <codeph>MERGE</codeph> statement supports multiple <codeph>WHEN</codeph> clauses, where each clause can specify
+      actions like <codeph>UPDATE</codeph>, <codeph>DELETE</codeph>, or <codeph>INSERT</codeph>. Actions are applied based
+      on the join conditions defined between the source and target tables.
+    </p>
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>MERGE INTO <i>target_table</i> [AS <i>target_alias</i>]
+USING <i>source_expr</i> [AS <i>source_alias</i>]
+ON <i>search_condition</i>
+[WHEN MATCHED [AND <i>search_condition</i>] THEN
+  UPDATE SET <i>column1 = expression1</i>, <i>column2 = expression2</i>, ... ]
+[WHEN MATCHED [AND <i>search_condition</i>] THEN DELETE]
+[WHEN NOT MATCHED [AND <i>search_condition</i>] THEN
+  INSERT (<i>column1</i>, <i>column2</i>, ...) VALUES (<i>expression1</i>, <i>expression2</i>, ...)]</codeblock>
+
+    <p>
+      The <codeph>WHEN MATCHED</codeph> clause is executed if a row from the source table matches a row in the target table,
+      based on the <codeph>ON</codeph> condition. Within this clause, you can either <codeph>UPDATE</codeph> specific
+      columns or <codeph>DELETE</codeph> the matched rows. Multiple <codeph>WHEN MATCHED</codeph> clauses can be provided,
+      each with a different condition.
+    </p>
+
+    <p>
+      The <codeph>WHEN NOT MATCHED</codeph> clause is executed if a row from the source table has no matching row in the
+      target table. This clause typically inserts new rows into the target table.
+    </p>
+
+    <ul>
+      <li><codeph>UPDATE</codeph>: Updates specified columns of the target table for matching rows. Both source and target
+      fields can be used in the update expressions.</li>
+      <li><codeph>DELETE</codeph>: Deletes the matching rows from the target table.</li>
+      <li><codeph>INSERT</codeph>: Inserts new rows into the target table when no match is found, using values from the source table.</li>
+    </ul>
+
+    <p>
+      The <codeph>ON</codeph> clause defines the join condition between the target table and source expression, typically based
+      on primary key or unique identifier columns. The <codeph>MERGE</codeph> operation evaluates the conditions in the order
+      of the <codeph>WHEN</codeph> clauses, executing the first matching action and discarding subsequent clauses.
+    </p>
+
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+
+<codeblock>MERGE INTO customers AS c
+USING updates AS u
+ON u.customer_id = c.customer_id
+WHEN MATCHED AND c.status != 'inactive' THEN
+  UPDATE SET c.name = u.name, c.email = u.email
+WHEN MATCHED THEN DELETE
+WHEN NOT MATCHED THEN
+  INSERT (customer_id, name, email, status) VALUES (u.customer_id, u.name, u.email, 'active');</codeblock>
+    <p>
+      In this example, the <codeph>MERGE</codeph> operation updates customer information where IDs match and the customer
+      is not inactive, deletes inactive customers, and inserts new customers from the source table if no match is found.
+    </p>
+    <p>
+      The <codeph>MERGE</codeph> statement is only supported for Iceberg tables.
+    </p>
+    <p>
+      For Iceberg tables, this operation generally uses a full outer join with the <codeph>STRAIGHT_JOIN</codeph> hint
+      to combine the target and source datasets.
+    </p>
+  </conbody>
+</concept>

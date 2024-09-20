@@ -550,12 +550,40 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
           </li>
           <li>
             Updating partitioning column with non-constant expression via the UPDATE FROM statement is not allowed.
-            The upcoming MERGE statement will not have this limitation.
+            This limitation could be eliminated by using a <codeph>MERGE</codeph> statement.
           </li>
         </ul>
       </p>
       <p>
         More information about the <codeph>UPDATE</codeph> statement can be found at <xref href="impala_update.xml#update"/>.
+      </p>
+    </conbody>
+  </concept>
+
+    <concept id="iceberg_merge">
+    <title>Merging data into Iceberg tables</title>
+    <conbody>
+      <p>
+        Impala can execute MERGE statements against Iceberg tables, e.g:
+        <codeblock>
+MERGE INTO ice_t USING source ON ice_t.a = source.id WHEN NOT MATCHED THEN INSERT VALUES(id, source.column1);
+MERGE INTO ice_t USING source ON ice_t.a = source.id WHEN MATCHED THEN DELETE;
+MERGE INTO ice_t USING source ON ice_t.a = source.id WHEN MATCHED THEN UPDATE SET b = source.b;
+MERGE INTO ice_t USING source ON ice_t.a = source.id
+  WHEN MATCHED AND ice_t.a &lt; 100 THEN UPDATE SET b = source.b
+  WHEN MATCHED THEN DELETE
+  WHEN NOT MATCHED THEN INSERT VALUES(id, source.column1);
+        </codeblock>
+      </p>
+      <p>
+        The limitations of the <codeph>UPDATE</codeph> statement also apply to the <codeph>MERGE</codeph> statement; in addition,
+        the limitations of the <codeph>MERGE</codeph> statement:
+        <ul>
+          <li>Subqueries in source statements must be simple queries as internal rewrite is not supported.</li>
+        </ul>
+      </p>
+      <p>
+        More information about the <codeph>MERGE</codeph> statement can be found at <xref href="impala_merge.xml"/>.
       </p>
     </conbody>
   </concept>

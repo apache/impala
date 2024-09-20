@@ -157,6 +157,7 @@ under the License.
       <topicref href="topics/impala_insert.xml"/>
       <topicref href="topics/impala_invalidate_metadata.xml"/>
       <topicref href="topics/impala_load_data.xml"/>
+      <topicref href="topics/impala_merge.xml"/>
       <topicref href="topics/impala_refresh.xml"/>
       <topicref href="topics/impala_refresh_authorization.xml"/>
       <topicref href="topics/impala_refresh_functions.xml"/>
@@ -304,7 +305,6 @@ under the License.
     <topicref href="topics/impala_porting.xml"/>
     <topicref href="topics/impala_utf_8.xml"/>
   </topicref>
-  
   <topicref href="topics/impala_performance.xml">
     <topicref href="topics/impala_perf_cookbook.xml"/>
     <topicref href="topics/impala_perf_joins.xml"/>
