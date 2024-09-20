@@ -46,8 +46,8 @@ CONFIGS=(
   "-skiptests -noclean -tsan"
   "-skiptests -noclean -ubsan -so -ninja"
   # USE_APACHE_HIVE=true build:
-  "-skiptests -noclean -use_apache_hive"
-  "-notests -noclean -use_apache_hive -package"
+  "-skiptests -noclean -use_apache_components"
+  "-notests -noclean -use_apache_components -package"
 )
 
 FAILED=""
@@ -67,14 +67,14 @@ function onexit {
 trap onexit EXIT
 
 for CONFIG in "${CONFIGS[@]}"; do
-  CONFIG2=${CONFIG/-use_apache_hive/}
+  CONFIG2=${CONFIG/-use_apache_components/}
   if [[ "$CONFIG" != "$CONFIG2" ]]; then
     CONFIG=$CONFIG2
-    export USE_APACHE_HIVE=true
+    export USE_APACHE_COMPONENTS=true
   else
-    export USE_APACHE_HIVE=false
+    export USE_APACHE_COMPONENTS=false
   fi
-  DESCRIPTION="Options $CONFIG USE_APACHE_HIVE=$USE_APACHE_HIVE"
+  DESCRIPTION="Options $CONFIG USE_APACHE_COMPONENTS=$USE_APACHE_COMPONENTS"
 
   if [[ $# == 1 && $1 == "--dryrun" ]]; then
     echo $DESCRIPTION
