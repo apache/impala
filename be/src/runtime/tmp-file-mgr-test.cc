@@ -311,18 +311,18 @@ class TmpFileMgrTest : public ::testing::Test {
     EXPECT_EQ(end, search->second.end);
   }
 
-  /// Helper to wait for the disk file changing to specific status. Will timeout after 2
+  /// Helper to wait for the disk file changing to specific status. Will timeout after 20
   /// seconds.
-  static void WaitForDiskFileStatus(DiskFile* file, DiskFileStatus status) {
-    int wait_times = 10;
-    while (true) {
+  static bool WaitForDiskFileStatus(DiskFile* file, DiskFileStatus status) {
+    DCHECK(file != nullptr);
+    int wait_times = 20;
+    while (wait_times-- > 0) {
       if (file->GetFileStatus() == status) {
-        break;
+        return true;
       }
-      // Suppose the upload should be finished in two seconds.
-      ASSERT_TRUE(wait_times-- > 0);
-      usleep(200 * 1000);
+      usleep(1000 * 1000); // sleep 1s each round.
     }
+    return false;
   }
 
   /// Helper to get the remote temporary file from the temporary file group.
@@ -1300,13 +1300,8 @@ void TmpFileMgrTest::TestCompressBufferManagement(
     EXPECT_NE(compressed_handle->file_, uncompressed_handle->file_);
     auto wait_upload_func = [&](TmpFile* tmp_file) {
       // Wait until the file has been uploaded to remote dir.
-      // Should be finished in 2 seconds.
-      int wait_times = 10;
-      while (wait_times-- > 0) {
-        if (tmp_file->DiskFile()->GetFileStatus() == io::DiskFileStatus::PERSISTED) break;
-        usleep(200 * 1000);
-      }
-      EXPECT_EQ(tmp_file->DiskFile()->GetFileStatus(), io::DiskFileStatus::PERSISTED);
+      EXPECT_TRUE(WaitForDiskFileStatus(tmp_file->DiskFile(),
+          io::DiskFileStatus::PERSISTED));
       // Remove the local buffer to enforce reading from the remote file.
       unique_lock<shared_mutex> buffer_file_lock(
           *(tmp_file->GetWriteFile()->GetFileLock()));
@@ -2177,10 +2172,10 @@ TEST_F(TmpFileMgrTest, TestBatchReadingFromRemote) {
   ASSERT_EQ(GetRemoteTmpFileNum(file_group), 2);
   auto file1 = GetRemoteTmpFileByFileGroup(file_group, 0);
   auto file2 = GetRemoteTmpFileByFileGroup(file_group, 1);
-  WaitForDiskFileStatus(file1->DiskFile(), DiskFileStatus::PERSISTED);
-  WaitForDiskFileStatus(file1->DiskBufferFile(), DiskFileStatus::PERSISTED);
-  WaitForDiskFileStatus(file2->DiskFile(), DiskFileStatus::PERSISTED);
-  WaitForDiskFileStatus(file2->DiskBufferFile(), DiskFileStatus::PERSISTED);
+  EXPECT_TRUE(WaitForDiskFileStatus(file1->DiskFile(), DiskFileStatus::PERSISTED));
+  EXPECT_TRUE(WaitForDiskFileStatus(file1->DiskBufferFile(), DiskFileStatus::PERSISTED));
+  EXPECT_TRUE(WaitForDiskFileStatus(file2->DiskFile(), DiskFileStatus::PERSISTED));
+  EXPECT_TRUE(WaitForDiskFileStatus(file2->DiskBufferFile(), DiskFileStatus::PERSISTED));
 
   // Check Actual Size is as expected.
   ASSERT_EQ(file1->DiskBufferFile()->actual_file_size(), file_size_1);

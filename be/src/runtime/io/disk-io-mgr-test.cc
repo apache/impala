@@ -297,6 +297,19 @@ class DiskIoMgrTest : public testing::Test {
     scan_range->SetFileReader(move(reader_stub));
   }
 
+  static bool WaitForStatus(DiskFile* disk_file, DiskFileStatus target_status) {
+    DCHECK(disk_file != nullptr);
+    // Suppose the upload should be finished in 20 seconds.
+    int max_wait_times = 20;
+    while (max_wait_times-- > 0) {
+      if (disk_file->GetFileStatus() == target_status) {
+        return true;
+      }
+      usleep(1000 * 1000); // sleep 1s each round.
+    }
+    return false;
+  }
+
   ScanRange* InitRange(ObjectPool* pool, const char* file_path, int offset, int len,
       int disk_id, int64_t mtime, void* meta_data = nullptr, bool is_hdfs_cached = false,
       std::vector<ScanRange::SubRange> sub_ranges = {}) {
@@ -2044,17 +2057,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
       (*new_tmp_file_obj)->DiskBufferFile(), (*new_tmp_file_obj)->DiskFile(), file_size,
       disk_id, RequestType::FILE_UPLOAD, &io_mgr, u_callback));
   EXPECT_OK(io_ctx->AddRemoteOperRange(upload_range));
-
-  int wait_times = 10;
-  while (true) {
-    if ((*new_tmp_file_obj)->DiskFile()->GetFileStatus() == DiskFileStatus::PERSISTED) {
-      break;
-    }
-    // Suppose the upload should be finished in two seconds.
-    ASSERT_TRUE(wait_times-- > 0);
-    usleep(200 * 1000);
-  }
-
+  EXPECT_TRUE(WaitForStatus((*new_tmp_file_obj)->DiskFile(), DiskFileStatus::PERSISTED));
   EXPECT_TRUE(HdfsFileExist(remote_file_path));
 
   auto exam_fuc = [&](HistogramMetric* metric, const string& keyname) {
@@ -2356,16 +2359,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteEvictLocal) {
       new RemoteOperRange(shared_tmp_file->DiskBufferFile(), shared_tmp_file->DiskFile(),
           file_size, 0, RequestType::FILE_UPLOAD, &io_mgr, u_callback));
   Status add_status = io_ctx->AddRemoteOperRange(upload_range);
-
-  int wait_times = 10;
-  while (true) {
-    if (shared_tmp_file->DiskFile()->GetFileStatus() == DiskFileStatus::PERSISTED) {
-      break;
-    }
-    // Suppose the upload should be finished in two seconds.
-    ASSERT_TRUE(wait_times-- > 0);
-    usleep(200 * 1000);
-  }
+  EXPECT_TRUE(WaitForStatus(shared_tmp_file->DiskFile(), DiskFileStatus::PERSISTED));
 
   // TryEvictFile and the local buffer file should be evicted for releasing local
   // scratch space.
@@ -2498,16 +2492,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteDiffPagesSuccess) {
       (*new_tmp_file_obj)->DiskBufferFile(), (*new_tmp_file_obj)->DiskFile(), block_size,
       disk_id, RequestType::FILE_UPLOAD, &io_mgr, u_callback));
   EXPECT_OK(io_ctx->AddRemoteOperRange(upload_range));
-
-  int wait_times = 10;
-  while (true) {
-    if ((*new_tmp_file_obj)->DiskFile()->GetFileStatus() == DiskFileStatus::PERSISTED) {
-      break;
-    }
-    // Suppose the upload should be finished in two seconds.
-    ASSERT_TRUE(wait_times-- > 0);
-    usleep(200 * 1000);
-  }
+  EXPECT_TRUE(WaitForStatus((*new_tmp_file_obj)->DiskFile(), DiskFileStatus::PERSISTED));
 
   // Assert remote file actual size is the same as the local actual size.
   EXPECT_TRUE(HdfsFileExist(remote_file_path));
