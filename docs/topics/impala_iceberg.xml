@@ -490,8 +490,40 @@ DELETE FROM ice_t where i = 3;
     </conbody>
   </concept>
 
+  <concept id="iceberg_drop_partition">
+    <title>Dropping partitions from Iceberg tables</title>
+    <conbody>
+      <p>
+        Since <keyword keyref="impala44"/> Impala is able to run <codeph>ALTER TABLE DROP PARTITION</codeph> statements. E.g.:
+        <codeblock>
+ALTER TABLE ice_t DROP PARTITION (i = 3);
+ALTER TABLE ice_t DROP PARTITION (day(date_col) &lt; '2024-10-01');
+ALTER TABLE ice_t DROP PARTITION (year(timestamp_col) = '2024');
+        </codeblock>
+      </p>
+      <p>
+      Any non-identity transforms must be included in the partition selector like <codeph>(day(date_col))</codeph>. Operands for filtering date and
+      timestamp-based columns with transforms must be provided as strings, for example: <codeph>(day(date_col) = '2024-10-01')</codeph>.
+      This is a metadata-only operation, the datafiles targeted by the deleted partitions do not get purged or removed from the filesystem,
+      only a new snapshot is getting created with the remaining partitions.
+      </p>
+      <p>
+      Limitations:
+        <ul>
+          <li>Binary filter predicates must consist of one partition selector and one constant expression;
+          e.g.: <codeph>(day(date_col) = '2024-10-01')</codeph> is allowed, but <codeph>(another_date_col = date_col)</codeph> is not allowed.</li>
+          <li>Filtering expressions must target the latest partition spec of the table.</li>
+        </ul>
+      </p>
+      <p>
+        More information about the <codeph>ALTER TABLE DROP PARTITION</codeph> statement can be found at
+        <xref href="impala_alter_table.xml"/>.
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_update">
-    <title>Updating data int Iceberg tables</title>
+    <title>Updating data in Iceberg tables</title>
     <conbody>
       <p>
         Since <keyword keyref="impala44"/> Impala is able to run <codeph>UPDATE</codeph> statements against
