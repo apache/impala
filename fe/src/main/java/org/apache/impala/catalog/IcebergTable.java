@@ -423,6 +423,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
         setIcebergTableStats();
         loadAllColumnStats(msClient, catalogTimeline);
         setAvroSchema(msClient, msTbl, fileStore_, catalogTimeline);
+
+        // We no longer need to keep Iceberg's content files in memory.
+        hdfsTable_.setIcebergFiles(null);
       } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
             + icebergTableLocation_, e);

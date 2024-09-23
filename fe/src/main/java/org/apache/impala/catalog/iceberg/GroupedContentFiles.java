@@ -37,6 +37,10 @@ import com.google.common.collect.Iterables;
  * - data files without deleted rows
  * - data files with deleted rows
  * - delete files (position and equality)
+ *
+ * For memory footprint considerations it's not recommended to keep the content of this
+ * store in the memory for a long time. The desired usage is to initialize it, use it to
+ * create some catalog objects in Impala and then drop it.
  */
 public class GroupedContentFiles {
   public List<DataFile> dataFilesWithoutDeletes = new ArrayList<>();
