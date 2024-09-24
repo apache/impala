@@ -72,13 +72,6 @@ under the License.
         </li>
         <li>
           <p>
-            <codeph>DML</codeph> statements. <codeph>MT_DOP</codeph> values greater
-            than zero are not currently supported for DML statements. DML statements
-            will produce an error if <codeph>MT_DOP</codeph> is set to a non-zero value.
-          </p>
-        </li>
-        <li>
-          <p>
             In <keyword keyref="impala34"/> and earlier, not all <codeph>SELECT</codeph>
             statements support setting <codeph>MT_DOP</codeph>. Specifically, only
             scan and aggregation operators, and
