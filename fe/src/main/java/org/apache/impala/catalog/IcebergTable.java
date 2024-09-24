@@ -439,7 +439,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         hdfsTable_.setCanDataBeOutsideOfTableLocation(
             !Utils.requiresDataFilesInTableLocation(this));
         hdfsTable_.load(reuseMetadata, msClient, msTable_, reason, catalogTimeline);
-        fileStore_ = Utils.loadAllPartition(this, icebergFiles);
+        fileStore_ = new IcebergContentFileStore(this, icebergFiles);
         partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();
         loadAllColumnStats(msClient, catalogTimeline);

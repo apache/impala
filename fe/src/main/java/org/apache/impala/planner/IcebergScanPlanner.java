@@ -592,6 +592,8 @@ public class IcebergScanPlanner {
 
   private void addEqualityDeletesAndIds(FileDescriptor fd) {
     FbIcebergMetadata fileMetadata = fd.getFbFileMetadata().icebergMetadata();
+    Preconditions.checkState(fileMetadata.equalityFieldIdsLength() > 0,
+        "Equality delete file doesn't have equality field IDs: " + fd.toString());
     List<Integer> eqFieldIdList = new ArrayList<>();
     for (int i = 0; i < fileMetadata.equalityFieldIdsLength(); ++i) {
       eqFieldIdList.add(fileMetadata.equalityFieldIds(i));

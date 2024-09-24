@@ -87,6 +87,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   private String icebergTableLocation_;
   private String icebergCatalogLocation_;
   private HdfsStorageDescriptor hdfsSd_;
+  private final IcebergContentFileStore icebergContentFiles_;
 
   public IcebergCtasTarget(FeDb db, org.apache.hadoop.hive.metastore.api.Table msTbl,
         List<ColumnDef> columnDefs, List<String> primaryKeyNames,
@@ -103,6 +104,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);
     icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
     hdfsSd_ = HdfsStorageDescriptor.fromStorageDescriptor(name_, msTable_.getSd());
+    icebergContentFiles_ = new IcebergContentFileStore();
   }
 
   private void createIcebergSchema(List<ColumnDef> columnDefs,
@@ -185,7 +187,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
 
   @Override
   public IcebergContentFileStore getContentFileStore() {
-    return new IcebergContentFileStore();
+    return icebergContentFiles_;
   }
 
   @Override

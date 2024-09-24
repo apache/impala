@@ -123,7 +123,7 @@ public class HdfsPartition extends CatalogObjectImpl
       fbFileMetadata_ = null;
     }
 
-    private FileDescriptor(FbFileDesc fileDescData, FbFileMetadata fileMetadata) {
+    public FileDescriptor(FbFileDesc fileDescData, FbFileMetadata fileMetadata) {
       fbFileDescriptor_ = fileDescData;
       fbFileMetadata_ = fileMetadata;
     }
@@ -306,6 +306,10 @@ public class HdfsPartition extends CatalogObjectImpl
 
     public FbFileBlock getFbFileBlock(int idx) {
       return fbFileDescriptor_.fileBlocks(idx);
+    }
+
+    public FbFileDesc getFbFileDescriptor() {
+      return fbFileDescriptor_;
     }
 
     public FbFileMetadata getFbFileMetadata() {

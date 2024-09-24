@@ -236,8 +236,8 @@ public class OptimizeStmt extends DmlStatementBase {
       throws IOException, ImpalaRuntimeException {
     GroupedContentFiles selectedContentFiles = new GroupedContentFiles();
     selectedContentFiles.dataFilesWithoutDeletes = contentFiles;
-    IcebergContentFileStore selectedFiles = FeIcebergTable.Utils
-        .loadAllPartition(iceTable, selectedContentFiles);
+    IcebergContentFileStore selectedFiles =
+        new IcebergContentFileStore(iceTable, selectedContentFiles);
     return selectedFiles.getDataFilesWithoutDeletes();
   }
 
