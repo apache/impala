@@ -39,7 +39,8 @@ PYPI_MIRROR = os.environ.get('PYPI_MIRROR', 'https://pypi.python.org')
 # The requirement files that list all of the required packages and versions.
 REQUIREMENTS_FILES = ['requirements.txt', 'setuptools-requirements.txt',
                       'kudu-requirements.txt', 'adls-requirements.txt',
-                      'py2-requirements.txt', 'py3-requirements.txt']
+                      'py2-requirements.txt', 'py3-requirements.txt',
+                      'gcovr-requirements.txt']
 
 
 def check_digest(filename, algorithm, expected_digest):

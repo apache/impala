@@ -28,6 +28,7 @@
 # 2. Install most packages (including ones that require C/C++ compilation)
 # 3. Install Kudu package (which uses the toolchain GCC and the installed Cython)
 # 4. Install ADLS packages if applicable
+# 5. Install GCOVR packages if this is a code coverage build
 #
 # This module can be run with python >= 2.7. It makes no guarantees about usage on
 # python < 2.7.
@@ -54,6 +55,8 @@ SKIP_TOOLCHAIN_BOOTSTRAP = "SKIP_TOOLCHAIN_BOOTSTRAP"
 
 GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]
 
+IMPALA_HOME = os.environ["IMPALA_HOME"]
+
 DEPS_DIR = os.path.join(os.path.dirname(__file__), "deps")
 ENV_DIR_PY2 = os.path.join(os.path.dirname(__file__),
                            "env-gcc{0}".format(GCC_VERSION))
@@ -79,6 +82,11 @@ KUDU_REQS_PATH = os.path.join(DEPS_DIR, "kudu-requirements.txt")
 # Requirements for the ADLS test client step, which depends on Cffi (C Foreign Function
 # Interface) being installed by the requirements step.
 ADLS_REQS_PATH = os.path.join(DEPS_DIR, "adls-requirements.txt")
+
+# Requirements for the gcovr utility. These add several minutes to initializing the
+# virtualenv, so they are split off into their own step that only runs when coverage
+# is enabled.
+GCOVR_REQS_PATH = os.path.join(DEPS_DIR, "gcovr-requirements.txt")
 
 # Extra packages specific to python 3
 PY3_REQS_PATH = os.path.join(DEPS_DIR, "py3-requirements.txt")
@@ -318,6 +326,35 @@ def install_adls_deps(venv_dir, is_py3):
     mark_reqs_installed(venv_dir, ADLS_REQS_PATH)
 
 
+def install_gcovr_deps(venv_dir, is_py3):
+  # Gcovr is only installed in the python3 virtualenv
+  if not is_py3:
+    return
+  if not reqs_are_installed(venv_dir, GCOVR_REQS_PATH):
+    # Gcovr takes several minutes to install, so we only install it if this is a coverage
+    # build. We detect a coverage build by reading ${IMPALA_HOME}/.cmake_build_type.
+    # The python virtualenv is typically initialized during the main build, and CMake
+    # writes .cmake_build_type before the build starts. If that file doesn't exist
+    # (usually because impala-python3 is being run manually), don't install gcovr. Future
+    # invocations will check again and can install it if needed.
+    cmake_build_type_file = os.path.join(IMPALA_HOME, ".cmake_build_type")
+    if not os.path.isfile(cmake_build_type_file):
+      return
+    coverage_enabled = False
+    with open(cmake_build_type_file) as f:
+      for line in f:
+        if line.find("COVERAGE") != -1:
+          coverage_enabled = True
+          break
+
+    if coverage_enabled:
+      cc = select_cc()
+      assert cc is not None
+      LOG.info("Installing gcovr packages into the python3 virtualenv")
+      exec_pip_install(venv_dir, is_py3, ["-r", GCOVR_REQS_PATH], cc=cc)
+      mark_reqs_installed(venv_dir, GCOVR_REQS_PATH)
+
+
 def install_py_version_deps(venv_dir, is_py3):
   cc = select_cc()
   assert cc is not None
@@ -485,3 +522,4 @@ if __name__ == "__main__":
   install_kudu_client_if_possible(venv_dir, options.python3)
   install_adls_deps(venv_dir, options.python3)
   install_py_version_deps(venv_dir, options.python3)
+  install_gcovr_deps(venv_dir, options.python3)
