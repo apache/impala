@@ -782,10 +782,9 @@ bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
                     << TNetworkAddressToString(connection_context->network_address)
                     << ": " << spnego_status.ToString();
       } else {
+        string short_user = GetShortUsernameFromKerberosPrincipal(username);
         if (FLAGS_enable_ldap_auth &&
             FLAGS_enable_group_filter_check_for_authenticated_kerberos_user) {
-
-          string short_user = GetShortUsernameFromKerberosPrincipal(username);
 
           LOG(INFO) << "Checking LDAP group filters for "
                     << "username \"" << short_user << "\" "
@@ -807,6 +806,7 @@ bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
         connection_context->username = username;
         // Save the username as Kerberos user principal in the connection context.
         connection_context->kerberos_user_principal = username;
+        connection_context->kerberos_user_short = short_user;
         // Create a cookie to return.
         connection_context->return_headers.push_back(
             Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
@@ -1405,6 +1405,8 @@ void SecureAuthProvider::SetupConnectionContext(
         // Save the username as Kerberos user principal in the connection context
         // if the actual auth mechanism is Kerberos.
         connection_ptr->kerberos_user_principal = connection_ptr->username;
+        connection_ptr->kerberos_user_short =
+            GetShortUsernameFromKerberosPrincipal(connection_ptr->username);
       }
       break;
     }

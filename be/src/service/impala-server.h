@@ -613,6 +613,10 @@ class ImpalaServer : public ImpalaServiceIf,
     /// Connected user for this session, i.e. the user which originated this session.
     std::string connected_user;
 
+    /// Short username for connected user. Only applies when connected_user is a kerberos
+    /// principal. Only applicable for hs2 sessions.
+    std::string connected_user_short;
+
     /// The user to delegate to. Empty for no delegation.
     std::string do_as_user;
 
@@ -1378,30 +1382,7 @@ class ImpalaServer : public ImpalaServiceIf,
     /// 'secret' must be provided and is validated against the stored secret for the
     /// session. Must only be called once per ScopedSessionState.
     Status WithSession(const TUniqueId& session_id, const SecretArg& secret,
-        std::shared_ptr<SessionState>* session = NULL) WARN_UNUSED_RESULT {
-      DCHECK(session_.get() == NULL);
-      RETURN_IF_ERROR(impala_->GetSessionState(
-            session_id, secret, &session_, /* mark_active= */ true));
-      if (session != NULL) (*session) = session_;
-
-      // We won't have a connection context in the case of ChildQuery, which calls into
-      // hiveserver2 functions directly without going through the Thrift stack.
-      if (ThriftServer::HasThreadConnectionContext()) {
-        // Check that the session user matches the user authenticated on the connection.
-        const ThriftServer::Username& connection_username =
-            ThriftServer::GetThreadConnectionContext()->username;
-        if (!connection_username.empty()
-            && session_->connected_user != connection_username) {
-          return Status::Expected(TErrorCode::UNAUTHORIZED_SESSION_USER,
-              connection_username, session_->connected_user);
-        }
-
-        // Try adding the session id to the connection's set of sessions in case this is
-        // the first time this session has been used on this connection.
-        impala_->AddSessionToConnection(session_id, session_.get());
-      }
-      return Status::OK();
-    }
+        std::shared_ptr<SessionState>* session = NULL) WARN_UNUSED_RESULT;
 
     /// Same as WithSession(), except:
     /// * It should only be called from beeswax with a 'connection_id' obtained from

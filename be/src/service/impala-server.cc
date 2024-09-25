@@ -3475,4 +3475,45 @@ TUniqueId ImpalaServer::RandomUniqueID() {
 
   return conn_id;
 }
+
+Status ImpalaServer::ScopedSessionState::WithSession(const TUniqueId& session_id,
+    const SecretArg& secret, std::shared_ptr<SessionState>* session) {
+  DCHECK(session_.get() == NULL);
+  RETURN_IF_ERROR(impala_->GetSessionState(
+      session_id, secret, &session_, /* mark_active= */ true));
+  if (session != NULL) (*session) = session_;
+
+  // We won't have a connection context in the case of ChildQuery, which calls into
+  // hiveserver2 functions directly without going through the Thrift stack.
+  if (ThriftServer::HasThreadConnectionContext()) {
+    // Check that the session user matches the user authenticated on the connection.
+    const ThriftServer::Username& connection_username =
+        ThriftServer::GetThreadConnectionContext()->username;
+    const string& kerberos_user_principal =
+        ThriftServer::GetThreadConnectionContext()->kerberos_user_principal;
+    // Compare only the short user name if the connected user is a proxy and using
+    // kerberos AuthN.
+    if (!session_->do_as_user.empty() && !kerberos_user_principal.empty()) {
+      // This is the connected/authenticated user
+      const string connection_user_short =
+          ThriftServer::GetThreadConnectionContext()->kerberos_user_short;
+      // This is the user which created the original session
+      const string session_user_short = session_->connected_user_short;
+      if (connection_user_short != session_user_short) {
+        return Status::Expected(TErrorCode::UNAUTHORIZED_SESSION_USER,
+            connection_user_short, session_user_short);
+      }
+    } else if (!connection_username.empty()
+        && session_->connected_user != connection_username) {
+      return Status::Expected(TErrorCode::UNAUTHORIZED_SESSION_USER,
+          connection_username, session_->connected_user);
+    }
+
+    // Try adding the session id to the connection's set of sessions in case this is
+    // the first time this session has been used on this connection.
+    impala_->AddSessionToConnection(session_id, session_.get());
+  }
+  return Status::OK();
+}
+
 } // namespace impala

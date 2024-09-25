@@ -120,6 +120,9 @@ class ThriftServer {
     // Used in case of Kerberos authentication only to store the authenticated Kerberos
     // user principal
     std::string kerberos_user_principal;
+    // Used in case of Kerberos authentication only to store the authenticated Kerberos
+    // user principal's short name
+    std::string kerberos_user_short;
   };
 
   /// Interface class for receiving connection creation / termination events.

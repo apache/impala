@@ -368,6 +368,11 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   } else {
     state->connected_user = FLAGS_anonymous_user_name;
   }
+  // Set the 'connected_user_short' member in the SessionState. This is only used if
+  // the 'connected_user' is a kerberos principal.
+  if (!connection_context->kerberos_user_short.empty()) {
+    state->connected_user_short = connection_context->kerberos_user_short;
+  }
 
   // Process the supplied configuration map.
   state->database = "default";
