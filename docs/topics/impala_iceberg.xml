@@ -555,18 +555,22 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
         This causes read performance to degrade over time.
         The following statement can be used to compact the table and optimize it for reading.
         <codeblock>
-OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname>;
+OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [FILE_SIZE_THRESHOLD_MB=<varname>value</varname>];
         </codeblock>
       </p>
 
       <p>
-        The current implementation of the <codeph>OPTIMIZE TABLE</codeph> statement rewrites
-        the entire table, executing the following tasks:
+        The <codeph>OPTIMIZE TABLE</codeph> statement rewrites the table, executing the
+        following tasks:
         <ul>
-          <li>compact small files</li>
-          <li>merge delete and update deltas</li>
-          <li>rewrite all files, converting them to the latest table schema</li>
-          <li>rewrite all partitions according to the latest partition spec</li>
+          <li>Merges delete files with the corresponding data files.</li>
+          <li>Compacts data files that are smaller than the specified file size threshold in megabytes.</li>
+        </ul>
+        If no <codeph>FILE_SIZE_THRESHOLD_MB</codeph> was specified, the command compacts
+        ALL files and also
+        <ul>
+          <li>Converts data files to the latest table schema.</li>
+          <li>Rewrites all partitions according to the latest partition spec.</li>
         </ul>
       </p>
 
@@ -574,9 +578,9 @@ OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname>;
         To execute table optimization:
         <ul>
           <li>The user needs ALL privileges on the table.</li>
-          <li>The table can conatin any file formats that Impala can read, but <codeph>write.format.default</codeph>
+          <li>The table can contain any file formats that Impala can read, but <codeph>write.format.default</codeph>
           has to be <codeph>parquet</codeph>.</li>
-          <li>The table cannot contain complex types.</li>
+          <li>General write limitations apply, e.g. the table cannot contain complex types.</li>
         </ul>
       </p>
 
@@ -584,11 +588,15 @@ OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname>;
         When a table is optimized, a new snapshot is created. The old table state is still
         accessible by time travel to previous snapshots, because the rewritten data and
         delete files are not removed physically.
+        Issue the <codeph>ALTER TABLE ... EXECUTE expire_snapshots(...)</codeph> command
+        to remove the old files from the file system.
       </p>
       <p>
-        Note that the current implementation of <codeph>OPTIMIZE TABLE</codeph> rewrites
-        the entire table, therefore this operation can take a long time to complete
+        Note that <codeph>OPTIMIZE TABLE</codeph> without a specified <codeph>FILE_SIZE_THRESHOLD_MB</codeph>
+        rewrites the entire table, therefore the operation can take a long time to complete
         depending on the size of the table.
+        It is recommended to specify a file size threshold for recurring table maintenance
+        jobs to save resources.
       </p>
     </conbody>
   </concept>
@@ -700,8 +708,9 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
       <p>
         Expire snapshots:
         <ul>
-          <li>does not remove old metadata files by default.</li>
+          <li>removes data files that are no longer referenced by non-expired snapshots.</li>
           <li>does not remove orphaned data files.</li>
+          <li>does not remove old metadata files by default.</li>
           <li>respects the minimum number of snapshots to keep:
           <codeph>history.expire.min-snapshots-to-keep</codeph> table property.</li>
         </ul>
