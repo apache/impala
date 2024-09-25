@@ -19,10 +19,10 @@ importScripts("../../pako.min.js");
 importScripts("../common_util.js");
 
 self.onmessage = (e) => {
-  var query = {};
+  const query = {};
   try {
-    var profile = JSON.parse(e.data).contents;
-    var val = profile.profile_name;
+    const profile = JSON.parse(e.data).contents;
+    const val = profile.profile_name;
     query.id = val.substring(val.indexOf("=") + 1, val.length - 1);
     query.user = profile.child_profiles[0].info_strings
         .find(({key}) => key === "User").value;

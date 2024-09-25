@@ -23,7 +23,7 @@ under the License.
 
 <div class="container" style="width:1200px;margin:0 auto;">
 
-<style id="css">
+<style id="page_export_css">
 /* Text style for graph nodes */
 .node {
   color: white;
@@ -113,18 +113,18 @@ data_stream_target attribute. -->
 <script>
 $("#plan-tab").addClass("active");
 
-var g = new dagreD3.graphlib.Graph().setGraph({rankDir: "BT"});
+const g = new dagreD3.graphlib.Graph().setGraph({rankDir: "BT"});
 
-var svg = d3.select("svg");
-var inner = svg.select("g");
+const svg = d3.select("svg");
+const inner = svg.select("g");
 
-var export_link = document.getElementById("export_link");
-var export_filename = document.getElementById("export_filename");
-var export_format = document.getElementById("export_format");
+const export_link = document.getElementById("export_link");
+const export_filename = document.getElementById("export_filename");
+const export_format = document.getElementById("export_format");
 export_filename.value = export_filename.value.replace(/\W/g,'_');
 
 // Set up zoom support
-var zoom = d3.behavior.zoom().on("zoom", function() {
+const zoom = d3.behavior.zoom().on("zoom", () => {
   inner.attr("transform", "translate(" + d3.event.translate + ")" +
              "scale(" + d3.event.scale + ")");
 });
@@ -132,11 +132,11 @@ svg.call(zoom);
 
 // Set of colours to use, with the same colour used for every node in the same plan
 // fragment.
-var colours = ["#A9A9A9", "#FF8C00", "#8A2BE2", "#A52A2A", "#00008B", "#006400",
+const colours = ["#A9A9A9", "#FF8C00", "#8A2BE2", "#A52A2A", "#00008B", "#006400",
                "#228B22", "#4B0082", "#DAA520", "#008B8B", "#000000", "#DC143C"]
 
 // Shades of red in order of intensity, used for colouring nodes by time taken
-var cols_by_time = ["#000000", "#1A0500", "#330A00", "#4C0F00", "#661400", "#801A00",
+const cols_by_time = ["#000000", "#1A0500", "#330A00", "#4C0F00", "#661400", "#801A00",
                     "#991F00", "#B22400", "#CC2900", "#E62E00", "#FF3300", "#FF4719"];
 
 // Recursively build a list of edges and states that comprise the plan graph
@@ -151,9 +151,9 @@ function build(node, parent, edges, states, colour_idx, max_node_time) {
                 "max_time_val": node["max_time_val"],
                 "style": "fill: " + colours[colour_idx]});
   if (parent != null) {
-    var label_val = "" + node["output_card"].toLocaleString();
+    const LABEL_VAL = "" + node["output_card"].toLocaleString();
     edges.push({ start: node["label"], end: parent,
-                 style: { label: label_val }});
+                 style: { label: LABEL_VAL }});
   }
   // Add an inter-fragment edges
   if (node["data_stream_target"]) {
@@ -171,35 +171,35 @@ function build(node, parent, edges, states, colour_idx, max_node_time) {
 });
   }
   max_node_time = Math.max(node["max_time_val"], max_node_time)
-  for (var i = 0; i < node["children"].length; ++i) {
+  for (let i = 0; i < node["children"].length; ++i) {
     max_node_time = build(
       node["children"][i], node["label"], edges, states, colour_idx, max_node_time);
   }
   return max_node_time;
 }
 
-var is_first = true;
+let is_first = true;
 
 function renderGraph(ignored_arg) {
   if (req.status != 200) return;
-  var json = JSON.parse(req.responseText);
+  const json = JSON.parse(req.responseText);
   if (json.error) {
-    clearInterval(intervalId);
+    clearInterval(interval_id);
     return;
   }
   refresh_record(json.record_json);
-  var plan = json["plan_json"];
-  var inflight = json["inflight"];
+  const plan = json["plan_json"];
+  const inflight = json["inflight"];
   if (!inflight) {
-    clearInterval(intervalId);
+    clearInterval(interval_id);
   }
 
-  var states = []
-  var edges = []
-  var colour_idx = 0;
+  const states = []
+  const edges = []
+  let colour_idx = 0;
 
-  var max_node_time = 0;
-  plan["plan_nodes"].forEach(function(parent) {
+  let max_node_time = 0;
+  plan["plan_nodes"].forEach((parent) => {
     max_node_time = Math.max(
       build(parent, null, edges, states, colour_idx, max_node_time));
     // Pick a new colour for each plan fragment
@@ -207,10 +207,10 @@ function renderGraph(ignored_arg) {
   });
 
   // Keep a map of names to states for use when processing edges.
-  var states_by_name = { }
-  states.forEach(function(state) {
+  const states_by_name = { }
+  states.forEach((state) => {
     // Build the label for the node from the name and the detail
-    var html = "<span>" + state.name + "</span><br/>";
+    let html = "<span>" + state.name + "</span><br/>";
     html += "<span>" + state.detail + "</span><br/>";
     html += "<span>" + state.num_instances + " instance";
     if (state.num_instances > 1) {
@@ -219,13 +219,13 @@ function renderGraph(ignored_arg) {
     html += "</span><br/>";
     html += "<span>Max: " + state.max_time + ", avg: " + state.avg_time + "</span>";
 
-    var style = state.style;
+    let style = state.style;
 
     // If colouring nodes by total time taken, choose a shade in the cols_by_time list
     // with idx proportional to the max time of the node divided by the max time over all
     // nodes.
     if (document.getElementById("colour_scheme").checked) {
-      var idx = (cols_by_time.length - 1) * (state.max_time_val / (1.0 * max_node_time));
+      let idx = (cols_by_time.length - 1) * (state.max_time_val / (1.0 * max_node_time));
       style = "fill: " + cols_by_time[Math.floor(idx)];
     }
     g.setNode(state.name, { "label": html,
@@ -234,7 +234,7 @@ function renderGraph(ignored_arg) {
     states_by_name[state.name] = state;
   });
 
-  edges.forEach(function(edge) {
+  edges.forEach((edge) => {
     // Impala marks 'broadcast' as a property of the receiver, not the sender. We use
     // '(BCAST)' to denote that a node is duplicating its output to all receivers.
     if (states_by_name[edge.end].is_broadcast) {
@@ -243,24 +243,24 @@ function renderGraph(ignored_arg) {
     g.setEdge(edge.start, edge.end, edge.style);
   });
 
-  g.nodes().forEach(function(v) {
-    var node = g.node(v);
+  g.nodes().forEach((v) => {
+    const node = g.node(v);
     node.rx = node.ry = 5;
   });
 
   // Create the renderer
-  var render = new dagreD3.render();
+  const render = new dagreD3.render();
 
   // Run the renderer. This is what draws the final graph.
   render(inner, g);
 
   // Center the graph, but only the first time through (so as to not lose user zooms).
   if (is_first) {
-    var initialScale = 0.75;
-    zoom.translate([(svg.attr("width") - g.graph().width * initialScale) / 2, 20])
-      .scale(initialScale)
+    const initial_scale = 0.75;
+    zoom.translate([(svg.attr("width") - g.graph().width * initial_scale) / 2, 20])
+      .scale(initial_scale)
       .event(svg);
-    svg.attr('height', Math.max(g.graph().height * initialScale + 40, 600));
+    svg.attr('height', Math.max(g.graph().height * initial_scale + 40, 600));
     is_first = false;
   }
 
@@ -276,11 +276,11 @@ function refresh() {
 }
 
 // Attaches a blob of the current SVG viewport to the associated link
-export_link.addEventListener('click', function(event) {
+export_link.addEventListener('click', (event) => {
   if (export_format.value === ".html") {
-    var svg_viewport = document.querySelector("svg");
-    var export_style = document.getElementById("css");
-    var html_blob = new Blob([`<!DOCTYPE html><body>`,
+    const svg_viewport = document.querySelector("svg");
+    const export_style = document.getElementById("page_export_css");
+    const html_blob = new Blob([`<!DOCTYPE html><body>`,
         `<h1 style="font-family:monospace;">Query {{query_id}}</h1>`,
         export_style.outerHTML, svg_viewport.outerHTML, `</body></html>`],
         {type: "text/html;charset=utf-8"});
@@ -293,6 +293,6 @@ export_link.addEventListener('click', function(event) {
 // Force one refresh before starting the timer.
 refresh();
 
-var intervalId = setInterval(refresh, 2000);
+const interval_id = setInterval(refresh, 2000);
 
 </script>

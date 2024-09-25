@@ -162,19 +162,19 @@ under the License.
 {{/num_blacklisted_backends}}
 
 <script>
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#backends').DataTable({
             "order": [[ 0, "desc" ]],
             "pageLength": 100
         });
     });
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#quiescing_backends').DataTable({
             "order": [[ 0, "desc" ]],
             "pageLength": 100
         });
     });
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#blacklisted_backends').DataTable({
             "order": [[ 0, "desc" ]],
             "pageLength": 100

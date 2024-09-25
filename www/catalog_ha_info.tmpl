@@ -73,7 +73,7 @@ under the License.
 statestored for the catalog's high availability information.</h5>
 {{/is_active_statestored}}
 <script>
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#notified-subscribers-tbl').DataTable({
             "order": [[ 6, "asc" ]],
             "pageLength": 100

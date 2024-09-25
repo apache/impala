@@ -39,19 +39,19 @@ $("#stmt-tab").addClass("active");
 import {inflateParseJSON}
     from "{{ __common__.host-url }}/www/scripts/compression_util.js";
 
-var dbOpenReq = indexedDB.open("imported_queries");
-var db;
+const db_open_req = indexedDB.open("imported_queries");
+let db;
 
-var supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
+const supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
 
 if (window.location.search.includes("imported")) {
-  var alertMessage = document.getElementsByClassName("alert alert-danger")[0];
-  if (alertMessage) {
-    alertMessage.remove();
+  const alert_message = document.getElementsByClassName("alert alert-danger")[0];
+  if (alert_message) {
+    alert_message.remove();
   }
-  var nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  const nav_links = document.getElementsByClassName("nav nav-tabs")[0];
   nav_links = nav_links.getElementsByClassName("nav-link");
-  for (var i = 0; i < nav_links.length;) {
+  for (let i = 0; i < nav_links.length;) {
     if (supported_tabs.includes(nav_links[i].textContent)) {
       nav_links[i].href = `${nav_links[i].href}&imported=true`;
       i++;
@@ -60,19 +60,19 @@ if (window.location.search.includes("imported")) {
     }
   }
 
-  dbOpenReq.onsuccess = (e) => {
+  db_open_req.onsuccess = (e) => {
     db = e.target.result;
     db.onerror = (e) => {
       console.log("IndexedDB error");
       console.log(e);
     }
-    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
-    profileStore.get(getQueryID()).onsuccess = (e) => {
-      var sql_query = inflateParseJSON(e.target.result.profile).contents
+    const profile_store = db.transaction("profiles", "readonly").objectStore("profiles");
+    profile_store.get(getQueryID()).onsuccess = (e) => {
+      const sql_query = inflateParseJSON(e.target.result.profile).contents
           .child_profiles[0].info_strings.find(({key}) => key === "Sql Statement").value;
-      var sql_stmt_body = document.createElement("pre");
+      const sql_stmt_body = document.createElement("pre");
       sql_stmt_body.className = "code";
-      var sql_code = sql_stmt_body.appendChild(document.createElement("code"))
+      const sql_code = sql_stmt_body.appendChild(document.createElement("code"))
       sql_code.innerHTML = sql_query;
       tab_body.innerHTML = "";
       tab_body.appendChild(sql_stmt_body);

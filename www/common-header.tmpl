@@ -77,8 +77,8 @@ common-footer.tmpl) }}
 // For Apache Knox compatibility, all urls that are accessed by javascript should have
 // their path wrapped with this.
 function make_url(path) {
-  var root_link = document.getElementById('root-link');
-  var s  = root_link.href.split("?");
+  const root_link = document.getElementById('root-link');
+  const s  = root_link.href.split("?");
   url = s[0] + path;
   if (s.length > 1) {
     if (path.includes("?")) {

@@ -85,9 +85,9 @@ under the License.
 
 <script>
 
-  $(document).ready(function() {
+  $(document).ready(() => {
     $('select[name=glog]').val({{glog_level}});
-    var text=$('select[name=glog]').children("option:selected").text();
+    const text = $('select[name=glog]').children("option:selected").text();
     document.getElementById("glog_text").innerHTML = text;
   });
 

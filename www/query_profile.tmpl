@@ -49,10 +49,10 @@ $("#profile-tab").addClass("active");
 import {inflateParseJSON}
     from "{{ __common__.host-url }}/www/scripts/compression_util.js";
 
-var dbOpenReq = indexedDB.open("imported_queries");
-var db;
+const db_open_req = indexedDB.open("imported_queries");
+let db;
 
-var supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
+const supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
 
 function profileToString(profile, indent="") {
   let info_strings = "";
@@ -88,19 +88,19 @@ function profileToString(profile, indent="") {
   return `${indent}${profile.profile_name}:\n${info_strings}${event_sequences}${child_profiles}${counters}`;
 }
 
-document.querySelectorAll('.profile-download').forEach(function (profile_link) {
+document.querySelectorAll('.profile-download').forEach((profile_link) => {
   profile_link.download = profile_link.download.replace(/\W/g,'_');
 });
 
 if (window.location.search.includes("imported")) {
   profile_download_section.remove();
-  var alertMessage = document.getElementsByClassName("alert alert-danger")[0];
-  if (alertMessage) {
-    alertMessage.remove();
+  const alert_message = document.getElementsByClassName("alert alert-danger")[0];
+  if (alert_message) {
+    alert_message.remove();
   }
-  var nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  const nav_links = document.getElementsByClassName("nav nav-tabs")[0];
   nav_links = nav_links.getElementsByClassName("nav-link");
-  for (var i = 0; i < nav_links.length;) {
+  for (let i = 0; i < nav_links.length;) {
     if (supported_tabs.includes(nav_links[i].textContent)) {
       nav_links[i].href = `${nav_links[i].href}&imported=true`;
       i++;
@@ -109,14 +109,14 @@ if (window.location.search.includes("imported")) {
     }
   }
 
-  dbOpenReq.onsuccess = (e) => {
+  db_open_req.onsuccess = (e) => {
     db = e.target.result;
     db.onerror = (e) => {
       console.log("IndexedDB error");
       console.log(e);
     }
-    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
-    profileStore.get(getQueryID()).onsuccess = (e) => {
+    const profile_store = db.transaction("profiles", "readonly").objectStore("profiles");
+    profile_store.get(getQueryID()).onsuccess = (e) => {
       plain_text_profile_field.textContent = profileToString(
           inflateParseJSON(e.target.result.profile).contents);
     };

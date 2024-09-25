@@ -21,9 +21,9 @@ import {exportedForTest} from "../../query_timeline/host_utilization_diagram.js"
 describe("Test initializeUtilizationMetrics", () => {
   // Test whether aggregate arrays and time sample arrays are correctly allocated
   // based on counters and max_samples
-  var {initializeUtilizationMetrics} = exportedForTest;
+  const {initializeUtilizationMetrics} = exportedForTest;
   test("Basic Test", () => {
-    var parent_profile =
+    const parent_profile =
     {
       "profile_name": "Per Node Profiles",
       "num_children": 3,
@@ -52,24 +52,24 @@ describe("Test initializeUtilizationMetrics", () => {
         }
       ]
     };
-    var max_samples = {
+    const max_samples = {
       allocated : 3,
       period : 0,
       available : 0,
       collected : 0
     };
-    var counters_y1 = [
+    const counters_y1 = [
         ["HostCpuUserPercentage", "avg io wait", 0],
         ["HostCpuSysPercentage", "avg sys", 0]
     ];
-    var counters_y2 = [
+    const counters_y2 = [
         ["HostNetworkRx", "avg network rx", 0]
     ];
-    var timeaxis_name = "utilization timeticks";
-    var {cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
+    const TIMEAXIS_NAME = "utilization timeticks";
+    const {cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
         sampled_utilization_timeseries} = initializeUtilizationMetrics(
         parent_profile, counters_y1, counters_y2,
-        max_samples, timeaxis_name);
+        max_samples, TIMEAXIS_NAME);
     expect(cpu_nodes_usage_aggregate).toEqual([
         [counters_y1[0][1], 0, null, null, null],
         [counters_y1[1][1], 0, null, null, null]
@@ -78,7 +78,7 @@ describe("Test initializeUtilizationMetrics", () => {
         [counters_y2[0][1], 0, null, null, null]
     ]);
     expect(sampled_utilization_timeseries).toEqual(
-        [timeaxis_name, null, null, null, null]
+        [TIMEAXIS_NAME, null, null, null, null]
     );
     expect(counters_y1[0][2]).toBe(0);
     expect(counters_y1[1][2]).toBe(1);

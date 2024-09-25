@@ -75,7 +75,7 @@ under the License.
 </div>
 
 <script>
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#large-tables').DataTable({
             "columnDefs": [{"targets": 1, "render": renderSize}],
             "order": [[ 1, "desc" ]],
@@ -120,7 +120,7 @@ under the License.
 </div>
 
 <script>
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#frequent-tables').DataTable({
             "order": [[ 0, "desc" ]],
             "pageLength": 10
@@ -164,7 +164,7 @@ under the License.
 </div>
 
 <script>
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#high-file-count-tables').DataTable({
             "order": [[ 1, "desc" ]],
             "pageLength": 10
@@ -218,7 +218,7 @@ under the License.
 </div>
 
 <script>
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#long-metadata-loading-tables').DataTable({
             "order": [[ 2, "desc" ]],
             "pageLength": 10,
@@ -282,7 +282,7 @@ under the License.
 </div>
 
 <script>
-    $(document).ready(function() {
+    $(document).ready(() => {
         $('#{{name}}-tables').DataTable({
             "pageLength": 5
         });

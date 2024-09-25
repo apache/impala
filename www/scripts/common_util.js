@@ -16,8 +16,8 @@
 // under the License.
 
 function getReadableSize(value, precision = 2) {
-  var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  var current_unit = 0;
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  let current_unit = 0;
   while( value >= 1e3 ) {
     value = value / 1e3;
     ++current_unit;
@@ -38,10 +38,10 @@ function getReadableTimeNS(value) {
 }
 
 function getReadableTimeMS(value) {
-    var hour = false;
-    var minute = false;
-    var second = false;
-    var re = "";
+    let hour = false;
+    let minute = false;
+    let second = false;
+    let re = "";
     if (value >= 3600000) {
         re += (Math.floor(value / 3600000) + "h");
         value = value % 3600000;
@@ -102,7 +102,7 @@ function renderTime(data, type, row) {
   * Query ID always starts from index 10 in above format
 */
 function getQueryID() {
-  let query_id = window.location.search.split("query_id=")[1];
+  const query_id = window.location.search.split("query_id=")[1];
   if (query_id) {
     return query_id.substring(0, query_id.indexOf("&"));
   }

@@ -20,9 +20,9 @@ import {exportedForTest} from "../../query_timeline/fragment_metrics_diagram.js"
 describe("Test initializeFragmentMetrics", () => {
   // Test whether aggregate arrays and time sample arrays are correctly allocated
   // based on counters and max_samples
-  var {initializeFragmentMetrics} = exportedForTest;
+  const {initializeFragmentMetrics} = exportedForTest;
   test("Basic Test", () => {
-    var parent_profile =
+    const parent_profile =
     {
       "profile_name": "Coordinator Fragment F31",
       "num_children": 1,
@@ -45,25 +45,25 @@ describe("Test initializeFragmentMetrics", () => {
         }
       ]
     };
-    var max_samples = {
+    const max_samples = {
       allocated : 4,
       period : 0,
       available : 0,
       collected : 0
     };
-    var counters = [
+    const counters = [
         ["MemoryUsage", "memory usage", 0],
         ["ThreadUsage", "thread usage", 0]
     ];
-    var timeaxis_name = "fragment metrics timeticks";
-    var {fragment_metrics_aggregate, sampled_fragment_metrics_timeseries}
-        = initializeFragmentMetrics(parent_profile, counters, max_samples, timeaxis_name);
+    const TIMEAXIS_NAME = "fragment metrics timeticks";
+    const {fragment_metrics_aggregate, sampled_fragment_metrics_timeseries}
+        = initializeFragmentMetrics(parent_profile, counters, max_samples, TIMEAXIS_NAME);
     expect(fragment_metrics_aggregate).toEqual([
         [null, 0, null, null, null, null, null],
         [null, 0, null, null, null, null, null]
     ]);
     expect(sampled_fragment_metrics_timeseries).toEqual(
-        [timeaxis_name, null, null, null, null, null, null]
+        [TIMEAXIS_NAME, null, null, null, null, null, null]
     );
   });
 });

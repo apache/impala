@@ -294,12 +294,12 @@ command line parameter.</p>
 {{/query_locations}}
 </table>
 <script>
-  var dbOpenReq = indexedDB.open("imported_queries");
-  var db;
+  const db_open_req = indexedDB.open("imported_queries");
+  let db;
 
-  const profileParseWorker = new Worker(
+  const profile_parse_worker = new Worker(
       "{{ __common__.host-url }}/www/scripts/queries/profileParseWorker.js");
-  var query_processor_start_time, raw_total_size, compressed_total_size, upload_count;
+  let query_processor_start_time, raw_total_size, compressed_total_size, upload_count;
 
   function insertRowVal(row, val) {
     row.insertCell().innerHTML = val;
@@ -311,9 +311,9 @@ command line parameter.</p>
   }
 
   function deleteProfile(el) {
-    var row = el.parentElement.parentElement;
-    var profileStore = db.transaction("profiles", "readwrite").objectStore("profiles");
-    profileStore.delete(row.cells[0].textContent).onsuccess = () => {
+    const row = el.parentElement.parentElement;
+    const profile_store = db.transaction("profiles", "readwrite").objectStore("profiles");
+    profile_store.delete(row.cells[0].textContent).onsuccess = () => {
       setScrollReload();
     };
   }
@@ -342,22 +342,22 @@ command line parameter.</p>
 
   function uploadProfile() {
     json_profile_chooser.disabled = true;
-    var fileReader = new FileReader();
-    fileReader.readAsText(json_profile_chooser.files[upload_count]);
-    fileReader.onload = (e) => {
-      profileParseWorker.postMessage(e.target.result);
+    const file_reader = new FileReader();
+    file_reader.readAsText(json_profile_chooser.files[upload_count]);
+    file_reader.onload = (e) => {
+      profile_parse_worker.postMessage(e.target.result);
     };
   }
 
-  profileParseWorker.onmessage = (e) => {
+  profile_parse_worker.onmessage = (e) => {
     if (e.data.error) {
       showImportedQueriesStatusMessage("Error parsing some JSON profiles");
       setTimeout(setScrollReload, 1500);
       console.log(e.data.error);
       return;
     }
-    var profileStore = db.transaction("profiles", "readwrite").objectStore("profiles");
-    profileStore.put(e.data).onsuccess = () => {
+    const profile_store = db.transaction("profiles", "readwrite").objectStore("profiles");
+    profile_store.put(e.data).onsuccess = () => {
       raw_total_size += json_profile_chooser.files[upload_count].size;
       compressed_total_size += e.data.profile.length;
       upload_count++;
@@ -376,38 +376,38 @@ command line parameter.</p>
     };
   };
 
-  dbOpenReq.onupgradeneeded = (e) => {
+  db_open_req.onupgradeneeded = (e) => {
     db = e.target.result;
-    var profileStore = db.createObjectStore("profiles", { keyPath : "id" });
+    const profile_store = db.createObjectStore("profiles", { keyPath : "id" });
 
-    profileStore.createIndex("start_time", "start_time");
+    profile_store.createIndex("start_time", "start_time");
   };
 
-  dbOpenReq.onsuccess = (e) => {
+  db_open_req.onsuccess = (e) => {
     db = e.target.result;
     db.onerror = (e) => {
       console.log("IndexedDB error");
       console.log(e);
     }
 
-    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
-    var countReq = profileStore.count();
+    const profile_store = db.transaction("profiles", "readonly").objectStore("profiles");
+    const count_req = profile_store.count();
 
-    countReq.onsuccess = () => {
-      if (countReq.result) {
+    count_req.onsuccess = () => {
+      if (count_req.result) {
         imported_queries_header.innerHTML = imported_queries_header.innerHTML
-            .replace("0", String(countReq.result));
+            .replace("0", String(count_req.result));
       } else {
         clear_profiles_button.remove();
       }
     };
 
-    profileStore.index("start_time").openCursor(null, "prev").onsuccess = (e) => {
-      var cursor = e.target.result;
+    profile_store.index("start_time").openCursor(null, "prev").onsuccess = (e) => {
+      const cursor = e.target.result;
       if (cursor) {
-        var query = cursor.value;
-        var row = imported_queries_table.insertRow();
-        var query_link = document.createElement("a");
+        const query = cursor.value;
+        const row = imported_queries_table.insertRow();
+        const query_link = document.createElement("a");
         query_link.href = `{{ __common__.host-url }}/query_timeline?query_id=${query.id}&imported=true`;
         query_link.innerHTML = query.id;
         insertRowVal(row, query_link.outerHTML);
@@ -424,7 +424,7 @@ command line parameter.</p>
         insertRowVal(row, query.coordinator_slots);
         insertRowVal(row, query.executor_slots);
         insertRowVal(row, query.statement);
-        var deleteButton = document.createElement("input");
+        const deleteButton = document.createElement("input");
         deleteButton.type = "button";
         deleteButton.value = "X";
         deleteButton.className = "btn btn-primary";

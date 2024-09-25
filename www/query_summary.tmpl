@@ -25,7 +25,7 @@ under the License.
   <label>
     <input type="checkbox" checked="true" id="toggle" onClick="toggleRefresh()"/>
     <span id="refresh_on">Auto-refresh on</span>
-  </label>  Last updated: <span id="last-updated"></span>
+  </label>  Last updated: <span id="last_updated"></span>
 </div>
 
 <h3>Timeline</h3>
@@ -38,17 +38,17 @@ $("#summary-tab").addClass("active");
 
 // Periodically refreshes the summary details
 function refresh() {
-  var xhr = new XMLHttpRequest();
+  const xhr = new XMLHttpRequest();
   xhr.responseType = 'text';
   xhr.timeout = 60000;
-  xhr.onload = function(ignored_arg) {
+  xhr.onload = (ignored_arg) => {
     if (xhr.status != 200) {
       return;
     }
-    var blob = xhr.response;
+    const blob = xhr.response;
     json = JSON.parse(blob);
     if (json.error) {
-      clearInterval(intervalId);
+      clearInterval(interval_id);
       document.getElementById("toggle").checked = false;
       return;
     }
@@ -58,20 +58,19 @@ function refresh() {
     document.getElementById("status").textContent = json["status"];
     document.getElementById("last-updated").textContent = new Date();
   }
-  xhr.ontimeout = function(){ }
   xhr.open('GET', make_url("/query_summary?query_id={{query_id}}&json"), true);
   xhr.send();
 }
 
 document.getElementById("last-updated").textContent = new Date();
-var intervalId = setInterval(refresh, 1000);
+let interval_id = setInterval(refresh, 1000);
 
 function toggleRefresh() {
   if (document.getElementById("toggle").checked === true) {
-    intervalId = setInterval(refresh, 1000);
+    interval_id = setInterval(refresh, 1000);
     document.getElementById("refresh_on").textContent = "Auto-refresh on";
   } else {
-    clearInterval(intervalId);
+    clearInterval(interval_id);
     document.getElementById("refresh_on").textContent = "Auto-refresh off";
   }
 }

@@ -20,8 +20,8 @@ import {exportedForTest} from "../../query_timeline/fragment_diagram.js";
 
 describe("Test getSvg*", () => {
   // Test whether getSvg* methods correctly set attributes and return expected elements
-  var {getSvgRect, getSvgLine, getSvgText, getSvgTitle, getSvgGroup} = exportedForTest;
-  var stroke_fill_colors = { black : "#000000", dark_grey : "#505050",
+  const {getSvgRect, getSvgLine, getSvgText, getSvgTitle, getSvgGroup} = exportedForTest;
+  const stroke_fill_colors = { black : "#000000", dark_grey : "#505050",
       light_grey : "#F0F0F0", transperent : "rgba(0, 0, 0, 0)" };
 
   test("Test getSvgRect", () => {

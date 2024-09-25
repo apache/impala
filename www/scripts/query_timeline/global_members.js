@@ -19,15 +19,19 @@ import {renderTimingDiagram, setTimingDiagramDimensions} from "./fragment_diagra
 import {resizeFragmentMetricsChart} from "./fragment_metrics_diagram.js";
 import {resizeUtilizationChart} from "./host_utilization_diagram.js";
 
-export var profile = {};
-export var maxts = 0;
-export var decimals = 2;
-export var border_stroke_width = 2;
-export var diagram_width = window.innerWidth - border_stroke_width; // border width
-export var margin_header_footer = 5;
-export var margin_chart_end = 60;
-export var diagram_min_height = 200;
-export var diagram_controls_height = Math.max(28, window.innerHeight * 0.025);
+// Stroke width of fragment diagrams borders
+export const BORDER_STROKE_WIDTH = 2;
+// Default margin provided for fragment diagram's header and footer
+export const MARGIN_HEADER_FOOTER = 5;
+// Default margin provided on the right(at the end) of all charts
+export const MARGIN_CHART_END = 60;
+// The minimum height of diagrams / charts
+export const DIAGRAM_MIN_HEIGHT = 200;
+
+export let diagram_width = window.innerWidth - BORDER_STROKE_WIDTH; // border width
+export let profile = {};
+export let maxts = 0;
+export let decimals = 2;
 
 export function set_profile(val) {
   profile = val;

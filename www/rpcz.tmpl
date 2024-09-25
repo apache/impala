@@ -234,33 +234,33 @@ under the License.
 
 <script>
 function reset_all() {
-  var xhr = new XMLHttpRequest();
+  const xhr = new XMLHttpRequest();
   xhr.open('GET', make_url("/rpcz_reset"), true);
   xhr.send();
 }
 
 function reset_method(server, method) {
-  var xhr = new XMLHttpRequest();
+  const xhr = new XMLHttpRequest();
   xhr.open('GET', make_url("/rpcz_reset?server=" + server + "&method=" + method), true);
   xhr.send();
 }
 
 function reset_server(server) {
-  var xhr = new XMLHttpRequest();
+  const xhr = new XMLHttpRequest();
   xhr.open('GET', make_url("/rpcz_reset?server=" + server), true);
   xhr.send();
 }
 
 // Update all metrics for services in "servers", which use Impala's old RPC layer.
 function update_impala_services(json) {
-  for (var i = 0; i < json["servers"].length; ++i) {
-    var tbl_json = json["servers"][i];
-    var table = document.getElementById(tbl_json["name"]);
+  for (let i = 0; i < json["servers"].length; ++i) {
+    const tbl_json = json["servers"][i];
+    const table = document.getElementById(tbl_json["name"]);
     if (!table) continue;
     // Delete all existing rows, stopping at 1 to save the header
-    for (var j = table.rows.length - 1; j >= 1; --j) table.deleteRow(j);
-    tbl_json["methods"].forEach(function(method) {
-      var row = table.insertRow();
+    for (let j = table.rows.length - 1; j >= 1; --j) table.deleteRow(j);
+    tbl_json["methods"].forEach((method) => {
+      const row = table.insertRow();
       row.insertCell().innerHTML = "<samp>" + method.name + "</samp>";
       row.insertCell().innerHTML = method.summary;
       cell = row.insertCell()
@@ -272,12 +272,12 @@ function update_impala_services(json) {
       cell.style.display= getRWDisplay();
       cell.innerHTML = method.write;
       row.insertCell().innerHTML = method.in_flight;
-      var reset_cell = row.insertCell();
+      const reset_cell = row.insertCell();
       reset_cell.align = "center";
-      var button = document.createElement("button");
+      const button = document.createElement("button");
       button.className = "btn btn-warning btn-xs";
       button.appendChild(document.createTextNode("Reset"));
-      button.onclick = function() { reset_method(method.server_name, method.name); }
+      button.onclick = () => { reset_method(method.server_name, method.name); }
       reset_cell.appendChild(button);
     });
   }
@@ -287,47 +287,48 @@ function update_impala_services(json) {
 function update_krpc_services(json) {
   if (!json["services"]) return;
   // Update each service
-  for (var i = 0; i < json["services"].length; ++i) {
-    var svc_json = json["services"][i];
-    var svc_name = svc_json["service_name"];
-    var table = document.getElementById(svc_name + "_metrics");
+  for (let i = 0; i < json["services"].length; ++i) {
+    const svc_json = json["services"][i];
+    const SVC_NAME = svc_json["service_name"];
+    const table = document.getElementById(SVC_NAME + "_metrics");
 
     // Skip updates for unknown services.
     if (!table) continue;
 
     // Update service metrics
-    var keys = ["queue_size", "idle_threads", "mem_usage", "mem_peak",
+    const keys = ["queue_size", "idle_threads", "mem_usage", "mem_peak",
         "rpcs_queue_overflow", "incoming_queue_time"];
-    for (var j = 0; j < keys.length; ++j) {
-      var key = keys[j];
-      var cell = document.getElementById(svc_name + "_" + key);
+    for (let j = 0; j < keys.length; ++j) {
+      const KEY = keys[j];
+      const cell = document.getElementById(SVC_NAME + "_" + KEY);
       // Skip update for unknown values.
       if (!cell) continue;
-      cell.innerHTML = svc_json[key];
+      cell.innerHTML = svc_json[KEY];
     }
 
     // Update metrics for individual methods.
-    var num_methods = svc_json["rpc_method_metrics"].length;
-    for (var j = 0; j < num_methods; ++j) {
-      var method_json = svc_json["rpc_method_metrics"][j];
-      var method_name = method_json["method_name"];
+    const num_methods = svc_json["rpc_method_metrics"].length;
+    for (let j = 0; j < num_methods; ++j) {
+      const method_json = svc_json["rpc_method_metrics"][j];
+      const METHOD_NAME = method_json["method_name"];
       // Update all metrics for this method.
-      var keys = ["handler_latency", "payload_size"];
-      for (var l = 0; l < keys.length; ++l) {
-        var key = keys[l];
-        var cell = $(table).find("." + method_name + "_" + key)[0];
+      const keys = ["handler_latency", "payload_size"];
+      for (let l = 0; l < keys.length; ++l) {
+        const KEY = keys[l];
+        const cell = $(table).find("." + METHOD_NAME + "_" + KEY)[0];
         // Skip update for unknown values.
         if (!cell) continue;
-        cell.innerHTML = method_json[key];
+        cell.innerHTML = method_json[KEY];
       }
     }
   }
 }
 
 function update_krpc_conn_metrics_datatable(json) {
-  var table = $('#per_conn_metrics').DataTable();
+  const table = $('#per_conn_metrics').DataTable();
+  let rows;
   if (!json["rpc_use_unix_domain_socket"]) {
-    var rows = $.map(json["per_conn_metrics"], function(row) {
+    rows = $.map(json["per_conn_metrics"], (row) => {
       return [[row["remote_addr"], row["num_calls_in_flight"], row["outbound_queue_size"],
              row["socket_stats"]["rtt"] ?? '',
              row["socket_stats"]["rttvar"] ?? '',
@@ -343,7 +344,7 @@ function update_krpc_conn_metrics_datatable(json) {
              row["socket_stats"]["receive_queue_bytes"] ?? '']];
     });
   } else {
-    var rows = $.map(json["per_conn_metrics"], function(row) {
+    rows = $.map(json["per_conn_metrics"], (row) => {
       return [[row["remote_addr"], row["num_calls_in_flight"], row["outbound_queue_size"],
              'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A',
              'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']];
@@ -354,9 +355,10 @@ function update_krpc_conn_metrics_datatable(json) {
 }
 
 function update_krpc_inbound_conn_metrics_datatable(json) {
-  var table = $('#inbound_per_conn_metrics').DataTable();
+  const table = $('#inbound_per_conn_metrics').DataTable();
+  let rows;
   if (!json["rpc_use_unix_domain_socket"]) {
-    var rows = $.map(json["inbound_per_conn_metrics"], function(row) {
+    rows = $.map(json["inbound_per_conn_metrics"], (row) => {
       return [[row["remote_addr"], row["num_calls_in_flight"],
              row["socket_stats"]["rtt"] ?? '',
              row["socket_stats"]["rttvar"] ?? '',
@@ -372,7 +374,7 @@ function update_krpc_inbound_conn_metrics_datatable(json) {
              row["socket_stats"]["receive_queue_bytes"] ?? '']];
     });
   } else {
-    var rows = $.map(json["inbound_per_conn_metrics"], function(row) {
+    rows = $.map(json["inbound_per_conn_metrics"], (row) => {
       return [[row["remote_addr"], row["num_calls_in_flight"],
              'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A',
              'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']];
@@ -382,7 +384,7 @@ function update_krpc_inbound_conn_metrics_datatable(json) {
   table.clear().rows.add(rows).draw();
 }
 
-$(document).ready(function() {
+$(document).ready(() => {
   table = $('#per_conn_metrics').DataTable({
     "order": [[ 0, "asc" ]],
     "pageLength": 50
@@ -390,12 +392,12 @@ $(document).ready(function() {
 });
 
 function refresh() {
-  var xhr = new XMLHttpRequest();
+  const xhr = new XMLHttpRequest();
   xhr.responseType = 'text';
   xhr.timeout = 60000;
-  xhr.onload = function(ignored_arg) {
+  xhr.onload = () => {
     if (xhr.status != 200) return;
-    var blob = xhr.response;
+    const blob = xhr.response;
     json = JSON.parse(blob);
     update_impala_services(json);
     update_krpc_services(json);
@@ -404,35 +406,35 @@ function refresh() {
     document.getElementById("last-updated").textContent = new Date();
   }
 
-  xhr.ontimeout = function() {}
+  xhr.ontimeout = () => {}
   xhr.open('GET', make_url("/rpcz?json"), true);
   xhr.send();
 }
 
 document.getElementById("last-updated").textContent = new Date();
-var intervalId = setInterval(refresh, 1000);
+let interval_id = setInterval(refresh, 1000);
 
 function toggleRefresh() {
-  if (document.getElementById("toggle").checked === true) {
-    intervalId = setInterval(refresh, 1000);
+  if (toggle.checked === true) {
+    interval_id = setInterval(refresh, 1000);
     document.getElementById("refresh_on").textContent = "Auto-refresh on";
   } else {
-    clearInterval(intervalId);
+    clearInterval(interval_id);
     document.getElementById("refresh_on").textContent = "Auto-refresh off";
   }
 }
 
 function getRWDisplay() {
-  if (document.getElementById('show_rw_stats').checked) {
+  if (document.getElementById("show_rw_stats").checked) {
     return "";
   }
   return "none";
 }
 
 function toggleRWStats() {
-  var rwDisplay = getRWDisplay();
+  const rw_display = getRWDisplay();
   for (item of document.getElementsByClassName('rwstats')) {
-    item.style.display = rwDisplay;
+    item.style.display = rw_display;
   }
 }
 

@@ -24,7 +24,7 @@ describe("Test mapTimeseriesCounters", () => {
   // Test whether the method correctly searches and maps indexes of counters based
   // on counter_name
   test("Basic Test (Serial Order)", () => {
-    var parent_profile =
+    const parent_profile =
     {
       "profile_name": "Per Node Profiles",
       "num_children": 3,
@@ -53,20 +53,20 @@ describe("Test mapTimeseriesCounters", () => {
         }
       ]
     };
-    var counters = [
+    const counters = [
         ["HostCpuIoWaitPercentage", "avg io wait", 0],
         ["HostCpuSysPercentage", "avg sys", 0],
         ["HostCpuUserPercentage", "avg user", 0]
     ];
     expect(mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters,
         counters)).toBe(undefined);
-    for (var i = 0; i < counters.length; i++) {
+    for (let i = 0; i < counters.length; i++) {
       expect(counters[i][2]).toBe(i);
     }
   });
 
   test("Basic Test (Reverse Order)", () => {
-    var parent_profile =
+    const parent_profile =
     {
       "profile_name": "Per Node Profiles",
       "num_children": 3,
@@ -95,20 +95,20 @@ describe("Test mapTimeseriesCounters", () => {
         }
       ]
     };
-    var counters = [
+    const counters = [
         ["HostCpuIoWaitPercentage", "avg io wait", 0],
         ["HostCpuSysPercentage", "avg sys", 0],
         ["HostCpuUserPercentage", "avg user", 0]
     ];
     expect(mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters,
         counters)).toBe(undefined);
-    for (var i = 0; i < counters.length; i++) {
+    for (let i = 0; i < counters.length; i++) {
       expect(counters[i][2]).toBe(counters.length - i - 1);
     }
   });
 
   test("Edge Case (No such 'counter_name' within profile)", () => {
-    var parent_profile =
+    const parent_profile =
     {
       "profile_name": "Per Node Profiles",
       "num_children": 3,
@@ -137,7 +137,7 @@ describe("Test mapTimeseriesCounters", () => {
         }
       ]
     };
-    var counters = [
+    const counters = [
         ["HostPercentage", "avg io wait", 0],
         ["HostSysPercenage", "avg sys", 0],
         ["HostUserPercntage", "avg user", 0]
@@ -154,17 +154,17 @@ describe("Test mapTimeseriesCounters", () => {
 describe("Test accumulateTimeseriesValues", () => {
   // Test whether the method correctly accumlates values after parsing values from 'data'
   // in 'time_series_counters' and correctly updates 'max_samples' even in corner cases
-  var {accumulateTimeseriesValues} = exportedForTest;
-  var data_type = "value type";
+  const {accumulateTimeseriesValues} = exportedForTest;
+  const DATA_TYPE = "value type";
   test("Basic Case (time_series_counter.num > max_samples.collected)", () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 7,
       period : 0,
       available : 0,
       collected : 0
     };
-    var values_array = [data_type, 0, 60, 100, 40, 38, 49, 61, 27];
-    var time_series_counter = {
+    const values_array = [DATA_TYPE, 0, 60, 100, 40, 38, 49, 61, 27];
+    const time_series_counter = {
       period: 100,
       num: 2000,
       data: "30, 100, 40"
@@ -173,7 +173,7 @@ describe("Test accumulateTimeseriesValues", () => {
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
         .toBe(undefined);
 
-    expect(values_array).toEqual([data_type, 0, 90, 200, 80, 38, 49, 61, 27]);
+    expect(values_array).toEqual([DATA_TYPE, 0, 90, 200, 80, 38, 49, 61, 27]);
 
     expect(max_samples).toEqual({
       allocated : 7,
@@ -184,14 +184,14 @@ describe("Test accumulateTimeseriesValues", () => {
   });
 
   test("Basic Case (time_series_counter.period > max_samples.period", () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 7,
       period : 100,
       available : 1000,
       collected : 1000
     };
-    var values_array = [data_type, 0, 60, 100, 40, 38, 49, 61, 27];
-    var time_series_counter = {
+    const values_array = [DATA_TYPE, 0, 60, 100, 40, 38, 49, 61, 27];
+    const time_series_counter = {
       period: 200,
       num: 300,
       data: "30, 100, 40"
@@ -200,7 +200,7 @@ describe("Test accumulateTimeseriesValues", () => {
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
         .toBe(undefined);
 
-    expect(values_array).toEqual([data_type, 0, 90, 200, 80, 38, 49, 61, 27]);
+    expect(values_array).toEqual([DATA_TYPE, 0, 90, 200, 80, 38, 49, 61, 27]);
 
     expect(max_samples).toEqual({
       allocated : 7,
@@ -212,14 +212,14 @@ describe("Test accumulateTimeseriesValues", () => {
 
   test(`Basic Case (time_series_counter.period <= max_samples.period
       && time_series_counter.num <= max_samples.collected)`, () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 7,
       period : 100,
       available : 1000,
       collected : 1000
     };
-    var values_array = [data_type, 0, 60, 100, 40, 38, 49, 61, 27];
-    var time_series_counter = {
+    const values_array = [DATA_TYPE, 0, 60, 100, 40, 38, 49, 61, 27];
+    const time_series_counter = {
       period: 100,
       num: 300,
       data: "30, 100, 40"
@@ -228,7 +228,7 @@ describe("Test accumulateTimeseriesValues", () => {
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
         .toBe(undefined);
 
-    expect(values_array).toEqual([data_type, 0, 90, 200, 80, 38, 49, 61, 27]);
+    expect(values_array).toEqual([DATA_TYPE, 0, 90, 200, 80, 38, 49, 61, 27]);
 
     expect(max_samples).toEqual({
       allocated : 7,
@@ -239,14 +239,14 @@ describe("Test accumulateTimeseriesValues", () => {
   });
 
   test(`Edge Case (values_array length is smaller than collected samples)`, () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 2,
       period : 100,
       available : 2,
       collected : 1000
     };
-    var values_array = [data_type, 0, 60, 100];
-    var time_series_counter = {
+    const values_array = [DATA_TYPE, 0, 60, 100];
+    const time_series_counter = {
       period: 100,
       num: 300,
       data: "30, 100, 40"
@@ -255,7 +255,7 @@ describe("Test accumulateTimeseriesValues", () => {
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
         .toBe(undefined);
 
-    expect(values_array).toEqual([data_type, 0, 90, 200]);
+    expect(values_array).toEqual([DATA_TYPE, 0, 90, 200]);
 
     expect(max_samples).toEqual({
       allocated : 2,
@@ -269,91 +269,91 @@ describe("Test accumulateTimeseriesValues", () => {
 describe("Test generateTimesamples", () => {
   // Test whether time sample values generated based on 'max_samples' are correct,
   // even in corner cases, with different 'max_samples' scenarios
-  var data_type = "timesample type";
+  const DATA_TYPE = "timesample type";
   test("Basic Case (max_samples.allocated > max_samples.available)", () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 10,
       period : 1000,
       available : 4,
       collected : 10
     };
-    var timesamples_array = new Array(max_samples.allocated + 2).fill(null);
-    timesamples_array[0] = data_type;
+    const timesamples_array = new Array(max_samples.allocated + 2).fill(null);
+    timesamples_array[0] = DATA_TYPE;
 
     expect(generateTimesamples(timesamples_array, max_samples)).toBe(undefined);
 
-    expect(timesamples_array).toEqual([data_type, 0, 2.5, 5, 7.5, 10, null, null,
+    expect(timesamples_array).toEqual([DATA_TYPE, 0, 2.5, 5, 7.5, 10, null, null,
         null, null, null, null]);
   });
 
   test("Edge Case (max_samples.allocated < max_samples.available)", () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 10,
       period : 1000,
       available : 20,
       collected : 10
     };
-    var timesamples_array = new Array(max_samples.allocated + 2);
-    timesamples_array[0] = data_type;
+    const timesamples_array = new Array(max_samples.allocated + 2);
+    timesamples_array[0] = DATA_TYPE;
 
     expect(generateTimesamples(timesamples_array, max_samples)).toBe(undefined);
 
-    expect(timesamples_array).toEqual([data_type, 0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4,
+    expect(timesamples_array).toEqual([DATA_TYPE, 0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4,
         4.5, 5]);
   });
 
   test("Edge Case (max_samples.allocated = max_samples.available)", () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 10,
       period : 1000,
       available : 10,
       collected : 10
     };
-    var timesamples_array = new Array(max_samples.allocated + 2);
-    timesamples_array[0] = data_type;
+    const timesamples_array = new Array(max_samples.allocated + 2);
+    timesamples_array[0] = DATA_TYPE;
 
     expect(generateTimesamples(timesamples_array, max_samples)).toBe(undefined);
 
-    expect(timesamples_array).toEqual([data_type, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(timesamples_array).toEqual([DATA_TYPE, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   });
 });
 
 describe("Test clearTimeseriesValues", () => {
   // Test whether Timeseries arrays are being properly truncated in the correct range
-  var data_type = "value type";
+  const DATA_TYPE = "value type";
   test("Basic Case (max_samples.available < max_samples.allocated)", () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 7,
       period : 1000,
       available : 3,
       collected : 10
     };
-    var values_array = [data_type, 0, 4, 3, 20, 10, 100, 10];
+    const values_array = [DATA_TYPE, 0, 4, 3, 20, 10, 100, 10];
 
     expect(clearTimeseriesValues(values_array, max_samples)).toBe(undefined);
 
-    expect(values_array).toEqual([data_type, 0, null, null, null, 10, 100, 10]);
+    expect(values_array).toEqual([DATA_TYPE, 0, null, null, null, 10, 100, 10]);
   });
 
   test("Edge Case (max_samples.available >= max_samples.allocated)", () => {
-    var max_samples = {
+    const max_samples = {
       allocated : 7,
       period : 1000,
       available : 30,
       collected : 10
     };
-    var values_array = [data_type, 0, 3, 4, 3, 20, 10, 100, 10];
+    const values_array = [DATA_TYPE, 0, 3, 4, 3, 20, 10, 100, 10];
 
     expect(clearTimeseriesValues(values_array, max_samples)).toBe(undefined);
 
-    expect(values_array).toEqual([data_type, 0, null, null, null, null, null, null, null]);
+    expect(values_array).toEqual([DATA_TYPE, 0, null, null, null, null, null, null, null]);
   });
 });
 
 describe("Test aggregateProfileTimeseries", () => {
   // Test correctness of values being aggregated from parsing the profile
   test("Basic Case", () => {
-    var parent_profile =
+    const parent_profile =
     {
       "profile_name": "Per Node Profiles",
       "num_children": 3,
@@ -426,19 +426,19 @@ describe("Test aggregateProfileTimeseries", () => {
         }
       ]
     };
-    var max_samples = {
+    const max_samples = {
       allocated : 10,
       period : 0,
       available : 0,
       collected : 0
     };
-    var counters = [
+    const counters = [
         ["HostCpuIoWaitPercentage", "avg io wait", 0],
         ["HostCpuSysPercentage", "avg sys", 0],
         ["HostCpuUserPercentage", "avg user", 0]
     ];
-    var aggregate_array = new Array(counters.length);
-    for (var i = 0; i < counters.length; ++i) {
+    const aggregate_array = new Array(counters.length);
+    for (let i = 0; i < counters.length; ++i) {
       aggregate_array[i] = new Array(max_samples.allocated + 2).fill(0);
       aggregate_array[i][0] = counters[i][1];
     }

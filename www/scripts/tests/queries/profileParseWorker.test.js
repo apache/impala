@@ -23,7 +23,7 @@ describe("Test Compression Library", () => {
   // Test whether the compression library imported by the worker script
   // properly utilizes the pako library's compression methods
   test("Basic Test", () => {
-    var exampleJSONProfileText = readFileSync("../../../testdata/impala-profiles/"
+    const exampleJSONProfileText = readFileSync("../../../testdata/impala-profiles/"
         + "impala_profile_log_tpcds_compute_stats_extended.expected.pretty.json",
         {encoding : "utf-8"});
     import("../../../pako.min.js").then((pako) => {

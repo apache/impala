@@ -101,7 +101,7 @@ Example of json received from the impala server
 {{/statestore_update_staleness_detail}}
 <script src='{{ __common__.host-url }}/www/Chart-2.9.4.min.js'></script>
 <script type="text/javascript">
-window.onload = function() {
+window.onload = () => {
   renderGraph();
   formatMemoryColumns();
 };
@@ -110,30 +110,30 @@ window.onload = function() {
 // label is always omitted. This function bakes in a lot of assumptions for our chart.
 function afterFit(axis) {
   const ticks = axis.getTicks();
-  const widest = axis._labelSizes.widest.width;
-  const chartWidth = axis.width;
+  const WIDEST_WIDTH = axis._labelSizes.widest.width;
+  const CHART_WIDTH = axis.width;
 
   // Apply a rough heuristic for rotation.
-  const maxFit = Math.trunc(3 * chartWidth / (2 * widest));
+  const MAX_FIT_COUNT = Math.trunc(3 * CHART_WIDTH / (2 * WIDEST_WIDTH));
   // Limit to 20 labels.
-  const willFit = Math.min(maxFit, 20);
+  const WILL_FIT_COUNT = Math.min(MAX_FIT_COUNT, 20);
 
   // Ensure first and last are always shown.
-  const validLabelIndices = new Set();
-  validLabelIndices.add(0);
-  validLabelIndices.add(ticks.length - 1);
+  const valid_label_indices = new Set();
+  valid_label_indices.add(0);
+  valid_label_indices.add(ticks.length - 1);
 
-  const numLabels = ticks.length % 2 === 0 ? willFit : willFit - 1;
+  const NUM_LABELS = ticks.length % 2 === 0 ? WILL_FIT_COUNT : WILL_FIT_COUNT - 1;
 
-  const interval = ticks.length / (numLabels - 1);
-  for (let i = 1; i < willFit - 1; i += 1) {
-    validLabelIndices.add(Math.floor(interval * i));
+  const INTERVAL = ticks.length / (NUM_LABELS - 1);
+  for (let i = 1; i < WILL_FIT_COUNT - 1; i += 1) {
+    valid_label_indices.add(Math.floor(INTERVAL * i));
   }
 
   ticks.forEach((tick, index) => {
     Object.assign(
       tick,
-      { label: validLabelIndices.has(index) ? tick.label : null },
+      { label: valid_label_indices.has(index) ? tick.label : null },
     );
   });
 }
@@ -141,24 +141,24 @@ function afterFit(axis) {
 // Picks up all the canvas elements associated with each resource pool and renders its
 // peak memory usage histogram.
 function renderGraph() {
-  var plainJson = document.getElementById("resource_pools_plain_json");
-  var json = JSON.parse(plainJson.innerText);
-  var canvases = document.getElementsByTagName("canvas");
+  const plain_json = document.getElementById("resource_pools_plain_json");
+  const json = JSON.parse(plain_json.innerText);
+  const canvases = document.getElementsByTagName("canvas");
 
-  for (var pool_idx = 0; pool_idx < json.length; pool_idx++){
-    var histogram = json[pool_idx]["peak_mem_usage_histogram"]
-    var pool_name = json[pool_idx]['pool_name'];
-    var hist_labels = new Array();
-    var hist_values = new Array();
-    for (var i = 0; i < histogram.length; i++) {
-      var hist_elem = histogram[i];
+  for (let pool_idx = 0; pool_idx < json.length; pool_idx++){
+    const POOL_NAME = json[pool_idx]['pool_name'];
+    const histogram = json[pool_idx]["peak_mem_usage_histogram"];
+    const hist_labels = new Array();
+    const hist_values = new Array();
+    for (let i = 0; i < histogram.length; i++) {
+      const hist_elem = histogram[i];
       //hist_labels.push((hist_elem[0]-1) + " - " + hist_elem[0] + " GB");
-      hist_labels.push((hist_elem[0]+1) + " GB");
+      hist_labels.push((hist_elem[0] + 1) + " GB");
       hist_values.push(hist_elem[1]);
     }
     hist_labels[hist_labels.length-1] += " and above"
     // Render the bar chart now.
-    var chart_Data = {
+    const chart_data = {
             labels: hist_labels,
             datasets: [{
                 label: 'Number of Queries',
@@ -167,10 +167,10 @@ function renderGraph() {
             }],
       };
 
-    var ctx = canvases[pool_name].getContext('2d');
+    const ctx = canvases[POOL_NAME].getContext('2d');
       window.myBar = new Chart(ctx, {
           type: 'bar',
-          data: chart_Data,
+          data: chart_data,
           options: {
               responsive: true,
               legend: {
@@ -196,13 +196,13 @@ function renderGraph() {
 // Picks up all the elements classified as memory and replaces it with pretty printed
 // value.
 function formatMemoryColumns() {
-  var cols = document.getElementsByClassName("memory");
-  for (var idx = 0; idx < cols.length; idx++) {
+  const cols = document.getElementsByClassName("memory");
+  for (let idx = 0; idx < cols.length; idx++) {
     cols[idx].innerText = formatMemory(cols[idx].innerText);
   }
 }
 
-var memory_key = [
+const memory_key = [
   {'unit': 'B', 'val': 1},
   {'unit': 'KB', 'val': 1024},
   {'unit': 'MB', 'val': 1048576},
@@ -211,19 +211,19 @@ var memory_key = [
 
 // Helper method that takes in a value (in bytes) and outputs its pretty printed value.
 function formatMemory(val) {
-  var mem_bytes = parseInt(val);
-  for (var idx = memory_key.length - 1; idx >= 0; idx--) {
-    var result = parseFloat(mem_bytes / memory_key[idx].val);
-    if (result < 1) continue;
-    return result.toFixed(2) + " " + memory_key[idx].unit;
+  const MEM_BYTES = parseInt(val);
+  for (let idx = memory_key.length - 1; idx >= 0; idx--) {
+    const RESULT_MEM = parseFloat(MEM_BYTES / memory_key[idx].val);
+    if (RESULT_MEM < 1) continue;
+    return RESULT_MEM.toFixed(2) + " " + memory_key[idx].unit;
   }
   return "0 B";
 }
 
 function reset_all() {
   if (!confirm('Are you sure you want to reset stats for all resource pools ?')) return;
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function(ignored_arg) {
+  const xhr = new XMLHttpRequest();
+  xhr.onload = () => {
     window.location.reload(true);
   }
   xhr.open('GET', make_url("/resource_pool_reset"), true);
@@ -232,8 +232,8 @@ function reset_all() {
 
 function reset_method(pool_name) {
   if (!confirm('Are you sure you want to reset stats for ' + pool_name +' ?')) return;
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function(ignored_arg) {
+  const xhr = new XMLHttpRequest();
+  xhr.onload = () => {
     window.location.reload(true);
   }
   xhr.open('GET', make_url("/resource_pool_reset?pool_name=" + pool_name), true);

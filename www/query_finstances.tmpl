@@ -46,9 +46,9 @@ under the License.
 </table>
 
 <script>
-var intervalId = 0;
-var table = null;
-var refresh = function () {
+let interval_id = 0;
+let table = null;
+const refresh = () => {
     table.ajax.reload();
     document.getElementById("last-updated").textContent = new Date();
 };
@@ -57,7 +57,7 @@ var refresh = function () {
 // row. Also clears the last report timestamp field for instances that have not started or
 // have already finished execution.
 function unpackJson(json) {
-    var result = new Array();
+    const result = new Array();
     if (typeof json.backend_instances === "undefined") {
         // Table will be empty, remove it.
         table.table().destroy(true);
@@ -69,11 +69,11 @@ function unpackJson(json) {
         toggleRefresh();
         return json;
     }
-    for (var i = 0; i < json.backend_instances.length; ++i) {
-        var backend_state = json.backend_instances[i];
-        var instance_stats = backend_state.instance_stats;
-        for (var j = 0; j < instance_stats.length; ++j) {
-            var instance = instance_stats[j];
+    for (let i = 0; i < json.backend_instances.length; ++i) {
+        const backend_state = json.backend_instances[i];
+        const instance_stats = backend_state.instance_stats;
+        for (let j = 0; j < instance_stats.length; ++j) {
+            const instance = instance_stats[j];
             instance.host = backend_state.host;
             if (instance.done) instance.time_since_last_heard_from = "";
             if (!instance.first_status_update_received) {
@@ -86,7 +86,7 @@ function unpackJson(json) {
     return result;
 }
 
-$(document).ready(function() {
+$(document).ready(() => {
     table = $('#finstances').DataTable({
         ajax: { url: make_url("/query_finstances?query_id={{query_id}}&json"),
                 dataSrc: unpackJson,
@@ -100,15 +100,15 @@ $(document).ready(function() {
         "order": [[ 0, "desc" ]],
         "pageLength": 100
     });
-    intervalId = setInterval(refresh, 1000);
+    interval_id = setInterval(refresh, 1000);
 });
 
 function toggleRefresh() {
-    if (document.getElementById("toggle").checked === true) {
-        intervalId = setInterval(refresh, 1000);
+    if (toggle.getElementById("toogle").checked === true) {
+        interval_id = setInterval(refresh, 1000);
         document.getElementById("refresh_on").textContent = "Auto-refresh on";
     } else {
-        clearInterval(intervalId);
+        clearInterval(interval_id);
         document.getElementById("refresh_on").textContent = "Auto-refresh off";
     }
 }

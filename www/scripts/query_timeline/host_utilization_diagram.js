@@ -15,80 +15,81 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import {profile, set_maxts, maxts, diagram_width, diagram_controls_height,
-    resizeVerticalAll, diagram_min_height, margin_chart_end, decimals}
-    from "./global_members.js";
+import {profile, diagram_width, resizeVerticalAll, DIAGRAM_MIN_HEIGHT, MARGIN_CHART_END,
+    decimals} from "./global_members.js";
 import {name_width, page_additional_height, setTimingDiagramDimensions}
     from "./fragment_diagram.js";
-import {array_values_start_index, aggregateProfileTimeseries, generateTimesamples,
+import {ARRAY_VALUES_START_INDEX, aggregateProfileTimeseries, generateTimesamples,
     clearTimeseriesValues, mapTimeseriesCounters, displayWarning, destroyChart}
     from "./chart_commons.js";
 import {getFragmentMetricsWrapperHeight} from "./fragment_metrics_diagram.js";
 import "./global_dom.js";
 
-export var exportedForTest;
+export let exportedForTest;
 
 // #host_utilization_diagram
-export var host_utilization_visible = true;
-export var host_utilization_chart = null;
-export var utilization_metrics_parse_successful = false;
+export let host_utilization_visible = true;
+export let host_utilization_chart = null;
+export let utilization_metrics_parse_successful = false;
 
-var cpu_utilization_counters = [
+const cpu_utilization_counters = [
     ["HostCpuIoWaitPercentage", "avg io wait", 0],
     ["HostCpuSysPercentage", "avg sys", 0],
     ["HostCpuUserPercentage", "avg user", 0]
 ];
-var read_write_metrics_counters = [
+const read_write_metrics_counters = [
     ["HostDiskReadThroughput", "avg disk read", 0],
     ["HostDiskWriteThroughput", "avg disk write", 0],
     ["HostNetworkRx", "avg network rx", 0],
     ["HostNetworkTx", "avg network tx", 0]
 ];
-var cpu_nodes_usage_aggregate;
-var read_write_metrics_aggregate;
-var sampled_utilization_timeseries;
-var utilization_timeaxis_name = "utilization timeticks";
-var prev_utilization_num_samples = 0;
-var max_samples_utilization = {
+const UTILIZATION_TIMEAXIS_NAME = "utilization timeticks";
+const MIN_NUM_SAMPLES = 3;
+const DIAGRAM_CONTROLS_HEIGHT = Math.max(28, window.innerHeight * 0.025);
+
+let cpu_nodes_usage_aggregate;
+let read_write_metrics_aggregate;
+let sampled_utilization_timeseries;
+let prev_utilization_num_samples = 0;
+const max_samples_utilization = {
   allocated : 64,
   available : 0,
   collected : 0,
   period : null
 };
-var host_utilization_resize_factor = 0.2;
-var min_num_samples = 3;
+let host_utilization_resize_factor = 0.2;
 
-var host_utilization_close_btn = document.getElementById("host_utilization_close_btn");
-var host_utilization_resize_bar = document.getElementById("host_utilization_resize_bar");
+const host_utilization_close_btn = document.getElementById("host_utilization_close_btn");
+const host_utilization_resize_bar = document.getElementById("host_utilization_resize_bar");
 
 function initializeUtilizationChart() {
-  var axis_mappings = {};
-  for(var i = 0; i < cpu_utilization_counters.length; ++i) {
+  const axis_mappings = {};
+  for(let i = 0; i < cpu_utilization_counters.length; ++i) {
     axis_mappings[cpu_utilization_counters[i][1]] = "y";
   }
-  for(var i = 0; i < read_write_metrics_counters.length; ++i) {
+  for(let i = 0; i < read_write_metrics_counters.length; ++i) {
     axis_mappings[read_write_metrics_counters[i][1]] = "y2";
   }
-  var cpu_utilization_counter_group = new Array(cpu_utilization_counters.length);
-  for (var i = 0; i < cpu_utilization_counters.length; i++){
+  const cpu_utilization_counter_group = new Array(cpu_utilization_counters.length);
+  for (let i = 0; i < cpu_utilization_counters.length; i++){
     cpu_utilization_counter_group[i] = cpu_utilization_counters[i][1];
   }
   host_utilization_diagram.style = null;
   host_utilization_chart = c3.generate({
     bindto : "#host_utilization_diagram",
     data : {
-      columns : [[utilization_timeaxis_name, 0]],
+      columns : [[UTILIZATION_TIMEAXIS_NAME, 0]],
       axes: axis_mappings,
       type : "area",
       groups : [ cpu_utilization_counter_group ],
       order : "asc",
-      x : utilization_timeaxis_name
+      x : UTILIZATION_TIMEAXIS_NAME
     }, size : {
       height : getUtilizationHeight(),
       width : diagram_width
     }, padding : {
       left : name_width,
-      right : margin_chart_end
+      right : MARGIN_CHART_END
     }, axis : {
       x :
       {
@@ -97,19 +98,19 @@ function initializeUtilizationChart() {
           right : 0
         },
         tick : {
-          format : function (x) { return x.toFixed(decimals); }
+          format : (x) => x.toFixed(decimals)
         }
       },
       y :
       {
         tick : {
-          format : function (y) { return y + '%'; }
+          format : (y) => y + '%'
         }
       },
       y2 :
       {
         tick : {
-          format : function (y2) { return `${getReadableSize(y2, 1)}/s`; }
+          format : (y2) => `${getReadableSize(y2, 1)}/s`
         },
         show : true
       }
@@ -117,37 +118,35 @@ function initializeUtilizationChart() {
       show : false
     }, tooltip : {
       format : {
-        value : function (value, ratio, id, index) {
+        value : (value, ratio, id, index) => {
           if (cpu_utilization_counter_group.includes(id)){
             return value.toFixed(decimals) + '%';
           } else {
             return `${getReadableSize(value, decimals)}/s`;
           }
         },
-        title : function (x, index) {
-          return x.toFixed(decimals) + "s";
-        }
+        title : (x, index) => x.toFixed(decimals) + "s"
       }
     }
   });
   host_utilization_chart.load({
     unload : true
   });
-  var chart_width = diagram_width - margin_chart_end - name_width;
+  const CHART_WIDTH = diagram_width - MARGIN_CHART_END - name_width;
   prev_utilization_num_samples = 0;
-  host_utilization_resize_bar.style.marginLeft = `${name_width + chart_width / 4}px`;
-  host_utilization_resize_bar.style.width = `${chart_width / 2}px`;
-  host_utilization_resize_bar.style.marginRight = `${chart_width / 4}px`;
+  host_utilization_resize_bar.style.marginLeft = `${name_width + CHART_WIDTH / 4}px`;
+  host_utilization_resize_bar.style.width = `${CHART_WIDTH / 2}px`;
+  host_utilization_resize_bar.style.marginRight = `${CHART_WIDTH / 4}px`;
 }
 
 function dragResizeBar(mousemove_e) {
   if (mousemove_e.target.classList[0] === "c3-event-rect") return;
-  var next_height = getUtilizationHeight() + (host_utilization_resize_bar.offsetTop -
+  const NEXT_HEIGHT = getUtilizationHeight() + (host_utilization_resize_bar.offsetTop -
       mousemove_e.clientY);
-  if (next_height >= diagram_min_height && window.innerHeight - next_height
-      - diagram_controls_height >= page_additional_height
-      + getFragmentMetricsWrapperHeight() + diagram_min_height) {
-    host_utilization_resize_factor = next_height / window.innerHeight;
+  if (NEXT_HEIGHT >= DIAGRAM_MIN_HEIGHT && window.innerHeight - NEXT_HEIGHT
+      - DIAGRAM_CONTROLS_HEIGHT >= page_additional_height
+      + getFragmentMetricsWrapperHeight() + DIAGRAM_MIN_HEIGHT) {
+    host_utilization_resize_factor = NEXT_HEIGHT / window.innerHeight;
     resizeVerticalAll();
   }
 }
@@ -156,23 +155,23 @@ function initializeUtilizationMetrics(parent_profile, counters_y1, counters_y2,
     max_samples, timeaxis_name) {
   console.assert(parent_profile.profile_name === "Per Node Profiles");
   // user, sys, io and sampled timeticks
-  var cpu_nodes_usage_aggregate = new Array(counters_y1.length);
+  const cpu_nodes_usage_aggregate = new Array(counters_y1.length);
   max_samples.available = 0;
   max_samples.period = 0;
-  for (var i = 0; i < counters_y1.length; ++i) {
+  for (let i = 0; i < counters_y1.length; ++i) {
     cpu_nodes_usage_aggregate[i] = new Array(max_samples.allocated + 2)
         .fill(null);
     cpu_nodes_usage_aggregate[i][0] = counters_y1[i][1];
     cpu_nodes_usage_aggregate[i][1] = 0;
   }
-  var read_write_metrics_aggregate = new Array(counters_y2.length);
-  for (var i = 0; i < counters_y2.length; ++i) {
+  const read_write_metrics_aggregate = new Array(counters_y2.length);
+  for (let i = 0; i < counters_y2.length; ++i) {
     read_write_metrics_aggregate[i] = new Array(max_samples.allocated + 2)
         .fill(null);
     read_write_metrics_aggregate[i][0] = counters_y2[i][1];
     read_write_metrics_aggregate[i][1] = 0;
   }
-  var sampled_utilization_timeseries = new Array(max_samples.allocated + 2)
+  const sampled_utilization_timeseries = new Array(max_samples.allocated + 2)
       .fill(null);
   sampled_utilization_timeseries[0] = timeaxis_name;
   mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters, counters_y1);
@@ -182,13 +181,13 @@ function initializeUtilizationMetrics(parent_profile, counters_y1, counters_y2,
 }
 
 function getUtilizationHeight() {
-  return Math.max(diagram_min_height, window.innerHeight *
+  return Math.max(DIAGRAM_MIN_HEIGHT, window.innerHeight *
       host_utilization_resize_factor);
 }
 
 export function getUtilizationWrapperHeight() {
   return (utilization_metrics_parse_successful && host_utilization_visible) *
-      (getUtilizationHeight() + diagram_controls_height);
+      (getUtilizationHeight() + DIAGRAM_CONTROLS_HEIGHT);
 }
 
 export function resetUtilizationHeight() {
@@ -205,10 +204,10 @@ export function toogleUtilizationVisibility() {
 
 export async function resizeUtilizationChart() {
   if (host_utilization_chart === null) return;
-  var chart_width = diagram_width - margin_chart_end - name_width;
-  host_utilization_resize_bar.style.marginLeft = `${name_width + chart_width / 4}px`;
-  host_utilization_resize_bar.style.width = `${chart_width / 2}px`;
-  host_utilization_resize_bar.style.marginRight = `${chart_width / 4}px`;
+  const CHART_WIDTH = diagram_width - MARGIN_CHART_END - name_width;
+  host_utilization_resize_bar.style.marginLeft = `${name_width + CHART_WIDTH / 4}px`;
+  host_utilization_resize_bar.style.width = `${CHART_WIDTH / 2}px`;
+  host_utilization_resize_bar.style.marginRight = `${CHART_WIDTH / 4}px`;
   host_utilization_chart.resize({
     height : getUtilizationHeight(),
     width : diagram_width
@@ -227,16 +226,16 @@ export function collectUtilizationFromProfile() {
   try {
     // initialize the collection arrays for subsequent collections
     // arrays are overwritten without further re-allocation to reduce memory usage
-    var per_node_profiles = profile.child_profiles[2].child_profiles[0];
+    const per_node_profiles = profile.child_profiles[2].child_profiles[0];
     console.assert(per_node_profiles.profile_name === "Per Node Profiles");
     if (host_utilization_chart === null) {
       ({cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
           sampled_utilization_timeseries} = initializeUtilizationMetrics(
           per_node_profiles, cpu_utilization_counters, read_write_metrics_counters,
-          max_samples_utilization, utilization_timeaxis_name));
+          max_samples_utilization, UTILIZATION_TIMEAXIS_NAME));
       initializeUtilizationChart();
     }
-    var impala_server_profile = profile.child_profiles[1];
+    const impala_server_profile = profile.child_profiles[1];
     console.assert(impala_server_profile.profile_name === "ImpalaServer");
     // Update the plot, only when number of samples in SummaryStatsCounter is updated
     if (impala_server_profile.summary_stats_counters[0].num_of_samples ==
@@ -252,28 +251,28 @@ export function collectUtilizationFromProfile() {
         read_write_metrics_counters, max_samples_utilization);
 
     // display warnings in case less samples are available without plotting
-    if (max_samples_utilization.available < min_num_samples) {
-      var utilization_samples_message = `Warning: Not enough samples for
+    if (max_samples_utilization.available < MIN_NUM_SAMPLES) {
+      const UTILIZATION_SAMPLES_MESSAGE = `Warning: Not enough samples for
           CPU utilization plot. Please decrease the value of starting flag
           variable <b><i>periodic_counter_update_period_ms </b></i> to
           increase the granularity of CPU utilization plot.`;
       host_utilization_chart = destroyChart(host_utilization_chart,
           host_utilization_diagram);
-      displayWarning(host_utilization_diagram, utilization_samples_message,
-          diagram_width, name_width, margin_chart_end);
+      displayWarning(host_utilization_diagram, UTILIZATION_SAMPLES_MESSAGE,
+          diagram_width, name_width, MARGIN_CHART_END);
       utilization_metrics_parse_successful = true;
       return;
     }
     // average the aggregated metrics
-    cpu_nodes_usage_aggregate.forEach(function (acc_usage) {
-      for (var i = array_values_start_index; i < max_samples_utilization.available
-          + array_values_start_index; ++i) {
+    cpu_nodes_usage_aggregate.forEach((acc_usage) => {
+      for (let i = ARRAY_VALUES_START_INDEX; i < max_samples_utilization.available
+          + ARRAY_VALUES_START_INDEX; ++i) {
         acc_usage[i] = acc_usage[i] / (100 * per_node_profiles.child_profiles.length);
       }
     });
-    read_write_metrics_aggregate.forEach(function (acc_usage) {
-      for (var i = array_values_start_index; i < max_samples_utilization.available
-          + array_values_start_index; ++i) {
+    read_write_metrics_aggregate.forEach((acc_usage) => {
+      for (let i = ARRAY_VALUES_START_INDEX; i < max_samples_utilization.available
+          + ARRAY_VALUES_START_INDEX; ++i) {
         acc_usage[i] = acc_usage[i] / per_node_profiles.child_profiles.length;
       }
     });
@@ -286,10 +285,10 @@ export function collectUtilizationFromProfile() {
           sampled_utilization_timeseries]
     });
     // clear utilization value and timestamp samples arrays
-    cpu_nodes_usage_aggregate.forEach(function (acc_usage) {
+    cpu_nodes_usage_aggregate.forEach((acc_usage) => {
       clearTimeseriesValues(acc_usage, max_samples_utilization);
     });
-    read_write_metrics_aggregate.forEach(function (acc_usage) {
+    read_write_metrics_aggregate.forEach((acc_usage) => {
       clearTimeseriesValues(acc_usage, max_samples_utilization);
     });
     prev_utilization_num_samples = profile.child_profiles[1].summary_stats_counters[0]
@@ -321,13 +320,13 @@ host_utilization_resize_bar.addEventListener('mousedown',
 });
 
 
-host_utilization_close_btn.addEventListener('click', function(e) {
+host_utilization_close_btn.addEventListener('click', (e) => {
   host_utilization_visible = false;
   destroyUtilizationChart();
 });
 
-host_utilization_close_btn.style.height = `${diagram_controls_height}px`;
-host_utilization_close_btn.style.fontSize = `${diagram_controls_height / 2}px`;
+host_utilization_close_btn.style.height = `${DIAGRAM_CONTROLS_HEIGHT}px`;
+host_utilization_close_btn.style.fontSize = `${DIAGRAM_CONTROLS_HEIGHT / 2}px`;
 
 if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
   exportedForTest = {initializeUtilizationMetrics};

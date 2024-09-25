@@ -28,7 +28,7 @@ under the License.
 
 <div class="container">
 
-<style id="page_export-css">
+<style id="page_export_css">
 #fragment_diagram, #phases_header, #timeticks_footer {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
       Arial, "Noto Sans", sans-serif;
@@ -171,17 +171,17 @@ import {collectUtilizationFromProfile, toogleUtilizationVisibility,
 import {collectFragmentMetricsFromProfile, closeFragmentMetricsChart} from
     "{{ __common__.host-url }}/www/scripts/query_timeline/fragment_metrics_diagram.js";
 import {profile, set_profile, maxts, set_maxts, diagram_width, set_diagram_width,
-    border_stroke_width, resizeHorizontalAll}
+    BORDER_STROKE_WIDTH, resizeHorizontalAll}
     from "{{ __common__.host-url }}/www/scripts/query_timeline/global_members.js";
 import {inflateParseJSON} from "{{ __common__.host-url }}/www/scripts/compression_util.js";
 
-var chart_export_style;
-var last_maxts;
+let chart_export_style;
+let last_maxts;
 
-var dbOpenReq = indexedDB.open("imported_queries");
-var db;
+const db_open_req = indexedDB.open("imported_queries");
+let db;
 
-var supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
+const supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
 
 function refreshView() {
   collectFragmentEventsFromProfile();
@@ -196,13 +196,13 @@ function refreshView() {
 
 
 if (window.location.search.includes("imported")) {
-  var alertMessage = document.getElementsByClassName("alert alert-danger")[0];
-  if (alertMessage) {
-    alertMessage.remove();
+  const alert_message = document.getElementsByClassName("alert alert-danger")[0];
+  if (alert_message) {
+    alert_message.remove();
   }
-  var nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  const nav_links = document.getElementsByClassName("nav nav-tabs")[0];
   nav_links = nav_links.getElementsByClassName("nav-link");
-  for (var i = 0; i < nav_links.length;) {
+  for (let i = 0; i < nav_links.length;) {
     if (supported_tabs.includes(nav_links[i].textContent)) {
       nav_links[i].href = `${nav_links[i].href}&imported=true`;
       i++;
@@ -211,22 +211,22 @@ if (window.location.search.includes("imported")) {
     }
   }
 
-  dbOpenReq.onsuccess = (e) => {
+  db_open_req.onsuccess = (e) => {
     db = e.target.result;
     db.onerror = (e) => {
       console.log("IndexedDB error");
       console.log(e);
     }
-    var profileStore = db.transaction("profiles", "readonly").objectStore("profiles");
-    profileStore.get(getQueryID()).onsuccess = (e) => {
+    const profile_store = db.transaction("profiles", "readonly").objectStore("profiles");
+    profile_store.get(getQueryID()).onsuccess = (e) => {
       set_profile(inflateParseJSON(e.target.result.profile).contents);
       refreshView();
     };
   };
 } else {
   window.onload = function refreshProfile() {
-    var req = new XMLHttpRequest();
-    req.onload = function() {
+    const req = new XMLHttpRequest();
+    req.onload = () => {
       if (req.status === 200) {
         set_profile(JSON.parse(req.responseText)["profile_json"]);
         refreshView();
@@ -241,20 +241,20 @@ if (window.location.search.includes("imported")) {
   }
 }
 
-scrollable_screen.addEventListener('mousemove', function(e) {
-  var scroll_margin = window.innerWidth / 10;
-  var scroll_amount = window.innerWidth / 3;
-  if (e.clientX <= scroll_margin) {
-    scrollable_screen.scrollBy({left : - scroll_amount, behavior : "smooth"});
-  } else if (e.clientX >= window.innerWidth - scroll_margin) {
-    scrollable_screen.scrollBy({left : + scroll_amount, behavior : "smooth"});
+scrollable_screen.addEventListener('mousemove', (e) => {
+  const SCROLL_MARGIN = window.innerWidth / 10;
+  const SCROLL_AMOUNT = window.innerWidth / 3;
+  if (e.clientX <= SCROLL_MARGIN) {
+    scrollable_screen.scrollBy({left : - SCROLL_AMOUNT, behavior : "smooth"});
+  } else if (e.clientX >= window.innerWidth - SCROLL_MARGIN) {
+    scrollable_screen.scrollBy({left : + SCROLL_AMOUNT, behavior : "smooth"});
   }
 });
 
-window.addEventListener('resize', function(event) {
-  var window_diagram_width = window.innerWidth - border_stroke_width;
-  if (diagram_width <= window_diagram_width) {
-    set_diagram_width(window_diagram_width);
+window.addEventListener('resize', (event) => {
+  const WINDOW_DIAGRAM_WIDTH = window.innerWidth - BORDER_STROKE_WIDTH;
+  if (diagram_width <= WINDOW_DIAGRAM_WIDTH) {
+    set_diagram_width(WINDOW_DIAGRAM_WIDTH);
     hor_zoomout.disabled = true;
   } else {
     hor_zoomout.disabled = false;
@@ -262,40 +262,39 @@ window.addEventListener('resize', function(event) {
   resizeHorizontalAll();
 }, true);
 
-hor_zoomin.addEventListener('click', function(event) {
+hor_zoomin.addEventListener('click', (event) => {
   set_diagram_width(diagram_width + window.innerWidth * 0.2)
   set_ntics(ntics + 2);
   resizeHorizontalAll();
   hor_zoomout.disabled = false;
 });
 
-hor_zoomout.addEventListener('click', function(event) {
-  var prev_diagram_width = diagram_width;
-  var next_width = diagram_width - window.innerWidth * 0.2;
-  var window_diagram_width = window.innerWidth - border_stroke_width;
-  if (next_width <= window_diagram_width) {
-    next_width = window_diagram_width;
+hor_zoomout.addEventListener('click', (event) => {
+  const PREV_DIAGRAM_WIDTH = diagram_width;
+  const WINDOW_DIAGRAM_WIDTH = window.innerWidth - BORDER_STROKE_WIDTH;
+  let next_width = diagram_width - window.innerWidth * 0.2;
+  if (next_width <= WINDOW_DIAGRAM_WIDTH) {
+    next_width = WINDOW_DIAGRAM_WIDTH;
     hor_zoomout.disabled = true;
   }
   set_diagram_width(next_width);
-  var next_ntics = ntics + (diagram_width - prev_diagram_width) * 10 / window.innerWidth;
-  next_ntics = Math.round(next_ntics);
-  set_ntics(next_ntics);
+  const NEXT_NTICS = ntics + (diagram_width - PREV_DIAGRAM_WIDTH) * 10 / window.innerWidth;
+  NEXT_NTICS = Math.round(NEXT_NTICS);
+  set_ntics(NEXT_NTICS);
   resizeHorizontalAll();
 });
 
 // Attaches a SVG blob of the complete timeline to the associated link
-export_link.addEventListener('click', function (event) {
+export_link.addEventListener('click', (event) => {
   if (export_format.value === ".html") {
-    var export_style = document.getElementById("page_export-css");
-
+    const export_style = document.getElementById("page_export_css");
     // Deep clone 'parentNode's as wrappers to SVG components
-    var fragment_diagram_wrapper = fragment_diagram.parentNode.cloneNode(true);
+    const fragment_diagram_wrapper = fragment_diagram.parentNode.cloneNode(true);
 
     // Set dimensions for fragment diagram's wrapper
     fragment_diagram_wrapper.style.height = fragment_diagram.style.height;
 
-    var html_blob = new Blob(['<!DOCTYPE html><body>',
+    const html_blob = new Blob(['<!DOCTYPE html><body>',
         '<h1 style=\"font-family:monospace;\">Query {{query_id}}</h1>',
         `<style>${export_style.innerHTML} ${chart_export_style}</style>`,
         phases_header.parentNode.outerHTML, fragment_diagram_wrapper.outerHTML,

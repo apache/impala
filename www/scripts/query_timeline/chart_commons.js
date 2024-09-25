@@ -17,19 +17,20 @@
 
 import {maxts, set_maxts, clearDOMChildren} from "./global_members.js";
 
-export var exportedForTest;
+export let exportedForTest;
 // In the data array provided for c3's line chart,
 // 0th element is name of dataset
 // 1st element is zero in all datasets(to compensate missing value for line chart)
 // Hence the values index start at 2
-export var array_values_start_index = 2;
+export const ARRAY_VALUES_START_INDEX = 2;
 
 function accumulateTimeseriesValues(values_array, time_series_counter, max_samples) {
-  var samples = time_series_counter.data.split(",").map(el => parseInt(el));
-  var max_traverse_len = Math.min(samples.length, values_array.length - 2);
+  const samples = time_series_counter.data.split(",").map(el => parseInt(el));
+  const MAX_TRAVERSE_LEN = Math.min(samples.length, values_array.length
+      - ARRAY_VALUES_START_INDEX);
   if (isNaN(samples[0])) return;
-  for (var j = 0; j < max_traverse_len; ++j) {
-    values_array[j + 2] += samples[j];
+  for (let j = 0; j < MAX_TRAVERSE_LEN; ++j) {
+    values_array[j + ARRAY_VALUES_START_INDEX] += samples[j];
   }
   if (time_series_counter.num > max_samples.collected || time_series_counter.period
       > max_samples.period) {
@@ -40,17 +41,18 @@ function accumulateTimeseriesValues(values_array, time_series_counter, max_sampl
 }
 
 export function generateTimesamples(timesamples_array, max_samples, extend) {
-  var avg_period = max_samples.collected * max_samples.period / max_samples.available;
-  avg_period = avg_period / 1000;
-  var max_traverse_len = Math.min(max_samples.available, timesamples_array.length - 2);
-  for (var k = 0; k <= max_traverse_len; ++k) {
-    timesamples_array[k + 1] = (k * avg_period);
+  const AVG_PERIOD = max_samples.collected * max_samples.period /
+      (max_samples.available * 1000);
+  const MAX_TRAVERSE_LEN = Math.min(max_samples.available, timesamples_array.length
+      - ARRAY_VALUES_START_INDEX);
+  for (let k = 0; k <= MAX_TRAVERSE_LEN; ++k) {
+    timesamples_array[k + 1] = (k * AVG_PERIOD);
   }
   if (maxts / 1e9 > timesamples_array[max_samples.available + 1]) {
     // extend by one additional point or correct the final point
     if (extend) {
       // extend
-      timesamples_array[max_samples.available + 2] = maxts / 1e9;
+      timesamples_array[max_samples.available + ARRAY_VALUES_START_INDEX] = maxts / 1e9;
     } else {
       // correct
       timesamples_array[max_samples.available + 1] = maxts / 1e9;
@@ -58,16 +60,17 @@ export function generateTimesamples(timesamples_array, max_samples, extend) {
   } else {
     set_maxts(timesamples_array[max_samples.available + 1] * 1e9);
   }
-  var j = max_samples.available + (extend ? 3 : 2);
+  let j = max_samples.available + (extend ? 3 : 2);
   for (; j < timesamples_array.length && timesamples_array[j] !== null; ++j) {
     timesamples_array[j] = null;
   }
 }
 
 export function mapTimeseriesCounters(time_series_counters, counters) {
-  for (var i = 0; i < counters.length; i++) {
-    var no_change = true;
-    for (var j = 0; j < time_series_counters.length; j++) {
+  let no_change;
+  for (let i = 0; i < counters.length; i++) {
+    no_change = true;
+    for (let j = 0; j < time_series_counters.length; j++) {
       if (time_series_counters[j].counter_name === counters[i][0]) {
         counters[i][2] = j;
         no_change = false;
@@ -80,16 +83,16 @@ export function mapTimeseriesCounters(time_series_counters, counters) {
 }
 
 export function clearTimeseriesValues(values_array, max_samples) {
-  var max_traverse_len = Math.min(max_samples.available + 1, values_array.length - 1);
-  for (var j = array_values_start_index; j <= max_traverse_len; ++j) {
+  const MAX_TRAVERSE_LEN = Math.min(max_samples.available + 1, values_array.length - 1);
+  for (let j = ARRAY_VALUES_START_INDEX; j <= MAX_TRAVERSE_LEN; ++j) {
     values_array[j] = null;
   }
 }
 
 export function aggregateProfileTimeseries(parent_profile, aggregate_array,
     counters, max_samples) {
-  parent_profile.child_profiles.forEach(function (time_series_profiles) {
-    for (var i = 0; i < aggregate_array.length; ++i) {
+  parent_profile.child_profiles.forEach((time_series_profiles) => {
+    for (let i = 0; i < aggregate_array.length; ++i) {
       accumulateTimeseriesValues(aggregate_array[i],
           time_series_profiles.time_series_counters[counters[i][2]],
           max_samples);

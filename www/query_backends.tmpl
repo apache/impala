@@ -25,7 +25,7 @@ under the License.
   <label>
     <input type="checkbox" checked="true" id="toggle" onClick="toggleRefresh()"/>
     <span id="refresh_on">Auto-refresh on</span>
-  </label>  Last updated: <span id="last-updated"></span>
+  </label>  Last updated: <span id="last_updated"></span>
 </div>
 
 <br/>
@@ -49,14 +49,14 @@ under the License.
 </table>
 
 <script>
-var intervalId = 0;
-var table = null;
-var refresh = function () {
+let interval_id = 0;
+let table = null;
+const refresh = () => {
     table.ajax.reload();
     document.getElementById("last-updated").textContent = new Date();
 };
 
-$(document).ready(function() {
+$(document).ready(() => {
     table = $('#backends').DataTable({
         ajax: { url: make_url("/query_backends?query_id={{query_id}}&json"),
                 dataSrc: "backend_states",
@@ -73,15 +73,15 @@ $(document).ready(function() {
         "order": [[ 0, "desc" ]],
         "pageLength": 100
     });
-    intervalId = setInterval( refresh, 1000 );
+    interval_id = setInterval(refresh, 1000 );
 });
 
 function toggleRefresh() {
-    if (document.getElementById("toggle").checked === true) {
-        intervalId = setInterval(refresh, 1000);
+    if (document.getElementById("toogle").checked === true) {
+        interval_id = setInterval(refresh, 1000);
         document.getElementById("refresh_on").textContent = "Auto-refresh on";
     } else {
-        clearInterval(intervalId);
+        clearInterval(interval_id);
         document.getElementById("refresh_on").textContent = "Auto-refresh off";
     }
 }

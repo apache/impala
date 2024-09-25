@@ -107,47 +107,45 @@ under the License.
 </ul>
 
 <script>
-if (typeof index === "undefined") {
-  var index = {};
+const index = {};
 
-  // For inflight (executing or waiting) query
-  index.action = 0;
-  index.default_db = 1;
-  index.stmt_type = 2;
-  index.start_time = 3;
+// For inflight (executing or waiting) query
+index.action = 0;
+index.default_db = 1;
+index.stmt_type = 2;
+index.start_time = 3;
 
-  // For not inflight query
-  index.end_time = 3;
+// For not inflight query
+index.end_time = 3;
 
-  // For executing query
-  index.executing = {
-    duration        : 4,
-    queued_duration : 5,
-    mem_usage       : 6,
-    mem_est         : 7,
-    progress        : 8,
-    query_progress   : 9,
-    bytes_read      : 10,
-    bytes_sent      : 11,
-    last_event      : 12,
-    rows_fetched    : 13
-  };
+// For executing query
+index.executing = {
+  duration        : 4,
+  queued_duration : 5,
+  mem_usage       : 6,
+  mem_est         : 7,
+  progress        : 8,
+  query_progress   : 9,
+  bytes_read      : 10,
+  bytes_sent      : 11,
+  last_event      : 12,
+  rows_fetched    : 13
+};
 
-  // For waiting query
-  index.waiting = {
-    waiting_time    : 4,
-    duration        : 5,
-    queued_duration : 6,
-    mem_usage       : 7,
-    mem_est         : 8,
-    progress        : 9,
-    query_progress  : 10,
-    bytes_read      : 11,
-    bytes_sent      : 12,
-    last_event      : 13,
-    rows_fetched    : 14
-  };
-}
+// For waiting query
+index.waiting = {
+  waiting_time    : 4,
+  duration        : 5,
+  queued_duration : 6,
+  mem_usage       : 7,
+  mem_est         : 8,
+  progress        : 9,
+  query_progress  : 10,
+  bytes_read      : 11,
+  bytes_sent      : 12,
+  last_event      : 13,
+  rows_fetched    : 14
+};
 
 function update_executing_record(data_row, record_json) {
   for (name in index.executing) {
