@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=51-e06c7dcb96
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=475-e06c7dcb96
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=56-810d0f4757
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=486-810d0f4757
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-e06c7dcb9663a5df08a6bda025d82806762d019f}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-810d0f47572d9ac4036c34eb2ad6342d51d510cd}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -121,7 +121,7 @@ export IMPALA_CMAKE_VERSION=3.22.2
 unset IMPALA_CMAKE_URL
 export IMPALA_CRCUTIL_VERSION=2903870057d2f1f109b245650be29e856dc8b646
 unset IMPALA_CRCUTIL_URL
-export IMPALA_CURL_VERSION=7.78.0
+export IMPALA_CURL_VERSION=8.10.1
 unset IMPALA_CURL_URL
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 unset IMPALA_CYRUS_SASL_URL

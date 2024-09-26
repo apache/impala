@@ -487,7 +487,7 @@ public class JwtHttpTest {
     String expectedErrString = String.format("Impalad services did not start correctly, "
         + "exiting.  Error: Error downloading JWKS from '%s': Network error: curl "
         + "error: SSL peer certificate or SSH remote key was not OK: SSL: "
-        + "certificate subject name '%s' does not match target host name '%s'",
+        + "certificate subject name '%s' does not match target hostname '%s'",
         jwksHttpUrl, certCN, "localhost");
 
     // cluster start will fail because the TLS cert returned by the
