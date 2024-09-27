@@ -24,9 +24,10 @@ USE_APACHE_HIVE_3 = os.environ['USE_APACHE_HIVE_3']
 KERBERIZE = os.environ.get('IMPALA_KERBERIZE') == 'true'
 VARIANT = os.environ.get('HIVE_VARIANT')
 IMPALA_JAVA_TOOL_OPTIONS=os.environ.get("IMPALA_JAVA_TOOL_OPTIONS")
+HDFS_REPLICATION=os.environ.get("HDFS_REPLICATION")
 
 CONFIG = {
-  'dfs.replication': '3'
+  'dfs.replication': HDFS_REPLICATION
 }
 
 # General Hive configuration.
