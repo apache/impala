@@ -19,10 +19,10 @@ select  i_product_name
 order by qoh, i_product_name, i_brand, i_class, i_category
 limit 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=149.44MB Threads=5
-Per-Host Resource Estimates: Memory=13.61GB
+Max Per-Host Resource Reservation: Memory=140.06MB Threads=5
+Per-Host Resource Estimates: Memory=12.02GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=13.61GB mem-reservation=149.44MB thread-reservation=5 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=12.02GB mem-reservation=140.06MB thread-reservation=5 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_product_name WHEN 7 THEN i_product_name WHEN 9 THEN i_product_name WHEN 11 THEN i_product_name WHEN 13 THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_brand WHEN 7 THEN i_brand WHEN 9 THEN i_brand WHEN 11 THEN NULL WHEN 13 THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_class WHEN 7 THEN i_class WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_category WHEN 7 THEN NULL WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END, aggif(valid_tid(5,7,9,11,13) IN (5, 7, 9, 11, 13), CASE valid_tid(5,7,9,11,13) WHEN 5 THEN avg(inv_quantity_on_hand) WHEN 7 THEN avg(inv_quantity_on_hand) WHEN 9 THEN avg(inv_quantity_on_hand) WHEN 11 THEN avg(inv_quantity_on_hand) WHEN 13 THEN avg(inv_quantity_on_hand) END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -36,8 +36,8 @@ PLAN-ROOT SINK
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(5,7,9,11,13) IN (CAST(5 AS INT), CAST(7 AS INT), CAST(9 AS INT), CAST(11 AS INT), CAST(13 AS INT)), CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(7 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(9 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(11 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(13 AS INT) THEN avg(inv_quantity_on_hand) END)
 |  group by: CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN i_product_name WHEN CAST(11 AS INT) THEN i_product_name WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
-|  mem-estimate=1.72GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=14 row-size=60B cardinality=35.25M
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=14 row-size=60B cardinality=72.00K
 |  in pipelines: 08(GETNEXT), 07(OPEN)
 |
 07:AGGREGATE [FINALIZE]
@@ -57,7 +57,7 @@ PLAN-ROOT SINK
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=11.88GB mem-reservation=112.44MB thread-reservation=0
-|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
+|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=72.00K
 |  in pipelines: 07(GETNEXT), 00(OPEN)
 |
 06:HASH JOIN [INNER JOIN]
@@ -128,8 +128,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=11.74M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=288.82MB Threads=10
-Per-Host Resource Estimates: Memory=11.48GB
+Max Per-Host Resource Reservation: Memory=171.82MB Threads=10
+Per-Host Resource Estimates: Memory=4.97GB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -144,7 +144,7 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 10 THEN murmur_hash(i_product_name) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=6.57GB mem-reservation=142.69MB thread-reservation=1
+Per-Host Resources: mem-estimate=60.86MB mem-reservation=25.69MB thread-reservation=1
 09:TOP-N [LIMIT=100]
 |  order by: aggif(valid_tid(5,7,9,11,13) IN (5, 7, 9, 11, 13), CASE valid_tid(5,7,9,11,13) WHEN 5 THEN avg(inv_quantity_on_hand) WHEN 7 THEN avg(inv_quantity_on_hand) WHEN 9 THEN avg(inv_quantity_on_hand) WHEN 11 THEN avg(inv_quantity_on_hand) WHEN 13 THEN avg(inv_quantity_on_hand) END) ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_product_name WHEN 7 THEN i_product_name WHEN 9 THEN i_product_name WHEN 11 THEN i_product_name WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_brand WHEN 7 THEN i_brand WHEN 9 THEN i_brand WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_class WHEN 7 THEN i_class WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_category WHEN 7 THEN NULL WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC
 |  mem-estimate=5.47KB mem-reservation=0B thread-reservation=0
@@ -154,8 +154,8 @@ Per-Host Resources: mem-estimate=6.57GB mem-reservation=142.69MB thread-reservat
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(5,7,9,11,13) IN (CAST(5 AS INT), CAST(7 AS INT), CAST(9 AS INT), CAST(11 AS INT), CAST(13 AS INT)), CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(7 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(9 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(11 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(13 AS INT) THEN avg(inv_quantity_on_hand) END)
 |  group by: CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN i_product_name WHEN CAST(11 AS INT) THEN i_product_name WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
-|  mem-estimate=970.16MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=14 row-size=60B cardinality=35.25M
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=14 row-size=60B cardinality=72.00K
 |  in pipelines: 08(GETNEXT), 14(OPEN)
 |
 14:AGGREGATE [FINALIZE]
@@ -174,13 +174,13 @@ Per-Host Resources: mem-estimate=6.57GB mem-reservation=142.69MB thread-reservat
 |  Class 4
 |    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=5.62GB mem-reservation=108.69MB thread-reservation=0
-|  tuple-ids=5N,7N,9N,11N,13N row-size=422B cardinality=35.25M
+|  mem-estimate=50.00MB mem-reservation=20.94MB thread-reservation=0
+|  tuple-ids=5N,7N,9N,11N,13N row-size=422B cardinality=72.00K
 |  in pipelines: 14(GETNEXT), 00(OPEN)
 |
 13:EXCHANGE [HASH(CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 10 THEN murmur_hash(i_product_name) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)]
 |  mem-estimate=10.86MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
+|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=72.00K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -202,7 +202,7 @@ Per-Host Resources: mem-estimate=4.78GB mem-reservation=140.62MB thread-reservat
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=4.64GB mem-reservation=113.00MB thread-reservation=0
-|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
+|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=72.00K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -294,8 +294,8 @@ Per-Host Resources: mem-estimate=4.78GB mem-reservation=140.62MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=11.74M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=300.45MB Threads=9
-Per-Host Resource Estimates: Memory=11.32GB
+Max Per-Host Resource Reservation: Memory=183.45MB Threads=9
+Per-Host Resource Estimates: Memory=4.81GB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -310,7 +310,7 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 10 THEN murmur_hash(i_product_name) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=6.57GB mem-reservation=142.69MB thread-reservation=1
+Per-Instance Resources: mem-estimate=60.86MB mem-reservation=25.69MB thread-reservation=1
 09:TOP-N [LIMIT=100]
 |  order by: aggif(valid_tid(5,7,9,11,13) IN (5, 7, 9, 11, 13), CASE valid_tid(5,7,9,11,13) WHEN 5 THEN avg(inv_quantity_on_hand) WHEN 7 THEN avg(inv_quantity_on_hand) WHEN 9 THEN avg(inv_quantity_on_hand) WHEN 11 THEN avg(inv_quantity_on_hand) WHEN 13 THEN avg(inv_quantity_on_hand) END) ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_product_name WHEN 7 THEN i_product_name WHEN 9 THEN i_product_name WHEN 11 THEN i_product_name WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_brand WHEN 7 THEN i_brand WHEN 9 THEN i_brand WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_class WHEN 7 THEN i_class WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_category WHEN 7 THEN NULL WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC
 |  mem-estimate=5.47KB mem-reservation=0B thread-reservation=0
@@ -320,8 +320,8 @@ Per-Instance Resources: mem-estimate=6.57GB mem-reservation=142.69MB thread-rese
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(5,7,9,11,13) IN (CAST(5 AS INT), CAST(7 AS INT), CAST(9 AS INT), CAST(11 AS INT), CAST(13 AS INT)), CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(7 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(9 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(11 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(13 AS INT) THEN avg(inv_quantity_on_hand) END)
 |  group by: CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN i_product_name WHEN CAST(11 AS INT) THEN i_product_name WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
-|  mem-estimate=970.16MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=14 row-size=60B cardinality=35.25M
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=14 row-size=60B cardinality=72.00K
 |  in pipelines: 08(GETNEXT), 14(OPEN)
 |
 14:AGGREGATE [FINALIZE]
@@ -340,13 +340,13 @@ Per-Instance Resources: mem-estimate=6.57GB mem-reservation=142.69MB thread-rese
 |  Class 4
 |    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=5.62GB mem-reservation=108.69MB thread-reservation=0
-|  tuple-ids=5N,7N,9N,11N,13N row-size=422B cardinality=35.25M
+|  mem-estimate=50.00MB mem-reservation=20.94MB thread-reservation=0
+|  tuple-ids=5N,7N,9N,11N,13N row-size=422B cardinality=72.00K
 |  in pipelines: 14(GETNEXT), 00(OPEN)
 |
 13:EXCHANGE [HASH(CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 10 THEN murmur_hash(i_product_name) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)]
 |  mem-estimate=10.86MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
+|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=72.00K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -369,7 +369,7 @@ Per-Instance Resources: mem-estimate=4.68GB mem-reservation=129.00MB thread-rese
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=4.64GB mem-reservation=113.00MB thread-reservation=0
-|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
+|  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=72.00K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -529,9 +529,9 @@ order by i_category
 limit 100;
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=251.75MB Threads=5
-Per-Host Resource Estimates: Memory=11.51GB
+Per-Host Resource Estimates: Memory=11.36GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=11.51GB mem-reservation=251.75MB thread-reservation=5 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=11.36GB mem-reservation=251.75MB thread-reservation=5 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, s_store_id, sumsales, rk
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -568,8 +568,8 @@ PLAN-ROOT SINK
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT), CAST(7 AS INT), CAST(8 AS INT), CAST(9 AS INT), CAST(10 AS INT), CAST(11 AS INT), CAST(12 AS INT)), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(5 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(6 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(7 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(8 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(9 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(10 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(11 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(12 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END)
 |  group by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_category WHEN CAST(5 AS INT) THEN i_category WHEN CAST(6 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN i_category WHEN CAST(8 AS INT) THEN i_category WHEN CAST(9 AS INT) THEN i_category WHEN CAST(10 AS INT) THEN i_category WHEN CAST(11 AS INT) THEN i_category WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_class WHEN CAST(5 AS INT) THEN i_class WHEN CAST(6 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(8 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN i_class WHEN CAST(10 AS INT) THEN i_class WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_brand WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(6 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(8 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_product_name WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(6 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(8 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_year WHEN CAST(5 AS INT) THEN d_year WHEN CAST(6 AS INT) THEN d_year WHEN CAST(7 AS INT) THEN d_year WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_qoy WHEN CAST(5 AS INT) THEN d_qoy WHEN CAST(6 AS INT) THEN d_qoy WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_moy WHEN CAST(5 AS INT) THEN d_moy WHEN CAST(6 AS INT) THEN NULL WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN s_store_id WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) END
-|  mem-estimate=935.74MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=13 row-size=92B cardinality=15.09M
+|  mem-estimate=785.09MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=13 row-size=92B cardinality=11.56M
 |  in pipelines: 08(GETNEXT), 07(OPEN)
 |
 07:AGGREGATE [FINALIZE]
@@ -601,7 +601,7 @@ PLAN-ROOT SINK
 |    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=10.59GB mem-reservation=210.75MB thread-reservation=0
-|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=15.09M
+|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.56M
 |  in pipelines: 07(GETNEXT), 00(OPEN)
 |
 06:HASH JOIN [INNER JOIN]
@@ -673,8 +673,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=24B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=477.45MB Threads=11
-Per-Host Resource Estimates: Memory=8.63GB
+Max Per-Host Resource Reservation: Memory=426.45MB Threads=11
+Per-Host Resource Estimates: Memory=7.57GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -724,7 +724,7 @@ Per-Host Resources: mem-estimate=4.08MB mem-reservation=4.00MB thread-reservatio
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(i_category) WHEN 7 THEN murmur_hash(i_category) WHEN 8 THEN murmur_hash(i_category) WHEN 9 THEN murmur_hash(i_category) WHEN 10 THEN murmur_hash(i_category) WHEN 11 THEN murmur_hash(i_category) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 7 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(i_class) WHEN 9 THEN murmur_hash(i_class) WHEN 10 THEN murmur_hash(i_class) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 5 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 7 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 9 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 5 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 7 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_year) WHEN 5 THEN murmur_hash(d_year) WHEN 6 THEN murmur_hash(d_year) WHEN 7 THEN murmur_hash(d_year) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_qoy) WHEN 5 THEN murmur_hash(d_qoy) WHEN 6 THEN murmur_hash(d_qoy) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_moy) WHEN 5 THEN murmur_hash(d_moy) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(s_store_id) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=4.43GB mem-reservation=243.81MB thread-reservation=1
+Per-Host Resources: mem-estimate=3.36GB mem-reservation=192.81MB thread-reservation=1
 09:TOP-N
 |  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS LAST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
 |  limit with ties: 200
@@ -736,8 +736,8 @@ Per-Host Resources: mem-estimate=4.43GB mem-reservation=243.81MB thread-reservat
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT), CAST(7 AS INT), CAST(8 AS INT), CAST(9 AS INT), CAST(10 AS INT), CAST(11 AS INT), CAST(12 AS INT)), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(5 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(6 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(7 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(8 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(9 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(10 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(11 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(12 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END)
 |  group by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_category WHEN CAST(5 AS INT) THEN i_category WHEN CAST(6 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN i_category WHEN CAST(8 AS INT) THEN i_category WHEN CAST(9 AS INT) THEN i_category WHEN CAST(10 AS INT) THEN i_category WHEN CAST(11 AS INT) THEN i_category WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_class WHEN CAST(5 AS INT) THEN i_class WHEN CAST(6 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(8 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN i_class WHEN CAST(10 AS INT) THEN i_class WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_brand WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(6 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(8 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_product_name WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(6 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(8 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_year WHEN CAST(5 AS INT) THEN d_year WHEN CAST(6 AS INT) THEN d_year WHEN CAST(7 AS INT) THEN d_year WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_qoy WHEN CAST(5 AS INT) THEN d_qoy WHEN CAST(6 AS INT) THEN d_qoy WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_moy WHEN CAST(5 AS INT) THEN d_moy WHEN CAST(6 AS INT) THEN NULL WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN s_store_id WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) END
-|  mem-estimate=498.79MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=13 row-size=92B cardinality=15.09M
+|  mem-estimate=382.14MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=13 row-size=92B cardinality=11.56M
 |  in pipelines: 08(GETNEXT), 17(OPEN)
 |
 17:AGGREGATE [FINALIZE]
@@ -768,13 +768,13 @@ Per-Host Resources: mem-estimate=4.43GB mem-reservation=243.81MB thread-reservat
 |  Class 8
 |    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-|  mem-estimate=3.94GB mem-reservation=209.81MB thread-reservation=0
-|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=15.09M
+|  mem-estimate=2.99GB mem-reservation=158.81MB thread-reservation=0
+|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.56M
 |  in pipelines: 17(GETNEXT), 00(OPEN)
 |
 16:EXCHANGE [HASH(CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(i_category) WHEN 7 THEN murmur_hash(i_category) WHEN 8 THEN murmur_hash(i_category) WHEN 9 THEN murmur_hash(i_category) WHEN 10 THEN murmur_hash(i_category) WHEN 11 THEN murmur_hash(i_category) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 7 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(i_class) WHEN 9 THEN murmur_hash(i_class) WHEN 10 THEN murmur_hash(i_class) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 5 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 7 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 9 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 5 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 7 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_year) WHEN 5 THEN murmur_hash(d_year) WHEN 6 THEN murmur_hash(d_year) WHEN 7 THEN murmur_hash(d_year) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_qoy) WHEN 5 THEN murmur_hash(d_qoy) WHEN 6 THEN murmur_hash(d_qoy) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_moy) WHEN 5 THEN murmur_hash(d_moy) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(s_store_id) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)]
 |  mem-estimate=13.32MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=15.09M
+|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.56M
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -808,7 +808,7 @@ Per-Host Resources: mem-estimate=4.01GB mem-reservation=223.62MB thread-reservat
 |    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=3.92GB mem-reservation=211.00MB thread-reservation=0
-|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=15.09M
+|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.56M
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -901,8 +901,8 @@ Per-Host Resources: mem-estimate=4.01GB mem-reservation=223.62MB thread-reservat
    tuple-ids=0 row-size=24B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=948.89MB Threads=13
-Per-Host Resource Estimates: Memory=10.43GB
+Max Per-Host Resource Reservation: Memory=831.89MB Threads=13
+Per-Host Resource Estimates: Memory=9.13GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -952,7 +952,7 @@ Per-Instance Resources: mem-estimate=4.13MB mem-reservation=4.00MB thread-reserv
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(i_category) WHEN 7 THEN murmur_hash(i_category) WHEN 8 THEN murmur_hash(i_category) WHEN 9 THEN murmur_hash(i_category) WHEN 10 THEN murmur_hash(i_category) WHEN 11 THEN murmur_hash(i_category) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 7 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(i_class) WHEN 9 THEN murmur_hash(i_class) WHEN 10 THEN murmur_hash(i_class) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 5 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 7 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 9 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 5 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 7 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_year) WHEN 5 THEN murmur_hash(d_year) WHEN 6 THEN murmur_hash(d_year) WHEN 7 THEN murmur_hash(d_year) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_qoy) WHEN 5 THEN murmur_hash(d_qoy) WHEN 6 THEN murmur_hash(d_qoy) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_moy) WHEN 5 THEN murmur_hash(d_moy) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(s_store_id) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=2.87GB mem-reservation=243.81MB thread-reservation=1
+Per-Instance Resources: mem-estimate=2.22GB mem-reservation=185.31MB thread-reservation=1
 09:TOP-N
 |  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS LAST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
 |  limit with ties: 200
@@ -964,8 +964,8 @@ Per-Instance Resources: mem-estimate=2.87GB mem-reservation=243.81MB thread-rese
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT), CAST(7 AS INT), CAST(8 AS INT), CAST(9 AS INT), CAST(10 AS INT), CAST(11 AS INT), CAST(12 AS INT)), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(5 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(6 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(7 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(8 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(9 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(10 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(11 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN CAST(12 AS INT) THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END)
 |  group by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_category WHEN CAST(5 AS INT) THEN i_category WHEN CAST(6 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN i_category WHEN CAST(8 AS INT) THEN i_category WHEN CAST(9 AS INT) THEN i_category WHEN CAST(10 AS INT) THEN i_category WHEN CAST(11 AS INT) THEN i_category WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_class WHEN CAST(5 AS INT) THEN i_class WHEN CAST(6 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(8 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN i_class WHEN CAST(10 AS INT) THEN i_class WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_brand WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(6 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(8 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN i_product_name WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(6 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(8 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_year WHEN CAST(5 AS INT) THEN d_year WHEN CAST(6 AS INT) THEN d_year WHEN CAST(7 AS INT) THEN d_year WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_qoy WHEN CAST(5 AS INT) THEN d_qoy WHEN CAST(6 AS INT) THEN d_qoy WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN d_moy WHEN CAST(5 AS INT) THEN d_moy WHEN CAST(6 AS INT) THEN NULL WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN s_store_id WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL WHEN CAST(7 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL END, CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) END
-|  mem-estimate=249.40MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=13 row-size=92B cardinality=15.09M
+|  mem-estimate=191.07MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=13 row-size=92B cardinality=11.56M
 |  in pipelines: 08(GETNEXT), 17(OPEN)
 |
 17:AGGREGATE [FINALIZE]
@@ -996,13 +996,13 @@ Per-Instance Resources: mem-estimate=2.87GB mem-reservation=243.81MB thread-rese
 |  Class 8
 |    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-|  mem-estimate=2.63GB mem-reservation=209.81MB thread-reservation=0
-|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=15.09M
+|  mem-estimate=2.03GB mem-reservation=151.31MB thread-reservation=0
+|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.56M
 |  in pipelines: 17(GETNEXT), 00(OPEN)
 |
 16:EXCHANGE [HASH(CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(i_category) WHEN 7 THEN murmur_hash(i_category) WHEN 8 THEN murmur_hash(i_category) WHEN 9 THEN murmur_hash(i_category) WHEN 10 THEN murmur_hash(i_category) WHEN 11 THEN murmur_hash(i_category) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 7 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(i_class) WHEN 9 THEN murmur_hash(i_class) WHEN 10 THEN murmur_hash(i_class) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 5 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 7 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 9 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 5 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 7 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_year) WHEN 5 THEN murmur_hash(d_year) WHEN 6 THEN murmur_hash(d_year) WHEN 7 THEN murmur_hash(d_year) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_qoy) WHEN 5 THEN murmur_hash(d_qoy) WHEN 6 THEN murmur_hash(d_qoy) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(d_moy) WHEN 5 THEN murmur_hash(d_moy) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN murmur_hash(s_store_id) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)]
 |  mem-estimate=16.64MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=15.09M
+|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.56M
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1037,7 +1037,7 @@ Per-Instance Resources: mem-estimate=2.30GB mem-reservation=212.00MB thread-rese
 |    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=2.26GB mem-reservation=211.00MB thread-reservation=0
-|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=15.09M
+|  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.56M
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

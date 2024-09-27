@@ -201,8 +201,10 @@ public class CardinalityTest extends PlannerTestBase {
     // NDV(id) = 26 * ndv(null_str) = 1 ; 26 * 1 = 26
     verifyCardinality(baseStmt + "nullrows.id, null_str", 26);
     // NDV(id) = 26 * ndv(group_str) = 156
-    // Planner does not know that id determines group_str
-    verifyCardinality(baseStmt + "nullrows.id, group_str", 156);
+    // However, id and group_str belong to the same nullrows table that has only 26 rows.
+    verifyCardinality(baseStmt + "nullrows.id, group_str", 26);
+    // NDV(nullrows.id) * NDV(alltypes.month) = 26 * 12 = 312
+    verifyCardinality(baseStmt + "nullrows.id, alltypes.month", 312);
   }
 
   /**
@@ -217,7 +219,7 @@ public class CardinalityTest extends PlannerTestBase {
     verifyCardinality(
         "SELECT COUNT(*)" + joinClause + "GROUP BY t1.id", 7300);
     verifyCardinality(
-        "SELECT COUNT(*)" + joinClause + "GROUP BY t1.id, t1.int_col", 7300 * 10);
+        "SELECT COUNT(*)" + joinClause + "GROUP BY t1.id, t1.int_col", 7300);
   }
 
   @Test

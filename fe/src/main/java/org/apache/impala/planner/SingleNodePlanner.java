@@ -2154,8 +2154,8 @@ public class SingleNodePlanner {
       joinInput.setLimit(1);
       return joinInput;
     }
-    long numDistinct = AggregationNode.estimateNumGroups(distinctExprs,
-            joinInput.getCardinality());
+    long numDistinct = AggregationNode.estimateNumGroups(
+        distinctExprs, joinInput.getCardinality(), joinInput);
     if (numDistinct < 0 || joinInput.getCardinality() < 0) {
       // Default to not adding the aggregation if stats are missing.
       LOG.trace("addDistinctToJoinInput():: missing stats, will not add agg");

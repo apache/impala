@@ -63,7 +63,7 @@ Max Per-Host Resource Reservation: Memory=118.75MB Threads=1
 Per-Host Resource Estimates: Memory=40.78GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=40.78GB mem-reservation=118.75MB thread-reservation=1 runtime-filters-memory=36.00MB
-|  max-parallelism=1 segment-costs=[11282009508, 5153509026, 1500]
+|  max-parallelism=1 segment-costs=[11282009508, 7914, 1500]
 PLAN-ROOT SINK
 |  output exprs: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip, sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk <= 30) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 30) AND (sr_returned_date_sk - ss_sold_date_sk <= 60) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 60) AND (sr_returned_date_sk - ss_sold_date_sk <= 90) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 90) AND (sr_returned_date_sk - ss_sold_date_sk <= 120) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 120) THEN 1 ELSE 0 END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1500
@@ -71,14 +71,14 @@ PLAN-ROOT SINK
 10:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC, s_company_id ASC, s_street_number ASC, s_street_name ASC, s_street_type ASC, s_suite_number ASC, s_city ASC, s_county ASC, s_state ASC, s_zip ASC
 |  mem-estimate=20.47KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=210B cardinality=100 cost=5153509026
+|  tuple-ids=6 row-size=210B cardinality=100 cost=7914
 |  in pipelines: 10(GETNEXT), 09(OPEN)
 |
 09:AGGREGATE [FINALIZE]
 |  output: sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(30 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(30 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(60 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(60 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(90 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(90 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  group by: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip
 |  mem-estimate=644.46MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=210B cardinality=323.35M cost=1999152520
+|  tuple-ids=5 row-size=210B cardinality=1.35K cost=1999152520
 |  in pipelines: 09(GETNEXT), 00(OPEN)
 |
 08:HASH JOIN [INNER JOIN]
@@ -170,10 +170,10 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=24B cardinality=8.64G cost=2985961602
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.07GB Threads=52
-Per-Host Resource Estimates: Memory=13.15GB
+Max Per-Host Resource Reservation: Memory=794.52MB Threads=44
+Per-Host Resource Estimates: Memory=8.08GB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=5.84MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1567] cpu-comparison-result=213 [max(1 (self) vs 213 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip, sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk <= 30) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 30) AND (sr_returned_date_sk - ss_sold_date_sk <= 60) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 60) AND (sr_returned_date_sk - ss_sold_date_sk <= 90) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 90) AND (sr_returned_date_sk - ss_sold_date_sk <= 120) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 120) THEN 1 ELSE 0 END)
@@ -182,39 +182,39 @@ PLAN-ROOT SINK
 18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_store_name ASC, s_company_id ASC, s_street_number ASC, s_street_name ASC, s_street_type ASC, s_suite_number ASC, s_city ASC, s_county ASC, s_state ASC, s_zip ASC
 |  limit: 100
-|  mem-estimate=1.84MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=210.63KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=6 row-size=210B cardinality=100 cost=67
 |  in pipelines: 10(GETNEXT)
 |
-F06:PLAN FRAGMENT [HASH(s_store_name,s_company_id,s_street_number,s_street_name,s_street_type,s_suite_number,s_city,s_county,s_state,s_zip)] hosts=10 instances=90 (adjusted from 120)
-Per-Instance Resources: mem-estimate=535.00MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=520 segment-costs=[2346816618, 5153509026, 580] cpu-comparison-result=213 [max(90 (self) vs 213 (sum children))]
+F06:PLAN FRAGMENT [HASH(s_store_name,s_company_id,s_street_number,s_street_name,s_street_type,s_suite_number,s_city,s_county,s_state,s_zip)] hosts=10 instances=10 (adjusted from 120)
+Per-Instance Resources: mem-estimate=22.54MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[9797, 7914, 580] cpu-comparison-result=213 [max(10 (self) vs 213 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC, s_company_id ASC, s_street_number ASC, s_street_name ASC, s_street_type ASC, s_suite_number ASC, s_city ASC, s_county ASC, s_state ASC, s_zip ASC
 |  mem-estimate=20.47KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=210B cardinality=100 cost=5153509026
+|  tuple-ids=6 row-size=210B cardinality=100 cost=7914
 |  in pipelines: 10(GETNEXT), 17(OPEN)
 |
 17:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk <= 30) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 30) AND (sr_returned_date_sk - ss_sold_date_sk <= 60) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 60) AND (sr_returned_date_sk - ss_sold_date_sk <= 90) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 90) AND (sr_returned_date_sk - ss_sold_date_sk <= 120) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 120) THEN 1 ELSE 0 END)
 |  group by: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip
-|  mem-estimate=512.48MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=210B cardinality=323.35M cost=1999152520
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5 row-size=210B cardinality=1.35K cost=8346
 |  in pipelines: 17(GETNEXT), 00(OPEN)
 |
 16:EXCHANGE [HASH(s_store_name,s_company_id,s_street_number,s_street_name,s_street_type,s_suite_number,s_city,s_county,s_state,s_zip)]
-|  mem-estimate=22.51MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=210B cardinality=323.35M cost=347664098
+|  mem-estimate=12.54MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=210B cardinality=1.35K cost=1451
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)] hosts=10 instances=60 (adjusted from 120)
-Per-Instance Resources: mem-estimate=601.04MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=910 segment-costs=[9096879477, 4530947220] cpu-comparison-result=213 [max(180 (self) vs 213 (sum children))]
+Per-Instance Resources: mem-estimate=534.29MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=910 segment-costs=[9096879477, 18916] cpu-comparison-result=213 [max(180 (self) vs 213 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(30 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(30 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(60 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(60 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(90 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(90 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  group by: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip
 |  mem-estimate=512.67MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=210B cardinality=323.35M cost=1999152520
+|  tuple-ids=5 row-size=210B cardinality=1.35K cost=1999152520
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -384,10 +384,10 @@ max-parallelism=1824 segment-costs=[20791140047]
    tuple-ids=0 row-size=24B cardinality=8.64G cost=2985961602
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.07GB Threads=52
-Per-Host Resource Estimates: Memory=13.15GB
+Max Per-Host Resource Reservation: Memory=794.52MB Threads=44
+Per-Host Resource Estimates: Memory=8.08GB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=5.84MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1567] cpu-comparison-result=213 [max(1 (self) vs 213 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip, sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk <= 30) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 30) AND (sr_returned_date_sk - ss_sold_date_sk <= 60) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 60) AND (sr_returned_date_sk - ss_sold_date_sk <= 90) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 90) AND (sr_returned_date_sk - ss_sold_date_sk <= 120) THEN 1 ELSE 0 END), sum(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 120) THEN 1 ELSE 0 END)
@@ -396,39 +396,39 @@ PLAN-ROOT SINK
 18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_store_name ASC, s_company_id ASC, s_street_number ASC, s_street_name ASC, s_street_type ASC, s_suite_number ASC, s_city ASC, s_county ASC, s_state ASC, s_zip ASC
 |  limit: 100
-|  mem-estimate=1.84MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=210.63KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=6 row-size=210B cardinality=100 cost=67
 |  in pipelines: 10(GETNEXT)
 |
-F06:PLAN FRAGMENT [HASH(s_store_name,s_company_id,s_street_number,s_street_name,s_street_type,s_suite_number,s_city,s_county,s_state,s_zip)] hosts=10 instances=90 (adjusted from 120)
-Per-Instance Resources: mem-estimate=535.00MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=520 segment-costs=[2346816618, 5153509026, 580] cpu-comparison-result=213 [max(90 (self) vs 213 (sum children))]
+F06:PLAN FRAGMENT [HASH(s_store_name,s_company_id,s_street_number,s_street_name,s_street_type,s_suite_number,s_city,s_county,s_state,s_zip)] hosts=10 instances=10 (adjusted from 120)
+Per-Instance Resources: mem-estimate=22.54MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[9797, 7914, 580] cpu-comparison-result=213 [max(10 (self) vs 213 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC, s_company_id ASC, s_street_number ASC, s_street_name ASC, s_street_type ASC, s_suite_number ASC, s_city ASC, s_county ASC, s_state ASC, s_zip ASC
 |  mem-estimate=20.47KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=210B cardinality=100 cost=5153509026
+|  tuple-ids=6 row-size=210B cardinality=100 cost=7914
 |  in pipelines: 10(GETNEXT), 17(OPEN)
 |
 17:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk <= 30) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 30) AND (sr_returned_date_sk - ss_sold_date_sk <= 60) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 60) AND (sr_returned_date_sk - ss_sold_date_sk <= 90) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 90) AND (sr_returned_date_sk - ss_sold_date_sk <= 120) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (sr_returned_date_sk - ss_sold_date_sk > 120) THEN 1 ELSE 0 END)
 |  group by: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip
-|  mem-estimate=512.48MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=210B cardinality=323.35M cost=1999152520
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5 row-size=210B cardinality=1.35K cost=8346
 |  in pipelines: 17(GETNEXT), 00(OPEN)
 |
 16:EXCHANGE [HASH(s_store_name,s_company_id,s_street_number,s_street_name,s_street_type,s_suite_number,s_city,s_county,s_state,s_zip)]
-|  mem-estimate=22.51MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=210B cardinality=323.35M cost=347664098
+|  mem-estimate=12.54MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=210B cardinality=1.35K cost=1451
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk,ss_ticket_number)] hosts=10 instances=60 (adjusted from 120)
-Per-Instance Resources: mem-estimate=601.04MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=910 segment-costs=[9096879477, 4530947220] cpu-comparison-result=213 [max(180 (self) vs 213 (sum children))]
+Per-Instance Resources: mem-estimate=534.29MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=910 segment-costs=[9096879477, 18916] cpu-comparison-result=213 [max(180 (self) vs 213 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(30 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(30 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(60 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(60 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(90 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(90 AS BIGINT)) AND (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) <= CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(sr_returned_date_sk AS BIGINT) - CAST(ss_sold_date_sk AS BIGINT) > CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  group by: s_store_name, s_company_id, s_street_number, s_street_name, s_street_type, s_suite_number, s_city, s_county, s_state, s_zip
 |  mem-estimate=512.67MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=210B cardinality=323.35M cost=1999152520
+|  tuple-ids=5 row-size=210B cardinality=1.35K cost=1999152520
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

@@ -94,7 +94,6 @@ public class HBaseScanNode extends ScanNode {
   private final static int DEFAULT_MIN_ESTIMATE_BYTES = 4 * 1024;
 
   private final static Logger LOG = LoggerFactory.getLogger(HBaseScanNode.class);
-  private final TupleDescriptor desc_;
 
   // One range per clustering column. The range bounds are expected to be constants.
   // A null entry means there's no range restriction for that particular key.
@@ -123,7 +122,6 @@ public class HBaseScanNode extends ScanNode {
 
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc, "SCAN HBASE");
-    desc_ = desc;
   }
 
   @Override

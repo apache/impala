@@ -76,7 +76,6 @@ import com.google.common.collect.Lists;
  */
 public class DataSourceScanNode extends ScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(DataSourceScanNode.class);
-  private final TupleDescriptor desc_;
   private final FeDataSourceTable table_;
 
   // The converted conjuncts_ that were accepted by the data source. A conjunct can
@@ -94,7 +93,6 @@ public class DataSourceScanNode extends ScanNode {
 
   public DataSourceScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
     super(id, desc, "SCAN DATA SOURCE");
-    desc_ = desc;
     table_ = (FeDataSourceTable) desc_.getTable();
     conjuncts_ = conjuncts;
     acceptedPredicates_ = null;

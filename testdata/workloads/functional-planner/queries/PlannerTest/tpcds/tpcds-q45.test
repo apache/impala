@@ -59,7 +59,7 @@ PLAN-ROOT SINK
 |  output: sum(ws_sales_price)
 |  group by: ca_zip, ca_city
 |  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=8 row-size=54B cardinality=73.80K
+|  tuple-ids=8 row-size=54B cardinality=50.00K
 |  in pipelines: 12(GETNEXT), 00(OPEN)
 |
 11:HASH JOIN [LEFT OUTER JOIN]
@@ -176,7 +176,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=73.80K(filtered from 719.38K)
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=46.12MB Threads=16
+Max Per-Host Resource Reservation: Memory=44.25MB Threads=16
 Per-Host Resource Estimates: Memory=391MB
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
@@ -192,7 +192,7 @@ PLAN-ROOT SINK
 |  in pipelines: 13(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(ca_zip,ca_city)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=12.01MB mem-reservation=4.75MB thread-reservation=1
+Per-Host Resources: mem-estimate=11.40MB mem-reservation=2.88MB thread-reservation=1
 13:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC, ca_city ASC
 |  mem-estimate=5.27KB mem-reservation=0B thread-reservation=0
@@ -202,13 +202,13 @@ Per-Host Resources: mem-estimate=12.01MB mem-reservation=4.75MB thread-reservati
 23:AGGREGATE [FINALIZE]
 |  output: sum:merge(ws_sales_price)
 |  group by: ca_zip, ca_city
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=8 row-size=54B cardinality=73.80K
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=8 row-size=54B cardinality=50.00K
 |  in pipelines: 23(GETNEXT), 00(OPEN)
 |
 22:EXCHANGE [HASH(ca_zip,ca_city)]
-|  mem-estimate=2.01MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=54B cardinality=73.80K
+|  mem-estimate=1.40MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=54B cardinality=50.00K
 |  in pipelines: 00(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=2 instances=2
@@ -217,7 +217,7 @@ Per-Host Resources: mem-estimate=22.98MB mem-reservation=11.75MB thread-reservat
 |  output: sum(ws_sales_price)
 |  group by: ca_zip, ca_city
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=8 row-size=54B cardinality=73.80K
+|  tuple-ids=8 row-size=54B cardinality=50.00K
 |  in pipelines: 00(GETNEXT)
 |
 11:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -389,8 +389,8 @@ Per-Host Resources: mem-estimate=138.48MB mem-reservation=17.69MB thread-reserva
    tuple-ids=0 row-size=20B cardinality=73.80K(filtered from 719.38K)
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=58.69MB Threads=15
-Per-Host Resource Estimates: Memory=197MB
+Max Per-Host Resource Reservation: Memory=56.81MB Threads=15
+Per-Host Resource Estimates: Memory=196MB
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -405,7 +405,7 @@ PLAN-ROOT SINK
 |  in pipelines: 13(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(ca_zip,ca_city)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=12.01MB mem-reservation=4.75MB thread-reservation=1
+Per-Instance Resources: mem-estimate=11.40MB mem-reservation=2.88MB thread-reservation=1
 13:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC, ca_city ASC
 |  mem-estimate=5.27KB mem-reservation=0B thread-reservation=0
@@ -415,13 +415,13 @@ Per-Instance Resources: mem-estimate=12.01MB mem-reservation=4.75MB thread-reser
 23:AGGREGATE [FINALIZE]
 |  output: sum:merge(ws_sales_price)
 |  group by: ca_zip, ca_city
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=8 row-size=54B cardinality=73.80K
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=8 row-size=54B cardinality=50.00K
 |  in pipelines: 23(GETNEXT), 00(OPEN)
 |
 22:EXCHANGE [HASH(ca_zip,ca_city)]
-|  mem-estimate=2.01MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=54B cardinality=73.80K
+|  mem-estimate=1.40MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=54B cardinality=50.00K
 |  in pipelines: 00(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=2 instances=2
@@ -430,7 +430,7 @@ Per-Instance Resources: mem-estimate=11.96MB mem-reservation=3.00MB thread-reser
 |  output: sum(ws_sales_price)
 |  group by: ca_zip, ca_city
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=8 row-size=54B cardinality=73.80K
+|  tuple-ids=8 row-size=54B cardinality=50.00K
 |  in pipelines: 00(GETNEXT)
 |
 11:HASH JOIN [LEFT OUTER JOIN, BROADCAST]

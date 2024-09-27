@@ -2748,11 +2748,11 @@ PLAN-ROOT SINK
 |
 13:SORT
 |  order by: s_name ASC
-|  row-size=67B cardinality=100.00K
+|  row-size=67B cardinality=10.00K
 |
 12:AGGREGATE [FINALIZE]
 |  group by: s_name, s_address
-|  row-size=67B cardinality=100.00K
+|  row-size=67B cardinality=10.00K
 |
 11:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
@@ -2808,7 +2808,7 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l.l_partkey, RF001 -> l.l_suppkey
    row-size=36B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=150.08MB Threads=11
+Max Per-Host Resource Reservation: Memory=147.27MB Threads=11
 Per-Host Resource Estimates: Memory=1.06GB
 PLAN-ROOT SINK
 |
@@ -2817,17 +2817,17 @@ PLAN-ROOT SINK
 |
 13:SORT
 |  order by: s_name ASC
-|  row-size=67B cardinality=100.00K
+|  row-size=67B cardinality=10.00K
 |
 20:AGGREGATE [FINALIZE]
 |  group by: s_name, s_address
-|  row-size=67B cardinality=100.00K
+|  row-size=67B cardinality=10.00K
 |
 19:EXCHANGE [HASH(s_name,s_address)]
 |
 12:AGGREGATE [STREAMING]
 |  group by: s_name, s_address
-|  row-size=67B cardinality=100.00K
+|  row-size=67B cardinality=10.00K
 |
 11:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey

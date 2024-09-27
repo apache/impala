@@ -19,7 +19,10 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -33,9 +36,11 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.ValidTupleIdExpr;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAggregationNode;
 import org.apache.impala.thrift.TAggregator;
@@ -45,6 +50,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.BitUtil;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +70,10 @@ public class AggregationNode extends PlanNode {
 
   // Default skew factor to account for data skew among fragment instances.
   private final static double DEFAULT_SKEW_FACTOR = 1.5;
+
+  // Non-grouping aggregation class always results in one group even if there are
+  // zero input rows.
+  private final static long NON_GROUPING_AGG_NUM_GROUPS = 1;
 
   private final MultiAggregateInfo multiAggInfo_;
   private final AggPhase aggPhase_;
@@ -239,12 +249,41 @@ public class AggregationNode extends PlanNode {
     cardinality_ = 0;
     aggInputCardinality_ = getAggInputCardinality();
     Preconditions.checkState(aggInputCardinality_ >= -1, aggInputCardinality_);
+
+    AggregationNode preaggNode = null;
+    if (aggPhase_.isMerge()) {
+      preaggNode = getPrevAggNode(this);
+      Preconditions.checkState(preaggNode.aggInfos_.size() == aggInfos_.size(),
+          "Merge aggregation %s have mismatch aggInfo count compared to the "
+              + "preaggregation %s (%s vs %s)",
+          getId(), preaggNode.getId(), aggInfos_.size(), preaggNode.aggInfos_.size());
+    }
+
     boolean unknownEstimate = false;
     aggClassNumGroups_ = Lists.newArrayList();
+    int aggIdx = 0;
     for (AggregateInfo aggInfo : aggInfos_) {
       // Compute the cardinality for this set of grouping exprs.
-      long numGroups = estimateNumGroups(aggInfo);
+      long numGroups = -1;
+      if (preaggNode != null) {
+        numGroups = preaggNode.aggClassNumGroups_.get(aggIdx);
+      } else {
+        // TODO: This numGroups is a global estimate accross all data. If this is
+        // a preaggregation node with N instances, actual number can be as high as
+        // N * numGroups. But N is unknown until later phase of planning. Preaggregation
+        // node can also stream rows, which will produce more rows than N * numGroups.
+        numGroups =
+            estimateNumGroups(aggInfo.getGroupingExprs(), aggInputCardinality_, this);
+      }
       Preconditions.checkState(numGroups >= -1, numGroups);
+
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(
+            "{} aggPhase={} aggInputCardinality={} aggIdx={} numGroups={} aggInfo={}",
+            getDisplayLabel(), aggPhase_, aggInputCardinality_, aggIdx, numGroups,
+            aggInfo.debugString());
+      }
+
       aggClassNumGroups_.add(numGroups);
       if (numGroups == -1) {
         // No estimate of the number of groups is possible, can't even make a
@@ -253,6 +292,7 @@ public class AggregationNode extends PlanNode {
       } else {
         cardinality_ = checkedAdd(cardinality_, numGroups);
       }
+      aggIdx++;
     }
     if (unknownEstimate) {
       cardinality_ = -1;
@@ -263,25 +303,103 @@ public class AggregationNode extends PlanNode {
       cardinality_ = applyConjunctsSelectivity(cardinality_);
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("{} cardinality={}", getDisplayLabel(), cardinality_);
+    }
   }
 
   /**
-   * Estimate the number of groups that will be present for the aggregation class
-   * described by 'aggInfo'.
+   * Estimate the number of groups that will be present for the provided grouping
+   * expressions and input cardinality.
    * Returns -1 if a reasonable cardinality estimate cannot be produced.
    */
-  private long estimateNumGroups(AggregateInfo aggInfo) {
+  public static long estimateNumGroups(
+      List<Expr> groupingExprs, long aggInputCardinality, PlanNode planNode) {
+    Preconditions.checkArgument(aggInputCardinality >= -1, aggInputCardinality);
+    if (groupingExprs.isEmpty()) { return NON_GROUPING_AGG_NUM_GROUPS; }
+
     // This is prone to overestimation, because we keep multiplying cardinalities,
     // even if the grouping exprs are functionally dependent (example:
     // group by the primary key of a table plus a number of other columns from that
     // same table). We limit the estimate to the estimated number of input row to
-    // limit the potential overestimation. We could, in future, improve this further
-    // by recognizing functional dependencies.
-    List<Expr> groupingExprs = aggInfo.getGroupingExprs();
-    long numGroups = estimateNumGroups(groupingExprs, aggInputCardinality_);
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Node " + id_ + " numGroups= " + numGroups + " aggInputCardinality="
-          + aggInputCardinality_ + " for agg class " + aggInfo.debugString());
+    // limit the potential overestimation. We also do simple TupleId analysis to
+    // lower estimate for expressions that share the same TupleId.
+
+    // Group 'groupingExprs' elements that have the same TupleId.
+    Map<TupleId, List<Expr>> tupleIdToExprs = new HashMap<>();
+    List<Expr> exprsWithUniqueTupleId = new ArrayList<>();
+    for (Expr expr : groupingExprs) {
+      SlotRef slotRef = expr.unwrapSlotRef(true);
+      if (slotRef != null && slotRef.getDesc() != null
+          && slotRef.getDesc().getColumn() != null
+          && slotRef.getDesc().getType().isScalarType()) {
+        TupleId tupleId = slotRef.getDesc().getParent().getId();
+        tupleIdToExprs.putIfAbsent(tupleId, new ArrayList<>());
+        tupleIdToExprs.get(tupleId).add(expr);
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Slot {} match with tuple {}", slotRef.debugString(), tupleId);
+        }
+      } else {
+        // expr is not a simple column SlotRef.
+        exprsWithUniqueTupleId.add(expr);
+      }
+    }
+
+    // Remove expression group that only have a single element and move that
+    // expression into exprsWithUniqueTupleId.
+    for (Iterator<Map.Entry<TupleId, List<Expr>>> it =
+             tupleIdToExprs.entrySet().iterator();
+         it.hasNext();) {
+      Map.Entry<TupleId, List<Expr>> entry = it.next();
+      if (entry.getValue().size() == 1) {
+        exprsWithUniqueTupleId.addAll(entry.getValue());
+        it.remove();
+      }
+    }
+
+    List<Pair<Long, List<Expr>>> knownCardinalities = new ArrayList<>();
+    if (tupleIdToExprs.isEmpty()) {
+      Preconditions.checkState(exprsWithUniqueTupleId.size() == groupingExprs.size(),
+          "Missing expression after TupleId analysis! Expect %s but found %s",
+          groupingExprs.size(), exprsWithUniqueTupleId.size());
+    } else {
+      // Find cardinality of tuple that referenced by multiple expressions.
+      // Search the first PlanNode that materialize a specific tupleId
+      // (in other words, the lowest PlanNode in query plan tree).
+      // This is done by visiting all children nodes in post-order traversal so that
+      // the lowest PlanNode is inspected first.
+      List<PlanNode> postOrderNodes = planNode.getNodesPostOrder();
+      for (PlanNode childNode : postOrderNodes) {
+        for (TupleId id : childNode.getTupleIds()) {
+          List<Expr> exprs = tupleIdToExprs.get(id);
+          if (exprs != null) {
+            knownCardinalities.add(Pair.create(childNode.getCardinality(), exprs));
+            tupleIdToExprs.remove(id);
+          }
+        }
+        if (tupleIdToExprs.isEmpty()) break;
+      }
+      // Move any expression with unknown PlanNode origin to exprsWithUniqueTupleId.
+      for (Iterator<Map.Entry<TupleId, List<Expr>>> it =
+               tupleIdToExprs.entrySet().iterator();
+           it.hasNext();) {
+        Map.Entry<TupleId, List<Expr>> entry = it.next();
+        exprsWithUniqueTupleId.addAll(entry.getValue());
+        it.remove();
+      }
+    }
+
+    long numGroups = 1;
+    if (!exprsWithUniqueTupleId.isEmpty()) {
+      numGroups = estimateNumGroups(exprsWithUniqueTupleId, aggInputCardinality);
+    }
+    for (Pair<Long, List<Expr>> entry : knownCardinalities) {
+      // Pick the minimum between NDV multiple of the expressions vs cardinality
+      // of tuple.
+      long numGroupFromCommonTuple = Math.min(
+          entry.getFirst(), estimateNumGroups(entry.getSecond(), aggInputCardinality));
+      numGroups = Math.min(aggInputCardinality,
+          MathUtil.saturatingMultiply(numGroups, numGroupFromCommonTuple));
     }
     return numGroups;
   }
@@ -291,13 +409,10 @@ public class AggregationNode extends PlanNode {
    * expressions and input cardinality.
    * Returns -1 if a reasonable cardinality estimate cannot be produced.
    */
-  public static long estimateNumGroups(
-          List<Expr> groupingExprs, long aggInputCardinality) {
-    if (groupingExprs.isEmpty()) {
-      // Non-grouping aggregation class - always results in one group even if there are
-      // zero input rows.
-      return 1;
-    }
+  private static long estimateNumGroups(
+      List<Expr> groupingExprs, long aggInputCardinality) {
+    Preconditions.checkArgument(
+        !groupingExprs.isEmpty(), "groupingExprs must not be empty");
     long numGroups = Expr.getNumDistinctValues(groupingExprs);
     if (numGroups == -1) {
       // A worst-case cardinality_ is better than an unknown cardinality_.
