@@ -165,6 +165,10 @@ SET_PATTERN = re.compile(
 METRICS_URL = 'http://{0}:25000/metrics?json'.format(IMPALAD_HOSTNAME)
 VARZ_URL = 'http://{0}:25000/varz?json'.format(IMPALAD_HOSTNAME)
 
+JSON_TABLE_OBJECT_URL =\
+    "http://{0}:25020/catalog_object?".format(IMPALAD_HOSTNAME) +\
+    "json&object_type=TABLE&object_name={0}.{1}"
+
 GROUP_NAME = grp.getgrgid(pwd.getpwnam(getuser()).pw_gid).gr_name
 
 EXEC_OPTION_NAMES = set([val.lower()
@@ -473,6 +477,19 @@ class ImpalaTestSuite(BaseTestSuite):
           result_fields.append(fields[i])
       result.append(tuple(result_fields))
     return result
+
+  def get_partition_id_set(self, db_name, tbl_name):
+    obj_url = JSON_TABLE_OBJECT_URL.format(db_name, tbl_name)
+    response = requests.get(obj_url)
+    assert response.status_code == requests.codes.ok
+    json_response = json.loads(response.text)
+    assert "json_string" in json_response, json_response
+    catalog_obj = json.loads(json_response["json_string"])
+    assert "table" in catalog_obj, catalog_obj
+    assert "hdfs_table" in catalog_obj["table"], catalog_obj["table"]
+    tbl_obj = catalog_obj["table"]["hdfs_table"]
+    assert "partitions" in tbl_obj, tbl_obj
+    return set(tbl_obj["partitions"].keys())
 
   def get_debug_page(self, page_url):
     """Returns the content of the debug page 'page_url' as json."""

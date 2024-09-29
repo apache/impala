@@ -347,6 +347,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     THdfsTable hdfsTable = new THdfsTable(getHdfsBaseDir(), getColumnNames(),
         getNullPartitionKeyValue(), nullColumnValue_, idToPartition,
         tPrototypePartition);
+    hdfsTable.setHas_full_partitions(true);
 
     if (avroSchema_ != null) {
       hdfsTable.setAvroSchema(avroSchema_);

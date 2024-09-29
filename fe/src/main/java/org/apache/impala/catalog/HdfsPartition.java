@@ -1071,8 +1071,11 @@ public class HdfsPartition extends CatalogObjectImpl
 
   public void setPartitionMetadata(TPartialPartitionInfo tPart) {
     // The special "prototype partition" or the only partition of an unpartitioned table
-    // have a null cachedMsPartitionDescriptor.
-    if (cachedMsPartitionDescriptor_ == null) return;
+    // don't have partition metadata.
+    if (id_ == CatalogObjectsConstants.PROTOTYPE_PARTITION_ID
+        || !table_.isPartitioned()) {
+      return;
+    }
     // Don't need to make a copy here since the caller should not modify the parameters.
     tPart.hms_parameters = getParameters();
     tPart.write_id = writeId_;

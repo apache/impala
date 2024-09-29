@@ -486,7 +486,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
 
     Preconditions.checkNotNull(newPartitions);
     Table existingTable = db.getTable(thriftTable.tbl_name);
-    Table newTable = Table.fromThrift(db, thriftTable);
+    Table newTable = Table.fromThrift(db, thriftTable, true);
     newTable.setCatalogVersion(catalogVersion);
     newTable.setLastLoadedTimeMs(lastLoadedTime);
     if (existingTable != null && existingTable.getCatalogVersion() >= catalogVersion) {

@@ -1106,7 +1106,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       } else {
         checkResponse(table.msTable_.getPartitionKeysSize() == 0, req,
             "Should not return a partition with missing partition meta unless " +
-            "the table is unpartitioned");
+            "the table is unpartitioned: %s", part);
         // For the only partition of a nonpartitioned table, reuse table-level metadata.
         try {
           hdfsStorageDescriptor = HdfsStorageDescriptor.fromStorageDescriptor(

@@ -19,7 +19,6 @@ package org.apache.impala.catalog;
 
 import static org.junit.Assert.fail;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 
@@ -90,7 +89,7 @@ public class CatalogObjectToFromThriftTest {
       }
 
       // Now try to load the thrift struct.
-      Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable);
+      Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable, true);
       Assert.assertTrue(newTable instanceof HdfsTable);
       Assert.assertEquals(newTable.name_, thriftTable.tbl_name);
       Assert.assertEquals(newTable.numClusteringCols_, 2);
@@ -141,7 +140,7 @@ public class CatalogObjectToFromThriftTest {
 
     // Now try to load the thrift struct.
     Table newTable = Table.fromThrift(catalog_.getDb("functional_avro_snap"),
-        thriftTable);
+        thriftTable, true);
     Assert.assertEquals(newTable.getColumns().size(), 9);
 
     // The table schema does not match the Avro schema - it has only 2 columns.
@@ -167,7 +166,7 @@ public class CatalogObjectToFromThriftTest {
       Assert.assertTrue(!isBinaryEncoded);
     }
 
-    Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable);
+    Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable, true);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
     Assert.assertEquals(newHBaseTable.getColumns().size(), 13);
@@ -201,7 +200,7 @@ public class CatalogObjectToFromThriftTest {
 
     // Verify that creating a table from this thrift struct results in a valid
     // Table.
-    Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable);
+    Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable, true);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
     Assert.assertEquals(newHBaseTable.getColumns().size(), 13);

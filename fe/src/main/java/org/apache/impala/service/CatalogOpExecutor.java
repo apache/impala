@@ -127,6 +127,7 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PartitionStatsUtil;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
@@ -146,7 +147,6 @@ import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
-import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogOperationTracker;
@@ -717,12 +717,14 @@ public class CatalogOpExecutor {
 
     int numTblsAdded = 0;
     int numViewsAdded = 0;
+    int numPartsAdded = 0;
+    int numFilesAdded = 0;
     if (testCaseData.getTables_and_views() != null) {
       for (TTable tTable : testCaseData.tables_and_views) {
         Db db = catalog_.getDb(tTable.db_name);
         // Db should have been created by now.
         Preconditions.checkNotNull(db, String.format("Missing db %s", tTable.db_name));
-        Table t = Table.fromThrift(db, tTable);
+        Table t = Table.fromThrift(db, tTable, /*loadedInImpalad*/false);
         // Set a new version to force an overwrite if a table already exists with the same
         // name.
         t.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
@@ -738,6 +740,14 @@ public class CatalogOpExecutor {
         t.takeReadLock();
         try {
           addTableToCatalogUpdate(t, wantMinimalResult, response.result);
+          if (t instanceof HdfsTable) {
+            HdfsTable hdfsTable = (HdfsTable) t;
+            for (PrunablePartition p : hdfsTable.getPartitions()) {
+              HdfsPartition part = (HdfsPartition) p;
+              numFilesAdded += part.getNumFileDescriptors();
+              ++numPartsAdded;
+            }
+          }
         } finally {
           t.releaseReadLock();
         }
@@ -750,7 +760,8 @@ public class CatalogOpExecutor {
         "%d db(s), %d table(s) and %d view(s) imported for query: ", numDbsAdded,
         numTblsAdded, numViewsAdded));
     responseStr.append("\n\n").append(testCaseData.getQuery_stmt());
-    LOG.info(String.format("%s. Testcase path: %s", responseStr, inputPath));
+    LOG.info("{}\n\nTotal partitions: {}. Total files: {}. Testcase path: {}",
+        responseStr, numPartsAdded, numFilesAdded, inputPath);
     addSummary(response, responseStr.toString());
     return testCaseData.getQuery_stmt();
   }
