@@ -42,7 +42,7 @@ DECLARE_string(state_store_2_host);
 DECLARE_int32(state_store_2_port);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_string(hostname);
-DECLARE_string(cluster_id);
+DECLARE_string(cluster_membership_topic_id);
 
 namespace impala {
 
@@ -65,8 +65,8 @@ AdmissiondEnv::AdmissiondEnv()
       MakeNetworkAddress(FLAGS_state_store_2_host, FLAGS_state_store_2_port);
   string subscriber_id = Substitute("admissiond@$0",
       TNetworkAddressToString(admission_service_addr));
-  if (!FLAGS_cluster_id.empty()) {
-    subscriber_id = FLAGS_cluster_id + '-' + subscriber_id;
+  if (!FLAGS_cluster_membership_topic_id.empty()) {
+    subscriber_id = FLAGS_cluster_membership_topic_id + '-' + subscriber_id;
   }
   statestore_subscriber_.reset(new StatestoreSubscriber(subscriber_id, subscriber_address,
       statestore_address, statestore2_address, metrics,

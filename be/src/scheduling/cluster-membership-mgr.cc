@@ -31,7 +31,7 @@
 
 DECLARE_int32(num_expected_executors);
 DECLARE_string(expected_executor_group_sets);
-DECLARE_string(cluster_id);
+DECLARE_string(cluster_membership_topic_id);
 
 namespace {
 using namespace impala;
@@ -91,10 +91,11 @@ ClusterMembershipMgr::ClusterMembershipMgr(
     current_membership_(std::make_shared<const Snapshot>()),
     statestore_subscriber_(subscriber),
     local_backend_id_(move(local_backend_id)) {
-  if (FLAGS_cluster_id.empty()) {
+  if (FLAGS_cluster_membership_topic_id.empty()) {
     membership_topic_name_ = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   } else {
-    membership_topic_name_ = FLAGS_cluster_id + '-' + Statestore::IMPALA_MEMBERSHIP_TOPIC;
+    membership_topic_name_ =
+        FLAGS_cluster_membership_topic_id + '-' + Statestore::IMPALA_MEMBERSHIP_TOPIC;
   }
   Status status = PopulateExpectedExecGroupSets(expected_exec_group_sets_);
   if(!status.ok()) {

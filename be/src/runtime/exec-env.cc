@@ -149,7 +149,7 @@ DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);
 DECLARE_int32(state_store_2_port);
-DECLARE_string(cluster_id);
+DECLARE_string(cluster_membership_topic_id);
 
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
@@ -286,8 +286,8 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   }
   // Set StatestoreSubscriber::subscriber_id as cluster_id + hostname + krpc_port.
   string subscriber_id = Substitute("impalad@$0:$1", FLAGS_hostname, FLAGS_krpc_port);
-  if (!FLAGS_cluster_id.empty()) {
-    subscriber_id = FLAGS_cluster_id + '-' + subscriber_id;
+  if (!FLAGS_cluster_membership_topic_id.empty()) {
+    subscriber_id = FLAGS_cluster_membership_topic_id + '-' + subscriber_id;
   }
   statestore_subscriber_.reset(new StatestoreSubscriber(subscriber_id, subscriber_address,
       statestore_address, statestore2_address, metrics_.get(), subscriber_type));

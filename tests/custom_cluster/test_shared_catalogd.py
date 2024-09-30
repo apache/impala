@@ -30,11 +30,11 @@ class TestSharedCatalogd(CustomClusterTestSuite):
     super(TestSharedCatalogd, self).setup_method(method)
     self.coordinator = self.cluster.impalads[0]
 
-  @CustomClusterTestSuite.with_args(impalad_args="-cluster_id=cluster1")
+  @CustomClusterTestSuite.with_args(impalad_args="-cluster_membership_topic_id=cluster1")
   def test_disjiont_clusters(self, unique_database):
     """Tests that two Impala clusters can share catalogd and statestore."""
     # Start a new cluster of 3 impalads using a new cluster id.
-    self._start_impala_cluster(["--impalad_args=-cluster_id=cluster2"],
+    self._start_impala_cluster(["--impalad_args=-cluster_membership_topic_id=cluster2"],
                                cluster_size=3,
                                num_coordinators=3,
                                add_impalads=True,
