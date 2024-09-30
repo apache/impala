@@ -1065,29 +1065,28 @@ void CodegenAnyVal::StructChildToReadWriteInfo(
   // 'AnyVal's). As this code deals with values in 'AnyVal's, for BOOLEANS we use i8,
   // which is the LLVM type corresponding to 'bool', and for other types we use the slot
   // type.
-  llvm::Type* child_type = type.type == TYPE_BOOLEAN ?
+  llvm::Type* child_type = type.type == TYPE_BOOLEAN || type.type == TYPE_CHAR ?
     codegen->i8_type() : slot_type;
   llvm::Value* cast_child_ptr = builder->CreateBitCast(child_ptr,
       child_type->getPointerTo(), "cast_child_ptr");
 
   switch (type.type) {
-    case TYPE_STRING:
-    case TYPE_VARCHAR:
     case TYPE_CHAR: {
+      llvm::Value* len = codegen->GetI32Constant(type.len);
+      read_write_info->SetPtrAndLen(cast_child_ptr, len);
+      break;
+    }
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       llvm::Function* str_ptr_fn = codegen->GetFunction(
             IRFunction::STRING_VALUE_PTR, false);
       llvm::Value* ptr = builder->CreateCall(str_ptr_fn,
             llvm::ArrayRef<llvm::Value*>({cast_child_ptr}), "ptr");
 
-      llvm::Value* len;
-      if (type.type == TYPE_CHAR) {
-        len = codegen->GetI32Constant(type.len);
-      } else {
-        llvm::Function* str_len_fn = codegen->GetFunction(
-            IRFunction::STRING_VALUE_LEN, false);
-        len = builder->CreateCall(str_len_fn,
-            llvm::ArrayRef<llvm::Value*>({cast_child_ptr}), "len");
-      }
+      llvm::Function* str_len_fn = codegen->GetFunction(
+          IRFunction::STRING_VALUE_LEN, false);
+      llvm::Value* len = builder->CreateCall(str_len_fn,
+          llvm::ArrayRef<llvm::Value*>({cast_child_ptr}), "len");
       read_write_info->SetPtrAndLen(ptr, len);
       break;
     }

@@ -201,14 +201,31 @@ from (
     arr.inner_struct2.str str,
     row_number() over (order by arr.inner_struct2.str) as row_no
   from collection_struct_mix t, t.arr_contains_nested_struct arr
-) res limit 4;
+) res;
 ---- RESULTS
 1,'four spaceship captains',2
 2,'lots of soju distilleries',105
 3,'more spaceship captains',20
 4,'very few distilleries',104
+5,'NULL',NULL
+6,'NULL',NULL
 ---- TYPES
 BIGINT,STRING, SMALLINT
+
+====
+---- QUERY
+# Regression test for # IMPALA-13407
+select id, str, alltypes, tiny_struct, small_struct from complextypes_structs order by str;
+---- RESULTS
+5,'fifth item','NULL','{"b":false}','{"i":98765,"s":"abcde f"}'
+1,'first item','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 08:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}','{"b":true}','NULL'
+4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2023-12-31 23:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}','{"b":null}','{"i":null,"s":"str"}'
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 10:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}','{"b":false}','{"i":19191,"s":"small_struct_str"}'
+6,'sixth item','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 01:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}','NULL','{"i":null,"s":null}'
+3,'third item','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}','{"b":true}','{"i":98765,"s":null}'
+---- TYPES
+INT,STRING,STRING,STRING,STRING
+
 ====
 ---- QUERY
 # Sorting is not supported yet for collections within structs: IMPALA-12160. Test with a
