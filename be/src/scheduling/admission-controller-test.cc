@@ -546,6 +546,87 @@ TEST_F(AdmissionControllerTest, Simple) {
   ASSERT_FALSE(coordinator_resource_limited);
 }
 
+/// Test that removing hosts from AdmissionController, and check if the memory reserved in
+/// host stats for the specific host is updated correctly after the host is removed.
+TEST_F(AdmissionControllerTest, EraseHostStats) {
+  FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-test2.xml");
+  FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
+
+  AdmissionController* admission_controller = MakeAdmissionController();
+
+  ASSERT_EQ(0, admission_controller->host_stats_.size());
+
+  TTopicDelta membership = MakeTopicDelta(false);
+
+  AddStatsToTopic(&membership, HOST_1, QUEUE_C, MakePoolStats(1000, 1, 0));
+  AddStatsToTopic(&membership, HOST_2, QUEUE_C, MakePoolStats(5000, 10, 0));
+  AddStatsToTopic(&membership, HOST_2, QUEUE_B, MakePoolStats(3000, 5, 0));
+
+  StatestoreSubscriber::TopicDeltaMap initial_topic_deltas;
+  initial_topic_deltas.emplace(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, membership);
+  vector<TTopicDelta> outgoing_topic_updates;
+  admission_controller->UpdatePoolStats(initial_topic_deltas, &outgoing_topic_updates);
+
+  // Verify that the host stats were added
+  ASSERT_EQ(3, admission_controller->host_stats_.size());
+  ASSERT_EQ(1, admission_controller->host_stats_.count(HOST_0));
+  ASSERT_EQ(1, admission_controller->host_stats_.count(HOST_1));
+  ASSERT_EQ(1, admission_controller->host_stats_.count(HOST_2));
+  ASSERT_EQ(1000, admission_controller->host_stats_[HOST_1].mem_reserved);
+  ASSERT_EQ(8000, admission_controller->host_stats_[HOST_2].mem_reserved);
+
+  // Create an update that deletes HOST_1
+  TTopicDelta delete_update = MakeTopicDelta(true);
+  TTopicItem delete_item;
+  delete_item.key = "POOL:" + QUEUE_C + "!" + HOST_1;
+  delete_item.deleted = true;
+  delete_update.topic_entries.push_back(delete_item);
+
+  StatestoreSubscriber::TopicDeltaMap delete_topic_deltas;
+  delete_topic_deltas.emplace(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, delete_update);
+
+  // Apply the delete update
+  admission_controller->UpdatePoolStats(delete_topic_deltas, &outgoing_topic_updates);
+
+  // Verify that HOST_1 mem_reserved was reset.
+  ASSERT_EQ(3, admission_controller->host_stats_.size());
+  ASSERT_EQ(8000, admission_controller->host_stats_[HOST_2].mem_reserved);
+  ASSERT_EQ(0, admission_controller->host_stats_[HOST_1].mem_reserved);
+
+  // Verify that the pool stats were updated accordingly
+  AdmissionController::PoolStats* pool_stats =
+      admission_controller->GetPoolStats(QUEUE_C);
+  ASSERT_EQ(5000, pool_stats->agg_mem_reserved_);
+  ASSERT_EQ(10, pool_stats->agg_num_running_);
+
+  // Remove HOST_2 in Queue C.
+  delete_update = MakeTopicDelta(true);
+  delete_item.key = "POOL:" + QUEUE_C + "!" + HOST_2;
+  delete_item.deleted = true;
+  delete_update.topic_entries.push_back(delete_item);
+  StatestoreSubscriber::TopicDeltaMap delete_topic_deltas2;
+  delete_topic_deltas2.emplace(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, delete_update);
+  admission_controller->UpdatePoolStats(delete_topic_deltas2, &outgoing_topic_updates);
+
+  ASSERT_EQ(3, admission_controller->host_stats_.size());
+  ASSERT_EQ(3000, admission_controller->host_stats_[HOST_2].mem_reserved);
+  ASSERT_EQ(0, admission_controller->host_stats_[HOST_1].mem_reserved);
+
+  // Remove HOST_2 in Queue B.
+  TTopicDelta delete_update3 = MakeTopicDelta(true);
+  TTopicItem delete_item3;
+  delete_item3.key = "POOL:" + QUEUE_B + "!" + HOST_2;
+  delete_item3.deleted = true;
+  delete_update3.topic_entries.push_back(delete_item3);
+  StatestoreSubscriber::TopicDeltaMap delete_topic_deltas3;
+  delete_topic_deltas3.emplace(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, delete_update3);
+  admission_controller->UpdatePoolStats(delete_topic_deltas3, &outgoing_topic_updates);
+
+  ASSERT_EQ(3, admission_controller->host_stats_.size());
+  ASSERT_EQ(0, admission_controller->host_stats_[HOST_2].mem_reserved);
+  ASSERT_EQ(0, admission_controller->host_stats_[HOST_1].mem_reserved);
+}
+
 /// Test CanAdmitRequest in the context of aggregated memory required to admit a query.
 TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
   // Pass the paths of the configuration files as command line flags.

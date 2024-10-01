@@ -1714,6 +1714,7 @@ void AdmissionController::UpdatePoolStats(
 
     StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
         incoming_topic_deltas.find(request_queue_topic_name_);
+    set<string> pool_stats_removed_hosts;
     if (topic != incoming_topic_deltas.end()) {
       const TTopicDelta& delta = topic->second;
       // Delta and non-delta updates are handled the same way, except for a full update
@@ -1723,9 +1724,9 @@ void AdmissionController::UpdatePoolStats(
         VLOG_ROW << "Full impala-request-queue stats update";
         for (auto& entry : pool_stats_) entry.second.ClearRemoteStats();
       }
-      HandleTopicUpdates(delta.topic_entries);
+      HandleTopicUpdates(delta.topic_entries, pool_stats_removed_hosts);
     }
-    UpdateClusterAggregates();
+    UpdateClusterAggregates(pool_stats_removed_hosts);
     last_topic_update_time_ms_ = MonotonicMillis();
     pending_dequeue_ = true;
   }
@@ -1755,7 +1756,8 @@ void AdmissionController::PoolStats::UpdateRemoteStats(const string& host_id,
   }
 }
 
-void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_updates) {
+void AdmissionController::HandleTopicUpdates(
+    const vector<TTopicItem>& topic_updates, set<string>& pool_stats_removed_nodes) {
   string topic_key_prefix;
   string topic_key_suffix;
   string pool_name;
@@ -1769,6 +1771,7 @@ void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_upd
       if (topic_backend_id == host_id_) continue;
       if (item.deleted) {
         GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, nullptr);
+        pool_stats_removed_nodes.insert(topic_backend_id);
         continue;
       }
       TPoolStats remote_update;
@@ -1860,7 +1863,7 @@ void AdmissionController::PoolStats::UpdateAggregates(HostMemMap* host_mem_reser
   VLOG_ROW << "Updated: " << DebugString();
 }
 
-void AdmissionController::UpdateClusterAggregates() {
+void AdmissionController::UpdateClusterAggregates(const set<string>& removed_nodes) {
   // Recompute mem_reserved for all hosts.
   PoolStats::HostMemMap updated_mem_reserved;
   for (auto& entry : pool_stats_) entry.second.UpdateAggregates(&updated_mem_reserved);
@@ -1878,6 +1881,26 @@ void AdmissionController::UpdateClusterAggregates() {
       ++i;
     }
   }
+
+  // We know if any host stats were removed from the pool stats during statestore topic
+  // update by the set pool_stats_removed_nodes. If a host was removed and no longer
+  // exists in any remote pool stats, we reset the mem_reserved to 0 for this host in
+  // the host stats.
+  for (const auto& host : removed_nodes) {
+    auto it = host_stats_.find(host);
+    if (it != host_stats_.end()
+        && updated_mem_reserved.find(host) == updated_mem_reserved.end()) {
+      int64_t old_mem_reserved = it->second.mem_reserved;
+      it->second.mem_reserved = 0;
+      if (VLOG_ROW_IS_ON) {
+        ss << endl
+           << "Mem_reserved reset to 0 for removed host: " << host
+           << " (old value=" << PrintBytes(old_mem_reserved) << ")";
+        ++i;
+      }
+    }
+  }
+
   if (i > 0) VLOG_ROW << ss.str();
 }
 

@@ -720,6 +720,7 @@ class AdmissionController {
     FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
     FRIEND_TEST(AdmissionControllerTest, QueryRejection);
     FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
+    FRIEND_TEST(AdmissionControllerTest, EraseHostStats);
     friend class AdmissionControllerTest;
   };
 
@@ -935,13 +936,18 @@ class AdmissionController {
   /// Updates the remote stats with per-host topic_updates coming from the statestore.
   /// Removes remote stats identified by topic deletions coming from the
   /// statestore. Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
-  void HandleTopicUpdates(const std::vector<TTopicItem>& topic_updates);
+  /// Any remote host stats removed from the pool stats during the process will result in
+  /// the host being added to the pool_stats_removed_nodes set.
+  void HandleTopicUpdates(const std::vector<TTopicItem>& topic_updates,
+      std::set<std::string>& pool_stats_removed_nodes);
 
   /// Re-computes the per-pool aggregate stats and the per-host aggregates in host_stats_
   /// using each pool's remote_stats_ and local_stats_.
   /// Called by UpdatePoolStats() after handling updates and deletions.
   /// Must hold admission_ctrl_lock_.
-  void UpdateClusterAggregates();
+  /// If the host is present in removed_nodes and the host is not present in any remote
+  /// pool stats, the mem_reserved will be reset in the host_stats_ for that host.
+  void UpdateClusterAggregates(const std::set<std::string>& removed_nodes);
 
   /// Computes schedules for all executor groups that can run the query in 'queue_node'.
   /// For subsequent calls schedules are only re-computed if the membership version inside
@@ -1224,6 +1230,7 @@ class AdmissionController {
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordScheduleState);
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordAdmissionChecks);
   FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
+  FRIEND_TEST(AdmissionControllerTest, EraseHostStats);
   friend class AdmissionControllerTest;
 };
 
