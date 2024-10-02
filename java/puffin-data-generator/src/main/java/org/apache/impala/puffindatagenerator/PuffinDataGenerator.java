@@ -27,11 +27,12 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Scanner;
@@ -146,14 +147,18 @@ public class PuffinDataGenerator {
     generator.writeFileContainsInvalidFieldId();
     generator.writeStatForUnsupportedType();
     generator.writeFileWithInvalidAndCorruptSketches();
+    generator.writeFileMetadataNdvOkFileCorrupt();
+    generator.writeFileMultipleFieldIds();
   }
 
   public PuffinDataGenerator(String metadataJsonTemplatePath, String localOutputDir)
       throws java.io.FileNotFoundException, JsonProcessingException {
     localOutputDir_ = localOutputDir;
 
-    String metadataJsonStr = new Scanner(new File(metadataJsonTemplatePath))
-        .useDelimiter("\\Z").next();
+    String metadataJsonStr;
+    try (Scanner scanner = new Scanner(new File(metadataJsonTemplatePath))) {
+      metadataJsonStr = scanner.useDelimiter("\\Z").next();
+    }
 
     snapshotId_ = getSnapshotIdFromMetadataJson(metadataJsonStr);
 
@@ -398,13 +403,7 @@ public class PuffinDataGenerator {
         SEQUENCE_NUMBER, sketches.get(1)));
 
     blobs.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 3, 3));
-
-    // Corrupt sketch.
-    byte[] bytes = {0, 0};
-    ByteBuffer corruptSketch = ByteBuffer.wrap(bytes);
-    blobs.add(new Blob(SKETCH_TYPE, Arrays.asList(4), snapshotId_, SEQUENCE_NUMBER,
-        corruptSketch));
-
+    blobs.add(createBlobCorruptSketch(snapshotId_, SEQUENCE_NUMBER, 4, 4, false));
     blobs.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 5, 5));
 
     FileData fileData = new FileData(
@@ -412,6 +411,37 @@ public class PuffinDataGenerator {
     List<FileData> puffinFiles = new ArrayList<>();
     puffinFiles.add(fileData);
     writeFilesForScenario(puffinFiles, "invalidAndCorruptSketches.metadata.json");
+  }
+
+  private void writeFileMetadataNdvOkFileCorrupt() throws IOException {
+    // The sketches in the Puffin file are corrupt but it shouldn't cause an error since
+    // we don't actually read it because we read the NDV value from the metadata.json
+    // file.
+    List<Blob> blobs = new ArrayList<>();
+    blobs.add(createBlobCorruptSketch(snapshotId_, SEQUENCE_NUMBER, 1, 1, true));
+    blobs.add(createBlobCorruptSketch(snapshotId_, SEQUENCE_NUMBER, 2, 2, true));
+
+    FileData corruptFile = new FileData(
+        "metadata_ndv_ok_sketches_corrupt.stats", snapshotId_, blobs, true);
+
+    List<FileData> puffinFiles = new ArrayList<>();
+    puffinFiles.add(corruptFile);
+    writeFilesForScenario(puffinFiles,
+        "metadata_ndv_ok_stats_file_corrupt.metadata.json");
+  }
+
+  private void writeFileMultipleFieldIds() throws IOException {
+    List<Blob> blobs = new ArrayList<>();
+    List<Integer> fieldIds = Arrays.asList(1, 2);
+    blobs.add(createBlobMultipleFieldIds(snapshotId_, SEQUENCE_NUMBER, fieldIds, 1,
+        true));
+
+    FileData file = new FileData(
+        "multiple_field_ids.stats", snapshotId_, blobs, true);
+
+    List<FileData> puffinFiles = new ArrayList<>();
+    puffinFiles.add(file);
+    writeFilesForScenario(puffinFiles, "multiple_field_ids.metadata.json");
   }
 
   private static ByteBuffer createSketchWithNdv(int ndv) {
@@ -430,8 +460,39 @@ public class PuffinDataGenerator {
 
   private static Blob createBlob(long snapshotId, long sequenceNumber,
       int fieldId, int ndv) {
-    return new Blob(SKETCH_TYPE, Arrays.asList(fieldId), snapshotId, sequenceNumber,
-        sketches.get(ndv-1));
+    return createBlob(snapshotId, sequenceNumber, fieldId, ndv, false);
+  }
+
+  private static Blob createBlob(long snapshotId, long sequenceNumber,
+      int fieldId, int ndv, boolean addNdvProperty) {
+    return createBlobMultipleFieldIds(snapshotId, sequenceNumber, Arrays.asList(fieldId),
+        ndv, addNdvProperty);
+  }
+
+  private static Blob createBlobCorruptSketch(long snapshotId, long sequenceNumber,
+      int fieldId, int ndv, boolean addNdvProperty) {
+    // Corrupt sketch.
+    byte[] bytes = {0, 0};
+    ByteBuffer corruptSketch = ByteBuffer.wrap(bytes);
+
+    return createBlobWithProperties(snapshotId, sequenceNumber, Arrays.asList(fieldId),
+        ndv, corruptSketch, addNdvProperty);
+  }
+
+  private static Blob createBlobMultipleFieldIds(long snapshotId, long sequenceNumber,
+      List<Integer> fieldIds, int ndv, boolean addNdvProperty) {
+    return createBlobWithProperties(snapshotId, sequenceNumber, fieldIds, ndv,
+        sketches.get(ndv-1), addNdvProperty);
+  }
+
+  private static Blob createBlobWithProperties(long snapshotId, long sequenceNumber,
+      List<Integer> fieldIds, int ndv, ByteBuffer datasketch, boolean addNdvProperty) {
+    Map<String, String> properties = new HashMap<>();
+    if (addNdvProperty) {
+      properties.put("ndv", Integer.toString(ndv));
+    }
+    return new Blob(SKETCH_TYPE, fieldIds, snapshotId, sequenceNumber,
+        datasketch, null, properties);
   }
 
   private void writeFilesForScenario(List<FileData> puffinFiles, String statsJsonFile)
@@ -497,6 +558,15 @@ public class PuffinDataGenerator {
     ArrayNode fieldsList = mapper_.createArrayNode();
     for (int fieldId : blob.inputFields()) fieldsList.add(fieldId);
     blobNode.set("fields", fieldsList);
+
+    // Put properties
+    if (!blob.properties().isEmpty()) {
+      ObjectNode properties = mapper_.createObjectNode();
+      for (Map.Entry<String, String> entry : blob.properties().entrySet()) {
+        properties.put(entry.getKey(), entry.getValue());
+      }
+      blobNode.set("properties", properties);
+    }
 
     return blobNode;
   }

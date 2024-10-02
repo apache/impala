@@ -121,6 +121,8 @@ class TestIcebergTableWithPuffinStats(CustomClusterTestSuite):
     self._check_file_contains_invalid_field_id(tbl_name, tbl_loc, metadata_json_path)
     self._check_stats_for_unsupported_type(tbl_name, tbl_loc, metadata_json_path)
     self._check_invalid_and_corrupt_sketches(tbl_name, tbl_loc, metadata_json_path)
+    self._check_metadata_ndv_ok_file_corrupt(tbl_name, tbl_loc, metadata_json_path)
+    self._check_multiple_field_ids_for_blob(tbl_name, tbl_loc, metadata_json_path)
 
     # Disable reading Puffin stats with a table property.
     disable_puffin_reading_tbl_prop_stmt = "alter table {} set tblproperties( \
@@ -230,6 +232,18 @@ class TestIcebergTableWithPuffinStats(CustomClusterTestSuite):
     self._check_scenario(tbl_name, tbl_loc, metadata_json_path,
         "invalidAndCorruptSketches.metadata.json",
         [1, -1, 3, -1, 5, -1, -1, -1, 2000, -1])
+
+  def _check_metadata_ndv_ok_file_corrupt(self, tbl_name, tbl_loc, metadata_json_path):
+    # The Puffin file is corrupt but it shouldn't cause an error since we don't actually
+    # read it because we read the NDV value from the metadata.json file.
+    self._check_scenario(tbl_name, tbl_loc, metadata_json_path,
+        "metadata_ndv_ok_stats_file_corrupt.metadata.json",
+        [1, 2, -1, -1, -1, -1, -1, -1, 2000, -1])
+
+  def _check_multiple_field_ids_for_blob(self, tbl_name, tbl_loc, metadata_json_path):
+    self._check_scenario(tbl_name, tbl_loc, metadata_json_path,
+        "multiple_field_ids.metadata.json",
+        [-1, -1, -1, -1, -1, -1, -1, -1, 2000, -1])
 
   def _check_reading_puffin_stats_disabled_by_tbl_prop(self, tbl_name, tbl_loc,
           metadata_json_path):
