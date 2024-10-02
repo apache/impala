@@ -857,6 +857,45 @@ ORDER BY made_current_at;
     </conbody>
   </concept>
 
+  <concept id="iceberg_puffin_stats">
+    <title>Iceberg Puffin statistics</title>
+    <conbody>
+      <p>
+      Impala supports reading NDV (Number of Distinct Values) statistics from Puffin files.
+      For the Puffin specification, see <xref keyref="upstream_iceberg_puffin_site"/>.
+      </p>
+      <p>
+      Impala only reads Puffin stats when they are available for the current snapshot.
+      Puffin files or blobs that were written for other snapshots than the current one
+      are ignored. This behaviour is different from how Impala treats HMS stats, where
+      older stats can also be used - see <xref keyref="perf_stats"/> for more.
+      As this may be unintuitive for users, reading Puffin stats is disabled by default;
+      set the "--disable_reading_puffin_stats" startup flag to false to enable it.
+      </p>
+      <p>
+      When Puffin stats reading is enabled, the NDV values read from Puffin files take
+      precedence over NDV values stored in the HMS. This is because we only read Puffin
+      stats for the current snapshot, so these values are always up-to-date, while the
+      values in the HMS may be stale.
+      </p>
+      <p>
+      Note that it is currently not possible to drop Puffin stats from Impala.
+      For this reason, it is possible to disable reading Puffin stats in two ways:
+      <ul>
+        <li>Globally, with the aforementioned
+            <codeph>disable_reading_puffin_stats</codeph> startup flag - when it is set
+            to true, Impala will never read Puffin stats.</li>
+        <li>For specific tables, by setting the
+            <codeph>impala.iceberg_disable_reading_puffin_stats</codeph> table property
+            to "true".</li>
+      </ul>
+      </p>
+      <p>
+      Note that Impala does not yet support writing Puffin statistics files.
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_table_cloning">
     <title>Cloning Iceberg tables (LIKE clause)</title>
     <conbody>
