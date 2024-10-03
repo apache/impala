@@ -27,6 +27,7 @@ import tempfile
 from subprocess import check_call
 
 from tests.util.filesystem_utils import get_fs_path, WAREHOUSE_PREFIX
+from tests.util.iceberg_metadata_util import rewrite_metadata
 
 
 def create_iceberg_table_from_directory(impala_client, unique_database, table_name,
@@ -38,28 +39,29 @@ def create_iceberg_table_from_directory(impala_client, unique_database, table_na
   assert file_format == "orc" or file_format == "parquet"
 
   local_dir = os.path.join(
-    os.environ['IMPALA_HOME'], 'testdata/data/iceberg_test/{0}'.format(table_name))
+    os.environ['IMPALA_HOME'], 'testdata', 'data', 'iceberg_test', table_name)
   assert os.path.isdir(local_dir)
 
-  # If using a prefix, rewrite iceberg metadata to use the prefix
-  if WAREHOUSE_PREFIX:
-    tmp_dir = tempfile.mktemp(table_name)
-    check_call(['cp', '-r', local_dir, tmp_dir])
-    rewrite = os.path.join(
-        os.environ['IMPALA_HOME'], 'testdata/bin/rewrite-iceberg-metadata.py')
-    check_call([rewrite, WAREHOUSE_PREFIX, os.path.join(tmp_dir, 'metadata')])
-    local_dir = tmp_dir
+  # Rewrite iceberg metadata to use the warehouse prefix and use unique_database
+  tmp_dir = tempfile.mktemp(table_name)
+  # Need to create the temp dir so 'cp -r' will copy local dir with its original name
+  # under the temp dir. rewrite_metadata() has the assumption that the parent directory
+  # of the 'metadata' directory bears the name of the table.
+  check_call(['mkdir', '-p', tmp_dir])
+  check_call(['cp', '-r', local_dir, tmp_dir])
+  local_dir = os.path.join(tmp_dir, table_name)
+  rewrite_metadata(WAREHOUSE_PREFIX, unique_database, os.path.join(local_dir, 'metadata'))
 
   # Put the directory in the database's directory (not the table directory)
-  hdfs_parent_dir = get_fs_path("/test-warehouse")
-
+  hdfs_parent_dir = os.path.join(get_fs_path("/test-warehouse"), unique_database)
   hdfs_dir = os.path.join(hdfs_parent_dir, table_name)
 
   # Purge existing files if any
   check_call(['hdfs', 'dfs', '-rm', '-f', '-r', hdfs_dir])
 
   # Note: -d skips a staging copy
-  check_call(['hdfs', 'dfs', '-put', '-d', local_dir, hdfs_dir])
+  check_call(['hdfs', 'dfs', '-mkdir', '-p', hdfs_parent_dir])
+  check_call(['hdfs', 'dfs', '-put', '-d', local_dir, hdfs_parent_dir])
 
   # Create external table
   qualified_table_name = '{0}.{1}'.format(unique_database, table_name)
