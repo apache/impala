@@ -3246,6 +3246,16 @@ public class MetastoreEventsProcessorTest {
     hmsTbl.getParameters().put("EXTERNAL", "false");
     fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
     assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+
+    // Test 9: Change trivial SD props and also change non-trivial
+    // TblProperties to verify file metadata is reloaded
+    LOG.info("Test changes in non-trivial tbl props and trivial SD");
+    hmsTbl = tbl.getMetaStoreTable().deepCopy();
+    hmsTbl.getSd().setBucketCols(Arrays.asList("c1"));
+    hmsTbl.getParameters().put("EXTERNAL", "true");
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
   }
 
   private long processAlterTableAndReturnMetric(String testTblName,

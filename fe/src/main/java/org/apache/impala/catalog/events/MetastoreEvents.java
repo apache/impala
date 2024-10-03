@@ -1945,19 +1945,17 @@ public class MetastoreEvents {
 
       // There are lot of other alter statements which doesn't require file metadata
       // reload but these are the most common types for alter statements.
-      boolean skipFileMetadata = false;
-      if (isFieldSchemaChanged(beforeTable, afterTable) ||
-          isTableOwnerChanged(beforeTable.getOwner(), afterTable.getOwner())) {
-        skipFileMetadata = true;
-      } else if (!Objects.equals(beforeTable.getSd(), afterTable.getSd())) {
-        if (isTrivialSdPropsChanged(beforeTable.getSd(), afterTable.getSd())) {
-          skipFileMetadata = true;
+      if (!Objects.equals(beforeTable.getSd(), afterTable.getSd())) {
+        if (!isTrivialSdPropsChanged(beforeTable.getSd(), afterTable.getSd())) {
+          return false;
         }
-      } else if (!isCustomTblPropsChanged(whitelistedTblProperties, beforeTable,
-          afterTable)) {
-        skipFileMetadata = true;
       }
-      return skipFileMetadata;
+      if (isCustomTblPropsChanged(whitelistedTblProperties, beforeTable, afterTable)) {
+        return false;
+      }
+      infoLog("Skipping reloading of file metadata for table {}.{} since SD and " +
+          "whitelistedTblProperties has not changed.", dbName_, tblName_);
+      return true;
     }
 
     private boolean isFieldSchemaChanged(
