@@ -19,6 +19,7 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 
+from tests.common.environ import IS_TUPLE_CACHE_CORRECT_CHECK
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_single_exec_option_dimension
@@ -29,6 +30,11 @@ MT_DOP_VALUES = [0, 4]
 
 def run_tuple_cache_test(self, vector, query, mtdop):
   vector.get_value('exec_option')['enable_tuple_cache'] = True
+  # Use a long runtime filter wait time (1 minute) to ensure filters arrive before
+  # generating the tuple cache for correctness check.
+  if IS_TUPLE_CACHE_CORRECT_CHECK:
+    vector.get_value('exec_option')['runtime_filter_wait_time_ms'] = 60000
+    vector.get_value('exec_option')['enable_tuple_cache_verification'] = True
   vector.get_value('exec_option')['mt_dop'] = mtdop
   # Run twice to test write and read the tuple cache.
   self.run_test_case(query, vector)

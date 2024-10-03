@@ -109,6 +109,11 @@ IS_TUPLE_CACHE = (
     and os.getenv("TUPLE_CACHE_CAPACITY", "") != ""
 )
 
+# Detect if we are testing with tuple cache correctness check enabled.
+IS_TUPLE_CACHE_CORRECT_CHECK = (
+    os.getenv("TUPLE_CACHE_DEBUG_DUMP_DIR", "") != ""
+)
+
 class ImpalaBuildFlavors:
   """
   Represents the possible CMAKE_BUILD_TYPE values. These build flavors are needed
