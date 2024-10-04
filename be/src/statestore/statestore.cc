@@ -155,6 +155,8 @@ DEFINE_int32(statestore_peer_cnxn_retry_interval_ms, 1000, "The interval, in ms,
 DEFINE_int32(statestore_ha_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
     "TSocket send/recv timeout in milliseconds for a client RPC of Statestore HA "
     "service.");
+DEFINE_int32(statestore_ha_client_rpc_conn_timeout_ms, 0, "(Advanced) The underlying "
+    "TSocket conn timeout in milliseconds for a client RPC of Statestore HA service.");
 DEFINE_int64(update_statestore_rpc_resend_interval_ms, 100, "(Advanced) Interval "
     "(in ms) with which the statestore resends the RPCs of updating statestored's role "
     "to subscribers if the statestore has failed to send the RPCs to the subscribers.");
@@ -753,7 +755,7 @@ Statestore::Statestore(MetricGroup* metrics)
     ha_client_cache_.reset(new StatestoreHaClientCache(1, 0,
         FLAGS_statestore_ha_client_rpc_timeout_ms,
         FLAGS_statestore_ha_client_rpc_timeout_ms, "",
-        IsInternalTlsConfigured()));
+        IsInternalTlsConfigured(), FLAGS_statestore_ha_client_rpc_conn_timeout_ms));
     ha_client_cache_->InitMetrics(metrics, "statestored-ha");
     ha_standby_ss_failure_detector_.reset(new MissedHeartbeatFailureDetector(
         FLAGS_statestore_max_missed_heartbeats,

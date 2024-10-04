@@ -171,12 +171,9 @@ class TestStatestoredHA(CustomClusterTestSuite):
           pytest.skip("Skip this tests for UBSAN builds since " + assert_string)
         assert False, assert_string
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-    statestored_args="--use_network_address_as_statestore_priority=true",
-    start_args="--enable_statestored_ha")
-  def test_statestored_ha_with_two_statestored(self):
-    """The test case for cluster started with statestored HA enabled."""
+  def __test_statestored_ha_with_two_statestored(self):
+    """Basic test case for cluster started with two statestored when statestored HA is
+    enabled."""
     # Verify two statestored instances are created with one as active.
     statestoreds = self.cluster.statestoreds()
     assert(len(statestoreds) == 2)
@@ -210,13 +207,26 @@ class TestStatestoredHA(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    statestored_args="--enable_statestored_ha=true "
-                     "--use_network_address_as_statestore_priority=true "
-                     "--statestore_ha_preemption_wait_period_ms=200",
-    catalogd_args="--enable_statestored_ha=true",
-    impalad_args="--enable_statestored_ha=true")
-  def test_statestored_ha_with_one_statestored(self):
-    """The test case for cluster with only one statestored when statestored HA is
+    statestored_args="--use_network_address_as_statestore_priority=true",
+    start_args="--enable_statestored_ha")
+  def test_statestored_ha_with_two_statestored(self):
+    """The test case for cluster with two statestored when statestored HA is enabled.
+    """
+    self.__test_statestored_ha_with_two_statestored()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_preemption_wait_period_ms=200 "
+                     "--statestore_ha_client_rpc_conn_timeout_ms=100",
+    start_args="--enable_statestored_ha")
+  def test_statestored_ha_with_two_statestored_and_conn_timeout(self):
+    """The test case for cluster with two statestored when statestored HA is enabled.
+    statestore_ha_client_rpc_conn_timeout_ms is set as 100 ms."""
+    self.__test_statestored_ha_with_two_statestored()
+
+  def __test_statestored_ha_with_one_statestored(self):
+    """Basic test case for cluster with only one statestored when statestored HA is
     enabled."""
     # Verify the statestored instances is created as active.
     statestoreds = self.cluster.statestoreds()
@@ -232,6 +242,31 @@ class TestStatestoredHA(CustomClusterTestSuite):
 
     # Verify simple queries are ran successfully.
     self.__run_simple_queries()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--enable_statestored_ha=true "
+                     "--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_preemption_wait_period_ms=200",
+    catalogd_args="--enable_statestored_ha=true",
+    impalad_args="--enable_statestored_ha=true")
+  def test_statestored_ha_with_one_statestored(self):
+    """The test case for cluster with only one statestored when statestored HA is
+    enabled."""
+    self.__test_statestored_ha_with_one_statestored()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--enable_statestored_ha=true "
+                     "--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_preemption_wait_period_ms=200 "
+                     "--statestore_ha_client_rpc_conn_timeout_ms=100",
+    catalogd_args="--enable_statestored_ha=true",
+    impalad_args="--enable_statestored_ha=true")
+  def test_statestored_ha_with_one_statestored_and_conn_timeout(self):
+    """The test case for cluster with only one statestored when statestored HA is
+    enabled. statestore_ha_client_rpc_conn_timeout_ms is set as 100 ms."""
+    self.__test_statestored_ha_with_one_statestored()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

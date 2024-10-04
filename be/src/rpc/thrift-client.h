@@ -62,6 +62,9 @@ class ThriftClientImpl {
   /// Set send timeout on the underlying TSocket.
   void setSendTimeout(int32_t ms) { socket_->setSendTimeout(ms); }
 
+  /// Set connect timeout on the underlying TSocket.
+  void setConnTimeout(int32_t ms) { socket_->setConnTimeout(ms); }
+
   Status init_status() { return init_status_; }
 
  protected:

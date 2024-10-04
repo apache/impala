@@ -119,9 +119,10 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,
     return client_impl->init_status();
   }
 
-  // Set the TSocket's send and receive timeouts.
+  // Set the TSocket's send, receive and connect timeouts.
   client_impl->setRecvTimeout(recv_timeout_ms_);
   client_impl->setSendTimeout(send_timeout_ms_);
+  client_impl->setConnTimeout(conn_timeout_ms_);
 
   Status status = client_impl->OpenWithRetry(num_tries_, wait_ms_);
   if (!status.ok()) {
