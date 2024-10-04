@@ -18,6 +18,7 @@
 package org.apache.impala.calcite.functions;
 
 import java.util.List;
+import com.google.common.base.Preconditions;
 import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.AnalyticWindow;
 import org.apache.impala.analysis.Analyzer;
@@ -50,6 +51,25 @@ public class AnalyzedAnalyticExpr extends AnalyticExpr {
 
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
-    // TODO: Will need to call standardize for some of the analytic functions.
+    // Analytic functions need to be standardized into canonical forms that are
+    // supported by Impala. For example, LAG(c1) is standardized to
+    // LAG(c1, 1, NULL).
+    FunctionCallExpr origFuncExpr = getFnCall();
+    this.standardize(analyzer);
+    // If the function expr has changed, make relevant adjustments
+    if (getFnCall() != origFuncExpr) {
+      // need to "setChildren" if expression was standardized
+      setChildren();
+      if (isOffsetFn(getFnCall().getFn())) {
+        try {
+          // Since standardization may change the function signature, we need to find
+          // the new matching function in the function registry
+          Preconditions.checkArgument(getFnCall() instanceof AnalyzedFunctionCallExpr);
+          ((AnalyzedFunctionCallExpr) getFnCall()).resetAnalyticOffsetFn();
+        } catch (ImpalaException e) {
+          throw new AnalysisException(e);
+        }
+      }
+    }
   }
 }

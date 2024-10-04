@@ -74,7 +74,11 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
     for (RexNode operand : rexCall.getOperands()) {
       params.add(operand.accept(this));
     }
-    return RexCallConverter.getExpr(rexCall, params, rexBuilder_);
+    try {
+      return RexCallConverter.getExpr(rexCall, params, rexBuilder_, analyzer_);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

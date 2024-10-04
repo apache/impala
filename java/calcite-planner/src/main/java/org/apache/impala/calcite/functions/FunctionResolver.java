@@ -25,6 +25,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.BuiltinsDb;
@@ -64,6 +65,7 @@ public class FunctionResolver {
       .put(SqlKind.MINUS, "subtract")
       .put(SqlKind.TIMES, "multiply")
       .put(SqlKind.DIVIDE, "divide")
+      .put(SqlKind.SUM0, "sum_init_zero")
       .build();
 
   public static Set<SqlKind> ARITHMETIC_TYPES =
@@ -109,12 +111,10 @@ public class FunctionResolver {
 
   private static Function getFunction(String name, SqlKind kind,
       List<RelDataType> argTypes, boolean exactMatch) {
+
     // Some names in Calcite don't map exactly to their corresponding Impala
     // functions, so we get the right mapping from the HashMap table.
-    String mappedName = CALCITE_KIND_TO_IMPALA_FUNC.get(kind);
-    return mappedName == null
-        ? getFunction(name, argTypes, exactMatch)
-        : getFunction(mappedName, argTypes, exactMatch);
+    return getFunction(getMappedName(name, kind, argTypes), argTypes, exactMatch);
   }
 
   private static Function getFunction(String name, List<RelDataType> argTypes,
@@ -137,6 +137,31 @@ public class FunctionResolver {
     }
 
     return fn;
+  }
+
+  /**
+   * For most Calcite operators, the function name within Calcite matches the
+   * Impala function name. This method handles the exceptions to that rule.
+   */
+  private static String getMappedName(String name, SqlKind kind,
+      List<RelDataType> argTypes) {
+
+    // First check if any special mappings exist from Calcite SqlKinds to
+    // Impala functions.
+    String mappedName = CALCITE_KIND_TO_IMPALA_FUNC.get(kind);
+    if (mappedName != null) {
+      // IMPALA-13435: for sum_init_zero, there is support for BIGINT arguments,
+      // but not for DECIMAL or FLOAT.
+      if (mappedName.equals("sum_init_zero")) {
+        if (!argTypes.get(0).getSqlTypeName().equals(SqlTypeName.BIGINT)) {
+          return "sum";
+        }
+      }
+      return mappedName;
+    }
+
+    // If reached here, use the function name as given, no special mapping needed.
+    return name.toLowerCase();
   }
 
   private static List<Type> getArgTypes(String name, List<RelDataType> argTypes,

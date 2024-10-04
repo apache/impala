@@ -20,10 +20,12 @@ package org.apache.impala.calcite.operators;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.ExplicitOperatorBinding;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
+import org.apache.calcite.sql.fun.SqlCountAggFunction;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
@@ -194,6 +196,9 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
           MOD_ADJUSTED_RETURN_TYPE_NULLABLE,
           null,
           OperandTypes.NUMERIC_NUMERIC);
+
+  public static final SqlAggFunction COUNT =
+      new SqlCountAggFunction("COUNT", OperandTypes.VARIADIC);
 
   public static ImpalaCustomOperatorTable instance() {
     return INSTANCE.get();

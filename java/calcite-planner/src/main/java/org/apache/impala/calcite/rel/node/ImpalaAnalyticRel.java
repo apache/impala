@@ -218,7 +218,8 @@ public class ImpalaAnalyticRel extends Project
     // For offset functions like LEAD/LAG, we skip this and let Impala assign
     // the window frame as part of the AnalyticExpr's standardization.
     AnalyticWindow window = null;
-    if ((!partitionExprs.isEmpty() || !orderByElements.isEmpty())) {
+    if ((!partitionExprs.isEmpty() || !orderByElements.isEmpty()) &&
+        !skipWindowGeneration(fn)) {
       Boundary lBoundary = getWindowBoundary(rexWindow.getLowerBound(),
           ctx, inputRel, visitor);
       Boundary rBoundary = getWindowBoundary(rexWindow.getUpperBound(),
@@ -232,6 +233,15 @@ public class ImpalaAnalyticRel extends Project
         orderByElements, window);
     retExpr.analyze(ctx.getRootAnalyzer());
     return retExpr;
+  }
+
+  /**
+   * Skip window generation on certain functions. These functions explicitly
+   * set the window within AnalyticExpr.standardize
+   */
+  private boolean skipWindowGeneration(Function fn) {
+    return fn.functionName().equals("lag") || fn.functionName().equals("lead") ||
+        fn.functionName().equals("row_number");
   }
 
   private Boundary getWindowBoundary(RexWindowBound wb, PlannerContext ctx,
@@ -262,8 +272,8 @@ public class ImpalaAnalyticRel extends Project
   private List<Expr> getOutputExprs(Map<RexNode, Expr> mapping,
       List<RexNode> projects, Analyzer analyzer) throws ImpalaException {
 
-    AnalyticRexVisitor visitor =
-        new AnalyticRexVisitor(mapping, getCluster().getRexBuilder());
+    AnalyticRexVisitor visitor = new AnalyticRexVisitor(mapping,
+        getCluster().getRexBuilder(), analyzer);
 
     Map<Integer, Expr> projectExprs = new LinkedHashMap<>();
     List<Expr> outputExprs = new ArrayList<>();
@@ -291,8 +301,7 @@ public class ImpalaAnalyticRel extends Project
     return result;
   }
 
-  private Function getFunction(RexOver exp)
-      throws ImpalaException {
+  private Function getFunction(RexOver exp) throws ImpalaException {
     RelDataType retType = exp.getType();
     SqlAggFunction aggFunction = exp.getAggOperator();
     List<RelDataType> operandTypes = Lists.newArrayList();
@@ -399,11 +408,14 @@ public class ImpalaAnalyticRel extends Project
 
     private final RexBuilder rexBuilder_;
 
+    private final Analyzer analyzer_;
+
     public AnalyticRexVisitor(Map<RexNode, Expr> exprsMap,
-        RexBuilder rexBuilder) {
+        RexBuilder rexBuilder, Analyzer analyzer) {
       super(false);
       this.exprsMap_ = exprsMap;
       this.rexBuilder_ = rexBuilder;
+      this.analyzer_ = analyzer;
     }
 
     @Override
@@ -412,7 +424,11 @@ public class ImpalaAnalyticRel extends Project
       for (RexNode operand : rexCall.getOperands()) {
         params.add(operand.accept(this));
       }
-      return RexCallConverter.getExpr(rexCall, params, rexBuilder_);
+      try {
+        return RexCallConverter.getExpr(rexCall, params, rexBuilder_, analyzer_);
+      } catch (ImpalaException e) {
+        throw new RuntimeException(e);
+      }
     }
 
     @Override

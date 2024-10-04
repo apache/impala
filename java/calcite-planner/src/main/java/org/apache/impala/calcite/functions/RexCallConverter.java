@@ -25,6 +25,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CaseWhenClause;
 import org.apache.impala.analysis.CompoundPredicate;
@@ -32,6 +33,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ImpalaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +63,8 @@ public class RexCallConverter {
   /*
    * Returns the Impala Expr object for RexCallConverter.
    */
-  public static Expr getExpr(RexCall rexCall, List<Expr> params, RexBuilder rexBuilder) {
+  public static Expr getExpr(RexCall rexCall, List<Expr> params, RexBuilder rexBuilder,
+      Analyzer analyzer) throws ImpalaException {
 
     // Some functions are known just based on their RexCall signature.
     switch (rexCall.getOperator().getKind()) {
@@ -69,7 +72,7 @@ public class RexCallConverter {
       case AND:
         return createCompoundExpr(rexCall, params);
       case CAST:
-        return createCastExpr(rexCall, params);
+        return createCastExpr(rexCall, params, analyzer);
     }
 
     String funcName = rexCall.getOperator().getName().toLowerCase();
@@ -121,7 +124,8 @@ public class RexCallConverter {
     return null;
   }
 
-  private static Expr createCastExpr(RexCall call, List<Expr> params) {
+  private static Expr createCastExpr(RexCall call, List<Expr> params, Analyzer analyzer)
+      throws ImpalaException {
     Type impalaRetType = ImpalaTypeConverter.createImpalaType(call.getType());
     if (params.get(0).getType() == Type.NULL) {
       return new AnalyzedNullLiteral(impalaRetType);
@@ -132,6 +136,10 @@ public class RexCallConverter {
       return params.get(0);
     }
 
+    // Small hack: Most cast expressions have "isImplicit" set to true. If this
+    // is the case, then it blocks "analyze" from working through the cast. We
+    // need to analyze the expression before creating the cast around it.
+    params.get(0).analyze(analyzer);
     return new AnalyzedCastExpr(impalaRetType, params.get(0));
   }
 
