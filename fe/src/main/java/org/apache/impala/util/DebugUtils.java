@@ -149,7 +149,7 @@ public class DebugUtils {
           Preconditions.checkState(actionParams.size() == 2);
           try {
             int timeToSleepMs = Integer.parseInt(actionParams.get(1).trim());
-            LOG.trace("Sleeping for {} msec to execute debug action {}",
+            LOG.debug("Sleeping for {} msec to execute debug action {}",
                 timeToSleepMs, label);
             Thread.sleep(timeToSleepMs);
           } catch (NumberFormatException ex) {
@@ -171,7 +171,7 @@ public class DebugUtils {
               continue;
             }
             long timeToSleepMs = random.nextInt(maxTimeToSleepMs);
-            LOG.trace("Sleeping for {} msec to execute debug action {}",
+            LOG.debug("Sleeping for {} msec to execute debug action {}",
                 timeToSleepMs, action);
             Thread.sleep(timeToSleepMs);
           } catch (NumberFormatException ex) {
