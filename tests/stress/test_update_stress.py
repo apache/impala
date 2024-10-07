@@ -119,7 +119,7 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
       time.sleep(random.random())
     impalad_client.close()
 
-  @pytest.mark.stress
+  @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_updates(self, unique_database):
     """Issues UPDATE statements against multiple impalads in a way that some
@@ -232,7 +232,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
       time.sleep(random.random())
     impalad_client.close()
 
-  @pytest.mark.stress
+  @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_deletes_and_updates(self, unique_database):
     """Issues DELETE and UPDATE statements in parallel in a way that some
@@ -259,7 +259,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     result = self.client.execute("select count(*) from {}".format(tbl_name))
     assert result.data == ['0']
 
-  @pytest.mark.stress
+  @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_deletes_and_updates_and_optimize(self, unique_database):
     """Issues DELETE and UPDATE statements in parallel in a way that some

@@ -64,7 +64,7 @@ NUM_CONCURRENT_TESTS = multiprocessing.cpu_count()
 if 'NUM_CONCURRENT_TESTS' in os.environ:
   NUM_CONCURRENT_TESTS = int(os.environ['NUM_CONCURRENT_TESTS'])
 
-# Default the number of stress clinets to 4x the number of CPUs (but not exceeding the
+# Default the number of stress clients to 4x the number of CPUs (but not exceeding the
 # default max # of concurrent connections)
 # This can be overridden by setting the NUM_STRESS_CLIENTS environment variable.
 # TODO: fix the stress test so it can start more clients than available connections

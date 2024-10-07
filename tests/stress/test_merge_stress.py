@@ -101,7 +101,7 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
       time.sleep(random.random())
     impalad_client.close()
 
-  @pytest.mark.stress
+  @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_merge_updates(self, unique_database):
     """Issues MERGE statements with UPDATE and INSERT clause against multiple

@@ -82,7 +82,7 @@ class TestInsertStress(ImpalaTestSuite):
     finally:
       impalad_client.close()
 
-  @pytest.mark.stress
+  @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_inserts(self, unique_database):
     """Issues INSERT statements against multiple impalads in a way that some
@@ -104,7 +104,7 @@ class TestInsertStress(ImpalaTestSuite):
                 for i in range(0, num_checkers)]
     run_tasks(writers + checkers)
 
-  @pytest.mark.stress
+  @pytest.mark.execute_serially
   @SkipIf.not_dfs
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_inserts(self, unique_database):
