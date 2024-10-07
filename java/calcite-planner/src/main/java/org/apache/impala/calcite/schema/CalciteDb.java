@@ -22,6 +22,7 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.AbstractSchema;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.common.ImpalaException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,7 +49,7 @@ public class CalciteDb extends AbstractSchema {
       this.reader_ = reader;
     }
 
-    public Builder addTable(String tableName, FeTable table) {
+    public Builder addTable(String tableName, FeTable table) throws ImpalaException {
       if (!tableMap_.containsKey(tableName)) {
         tableMap_.put(tableName.toLowerCase(), new CalciteTable(table, reader_));
       }

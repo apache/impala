@@ -51,12 +51,14 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.UnsupportedFeatureException;
 
 import com.google.common.collect.ImmutableList;
 
@@ -72,10 +74,16 @@ public class CalciteTable extends RelOptAbstractTable
 
   private final List<String> qualifiedTableName_;
 
-  public CalciteTable(FeTable table, CalciteCatalogReader reader) {
+  public CalciteTable(FeTable table, CalciteCatalogReader reader)
+      throws ImpalaException {
     super(reader, table.getName(), buildColumnsForRelDataType(table));
     this.table_ = (HdfsTable) table;
     this.qualifiedTableName_ = table.getTableName().toPath();
+
+    if (table instanceof IcebergTable) {
+      throw new UnsupportedFeatureException("Calcite parser does not support " +
+          "Iceberg tables yet.");
+    }
   }
 
   private static RelDataType buildColumnsForRelDataType(FeTable table) {

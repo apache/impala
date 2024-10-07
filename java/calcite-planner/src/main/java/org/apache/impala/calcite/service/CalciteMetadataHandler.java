@@ -121,7 +121,7 @@ public class CalciteMetadataHandler implements CompilerStep {
    * Populate the CalciteSchema with tables being used by this query.
    */
   private void populateCalciteSchema(CalciteCatalogReader reader,
-      FeCatalog catalog, Set<TableName> tableNames) {
+      FeCatalog catalog, Set<TableName> tableNames) throws ImpalaException {
     CalciteSchema rootSchema = reader.getRootSchema();
     Map<String, CalciteDb.Builder> dbSchemas = new HashMap<>();
     for (TableName tableName : tableNames) {
