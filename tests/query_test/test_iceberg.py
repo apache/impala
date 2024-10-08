@@ -1523,6 +1523,21 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_read_position_deletes(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes', vector)
 
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  def test_read_position_deletes_orc(self, vector):
+    self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc', vector)
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  @pytest.mark.execute_serially
+  def test_read_position_deletes_compute_stats(self, vector):
+    """Tests COMPUTE STATS on Iceberg V2 tables. Need to be executed serially
+    because it modifies tables that are used by other tests (e.g. multiple
+    instances of this test)."""
+    self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-stats', vector)
+    self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc-stats', vector)
+
   @SkipIfFS.hive
   def test_read_mixed_format_position_deletes(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-mixed-format-position-deletes',
@@ -1557,11 +1572,6 @@ class TestIcebergV2Table(IcebergTestSuite):
   @SkipIf.hardcoded_uris
   def test_read_equality_deletes(self, vector):
     self.run_test_case('QueryTest/iceberg-v2-read-equality-deletes', vector)
-
-  @SkipIfDockerizedCluster.internal_hostname
-  @SkipIf.hardcoded_uris
-  def test_read_position_deletes_orc(self, vector):
-    self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc', vector)
 
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris

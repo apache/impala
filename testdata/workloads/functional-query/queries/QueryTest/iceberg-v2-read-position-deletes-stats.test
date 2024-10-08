@@ -1,0 +1,249 @@
+====
+---- QUERY
+DROP STATS iceberg_v2_no_deletes;
+COMPUTE STATS iceberg_v2_no_deletes;
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW COLUMN STATS iceberg_v2_no_deletes
+---- RESULTS
+'i','INT',3,0,4,4,-1,-1
+'s','STRING',3,0,1,1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_no_deletes
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+3,1,'625B','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_no_deletes','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_no_deletes
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_no_deletes
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+3,1,'625B','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_no_deletes','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_delete_positional;
+COMPUTE STATS iceberg_v2_delete_positional;
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW COLUMN STATS iceberg_v2_delete_positional
+---- RESULTS
+'id','BIGINT',2,0,8,8,-1,-1
+'data','STRING',2,0,1,1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_delete_positional
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+2,2,'2.21KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_positional','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_delete_positional
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_delete_positional
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+3,2,'2.21KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_positional','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_positional_delete_all_rows;
+COMPUTE STATS iceberg_v2_positional_delete_all_rows;
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW COLUMN STATS iceberg_v2_positional_delete_all_rows
+---- RESULTS
+'i','INT',0,0,4,4,-1,-1
+'s','STRING',0,0,0,0,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_positional_delete_all_rows
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+0,2,'3.21KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_delete_all_rows','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_positional_delete_all_rows
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_positional_delete_all_rows
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+3,2,'3.21KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_delete_all_rows','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_positional_not_all_data_files_have_delete_files;
+COMPUTE STATS iceberg_v2_positional_not_all_data_files_have_delete_files;
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW COLUMN STATS iceberg_v2_positional_not_all_data_files_have_delete_files
+---- RESULTS
+'i','INT',6,0,4,4,-1,-1
+'s','STRING',6,0,1,1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_positional_not_all_data_files_have_delete_files
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+6,6,'7.77KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_positional_not_all_data_files_have_delete_files
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_positional_not_all_data_files_have_delete_files
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+10,6,'7.77KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_not_all_data_files_have_delete_files','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_positional_update_all_rows;
+COMPUTE STATS iceberg_v2_positional_update_all_rows;
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW COLUMN STATS iceberg_v2_positional_update_all_rows
+---- RESULTS
+'i','INT',3,0,4,4,-1,-1
+'s','STRING',3,0,1,1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_positional_update_all_rows
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+3,3,'3.82KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_update_all_rows','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_positional_update_all_rows
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_positional_update_all_rows
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+6,3,'3.82KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_positional_update_all_rows','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_partitioned_position_deletes;
+COMPUTE STATS iceberg_v2_partitioned_position_deletes;
+---- RESULTS
+'Updated 1 partition(s) and 4 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW COLUMN STATS iceberg_v2_partitioned_position_deletes
+---- RESULTS
+'id','INT',10,0,4,4,-1,-1
+'user','STRING',3,0,4,4,-1,-1
+'action','STRING',3,0,8,5.900000095367432,-1,-1
+'event_time','TIMESTAMP',3,0,16,16,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_partitioned_position_deletes
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+10,6,'12.95KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_partitioned_position_deletes','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+DROP STATS iceberg_v2_partitioned_position_deletes
+---- RESULTS
+'Stats have been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW TABLE STATS iceberg_v2_partitioned_position_deletes
+---- LABELS
+#ROWS, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental stats, Location, EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+20,6,'12.95KB','NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_partitioned_position_deletes','$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
