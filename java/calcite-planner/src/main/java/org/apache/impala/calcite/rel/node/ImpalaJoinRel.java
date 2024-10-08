@@ -46,6 +46,7 @@ import org.apache.impala.calcite.rel.phys.ImpalaHashJoinNode;
 import org.apache.impala.calcite.rel.phys.ImpalaNestedLoopJoinNode;
 import org.apache.impala.calcite.rel.util.CreateExprVisitor;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
+import org.apache.impala.calcite.rel.util.RexInputRefCollector;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
@@ -57,6 +58,7 @@ import org.apache.impala.planner.PlanNode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,7 +100,7 @@ public class ImpalaJoinRel extends Join
     JoinOperator joinOp = getImpalaJoinOp();
 
     List<BinaryPredicate> equiJoinConjuncts = new ArrayList<>();
-    List<Expr> nonEquiJoinConjuncts = new ArrayList<>();
+    List<Expr> otherJoinConjuncts = new ArrayList<>();
 
     // IMPALA-13176: TODO: Impala allows forcing hints for the distribution mode
     // - e.g force broadcast or hash partition join.  However, we are not
@@ -119,7 +121,7 @@ public class ImpalaJoinRel extends Join
         if (conjunctInfo.isEquiJoin_) {
           equiJoinConjuncts.add((BinaryPredicate) conjunctInfo.conjunct_);
         } else {
-          nonEquiJoinConjuncts.add(conjunctInfo.conjunct_);
+          otherJoinConjuncts.add(conjunctInfo.conjunct_);
         }
       }
     }
@@ -136,10 +138,10 @@ public class ImpalaJoinRel extends Join
     PlanNode joinNode = equiJoinConjuncts.size() == 0
       ? new ImpalaNestedLoopJoinNode(context.ctx_.getNextNodeId(), leftInput.planNode_,
           rightInput.planNode_, false /* not a straight join */, distMode, joinOp,
-          nonEquiJoinConjuncts, filterConjuncts, analyzer)
+          otherJoinConjuncts, filterConjuncts, analyzer)
       : new ImpalaHashJoinNode(context.ctx_.getNextNodeId(), leftInput.planNode_,
           rightInput.planNode_, false /* not a straight join */, distMode, joinOp,
-          equiJoinConjuncts, nonEquiJoinConjuncts, filterConjuncts, analyzer);
+          equiJoinConjuncts, otherJoinConjuncts, filterConjuncts, analyzer);
 
     if (equiJoinConjuncts.size() > 0) {
       // register the equi and non-equi join conjuncts with the analyzer such that
@@ -147,7 +149,7 @@ public class ImpalaJoinRel extends Join
       List<Expr> equiJoinExprs = new ArrayList<Expr>(equiJoinConjuncts);
       analyzer.registerConjuncts(getJoinConjunctListToRegister(equiJoinExprs));
     }
-    analyzer.registerConjuncts(getJoinConjunctListToRegister(nonEquiJoinConjuncts));
+    analyzer.registerConjuncts(getJoinConjunctListToRegister(otherJoinConjuncts));
 
     return new NodeWithExprs(joinNode, outputExprs);
   }
@@ -425,9 +427,54 @@ public class ImpalaJoinRel extends Join
       // get a canonicalized representation
       conj = getCanonical(conj, leftInput.outputExprs_.size());
       Expr impalaConjunct = conj.accept(visitor);
-      conjunctInfos.add(new ConjunctInfo(impalaConjunct, conj.isA(SqlKind.EQUALS)));
+      conjunctInfos.add(
+          new ConjunctInfo(impalaConjunct, isEquijoinConjunct(conj, leftInput)));
     }
     return conjunctInfos;
+  }
+
+  // Checks to see if this conjunct can be considered an "equijoin" conjunct.
+  // An equijoin conjunct must have the following traits:
+  // - should be an "EQUALS" RexCall at the top level.
+  // - be in canonical form, that is, the input refs on the left side of the
+  //   equals RexNode should point to the left input and the right side of the
+  //   equals RexNode should point to the right input.
+  // - should be at least one input ref on the left side and one input ref on
+  //   the right side.
+  private boolean isEquijoinConjunct(RexNode conjunct, NodeWithExprs leftInput) {
+    if (!conjunct.isA(SqlKind.EQUALS)) {
+      return false;
+    }
+
+    Preconditions.checkState(conjunct instanceof RexCall);
+    RexCall call = (RexCall) conjunct;
+
+    // left side expr may only contain inputrefs from left side.
+    // right side expr may only contain inputrefs from right side.
+    RexNode left = call.getOperands().get(0);
+    Set<Integer> inputRefs = RexInputRefCollector.getInputRefs(left);
+    if (inputRefs.size() == 0) {
+      return false;
+    }
+
+    for (Integer inputRef : inputRefs) {
+      if (inputRef >= leftInput.outputExprs_.size()) {
+        return false;
+      }
+    }
+
+    RexNode right = call.getOperands().get(1);
+    inputRefs = RexInputRefCollector.getInputRefs(right);
+    if (inputRefs.size() == 0) {
+      return false;
+    }
+    for (Integer inputRef : inputRefs) {
+      if (inputRef < leftInput.outputExprs_.size()) {
+        return false;
+      }
+    }
+    return true;
+
   }
 
   private static class ConjunctInfo {
