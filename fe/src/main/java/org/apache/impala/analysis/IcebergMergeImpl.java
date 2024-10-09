@@ -127,6 +127,12 @@ public class IcebergMergeImpl implements MergeImpl {
           "Unsupported '%s': '%s' for Iceberg table: %s",
           TableProperties.MERGE_MODE, modifyWriteMode, icebergTable_.getFullName()));
     }
+    if (!icebergTable_.getContentFileStore().getEqualityDeleteFiles().isEmpty()) {
+      throw new AnalysisException(
+          "MERGE statement is not supported for Iceberg tables "
+              + "containing equality deletes.");
+      //TODO: IMPALA-13674
+    }
     for (Column column : icebergTable_.getColumns()) {
       Path slotPath =
           new Path(targetTableRef_.desc_, Collections.singletonList(column.getName()));
@@ -329,13 +335,21 @@ public class IcebergMergeImpl implements MergeImpl {
               VirtualColumn.ICEBERG_PARTITION_SERIALIZED.getName())));
     }
 
-    List<Expr> positionMetaExpressions = ImmutableList.of(
-        new SlotRef(
-            ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                VirtualColumn.INPUT_FILE_NAME.getName())),
-        new SlotRef(
-            ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                VirtualColumn.FILE_POSITION.getName())));
+    List<Expr> positionMetaExpressions;
+
+    if (mergeStmt_.hasOnlyInsertCases() && icebergTable_.getContentFileStore()
+        .getDataFilesWithDeletes().isEmpty()) {
+      positionMetaExpressions = Collections.emptyList();
+    } else {
+      // DELETE/UPDATE cases require position information to write delete files
+      positionMetaExpressions = ImmutableList.of(
+          new SlotRef(
+              ImmutableList.of(targetTableRef_.getUniqueAlias(),
+                  VirtualColumn.INPUT_FILE_NAME.getName())),
+          new SlotRef(
+              ImmutableList.of(targetTableRef_.getUniqueAlias(),
+                  VirtualColumn.FILE_POSITION.getName())));
+    }
 
     selectListItems.add(new SelectListItem(rowPresentExpression, ROW_PRESENT));
     selectListItems.addAll(

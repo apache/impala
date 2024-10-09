@@ -1637,5 +1637,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testIcebergMerge() {
     runPlannerTestFile("iceberg-merge");
+    TQueryOptions options = new TQueryOptions();
+    runPlannerTestFile("iceberg-merge-insert-only", options,
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.INCLUDE_EXPLAIN_HEADER));
   }
 }
