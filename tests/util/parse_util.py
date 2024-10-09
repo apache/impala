@@ -34,6 +34,7 @@ EXPECTED_TPCH_STRESS_QUERIES_COUNT = EXPECTED_TPCH_QUERIES_COUNT + 3
 MEM_ESTIMATE_PATTERN = re.compile(
     r"Per-Host Resource Estimates: Memory=(\d+\.?\d*)(P|T|G|M|K)?B")
 NEW_GLOG_ENTRY_PATTERN = re.compile(r"[IWEF](?P<Time>\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*")
+CACHE_KEY_PATTERN = re.compile(r"cache key: ([a-f0-9]+)")
 
 
 def parse_glog(text, start_time=None):
@@ -153,6 +154,31 @@ def match_memory_estimate(explain_lines):
   if None in (mem_limit, units):
     raise Exception('could not parse explain string:\n' + '\n'.join(explain_lines))
   return mem_limit, units
+
+
+def match_cache_key(explain_lines):
+  """
+  Given a list of strings from EXPLAIN output, find the cache key.
+
+  Params:
+    explain_lines: list of str
+
+  Returns:
+    str - The cache key if found
+
+  Raises:
+    Exception if no cache key is found
+  """
+  cache_key = None
+  for line in explain_lines:
+    regex_result = CACHE_KEY_PATTERN.search(line)
+    if regex_result:
+      cache_key = regex_result.group(1)
+      break
+  if cache_key is None:
+    raise Exception(
+      'could not find cache key in explain string:\n' + '\n'.join(explain_lines))
+  return cache_key
 
 
 def get_bytes_summary_stats_counter(counter_name, runtime_profile):

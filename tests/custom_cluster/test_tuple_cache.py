@@ -25,6 +25,8 @@ import string
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import (
     add_exec_option_dimension, add_mandatory_exec_option)
+from tests.util.parse_util import (
+    match_memory_estimate, parse_mem_to_mb, match_cache_key)
 
 TABLE_LAYOUT = 'name STRING, age INT, address STRING'
 CACHE_START_ARGS = "--tuple_cache_dir=/tmp --log_level=2"
@@ -703,3 +705,48 @@ class TestTupleCacheCountStar(TestTupleCacheBase):
     result1 = self.execute_query(query)
     result2 = self.execute_query(query)
     assert result1.success and result2.success
+
+
+class TestTupleCacheComputeStats(TestTupleCacheBase):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTupleCacheComputeStats, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'mt_dop', [0, 2])
+
+  @CustomClusterTestSuite.with_args(
+    start_args=CACHE_START_ARGS, cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_tuple_cache_key_with_stats(self, vector, unique_database):
+    """
+    This test verifies if compute stats affect the tuple cache key.
+    """
+    self.client.set_configuration(vector.get_value('exec_option'))
+    fq_table = "{0}.tuple_cache_stats_test".format(unique_database)
+
+    # Create a table.
+    self.create_table(fq_table, scale=1)
+
+    # Get the explain text for a simple query.
+    query = "explain select * from {0}".format(fq_table)
+    result1 = self.execute_query(query)
+
+    # Insert rows to make the stats different.
+    for i in range(10):
+      self.execute_query("INSERT INTO {0} VALUES ({1})".format(
+        fq_table, table_value(i)))
+
+    # Run compute stats and get the explain text again for the same query.
+    self.client.execute("COMPUTE STATS {0}".format(fq_table))
+    result2 = self.execute_query(query)
+
+    # Verify memory estimations are different, while the cache keys are identical.
+    assert result1.success and result2.success
+    mem_limit1, units1 = match_memory_estimate(result1.data)
+    mem_limit1 = parse_mem_to_mb(mem_limit1, units1)
+    mem_limit2, units2 = match_memory_estimate(result2.data)
+    mem_limit2 = parse_mem_to_mb(mem_limit2, units2)
+    assert mem_limit1 != mem_limit2
+    cache_key1 = match_cache_key(result1.data)
+    cache_key2 = match_cache_key(result2.data)
+    assert cache_key1 is not None and cache_key1 == cache_key2
