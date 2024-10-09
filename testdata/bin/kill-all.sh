@@ -28,6 +28,7 @@ ${IMPALA_HOME}/bin/start-impala-cluster.py --kill
 $IMPALA_HOME/testdata/bin/kill-sentry-service.sh
 $IMPALA_HOME/testdata/bin/kill-hive-server.sh
 $IMPALA_HOME/testdata/bin/kill-hbase.sh
+$IMPALA_HOME/testdata/bin/kill-kudu.sh
 $IMPALA_HOME/testdata/bin/kill-mini-dfs.sh
 $IMPALA_HOME/testdata/bin/kill-ranger-server.sh
 
