@@ -23,10 +23,15 @@ import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.rel.util.CreateExprVisitor;
@@ -68,7 +73,17 @@ public class ImpalaProjectRel extends Project
 
   @Override
   public NodeWithExprs getPlanNode(ParentPlanRelContext context) throws ImpalaException {
-    NodeWithExprs inputWithExprs = getChildPlanNode(context);
+
+    // see comment in isCoercedProjectForValues method
+    boolean isCoercedProjectForValues = isCoercedProjectForValues(context);
+    NodeWithExprs inputWithExprs = getChildPlanNode(context, isCoercedProjectForValues);
+
+    // If this Project is a coercedProjectForValues, then this Project has been taken
+    // care of in the underlying Values RelNode so the output of that node is passed
+    // directly up to the parent.
+    if (isCoercedProjectForValues) {
+      return inputWithExprs;
+    }
 
     // get the output exprs for this node that are needed by the parent node.
     List<Expr> outputExprs =
@@ -100,15 +115,66 @@ public class ImpalaProjectRel extends Project
     return builder.build();
   }
 
-  private NodeWithExprs getChildPlanNode(ParentPlanRelContext context
-      ) throws ImpalaException {
+  private NodeWithExprs getChildPlanNode(ParentPlanRelContext context,
+      boolean isCoercedProjectForValues) throws ImpalaException {
     Preconditions.checkState(context.filterCondition_ == null,
         "Failure, Filter RelNode needs to be passed through the Project Rel Node.");
     ImpalaPlanRel relInput = (ImpalaPlanRel) getInput(0);
     ParentPlanRelContext.Builder builder =
         new ParentPlanRelContext.Builder(context, this);
+    // see "isCoercedProjectForValues" method
+    if (isCoercedProjectForValues) {
+      // RelNode type of parent of project is set for the child
+      builder.setParentType(context.parentType_);
+      // For a coerced project, the rowtype of the project is passed in. This is because
+      // a "cast(inputref)" may change the row type for the underlying Values RelNode.
+      builder.setParentRowType(getRowType());
+    }
     builder.setInputRefs(RelOptUtil.InputFinder.bits(getProjects(), null));
     return relInput.getPlanNode(builder.build());
+  }
+
+  // isCoercedProjectForValues returns true if this Project RelNode was
+  // explicitly created by the CoerceNodes module for the purpose of handling
+  // a RelDataType that had to be modified. This is a hack to get around a
+  // limitation of Calcite. Calcite only allows string literals to be created
+  // as "char(x)". So the CoerceNodes module injects a Project above the Values
+  // RelNode, casts the column to string, and propagates the string data type
+  // to all the RelNodes above the Project.
+  //
+  // The signs that show this is a coerced nodes created project is that all
+  // the columns are either passthrough (just an inputref to the same column
+  // number) or a cast of an inputref of the same column number.
+  private boolean isCoercedProjectForValues(ParentPlanRelContext context) {
+
+    // only care about simple projects if the underlying input is a Values
+    if (!(getInput() instanceof Values)) {
+      return false;
+    }
+
+    List<RexNode> projects = getProjects();
+    for (int i = 0; i < projects.size(); ++i) {
+      RexNode project = projects.get(i);
+      if (project instanceof RexInputRef) {
+        RexInputRef inputRef = (RexInputRef) project;
+        if (inputRef.getIndex() == i) {
+          continue;
+        }
+      }
+
+      if (project instanceof RexCall) {
+        RexCall call = (RexCall) project;
+        if (call.getKind().equals(SqlKind.CAST) &&
+            call.getOperands().get(0) instanceof RexInputRef) {
+          RexInputRef inputRef = (RexInputRef) call.getOperands().get(0);
+          if (inputRef.getIndex() == i) {
+            continue;
+          }
+        }
+      }
+      return false;
+    }
+    return true;
   }
 
   @Override
