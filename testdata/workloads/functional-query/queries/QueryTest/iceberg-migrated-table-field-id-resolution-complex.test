@@ -242,22 +242,26 @@ select * from array_struct_table_test_orc;
 INT, STRING, STRING, STRING
 ====
 ---- QUERY
-select * from $DATABASE.array_struct_table_test.`partitions`;
+select `partition`, spec_id, record_count, file_count,
+       position_delete_record_count, position_delete_file_count
+from $DATABASE.array_struct_table_test.`partitions`;
 ---- RESULTS
-'{"result_date":null,"id":4,"name":"Test 4"}',1,1,1,0,0,0,0
-'{"result_date":"2024-08-26","id":null,"name":null}',0,2,1,0,0,0,0
-'{"result_date":null,"id":3,"name":"Test 3"}',1,1,1,0,0,0,0
+'{"result_date":null,"id":4,"name":"Test 4"}',1,1,1,0,0
+'{"result_date":"2024-08-26","id":null,"name":null}',0,2,1,0,0
+'{"result_date":null,"id":3,"name":"Test 3"}',1,1,1,0,0
 ---- TYPES
-STRING, INT, BIGINT, INT, BIGINT, INT, BIGINT, INT
+STRING, INT, BIGINT, INT, BIGINT, INT
 ====
 ---- QUERY
-select * from $DATABASE.array_struct_table_test_orc.`partitions`;
+select `partition`, spec_id, record_count, file_count,
+       position_delete_record_count, position_delete_file_count
+from $DATABASE.array_struct_table_test_orc.`partitions`;
 ---- RESULTS
-'{"result_date":null,"id":4,"name":"Test 4"}',1,1,1,0,0,0,0
-'{"result_date":"2024-08-26","id":null,"name":null}',0,2,1,0,0,0,0
-'{"result_date":null,"id":3,"name":"Test 3"}',1,1,1,0,0,0,0
+'{"result_date":null,"id":4,"name":"Test 4"}',1,1,1,0,0
+'{"result_date":"2024-08-26","id":null,"name":null}',0,2,1,0,0
+'{"result_date":null,"id":3,"name":"Test 3"}',1,1,1,0,0
 ---- TYPES
-STRING, INT, BIGINT, INT, BIGINT, INT, BIGINT, INT
+STRING, INT, BIGINT, INT, BIGINT, INT
 ====
 ---- QUERY
 select teststeps.step_description, teststeps.step_number from all_part_cols_stored_parquet m, m.teststeps;
