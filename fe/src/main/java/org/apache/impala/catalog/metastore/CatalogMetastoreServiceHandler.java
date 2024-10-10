@@ -1331,10 +1331,10 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
             MetastoreEventsProcessor.getNextMetastoreEventsInBatchesForTable(catalog_,
                 currentEventId, newTable.getDbName(), newTable.getTableName(),
                 MetastoreEvents.AlterTableEvent.EVENT_TYPE);
-        Preconditions.checkState(events.size() == 1, String.format("For table %s.%s, "
+        Preconditions.checkState(events.size() == 1, "For table %s.%s, "
             + "from event id: %s, expected ALTER_TABLE events size to be 1 but is %s",
             newTable.getDbName(), newTable.getTableName(), currentEventId,
-            events.size()));
+            events.size());
 
         MetastoreEvents.MetastoreEvent event = metastoreEventFactory_.get(events.get(0),
             metastoreEventsMetrics_);

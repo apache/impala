@@ -88,9 +88,9 @@ public class CalcitePhysPlanCreator implements CompilerStep {
   @Override
   public void logDebug(Object resultObject) {
     if (!(resultObject instanceof NodeWithExprs)) {
-      LOG.debug("Finished physical plan step, but unknown result: " + resultObject);
+      LOG.debug("Finished physical plan step, but unknown result: {}", resultObject);
       return;
     }
-    LOG.debug("Physical Plan: " + resultObject);
+    LOG.debug("Physical Plan: {}", resultObject);
   }
 }

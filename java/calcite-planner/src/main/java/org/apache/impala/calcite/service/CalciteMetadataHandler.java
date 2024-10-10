@@ -354,9 +354,10 @@ public class CalciteMetadataHandler implements CompilerStep {
 
   @Override
   public void logDebug(Object resultObject) {
-    LOG.debug("Loaded tables: " + stmtTableCache_.tables.values().stream()
+    if (!LOG.isDebugEnabled()) return;
+    String allTables = stmtTableCache_.tables.values().stream()
         .map(feTable -> feTable.getName().toString())
-        .collect(Collectors.joining( ", " )));
+        .collect(Collectors.joining( ", " ));
+    LOG.debug("Loaded tables: {}", allTables);
   }
 }
-

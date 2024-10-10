@@ -93,9 +93,9 @@ public class CalciteValidator implements CompilerStep {
   @Override
   public void logDebug(Object resultObject) {
     if (!(resultObject instanceof SqlNode)) {
-      LOG.debug("Finished validator step, but unknown result: " + resultObject);
+      LOG.debug("Finished validator step, but unknown result: {}", resultObject);
       return;
     }
-    LOG.debug("Validated node: " + resultObject);
+    LOG.debug("Validated node: {}", resultObject);
   }
 }

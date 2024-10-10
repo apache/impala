@@ -427,8 +427,8 @@ public class ExecRequestCreator implements CompilerStep {
   @Override
   public void logDebug(Object resultObject) {
     if (!(resultObject instanceof TExecRequest)) {
-      LOG.debug("Finished create exec request step, but unknown result: " + resultObject);
+      LOG.debug("Finished exec request step, but unknown result: {}", resultObject);
     }
-    LOG.debug("Exec request: " + resultObject);
+    LOG.debug("Exec request: {}", resultObject);
   }
 }

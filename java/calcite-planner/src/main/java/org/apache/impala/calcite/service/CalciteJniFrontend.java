@@ -199,9 +199,7 @@ public class CalciteJniFrontend extends JniFrontend {
       QueryContext queryCtx, String stepMessage) {
     LOG.info(stepMessage);
     queryCtx.getTimeline().markEvent(stepMessage);
-    if (LOG.isDebugEnabled()) {
-      compilerStep.logDebug(stepResult);
-    }
+    compilerStep.logDebug(stepResult);
   }
 
   private static void loadCalciteImpalaFunctions() {

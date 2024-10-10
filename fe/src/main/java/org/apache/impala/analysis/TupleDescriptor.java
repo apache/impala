@@ -292,12 +292,12 @@ public class TupleDescriptor {
    * is not executable, i.e., if one of those conditions is not met.
    */
   public void checkIsExecutable() {
-    Preconditions.checkState(isMaterialized_, String.format(
+    Preconditions.checkState(isMaterialized_,
         "Illegal reference to non-materialized tuple: debugname=%s alias=%s tid=%s",
-        debugName_, StringUtils.defaultIfEmpty(getAlias(), "n/a"), id_));
-    Preconditions.checkState(hasMemLayout_, String.format(
+        debugName_, StringUtils.defaultIfEmpty(getAlias(), "n/a"), id_);
+    Preconditions.checkState(hasMemLayout_,
         "Missing memory layout for tuple: debugname=%s alias=%s tid=%s",
-        debugName_, StringUtils.defaultIfEmpty(getAlias(), "n/a"), id_));
+        debugName_, StringUtils.defaultIfEmpty(getAlias(), "n/a"), id_);
   }
 
   /**

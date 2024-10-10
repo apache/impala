@@ -330,7 +330,8 @@ public class SlotRef extends Expr {
     // we shouldn't be sending exprs over non-materialized slots
     Preconditions.checkState(desc_.isMaterialized(),
         "Illegal reference to non-materialized slot: %s", this);
-    Preconditions.checkState(desc_.getByteOffset() >= 0);
+    Preconditions.checkState(desc_.getByteOffset() >= 0,
+        "computeMemLayout not done for slot: %s", this);
     // check that the tuples associated with this slot are executable
     desc_.getParent().checkIsExecutable();
     if (desc_.getItemTupleDesc() != null) desc_.getItemTupleDesc().checkIsExecutable();

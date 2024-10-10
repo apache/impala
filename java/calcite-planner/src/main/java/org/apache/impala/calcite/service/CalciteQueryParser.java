@@ -65,9 +65,9 @@ public class CalciteQueryParser implements CompilerStep {
 
   public void logDebug(Object resultObject) {
     if (!(resultObject instanceof SqlNode)) {
-      LOG.debug("Parser produced an unknown output: " + resultObject);
+      LOG.debug("Parser produced an unknown output: {}", resultObject);
       return;
     }
-    LOG.debug("Parsed node: " + resultObject);
+    LOG.debug("Parsed node: {}", resultObject);
   }
 }

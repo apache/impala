@@ -261,8 +261,8 @@ public class ArithmeticExpr extends Expr {
     fn_ = getBuiltinFunction(analyzer, fnName, collectChildReturnTypes(),
         CompareMode.IS_IDENTICAL);
     if (fn_ == null) {
-      Preconditions.checkState(false, String.format("No match " +
-          "for '%s' with operand types %s and %s", toSql(), t0, t1));
+      Preconditions.checkState(false,
+          "No match for '%s' with operand types %s and %s", toSql(), t0, t1);
     }
     Preconditions.checkState(type_.matchesType(fn_.getReturnType()));
   }
