@@ -320,6 +320,13 @@ public class FrontendTestBase extends AbstractFrontendTest {
         errorString = errorString.replace("No FileSystem for scheme ",
             "No FileSystem for scheme: ");
       }
+      // Different versions of Avro use different versions of Jackson. That can result
+      // in a different package name for JsonParseException. Tolerate either version
+      // by replacing the old package (org.codehaus.jackson.JsonParseException) for
+      // the new package (com.fasterxml.jackson.core.JsonParseException).
+      errorString = errorString.replace("org.codehaus.jackson.JsonParseException",
+          "com.fasterxml.jackson.core.JsonParseException");
+
       Assert.assertTrue(msg, errorString.startsWith(expectedErrorString));
       return;
     }

@@ -48,6 +48,11 @@ class TestSFS(ImpalaTestSuite):
     hdfs_dir_for_managed_tables =\
         "{0}/managed/{1}.db/".format(WAREHOUSE, unique_database)
 
+    # Some versions of HMS do not properly create the database directories.
+    # This isn't a test for HMS, so workaround the issue by creating the
+    # directories manually.
+    self.filesystem_client.make_dir(hdfs_dir_for_external_tables)
+    self.filesystem_client.make_dir(hdfs_dir_for_managed_tables)
     copy_files_to_hdfs_dir(files_for_external_tables, hdfs_dir_for_external_tables)
     copy_files_to_hdfs_dir(files_for_managed_tables, hdfs_dir_for_managed_tables)
 

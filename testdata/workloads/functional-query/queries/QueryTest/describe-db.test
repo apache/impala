@@ -30,7 +30,7 @@ describe database extended impala_test_desc_db3
 ---- RESULTS
 '','$USER','USER'
 'Owner: ','',''
-'impala_test_desc_db3','$NAMENODE/testdb',''
+'impala_test_desc_db3','$NAMENODE/testdb3',''
 ---- TYPES
 string, string, string
 ====
@@ -39,7 +39,7 @@ describe database extended impala_test_desc_db4
 ---- RESULTS
 '','$USER','USER'
 'Owner: ','',''
-'impala_test_desc_db4','$NAMENODE/test2.db','test comment'
+'impala_test_desc_db4','$NAMENODE/test4.db','test comment'
 ---- TYPES
 string, string, string
 ====
@@ -47,7 +47,7 @@ string, string, string
 describe database impala_test_desc_db5
 ---- RESULTS
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/test2.db',''
+'managedlocation:','$NAMENODE/test5.db',''
 ---- TYPES
 string, string, string
 ====
@@ -57,7 +57,7 @@ describe database extended impala_test_desc_db5
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/test2.db',''
+'managedlocation:','$NAMENODE/test5.db',''
 ---- TYPES
 string, string, string
 ====
@@ -67,7 +67,7 @@ describe database extended impala_test_desc_db5
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/test2.db',''
+'managedlocation:','$NAMENODE/test5.db',''
 ---- TYPES
 string, string, string
 ====
@@ -77,7 +77,7 @@ describe database formatted impala_test_desc_db5
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/test2.db',''
+'managedlocation:','$NAMENODE/test5.db',''
 ---- TYPES
 string, string, string
 ====

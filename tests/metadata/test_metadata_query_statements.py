@@ -167,15 +167,18 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_describe_db(self, vector, cluster_properties):
     self.__test_describe_db_cleanup()
     try:
+      # Some versions of HMS will fail to create the database if the managed directory
+      # is already present. This is not a test for HMS, so this uses unique directory
+      # names to workaround the issue.
       self.client.execute("create database impala_test_desc_db1")
       self.client.execute("create database impala_test_desc_db2 "
                           "comment 'test comment'")
       self.client.execute("create database impala_test_desc_db3 "
-                          "location '" + get_fs_path("/testdb") + "'")
+                          "location '" + get_fs_path("/testdb3") + "'")
       self.client.execute("create database impala_test_desc_db4 comment 'test comment' "
-                          "location \"" + get_fs_path("/test2.db") + "\"")
+                          "location \"" + get_fs_path("/test4.db") + "\"")
       self.client.execute("create database impala_test_desc_db5 comment 'test comment' "
-                          "managedlocation \"" + get_fs_path("/test2.db") + "\"")
+                          "managedlocation \"" + get_fs_path("/test5.db") + "\"")
       self.run_stmt_in_hive("create database hive_test_desc_db comment 'test comment' "
                            "with dbproperties('pi' = '3.14', 'e' = '2.82')")
       self.run_stmt_in_hive("create database hive_test_desc_db2 comment 'test comment' "

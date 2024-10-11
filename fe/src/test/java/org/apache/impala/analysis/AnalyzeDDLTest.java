@@ -1337,7 +1337,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
           "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}')", propertyType),
           "Error parsing Avro schema for table 'functional.alltypes': " +
-          "org.codehaus.jackson.JsonParseException: Unexpected close marker ']': " +
+          "com.fasterxml.jackson.core.JsonParseException: Unexpected close marker ']': "+
           "expected '}'");
       AnalysisError(String.format("alter table functional.alltypes set %s " +
           "('avro.schema.literal'='')", propertyType),
@@ -1372,7 +1372,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}', " +
           "'avro.schema.url'='')", propertyType),
           "Error parsing Avro schema for table 'functional.alltypes': " +
-          "org.codehaus.jackson.JsonParseException: Unexpected close marker ']': " +
+          "com.fasterxml.jackson.core.JsonParseException: Unexpected close marker ']': "+
           "expected '}'");
       // Url is invalid but ignored because literal is provided.
       AnalyzesOk(String.format("alter table functional.alltypes set %s " +
@@ -3249,7 +3249,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
         "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}')",
         "Error parsing Avro schema for table 'default.foo_avro': " +
-        "org.codehaus.jackson.JsonParseException: Unexpected close marker ']': "+
+        "com.fasterxml.jackson.core.JsonParseException: Unexpected close marker ']': "+
         "expected '}'");
 
     // Map/Array types in Avro schema.

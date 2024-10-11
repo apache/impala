@@ -60,6 +60,10 @@ under the License.
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.cloudera.logredactor</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.bouncycastle</groupId>
           <artifactId>*</artifactId>
         </exclusion>
