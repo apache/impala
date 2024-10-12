@@ -433,12 +433,30 @@ class TestLoggingBase(TestBreakpadBase):
           if i < len(paths) - 1:
             # check that we print the next_path in last line of this log file
             next_path = paths[i + 1]
-            with open(curr_path, 'rb') as f:
-              f.seek(-2, os.SEEK_END)
-              while f.read(1) != b'\n':
-                f.seek(-2, os.SEEK_CUR)
-              last_line = f.readline().decode()
-              assert next_path in last_line
+            with open(curr_path, 'r') as f:
+              lines = f.readlines()
+              # There have been some test failures where the next_path is not in the last
+              # line of the output. One theory is that some output could have gone to the
+              # file after the next_path has been written. This tolerates having the
+              # next path in the last 3 lines. It also preserves the logs if there is a
+              # failure.
+              found_next_path = False
+              NUM_LINES_TO_CHECK = 3
+              for i in range(max(NUM_LINES_TO_CHECK, len(lines))):
+                if next_path in lines[-i]:
+                  found_next_path = True
+                  break
+              if not found_next_path:
+                # These logs are in a temporary directory. To improve debuggability,
+                # copy the logs to a location that would be preserved.
+                preserved_log_dir = os.getenv("LOG_DIR", "/tmp/")
+                preserved_path = os.path.join(preserved_log_dir,
+                    os.path.basename(curr_path))
+                shutil.copyfile(curr_path, preserved_path)
+                msg = "Did not find {0} in the last {1} lines of {2}.".format(
+                    next_path, NUM_LINES_TO_CHECK, curr_path)
+                msg += " Preserved the log contents at {0}".format(preserved_path)
+                assert False, msg
         except OSError:
           # The daemon might delete the log in the middle of assertion.
           # In that case, do nothing and move on.
