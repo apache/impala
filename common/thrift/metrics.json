@@ -45,7 +45,7 @@
       "IMPALAD"
     ],
     "label": "In-use CodeGen Cache Entries total bytes",
-    "units": "UNIT",
+    "units": "BYTES",
     "kind": "GAUGE",
     "key": "impala.codegen-cache.entries-in-use-bytes"
   },
@@ -135,7 +135,7 @@
       "IMPALAD"
     ],
     "label": "In-use Tuple Cache Entries total bytes",
-    "units": "UNIT",
+    "units": "BYTES",
     "kind": "GAUGE",
     "key": "impala.tuple-cache.entries-in-use-bytes"
   },
