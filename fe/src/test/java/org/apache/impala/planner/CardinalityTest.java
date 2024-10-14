@@ -1032,6 +1032,54 @@ public class CardinalityTest extends PlannerTestBase {
         ImmutableSet.of(), pathToKuduScanNodeSg, KuduScanNode.class);
   }
 
+  @Test
+  public void testByteBasedNumWriters() {
+    int min_bytes = HdfsTableSink.MIN_WRITE_BYTES;
+
+    // Test unpartitioned insert cases.
+    assertEquals(1, HdfsTableSink.bytesBasedNumWriters(10, 50, false, 1, min_bytes, 1));
+    assertEquals(25, HdfsTableSink.bytesBasedNumWriters(10, 50, false, 1, min_bytes, 25));
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 10, false, 1, min_bytes, 25));
+
+    // Test partitioned insert cases with unknown totalNumPartitions.
+    assertEquals(1, HdfsTableSink.bytesBasedNumWriters(10, 50, true, -1, min_bytes, 1));
+    assertEquals(25, HdfsTableSink.bytesBasedNumWriters(10, 50, true, -1, min_bytes, 25));
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 10, true, -1, min_bytes, 25));
+
+    // Test partitioned insert cases with totalNumPartitions == 1.
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 1, min_bytes, 1));
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 1, min_bytes, 25));
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 10, true, 1, min_bytes, 25));
+
+    // Test partitioned insert cases with totalNumPartitions == maxNumWriters.
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 50, min_bytes, 1));
+    assertEquals(25, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 50, min_bytes, 25));
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 10, true, 10, min_bytes, 25));
+
+    // Test partitioned insert cases with totalNumPartitions > maxNumWriters.
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 60, min_bytes, 1));
+    assertEquals(25, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 60, min_bytes, 25));
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 10, true, 11, min_bytes, 25));
+
+    // Test partitioned insert cases with totalNumPartitions < maxNumWriters.
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 40, min_bytes, 1));
+    assertEquals(25, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 40, min_bytes, 25));
+    assertEquals(9, HdfsTableSink.bytesBasedNumWriters(10, 10, true, 9, min_bytes, 25));
+
+    // Test partitioned insert cases with totalNumPartitions < numInputNodes.
+    assertEquals(8, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 8, min_bytes, 1));
+    assertEquals(8, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 8, min_bytes, 25));
+    assertEquals(8, HdfsTableSink.bytesBasedNumWriters(10, 10, true, 8, min_bytes, 25));
+
+    // Test 0 cardinality.
+    assertEquals(1, HdfsTableSink.bytesBasedNumWriters(10, 50, false, 1, 0, 25));
+    assertEquals(1, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 50, 0, 25));
+
+    // Test 0 avgRowSize (this is hypothetical and defensive).
+    assertEquals(1, HdfsTableSink.bytesBasedNumWriters(10, 50, false, 1, min_bytes, 0));
+    assertEquals(10, HdfsTableSink.bytesBasedNumWriters(10, 50, true, 50, min_bytes, 0));
+  }
+
   /**
    * Given a query and an expected cardinality, checks that the root
    * node of the single-fragment plan has the expected cardinality.

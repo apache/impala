@@ -426,4 +426,41 @@ public class HdfsTableSink extends TableSink {
     super.computeRowConsumptionAndProductionToCost();
     fragment_.setFixedInstanceCount(fragment_.getNumInstances());
   }
+
+  /**
+   * Estimate such that each writer will work on at least MIN_WRITE_BYTES of rows.
+   * However, if this is a partitioned insert, the output volume will be divided
+   * into several partitions. In that case, consider totalNumPartitions so that
+   * total num writers is close to totalNumPartitions.
+   */
+  public static int bytesBasedNumWriters(int numInputNodes, int maxNumWriters,
+      boolean isPartitioned, long totalNumPartitions, long inputCardinality,
+      double avgRowSize) {
+    Preconditions.checkArgument(maxNumWriters > 0);
+    Preconditions.checkArgument(inputCardinality >= 0);
+    Preconditions.checkArgument(avgRowSize >= 0);
+    if (inputCardinality == 0) return 1;
+    long byteBasedNumWriters = (long) Math.round(
+        (avgRowSize / HdfsTableSink.MIN_WRITE_BYTES) * inputCardinality);
+
+    if (isPartitioned && totalNumPartitions > 0) {
+      // This is a partitioned insert and totalNumPartitions is known.
+      // Utilize all input nodes if possible, but do not schedule more writers than
+      // partitions, except if there is only 1 partition.
+      if (totalNumPartitions == 1) {
+        // Force colocation between input fragment and writer fragment.
+        // Note that we are risking writing more files than needed here to gain
+        // performance by not shuffling.
+        byteBasedNumWriters = numInputNodes;
+      } else {
+        long minWriters = Math.min(numInputNodes, totalNumPartitions);
+        long maxWriters = totalNumPartitions;
+        byteBasedNumWriters = Math.max(minWriters, byteBasedNumWriters);
+        byteBasedNumWriters = Math.min(maxWriters, byteBasedNumWriters);
+      }
+    }
+
+    // Cap it at most maxNumWriters and at least one writer.
+    return (int) Math.max(1, Math.min(maxNumWriters, byteBasedNumWriters));
+  }
 }

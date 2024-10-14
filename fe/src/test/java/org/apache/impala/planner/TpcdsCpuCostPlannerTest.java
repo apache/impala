@@ -635,4 +635,22 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
   public void testQ43Verbose() {
     runPlannerTestFile("tpcds_cpu_cost/tpcds-q43-verbose", testDb, options, testOptions);
   }
+
+  @Test
+  public void testNonTpcdsDdl() {
+    // This is a copy of PlannerTest.testDdl().
+    // Not using tpcds_partitioned_parquet_snap db, but piggy-backed to test them
+    // under costing setup.
+    runPlannerTestFile("tpcds_cpu_cost/ddl", testDb, options, testOptions);
+  }
+
+  @Test
+  public void testTpcdsDdlParquet() {
+    runPlannerTestFile("tpcds_cpu_cost/tpcds-ddl-parquet", testDb, options, testOptions);
+  }
+
+  @Test
+  public void testTpcdsDdlIceberg() {
+    runPlannerTestFile("tpcds_cpu_cost/tpcds-ddl-iceberg", testDb, options, testOptions);
+  }
 }

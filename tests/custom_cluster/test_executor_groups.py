@@ -954,16 +954,17 @@ class TestExecutorGroups(CustomClusterTestSuite):
                           expected_instances_per_host):
     assert 'HDFS WRITER' in result.exec_summary[0]['operator'], result.runtime_profile
     num_writers = int(result.exec_summary[0]['num_instances'])
-    assert (num_writers == expected_num_writers), result.runtime_profile
+    assert num_writers == expected_num_writers
     num_hosts = len(expected_instances_per_host)
     regex = (r'Per Host Number of Fragment Instances:'
              + (num_hosts * r'.*?\((.*?)\)') + r'.*?\n')
     matches = re.findall(regex, result.runtime_profile)
-    assert len(matches) == 1 and len(matches[0]) == num_hosts, result.runtime_profile
+    assert len(matches) == 1
+    assert len(matches[0]) == num_hosts
     num_instances_per_host = [int(i) for i in matches[0]]
     num_instances_per_host.sort()
     expected_instances_per_host.sort()
-    assert num_instances_per_host == expected_instances_per_host, result.runtime_profile
+    assert num_instances_per_host == expected_instances_per_host
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
@@ -1196,6 +1197,56 @@ class TestExecutorGroups(CustomClusterTestSuite):
        "ExecutorGroupsConsidered: 1", "AvgAdmissionSlotsPerExecutor: 1"])
     # END testing count queries
 
+    # BEGIN test slot count strategy
+    # Unset SLOT_COUNT_STRATEGY to use default strategy, which is max # of instances
+    # of any fragment on that backend.
+    # TPCDS_Q1 at root.large_group will have following CoreCount trace:
+    #   CoreCount={total=16 trace=F15:3+F01:1+F14:3+F03:1+F13:3+F05:1+F12:3+F07:1},
+    #   coresRequired=16
+    self._set_query_options({'SLOT_COUNT_STRATEGY': ''})
+    result = self._run_query_and_verify_profile(TPCDS_Q1,
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 16",
+       "AdmissionSlots: 1"  # coordinator and executors all have 1 slot
+       ],
+      ["AvgAdmissionSlotsPerExecutor:", "AdmissionSlots: 6"])
+
+    # Test with SLOT_COUNT_STRATEGY='PLANNER_CPU_ASK'.
+    self._set_query_options({'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
+    result = self._run_query_and_verify_profile(TPCDS_Q1,
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 16", "AvgAdmissionSlotsPerExecutor: 6",
+       # coordinator has 1 slot
+       "AdmissionSlots: 1",
+       # 1 executor has F15:1+F01:1+F14:1+F03:1+F13:1+F05:1+F12:1+F07:1 = 8 slots
+       "AdmissionSlots: 8",
+       # 2 executors have F15:1+F14:1+F13:1+F12:1 = 4 slots
+       "AdmissionSlots: 4"
+       ])
+    # END test slot count strategy
+
+    # Check resource pools on the Web queries site and admission site
+    self._verify_query_num_for_resource_pool("root.tiny", 17)
+    self._verify_query_num_for_resource_pool("root.small", 3)
+    self._verify_query_num_for_resource_pool("root.large", 7)
+    self._verify_total_admitted_queries("root.tiny", 18)
+    self._verify_total_admitted_queries("root.small", 3)
+    self._verify_total_admitted_queries("root.large", 7)
+
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  @pytest.mark.execute_serially
+  def test_query_cpu_count_on_insert(self, unique_database):
+    coordinator_test_args = ""
+    self._setup_three_exec_group_cluster(coordinator_test_args)
+    self.client.clear_configuration()
+
+    # The default query options for this test.
+    # Some test case will change these options along the test, but should eventually
+    # restored to this default values.
+    self._set_query_options({
+      'COMPUTE_PROCESSING_COST': 'true',
+      'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
+
     # BEGIN testing insert + MAX_FS_WRITER
     # Test unpartitioned insert, small scan, no MAX_FS_WRITER.
     # Scanner and writer will collocate since num scanner equals to num writer (1).
@@ -1227,102 +1278,110 @@ class TestExecutorGroups(CustomClusterTestSuite):
        "Verdict: Match", "CpuAsk: 1", "AvgAdmissionSlotsPerExecutor: 1"])
     self.__verify_fs_writers(result, 1, [0, 1])
 
+    store_sales_no_part_col = (
+      "ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, "
+      "ss_addr_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, "
+      "ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, "
+      "ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, "
+      "ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk"
+    )
+    store_sales_columns = store_sales_no_part_col + ", ss_store_sk"
+    big_select = (
+      "select {0} from tpcds_parquet.store_sales "
+      "union all select {0} from tpcds_parquet.store_sales"
+    ).format(store_sales_columns)
+
     # Test unpartitioned insert, large scan, no MAX_FS_WRITER.
     result = self._run_query_and_verify_profile(
-      ("create table {0}.{1} as "
-       "select ss_item_sk, ss_ticket_number, ss_store_sk "
-       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas4"),
-      ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
-       "Verdict: Match", "CpuAsk: 1"])
-    self.__verify_fs_writers(result, 1, [0, 1])
+      ("create table {0}.{1} as {2}").format(
+         unique_database, "test_ctas4", big_select),
+      ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+       "Verdict: Match", "CpuAsk: 9", "CpuAskBounded: 2"])
+    self.__verify_fs_writers(result, 2, [0, 1, 1])
 
     # Test partitioned insert, large scan, no MAX_FS_WRITER.
     result = self._run_query_and_verify_profile(
-      ("create table {0}.{1} partitioned by (ss_store_sk) as "
-       "select ss_item_sk, ss_ticket_number, ss_store_sk "
-       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas5"),
-      ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
-       "Verdict: Match", "CpuAsk: 4"])
-    self.__verify_fs_writers(result, 2, [0, 2, 2])
+      ("create table {0}.{1} partitioned by (ss_store_sk) as {2}").format(
+         unique_database, "test_ctas5", big_select),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 9", "CpuAskBounded: 9"])
+    self.__verify_fs_writers(result, 3, [0, 3, 3, 3])
 
     # Test partitioned insert, large scan, high MAX_FS_WRITER.
     self._set_query_options({'MAX_FS_WRITERS': '30'})
     result = self._run_query_and_verify_profile(
-      ("create table {0}.{1} partitioned by (ss_store_sk) as "
-       "select ss_item_sk, ss_ticket_number, ss_store_sk "
-       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas6"),
-      ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
-       "Verdict: Match", "CpuAsk: 4"])
-    self.__verify_fs_writers(result, 2, [0, 2, 2])
+      ("create table {0}.{1} partitioned by (ss_store_sk) as {2}").format(
+         unique_database, "test_ctas6", big_select),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 9", "CpuAskBounded: 9"])
+    self.__verify_fs_writers(result, 3, [0, 3, 3, 3])
 
     # Test partitioned insert, large scan, low MAX_FS_WRITER.
     self._set_query_options({'MAX_FS_WRITERS': '2'})
     result = self._run_query_and_verify_profile(
-      ("create table {0}.{1} partitioned by (ss_store_sk) as "
-       "select ss_item_sk, ss_ticket_number, ss_store_sk "
-       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas7"),
-      ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
-       "Verdict: Match", "CpuAsk: 4", "AvgAdmissionSlotsPerExecutor: 2"])
-    self.__verify_fs_writers(result, 2, [0, 2, 2])
+      ("create table {0}.{1} partitioned by (ss_store_sk) as {2}").format(
+         unique_database, "test_ctas7", big_select),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 9", "CpuAskBounded: 8"])
+    self.__verify_fs_writers(result, 2, [0, 2, 3, 3])
 
-    # Test that non-CTAS unpartitioned insert works. MAX_FS_WRITER=2.
+    # Test unpartitioned insert overwrite. MAX_FS_WRITER=2.
     result = self._run_query_and_verify_profile(
-      ("insert overwrite {0}.{1} "
-       "select ss_item_sk, ss_ticket_number, ss_store_sk "
-       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas4"),
-      ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
-       "Verdict: Match", "CpuAsk: 1", "AvgAdmissionSlotsPerExecutor: 1"])
-    self.__verify_fs_writers(result, 1, [0, 1])
-
-    # Test that non-CTAS partitioned insert works. MAX_FS_WRITER=2.
-    result = self._run_query_and_verify_profile(
-      ("insert overwrite {0}.{1} (ss_item_sk, ss_ticket_number) "
-       "partition (ss_store_sk) "
-       "select ss_item_sk, ss_ticket_number, ss_store_sk "
-       "from tpcds_parquet.store_sales").format(unique_database, "test_ctas7"),
+      ("insert overwrite {0}.{1} {2}").format(
+         unique_database, "test_ctas4", big_select),
       ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
-       "Verdict: Match", "CpuAsk: 4", "AvgAdmissionSlotsPerExecutor: 2"])
-    self.__verify_fs_writers(result, 2, [0, 2, 2])
+       "Verdict: Match", "CpuAsk: 9", "CpuAskBounded: 2"])
+    self.__verify_fs_writers(result, 2, [0, 1, 1])
+
+    # Test partitioned insert overwrite. MAX_FS_WRITER=2.
+    result = self._run_query_and_verify_profile(
+      ("insert overwrite {0}.{1} ({2}) partition (ss_store_sk) {3}").format(
+        unique_database, "test_ctas7", store_sales_no_part_col, big_select),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 8", "CpuAskBounded: 8"])
+    self.__verify_fs_writers(result, 2, [0, 2, 3, 3])
+
+    # Test unpartitioned insert overwrite. MAX_FS_WRITER=1.
+    self._set_query_options({'MAX_FS_WRITERS': '1'})
+    result = self._run_query_and_verify_profile(
+      ("insert overwrite {0}.{1} {2}").format(
+         unique_database, "test_ctas4", big_select),
+      ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
+       "Verdict: Match", "CpuAsk: 7", "CpuAskBounded: 7"])
+    self.__verify_fs_writers(result, 1, [0, 3, 4])
 
     # Unset MAX_FS_WRITERS.
     self._set_query_options({'MAX_FS_WRITERS': ''})
+
+    # Test partitioned insert overwrite, single partition.
+    # TODO: equality predicate on ss_store_sk should lead to single partition estimate.
+    result = self._run_query_and_verify_profile(
+      ("insert overwrite {0}.{1} ({2}) partition (ss_store_sk) "
+       "select {3} from tpcds_parquet.store_sales "
+       "where ss_store_sk=1").format(
+         unique_database, "test_ctas7", store_sales_no_part_col, store_sales_columns),
+      ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
+       "Verdict: Match", "CpuAsk: 1", "CpuAskBounded: 1", "|  partitions=6"])
+    self.__verify_fs_writers(result, 1, [0, 1])
+
+    # Test partitioned insert overwrite, with unknown partition estimate.
+    result = self._run_query_and_verify_profile(
+      ("insert overwrite {0}.{1} ({2}) partition (ss_store_sk) "
+       "select {3} from {0}.{4} "
+       "where ss_store_sk=1").format(
+         unique_database, "test_ctas7", store_sales_no_part_col, store_sales_columns,
+         "test_ctas4"),
+      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+       "Verdict: Match", "CpuAsk: 9", "CpuAskBounded: 9", "|  partitions=unavailable"])
+    self.__verify_fs_writers(result, 3, [0, 3, 3, 3])
     # END testing insert + MAX_FS_WRITER
 
-    # BEGIN test slot count strategy
-    # Unset SLOT_COUNT_STRATEGY to use default strategy, which is max # of instances
-    # of any fragment on that backend.
-    # TPCDS_Q1 at root.large_group will have following CoreCount trace:
-    #   CoreCount={total=16 trace=F15:3+F01:1+F14:3+F03:1+F13:3+F05:1+F12:3+F07:1},
-    #   coresRequired=16
-    self._set_query_options({'SLOT_COUNT_STRATEGY': ''})
-    result = self._run_query_and_verify_profile(TPCDS_Q1,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Verdict: Match", "CpuAsk: 16",
-       "AdmissionSlots: 1"  # coordinator and executors all have 1 slot
-       ],
-      ["AvgAdmissionSlotsPerExecutor:", "AdmissionSlots: 6"])
-
-    # Test with SLOT_COUNT_STRATEGY='PLANNER_CPU_ASK'.
-    self._set_query_options({'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
-    result = self._run_query_and_verify_profile(TPCDS_Q1,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Verdict: Match", "CpuAsk: 16", "AvgAdmissionSlotsPerExecutor: 6",
-       # coordinator has 1 slot
-       "AdmissionSlots: 1",
-       # 1 executor has F15:1+F01:1+F14:1+F03:1+F13:1+F05:1+F12:1+F07:1 = 8 slots
-       "AdmissionSlots: 8",
-       # 2 executors have F15:1+F14:1+F13:1+F12:1 = 4 slots
-       "AdmissionSlots: 4"
-       ])
-    # END test slot count strategy
-
-    # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.tiny", 18)
-    self._verify_query_num_for_resource_pool("root.small", 4)
-    self._verify_query_num_for_resource_pool("root.large", 7)
-    self._verify_total_admitted_queries("root.tiny", 23)
-    self._verify_total_admitted_queries("root.small", 7)
-    self._verify_total_admitted_queries("root.large", 7)
+    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_query_num_for_resource_pool("root.small", 2)
+    self._verify_query_num_for_resource_pool("root.large", 2)
+    self._verify_total_admitted_queries("root.tiny", 4)
+    self._verify_total_admitted_queries("root.small", 3)
+    self._verify_total_admitted_queries("root.large", 5)
 
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_two(self):

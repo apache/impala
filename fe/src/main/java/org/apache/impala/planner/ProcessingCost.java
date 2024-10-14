@@ -219,6 +219,10 @@ public abstract class ProcessingCost implements Cloneable {
 
   protected int getNumInstanceMax() { return getNumInstanceMax(1); }
 
+  /**
+   * Return maximum number of scanner threads purely from cost perspective.
+   * There is no bounding against any query options.
+   */
   protected int getNumInstanceMax(int numNodes) {
     long maxParallelism = LongMath.divide(getTotalCost(),
         BackendConfig.INSTANCE.getMinProcessingPerThread(), RoundingMode.CEILING);
