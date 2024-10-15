@@ -90,6 +90,17 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     self.close()
 
   @abc.abstractmethod
+  def get_test_protocol(self):
+    """Return client protocol name that is specific to Impala test framework.
+    Possible return value are either of 'beeswax', 'hs2', or 'hs2-http'."""
+    pass
+
+  @abc.abstractmethod
+  def get_host_port(self):
+    """Return the 'host:port' string of impala server that this object connecting to."""
+    pass
+
+  @abc.abstractmethod
   def set_configuration_option(self, name, value):
     """Sets a configuration option name to the given value"""
     pass
@@ -187,6 +198,12 @@ class BeeswaxConnection(ImpalaConnection):
                                                 password=password, use_ssl=use_ssl)
     self.__host_port = host_port
     self.QUERY_STATES = self.__beeswax_client.query_states
+
+  def get_test_protocol(self):
+    return 'beeswax'
+
+  def get_host_port(self):
+    return self.__host_port
 
   def set_configuration_option(self, name, value):
     # Only set the option if it's not already set to the same value.
@@ -287,6 +304,9 @@ class BeeswaxConnection(ImpalaConnection):
     handle_id = self.handle_id(operation_handle)
     LOG.info("-- {0}: {1}".format(handle_id, message))
 
+  def get_query_id(self, operation_handle):
+    return operation_handle.get_handle().id
+
 
 class ImpylaHS2Connection(ImpalaConnection):
   """Connection to Impala using the impyla client connecting to HS2 endpoint.
@@ -315,6 +335,15 @@ class ImpylaHS2Connection(ImpalaConnection):
     # Some Hive HS2 protocol, such as custom Calcite planner, may be able to collect
     # profile and log from Impala.
     self._collect_profile_and_log = collect_profile_and_log
+
+  def get_test_protocol(self):
+    if self.__http_path:
+      return 'hs2-http'
+    else:
+      return 'hs2'
+
+  def get_host_port(self):
+    return self.__host_port
 
   def set_configuration_option(self, name, value):
     self.__query_options[name] = str(value)

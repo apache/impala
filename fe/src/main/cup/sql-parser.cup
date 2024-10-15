@@ -87,9 +87,24 @@ parser code {:
   // TODO: remove when V1 code is dropped.
   private TQueryOptions queryOptions;
 
+  // Whether the token is an "unreserved keyword".
+  // NOTE: This method should be kept in sync with the rule for 'ident_or_unreserved'.
+  private boolean isUnreservedKeyword(Integer tokenId) {
+    return (
+        tokenId == SqlParserSymbols.KW_DEFAULT ||
+        tokenId == SqlParserSymbols.KW_KILL ||
+        tokenId == SqlParserSymbols.KW_QUERY
+    );
+  }
+
   // to avoid reporting trivial tokens as expected tokens in error messages
-  private boolean reportExpectedToken(Integer tokenId, int numExpectedTokens) {
-    if (SqlScanner.isKeyword(tokenId) ||
+  private boolean reportExpectedToken(
+      Integer tokenId, int numExpectedTokens, boolean identifierExpected) {
+    if (identifierExpected && isUnreservedKeyword(tokenId)) {
+      // Skip all "unreserved keywords" in the expected token list if
+      // 'IDENTIFIER' exists since unreserved keywords can be used as identifiers.
+      return false;
+    } else if (SqlScanner.isKeyword(tokenId) ||
         tokenId.intValue() == SqlParserSymbols.COMMA ||
         tokenId.intValue() == SqlParserSymbols.IDENT) {
       return true;
@@ -253,6 +268,12 @@ parser code {:
     result.append("\n");
 
     boolean identifierExpected = false;
+    for (Integer tokenId : expectedTokenIds_) {
+      if (tokenId == SqlParserSymbols.IDENT) {
+        identifierExpected = true;
+        break;
+      }
+    }
 
     // append expected tokens
     result.append("Expected: ");
@@ -261,11 +282,8 @@ parser code {:
       Integer tokenId = null;
       for (int i = 0; i < expectedTokenIds_.size(); ++i) {
         tokenId = expectedTokenIds_.get(i);
-        if (reportExpectedToken(tokenId, expectedTokenIds_.size())) {
+        if (reportExpectedToken(tokenId, expectedTokenIds_.size(), identifierExpected)) {
           expectedToken = SqlScanner.tokenIdMap.get(tokenId);
-          if(expectedToken.equals(SqlScanner.tokenIdMap.get(SqlParserSymbols.IDENT))) {
-            identifierExpected = true;
-          }
           result.append(expectedToken + ", ");
         }
       }
@@ -317,13 +335,13 @@ terminal
   KW_GROUP, KW_GROUPING, KW_HASH, KW_HUDIPARQUET, KW_IGNORE, KW_HAVING, KW_ICEBERG, KW_IF,
   KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
   KW_INTERMEDIATE, KW_INTERSECT, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP, KW_IS,
-  KW_JDBC, KW_JOIN, KW_JSONFILE, KW_KUDU, KW_LAST, KW_LEADING, KW_LEFT, KW_LEXICAL, KW_LIKE,
-  KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_LOGICAL_OR, KW_MANAGED_LOCATION, KW_MAP, KW_MATCHED,
-  KW_MERGE, KW_MERGE_FN, KW_METADATA, KW_MINUS, KW_NON, KW_NORELY, KW_NOT,
+  KW_JDBC, KW_JOIN, KW_JSONFILE, KW_KILL, KW_KUDU, KW_LAST, KW_LEADING, KW_LEFT, KW_LEXICAL,
+  KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_LOGICAL_OR, KW_MANAGED_LOCATION, KW_MAP,
+  KW_MATCHED, KW_MERGE, KW_MERGE_FN, KW_METADATA, KW_MINUS, KW_NON, KW_NORELY, KW_NOT,
   KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OF, KW_OFFSET, KW_ON, KW_OPTIMIZE, KW_OR,
   KW_ORC, KW_ORDER, KW_OUTER,
   KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED,
-  KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED, KW_PURGE,
+  KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED, KW_PURGE, KW_QUERY,
   KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFERENCES, KW_REFRESH, KW_REGEXP, KW_RELY,
   KW_RENAME, KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
   KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROLLUP, KW_ROW, KW_ROWS, KW_RWSTORAGE,
@@ -355,10 +373,9 @@ terminal String UNMATCHED_STRING_LITERAL;
 terminal String UNEXPECTED_CHAR;
 terminal KW_CLUSTERED, KW_BUCKETS;
 
-// IMPALA-3726 introduced the DEFAULT keyword which could break existing applications
-// that use the identifier "KEYWORD" as database, column or table names. To avoid that,
-// the ident_or_default non-terminal is introduced and should be used instead of IDENT.
-nonterminal String ident_or_default;
+// An identifier or an "unreserved keyword". An unreserved keyword is a keyword that can
+// also be used as an identifier.
+nonterminal String ident_or_unreserved;
 // A word is an arbitrary token composed of digits and at least one letter. Reserved
 // words cannot be used as identifiers but they are words and can be used in query
 // options, column attributes, etc.
@@ -637,6 +654,9 @@ nonterminal AdminFnStmt admin_fn_stmt;
 // For "ALTER TABLE ... CONVERT TO" statements
 nonterminal ConvertTableToIcebergStmt convert_tbl_stmt;
 
+// For "KILL QUERY" statemnts
+nonterminal KillQueryStmt kill_query_stmt;
+
 precedence left KW_LOGICAL_OR;
 precedence left KW_OR;
 precedence left KW_AND;
@@ -794,6 +814,8 @@ stmt ::=
   {: RESULT = s; :}
   | convert_tbl_stmt: convert
   {: RESULT = convert; :}
+  | kill_query_stmt: kill_query
+  {: RESULT = kill_query; :}
   ;
 
 load_stmt ::=
@@ -825,7 +847,7 @@ reset_metadata_stmt ::=
   {: RESULT = ResetMetadataStmt.createRefreshTableStmt(table); :}
   | KW_REFRESH table_name:table partition_spec:partition
   {: RESULT = ResetMetadataStmt.createRefreshPartitionStmt(table, partition); :}
-  | KW_REFRESH KW_FUNCTIONS ident_or_default:db
+  | KW_REFRESH KW_FUNCTIONS ident_or_unreserved:db
   {: RESULT = ResetMetadataStmt.createRefreshFunctionsStmt(db); :}
   | KW_REFRESH KW_AUTHORIZATION
   {: RESULT = ResetMetadataStmt.createRefreshAuthorizationStmt(); :}
@@ -1147,34 +1169,34 @@ opt_kw_table ::=
 show_roles_stmt ::=
   KW_SHOW KW_ROLES
   {: RESULT = new ShowRolesStmt(false, null); :}
-  | KW_SHOW KW_ROLE KW_GRANT KW_GROUP ident_or_default:group
+  | KW_SHOW KW_ROLE KW_GRANT KW_GROUP ident_or_unreserved:group
   {: RESULT = new ShowRolesStmt(false, group); :}
   | KW_SHOW KW_CURRENT KW_ROLES
   {: RESULT = new ShowRolesStmt(true, null); :}
   ;
 
 show_grant_principal_stmt ::=
-  KW_SHOW KW_GRANT principal_type:type ident_or_default:name
+  KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name
   {: RESULT = new ShowGrantPrincipalStmt(name, type, null); :}
-  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON
+  | KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name KW_ON
   server_ident:server_kw
   {:
     RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createServerScopedPriv(TPrivilegeLevel.ALL));
   :}
-  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON
-    KW_DATABASE ident_or_default:db_name
+  | KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name KW_ON
+    KW_DATABASE ident_or_unreserved:db_name
   {:
     RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createDbScopedPriv(TPrivilegeLevel.ALL, db_name));
   :}
-  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_TABLE
+  | KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name KW_ON KW_TABLE
   table_name:tbl_name
   {:
     RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createTableScopedPriv(TPrivilegeLevel.ALL, tbl_name));
   :}
-  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_COLUMN
+  | KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name KW_ON KW_COLUMN
   column_name:col_name
   {:
     RESULT = new ShowGrantPrincipalStmt(name, type,
@@ -1182,20 +1204,20 @@ show_grant_principal_stmt ::=
             col_name.getTableName(),
             Collections.singletonList(col_name.getColumnName())));
   :}
-  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON uri_ident:uri_kw
+  | KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name KW_ON uri_ident:uri_kw
     STRING_LITERAL:uri
   {:
     RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createUriScopedPriv(TPrivilegeLevel.ALL, new HdfsUri(uri)));
   :}
-  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_STORAGE_HANDLER_URI
+  | KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name KW_ON KW_STORAGE_HANDLER_URI
   STRING_LITERAL:storage_handler_uri
   {:
     RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createStorageHandlerUriScopedPriv(TPrivilegeLevel.RWSTORAGE,
         new StorageHandlerUri(storage_handler_uri)));
   :}
-  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_UDF
+  | KW_SHOW KW_GRANT principal_type:type ident_or_unreserved:name KW_ON KW_UDF
   function_name:fn_name
   {:
     RESULT = new ShowGrantPrincipalStmt(name, type,
@@ -1204,38 +1226,38 @@ show_grant_principal_stmt ::=
   ;
 
 create_drop_role_stmt ::=
-  KW_CREATE KW_ROLE ident_or_default:role
+  KW_CREATE KW_ROLE ident_or_unreserved:role
   {: RESULT = new CreateDropRoleStmt(role, false); :}
-  | KW_DROP KW_ROLE ident_or_default:role
+  | KW_DROP KW_ROLE ident_or_unreserved:role
   {: RESULT = new CreateDropRoleStmt(role, true); :}
   ;
 
 grant_role_stmt ::=
-  KW_GRANT KW_ROLE ident_or_default:role KW_TO KW_GROUP ident_or_default:group
+  KW_GRANT KW_ROLE ident_or_unreserved:role KW_TO KW_GROUP ident_or_unreserved:group
   {: RESULT = new GrantRevokeRoleStmt(role, group, true); :}
   ;
 
 revoke_role_stmt ::=
-  KW_REVOKE KW_ROLE ident_or_default:role KW_FROM KW_GROUP ident_or_default:group
+  KW_REVOKE KW_ROLE ident_or_unreserved:role KW_FROM KW_GROUP ident_or_unreserved:group
   {: RESULT = new GrantRevokeRoleStmt(role, group, false); :}
   ;
 
 // For backwards compatibility, a grant without the principal type will default to
 // TPrincipalType.ROLE
 grant_privilege_stmt ::=
-  KW_GRANT privilege_spec:priv KW_TO KW_ROLE ident_or_default:role
+  KW_GRANT privilege_spec:priv KW_TO KW_ROLE ident_or_unreserved:role
   opt_with_grantopt:grant_opt
   {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt, TPrincipalType.ROLE); :}
-  | KW_GRANT privilege_spec:priv KW_TO ident_or_default:role
+  | KW_GRANT privilege_spec:priv KW_TO ident_or_unreserved:role
     opt_with_grantopt:grant_opt
   {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt, TPrincipalType.ROLE); :}
-  | KW_GRANT privilege_spec:priv KW_TO IDENT:user_id ident_or_default:user
+  | KW_GRANT privilege_spec:priv KW_TO IDENT:user_id ident_or_unreserved:user
     opt_with_grantopt:grant_opt
   {:
     parser.checkIdentKeyword("USER", user_id);
     RESULT = new GrantRevokePrivStmt(user, priv, true, grant_opt, TPrincipalType.USER);
   :}
-  | KW_GRANT privilege_spec:priv KW_TO KW_GROUP ident_or_default:group
+  | KW_GRANT privilege_spec:priv KW_TO KW_GROUP ident_or_unreserved:group
     opt_with_grantopt:grant_opt
   {: RESULT = new GrantRevokePrivStmt(group, priv, true, grant_opt, TPrincipalType.GROUP); :}
   ;
@@ -1244,28 +1266,28 @@ grant_privilege_stmt ::=
 // TPrincipalType.ROLE
 revoke_privilege_stmt ::=
   KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
-  KW_ROLE ident_or_default:role
+  KW_ROLE ident_or_unreserved:role
   {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt, TPrincipalType.ROLE); :}
   | KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
-    ident_or_default:role
+    ident_or_unreserved:role
   {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt, TPrincipalType.ROLE); :}
   | KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
-    IDENT:user_id ident_or_default:user
+    IDENT:user_id ident_or_unreserved:user
   {:
     parser.checkIdentKeyword("USER", user_id);
     RESULT = new GrantRevokePrivStmt(user, priv, false, grant_opt, TPrincipalType.USER);
   :}
   | KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
-    KW_GROUP ident_or_default:group
+    KW_GROUP ident_or_unreserved:group
   {: RESULT = new GrantRevokePrivStmt(group, priv, false, grant_opt, TPrincipalType.GROUP); :}
   ;
 
 privilege_spec ::=
   privilege:priv KW_ON server_ident:server_kw
   {: RESULT = PrivilegeSpec.createServerScopedPriv(priv); :}
-  | privilege:priv KW_ON server_ident:server_kw ident_or_default:server_name
+  | privilege:priv KW_ON server_ident:server_kw ident_or_unreserved:server_name
   {: RESULT = PrivilegeSpec.createServerScopedPriv(priv, server_name); :}
-  | privilege:priv KW_ON KW_DATABASE ident_or_default:db_name
+  | privilege:priv KW_ON KW_DATABASE ident_or_unreserved:db_name
   {: RESULT = PrivilegeSpec.createDbScopedPriv(priv, db_name); :}
   | privilege:priv KW_ON KW_TABLE table_name:tbl_name
   {: RESULT = PrivilegeSpec.createTableScopedPriv(priv, tbl_name); :}
@@ -1346,7 +1368,7 @@ partition_def_list ::=
   ;
 
 comment_on_stmt ::=
-  KW_COMMENT KW_ON KW_DATABASE ident_or_default:db_name KW_IS nullable_comment_val:comment
+  KW_COMMENT KW_ON KW_DATABASE ident_or_unreserved:db_name KW_IS nullable_comment_val:comment
   {: RESULT = new CommentOnDbStmt(db_name, comment); :}
   | KW_COMMENT KW_ON KW_TABLE table_name:table KW_IS nullable_comment_val:comment
   {: RESULT = new CommentOnTableStmt(table, comment); :}
@@ -1360,15 +1382,15 @@ comment_on_stmt ::=
 // such that any names that use OWNER or USER will need to be escaped. By using IDENT
 // token we can make OWNER and USER to be keywords only in these statements.
 alter_db_stmt ::=
-  KW_ALTER KW_DATABASE ident_or_default:db KW_SET IDENT:owner_id IDENT:user_id
-  ident_or_default:user
+  KW_ALTER KW_DATABASE ident_or_unreserved:db KW_SET IDENT:owner_id IDENT:user_id
+  ident_or_unreserved:user
   {:
     parser.checkIdentKeyword("OWNER", owner_id);
     parser.checkIdentKeyword("USER", user_id);
     RESULT = new AlterDbSetOwnerStmt(db, new Owner(TOwnerType.USER, user));
   :}
-  | KW_ALTER KW_DATABASE ident_or_default:db KW_SET IDENT:owner_id KW_ROLE
-    ident_or_default:role
+  | KW_ALTER KW_DATABASE ident_or_unreserved:db KW_SET IDENT:owner_id KW_ROLE
+    ident_or_unreserved:role
   {:
     parser.checkIdentKeyword("OWNER", owner_id);
     RESULT = new AlterDbSetOwnerStmt(db, new Owner(TOwnerType.ROLE, role));
@@ -1398,7 +1420,7 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists
     partition_def_list:partitions KW_SET KW_FILEFORMAT file_format_val:file_format
   {: RESULT = new AlterTableAddPartitionStmt(table, if_not_exists, partitions, file_format); :}
-  | KW_ALTER KW_TABLE table_name:table KW_DROP opt_kw_column ident_or_default:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_DROP opt_kw_column ident_or_unreserved:col_name
   {: RESULT = new AlterTableDropColStmt(table, col_name); :}
   | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists
     KW_RANGE range_param:partition
@@ -1406,7 +1428,7 @@ alter_tbl_stmt ::=
     RESULT = new AlterTableAddDropRangePartitionStmt(table, partition, if_not_exists,
         Operation.ADD);
   :}
-  | KW_ALTER KW_TABLE table_name:table KW_CHANGE opt_kw_column ident_or_default:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_CHANGE opt_kw_column ident_or_unreserved:col_name
     column_def:col_def
   {: RESULT = AlterTableAlterColStmt.createChangeColStmt(table, col_name, col_def); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
@@ -1453,7 +1475,7 @@ alter_tbl_stmt ::=
     RESULT = new AlterTableSortByStmt(table, col_names, TSortingOrder.ZORDER);
   :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partition KW_SET
-    KW_COLUMN KW_STATS ident_or_default:col LPAREN properties_map:map RPAREN
+    KW_COLUMN KW_STATS ident_or_unreserved:col LPAREN properties_map:map RPAREN
   {:
     // See above for special partition clause handling.
     if (partition != null) parser.parseError("set", SqlParserSymbols.KW_SET);
@@ -1471,17 +1493,17 @@ alter_tbl_stmt ::=
   :}
   | KW_ALTER KW_TABLE table_name:table KW_RECOVER KW_PARTITIONS
   {: RESULT = new AlterTableRecoverPartitionsStmt(table); :}
-  | KW_ALTER KW_TABLE table_name:table KW_ALTER opt_kw_column ident_or_default:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_ALTER opt_kw_column ident_or_unreserved:col_name
     KW_SET column_options_map:options
   {:
     RESULT = new AlterTableAlterColStmt(
         table, col_name, new ColumnDef(col_name, null, options));
   :}
-  | KW_ALTER KW_TABLE table_name:table KW_ALTER opt_kw_column ident_or_default:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_ALTER opt_kw_column ident_or_unreserved:col_name
     KW_DROP KW_DEFAULT
   {: RESULT = AlterTableAlterColStmt.createDropDefaultStmt(table, col_name); :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET IDENT:owner_id
-    IDENT:user_id ident_or_default:user
+    IDENT:user_id ident_or_unreserved:user
   {:
     // See above for special partition clause handling.
     if (partitions != null) parser.parseError("set", SqlParserSymbols.KW_SET);
@@ -1490,7 +1512,7 @@ alter_tbl_stmt ::=
     RESULT = new AlterTableSetOwnerStmt(table, new Owner(TOwnerType.USER, user));
   :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET IDENT:owner_id
-    KW_ROLE ident_or_default:role
+    KW_ROLE ident_or_unreserved:role
   {:
     // See above for special partition clause handling.
     if (partitions != null) parser.parseError("set", SqlParserSymbols.KW_SET);
@@ -1521,6 +1543,13 @@ convert_tbl_stmt ::=
   {: RESULT =  new ConvertTableToIcebergStmt(table, props); :}
   ;
 
+kill_query_stmt ::=
+  KW_KILL KW_QUERY STRING_LITERAL:query_id
+  {:
+    RESULT = new KillQueryStmt(query_id);
+  :}
+  ;
+
 table_property_type ::=
   KW_TBLPROPERTIES
   {: RESULT = TTablePropertyType.TBL_PROPERTY; :}
@@ -1534,7 +1563,7 @@ opt_kw_column ::=
   ;
 
 create_db_stmt ::=
-  KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists ident_or_default:db_name
+  KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists ident_or_unreserved:db_name
   opt_comment_val:comment location_val:location managed_location_val:managed_location
   {: RESULT = new CreateDbStmt(db_name, comment, location,
                                managed_location, if_not_exists);
@@ -1645,7 +1674,7 @@ create_tbl_stmt ::=
     RESULT = new CreateTableStmt(tbl_def);
   :}
   | KW_CREATE tbl_def_with_col_defs:tbl_def
-    KW_PRODUCED KW_BY KW_DATA source_ident:is_source_id ident_or_default:data_src_name
+    KW_PRODUCED KW_BY KW_DATA source_ident:is_source_id ident_or_unreserved:data_src_name
     opt_init_string_val:init_string
     opt_comment_val:comment
   {:
@@ -2083,21 +2112,21 @@ iceberg_partition_field_defs ::=
   ;
 
 iceberg_partition_field_def ::=
-  IDENT:col_name
+  ident_or_unreserved:col_name
   {:
     RESULT = new IcebergPartitionField(col_name,
                                        IcebergUtil.getPartitionTransform("IDENTITY"));
   :}
   |
   iceberg_partition_transform_type:partition_transform
-  LPAREN IDENT:col_name RPAREN
+  LPAREN ident_or_unreserved:col_name RPAREN
   {:
     RESULT = new IcebergPartitionField(col_name, IcebergUtil.getPartitionTransform(
                                        partition_transform));
   :}
   | iceberg_partition_transform_type:partition_transform
     LPAREN
-      INTEGER_LITERAL:transform_param COMMA IDENT:col_name
+      INTEGER_LITERAL:transform_param COMMA ident_or_unreserved:col_name
     RPAREN
   {:
     RESULT = new IcebergPartitionField(col_name, IcebergUtil.getPartitionTransform(
@@ -2367,9 +2396,9 @@ column_def_list ::=
   ;
 
 column_def ::=
-  ident_or_default:col_name type_def:type column_options_map:options
+  ident_or_unreserved:col_name type_def:type column_options_map:options
   {: RESULT = new ColumnDef(col_name, type, options); :}
-  | ident_or_default:col_name type_def:type
+  | ident_or_unreserved:col_name type_def:type
   {: RESULT = new ColumnDef(col_name, type); :}
   ;
 
@@ -2454,7 +2483,7 @@ create_view_stmt ::=
 
 create_data_src_stmt ::=
   KW_CREATE KW_DATA source_ident:is_source_id
-  if_not_exists_val:if_not_exists ident_or_default:data_src_name
+  if_not_exists_val:if_not_exists ident_or_unreserved:data_src_name
   location_val:location
   KW_CLASS STRING_LITERAL:class_name
   KW_API_VERSION STRING_LITERAL:api_version
@@ -2574,7 +2603,7 @@ view_column_def_list ::=
   ;
 
 view_column_def ::=
-  ident_or_default:col_name opt_comment_val:comment
+  ident_or_unreserved:col_name opt_comment_val:comment
   {:
     LinkedHashMap<Option, Object> options = Maps.newLinkedHashMap();
     if (comment != null) options.put(Option.COMMENT, comment);
@@ -2589,13 +2618,13 @@ alter_view_stmt ::=
   | KW_ALTER KW_VIEW table_name:before_table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(before_table, new_table, false); :}
   | KW_ALTER KW_VIEW table_name:table KW_SET IDENT:owner_id IDENT:user_id
-    ident_or_default:user
+    ident_or_unreserved:user
   {:
     parser.checkIdentKeyword("OWNER", owner_id);
     parser.checkIdentKeyword("USER", user_id);
     RESULT = new AlterViewSetOwnerStmt(table, new Owner(TOwnerType.USER, user));
   :}
-  | KW_ALTER KW_VIEW table_name:table KW_SET IDENT:owner_id KW_ROLE ident_or_default:role
+  | KW_ALTER KW_VIEW table_name:table KW_SET IDENT:owner_id KW_ROLE ident_or_unreserved:role
   {:
     parser.checkIdentKeyword("OWNER", owner_id);
     RESULT = new AlterViewSetOwnerStmt(table, new Owner(TOwnerType.ROLE, role));
@@ -2647,7 +2676,7 @@ drop_stats_stmt ::=
   ;
 
 drop_db_stmt ::=
-  KW_DROP db_or_schema_kw if_exists_val:if_exists ident_or_default:db_name
+  KW_DROP db_or_schema_kw if_exists_val:if_exists ident_or_unreserved:db_name
   cascade_val:cascade
   {: RESULT = new DropDbStmt(db_name, if_exists, cascade); :}
   ;
@@ -2671,7 +2700,7 @@ drop_function_stmt ::=
 
 drop_data_src_stmt ::=
   KW_DROP KW_DATA source_ident:is_source_id if_exists_val:if_exists
-  ident_or_default:data_src_name
+  ident_or_unreserved:data_src_name
   {: RESULT = new DropDataSrcStmt(data_src_name, if_exists); :}
   ;
 
@@ -2761,7 +2790,7 @@ static_partition_key_value_list ::=
 
 partition_key_value ::=
   // Dynamic partition key values.
-  ident_or_default:column
+  ident_or_unreserved:column
   {: RESULT = new PartitionKeyValue(column, null); :}
   | static_partition_key_value:partition
   {: RESULT = partition; :}
@@ -2769,7 +2798,7 @@ partition_key_value ::=
 
 static_partition_key_value ::=
   // Static partition key values.
-  ident_or_default:column EQUAL expr:e
+  ident_or_unreserved:column EQUAL expr:e
   {: RESULT = new PartitionKeyValue(column, e); :}
   ;
 
@@ -2903,11 +2932,11 @@ opt_with_clause ::=
   ;
 
 with_view_def ::=
-  ident_or_default:alias KW_AS LPAREN query_stmt:query RPAREN
+  ident_or_unreserved:alias KW_AS LPAREN query_stmt:query RPAREN
   {: RESULT = new View(alias, query, null); :}
   | STRING_LITERAL:alias KW_AS LPAREN query_stmt:query RPAREN
   {: RESULT = new View(alias, query, null); :}
-  | ident_or_default:alias LPAREN ident_list:col_names RPAREN KW_AS LPAREN
+  | ident_or_unreserved:alias LPAREN ident_list:col_names RPAREN KW_AS LPAREN
     query_stmt:query RPAREN
   {: RESULT = new View(alias, query, col_names); :}
   | STRING_LITERAL:alias LPAREN ident_list:col_names RPAREN
@@ -3057,7 +3086,7 @@ values_operand_list ::=
   ;
 
 use_stmt ::=
-  KW_USE ident_or_default:db
+  KW_USE ident_or_unreserved:db
   {: RESULT = new UseStmt(db); :}
   ;
 
@@ -3066,9 +3095,9 @@ show_tables_stmt ::=
   {: RESULT = new ShowTablesStmt(); :}
   | KW_SHOW KW_TABLES show_pattern:showPattern
   {: RESULT = new ShowTablesStmt(showPattern); :}
-  | KW_SHOW KW_TABLES KW_IN ident_or_default:db
+  | KW_SHOW KW_TABLES KW_IN ident_or_unreserved:db
   {: RESULT = new ShowTablesStmt(db, null); :}
-  | KW_SHOW KW_TABLES KW_IN ident_or_default:db show_pattern:showPattern
+  | KW_SHOW KW_TABLES KW_IN ident_or_unreserved:db show_pattern:showPattern
   {: RESULT = new ShowTablesStmt(db, showPattern); :}
   ;
 
@@ -3086,9 +3115,9 @@ show_views_stmt ::=
   {: RESULT = new ShowViewsStmt(); :}
   | KW_SHOW KW_VIEWS show_pattern:showPattern
   {: RESULT = new ShowViewsStmt(showPattern); :}
-  | KW_SHOW KW_VIEWS KW_IN ident_or_default:db
+  | KW_SHOW KW_VIEWS KW_IN ident_or_unreserved:db
   {: RESULT = new ShowViewsStmt(db, null); :}
-  | KW_SHOW KW_VIEWS KW_IN ident_or_default:db show_pattern:showPattern
+  | KW_SHOW KW_VIEWS KW_IN ident_or_unreserved:db show_pattern:showPattern
   {: RESULT = new ShowViewsStmt(db, showPattern); :}
   ;
 
@@ -3126,9 +3155,9 @@ show_functions_stmt ::=
   {: RESULT = new ShowFunctionsStmt(null, null, fn_type); :}
   | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS show_pattern:showPattern
   {: RESULT = new ShowFunctionsStmt(null, showPattern, fn_type); :}
-  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN ident_or_default:db
+  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN ident_or_unreserved:db
   {: RESULT = new ShowFunctionsStmt(db, null, fn_type); :}
-  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN ident_or_default:db
+  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN ident_or_unreserved:db
       show_pattern:showPattern
   {: RESULT = new ShowFunctionsStmt(db, showPattern, fn_type); :}
   ;
@@ -3181,7 +3210,7 @@ show_files_stmt ::=
   ;
 
 describe_stmt ::=
-  KW_DESCRIBE db_or_schema_kw describe_output_style:style ident_or_default:db
+  KW_DESCRIBE db_or_schema_kw describe_output_style:style ident_or_unreserved:db
   {: RESULT = new DescribeDbStmt(db, style); :}
   | KW_DESCRIBE KW_FORMATTED dotted_path:path
   {: RESULT = new DescribeTableStmt(path, TDescribeOutputStyle.FORMATTED); :}
@@ -3254,15 +3283,15 @@ select_clause ::=
   ;
 
 set_stmt ::=
-  KW_SET ident_or_default:key EQUAL numeric_literal:l
+  KW_SET ident_or_unreserved:key EQUAL numeric_literal:l
   {: RESULT = new SetStmt(key, l.getStringValue(), TQueryOptionType.SET_ONE); :}
-  | KW_SET ident_or_default:key EQUAL STRING_LITERAL:l
+  | KW_SET ident_or_unreserved:key EQUAL STRING_LITERAL:l
   {: RESULT = new SetStmt(key, l, TQueryOptionType.SET_ONE); :}
-  | KW_SET ident_or_default:key EQUAL SUBTRACT numeric_literal:l
+  | KW_SET ident_or_unreserved:key EQUAL SUBTRACT numeric_literal:l
   {:
     l.swapSign();
     RESULT = new SetStmt(key, l.getStringValue(), TQueryOptionType.SET_ONE); :}
-  | KW_SET ident_or_default:key EQUAL word:value
+  | KW_SET ident_or_unreserved:key EQUAL word:value
   {: RESULT = new SetStmt(key, value, TQueryOptionType.SET_ONE); :}
   | KW_SET KW_ALL
   {: RESULT = new SetStmt(null, null, TQueryOptionType.SET_ALL); :}
@@ -3277,9 +3306,9 @@ unset_stmt ::=
 
 // Top-level function call, e.g. ": shutdown()", used for admin commands, etc.
 admin_fn_stmt ::=
-    COLON ident_or_default:fn_name LPAREN RPAREN
+    COLON ident_or_unreserved:fn_name LPAREN RPAREN
   {: RESULT = new AdminFnStmt(fn_name, Collections.<Expr>emptyList()); :}
-  | COLON ident_or_default:fn_name LPAREN expr_list:params RPAREN
+  | COLON ident_or_unreserved:fn_name LPAREN expr_list:params RPAREN
   {: RESULT = new AdminFnStmt(fn_name, params); :}
   ;
 
@@ -3307,9 +3336,9 @@ select_list_item ::=
   ;
 
 alias_clause ::=
-  KW_AS ident_or_default:ident
+  KW_AS ident_or_unreserved:ident
   {: RESULT = ident; :}
-  | ident_or_default:ident
+  | ident_or_unreserved:ident
   {: RESULT = ident; :}
   | KW_AS STRING_LITERAL:l
   {: RESULT = l; :}
@@ -3325,16 +3354,16 @@ star_expr ::=
   ;
 
 table_name ::=
-  ident_or_default:tbl
+  ident_or_unreserved:tbl
   {: RESULT = new TableName(null, tbl); :}
-  | ident_or_default:db DOT ident_or_default:tbl
+  | ident_or_unreserved:db DOT ident_or_unreserved:tbl
   {: RESULT = new TableName(db, tbl); :}
   ;
 
 column_name ::=
-  | ident_or_default:tbl DOT ident_or_default:col
+  | ident_or_unreserved:tbl DOT ident_or_unreserved:col
   {: RESULT = new ColumnName(new TableName(null, tbl), col); :}
-  | ident_or_default:db DOT ident_or_default:tbl DOT ident_or_default:col
+  | ident_or_unreserved:db DOT ident_or_unreserved:tbl DOT ident_or_unreserved:col
   {: RESULT = new ColumnName(new TableName(db, tbl), col); :}
   ;
 
@@ -3546,11 +3575,11 @@ plan_hint ::=
   {: RESULT = new PlanHint("straight_join"); :}
   | KW_CLUSTERED
   {: RESULT = new PlanHint("clustered"); :}
-  | IDENT:name
+  | ident_or_unreserved:name
   {: RESULT = new PlanHint(name); :}
-  | IDENT:name LPAREN ident_list:args RPAREN
+  | ident_or_unreserved:name LPAREN ident_list:args RPAREN
   {: RESULT = new PlanHint(name, args); :}
-  | IDENT:name LPAREN INTEGER_LITERAL:value RPAREN
+  | ident_or_unreserved:name LPAREN INTEGER_LITERAL:value RPAREN
   {:
     if (value != null) {
       RESULT = new PlanHint(name,
@@ -3577,13 +3606,13 @@ plan_hint_list ::=
   ;
 
 ident_list ::=
-  ident_or_default:ident
+  ident_or_unreserved:ident
   {:
     List<String> list = new ArrayList<>();
     list.add(ident);
     RESULT = list;
   :}
-  | ident_list:list COMMA ident_or_default:ident
+  | ident_list:list COMMA ident_or_unreserved:ident
   {:
     list.add(ident);
     RESULT = list;
@@ -3913,7 +3942,7 @@ function_call_expr ::=
   // avoid adding new keywords.
   // Common syntax for "EXTRACT(unit FROM TIMESTAMP/DATE ts)"
   // and "TRIM(where FROM string)":
-  | function_name:fn_name LPAREN ident_or_default:i KW_FROM expr:e RPAREN
+  | function_name:fn_name LPAREN ident_or_unreserved:i KW_FROM expr:e RPAREN
   {:
     if (fn_name.toString().toLowerCase().endsWith("extract")) {
       RESULT = new ExtractFromExpr(fn_name, i, e);
@@ -4264,13 +4293,13 @@ slot_ref ::=
   ;
 
 dotted_path ::=
-  ident_or_default:ident
+  ident_or_unreserved:ident
   {:
     List<String> list = new ArrayList<>();
     list.add(ident);
     RESULT = list;
   :}
-  | dotted_path:list DOT ident_or_default:ident
+  | dotted_path:list DOT ident_or_unreserved:ident
   {:
     list.add(ident);
     RESULT = list;
@@ -4349,10 +4378,16 @@ struct_field_def_list ::=
   :}
   ;
 
-ident_or_default ::=
+// NOTE: If a new keyword is added here, it should also be added to the
+// isUnreservedKeyword() method.
+ident_or_unreserved ::=
   IDENT:name
   {: RESULT = name.toString(); :}
   | KW_DEFAULT:name
+  {: RESULT = name.toString(); :}
+  | KW_KILL:name
+  {: RESULT = name.toString(); :}
+  | KW_QUERY:name
   {: RESULT = name.toString(); :}
   ;
 
@@ -4587,6 +4622,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_JSONFILE:r
   {: RESULT = r.toString(); :}
+  | KW_KILL:r
+  {: RESULT = r.toString(); :}
   | KW_KUDU:r
   {: RESULT = r.toString(); :}
   | KW_LAST:r
@@ -4674,6 +4711,8 @@ word ::=
   | KW_PRODUCED:r
   {: RESULT = r.toString(); :}
   | KW_PURGE:r
+  {: RESULT = r.toString(); :}
+  | KW_QUERY:r
   {: RESULT = r.toString(); :}
   | KW_RANGE:r
   {: RESULT = r.toString(); :}

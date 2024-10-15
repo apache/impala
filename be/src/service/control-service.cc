@@ -221,6 +221,17 @@ void ControlService::RespondAndReleaseRpc(
   rpc_context->RespondSuccess();
 }
 
+template <typename ResponsePBType>
+void ControlService::RespondAndReleaseRpc(
+    const vector<Status>& statuses, ResponsePBType* response, RpcContext* rpc_context) {
+  for (int i = 0; i < statuses.size(); ++i) {
+    statuses[i].ToProto(response->add_statuses());
+  }
+  // Release the memory against the control service's memory tracker.
+  mem_tracker_->Release(rpc_context->GetTransferSize());
+  rpc_context->RespondSuccess();
+}
+
 void ControlService::CancelQueryFInstances(const CancelQueryFInstancesRequestPB* request,
     CancelQueryFInstancesResponsePB* response, RpcContext* rpc_context) {
   DCHECK(request->has_query_id());
@@ -248,5 +259,15 @@ void ControlService::RemoteShutdown(const RemoteShutdownParamsPB* req,
       response->mutable_shutdown_status());
 
   RespondAndReleaseRpc(status, response, rpc_context);
+}
+
+void ControlService::KillQuery(const KillQueryRequestPB* request,
+    KillQueryResponsePB* response, RpcContext* rpc_context) {
+  // Currently, we only support killing one query in one KILL QUERY statement.
+  DCHECK_EQ(request->query_ids_size(), 1);
+  const TUniqueId& query_id = ProtoToQueryId(request->query_ids(0));
+  Status status = ExecEnv::GetInstance()->impala_server()->KillQuery(
+      query_id, request->requesting_user(), request->is_admin());
+  RespondAndReleaseRpc(vector{status}, response, rpc_context);
 }
 }

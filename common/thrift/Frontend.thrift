@@ -635,6 +635,17 @@ struct TConvertTableRequest {
   12: optional string drop_temporary_hdfs_table_query
 }
 
+// Request for a KILL QUERY statement.
+struct TKillQueryReq {
+  1: required Types.TUniqueId query_id
+
+  // The effective user who submitted this request.
+  2: required string requesting_user;
+
+  // True if the requesting_user is an admin.
+  3: required bool is_admin;
+}
+
 // Result of call to createExecRequest()
 struct TExecRequest {
   1: required Types.TStmtType stmt_type = TStmtType.UNKNOWN
@@ -716,6 +727,9 @@ struct TExecRequest {
 
   // Columns referenced in an order by clause.
   25: optional list<string> orderby_columns
+
+  // Request for "KILL QUERY" statements.
+  26: optional TKillQueryReq kill_query_request
 }
 
 // Parameters to FeSupport.cacheJar().

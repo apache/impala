@@ -224,6 +224,10 @@ public class AnalysisContext {
       return stmt_ instanceof ConvertTableToIcebergStmt;
     }
 
+    public boolean isKillQueryStmt() {
+      return stmt_ instanceof KillQueryStmt;
+    }
+
     public AlterTableStmt getAlterTableStmt() {
       Preconditions.checkState(isAlterTableStmt());
       return (AlterTableStmt) stmt_;
@@ -416,6 +420,11 @@ public class AnalysisContext {
     public ConvertTableToIcebergStmt getConvertTableToIcebergStmt() {
       Preconditions.checkState(isConvertTableToIcebergStmt());
       return (ConvertTableToIcebergStmt) stmt_;
+    }
+
+    public KillQueryStmt getKillQueryStmt() {
+      Preconditions.checkState(isKillQueryStmt());
+      return (KillQueryStmt) stmt_;
     }
 
     public StatementBase getStmt() { return stmt_; }

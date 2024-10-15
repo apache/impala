@@ -76,6 +76,10 @@ class ControlService : public ControlServiceIf {
   virtual void RemoteShutdown(const RemoteShutdownParamsPB* req,
       RemoteShutdownResultPB* response, ::kudu::rpc::RpcContext* context) override;
 
+  /// Kill a query. The query will be unregistered.
+  virtual void KillQuery(const KillQueryRequestPB* request,
+      KillQueryResponsePB* response, ::kudu::rpc::RpcContext* rpc_context) override;
+
   /// Gets a ControlService proxy to a server with 'address' and 'hostname'.
   /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
   static Status GetProxy(const NetworkAddressPB& address, const std::string& hostname,
@@ -97,6 +101,11 @@ class ControlService : public ControlServiceIf {
   template <typename ResponsePBType>
   void RespondAndReleaseRpc(
       const Status& status, ResponsePBType* response, kudu::rpc::RpcContext* rpc_context);
+
+  /// For RPCs whose reponses have more than one Status.
+  template <typename ResponsePBType>
+  void RespondAndReleaseRpc(const vector<Status>& statuses, ResponsePBType* response,
+      kudu::rpc::RpcContext* rpc_context);
 };
 
 } // namespace impala

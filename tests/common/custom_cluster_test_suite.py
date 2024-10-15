@@ -107,7 +107,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   TMP_DIRS = dict()
 
   # Args for cluster startup/teardown when sharing a single cluster for the entire class.
-  SHARED_CLUSTER_ARGS = None
+  SHARED_CLUSTER_ARGS = {}
 
   @classmethod
   def get_workload(cls):
@@ -199,14 +199,35 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if log_symlinks:
       args[LOG_SYMLINKS] = True
 
+    def merge_args(args_first, args_last):
+      result = args_first.copy()
+      for key in args_last:
+        if key not in result:
+          result[key] = args_last[key]
+        else:
+          if key in (
+              IMPALAD_ARGS,
+              STATESTORED_ARGS,
+              CATALOGD_ARGS,
+              START_ARGS,
+              JVM_ARGS,
+              KUDU_ARGS
+          ):
+            # Let the server decide.
+            result[key] = " ".join((result[key], args_last[key]))
+          else:
+            # Last writer wins.
+            result[key] = args_last[key]
+      return result
+
     def decorate(obj):
       """If obj is a class, set SHARED_CLUSTER_ARGS for setup/teardown_class. Otherwise
       add to the function __dict__ for setup/teardown_method."""
       if inspect.isclass(obj):
-        obj.SHARED_CLUSTER_ARGS = args
+        obj.SHARED_CLUSTER_ARGS = merge_args(obj.SHARED_CLUSTER_ARGS, args)
       else:
         obj.__dict__[WITH_ARGS_METHOD] = True
-        obj.__dict__.update(args)
+        obj.__dict__ = merge_args(obj.__dict__, args)
       return obj
     return decorate
 

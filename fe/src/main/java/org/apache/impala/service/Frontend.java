@@ -2711,6 +2711,12 @@ public class Frontend {
           createCatalogOpRequest(analysisResult, result);
         }
         return result;
+      } else if (analysisResult.isKillQueryStmt()) {
+        result.stmt_type = TStmtType.KILL;
+        result.setResult_set_metadata(new TResultSetMetadata(
+            Collections.singletonList(new TColumn("result", Type.STRING.toThrift()))));
+        result.setKill_query_request(analysisResult.getKillQueryStmt().toThrift());
+        return result;
       }
 
       // Open or continue Kudu transaction if Kudu transaction is enabled and target table

@@ -3708,8 +3708,9 @@ public class ParserTest extends FrontendTestBase {
         "^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, COMMENT, COMPUTE, COPY, CREATE, DELETE, DESCRIBE, DROP, " +
-        "EXPLAIN, GRANT, INSERT, INVALIDATE, LOAD, MERGE, OPTIMIZE, REFRESH, REVOKE, " +
-        "SELECT, SET, SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, VALUES, WITH\n");
+        "EXPLAIN, GRANT, INSERT, INVALIDATE, KILL, LOAD, MERGE, OPTIMIZE, REFRESH, " +
+        "REVOKE, SELECT, SET, SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, VALUES, " +
+        "WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -3717,7 +3718,7 @@ public class ParserTest extends FrontendTestBase {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, GROUPING, " +
+        "Expected: ALL, CASE, CAST, DATE, DISTINCT, EXISTS, FALSE, GROUPING, " +
         "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, " +
         "UNNEST, IDENTIFIER\n" +
         "\n" +
@@ -3730,7 +3731,7 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AND, AS, BETWEEN, DEFAULT, DIV, EXCEPT, FROM, ILIKE, IN, INTERSECT, " +
+        "Expected: AND, AS, BETWEEN, DIV, EXCEPT, FROM, ILIKE, IN, INTERSECT, " +
         "IREGEXP, IS, LIKE, LIMIT, ||, MINUS, NOT, OR, ORDER, REGEXP, RLIKE, UNION, " +
         "COMMA, IDENTIFIER\n" +
         "\n" +
@@ -3743,7 +3744,7 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from where a = 5\n" +
         "                    ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: DEFAULT, UNNEST, IDENTIFIER\n" +
+        "Expected: UNNEST, IDENTIFIER\n" +
         "\n" +
         "Hint: reserved words have to be escaped when used as an identifier, e.g. `where`"
         );
@@ -3754,7 +3755,7 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
+        "Expected: CASE, CAST, DATE, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
         "LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, UNNEST, " +
         "IDENTIFIER");
 
@@ -3764,7 +3765,7 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
+        "Expected: CASE, CAST, DATE, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
         "LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, UNNEST, " +
         "IDENTIFIER\n" +
         "\n" +
@@ -3831,7 +3832,7 @@ public class ParserTest extends FrontendTestBase {
         "...c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t\n" +
         "                             ^\n" +
         "Encountered: COMMA\n" +
-        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
+        "Expected: CASE, CAST, DATE, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
         "LEFT, NOT, NULL, REPLACE, RIGHT, TRUNCATE, TRUE, UNNEST, IDENTIFIER");
 
     // Parsing identifiers that have different names printed as EXPECTED
@@ -3852,7 +3853,7 @@ public class ParserTest extends FrontendTestBase {
         "USE ` `\n" +
         "    ^\n" +
         "Encountered: EMPTY IDENTIFIER\n" +
-        "Expected: DEFAULT, IDENTIFIER\n");
+        "Expected: IDENTIFIER\n");
 
     // Expecting = token
     ParserError("SET foo",
@@ -3868,7 +3869,7 @@ public class ParserTest extends FrontendTestBase {
          "\n" +
          "^\n" +
          "Encountered: EOF\n" +
-         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, GROUPING, " +
+         "Expected: ALL, CASE, CAST, DATE, DISTINCT, EXISTS, FALSE, GROUPING, " +
          "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, " +
          "STRAIGHT_JOIN, TRUNCATE, TRUE, UNNEST, IDENTIFIER\n");
     ParserError("SELECT\n\n",
@@ -3876,7 +3877,7 @@ public class ParserTest extends FrontendTestBase {
          "\n" +
          "^\n" +
          "Encountered: EOF\n" +
-         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, GROUPING, " +
+         "Expected: ALL, CASE, CAST, DATE, DISTINCT, EXISTS, FALSE, GROUPING, " +
          "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, " +
          "STRAIGHT_JOIN, TRUNCATE, TRUE, UNNEST, IDENTIFIER\n");
   }
@@ -4548,5 +4549,15 @@ public class ParserTest extends FrontendTestBase {
 
     ParsesOk("--test\nSELECT 1\n");
     ParsesOk("--test\nSELECT 1\n  ");
+  }
+
+  @Test
+  public void TestUnreservedKeywords() {
+    // Test if "unreserved keywords" can be used as identifiers, such as table names and
+    // column names.
+    final String[] unreservedKeywords = { "DEFAULT", "KILL", "QUERY" };
+    for (String keyword : unreservedKeywords) {
+      ParsesOk(String.format("CREATE TABLE %s (%s INT);", keyword, keyword));
+    }
   }
 }

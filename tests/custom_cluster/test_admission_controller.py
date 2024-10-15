@@ -34,6 +34,7 @@ from time import sleep, time
 from beeswaxd.BeeswaxService import QueryState
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.cluster_config import impalad_admission_ctrl_flags
 from tests.common.custom_cluster_test_suite import (
     ADMISSIOND_ARGS,
     IMPALAD_ARGS,
@@ -141,26 +142,6 @@ INITIAL_QUEUE_REASON_REGEX = \
 
 # The path to resources directory which contains the admission control config files.
 RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "resources")
-
-
-def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
-                                 proc_mem_limit=None, queue_wait_timeout_ms=None,
-                                 admission_control_slots=None, executor_groups=None,
-                                 codegen_cache_capacity=0):
-  extra_flags = ""
-  if proc_mem_limit is not None:
-    extra_flags += " -mem_limit={0}".format(proc_mem_limit)
-  if queue_wait_timeout_ms is not None:
-    extra_flags += " -queue_wait_timeout_ms={0}".format(queue_wait_timeout_ms)
-  if admission_control_slots is not None:
-    extra_flags += " -admission_control_slots={0}".format(admission_control_slots)
-  if executor_groups is not None:
-    extra_flags += " -executor_groups={0}".format(executor_groups)
-  extra_flags += " -codegen_cache_capacity={0}".format(codegen_cache_capacity)
-
-  return ("-vmodule admission-controller=3 -default_pool_max_requests {0} "
-          "-default_pool_max_queued {1} -default_pool_mem_limit {2} {3}".format(
-            max_requests, max_queued, pool_max_mem, extra_flags))
 
 
 def impalad_admission_ctrl_config_args(fs_allocation_file, llama_site_file,

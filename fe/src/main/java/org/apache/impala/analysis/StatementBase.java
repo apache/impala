@@ -22,6 +22,7 @@ import java.util.List;
 
 import java.util.Optional;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -273,5 +274,28 @@ public abstract class StatementBase extends StmtNode {
           dstColType.toSql(), dstCol.getName()));
     }
     return srcExpr.castTo(compatType, compatibilityLevel);
+  }
+
+  /**
+   * This method is designed to allow custom authorization exception handling. A
+   * statement class that extends StatementBase can customize how it handles an
+   * authorization exception by
+   * 1. Registering a masked privilege request and set the associated error message to
+   *    null, so that this custom handler will be called when an authorization exception
+   *    is thrown;
+   * 2. Overriding this method to specify how to handle the authorization exception for
+   *    this statement class.
+   *
+   * By default, the handler ignores the exception. If a statement class registers only
+   * masked authorization exceptions with error message set to null, it might need to
+   * override this method.
+   *
+   * NOTE: Currently access to the runtime profile is set to disabled when a masked
+   * authorization exception is thrown before this handler gets called (Refer to
+   * BaseAuthorizationChecker.authorize() for details).
+   * @param analysisResult
+   */
+  public void handleAuthorizationException(AnalysisResult analysisResult) {
+    // Do nothing
   }
 }

@@ -359,6 +359,10 @@ Status ClientRequestState::Exec() {
     case TStmtType::UNKNOWN:
       DCHECK(false);
       return Status("Exec request uninitialized during execution");
+    case TStmtType::KILL:
+      DCHECK(exec_req.__isset.kill_query_request);
+      LOG_AND_RETURN_IF_ERROR(ExecKillQueryRequest());
+      break;
     default:
       return Status(Substitute("Unknown exec request stmt type: $0", exec_req.stmt_type));
   }
@@ -2458,6 +2462,117 @@ void ClientRequestState::ExecMigrateRequestImpl() {
       RETURN_VOID_IF_ERROR(UpdateQueryStatus(query_status));
     }
   }
+}
+
+Status ClientRequestState::TryKillQueryLocally(
+    const TUniqueId& query_id, const string& requesting_user, bool is_admin) {
+  Status status = ExecEnv::GetInstance()->impala_server()->KillQuery(
+      query_id, requesting_user, is_admin);
+  if (status.ok()) {
+    SetResultSet({Substitute("Query $0 is killed.", PrintId(query_id))});
+    return query_status_;
+  }
+  return status;
+}
+
+Status ClientRequestState::TryKillQueryRemotely(
+    const TUniqueId& query_id, const KillQueryRequestPB& request) {
+  // The initial status should be INVALID_QUERY_HANDLE so that if there is no other
+  // coordinator in the cluster, it will be the status to return.
+  Status status = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+  ExecutorGroup all_coordinators =
+      ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot()->GetCoordinators();
+  // Skipping the current impalad.
+  unique_ptr<ExecutorGroup> other_coordinators{ExecutorGroup::GetFilteredExecutorGroup(
+      &all_coordinators, {ExecEnv::GetInstance()->krpc_address()})};
+  // If we get an RPC error, instead of returning immediately, we record it and move
+  // on to the next coordinator.
+  Status rpc_errors = Status::OK();
+  for (const auto& backend : other_coordinators->GetAllExecutorDescriptors()) {
+    // The logic here is similar to ExecShutdownRequest()
+    NetworkAddressPB krpc_addr = MakeNetworkAddressPB(backend.ip_address(),
+        backend.address().port(), backend.backend_id(),
+        ExecEnv::GetInstance()->rpc_mgr()->GetUdsAddressUniqueId());
+    VLOG_QUERY << "Sending KillQuery() RPC to " << NetworkAddressPBToString(krpc_addr);
+    unique_ptr<ControlServiceProxy> proxy;
+    Status get_proxy_status =
+        ControlService::GetProxy(krpc_addr, backend.address().hostname(), &proxy);
+    if (!get_proxy_status.ok()) {
+      Status get_proxy_status_to_report{Substitute(
+          "KillQuery: Could not get Proxy to ControlService at $0 with error: $1.",
+          NetworkAddressPBToString(krpc_addr), get_proxy_status.msg().msg())};
+      rpc_errors.MergeStatus(get_proxy_status_to_report);
+      LOG(ERROR) << get_proxy_status_to_report.GetDetail();
+      continue;
+    }
+    KillQueryResponsePB response;
+    const int num_retries = 3;
+    const int64_t timeout_ms = 10 * MILLIS_PER_SEC;
+    const int64_t backoff_time_ms = 3 * MILLIS_PER_SEC;
+    // Currently, a KILL QUERY statement is not interruptible.
+    Status rpc_status = RpcMgr::DoRpcWithRetry(proxy, &ControlServiceProxy::KillQuery,
+        request, &response, query_ctx_, "KillQuery() RPC failed", num_retries, timeout_ms,
+        backoff_time_ms, "CRS_KILL_QUERY_RPC");
+    if (!rpc_status.ok()) {
+      LOG(ERROR) << rpc_status.GetDetail();
+      rpc_errors.MergeStatus(rpc_status);
+      continue;
+    }
+    // Currently, we only support killing one query in one KILL QUERY statement.
+    DCHECK_EQ(response.statuses_size(), 1);
+    status = Status(response.statuses(0));
+    if (status.ok()) {
+      // Kill succeeded.
+      VLOG_QUERY << "KillQuery: Found the coordinator at "
+                 << NetworkAddressPBToString(krpc_addr);
+      SetResultSet({Substitute("Query $0 is killed.", PrintId(query_id))});
+      return query_status_;
+    } else if (status.code() != TErrorCode::INVALID_QUERY_HANDLE) {
+      LOG(ERROR) << "KillQuery: Found the coordinator at "
+                 << NetworkAddressPBToString(krpc_addr)
+                 << " but failed to kill the query: "
+                 << status.GetDetail();
+      // Kill failed, but we found the coordinator of the query.
+      return status;
+    }
+  }
+  // We did't find the coordinator of the query after trying all other coordinators.
+  // If there is any RPC error, return it.
+  if (!rpc_errors.ok()) {
+    return rpc_errors;
+  }
+  // If there is no RPC error, return INVALID_QUERY_HANDLE.
+  return status;
+}
+
+Status ClientRequestState::ExecKillQueryRequest() {
+  TUniqueId query_id = exec_request().kill_query_request.query_id;
+  string requesting_user = exec_request().kill_query_request.requesting_user;
+  bool is_admin = exec_request().kill_query_request.is_admin;
+
+  VLOG_QUERY << "Exec KillQuery: query_id=" << PrintId(query_id)
+             << ", requesting_user=" << requesting_user << ", is_admin=" << is_admin;
+
+  // First try cancelling the query locally.
+  Status status = TryKillQueryLocally(query_id, requesting_user, is_admin);
+  if (status.code() != TErrorCode::INVALID_QUERY_HANDLE) {
+    return status;
+  }
+
+  // The current impalad is NOT the coordinator of the query. Now we have to broadcast
+  // the kill request to all other coordinators.
+  UniqueIdPB query_id_pb;
+  TUniqueIdToUniqueIdPB(query_id, &query_id_pb);
+  KillQueryRequestPB request;
+  *request.add_query_ids() = query_id_pb;
+  *request.mutable_requesting_user() = requesting_user;
+  request.set_is_admin(is_admin);
+  status = TryKillQueryRemotely(query_id, request);
+  if (status.code() != TErrorCode::INVALID_QUERY_HANDLE) {
+    return status;
+  }
+  // All the error messages are "Invalid or unknown query handle".
+  return Status("Could not find query on any coordinator.");
 }
 
 void ClientRequestState::AddTableResetHints(const TConvertTableRequest& params,

@@ -464,6 +464,21 @@ message ExecQueryFInstancesResponsePB {
   optional StatusPB status = 1;
 }
 
+message KillQueryRequestPB {
+  // The query ids of the queries to kill.
+  repeated UniqueIdPB query_ids = 1;
+
+  // The effective user who submitted this request.
+  required string requesting_user = 2;
+
+  // True if the requesting_user is an admin.
+  required bool is_admin = 3;
+}
+
+message KillQueryResponsePB {
+  repeated StatusPB statuses = 1;
+}
+
 service ControlService {
   // Override the default authorization method.
   option (kudu.rpc.default_authz_method) = "Authorize";
@@ -485,4 +500,7 @@ service ControlService {
 
   // Called to initiate shutdown of this backend.
   rpc RemoteShutdown(RemoteShutdownParamsPB) returns (RemoteShutdownResultPB);
+
+  // Called by an impalad to ask another impalad to kill a query.
+  rpc KillQuery(KillQueryRequestPB) returns (KillQueryResponsePB);
 }

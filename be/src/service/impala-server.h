@@ -722,6 +722,12 @@ class ImpalaServer : public ImpalaServiceIf,
   static int64_t DecrementCount(
       std::map<std::string, int64_t>& loads, const std::string& key);
 
+  /// Try cancelling and unregistering the query with the given query_id as the
+  /// requesting_user. 'is_admin' is true if requesting_user is an admin.
+  /// This method is used in executing a KILL QUERY statement.
+  Status KillQuery(
+      const TUniqueId& query_id, const std::string& requesting_user, bool is_admin);
+
  private:
   struct ExpirationEvent;
   class SecretArg;

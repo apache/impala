@@ -177,10 +177,9 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     }
 
     // Check all masked requests. If a masked request has an associated error message,
-    // an AuthorizationException is thrown if authorization fails. Masked requests with
-    // no error message are used to check if the user can access the runtime profile.
-    // These checks don't result in an AuthorizationException but set the
-    // 'user_has_profile_access' flag in queryCtx_.
+    // an AuthorizationException is thrown if authorization fails. Otherwise, the custom
+    // AuthorizationException handler of the statement will be called and the user will
+    // not be authorized to access the runtime profile by default if authorization fails.
     for (Pair<PrivilegeRequest, String> maskedReq : analyzer.getMaskedPrivilegeReqs()) {
       try {
         authzCtx.setRetainAudits(false);
@@ -189,6 +188,8 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
         analysisResult.setUserHasProfileAccess(false);
         if (!Strings.isNullOrEmpty(maskedReq.second)) {
           throw new AuthorizationException(maskedReq.second);
+        } else {
+          analysisResult.getStmt().handleAuthorizationException(analysisResult);
         }
         break;
       } finally {

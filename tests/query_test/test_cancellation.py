@@ -82,6 +82,11 @@ SORT_BUFFER_POOL_LIMIT = ['0', '300m'] # Test spilling and non-spilling sorts.
 # Test with and without multithreading
 MT_DOP_VALUES = [0, 4]
 
+# Use KILL QUERY statement or not.
+# False: Send the Thrift RPCs directly.
+# True: Execute a KILL QUERY statement.
+USE_KILL_QUERY_STATEMENT = [False, True]
+
 class TestCancellation(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -108,6 +113,8 @@ class TestCancellation(ImpalaTestSuite):
         ImpalaTestDimension('cpu_limit_s', *CPU_LIMIT_S))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('use_kill_query_statement', *USE_KILL_QUERY_STATEMENT))
 
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('query_type') != 'CTAS' or (\
@@ -119,6 +126,11 @@ class TestCancellation(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: not (v.get_value('query_type') == 'CTAS' and
             v.get_value('query').startswith('compute stats')))
+    # 'use_kill_query_statement' and 'join_before_close' cannot be both True, since
+    # the KILL QUERY statement will also close the query.
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: not (v.get_value('use_kill_query_statement')
+            and v.get_value('join_before_close')))
 
     # Ignore CTAS on Kudu if there is no PRIMARY KEY specified.
     cls.ImpalaTestMatrix.add_constraint(
@@ -167,7 +179,8 @@ class TestCancellation(ImpalaTestSuite):
     for i in range(NUM_CANCELATION_ITERATIONS):
       cancel_query_and_validate_state(self.client, query,
           vector.get_value('exec_option'), vector.get_value('table_format'),
-          vector.get_value('cancel_delay'), vector.get_value('join_before_close'))
+          vector.get_value('cancel_delay'), vector.get_value('join_before_close'),
+          use_kill_query_statement=vector.get_value('use_kill_query_statement'))
 
       if query_type == "CTAS":
         self.cleanup_test_table(vector.get_value('table_format'))

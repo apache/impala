@@ -1821,6 +1821,31 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   return Status::OK();
 }
 
+Status ImpalaServer::KillQuery(
+    const TUniqueId& query_id, const string& requesting_user, bool is_admin) {
+  VLOG_QUERY << "KillQuery(): query_id=" << PrintId(query_id)
+             << ", requesting_user=" << requesting_user << ", is_admin=" << is_admin;
+  QueryHandle query_handle;
+  RETURN_IF_ERROR(GetActiveQueryHandle(query_id, &query_handle));
+  if (!is_admin && requesting_user != query_handle->effective_user()) {
+    return Status(
+        Substitute("User '$0' is not authorized to kill the query.", requesting_user));
+  }
+  Status status = CancelInternal(query_id);
+  if (status.code() != TErrorCode::INVALID_QUERY_HANDLE) {
+    // The current impalad is the coordinator of the query.
+    RETURN_IF_ERROR(status);
+    status = UnregisterQuery(query_id, true, &Status::CANCELLED);
+    if (status.ok() || status.code() == TErrorCode::INVALID_QUERY_HANDLE) {
+      // There might be another thread that has already unregistered the query
+      // before UnregisterQuery() and after CancelInternal(). In this case we are done.
+      return Status::OK();
+    }
+    return status;
+  }
+  return status;
+}
+
 Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     const SecretArg& secret, bool ignore_if_absent) {
   DCHECK(secret.is_session_secret());

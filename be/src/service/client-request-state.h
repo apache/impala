@@ -978,6 +978,9 @@ class ClientRequestState {
   /// Core logic of executing a MIGRATE TABLE statement.
   void ExecMigrateRequestImpl();
 
+  /// The logic of executing a KILL QUERY statement.
+  Status ExecKillQueryRequest();
+
   /// Used when running into an error during table migration to extend 'status' with some
   /// hints about how to reset the original table name. 'params' holds the SQL query
   /// string the user should run.
@@ -985,5 +988,14 @@ class ClientRequestState {
 
   /// Adds the catalog execution timeline returned from catalog RPCs into the profile.
   void AddCatalogTimeline();
+
+  /// Try killing query with the given query_id locally as the requesting_user.
+  /// 'is_admin' is true if requesting_user is an admin.
+  Status TryKillQueryLocally(
+      const TUniqueId& query_id, const std::string& requesting_user, bool is_admin);
+
+  /// Try to ask other coordinators to kill query by sending the request.
+  Status TryKillQueryRemotely(
+      const TUniqueId& query_id, const KillQueryRequestPB& request);
 };
 }

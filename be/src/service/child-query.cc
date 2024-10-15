@@ -149,26 +149,28 @@ void ChildQuery::Cancel() {
     if (!is_running_) return;
     is_running_ = false;
   }
-  TUniqueId session_id;
+  TUniqueId query_id;
   TUniqueId secret_unused;
   // Ignore return statuses because they are not actionable.
-  Status status = ImpalaServer::THandleIdentifierToTUniqueId(hs2_handle_.operationId,
-      &session_id, &secret_unused);
+  Status status = ImpalaServer::THandleIdentifierToTUniqueId(
+      hs2_handle_.operationId, &query_id, &secret_unused);
   if (status.ok()) {
-    VLOG_QUERY << "Cancelling and closing child query with operation id: " <<
-        PrintId(session_id);
+    VLOG_QUERY << "Cancelling and closing child query with operation id: "
+               << PrintId(query_id);
   } else {
-    VLOG_QUERY << "Cancelling and closing child query. Failed to get query id: " <<
-        status;
+    VLOG_QUERY << "Cancelling and closing child query. Failed to get query id: "
+               << status;
   }
-  TCancelOperationResp cancel_resp;
-  TCancelOperationReq cancel_req;
-  cancel_req.operationHandle = hs2_handle_;
-  parent_server_->CancelOperation(cancel_resp, cancel_req);
-  TCloseOperationResp close_resp;
-  TCloseOperationReq close_req;
-  close_req.operationHandle = hs2_handle_;
-  parent_server_->CloseOperation(close_resp, close_req);
+  // Bypass the HS2 layer so that the session of the child query will not be added to
+  // the connection of the caller of ChildQuery::Cancel().
+  status = parent_server_->CancelInternal(query_id);
+  if (!status.ok()) {
+    LOG(ERROR) << "Failed to cancel child query: " << status.GetDetail();
+  }
+  status = parent_server_->UnregisterQuery(query_id, true, &Status::CANCELLED);
+  if (!status.ok()) {
+    LOG(ERROR) << "Failed to unregister child query: " << status.GetDetail();
+  }
 }
 
 Status ChildQuery::IsCancelled() {
