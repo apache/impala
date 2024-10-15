@@ -187,7 +187,11 @@ elif [[ $DISTRIBUTION == Redhat ]]; then
 
   if [[ $INSTALL_DEBUG_TOOLS == full ]]; then
     echo "Installing full debug tools"
-    wrap yum install -y --disableplugin=subscription-manager \
+    # Redhat 8 and 9 come with curl-minimal preinstalled, which conflicts with the
+    # full curl package. Add --allowerasing to the yum command to allow package
+    # replacement.
+
+    wrap yum install -y --disableplugin=subscription-manager --allowerasing \
         bind-utils \
         curl \
         iproute \
