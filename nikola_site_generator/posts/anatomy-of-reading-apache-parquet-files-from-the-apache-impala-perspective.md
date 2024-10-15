@@ -2,7 +2,7 @@
 .. title: Anatomy of reading Apache Parquet files (from the Apache Impala perspective)
 .. slug: anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective
 .. date: 2024-07-27 07:02:43 UTC-07:00
-.. tags:
+.. tags: cceu24
 .. category: talks
 .. link:
 .. description:

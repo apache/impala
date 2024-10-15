@@ -2,7 +2,7 @@
 .. title: Let’s see how fast Impala runs on Iceberg
 .. slug: lets-see-how-fast-impala-runs-on-iceberg
 .. date: 2024-07-27 07:07:38 UTC-07:00
-.. tags:
+.. tags: cceu24
 .. category: talks
 .. link:
 .. description:

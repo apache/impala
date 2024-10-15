@@ -5,15 +5,12 @@
 <meta name="keywords" content="hadoop, impala, sql, mpp, bi, big data, open source">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="utf-8">
-<title>This Impala not only reads, but modifies and optimizes Iceberg tables | Apache Impala</title>
+<title>Posts by Gabor Kaszab | Apache Impala</title>
 <link href="../../assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
 <link href="../../assets/css/bootstrap-responsive.min.css" rel="stylesheet" type="text/css">
 <!-- order is significant to prevent overwriting of some bootstrap-defined css styles --><link href="../../assets/css/additional_styles.css" rel="stylesheet" type="text/css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script><meta content="#5670d4" name="theme-color">
-<link rel="canonical" href="https://impala.apache.org/blog/posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/">
-<meta name="author" content="Impala Dev">
-<link rel="prev" href="../lets-see-how-fast-impala-runs-on-iceberg/" title="Let’s see how fast Impala runs on Iceberg" type="text/html">
-<link rel="next" href="../impalas-living-on-iceberg/" title="Impalas living on Iceberg" type="text/html">
+<link rel="canonical" href="https://impala.apache.org/blog/authors/gabor-kaszab/">
 </head>
 <body id="index" class="home">
     <div class="container">
@@ -56,50 +53,15 @@
     </nav></header>
 </div>
 <!-- masthead -->
-        <main id="content"><article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h3 class="p-name entry-title" itemprop="headline name"><a href="." class="u-url">This Impala not only reads, but modifies and optimizes Iceberg tables</a></h3>
-
+        <main id="content"><article class="authorpage"><header><h1>Posts by Gabor Kaszab</h1>
         <div class="metadata">
-            <p class="byline author vcard">
-                <span class="byline-name fn">
-                        <a href="../../authors/impala-dev/">Impala Dev</a>
-                </span>
-            </p>
-            <p class="dateline"><a href="." rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:09:35-07:00" itemprop="datePublished" title="2024-07-27 07:09">2024-07-27 07:09</time></a></p>
+
         </div>
-    </header><div class="e-content entry-content" itemprop="articleBody text">
-    <p>Apache Impala is a distributed, massively parallel query engine for big data. Initially, it focused
-on fast query execution on top of large datasets that were ingested via long-running batch jobs. The
-table schema and the ingested data typically remained unchanged, and row-level modifications were
-impractical to say the least.</p>
-<p>Today’s expectations for modern data warehouse engines have risen significantly. Users now want to
-have RDBMS-like capabilities in their data warehouses. E.g., they often need to comply with
-regulations like GDPR or CCPA, i.e. they need to be able to remove or update records belonging to
-certain individuals.</p>
-<p>Apache Iceberg is a cutting-edge table format that delivers advanced write capabilities for
-large-scale data. It allows schema and partition evolution, time-travel, and the focus of this talk:
-row-level modifications and table maintenance features. Impala has had support for reading Iceberg
-tables and inserting data for a while, but the capability of deleting and updating rows only
-recently became available.</p>
-<p>Frequent modifications come with a cost: eventually, the table will become full of small data and
-so-called delete files. This degrades the performance of read operations over time. The new table
-maintenance statement in Impala, OPTIMIZE, merges small data files and eliminates delete files to
-keep our table healthy. To make partition-level maintenance easier, DROP PARTITION statement allows
-selective partition removal based on predicates.</p>
-<p>Join us for this session to discover how Apache Impala evolved to meet emerging requirements without
-compromising performance.</p>
-<p><em>Appeared in <a href="https://eu.communityovercode.org/sessions/2024/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/">https://eu.communityovercode.org/sessions/2024/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/</a></em></p>
-    </div>
-    <aside class="postpromonav"><nav><ul itemprop="keywords" class="tags">
-<li><a class="tag p-category" href="../../categories/cceu24/" rel="tag">cceu24</a></li>
-        </ul>
-<ul class="pager hidden-print">
-<li class="previous">
-                <a href="../lets-see-how-fast-impala-runs-on-iceberg/" rel="prev" title="Let’s see how fast Impala runs on Iceberg">Previous post</a>
-            </li>
-            <li class="next">
-                <a href="../impalas-living-on-iceberg/" rel="next" title="Impalas living on Iceberg">Next post</a>
-            </li>
-        </ul></nav></aside></article></main><footer id="footer"><p> </p>
+    </header><ul class="postlist">
+<li>
+<time class="listdate" datetime="2024-10-07T16:00:00-06:00" title="2024-10-07 16:00">2024-10-07 16:00</time><a href="../../posts/impalas-living-on-iceberg/" class="listtitle">Impala's Living on Iceberg</a>
+</li>
+        </ul></article></main><footer id="footer"><p> </p>
     <div class="navbar">
       <div class="navbar-inner">
         <div class="container">

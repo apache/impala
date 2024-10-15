@@ -5,15 +5,15 @@
 <meta name="keywords" content="hadoop, impala, sql, mpp, bi, big data, open source">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="utf-8">
-<title>Let’s see how fast Impala runs on Iceberg | Apache Impala</title>
+<title>Impala's Living on Iceberg | Apache Impala</title>
 <link href="../../assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
 <link href="../../assets/css/bootstrap-responsive.min.css" rel="stylesheet" type="text/css">
 <!-- order is significant to prevent overwriting of some bootstrap-defined css styles --><link href="../../assets/css/additional_styles.css" rel="stylesheet" type="text/css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script><meta content="#5670d4" name="theme-color">
-<link rel="canonical" href="https://impala.apache.org/blog/posts/lets-see-how-fast-impala-runs-on-iceberg/">
-<meta name="author" content="Impala Dev">
-<link rel="prev" href="../anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/" title="Anatomy of reading Apache Parquet files (from the Apache Impala perspective)" type="text/html">
-<link rel="next" href="../this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" title="This Impala not only reads, but modifies and optimizes Iceberg tables" type="text/html">
+<link rel="canonical" href="https://impala.apache.org/blog/posts/impalas-living-on-iceberg/">
+<meta name="author" content="Gabor Kaszab">
+<link rel="prev" href="../this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" title="This Impala not only reads, but modifies and optimizes Iceberg tables" type="text/html">
+<link rel="next" href="../intelligent-utilization-aware-autoscaling-for-impala-virtual-compute-clusters/" title="Intelligent Utilization Aware Autoscaling for Impala Virtual Compute Clusters" type="text/html">
 </head>
 <body id="index" class="home">
     <div class="container">
@@ -56,46 +56,39 @@
     </nav></header>
 </div>
 <!-- masthead -->
-        <main id="content"><article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h3 class="p-name entry-title" itemprop="headline name"><a href="." class="u-url">Let’s see how fast Impala runs on Iceberg</a></h3>
+        <main id="content"><article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h3 class="p-name entry-title" itemprop="headline name"><a href="." class="u-url">Impala's Living on Iceberg</a></h3>
 
         <div class="metadata">
             <p class="byline author vcard">
                 <span class="byline-name fn">
-                        <a href="../../authors/impala-dev/">Impala Dev</a>
+                        <a href="../../authors/gabor-kaszab/">Gabor Kaszab</a>
                 </span>
             </p>
-            <p class="dateline"><a href="." rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:07:38-07:00" itemprop="datePublished" title="2024-07-27 07:07">2024-07-27 07:07</time></a></p>
+            <p class="dateline"><a href="." rel="bookmark"><time class="published dt-published" datetime="2024-10-07T16:00:00-06:00" itemprop="datePublished" title="2024-10-07 16:00">2024-10-07 16:00</time></a></p>
         </div>
     </header><div class="e-content entry-content" itemprop="articleBody text">
-    <p>Apache Impala is a distributed massively parallel query engine designed for high-performance
-querying of large-scale data. There has been a long list of new features recently around supporting
-Apache Iceberg tables such as reading, writing, time traveling, and so on. However, in a big data
-environment it is also a must to be performant. Since Impala has been designed to be fast, it has
-its own way of reading Iceberg tables. Other engines might simply use the Iceberg library to perform
-reads, while Impala has a C++ implementation itself optimized for speed.</p>
-<p>Nowadays, even big data storage techniques have to offer the possibility not just to store data but
-also to alter and delete data on a row level. Apache Iceberg solves this by using delete files that
-live alongside the data files. It is the responsibility of the query engines to then apply the
-delete files on the data files when querying the data. To efficiently read the data of such tables
-we implemented new Iceberg-specific operators in Impala.</p>
-<p>In this talk we will go into the implementation details and reveal what is the secret behind
-Impala’s great performance in general and also when reading Iceberg tables with position delete
-files. We will also show some measurements where we compare Impala’s performance with other
-open-source query engines.</p>
-<p>By the end of this talk, you should have a high-level understanding of Impala’s and Iceberg’s
-architecture, the performance tricks we implemented in Impala specifically for Iceberg, and you will
-see how Impala competes with other engines.</p>
-<p><em>Appeared in <a href="https://eu.communityovercode.org/sessions/2024/lets-see-how-fast-impala-runs-on-iceberg/">https://eu.communityovercode.org/sessions/2024/lets-see-how-fast-impala-runs-on-iceberg/</a></em></p>
+    <p>Apache Impala is a horizontally scalable database engine renowned for its emphasis on query
+efficiency. Over recent years, the Impala team has dedicated substantial effort to support Iceberg
+tables. Impala can read, write, modify, and optimize Iceberg tables. Additionally, it facilitates
+schema and partition evolution through DDL statements.</p>
+<p>Attendees can anticipate a comprehensive overview of all Iceberg-related features within Impala,
+along with insights into forthcoming developments expected this year. Given Impala's Java/C++ hybrid
+architecture — where the frontend, responsible for analysis and planning, is Java-based while
+backend executors are coded in C++ — the integration process encountered its own set of challenges.
+This presentation will delve into some details of this integration work, shedding light on the
+technical nuances.</p>
+<p>[<a href="https://impala.apache.org/gh-docs/ccna24-impalas_living_on_iceberg.pdf">slides</a>]</p>
+<p><em>Appeared in <a href="https://communityovercode.org/schedule/#sz-tab-45572">Community Over Code NA 2024</a></em></p>
     </div>
     <aside class="postpromonav"><nav><ul itemprop="keywords" class="tags">
-<li><a class="tag p-category" href="../../categories/cceu24/" rel="tag">cceu24</a></li>
+<li><a class="tag p-category" href="../../categories/ccna24/" rel="tag">ccna24</a></li>
         </ul>
 <ul class="pager hidden-print">
 <li class="previous">
-                <a href="../anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/" rel="prev" title="Anatomy of reading Apache Parquet files (from the Apache Impala perspective)">Previous post</a>
+                <a href="../this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" rel="prev" title="This Impala not only reads, but modifies and optimizes Iceberg tables">Previous post</a>
             </li>
             <li class="next">
-                <a href="../this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" rel="next" title="This Impala not only reads, but modifies and optimizes Iceberg tables">Next post</a>
+                <a href="../intelligent-utilization-aware-autoscaling-for-impala-virtual-compute-clusters/" rel="next" title="Intelligent Utilization Aware Autoscaling for Impala Virtual Compute Clusters">Next post</a>
             </li>
         </ul></nav></aside></article></main><footer id="footer"><p> </p>
     <div class="navbar">

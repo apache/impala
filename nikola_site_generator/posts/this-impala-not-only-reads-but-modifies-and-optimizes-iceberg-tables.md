@@ -2,7 +2,7 @@
 .. title: This Impala not only reads, but modifies and optimizes Iceberg tables
 .. slug: this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables
 .. date: 2024-07-27 07:09:35 UTC-07:00
-.. tags:
+.. tags: cceu24
 .. category: talks
 .. link:
 .. description:

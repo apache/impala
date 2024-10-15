@@ -12,7 +12,7 @@
 <!-- order is significant to prevent overwriting of some bootstrap-defined css styles --><link href="assets/css/additional_styles.css" rel="stylesheet" type="text/css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script><meta content="#5670d4" name="theme-color">
 <link rel="canonical" href="https://impala.apache.org/blog/">
-<link rel="prefetch" href="posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" type="text/html">
+<link rel="prefetch" href="posts/healing-iceberg-tables-with-impala/" type="text/html">
 </head>
 <body id="index" class="home">
     <div class="container">
@@ -58,10 +58,74 @@
         <main id="content"><h3>All articles</h3>
 <div class="postindex">
     <hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/healing-iceberg-tables-with-impala/" class="u-url">Healing Iceberg Tables with Impala</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                <a href="authors/noemi-pap-takacs/">Noémi Pap-Takács</a>
+            </span></p>
+            <p class="dateline"><a href="posts/healing-iceberg-tables-with-impala/" rel="bookmark"><time class="published dt-published" datetime="2024-10-10T10:55:00-06:00" title="2024-10-10 10:55">2024-10-10 10:55</time></a></p>
+        </div>
+    </header><div class="p-summary entry-summary">
+    <p>Apache Iceberg handles dynamically changing data at large scale. However, frequent modifications
+come at a cost: eventually, tables will become fragmented. This degrades the performance of read
+operations over time. To address this challenge, we introduced table maintenance features in Apache
+Impala, the high performance, distributed DB engine for big data.</p>
+<p>The new OPTIMIZE statement merges small data files and eliminates delete files to uphold table
+health. It allows rewriting the table according to the latest schema and partition layout, and also
+offers the flexibility of file filtering to optimize recurring maintenance jobs. Additionally, the
+DROP PARTITION statement allows selective partition removal based on predicates.</p>
+<p>Discover in this session how Impala ensures high performance on top of dynamically changing data.</p>
+<p>[<a href="https://impala.apache.org/gh-docs/ccna24-table_maintenance.pdf">slides</a>]</p>
+<p><em>Appeared in <a href="https://communityovercode.org/schedule/#sz-tab-45575">Community Over Code NA 2024</a></em></p>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/intelligent-utilization-aware-autoscaling-for-impala-virtual-compute-clusters/" class="u-url">Intelligent Utilization Aware Autoscaling for Impala Virtual Compute Clusters</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                <a href="authors/riza-suminto/">Riza Suminto</a>
+            </span></p>
+            <p class="dateline"><a href="posts/intelligent-utilization-aware-autoscaling-for-impala-virtual-compute-clusters/" rel="bookmark"><time class="published dt-published" datetime="2024-10-08T14:50:00-06:00" title="2024-10-08 14:50">2024-10-08 14:50</time></a></p>
+        </div>
+    </header><div class="p-summary entry-summary">
+    <p>Sizing Virtual compute clusters for diverse and complex workloads is hard. Queries often require
+large clusters to meet SLA requirements which can lead to low utilization and excessive cloud spend.
+To solve this problem, we present intelligent autoscaling for Impala virtual warehouses. This
+powerful feature dynamically analyzes query execution plans and resource requirements and adjusts
+cluster size to follow the workload. Once cluster size limits have been set, the autoscaler works in
+the background to maintain the ideal cluster size and is transparent to users. Observability UIs
+have also been enhanced to help understand autoscaler behavior and further tune workloads.</p>
+<p>We achieved 2 key goals with the design - delivering better ROI for compute cost and ease of use for
+admins/users to manage Virtual Clusters.</p>
+<p>[<a href="https://impala.apache.org/gh-docs/ccna24-intelligent_utilization_aware_scheduling.pdf">slides</a>]</p>
+<p><em>Appeared in <a href="https://communityovercode.org/schedule/#sz-tab-45573">Community Over Code NA 2024</a></em></p>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impalas-living-on-iceberg/" class="u-url">Impala's Living on Iceberg</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                <a href="authors/gabor-kaszab/">Gabor Kaszab</a>
+            </span></p>
+            <p class="dateline"><a href="posts/impalas-living-on-iceberg/" rel="bookmark"><time class="published dt-published" datetime="2024-10-07T16:00:00-06:00" title="2024-10-07 16:00">2024-10-07 16:00</time></a></p>
+        </div>
+    </header><div class="p-summary entry-summary">
+    <p>Apache Impala is a horizontally scalable database engine renowned for its emphasis on query
+efficiency. Over recent years, the Impala team has dedicated substantial effort to support Iceberg
+tables. Impala can read, write, modify, and optimize Iceberg tables. Additionally, it facilitates
+schema and partition evolution through DDL statements.</p>
+<p>Attendees can anticipate a comprehensive overview of all Iceberg-related features within Impala,
+along with insights into forthcoming developments expected this year. Given Impala's Java/C++ hybrid
+architecture — where the frontend, responsible for analysis and planning, is Java-based while
+backend executors are coded in C++ — the integration process encountered its own set of challenges.
+This presentation will delve into some details of this integration work, shedding light on the
+technical nuances.</p>
+<p>[<a href="https://impala.apache.org/gh-docs/ccna24-impalas_living_on_iceberg.pdf">slides</a>]</p>
+<p><em>Appeared in <a href="https://communityovercode.org/schedule/#sz-tab-45572">Community Over Code NA 2024</a></em></p>
+    </div>
+    </article><hr>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" class="u-url">This Impala not only reads, but modifies and optimizes Iceberg tables</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-                Impala Dev
+                <a href="authors/impala-dev/">Impala Dev</a>
             </span></p>
             <p class="dateline"><a href="posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:09:35-07:00" title="2024-07-27 07:09">2024-07-27 07:09</time></a></p>
         </div>
@@ -92,7 +156,7 @@ compromising performance.</p>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/lets-see-how-fast-impala-runs-on-iceberg/" class="u-url">Let’s see how fast Impala runs on Iceberg</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-                Impala Dev
+                <a href="authors/impala-dev/">Impala Dev</a>
             </span></p>
             <p class="dateline"><a href="posts/lets-see-how-fast-impala-runs-on-iceberg/" rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:07:38-07:00" title="2024-07-27 07:07">2024-07-27 07:07</time></a></p>
         </div>
@@ -121,7 +185,7 @@ see how Impala competes with other engines.</p>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/" class="u-url">Anatomy of reading Apache Parquet files (from the Apache Impala perspective)</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-                Impala Dev
+                <a href="authors/impala-dev/">Impala Dev</a>
             </span></p>
             <p class="dateline"><a href="posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/" rel="bookmark"><time class="published dt-published" datetime="2024-07-27T07:02:43-07:00" title="2024-07-27 07:02">2024-07-27 07:02</time></a></p>
         </div>
@@ -154,7 +218,7 @@ the world of Big Data query engines.</p>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-blog-coming-soon/" class="u-url">Impala Blog Coming Soon</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-                Impala Dev
+                <a href="authors/impala-dev/">Impala Dev</a>
             </span></p>
             <p class="dateline"><a href="posts/impala-blog-coming-soon/" rel="bookmark"><time class="published dt-published" datetime="2017-01-03T15:45:20-08:00" title="2017-01-03 15:45">2017-01-03 15:45</time></a></p>
         </div>
@@ -166,7 +230,7 @@ the world of Big Data query engines.</p>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-25-performance-overview/" class="u-url">Impala 2.5 performance overview</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-                Impala Dev
+                <a href="authors/impala-dev/">Impala Dev</a>
             </span></p>
             <p class="dateline"><a href="posts/impala-25-performance-overview/" rel="bookmark"><time class="published dt-published" datetime="2016-05-24T23:00:00-07:00" title="2016-05-24 23:00">2016-05-24 23:00</time></a></p>
         </div>
@@ -199,7 +263,7 @@ overview</a>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/nested-types-in-impala/" class="u-url">Nested Types in Impala</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-                Impala Dev
+                <a href="authors/impala-dev/">Impala Dev</a>
             </span></p>
             <p class="dateline"><a href="posts/nested-types-in-impala/" rel="bookmark"><time class="published dt-published" datetime="2015-03-24T23:00:00-07:00" title="2015-03-24 23:00">2015-03-24 23:00</time></a></p>
         </div>
@@ -226,7 +290,7 @@ handle nested data types.</p>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/" class="u-url">Impala: A Modern, Open-Source SQL Engine for Hadoop</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-                Impala Dev
+                <a href="authors/impala-dev/">Impala Dev</a>
             </span></p>
             <p class="dateline"><a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/" rel="bookmark"><time class="published dt-published" datetime="2015-01-05T23:00:00-07:00" title="2015-01-05 23:00">2015-01-05 23:00</time></a></p>
         </div>
