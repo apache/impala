@@ -33,6 +33,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.calcite.coercenodes.CoerceNodes;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
+import org.apache.impala.calcite.rules.ConvertToCNFRules;
 import org.apache.impala.common.ImpalaException;
 
 import org.slf4j.Logger;
@@ -57,12 +58,34 @@ public class CalciteOptimizer implements CompilerStep {
     RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(logPlan.getCluster(),
         validator_.getCatalogReader());
 
-    RelNode optimizedPlan = runJoinProgram(relBuilder, logPlan);
+    // Run some essential rules needed to create working RelNodes before doing
+    // optimization
+    RelNode expandedNodesPlan = runExpandNodesProgram(relBuilder, logPlan);
+
+    // Run essential Join Node rules
+    RelNode optimizedPlan = runJoinProgram(relBuilder, expandedNodesPlan);
 
     ImpalaPlanRel finalOptimizedPlan =
         runImpalaConvertProgram(relBuilder, optimizedPlan);
 
     return finalOptimizedPlan;
+  }
+
+  public RelNode runExpandNodesProgram(RelBuilder relBuilder,
+      RelNode plan) throws ImpalaException {
+
+    HepProgramBuilder builder = new HepProgramBuilder();
+
+    builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+    builder.addRuleCollection(ImmutableList.of(
+        new ConvertToCNFRules.FilterConvertToCNFRule(),
+        new ConvertToCNFRules.JoinConvertToCNFRule(),
+        new ConvertToCNFRules.ProjectConvertToCNFRule()
+        ));
+
+    builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+
+    return runProgram(plan, builder.build());
   }
 
   /**
