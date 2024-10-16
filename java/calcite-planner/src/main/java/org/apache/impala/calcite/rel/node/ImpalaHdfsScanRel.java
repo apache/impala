@@ -28,6 +28,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.calcite.rel.phys.ImpalaHdfsScanNode;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
 import org.apache.impala.calcite.schema.CalciteTable;
+import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.ImpalaException;
@@ -54,7 +55,7 @@ public class ImpalaHdfsScanRel extends TableScan
     CalciteTable table = (CalciteTable) getTable();
 
     BaseTableRef baseTblRef =
-        table.createBaseTableRef(context.ctx_.getRootAnalyzer());
+        table.createBaseTableRef((SimplifiedAnalyzer) context.ctx_.getRootAnalyzer());
 
     // Create the Tuple Descriptor which will contain only the relevant columns
     // from the table needed for the query.

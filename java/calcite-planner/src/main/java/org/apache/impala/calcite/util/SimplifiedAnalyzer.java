@@ -27,9 +27,12 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryCtx;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -41,9 +44,12 @@ import java.util.Set;
  * methods.
  */
 public class SimplifiedAnalyzer extends Analyzer {
+  public static final int MAX_IDENTIFIER_LENGTH = 128;
 
   // List of temporary filter expressions while initializing an Impala plan node.
   private List<Expr> unassignedConjuncts_ = Lists.newArrayList();
+
+  private Set<String> uniqueTableAlias_ = new HashSet<>();
 
   public SimplifiedAnalyzer(StmtMetadataLoader.StmtTableCache stmtTableCache,
       TQueryCtx queryCtx, AuthorizationFactory authzFactory,
@@ -124,5 +130,40 @@ public class SimplifiedAnalyzer extends Analyzer {
     SlotDescriptor result = super.addSlotDescriptor(tupleDesc);
     result.setIsMaterialized(true);
     return result;
+  }
+
+  /**
+   * Given an alias name, check if it is unique based on previously
+   * cached names. If not, create a unique name by concatenating
+   * it with an integer sequence counter.
+   *
+   * TODO: IMPALA-13460: Generating a unique alias is a problem because
+   * the user provided alias in the query should be used in the explain
+   * plan rather than this alias. There is a Calcite bug that has to be
+   * fixed. We'd have to generate our own TableScan object underneath their
+   * LogicalTableScan that would hold an alias. This TableScan can be
+   * generated through their RelBuilder Factory object. But the current
+   * code creates the LogicalTableScan directly rather than go through
+   * a factory, so that would need to be fixed first.
+   */
+  public String getUniqueTableAlias(String alias) throws ImpalaException {
+    final String base = alias;
+    String newAlias = base;
+    int i = 0;
+    while (uniqueTableAlias_.contains(newAlias)) {
+      newAlias = base + "_" + i++;
+    }
+
+    // final alias name should conform to the max identifer length
+    if (newAlias.length() > MAX_IDENTIFIER_LENGTH) {
+      newAlias = newAlias.substring(0, MAX_IDENTIFIER_LENGTH);
+      if (uniqueTableAlias_.contains(newAlias)) {
+        throw new AnalysisException ("Cannot create a unique identifier since it " +
+            "exceeds maximum allowed length");
+      }
+    }
+
+    uniqueTableAlias_.add(newAlias);
+    return newAlias;
   }
 }

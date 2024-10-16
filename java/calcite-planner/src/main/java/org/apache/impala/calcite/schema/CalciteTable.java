@@ -52,8 +52,10 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergTable;
+import org.apache.impala.calcite.rel.util.ImpalaBaseTableRef;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
+import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
@@ -99,14 +101,14 @@ public class CalciteTable extends RelOptAbstractTable
     return builder.build();
   }
 
-  public BaseTableRef createBaseTableRef(Analyzer analyzer
+  public BaseTableRef createBaseTableRef(SimplifiedAnalyzer analyzer
       ) throws ImpalaException {
 
     TableRef tblRef = new TableRef(qualifiedTableName_, null);
 
     Path resolvedPath = analyzer.resolvePath(tblRef.getPath(), Path.PathType.TABLE_REF);
 
-    BaseTableRef baseTblRef = new BaseTableRef(tblRef, resolvedPath);
+    BaseTableRef baseTblRef = new ImpalaBaseTableRef(tblRef, resolvedPath, analyzer);
     baseTblRef.analyze(analyzer);
     return baseTblRef;
   }
