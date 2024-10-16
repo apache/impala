@@ -18,6 +18,7 @@
 package org.apache.impala.calcite.operators;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
@@ -29,6 +30,7 @@ import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Db;
 
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,11 +49,27 @@ import org.slf4j.LoggerFactory;
  * the function name is known by Impala. If so, an ImpalaOperator class is generated
  * on the fly.
  *
+ * There are some special functions where we would prefer to use the Impala operator
+ * over the Calcite operator due to some incompatibility. These are specified in
+ * USE_IMPALA_OPERATOR.
+ *
  * TODO: IMPALA-13095: Handle UDFs
  */
 public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
   protected static final Logger LOG =
       LoggerFactory.getLogger(ImpalaOperatorTable.class.getName());
+
+  public static Set<String> USE_IMPALA_OPERATOR =
+      ImmutableSet.<String> builder()
+      .add("year")
+      .add("month")
+      .add("week")
+      .add("day")
+      .add("hour")
+      .add("minute")
+      .add("second")
+      .add("millisecond")
+      .build();
 
   private static ImpalaOperatorTable INSTANCE;
 
@@ -70,12 +88,15 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       return;
     }
 
-    // Check Calcite operator table for existence.
-    SqlStdOperatorTable.instance().lookupOperatorOverloads(opName, category, syntax,
-        operatorList, nameMatcher);
-    Preconditions.checkState(operatorList.size() <= 1);
-    if (operatorList.size() == 1) {
-      return;
+    String lowercaseOpName = opName.getSimple().toLowerCase();
+    if (!USE_IMPALA_OPERATOR.contains(lowercaseOpName)) {
+      // Check Calcite operator table for existence.
+      SqlStdOperatorTable.instance().lookupOperatorOverloads(opName, category, syntax,
+          operatorList, nameMatcher);
+      Preconditions.checkState(operatorList.size() <= 1);
+      if (operatorList.size() == 1) {
+        return;
+      }
     }
 
     // There shouldn't be more than one opName with our usage, so throw an exception
@@ -86,7 +107,7 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
     }
 
     // Check Impala Builtins for existence: TODO: IMPALA-13095: handle UDFs
-    if (!BuiltinsDb.getInstance().containsFunction(opName.getSimple())) {
+    if (!BuiltinsDb.getInstance().containsFunction(lowercaseOpName)) {
       return;
     }
 

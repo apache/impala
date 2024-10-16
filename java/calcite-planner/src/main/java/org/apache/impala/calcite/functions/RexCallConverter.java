@@ -25,11 +25,15 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.ArithmeticExpr;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CaseWhenClause;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.TimestampArithmeticExpr;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
@@ -77,6 +81,12 @@ public class RexCallConverter {
 
     String funcName = rexCall.getOperator().getName().toLowerCase();
 
+    // Date addition expressions have special handling.
+    Expr dateExpr = handleDateExprs(funcName, rexCall, params, rexBuilder);
+    if (dateExpr != null) {
+      return dateExpr;
+    }
+
     Function fn = getFunction(rexCall);
 
     if (fn == null) {
@@ -102,6 +112,19 @@ public class RexCallConverter {
       default:
         return new AnalyzedFunctionCallExpr(fn, params, impalaRetType);
     }
+  }
+
+  public static Expr handleDateExprs(String funcName, RexCall rexCall,
+      List<Expr> params, RexBuilder rexBuilder) {
+
+    if (SqlTypeName.INTERVAL_TYPES.contains(rexCall.getType().getSqlTypeName())) {
+      return new IntervalExpr(rexCall, params.get(0));
+    }
+
+    if (isTimestampArithExpr(params)) {
+      return createTimestampExpr(rexCall, params);
+    }
+    return null;
   }
 
   private static Function getFunction(RexCall call) {
@@ -166,5 +189,44 @@ public class RexCallConverter {
     BinaryPredicate.Operator op = BINARY_OP_MAP.get(sqlKind);
     Preconditions.checkNotNull(op, "Unknown Calcite op: " + sqlKind);
     return new AnalyzedBinaryCompExpr(fn, op, params.get(0), params.get(1));
+  }
+
+  private static Expr createTimestampExpr(RexCall rexCall, List<Expr> params) {
+    // one of the timestamp expressions should be a date time. The other should
+    // be some number to add or subtract. timestampParamIndex contains the
+    // parameter that is the timestamp.
+    int timestampParamIndex =
+        SqlTypeUtil.isDatetime(rexCall.getOperands().get(0).getType())
+            ? 0
+            : 1;
+    // and intervalIndex contains the non-timestampParamIndex parameter
+    int intervalIndex = timestampParamIndex == 0 ? 1 : 0;
+
+    IntervalExpr intervalExpr = (IntervalExpr) params.get(intervalIndex);
+    ArithmeticExpr.Operator op = getImpalaOp(rexCall);
+    return new TimestampArithmeticExpr(op, params.get(timestampParamIndex),
+        intervalExpr.getLiteral(), intervalExpr.getTimeUnit(), intervalIndex == 0
+        );
+  }
+
+  private static ArithmeticExpr.Operator getImpalaOp(RexCall rexCall) {
+    if (rexCall.getOperator().getName().equals("DATE_ADD") ||
+        rexCall.getOperator().getKind().equals(SqlKind.PLUS)) {
+      return ArithmeticExpr.Operator.ADD;
+    }
+    if (rexCall.getOperator().getName().equals("DATE_SUB") ||
+        rexCall.getOperator().getKind().equals(SqlKind.MINUS)) {
+      return ArithmeticExpr.Operator.SUBTRACT;
+    }
+    throw new RuntimeException("Unknown Operator found in arith expr: " +
+        rexCall.getOperator().getName());
+  }
+
+  public static boolean isTimestampArithExpr(List<Expr> params) {
+    if (params.size() != 2) {
+      return false;
+    }
+    return params.get(0) instanceof IntervalExpr ||
+        params.get(1) instanceof IntervalExpr;
   }
 }

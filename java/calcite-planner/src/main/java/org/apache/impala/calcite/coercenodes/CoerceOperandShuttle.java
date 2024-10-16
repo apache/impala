@@ -30,7 +30,10 @@ import org.apache.calcite.rex.RexOver;
 import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.fun.SqlDatetimePlusOperator;
+import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -70,7 +73,7 @@ public class CoerceOperandShuttle extends RexShuttle {
   private final RexBuilder rexBuilder;
   private final List<RelNode> inputs;
 
-  public static Set<SqlKind> NO_CASTING_NEEDED =
+  public static Set<SqlKind> NO_CAST_OPERATORS =
       ImmutableSet.<SqlKind> builder()
       // Cast doesn't need any operand casting because it is already a cast.
       .add(SqlKind.CAST)
@@ -102,7 +105,7 @@ public class CoerceOperandShuttle extends RexShuttle {
     RexCall castedOperandsCall = (RexCall) super.visitCall(call);
 
     // Certain operators will never need casting for their operands.
-    if (NO_CASTING_NEEDED.contains(castedOperandsCall.getOperator().getKind())) {
+    if (!isCastingNeeded(castedOperandsCall)) {
       return castedOperandsCall;
     }
 
@@ -215,6 +218,30 @@ public class CoerceOperandShuttle extends RexShuttle {
     }
 
     return retType;
+  }
+
+  private boolean isCastingNeeded(RexCall rexCall) {
+    if (NO_CAST_OPERATORS.contains(rexCall.getOperator().getKind())) {
+      return false;
+    }
+
+    // Time stamp operators don't require casting. When they are converted
+    // into Expr objects, they undergo special processing, so we leave them
+    // as/is.
+    if (isTimestampArithExpr(rexCall)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private static boolean isTimestampArithExpr(RexCall rexCall) {
+    return rexCall.getOperator() instanceof SqlDatetimePlusOperator
+        || rexCall.getOperator() instanceof SqlDatetimeSubtractionOperator
+        || SqlTypeName.INTERVAL_TYPES.contains(rexCall.getType().getSqlTypeName())
+        || ((rexCall.getOperator().equals("+") || rexCall.getOperator().equals("-")) &&
+            (SqlTypeUtil.isDatetime(rexCall.getOperands().get(0).getType()) ||
+            SqlTypeUtil.isDatetime(rexCall.getOperands().get(1).getType())));
   }
 
   /**
