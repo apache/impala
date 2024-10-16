@@ -56,6 +56,8 @@ public class FunctionResolver {
   public static Map<SqlKind, String> CALCITE_KIND_TO_IMPALA_FUNC =
       ImmutableMap.<SqlKind, String> builder()
       .put(SqlKind.EQUALS, "eq")
+      .put(SqlKind.IS_NOT_NULL, "is_not_null_pred")
+      .put(SqlKind.IS_NULL, "is_null_pred")
       .put(SqlKind.GREATER_THAN, "gt")
       .put(SqlKind.GREATER_THAN_OR_EQUAL, "ge")
       .put(SqlKind.LESS_THAN, "lt")
@@ -66,6 +68,12 @@ public class FunctionResolver {
       .put(SqlKind.TIMES, "multiply")
       .put(SqlKind.DIVIDE, "divide")
       .put(SqlKind.SUM0, "sum_init_zero")
+      .build();
+
+  // Map of Calcite names to an Impala function name when the names are different
+  public static Map<String, String> CALCITE_NAME_TO_IMPALA_FUNC =
+      ImmutableMap.<String, String> builder()
+      .put("||", "concat")
       .build();
 
   public static Set<SqlKind> ARITHMETIC_TYPES =
@@ -113,8 +121,40 @@ public class FunctionResolver {
       List<RelDataType> argTypes, boolean exactMatch) {
 
     // Some names in Calcite don't map exactly to their corresponding Impala
-    // functions, so we get the right mapping from the HashMap table.
+    // functions, so we check to see if the mapping exists
     return getFunction(getMappedName(name, kind, argTypes), argTypes, exactMatch);
+  }
+
+  /**
+   * For most Calcite operators, the function name within Calcite matches the
+   * Impala function name. This method handles the exceptions to that rule.
+   */
+  private static String getMappedName(String name, SqlKind kind,
+      List<RelDataType> argTypes) {
+    // First check if any special mappings exist from Calcite SqlKinds to
+    // Impala functions.
+    String mappedName = CALCITE_KIND_TO_IMPALA_FUNC.get(kind);
+    if (mappedName != null) {
+      // IMPALA-13435: for sum_init_zero, there is support for BIGINT arguments,
+      // but not for DECIMAL or FLOAT.
+      if (mappedName.equals("sum_init_zero")) {
+        if (!argTypes.get(0).getSqlTypeName().equals(SqlTypeName.BIGINT)) {
+          return "sum";
+        }
+      }
+      return mappedName;
+    }
+
+    String lowercaseName = name.toLowerCase();
+    // Next check if there are any names in Calcite that do not match
+    // the Impala function name.
+    mappedName = CALCITE_NAME_TO_IMPALA_FUNC.get(lowercaseName);
+    if (mappedName != null) {
+      return mappedName;
+    }
+
+    // If reached here, use the function name as given, no special mapping needed.
+    return lowercaseName;
   }
 
   private static Function getFunction(String name, List<RelDataType> argTypes,
@@ -137,31 +177,6 @@ public class FunctionResolver {
     }
 
     return fn;
-  }
-
-  /**
-   * For most Calcite operators, the function name within Calcite matches the
-   * Impala function name. This method handles the exceptions to that rule.
-   */
-  private static String getMappedName(String name, SqlKind kind,
-      List<RelDataType> argTypes) {
-
-    // First check if any special mappings exist from Calcite SqlKinds to
-    // Impala functions.
-    String mappedName = CALCITE_KIND_TO_IMPALA_FUNC.get(kind);
-    if (mappedName != null) {
-      // IMPALA-13435: for sum_init_zero, there is support for BIGINT arguments,
-      // but not for DECIMAL or FLOAT.
-      if (mappedName.equals("sum_init_zero")) {
-        if (!argTypes.get(0).getSqlTypeName().equals(SqlTypeName.BIGINT)) {
-          return "sum";
-        }
-      }
-      return mappedName;
-    }
-
-    // If reached here, use the function name as given, no special mapping needed.
-    return name.toLowerCase();
   }
 
   private static List<Type> getArgTypes(String name, List<RelDataType> argTypes,

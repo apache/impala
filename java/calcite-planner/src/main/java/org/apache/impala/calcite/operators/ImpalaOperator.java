@@ -115,15 +115,12 @@ public class ImpalaOperator extends SqlFunction {
   }
 
   private List<RelDataType> getOperandTypes(SqlOperatorBinding opBinding) {
-    Preconditions.checkState(opBinding instanceof SqlCallBinding);
-    SqlCallBinding callBinding = (SqlCallBinding) opBinding;
-
     List<RelDataType> operandTypes = new ArrayList<>();
-    for (int i = 0; i < callBinding.getOperandCount(); ++i) {
-      if (callBinding.isOperandNull(i, false)) {
+    for (int i = 0; i < opBinding.getOperandCount(); ++i) {
+      if (opBinding.isOperandNull(i, false)) {
         operandTypes.add(ImpalaTypeConverter.getRelDataType(Type.NULL));
       } else {
-        operandTypes.add(callBinding.getOperandType(i));
+        operandTypes.add(opBinding.getOperandType(i));
       }
     }
     return operandTypes;

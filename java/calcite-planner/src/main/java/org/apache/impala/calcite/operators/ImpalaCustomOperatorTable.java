@@ -24,6 +24,7 @@ import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
+import org.apache.calcite.sql.fun.ImpalaGroupingFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
 import org.apache.calcite.sql.fun.SqlCountAggFunction;
 import org.apache.calcite.sql.type.InferTypes;
@@ -199,6 +200,34 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
 
   public static final SqlAggFunction COUNT =
       new SqlCountAggFunction("COUNT", OperandTypes.VARIADIC);
+
+  public static final ImpalaAdjustScaleFunction ROUND =
+      new ImpalaAdjustScaleFunction("ROUND");
+
+  public static final ImpalaAdjustScaleFunction DROUND =
+      new ImpalaAdjustScaleFunction("DROUND");
+
+  public static final ImpalaAdjustScaleFunction TRUNCATE =
+      new ImpalaAdjustScaleFunction("TRUNCATE");
+
+  public static final ImpalaAdjustScaleFunction TRUNC =
+      new ImpalaAdjustScaleFunction("TRUNC");
+
+  public static final ImpalaAdjustScaleFunction DTRUNC =
+      new ImpalaAdjustScaleFunction("DTRUNC");
+
+  public static final ImpalaGroupingFunction GROUPING =
+      new ImpalaGroupingFunction();
+
+  public static final SqlBinaryOperator CONCAT =
+      new SqlBinaryOperator(
+          "||",
+          SqlKind.OTHER,
+          60,
+          true,
+          STRING_TYPE,
+          null,
+          OperandTypes.STRING_SAME_SAME_OR_ARRAY_SAME_SAME);
 
   public static ImpalaCustomOperatorTable instance() {
     return INSTANCE.get();

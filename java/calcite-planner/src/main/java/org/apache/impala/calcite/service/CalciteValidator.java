@@ -56,6 +56,9 @@ public class CalciteValidator implements CompilerStep {
         ImpalaOperatorTable.getInstance(),
         catalogReader, typeFactory,
         SqlValidator.Config.DEFAULT
+            // Impala requires identifier expansion (tpcds test queries fail
+            // without this)
+            .withIdentifierExpansion(true)
             .withConformance(ImpalaConformance.INSTANCE)
             );
   }
