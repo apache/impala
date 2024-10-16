@@ -48,6 +48,11 @@ under the License.
       <artifactId>avatica-core</artifactId>
       <version>1.23.0</version>
     </dependency>
+     <dependency>
+      <groupId>org.immutables</groupId>
+      <artifactId>value</artifactId>
+      <version>2.10.1</version>
+    </dependency>
   </dependencies>
 
  <build>
@@ -60,6 +65,18 @@ under the License.
       </plugins>
     </pluginManagement>
     <plugins>
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>auto-clean</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>clean</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
