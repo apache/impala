@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.service;
 
+import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -44,7 +45,9 @@ public class CalciteQueryParser implements CompilerStep {
     // Create an SQL parser
     SqlParser parser = SqlParser.create(queryCtx_.getStmt(),
         SqlParser.config().withParserFactory(ImpalaSqlParserImpl.FACTORY)
-                .withConformance(ImpalaConformance.INSTANCE));
+                .withConformance(ImpalaConformance.INSTANCE)
+                .withQuoting(Quoting.BACK_TICK_BACKSLASH)
+                );
 
     // Parse the query into an AST
     SqlNode sqlNode = parser.parseQuery();

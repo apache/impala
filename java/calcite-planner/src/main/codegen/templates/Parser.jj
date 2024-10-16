@@ -1945,12 +1945,8 @@ void AddSelectItem(List<SqlNode> list) :
     (
         [ <AS> ]
         (
-            id = SimpleIdentifier()
-        |
-            // Mute the warning about ambiguity between alias and continued
-            // string literal.
-            LOOKAHEAD(1)
-            id = SimpleIdentifierFromStringLiteral()
+            // Added Impala code to handle when there are quotes and no quotes
+            id = SimpleIdentifierFromAllQuotesOrNonQuotes()
         )
         { list.add(SqlStdOperatorTable.AS.createCall(span().end(e), e, id)); }
     |   { list.add(e); }
@@ -2233,7 +2229,8 @@ SqlNode TableRef3(ExprContext exprContext, boolean lateral) :
         tableRef = Unpivot(tableRef)
     ]
     [
-        [ <AS> ] alias = SimpleIdentifier()
+        // Added Impala code to handle when there are quotes and no quotes
+        [ <AS> ] alias = SimpleIdentifierFromAllQuotesOrNonQuotes()
         (
             columnAliasList = ParenthesizedSimpleIdentifierList()
         |   { columnAliasList = null; }
@@ -3502,7 +3499,8 @@ void AddWithItem(List<SqlWithItem> list, SqlLiteral recursive) :
     final SqlNode definition;
 }
 {
-    id = SimpleIdentifier()
+    // Added Impala code to handle when there are quotes and no quotes
+    id = SimpleIdentifierFromAllQuotesOrNonQuotes()
     ( columnList = ParenthesizedSimpleIdentifierList() | { columnList = null; } )
     <AS>
     definition = ParenthesizedExpression(ExprContext.ACCEPT_QUERY)
@@ -4690,10 +4688,6 @@ String SimpleStringLiteral() :
     <BIG_QUERY_QUOTED_STRING> {
         return SqlParserUtil.stripQuotes(token.image, "'", "'", "\\'", Casing.UNCHANGED);
     }
-|
-    <BIG_QUERY_DOUBLE_QUOTED_STRING> {
-        return SqlParserUtil.stripQuotes(token.image, DQ, DQ, "\\\"", Casing.UNCHANGED);
-    }
 }
 
 /**
@@ -5437,20 +5431,31 @@ SqlIdentifier SimpleIdentifier() :
     }
 }
 
-/**
- * Parses a character literal as an SqlIdentifier.
- * Only valid for column aliases in certain dialects.
- */
-SqlIdentifier SimpleIdentifierFromStringLiteral() :
+// Added Impala code to handle when there are quotes and no quotes
+SqlIdentifier SimpleIdentifierFromAllQuotesOrNonQuotes() :
 {
+  SqlIdentifier stringLiteral;
 }
 {
-    <QUOTED_STRING> {
+    <BIG_QUERY_DOUBLE_QUOTED_STRING> {
         if (!this.conformance.allowCharLiteralAlias()) {
             throw SqlUtil.newContextException(getPos(), RESOURCE.charLiteralAliasNotValid());
         }
-        final String s = SqlParserUtil.parseString(token.image);
+        String s = SqlParserUtil.stripQuotes(token.image, "\"", "\"", "\\\"", Casing.UNCHANGED);
         return new SqlIdentifier(s, getPos());
+    }
+    |
+    <BIG_QUERY_QUOTED_STRING> {
+        if (!this.conformance.allowCharLiteralAlias()) {
+            throw SqlUtil.newContextException(getPos(), RESOURCE.charLiteralAliasNotValid());
+        }
+        final String t = SqlParserUtil.parseString(token.image);
+        return new SqlIdentifier(t, getPos());
+    }
+    |
+        stringLiteral = SimpleIdentifier()
+    {
+      return stringLiteral;
     }
 }
 

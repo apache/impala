@@ -830,3 +830,19 @@ from functional.alltypes where id < 8
 7,1,2,3,4,4,4,4,3,2,1,0,0,0
 ---- TYPES
 INT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# make sure this parses
+select '1' as 'hello';
+---- RESULTS
+'1'
+---- TYPES
+string
+====
+---- QUERY
+# make sure this parses
+select "1" as "hello";
+---- RESULTS
+'1'
+---- TYPES
+string
