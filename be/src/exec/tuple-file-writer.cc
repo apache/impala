@@ -100,9 +100,9 @@ Status TupleFileWriter::Write(RuntimeState* state, RowBatch* row_batch) {
   DCHECK_GT(header_len, 0);
   kudu::Slice tuple_data = out.TupleDataAsSlice();
   kudu::Slice tuple_offsets = out.TupleOffsetsAsSlice();
+  // tuple_data_len is possible to be 0, see IMPALA-13411.
   size_t tuple_data_len = tuple_data.size();
   size_t tuple_offsets_len = tuple_offsets.size();
-  DCHECK_GT(tuple_data_len, 0);
   DCHECK_GT(tuple_offsets_len, 0);
 
   // We write things in this order (sizes first, then the variable-sized data):

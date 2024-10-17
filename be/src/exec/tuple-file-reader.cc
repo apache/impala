@@ -87,7 +87,8 @@ Status TupleFileReader::GetNext(RuntimeState *state,
       kudu::ArrayView<kudu::Slice>(chunk_lens_slices)),
       "Failed to read cache file");
 
-  if (header_len == 0 || tuple_data_len == 0 || tuple_offsets_len == 0) {
+  // tuple_data_len can be zero, see IMPALA-13411.
+  if (header_len == 0 || tuple_offsets_len == 0) {
     string err_msg = Substitute("Invalid data lengths at offset $0 in $1: "
         "header_len=$2, tuple_data_len=$3, tuple_offsets_len=$4", offset_, path_,
         header_len, tuple_data_len, tuple_offsets_len);

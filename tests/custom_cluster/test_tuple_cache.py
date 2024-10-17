@@ -675,3 +675,31 @@ class TestTupleCacheRuntimeKeys(TestTupleCacheBase):
     assert len(before_result_set) + 1 == len(after_insert_result_set)
     different_rows = before_result_set.symmetric_difference(after_insert_result_set)
     assert len(different_rows) == 1
+
+
+class TestTupleCacheCountStar(TestTupleCacheBase):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTupleCacheCountStar, cls).add_test_dimensions()
+    add_exec_option_dimension(cls, 'mt_dop', [0, 2])
+
+  @CustomClusterTestSuite.with_args(
+    start_args=CACHE_START_ARGS, cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_tuple_cache_count_star(self, vector, unique_database):
+    """
+    This test is a regression test for IMPALA-13411 to see whether it hits
+    the DCHECK.
+    """
+    self.client.set_configuration(vector.get_value('exec_option'))
+    fq_table = "{0}.tuple_cache_count_star".format(unique_database)
+
+    # Create a table.
+    self.create_table(fq_table, scale=1)
+
+    # Run twice and see if it hits the DCHECK.
+    query = "select count(*) from {0}".format(fq_table)
+    result1 = self.execute_query(query)
+    result2 = self.execute_query(query)
+    assert result1.success and result2.success
