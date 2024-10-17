@@ -655,7 +655,7 @@ public class IcebergUtil {
 
   private static TableScan createScanAsOf(FeIcebergTable table,
       TimeTravelSpec timeTravelSpec) {
-    TableScan scan = table.getIcebergApiTable().newScan();
+    TableScan scan = newScan(table);
     if (timeTravelSpec == null) {
       scan = scan.useSnapshot(table.snapshotId());
     } else {
@@ -687,7 +687,7 @@ public class IcebergUtil {
     if (table.snapshotId() == -1) {
       return new GroupedContentFiles(CloseableIterable.empty());
     }
-    TableScan scan = table.getIcebergApiTable().newScan();
+    TableScan scan = newScan(table);
     scan = scan.useSnapshot(snapshotId);
     for (Expression predicate : predicates) {
       scan = scan.filter(predicate);
@@ -697,6 +697,11 @@ public class IcebergUtil {
     } catch (IOException e) {
       throw new TableLoadingException("Error during reading Iceberg manifest files.", e);
     }
+  }
+
+  private static TableScan newScan(FeIcebergTable table) {
+    TableScan scan = table.getIcebergApiTable().newScan();
+    return scan.caseSensitive(false);
   }
 
   /**

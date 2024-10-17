@@ -1,0 +1,20 @@
+====
+---- QUERY
+select * from iceberg_column_case_sensitivity_issue;
+---- RESULTS
+'1','impala'
+'2','hive'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Check that predicate pushdown works well
+select * from iceberg_column_case_sensitivity_issue
+where id = '1';
+---- RESULTS
+'1','impala'
+---- TYPES
+STRING, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====

@@ -271,6 +271,12 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-migrated-table-field-id-resolution',
                        vector, unique_database)
 
+  def test_column_case_sensitivity(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_column_case_sensitivity_issue", "parquet")
+    self.run_test_case('QueryTest/iceberg-column-case-sensitivity-issue',
+                       vector, unique_database)
+
   @SkipIfFS.hive
   def test_migrated_table_field_id_resolution_complex(self, vector, unique_database):
     def get_table_loc(tbl_name):
