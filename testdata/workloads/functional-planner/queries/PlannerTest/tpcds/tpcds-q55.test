@@ -39,7 +39,7 @@ PLAN-ROOT SINK
 |  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3 row-size=48B cardinality=181
+|  tuple-ids=3 row-size=48B cardinality=1.72K
 |  in pipelines: 05(GETNEXT), 01(OPEN)
 |
 04:HASH JOIN [INNER JOIN]
@@ -112,7 +112,7 @@ PLAN-ROOT SINK
 |  in pipelines: 06(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(i_brand,i_brand_id)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=10.03MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.18MB mem-reservation=1.94MB thread-reservation=1
 06:TOP-N [LIMIT=100]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
 |  mem-estimate=4.71KB mem-reservation=0B thread-reservation=0
@@ -123,12 +123,12 @@ Per-Host Resources: mem-estimate=10.03MB mem-reservation=1.94MB thread-reservati
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3 row-size=48B cardinality=181
+|  tuple-ids=3 row-size=48B cardinality=1.72K
 |  in pipelines: 10(GETNEXT), 01(OPEN)
 |
 09:EXCHANGE [HASH(i_brand,i_brand_id)]
-|  mem-estimate=30.52KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=48B cardinality=181
+|  mem-estimate=183.51KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=48B cardinality=1.72K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -137,7 +137,7 @@ Per-Host Resources: mem-estimate=48.49MB mem-reservation=8.88MB thread-reservati
 |  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3 row-size=48B cardinality=181
+|  tuple-ids=3 row-size=48B cardinality=1.72K
 |  in pipelines: 01(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -224,7 +224,7 @@ PLAN-ROOT SINK
 |  in pipelines: 06(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(i_brand,i_brand_id)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.33MB mem-reservation=1.94MB thread-reservation=1
 06:TOP-N [LIMIT=100]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
 |  mem-estimate=4.71KB mem-reservation=0B thread-reservation=0
@@ -235,12 +235,12 @@ Per-Instance Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reser
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3 row-size=48B cardinality=181
+|  tuple-ids=3 row-size=48B cardinality=1.72K
 |  in pipelines: 10(GETNEXT), 01(OPEN)
 |
 09:EXCHANGE [HASH(i_brand,i_brand_id)]
-|  mem-estimate=58.20KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=48B cardinality=181
+|  mem-estimate=340.11KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=48B cardinality=1.72K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -250,7 +250,7 @@ Per-Instance Resources: mem-estimate=27.22MB mem-reservation=3.00MB thread-reser
 |  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3 row-size=48B cardinality=181
+|  tuple-ids=3 row-size=48B cardinality=1.72K
 |  in pipelines: 01(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

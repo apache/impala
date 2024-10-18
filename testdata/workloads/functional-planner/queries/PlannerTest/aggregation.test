@@ -2189,7 +2189,7 @@ PLAN-ROOT SINK
 |
 04:AGGREGATE [FINALIZE]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=1.50M
+|  row-size=10B cardinality=150.00K
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -2227,13 +2227,13 @@ PLAN-ROOT SINK
 |
 10:AGGREGATE [FINALIZE]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=1.50M
+|  row-size=10B cardinality=150.00K
 |
 09:EXCHANGE [HASH(c_nationkey,c_custkey)]
 |
 04:AGGREGATE [STREAMING]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=1.50M
+|  row-size=10B cardinality=150.00K
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
@@ -2295,7 +2295,7 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=3.00M
+|  row-size=10B cardinality=300.00K
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -2341,13 +2341,13 @@ PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=3.00M
+|  row-size=10B cardinality=300.00K
 |
 11:EXCHANGE [HASH(c_nationkey,c_custkey)]
 |
 06:AGGREGATE [STREAMING]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=3.00M
+|  row-size=10B cardinality=300.00K
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
@@ -2419,7 +2419,7 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=1.52K
+|  row-size=10B cardinality=100
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -2466,13 +2466,13 @@ PLAN-ROOT SINK
 |
 11:AGGREGATE [FINALIZE]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=1.52K
+|  row-size=10B cardinality=100
 |
 10:EXCHANGE [HASH(c_nationkey,c_custkey)]
 |
 06:AGGREGATE [STREAMING]
 |  group by: c_nationkey, c_custkey
-|  row-size=10B cardinality=1.52K
+|  row-size=10B cardinality=100
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey

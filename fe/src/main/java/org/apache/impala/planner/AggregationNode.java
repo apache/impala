@@ -20,7 +20,6 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -36,11 +35,12 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.ValidTupleIdExpr;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAggregationNode;
 import org.apache.impala.thrift.TAggregator;
@@ -323,13 +323,59 @@ public class AggregationNode extends PlanNode {
     }
 
     // Take conjuncts into account.
+    long cardBeforeConjunct = cardinality_;
+    long cardAfterConjunct = cardinality_;
     if (cardinality_ > 0) {
       cardinality_ = applyConjunctsSelectivity(cardinality_);
+      cardAfterConjunct = cardinality_;
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
+
     if (LOG.isTraceEnabled()) {
-      LOG.trace("{} cardinality={}", getDisplayLabel(), cardinality_);
+      LOG.trace("{} cardinality=[BeforeConjunct={} AfterConjunct={} AfterLimit={}]",
+          getDisplayLabel(), cardBeforeConjunct, cardAfterConjunct, cardinality_);
     }
+  }
+
+  /**
+   * Trace back expr until source column for that expr found and then return the
+   * TupleDescriptor that holds the column. Return null if no resolution can be found.
+   */
+  private static @Nullable TupleDescriptor findSourceTupleId(Expr expr) {
+    Expr exprToFind = expr;
+    Expr lastExpr = null;
+    while (exprToFind != null && exprToFind != lastExpr) {
+      // Memorize last expression to defend against self-reference expression.
+      // There should be no circular reference across expressions.
+      lastExpr = exprToFind;
+      SlotRef slotRef = exprToFind.unwrapSlotRef(true);
+
+      if (slotRef != null && slotRef.getDesc() != null) {
+        SlotDescriptor sd = slotRef.getDesc();
+
+        if (sd.getParent() != null && sd.getType().isScalarType()
+            && (sd.getColumn() != null)) {
+          LOG.trace("Tracing Slot={}, a simple column slot", slotRef);
+          return sd.getParent();
+        } else if (sd.getParent() != null && sd.getParent().getSourceView() != null) {
+          LOG.trace("Tracing Slot={}, a view slot", slotRef);
+          exprToFind = sd.getParent().getSourceView().getBaseTblSmap().get(slotRef);
+        } else if (sd.getSourceExprs().size() == 1) {
+          LOG.trace("Tracing Slot={}, an intermediate slot with single source", slotRef);
+          exprToFind = sd.getSourceExprs().get(0);
+        } else if (sd.getSourceExprs().size() > 1 && sd.getParent() != null
+            && sd.getType().isScalarType()) {
+          LOG.trace("Tracing Slot={}, an intermediate slot with {} sources", slotRef,
+              sd.getSourceExprs().size());
+          return sd.getParent();
+        } else {
+          exprToFind = null;
+        }
+      } else {
+        exprToFind = null;
+      }
+    }
+    return null;
   }
 
   /**
@@ -371,101 +417,104 @@ public class AggregationNode extends PlanNode {
     // lower estimate for expressions that share the same TupleId.
 
     // Group 'groupingExprs' elements that have the same TupleId.
-    Map<TupleId, List<Expr>> tupleIdToExprs = new HashMap<>();
+    Map<TupleDescriptor, List<Expr>> tupleDescToExprs = new HashMap<>();
     List<Expr> exprsWithUniqueTupleId = new ArrayList<>();
     for (Expr expr : groupingExprs) {
-      SlotRef slotRef = expr.unwrapSlotRef(true);
-      if (slotRef != null && slotRef.getDesc() != null
-          && slotRef.getDesc().getColumn() != null
-          && slotRef.getDesc().getType().isScalarType()) {
-        TupleId tupleId = slotRef.getDesc().getParent().getId();
-        tupleIdToExprs.putIfAbsent(tupleId, new ArrayList<>());
-        tupleIdToExprs.get(tupleId).add(expr);
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Slot {} match with tuple {}", slotRef.debugString(), tupleId);
-        }
+      TupleDescriptor tupleDesc = findSourceTupleId(expr);
+
+      if (tupleDesc != null) {
+        tupleDescToExprs.putIfAbsent(tupleDesc, new ArrayList<>());
+        tupleDescToExprs.get(tupleDesc).add(expr);
+        LOG.trace("Slot {} match with tuple {}", expr, tupleDesc.getId());
       } else {
         // expr is not a simple column SlotRef.
         exprsWithUniqueTupleId.add(expr);
       }
     }
 
-    // Remove expression group that only have a single element and move that
-    // expression into exprsWithUniqueTupleId.
-    for (Iterator<Map.Entry<TupleId, List<Expr>>> it =
-             tupleIdToExprs.entrySet().iterator();
-         it.hasNext();) {
-      Map.Entry<TupleId, List<Expr>> entry = it.next();
-      if (entry.getValue().size() == 1) {
-        exprsWithUniqueTupleId.addAll(entry.getValue());
-        it.remove();
-      }
-    }
-
-    // List of <outputCardinality, groupingExpressions> pairs.
-    // Note that outputCardinality can be -1.
-    List<Pair<Long, List<Expr>>> knownCardinalitySources = new ArrayList<>();
-
-    if (tupleIdToExprs.isEmpty()) {
+    boolean doneTraversal = false;
+    List<Long> tupleBasedNumGroups = new ArrayList<>();
+    if (tupleDescToExprs.isEmpty()) {
       Preconditions.checkState(exprsWithUniqueTupleId.size() == groupingExprs.size(),
           "Missing expression after TupleId analysis! Expect %s but found %s",
           groupingExprs.size(), exprsWithUniqueTupleId.size());
     } else {
       // Find cardinality of tuple that referenced by multiple expressions.
-      // Search the first PlanNode that materialize a specific tupleId
-      // (in other words, the lowest PlanNode in query plan tree).
-      // This is done by visiting all children nodes in post-order traversal so that
-      // the lowest PlanNode is inspected first.
-      List<PlanNode> postOrderNodes = planNode.getNodesPostOrder();
-      for (PlanNode childNode : postOrderNodes) {
-        for (TupleId id : childNode.getTupleIds()) {
-          List<Expr> exprs = tupleIdToExprs.get(id);
-          if (exprs != null) {
-            knownCardinalitySources.add(Pair.create(childNode.getCardinality(), exprs));
-            tupleIdToExprs.remove(id);
+      // Search the first PlanNode that materialize a specific tupleId.
+      // This is done by visiting all children ScanNodes or UnionNodes below planNode
+      // in post order fashion.
+      final Map<TupleId, PlanNode> producerNodes = new HashMap<>();
+      for (Map.Entry<TupleDescriptor, List<Expr>> entry : tupleDescToExprs.entrySet()) {
+        List<Expr> exprs = entry.getValue();
+        if (exprs.size() <= 1) {
+          // Move single expression to exprsWithUniqueTupleId.
+          exprsWithUniqueTupleId.addAll(exprs);
+          continue;
+        }
+
+        // Lazy load producerNodes map.
+        if (!doneTraversal) {
+          LOG.trace("Do tuple-based reduction for {}:AGGREGATE", planNode.getId());
+          planNode.postAccept(node -> {
+            if (node instanceof ScanNode || node instanceof UnionNode) {
+              PlanNode pNode = (PlanNode) node;
+              for (TupleId tupleId : pNode.tupleIds_) {
+                producerNodes.putIfAbsent(tupleId, pNode);
+              }
+            }
+          });
+          doneTraversal = true;
+        }
+
+        PlanNode producerNode = producerNodes.get(entry.getKey().getId());
+        if (producerNode == null) {
+          // Move expressions with unknown PlanNode origin to exprsWithUniqueTupleId.
+          exprsWithUniqueTupleId.addAll(exprs);
+        } else {
+          Preconditions.checkNotNull(exprs, "exprs must not be null");
+
+          // Find the maximum cardinality if conjunct is not applied.
+          // TODO: Use producerNode.getCardinality() directly if predicate selectivity
+          // is highly accurate (ie., histogram support from HIVE-26221).
+          long producerCardinality = -1;
+          if (producerNode.hasHardEstimates_ || producerNode instanceof UnionNode) {
+            // UnionNode cardinality is not impacted by its conjuncts_.
+            producerCardinality = producerNode.getCardinality();
+          } else {
+            // It is cheap to still account for limit.
+            producerCardinality =
+                producerNode.capCardinalityAtLimit(producerNode.getInputCardinality());
+          }
+
+          // Pick the minimum between NDV multiple of the expressions vs max
+          // cardinality of tuple.
+          Preconditions.checkState(!exprs.isEmpty(), "exprs must not be empty");
+          long ndvBasedNumGroup = estimateNumGroups(exprs, aggInputCardinality);
+          long numGroupFromCommonTuple =
+              smallestValidCardinality(producerCardinality, ndvBasedNumGroup);
+
+          if (numGroupFromCommonTuple < 0) {
+            // Can not reason about tuple cardinality.
+            // Move all exprs to exprsWithUniqueTupleId.
+            exprsWithUniqueTupleId.addAll(exprs);
+          } else {
+            tupleBasedNumGroups.add(numGroupFromCommonTuple);
           }
         }
-        if (tupleIdToExprs.isEmpty()) break;
       }
-      // Move any expression with unknown PlanNode origin to exprsWithUniqueTupleId.
-      for (Iterator<Map.Entry<TupleId, List<Expr>>> it =
-               tupleIdToExprs.entrySet().iterator();
-           it.hasNext();) {
-        Map.Entry<TupleId, List<Expr>> entry = it.next();
-        exprsWithUniqueTupleId.addAll(entry.getValue());
-        it.remove();
-      }
+    }
+
+    if (!doneTraversal) {
+      LOG.trace("No tuple-based reduction for {}:AGGREGATE", planNode.getId());
     }
 
     long numGroups = 1;
-    for (Pair<Long, List<Expr>> entry : knownCardinalitySources) {
-      // Pick the minimum between NDV multiple of the expressions vs cardinality
-      // of tuple.
-      long tupleCard = entry.getFirst();
-      long tupleNdv = estimateNumGroups(entry.getSecond(), aggInputCardinality);
-      long numGroupFromCommonTuple = smallestValidCardinality(tupleCard, tupleNdv);
-      if (numGroupFromCommonTuple < 0) {
-        // Can not reason about tuple cardinality.
-        // Fallback to the original estimation logic by moving all exprs to
-        // exprsWithUniqueTupleId.
-        exprsWithUniqueTupleId.addAll(entry.getSecond());
-      } else {
-        numGroups =
-            MathUtil.saturatingMultiplyCardinalites(numGroups, numGroupFromCommonTuple);
-      }
-    }
-    // numGroups should be non-negative at this point.
-    Preconditions.checkState(numGroups > -1, numGroups);
-
     if (!exprsWithUniqueTupleId.isEmpty()) {
-      long numGroupsForUniqueTuples =
-          estimateNumGroups(exprsWithUniqueTupleId, aggInputCardinality);
-      if (numGroupsForUniqueTuples < 0) {
-        numGroups = -1;
-      } else {
-        numGroups =
-            MathUtil.saturatingMultiplyCardinalites(numGroups, numGroupsForUniqueTuples);
-      }
+      numGroups = estimateNumGroups(exprsWithUniqueTupleId, aggInputCardinality);
+    }
+    if (numGroups < 0) return numGroups;
+    for (Long entry : tupleBasedNumGroups) {
+      numGroups = MathUtil.saturatingMultiply(numGroups, entry);
     }
     return smallestValidCardinality(numGroups, aggInputCardinality);
   }

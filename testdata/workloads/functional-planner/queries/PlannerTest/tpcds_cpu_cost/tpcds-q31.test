@@ -64,7 +64,7 @@ PLAN-ROOT SINK
 41:SORT
 |  order by: ca_county ASC
 |  mem-estimate=8192.00PB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=30 row-size=126B cardinality=3339304.17T cost=9223372036854775807
+|  tuple-ids=30 row-size=126B cardinality=9223372.04T cost=9223372036854775807
 |  in pipelines: 41(GETNEXT), 05(OPEN)
 |
 40:HASH JOIN [INNER JOIN]
@@ -72,15 +72,15 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  other predicates: CASE WHEN sum(ws_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ws_ext_sales_price) / sum(ws_ext_sales_price) ELSE NULL END > CASE WHEN sum(ss_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ss_ext_sales_price) / sum(ss_ext_sales_price) ELSE NULL END
 |  runtime filters: RF001[min_max] <- ca_county
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,8,13,18,23,28 row-size=300B cardinality=3339304.17T cost=609686924256267258
+|  mem-estimate=137.98MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3,8,13,18,23,28 row-size=300B cardinality=9223372.04T cost=3124868201677276432
 |  in pipelines: 05(GETNEXT), 35(OPEN)
 |
 |--35:AGGREGATE [FINALIZE]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=299319961
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=299319961
 |  |  in pipelines: 35(GETNEXT), 30(OPEN)
 |  |
 |  34:HASH JOIN [INNER JOIN]
@@ -139,15 +139,15 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  other predicates: CASE WHEN sum(ws_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ws_ext_sales_price) / sum(ws_ext_sales_price) ELSE NULL END > CASE WHEN sum(ss_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ss_ext_sales_price) / sum(ss_ext_sales_price) ELSE NULL END
 |  runtime filters: RF003[min_max] <- ca_county
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,8,13,18,23 row-size=250B cardinality=17953.25T cost=3277886689887450
+|  mem-estimate=137.98MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3,8,13,18,23 row-size=250B cardinality=5667029.98T cost=1028719904423318800
 |  in pipelines: 05(GETNEXT), 29(OPEN)
 |
 |--29:AGGREGATE [FINALIZE]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=299319961
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=299319961
 |  |  in pipelines: 29(GETNEXT), 24(OPEN)
 |  |
 |  28:HASH JOIN [INNER JOIN]
@@ -206,15 +206,15 @@ PLAN-ROOT SINK
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
 |  runtime filters: RF005[min_max] <- ca_county
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,8,13,18 row-size=200B cardinality=96.52T cost=17623047057450
+|  mem-estimate=137.98MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3,8,13,18 row-size=200B cardinality=7228.35T cost=1312142736662800
 |  in pipelines: 05(GETNEXT), 23(OPEN)
 |
 |--23:AGGREGATE [FINALIZE]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=299319961
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=299319961
 |  |  in pipelines: 23(GETNEXT), 18(OPEN)
 |  |
 |  22:HASH JOIN [INNER JOIN]
@@ -273,15 +273,15 @@ PLAN-ROOT SINK
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
 |  runtime filters: RF007[min_max] <- ca_county
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,8,13 row-size=150B cardinality=518.94G cost=94747902450
+|  mem-estimate=137.98MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3,8,13 row-size=150B cardinality=9.22T cost=1673652878800
 |  in pipelines: 05(GETNEXT), 17(OPEN)
 |
 |--17:AGGREGATE [FINALIZE]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=1177850292
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=1177850292
 |  |  in pipelines: 17(GETNEXT), 12(OPEN)
 |  |
 |  16:HASH JOIN [INNER JOIN]
@@ -340,15 +340,15 @@ PLAN-ROOT SINK
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
 |  runtime filters: RF009[min_max] <- ca_county
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,8 row-size=100B cardinality=2.79G cost=505974518
+|  mem-estimate=137.98MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3,8 row-size=100B cardinality=11.76G cost=2132709800
 |  in pipelines: 05(GETNEXT), 11(OPEN)
 |
 |--11:AGGREGATE [FINALIZE]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=1177850292
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=1177850292
 |  |  in pipelines: 11(GETNEXT), 06(OPEN)
 |  |
 |  10:HASH JOIN [INNER JOIN]
@@ -407,7 +407,7 @@ PLAN-ROOT SINK
 |  output: sum(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
 |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=1177850292
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=1177850292
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
 04:HASH JOIN [INNER JOIN]
@@ -462,7 +462,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=12B cardinality=881.05M(filtered from 8.64G) cost=152244752
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=4.88GB Threads=232
+Max Per-Host Resource Reservation: Memory=5.01GB Threads=232
 Per-Host Resource Estimates: Memory=8192.00PB
 F28:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=1.28GB mem-reservation=4.00MB thread-reservation=1
@@ -474,16 +474,16 @@ PLAN-ROOT SINK
 75:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_county ASC
 |  mem-estimate=1.19GB mem-reservation=0B thread-reservation=0
-|  tuple-ids=30 row-size=126B cardinality=3339304.17T cost=809527902572125440
+|  tuple-ids=30 row-size=126B cardinality=9223372.04T cost=2203463579604605952
 |  in pipelines: 41(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=3113.24PB mem-reservation=12.00MB thread-reservation=1
-max-parallelism=2147483640 segment-costs=[9223372036854775807, 591277494241003008] cpu-comparison-result=960 [max(120 (self) vs 960 (sum children))]
+Per-Instance Resources: mem-estimate=8192.00PB mem-reservation=12.00MB thread-reservation=1
+max-parallelism=2147483640 segment-costs=[9223372036854775807, 1207339399624290304] cpu-comparison-result=960 [max(120 (self) vs 960 (sum children))]
 41:SORT
 |  order by: ca_county ASC
-|  mem-estimate=3113.24PB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=30 row-size=126B cardinality=3339304.17T cost=9223372036854775807
+|  mem-estimate=8192.00PB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=30 row-size=126B cardinality=9223372.04T cost=9223372036854775807
 |  in pipelines: 41(GETNEXT), 45(OPEN)
 |
 40:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -491,47 +491,47 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
 |  other predicates: CASE WHEN sum(ws_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ws_ext_sales_price) / sum(ws_ext_sales_price) ELSE NULL END > CASE WHEN sum(ss_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ss_ext_sales_price) / sum(ss_ext_sales_price) ELSE NULL END
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13,18,23,28 row-size=300B cardinality=3339304.17T cost=609686924255927808
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13,18,23,28 row-size=300B cardinality=9223372.04T cost=3124868201675845632
 |  in pipelines: 45(GETNEXT), 73(OPEN)
 |
 |--F29:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF001[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  74:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 73(GETNEXT)
 |  |
 |  F27:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
 |  73:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 73(GETNEXT), 30(OPEN)
 |  |
 |  72:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F26:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=93.32MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=130 segment-costs=[1222372051, 1267069] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
+|  max-parallelism=130 segment-costs=[1222372051, 5340766] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
 |  35:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=78.71MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=1070365919
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=1070365919
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  34:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -633,47 +633,47 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
 |  other predicates: CASE WHEN sum(ws_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ws_ext_sales_price) / sum(ws_ext_sales_price) ELSE NULL END > CASE WHEN sum(ss_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ss_ext_sales_price) / sum(ss_ext_sales_price) ELSE NULL END
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13,18,23 row-size=250B cardinality=17953.25T cost=3277886689548000
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13,18,23 row-size=250B cardinality=5667029.98T cost=1028719904421888000
 |  in pipelines: 45(GETNEXT), 67(OPEN)
 |
 |--F32:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF003[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  68:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 67(GETNEXT)
 |  |
 |  F22:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
 |  67:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 67(GETNEXT), 24(OPEN)
 |  |
 |  66:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  F21:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=93.32MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=130 segment-costs=[1222372051, 1267069] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
+|  max-parallelism=130 segment-costs=[1222372051, 5340766] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
 |  29:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=78.71MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=1070365919
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=1070365919
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  28:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -775,47 +775,47 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash-table-id=06
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13,18 row-size=200B cardinality=96.52T cost=17623046718000
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13,18 row-size=200B cardinality=7228.35T cost=1312142735232000
 |  in pipelines: 45(GETNEXT), 61(OPEN)
 |
 |--F35:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF005[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  62:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 61(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
 |  61:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 61(GETNEXT), 18(OPEN)
 |  |
 |  60:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=93.32MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=130 segment-costs=[1222372051, 1267069] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
+|  max-parallelism=130 segment-costs=[1222372051, 5340766] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
 |  23:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=78.71MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=1070365919
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=1070365919
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  22:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -917,48 +917,48 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash-table-id=09
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13 row-size=150B cardinality=518.94G cost=94747563000
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13 row-size=150B cardinality=9.22T cost=1673651448000
 |  in pipelines: 45(GETNEXT), 55(OPEN)
 |
 |--F38:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF007[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  56:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 55(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  55:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 55(GETNEXT), 12(OPEN)
 |  |
 |  54:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-reservation=0 runtime-filters-memory=17.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=187 segment-costs=[2867229645, 1267069] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[2867229645, 5340766] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  17:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=1948896250
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=1948896250
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1051,48 +1051,48 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash-table-id=12
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8 row-size=100B cardinality=2.79G cost=505635068
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8 row-size=100B cardinality=11.76G cost=2131279000
 |  in pipelines: 45(GETNEXT), 49(OPEN)
 |
 |--F41:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=12 plan-id=13 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF009[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  51:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 49(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  49:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 49(GETNEXT), 06(OPEN)
 |  |
 |  48:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-reservation=0 runtime-filters-memory=17.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=187 segment-costs=[2867229645, 1267069] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[2867229645, 5340766] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  11:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=1948896250
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=1948896250
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  10:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1182,34 +1182,34 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |     in pipelines: 06(GETNEXT)
 |
 50:EXCHANGE [HASH(ca_county)]
-|  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=115726
+|  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=487791
 |  in pipelines: 45(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 45:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=2003637
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=8445440
 |  in pipelines: 45(GETNEXT), 00(OPEN)
 |
 44:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=115726
+|  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=487791
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-reservation=0 runtime-filters-memory=17.00MB
 Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=187 segment-costs=[2867229645, 1267069] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+max-parallelism=187 segment-costs=[2867229645, 5340766] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
 |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=1948896250
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=1948896250
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1298,7 +1298,7 @@ max-parallelism=187 segment-costs=[2867229645, 1267069] cpu-comparison-result=12
    tuple-ids=0 row-size=12B cardinality=881.05M(filtered from 8.64G) cost=152244752
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=4.88GB Threads=232
+Max Per-Host Resource Reservation: Memory=5.01GB Threads=232
 Per-Host Resource Estimates: Memory=8192.00PB
 F28:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=1.28GB mem-reservation=4.00MB thread-reservation=1
@@ -1310,16 +1310,16 @@ PLAN-ROOT SINK
 75:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_county ASC
 |  mem-estimate=1.19GB mem-reservation=0B thread-reservation=0
-|  tuple-ids=30 row-size=126B cardinality=3339304.17T cost=809527902572125440
+|  tuple-ids=30 row-size=126B cardinality=9223372.04T cost=2203463579604605952
 |  in pipelines: 41(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=3113.24PB mem-reservation=12.00MB thread-reservation=1
-max-parallelism=2147483640 segment-costs=[9223372036854775807, 591277494241003008] cpu-comparison-result=960 [max(120 (self) vs 960 (sum children))]
+Per-Instance Resources: mem-estimate=8192.00PB mem-reservation=12.00MB thread-reservation=1
+max-parallelism=2147483640 segment-costs=[9223372036854775807, 1207339399624290304] cpu-comparison-result=960 [max(120 (self) vs 960 (sum children))]
 41:SORT
 |  order by: ca_county ASC
-|  mem-estimate=3113.24PB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=30 row-size=126B cardinality=3339304.17T cost=9223372036854775807
+|  mem-estimate=8192.00PB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=30 row-size=126B cardinality=9223372.04T cost=9223372036854775807
 |  in pipelines: 41(GETNEXT), 45(OPEN)
 |
 40:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1327,47 +1327,47 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
 |  other predicates: CASE WHEN sum(ws_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ws_ext_sales_price) / sum(ws_ext_sales_price) ELSE NULL END > CASE WHEN sum(ss_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ss_ext_sales_price) / sum(ss_ext_sales_price) ELSE NULL END
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13,18,23,28 row-size=300B cardinality=3339304.17T cost=609686924255927808
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13,18,23,28 row-size=300B cardinality=9223372.04T cost=3124868201675845632
 |  in pipelines: 45(GETNEXT), 73(OPEN)
 |
 |--F29:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF001[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  74:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 73(GETNEXT)
 |  |
 |  F27:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
 |  73:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 73(GETNEXT), 30(OPEN)
 |  |
 |  72:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F26:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=93.32MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=130 segment-costs=[1222372051, 1267069] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
+|  max-parallelism=130 segment-costs=[1222372051, 5340766] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
 |  35:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=78.71MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=339.45K cost=1070365919
+|  |  tuple-ids=28 row-size=50B cardinality=1.43M cost=1070365919
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  34:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1469,47 +1469,47 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
 |  other predicates: CASE WHEN sum(ws_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ws_ext_sales_price) / sum(ws_ext_sales_price) ELSE NULL END > CASE WHEN sum(ss_ext_sales_price) > CAST(0 AS DECIMAL(3,0)) THEN sum(ss_ext_sales_price) / sum(ss_ext_sales_price) ELSE NULL END
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13,18,23 row-size=250B cardinality=17953.25T cost=3277886689548000
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13,18,23 row-size=250B cardinality=5667029.98T cost=1028719904421888000
 |  in pipelines: 45(GETNEXT), 67(OPEN)
 |
 |--F32:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF003[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  68:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 67(GETNEXT)
 |  |
 |  F22:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
 |  67:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 67(GETNEXT), 24(OPEN)
 |  |
 |  66:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  F21:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=93.32MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=130 segment-costs=[1222372051, 1267069] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
+|  max-parallelism=130 segment-costs=[1222372051, 5340766] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
 |  29:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=78.71MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=339.45K cost=1070365919
+|  |  tuple-ids=23 row-size=50B cardinality=1.43M cost=1070365919
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  28:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1611,47 +1611,47 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash-table-id=06
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13,18 row-size=200B cardinality=96.52T cost=17623046718000
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13,18 row-size=200B cardinality=7228.35T cost=1312142735232000
 |  in pipelines: 45(GETNEXT), 61(OPEN)
 |
 |--F35:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF005[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  62:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 61(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=200 [max(10 (self) vs 200 (sum children))]
 |  61:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 61(GETNEXT), 18(OPEN)
 |  |
 |  60:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=93.32MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=130 segment-costs=[1222372051, 1267069] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
+|  max-parallelism=130 segment-costs=[1222372051, 5340766] cpu-comparison-result=200 [max(200 (self) vs 141 (sum children))]
 |  23:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=78.71MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=339.45K cost=1070365919
+|  |  tuple-ids=18 row-size=50B cardinality=1.43M cost=1070365919
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  22:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1753,48 +1753,48 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash-table-id=09
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8,13 row-size=150B cardinality=518.94G cost=94747563000
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8,13 row-size=150B cardinality=9.22T cost=1673651448000
 |  in pipelines: 45(GETNEXT), 55(OPEN)
 |
 |--F38:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF007[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  56:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 55(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  55:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 55(GETNEXT), 12(OPEN)
 |  |
 |  54:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-reservation=0 runtime-filters-memory=17.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=187 segment-costs=[2867229645, 1267069] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[2867229645, 5340766] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  17:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=339.45K cost=1948896250
+|  |  tuple-ids=13 row-size=50B cardinality=1.43M cost=1948896250
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1887,48 +1887,48 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |  hash-table-id=12
 |  hash predicates: ca_county = ca_county
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3,8 row-size=100B cardinality=2.79G cost=505635068
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=3,8 row-size=100B cardinality=11.76G cost=2131279000
 |  in pipelines: 45(GETNEXT), 49(OPEN)
 |
 |--F41:PLAN FRAGMENT [HASH(ca_county)] hosts=10 instances=120
-|  |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=1.94MB thread-reservation=1
-|  |  max-parallelism=2147483640 segment-costs=[455176] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
+|  |  Per-Instance Resources: mem-estimate=10.22MB mem-reservation=2.88MB thread-reservation=1
+|  |  max-parallelism=2147483640 segment-costs=[1918591] cpu-comparison-result=120 [max(120 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=12 plan-id=13 cohort-id=01
 |  |  build expressions: ca_county
 |  |  runtime filters: RF009[min_max] <- ca_county
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=339450
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0 cost=1430800
 |  |
 |  51:EXCHANGE [HASH(ca_county)]
-|  |  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 49(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  49:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=2003637
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=8445440
 |  |  in pipelines: 49(GETNEXT), 06(OPEN)
 |  |
 |  48:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=115726
+|  |  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=487791
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 |  Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-reservation=0 runtime-filters-memory=17.00MB
 |  Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-|  max-parallelism=187 segment-costs=[2867229645, 1267069] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+|  max-parallelism=187 segment-costs=[2867229645, 5340766] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 |  11:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=339.45K cost=1948896250
+|  |  tuple-ids=8 row-size=50B cardinality=1.43M cost=1948896250
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  10:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2018,34 +2018,34 @@ max-parallelism=2147483640 segment-costs=[9223372036854775807, 59127749424100300
 |     in pipelines: 06(GETNEXT)
 |
 50:EXCHANGE [HASH(ca_county)]
-|  mem-estimate=2.14MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=115726
+|  mem-estimate=7.34MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=487791
 |  in pipelines: 45(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(ca_county,d_qoy,d_year)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=35.29MB mem-reservation=4.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[2119363, 1267069] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=42.29MB mem-reservation=17.00MB thread-reservation=1
+max-parallelism=10 segment-costs=[8933231, 5340766] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 45:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=2003637
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=8445440
 |  in pipelines: 45(GETNEXT), 00(OPEN)
 |
 44:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  mem-estimate=7.94MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=115726
+|  mem-estimate=13.14MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=487791
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-reservation=0 runtime-filters-memory=17.00MB
 Per-Instance Resources: mem-estimate=102.66MB mem-reservation=42.00MB thread-reservation=1
-max-parallelism=187 segment-costs=[2867229645, 1267069] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
+max-parallelism=187 segment-costs=[2867229645, 5340766] cpu-comparison-result=120 [max(120 (self) vs 31 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
 |  mem-estimate=84.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=339.45K cost=1948896250
+|  tuple-ids=3 row-size=50B cardinality=1.43M cost=1948896250
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

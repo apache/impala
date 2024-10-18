@@ -31,10 +31,10 @@ limit 100;
 # end query 20 in stream 0 using template query20.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=76.94MB Threads=1
-Per-Host Resource Estimates: Memory=813MB
+Per-Host Resource Estimates: Memory=829MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=812.84MB mem-reservation=76.94MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  max-parallelism=1 segment-costs=[197688508, 975545, 1126128, 700]
+|  Per-Instance Resources: mem-estimate=828.98MB mem-reservation=76.94MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  max-parallelism=1 segment-costs=[197688508, 3251818, 4106309, 700]
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_category, i_class, i_current_price, sum(cs_ext_sales_price), sum(cs_ext_sales_price) * CAST(100 AS DECIMAL(3,0)) / sum(sum(cs_ext_sales_price))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=700
@@ -42,27 +42,27 @@ PLAN-ROOT SINK
 08:TOP-N [LIMIT=100]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100 / sum(sum(cs_ext_sales_price)) ASC
 |  mem-estimate=20.93KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=214B cardinality=100 cost=1018128
+|  tuple-ids=5 row-size=214B cardinality=100 cost=3746309
 |  in pipelines: 08(GETNEXT), 06(OPEN)
 |
 07:ANALYTIC
 |  functions: sum(sum(cs_ext_sales_price))
 |  partition by: i_class
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=10,9 row-size=214B cardinality=108.00K cost=108000
+|  tuple-ids=10,9 row-size=214B cardinality=360.00K cost=360000
 |  in pipelines: 06(GETNEXT)
 |
 06:SORT
 |  order by: i_class ASC NULLS LAST
-|  mem-estimate=20.42MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=10 row-size=198B cardinality=108.00K cost=975545
+|  mem-estimate=68.08MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=10 row-size=198B cardinality=360.00K cost=3251818
 |  in pipelines: 06(GETNEXT), 05(OPEN)
 |
 05:AGGREGATE [FINALIZE]
 |  output: sum(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
 |  mem-estimate=754.90MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=129453102
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=129453102
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
 04:HASH JOIN [INNER JOIN]
@@ -119,8 +119,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=12B cardinality=73.14M(filtered from 4.32G) cost=12638882
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=172.12MB Threads=9
-Per-Host Resource Estimates: Memory=539MB
+Max Per-Host Resource Reservation: Memory=175.88MB Threads=9
+Per-Host Resource Estimates: Memory=547MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[768] cpu-comparison-result=25 [max(1 (self) vs 25 (sum children))]
@@ -136,56 +136,56 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(i_class)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=20.02MB mem-reservation=16.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[1086055, 1126128, 592] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=24.78MB mem-reservation=16.00MB thread-reservation=1
+max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100 / sum(sum(cs_ext_sales_price)) ASC
 |  mem-estimate=20.93KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=214B cardinality=100 cost=1018128
+|  tuple-ids=5 row-size=214B cardinality=100 cost=3746309
 |  in pipelines: 08(GETNEXT), 06(OPEN)
 |
 07:ANALYTIC
 |  functions: sum(sum(cs_ext_sales_price))
 |  partition by: i_class
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=10,9 row-size=214B cardinality=108.00K cost=108000
+|  tuple-ids=10,9 row-size=214B cardinality=360.00K cost=360000
 |  in pipelines: 06(GETNEXT)
 |
 06:SORT
 |  order by: i_class ASC NULLS LAST
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=10 row-size=198B cardinality=108.00K cost=975545
+|  tuple-ids=10 row-size=198B cardinality=360.00K cost=3251818
 |  in pipelines: 06(GETNEXT), 12(OPEN)
 |
 13:EXCHANGE [HASH(i_class)]
-|  mem-estimate=4.02MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=110510
+|  mem-estimate=8.78MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=368368
 |  in pipelines: 12(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=17.90MB mem-reservation=4.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[747990, 1434806] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=20.76MB mem-reservation=8.50MB thread-reservation=1
+max-parallelism=10 segment-costs=[2493304, 4782688] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=637480
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=2124936
 |  in pipelines: 12(GETNEXT), 00(OPEN)
 |
 11:EXCHANGE [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)]
-|  mem-estimate=5.99MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=110510
+|  mem-estimate=10.76MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=368368
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=188.84MB mem-reservation=35.00MB thread-reservation=1
-max-parallelism=20 segment-costs=[196840933, 1434806] cpu-comparison-result=25 [max(20 (self) vs 25 (sum children))]
+max-parallelism=20 segment-costs=[196840933, 4782688] cpu-comparison-result=25 [max(20 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
 |  mem-estimate=164.94MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=129453102
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=129453102
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -276,8 +276,8 @@ max-parallelism=20 segment-costs=[196840933, 1434806] cpu-comparison-result=25 [
    tuple-ids=0 row-size=12B cardinality=73.14M(filtered from 4.32G) cost=12638882
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=172.12MB Threads=9
-Per-Host Resource Estimates: Memory=539MB
+Max Per-Host Resource Reservation: Memory=175.88MB Threads=9
+Per-Host Resource Estimates: Memory=547MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[768] cpu-comparison-result=25 [max(1 (self) vs 25 (sum children))]
@@ -293,56 +293,56 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(i_class)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=20.02MB mem-reservation=16.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[1086055, 1126128, 592] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=24.78MB mem-reservation=16.00MB thread-reservation=1
+max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100 / sum(sum(cs_ext_sales_price)) ASC
 |  mem-estimate=20.93KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=214B cardinality=100 cost=1018128
+|  tuple-ids=5 row-size=214B cardinality=100 cost=3746309
 |  in pipelines: 08(GETNEXT), 06(OPEN)
 |
 07:ANALYTIC
 |  functions: sum(sum(cs_ext_sales_price))
 |  partition by: i_class
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=10,9 row-size=214B cardinality=108.00K cost=108000
+|  tuple-ids=10,9 row-size=214B cardinality=360.00K cost=360000
 |  in pipelines: 06(GETNEXT)
 |
 06:SORT
 |  order by: i_class ASC NULLS LAST
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=10 row-size=198B cardinality=108.00K cost=975545
+|  tuple-ids=10 row-size=198B cardinality=360.00K cost=3251818
 |  in pipelines: 06(GETNEXT), 12(OPEN)
 |
 13:EXCHANGE [HASH(i_class)]
-|  mem-estimate=4.02MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=110510
+|  mem-estimate=8.78MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=368368
 |  in pipelines: 12(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=17.90MB mem-reservation=4.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[747990, 1434806] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=20.76MB mem-reservation=8.50MB thread-reservation=1
+max-parallelism=10 segment-costs=[2493304, 4782688] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=637480
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=2124936
 |  in pipelines: 12(GETNEXT), 00(OPEN)
 |
 11:EXCHANGE [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)]
-|  mem-estimate=5.99MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=110510
+|  mem-estimate=10.76MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=368368
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=188.84MB mem-reservation=35.00MB thread-reservation=1
-max-parallelism=20 segment-costs=[196840933, 1434806] cpu-comparison-result=25 [max(20 (self) vs 25 (sum children))]
+max-parallelism=20 segment-costs=[196840933, 4782688] cpu-comparison-result=25 [max(20 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
 |  mem-estimate=164.94MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=108.00K cost=129453102
+|  tuple-ids=3 row-size=198B cardinality=360.00K cost=129453102
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

@@ -32,7 +32,6 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.Pair;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
