@@ -70,10 +70,8 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
       return ImpalaTypeConverter.getRelDataType(Type.TIMESTAMP);
     }
 
-    RelDataType type0 =
-        getOperandForArithmeticOpSqlOperatorBinding(opBinding, operandTypes, 0);
-    RelDataType type1 =
-        getOperandForArithmeticOpSqlOperatorBinding(opBinding, operandTypes, 1);
+    RelDataType type0 = CommonOperatorFunctions.getOperandType(opBinding, 0);
+    RelDataType type1 = CommonOperatorFunctions.getOperandType(opBinding, 1);
 
     RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
     ImpalaTypeSystemImpl typeSystemImpl =
@@ -81,33 +79,11 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
     return typeSystemImpl.deriveArithmeticType(typeFactory, type0, type1, op);
   };
 
-  private static RelDataType getOperandForArithmeticOpSqlOperatorBinding(
-      SqlOperatorBinding opBinding, List<RelDataType> operandTypes, int index) {
-    if (opBinding instanceof ExplicitOperatorBinding) {
-      return operandTypes.get(index);
-    } else if (opBinding.isOperandNull(index, true)) {
-      // for nulltypes, just assume smallest possible number type
-      return ImpalaTypeConverter.getRelDataType(Type.TINYINT);
-    } else if (operandTypes.get(index).getSqlTypeName().equals(SqlTypeName.INTEGER) &&
-        opBinding.isOperandLiteral(index, true)) {
-      // For literal types, currently Calcite treats all of them as INTEGERs. Impala
-      // requires the smallest possible type (e.g. 2 should be a TINYINT), and needs
-      // this to infer the proper return type. Note though: this method is only used
-      // for inferring the return type and not coercing the operand, which will stay
-      // an INTEGER for now. The operand will be coerced later in the compilation,
-      // under the coercenodes modules.
-      BigDecimal bd0 = opBinding.getOperandLiteralValue(index, BigDecimal.class);
-      RelDataType rdt =
-          ImpalaTypeConverter.getLiteralDataType(bd0, opBinding.getOperandType(index));
-      return rdt;
-    }
-
-    return opBinding.getOperandType(index);
-  }
-
   private static final Supplier<ImpalaCustomOperatorTable> INSTANCE =
       Suppliers.memoize(() ->
           (ImpalaCustomOperatorTable) new ImpalaCustomOperatorTable().init());
+
+  public static final SqlAggFunction AVG = new ImpalaAvgAggFunction();
 
   public static final SqlReturnTypeInference ADD_ADJUSTED_RETURN_TYPE = opBinding -> {
     return inferReturnTypeForArithmeticOps(opBinding, ArithmeticExpr.Operator.ADD);
@@ -218,6 +194,15 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
 
   public static final ImpalaGroupingFunction GROUPING =
       new ImpalaGroupingFunction();
+
+  public static final SqlAggFunction MIN =
+      new ImpalaMinMaxAggFunction(SqlKind.MIN);
+
+  public static final SqlAggFunction MAX =
+      new ImpalaMinMaxAggFunction(SqlKind.MAX);
+
+  public static final SqlAggFunction GROUPING_ID =
+      new ImpalaGroupingIdFunction();
 
   public static final SqlBinaryOperator CONCAT =
       new SqlBinaryOperator(

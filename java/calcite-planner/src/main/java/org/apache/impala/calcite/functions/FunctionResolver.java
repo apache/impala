@@ -27,6 +27,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Function;
@@ -83,6 +84,11 @@ public class FunctionResolver {
       .add(SqlKind.TIMES)
       .add(SqlKind.DIVIDE)
       .add(SqlKind.MOD)
+      .build();
+
+  public static Set<String> SPECIAL_PROCESSING_FUNCTIONS =
+      ImmutableSet.<String> builder()
+      .add("grouping_id")
       .build();
 
   public static Function getSupertypeFunction(RexCall call) {
@@ -163,6 +169,23 @@ public class FunctionResolver {
 
     List<Type> impalaArgTypes = getArgTypes(lowercaseName, argTypes, exactMatch);
 
+    return SPECIAL_PROCESSING_FUNCTIONS.contains(lowercaseName)
+        ? getSpecialProcessingFunction(lowercaseName, impalaArgTypes, exactMatch)
+        : getImpalaFunction(lowercaseName, impalaArgTypes, exactMatch);
+  }
+
+  private static Function getSpecialProcessingFunction(String lowercaseName,
+      List<Type> impalaArgTypes, boolean exactMatch) {
+    if (lowercaseName.equals("grouping_id")) {
+      return AggregateFunction.createRewrittenBuiltin(BuiltinsDb.getInstance(),
+          lowercaseName, impalaArgTypes, Type.BIGINT, true, false, true);
+    }
+
+    throw new RuntimeException("Special function not found: " + lowercaseName);
+  }
+
+  private static Function getImpalaFunction(String lowercaseName,
+      List<Type> impalaArgTypes, boolean exactMatch) {
     Function searchDesc = new Function(new FunctionName(BuiltinsDb.NAME, lowercaseName),
         impalaArgTypes, Type.INVALID, false);
 

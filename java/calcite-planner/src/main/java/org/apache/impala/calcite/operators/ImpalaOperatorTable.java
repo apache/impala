@@ -26,8 +26,10 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.util.ReflectiveSqlOperatorTable;
+import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function;
 
 import java.util.List;
 import java.util.Set;
@@ -69,6 +71,9 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       .add("minute")
       .add("second")
       .add("millisecond")
+      .add("corr")
+      .add("covar_pop")
+      .add("covar_samp")
       .build();
 
   private static ImpalaOperatorTable INSTANCE;
@@ -107,11 +112,16 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
     }
 
     // Check Impala Builtins for existence: TODO: IMPALA-13095: handle UDFs
-    if (!BuiltinsDb.getInstance().containsFunction(lowercaseOpName)) {
+    List<Function> functions = BuiltinsDb.getInstance().getFunctions(lowercaseOpName);
+    if (functions.size() == 0) {
       return;
     }
 
-    operatorList.add(new ImpalaOperator(opName.getSimple()));
+    SqlOperator impalaOp = (functions.get(0) instanceof AggregateFunction)
+        ? new ImpalaAggOperator(opName.getSimple())
+        : new ImpalaOperator(opName.getSimple());
+
+    operatorList.add(impalaOp);
   }
 
   public static synchronized void create(Db db) {

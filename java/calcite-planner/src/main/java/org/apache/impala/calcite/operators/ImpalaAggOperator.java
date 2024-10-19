@@ -19,6 +19,7 @@ package org.apache.impala.calcite.operators;
 
 import com.google.common.base.Preconditions;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
@@ -28,14 +29,14 @@ import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlSyntax;
 
 /**
- * ImpalaOperator is a custom Calcite operator that handles all generic functions
+ * ImpalaAggOperator is a custom Calcite operator that handles all generic functions
  * that are not defined by Calcite. It is preferable to use a Calcite operator
  * if possible because Calcite has optimizations that are based on the operator
- * class.
+ * class or SqlKind.
  */
-public class ImpalaOperator extends SqlFunction {
+public class ImpalaAggOperator extends SqlAggFunction {
 
-  public ImpalaOperator(String name) {
+  public ImpalaAggOperator(String name) {
     super(name.toUpperCase(), SqlKind.OTHER, null, null, null,
         SqlFunctionCategory.USER_DEFINED_FUNCTION);
   }
