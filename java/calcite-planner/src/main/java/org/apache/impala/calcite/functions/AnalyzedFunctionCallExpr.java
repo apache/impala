@@ -47,7 +47,7 @@ public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
   // resetAnalyzeState() method can be called at various points which could
   // set the fn_ member to null. So we save the function in the savedFunction_
   // variable so it can be properly set in analyzeImpl()
-  private final Function savedFunction_;
+  private Function savedFunction_;
 
   // c'tor that takes a list of Exprs that eventually get converted to FunctionParams
   public AnalyzedFunctionCallExpr(Function fn, List<Expr> params, Type retType) {
@@ -132,11 +132,11 @@ public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
           }
           fn_ = FunctionResolver.getExactFunction(getFnName().getFunction(),
               ImpalaTypeConverter.createRelDataTypes(operandTypes));
+          this.savedFunction_ = fn_;
           break;
       default:
         throw new AnalysisException("Unsupported aggregate function.");
       }
     }
   }
-
 }

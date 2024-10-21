@@ -192,6 +192,9 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   public static final ImpalaAdjustScaleFunction DTRUNC =
       new ImpalaAdjustScaleFunction("DTRUNC");
 
+  public static final ImpalaCoalesceFunction COALESCE =
+      new ImpalaCoalesceFunction();
+
   public static final ImpalaGroupingFunction GROUPING =
       new ImpalaGroupingFunction();
 

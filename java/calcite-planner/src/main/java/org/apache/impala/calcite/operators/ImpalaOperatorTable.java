@@ -74,6 +74,8 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       .add("corr")
       .add("covar_pop")
       .add("covar_samp")
+      .add("coalesce")
+      .add("lag")
       .build();
 
   private static ImpalaOperatorTable INSTANCE;

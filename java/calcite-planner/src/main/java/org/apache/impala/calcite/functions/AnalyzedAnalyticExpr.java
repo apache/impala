@@ -72,4 +72,14 @@ public class AnalyzedAnalyticExpr extends AnalyticExpr {
       }
     }
   }
+
+  // Overriding this method because a null literal may be created during the
+  // standardize() call and we want it to use the AnalyzedNullLiteral instead of
+  // base NullLiteral. The reason is that the base NullLiteral's
+  // resetAnalysisState() resets the type to NULL whereas we want any type that
+  // was previously assigned to the null literal to be preserved.
+  @Override
+  protected Expr createNullLiteral() {
+    return new AnalyzedNullLiteral(getFnCall().getParams().exprs().get(0).getType());
+  }
 }
