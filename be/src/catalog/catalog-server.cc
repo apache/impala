@@ -1221,6 +1221,8 @@ void CatalogServer::GetCatalogOpRecords(const TGetOperationUsageResponse& respon
       document);
   document->AddMember("inflight_catalog_operations", inflight_catalog_ops,
       document->GetAllocator());
+  document->AddMember("num_inflight_catalog_ops",
+      response.in_flight_catalog_operations.size(), document->GetAllocator());
   Value finished_catalog_ops(kArrayType);
   CatalogOpListToJson(response.finished_catalog_operations, &finished_catalog_ops,
       document);

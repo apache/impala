@@ -297,7 +297,8 @@ class TestWebPage(CustomClusterTestSuite):
     assert response.status_code == requests.codes.ok
     operations = json.loads(response.text)
     assert "inflight_catalog_operations" in operations
-    return operations["inflight_catalog_operations"]
+    assert "num_inflight_catalog_ops" in operations
+    return operations
 
   @staticmethod
   def _get_finished_catalog_operations():
@@ -377,7 +378,9 @@ class TestWebPage(CustomClusterTestSuite):
       assert "RPC recv timed out" in str(e)
     # In impalad side, the query fails by the above error. However, in catalogd side,
     # the RPCs are still running. Check the in-flight operations.
-    inflight_operations = self._get_inflight_catalog_operations()
+    operations = self._get_inflight_catalog_operations()
+    assert operations["num_inflight_catalog_ops"] == 2
+    inflight_operations = operations["inflight_catalog_operations"]
     assert len(inflight_operations) == 2
     for op in inflight_operations:
       assert op["status"] == "STARTED"
@@ -387,7 +390,7 @@ class TestWebPage(CustomClusterTestSuite):
     assert inflight_operations[0]["thread_id"] != inflight_operations[1]["thread_id"]
 
     # Wait until the catalog operations finish
-    while len(self._get_inflight_catalog_operations()) != 0:
+    while self._get_inflight_catalog_operations()["num_inflight_catalog_ops"] != 0:
       time.sleep(1)
 
     # Verify both RPC attempts are shown as finished operations.
