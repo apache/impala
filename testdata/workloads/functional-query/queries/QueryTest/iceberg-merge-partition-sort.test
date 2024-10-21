@@ -1,0 +1,120 @@
+====
+---- QUERY
+# Table creation and initial data loading
+create table target_part_sort(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  partitioned by spec (bucket(5, int_col), truncate(3, decimal_col), year(date_col), truncate(3, string_col))
+  sort by (int_col)
+  stored as iceberg tblproperties("format-version"="2") ;
+
+create table source(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  stored as iceberg tblproperties("format-version"="2");
+
+insert into source select id, bool_col, int_col,
+  float_col, cast(bigint_col as decimal(20,0)), to_date(timestamp_col),
+  string_col from functional.alltypes order by id limit 7;
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as an inline view
+# using inserts as the target table is empty
+merge into target_part_sort target using (select * from source) source on target.id = source.id
+when not matched and source.id % 2 = 0 then insert values(
+    cast(source.id + 1000 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, 'constant string value')
+when not matched then insert values(
+    cast(source.id + 2000 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, concat(source.string_col, " case 2"))
+---- DML_RESULTS: target_part_sort
+1000,true,0,0,0,2009-01-01,'constant string value'
+1002,true,2,2.200000047683716,20,2009-01-01,'constant string value'
+1004,true,4,4.400000095367432,40,2009-01-01,'constant string value'
+1006,true,6,6.599999904632568,60,2009-01-01,'constant string value'
+2001,false,1,1.100000023841858,10,2009-01-01,'1 case 2'
+2003,false,3,3.299999952316284,30,2009-01-01,'3 case 2'
+2005,false,5,5.5,50,2009-01-01,'5 case 2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as
+# an union of inline views duplicating the source rows
+# causing query abortion on the backend
+merge into target_part_sort target using (select * from source union all select * from source) source on target.id = source.id + 1002
+when not matched by target then insert values(
+    cast(source.id + 1000 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, 'constant string value')
+---- CATCH
+Duplicate row found
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as
+# an inline view using an update to combine target and source values as a source value
+merge into target_part_sort target using (select * from source) source on target.id = source.id + 1000
+when matched then update set float_col = cast(target.float_col + source.float_col as float)
+---- DML_RESULTS: target_part_sort
+1000,true,0,0,0,2009-01-01,'constant string value'
+1002,true,2,4.400000095367432,20,2009-01-01,'constant string value'
+1004,true,4,8.8000001907348632,40,2009-01-01,'constant string value'
+1006,true,6,13.19999980926514,60,2009-01-01,'constant string value'
+2001,false,1,1.100000023841858,10,2009-01-01,'1 case 2'
+2003,false,3,3.299999952316284,30,2009-01-01,'3 case 2'
+2005,false,5,5.5,50,2009-01-01,'5 case 2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table as
+# an inline view using an update to combine target and source values as a source value
+# using join condition on string columns
+merge into target_part_sort target using (select * from source) source on target.string_col = concat(source.string_col, ' case 2')
+when matched then update set float_col = cast(target.float_col + source.float_col as float)
+---- DML_RESULTS: target_part_sort
+1000,true,0,0,0,2009-01-01,'constant string value'
+1002,true,2,4.400000095367432,20,2009-01-01,'constant string value'
+1004,true,4,8.8000001907348632,40,2009-01-01,'constant string value'
+1006,true,6,13.19999980926514,60,2009-01-01,'constant string value'
+2001,false,1,2.200000047683716,10,2009-01-01,'1 case 2'
+2003,false,3,6.599999904632568,30,2009-01-01,'3 case 2'
+2005,false,5,11,50,2009-01-01,'5 case 2'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned and sorted target table from the source table
+# using all permutation of merge clauses (with an unconditional delete)
+merge into target_part_sort target using
+(select id, bool_col, int_col, float_col, decimal_col, date_col, string_col from source union all
+ select cast(id + 2000 as int), bool_col, int_col, float_col, decimal_col, date_col, string_col from source) source
+on target.id = source.id
+when not matched by target and source.id = 2006 then insert values (source.id, source.bool_col, source.int_col, source.float_col, source.decimal_col, source.date_col, "first")
+when not matched then insert values (source.id, source.bool_col, source.int_col, source.float_col, source.decimal_col, source.date_col, "second")
+when matched and target.id = 2005 then update set string_col = "third"
+when matched and target.id = 2003 then delete
+when matched then delete
+when not matched by source and target.id = 1000 then update set string_col = "fourth", decimal_col = 1000000
+when not matched by source then update set string_col = "fifth", float_col = -683925235.2
+---- DML_RESULTS: target_part_sort
+0,true,0,0,0,2009-01-01,'second'
+1,false,1,1.100000023841858,10,2009-01-01,'second'
+2,true,2,2.200000047683716,20,2009-01-01,'second'
+3,false,3,3.299999952316284,30,2009-01-01,'second'
+4,true,4,4.400000095367432,40,2009-01-01,'second'
+5,false,5,5.5,50,2009-01-01,'second'
+6,true,6,6.599999904632568,60,2009-01-01,'second'
+1000,true,0,0,1000000,2009-01-01,'fourth'
+1002,true,2,-683925248,20,2009-01-01,'fifth'
+1004,true,4,-683925248,40,2009-01-01,'fifth'
+1006,true,6,-683925248,60,2009-01-01,'fifth'
+2000,true,0,0,0,2009-01-01,'second'
+2002,true,2,2.200000047683716,20,2009-01-01,'second'
+2004,true,4,4.400000095367432,40,2009-01-01,'second'
+2005,false,5,11,50,2009-01-01,'third'
+2006,true,6,6.599999904632568,60,2009-01-01,'first'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+

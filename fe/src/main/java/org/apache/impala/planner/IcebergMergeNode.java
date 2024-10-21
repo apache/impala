@@ -68,7 +68,8 @@ public class IcebergMergeNode extends PlanNode {
     List<TIcebergMergeCase> mergeCases = new ArrayList<>();
     for (MergeCase mergeCase : cases_) {
       TIcebergMergeCase tMergeCase = new TIcebergMergeCase(
-          Expr.treesToThrift(mergeCase.getResultExprs()), mergeCase.caseType());
+          Expr.treesToThrift(mergeCase.getResultExprs()), mergeCase.caseType(),
+          mergeCase.matchType());
       if (!mergeCase.getFilterExprs().isEmpty()) {
         tMergeCase.setFilter_conjuncts(Expr.treesToThrift(mergeCase.getFilterExprs()));
       }
@@ -134,7 +135,7 @@ public class IcebergMergeNode extends PlanNode {
     for (int i = 0; i < cases_.size(); i++) {
       MergeCase mergeCase = cases_.get(i);
       joiner.add(String.format("%sCASE %d: %s", detailPrefix, i,
-          cases_.get(i).matchType().value()));
+          cases_.get(i).matchTypeAsString()));
       for (String detail : mergeCase.getExplainStrings(detailLevel)) {
         joiner.add(String.format("%s%s%s", detailPrefix, detailPrefix, detail));
       }

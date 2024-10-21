@@ -26,6 +26,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TMergeCaseType;
+import org.apache.impala.thrift.TMergeMatchType;
 
 /**
  * Base class for different merge cases in MERGE statements. Each merge case
@@ -40,25 +41,29 @@ public abstract class MergeCase extends StatementBase {
   protected TableName targetTableName_;
   protected List<Column> targetTableColumns_;
   protected TableRef targetTableRef_;
+  protected TMergeMatchType matchType_;
 
   protected MergeCase() {
+    matchType_ = TMergeMatchType.MATCHED;
     filterExprs_ = Collections.emptyList();
     resultExprs_ = Collections.emptyList();
   }
 
   protected MergeCase(List<Expr> resultExprs, List<Expr> filterExprs,
       TableName targetTableName, List<Column> targetTableColumns,
-      TableRef targetTableRef) {
+      TableRef targetTableRef, TMergeMatchType matchType) {
     targetTableName_ = targetTableName;
     targetTableColumns_ = targetTableColumns;
     targetTableRef_ = targetTableRef;
     resultExprs_ = resultExprs;
     filterExprs_ = filterExprs;
+    matchType_ = matchType;
   }
 
   public List<Expr> getFilterExprs() { return filterExprs_; }
 
   public void setFilterExprs(List<Expr> exprs) { filterExprs_ = exprs; }
+  public void setMatchType(TMergeMatchType matchType) { matchType_ = matchType; }
 
   public void setParent(MergeStmt parent) {
     targetTableName_ = parent.getTargetTable().getTableName();
@@ -101,7 +106,7 @@ public abstract class MergeCase extends StatementBase {
   public String toSql(ToSqlOptions options) {
     StringBuilder builder = new StringBuilder();
     builder.append("WHEN ");
-    builder.append(matchType().value());
+    builder.append(matchTypeAsString());
     if (!filterExprs_.isEmpty()) {
       StringJoiner expressionJoiner = new StringJoiner(" AND ");
       builder.append(" AND ");
@@ -127,15 +132,23 @@ public abstract class MergeCase extends StatementBase {
   @Override
   public List<Expr> getResultExprs() { return resultExprs_; }
 
-  public enum MatchType {
-    MATCHED("MATCHED"),
-    NOT_MATCHED("NOT MATCHED");
-
-    private final String value_;
-
-    MatchType(String value) { value_ = value; }
-    public String value() { return value_; }
+  public TMergeMatchType matchType(){
+    return matchType_;
   }
-  public abstract MatchType matchType();
+
+  public String matchTypeAsString() {
+    switch (matchType_) {
+      case MATCHED:
+        return "MATCHED";
+      case NOT_MATCHED_BY_TARGET:
+        return "NOT MATCHED BY TARGET";
+      case NOT_MATCHED_BY_SOURCE:
+        return "NOT MATCHED BY SOURCE";
+      default:
+        throw new IllegalStateException(
+            String.format("Invalid TMergeMatchType value: %s", matchType_));
+    }
+  }
+
   public abstract TMergeCaseType caseType();
 }

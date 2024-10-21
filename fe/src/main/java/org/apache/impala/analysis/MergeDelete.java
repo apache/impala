@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TMergeCaseType;
+import org.apache.impala.thrift.TMergeMatchType;
 
 /**
  * Delete clause for MERGE statement. This clause does not have any extra clauses, it
@@ -38,8 +39,9 @@ public class MergeDelete extends MergeCase {
 
   protected MergeDelete(List<Expr> resultExprs, List<Expr> filterExprs,
       TableName targetTableName, List<Column> targetTableColumns,
-      TableRef targetTableRef) {
-    super(resultExprs, filterExprs, targetTableName, targetTableColumns, targetTableRef);
+      TableRef targetTableRef, TMergeMatchType matchType) {
+    super(resultExprs, filterExprs, targetTableName, targetTableColumns, targetTableRef,
+        matchType);
   }
 
   @Override
@@ -61,16 +63,11 @@ public class MergeDelete extends MergeCase {
   }
 
   @Override
-  public MatchType matchType() {
-    return MatchType.MATCHED;
-  }
-
-  @Override
   public TMergeCaseType caseType() { return TMergeCaseType.DELETE; }
 
   @Override
   public MergeDelete clone() {
     return new MergeDelete(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
-        targetTableName_, targetTableColumns_, targetTableRef_);
+        targetTableName_, targetTableColumns_, targetTableRef_, matchType_);
   }
 }

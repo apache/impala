@@ -26,6 +26,7 @@ import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.thrift.TMergeCaseType;
+import org.apache.impala.thrift.TMergeMatchType;
 import org.apache.impala.thrift.TSortingOrder;
 
 /**
@@ -163,8 +164,8 @@ public class MergeStmt extends DmlStatementBase {
   public List<MergeCase> getCases() { return cases_; }
 
   public boolean hasOnlyMatchedCases() {
-    return cases_.stream().noneMatch(
-        mergeCase -> mergeCase.caseType().equals(TMergeCaseType.INSERT));
+    return cases_.stream().allMatch(mergeCase -> mergeCase.matchType().equals(
+        TMergeMatchType.MATCHED));
   }
 
   public boolean hasOnlyInsertCases() {

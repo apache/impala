@@ -1989,6 +1989,12 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_merge(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-merge', vector, unique_database)
 
+  def test_merge_partition(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-merge-partition', vector, unique_database)
+
+  def test_merge_partition_sort(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-merge-partition-sort', vector, unique_database)
+
   def test_merge_long(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-merge-long', vector, unique_database)
 

@@ -33,7 +33,6 @@
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
-#include "runtime/types.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 
@@ -70,7 +69,8 @@ Status IcebergMergeCasePlan::Init(const TIcebergMergeCase& tmerge_case,
       tmerge_case.output_expressions, *row_desc, state, pool, &output_exprs_));
   RETURN_IF_ERROR(ScalarExpr::Create(
       tmerge_case.filter_conjuncts, *row_desc, state, pool, &filter_conjuncts_));
-  type_ = tmerge_case.type;
+  case_type_ = tmerge_case.type;
+  match_type_ = tmerge_case.match_type;
   return Status::OK();
 }
 
@@ -97,10 +97,17 @@ IcebergMergeNode::IcebergMergeNode(
 
   for (auto* merge_case_plan : pnode.merge_case_plans_) {
     auto merge_case = pool->Add(new IcebergMergeCase(merge_case_plan));
-    if (merge_case->IsMatchedCase()) {
-      matched_cases_.push_back(merge_case);
-    } else {
-      not_matched_cases_.push_back(merge_case);
+    all_cases_.push_back(merge_case);
+    switch (merge_case->match_type_) {
+      case TMergeMatchType::MATCHED:
+        matched_cases_.push_back(merge_case);
+        break;
+      case TMergeMatchType::NOT_MATCHED_BY_TARGET:
+        not_matched_by_target_cases_.push_back(merge_case);
+        break;
+      case TMergeMatchType::NOT_MATCHED_BY_SOURCE:
+        not_matched_by_source_cases_.push_back(merge_case);
+        break;
     }
   }
 }
@@ -120,10 +127,7 @@ Status IcebergMergeNode::Prepare(RuntimeState* state) {
       ScalarExprEvaluator::Create(partition_meta_exprs_, state, state->obj_pool(),
           expr_perm_pool_.get(), expr_results_pool_.get(), &partition_meta_evaluators_));
 
-  for (auto* merge_case : matched_cases_) {
-    RETURN_IF_ERROR(merge_case->Prepare(state, *this));
-  }
-  for (auto* merge_case : not_matched_cases_) {
+  for (auto* merge_case : all_cases_) {
     RETURN_IF_ERROR(merge_case->Prepare(state, *this));
   }
 
@@ -142,10 +146,7 @@ Status IcebergMergeNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(position_meta_evaluators_, state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(partition_meta_evaluators_, state));
 
-  for (auto* merge_case : matched_cases_) {
-    RETURN_IF_ERROR(merge_case->Open(state));
-  }
-  for (auto* merge_case : not_matched_cases_) {
+  for (auto* merge_case : all_cases_) {
     RETURN_IF_ERROR(merge_case->Open(state));
   }
 
@@ -185,33 +186,45 @@ Status IcebergMergeNode::EvaluateCases(RowBatch* output_batch) {
     }
     previous_row_target_tuple_ = row->GetTuple(target_tuple_idx_);
 
-    auto row_present = row_present_evaluator_->GetTinyIntVal(row);
+    auto row_present = row_present_evaluator_->GetTinyIntVal(row).val;
     IcebergMergeCase* selected_case = nullptr;
 
-    if (row_present == TIcebergMergeRowPresent::BOTH) { // Matches
-      for (auto* matched_case : matched_cases_) {
-        if (EvalConjuncts(matched_case->filter_evaluators_.data(),
-                matched_case->filter_evaluators_.size(), row)) {
-          selected_case = matched_case;
-          break;
-        }
+
+    std::vector<IcebergMergeCase*>* cases = nullptr;
+    switch (row_present) {
+      case TIcebergMergeRowPresent::BOTH: {
+        cases = &matched_cases_;
+        break;
+      }
+      case TIcebergMergeRowPresent::SOURCE: {
+        cases = &not_matched_by_target_cases_;
+        break;
+      }
+      case TIcebergMergeRowPresent::TARGET: {
+        cases = &not_matched_by_source_cases_;
+        break;
+      }
+      default:
+        return Status("Invalid row presence value in MERGE statement's result set.");
+    }
+    for (auto* merge_case : *cases) {
+      if (CheckCase(merge_case, row)) {
+        selected_case = merge_case;
+        break;
       }
     }
-    if (row_present == TIcebergMergeRowPresent::SOURCE) { // Not matches
-      for (auto* not_matched_case : not_matched_cases_) {
-        if (EvalConjuncts(not_matched_case->filter_evaluators_.data(),
-                not_matched_case->filter_evaluators_.size(), row)) {
-          selected_case = not_matched_case;
-          break;
-        }
-      }
-    }
+
     if (!selected_case) continue;
     // Add a new row to output_batch
     AddRow(output_batch, selected_case, row);
     if (ReachedLimit() || output_batch->AtCapacity()) return Status::OK();
   }
   return Status::OK();
+}
+
+bool IcebergMergeNode::CheckCase(const IcebergMergeCase* merge_case, TupleRow* row) {
+  return EvalConjuncts(
+      merge_case->filter_evaluators_.data(), merge_case->filter_evaluators_.size(), row);
 }
 
 void IcebergMergeNode::AddRow(
@@ -264,11 +277,8 @@ Status IcebergMergeNode::Reset(RuntimeState* state, RowBatch* row_batch) {
 void IcebergMergeNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   child_row_batch_.reset();
-  for (auto matched_case : matched_cases_) {
-    matched_case->Close(state);
-  }
-  for (auto not_matched_case : not_matched_cases_) {
-    not_matched_case->Close(state);
+  for (auto merge_case : all_cases_) {
+    merge_case->Close(state);
   }
   row_present_evaluator_->Close(state);
   ScalarExprEvaluator::Close(position_meta_evaluators_, state);
@@ -287,7 +297,8 @@ const std::vector<ScalarExprEvaluator*>& IcebergMergeNode::PartitionMetaEvals() 
 IcebergMergeCase::IcebergMergeCase(const IcebergMergeCasePlan* merge_case_plan)
   : filter_conjuncts_(merge_case_plan->filter_conjuncts_),
     output_exprs_(merge_case_plan->output_exprs_),
-    type_(merge_case_plan->type_) {}
+    case_type_(merge_case_plan->case_type_),
+    match_type_(merge_case_plan->match_type_) {}
 
 Status IcebergMergeCase::Prepare(RuntimeState* state, IcebergMergeNode& parent) {
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(output_exprs_, state, state->obj_pool(),

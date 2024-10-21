@@ -29,6 +29,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TMergeCaseType;
+import org.apache.impala.thrift.TMergeMatchType;
 
 public class MergeUpdate extends MergeCase {
   private final List<Pair<SlotRef, Expr>> assignmentExprs_;
@@ -39,8 +40,9 @@ public class MergeUpdate extends MergeCase {
 
   protected MergeUpdate(List<Expr> resultExprs, List<Expr> filterExprs,
       TableName targetTableName, List<Column> targetTableColumns, TableRef targetTableRef,
-      List<Pair<SlotRef, Expr>> assignmentExprs) {
-    super(resultExprs, filterExprs, targetTableName, targetTableColumns, targetTableRef);
+      TMergeMatchType matchType, List<Pair<SlotRef, Expr>> assignmentExprs) {
+    super(resultExprs, filterExprs, targetTableName, targetTableColumns, targetTableRef,
+        matchType);
     assignmentExprs_ = assignmentExprs;
   }
 
@@ -94,9 +96,6 @@ public class MergeUpdate extends MergeCase {
   }
 
   @Override
-  public MatchType matchType() { return MatchType.MATCHED; }
-
-  @Override
   public TMergeCaseType caseType() { return TMergeCaseType.UPDATE; }
 
   /**
@@ -125,6 +124,7 @@ public class MergeUpdate extends MergeCase {
   @Override
   public MergeUpdate clone() {
     return new MergeUpdate(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
-        targetTableName_, targetTableColumns_, targetTableRef_, assignmentExprs_);
+        targetTableName_, targetTableColumns_, targetTableRef_, matchType_,
+        assignmentExprs_);
   }
 }

@@ -2009,6 +2009,19 @@ public class ParserTest extends FrontendTestBase {
         + "then update set t.a = s.a");
     ParsesOk("merge into t using s on t.id = s.id when not matched "
         + "then insert values(a,b,c)");
+    ParsesOk("merge into t using s on t.id = s.id when not matched by target "
+        + "then insert values(a,b,c)");
+    ParsesOk("merge into t using s on t.id = s.id when not matched by target "
+        + "and t.a > 10 then insert values(a,b,c)");
+    ParsesOk("merge into t using s on t.id = s.id when not matched by source "
+        + "then delete");
+    ParsesOk("merge into t using s on t.id = s.id when not matched by source "
+        + "and funcn(a) > 10 then delete");
+    ParsesOk("merge into t using s on t.id = s.id when not matched by source "
+        + "then update set b = 12");
+    ParsesOk("merge into t using s on t.id = s.id when not matched by source "
+        + "and func(b) != func(a) then update set b = 12");
+
 
     ParserError("merge into t using s on t.id = s.id "
         + "when matched and t.a > s.b then delete from");
@@ -2018,6 +2031,18 @@ public class ParserTest extends FrontendTestBase {
         + "when not matched and t.a > s.b then update set a = b");
     ParserError("merge into t using s on t.id = s.id "
         + "when not matched and t.a > s.b then delete");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched by target then delete");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched by target and a = 1 then delete");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched by target then update set b = a");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched by target and x = y then update set b = a, c = d");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched by source then insert values (1, 2, 3)");
+    ParserError("merge into t using s on t.id = s.id "
+        + "when not matched by source and a <> b then insert values (1, 2, 3)");
 
     // Invalid column permutation
     ParserError("merge into target t using (select * from source) s "

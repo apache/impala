@@ -732,6 +732,12 @@ enum TMergeCaseType {
   DELETE = 2
 }
 
+enum TMergeMatchType {
+  MATCHED = 0
+  NOT_MATCHED_BY_TARGET = 1
+  NOT_MATCHED_BY_SOURCE = 2
+}
+
 enum TIcebergMergeRowPresent {
   BOTH = 0
   SOURCE = 1
@@ -746,6 +752,7 @@ struct TIcebergMergeCase {
   2: optional list<Exprs.TExpr> filter_conjuncts
   // Type of the merge case that reflects the operation in it.
   3: required TMergeCaseType type
+  4: required TMergeMatchType match_type
 }
 
 struct TIcebergMergeNode {

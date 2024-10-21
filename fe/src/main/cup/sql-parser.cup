@@ -65,6 +65,8 @@ import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.thrift.TMergeCaseType;
+import org.apache.impala.thrift.TMergeMatchType;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.common.NotImplementedException;
@@ -469,10 +471,11 @@ nonterminal List<MergeCase> merge_case_list;
 nonterminal MergeCase merge_case;
 nonterminal MergeCase merge_when_matched;
 nonterminal MergeCase merge_when_not_matched;
-nonterminal MergeCase merge_matched;
+nonterminal MergeCase merge_update_and_delete;
 nonterminal MergeUpdate merge_update;
 nonterminal MergeDelete merge_delete;
 nonterminal MergeInsert merge_insert;
+nonterminal List<Expr> merge_then;
 nonterminal OptimizeStmt optimize_stmt;
 nonterminal List<Pair<SlotRef, Expr>> update_set_expr_list;
 nonterminal StatementBase explain_stmt;
@@ -607,6 +610,7 @@ nonterminal Boolean server_ident;
 nonterminal Boolean source_ident;
 nonterminal Boolean sources_ident;
 nonterminal Boolean uri_ident;
+nonterminal String target_or_source_ident;
 nonterminal testcase_ident;
 
 // For Create/Drop/Show function ddl
@@ -1042,24 +1046,54 @@ merge_case ::=
   {: RESULT = not_matched; :};
 
 merge_when_matched ::=
-  KW_WHEN KW_MATCHED KW_THEN merge_matched:matched
-  {: RESULT = matched; :}
-  | KW_WHEN KW_MATCHED KW_AND expr_list:exprs KW_THEN merge_matched:matched
+  KW_WHEN KW_MATCHED merge_then:exprs merge_update_and_delete:matched
   {:
     matched.setFilterExprs(exprs);
     RESULT = matched;
   :};
 
 merge_when_not_matched ::=
-  KW_WHEN KW_NOT KW_MATCHED KW_THEN merge_insert:insert
-  {: RESULT = insert; :}
-  | KW_WHEN KW_NOT KW_MATCHED KW_AND expr_list:exprs KW_THEN merge_insert:insert
+  KW_WHEN KW_NOT KW_MATCHED merge_then:exprs merge_insert:insert
   {:
     insert.setFilterExprs(exprs);
+    insert.setMatchType(TMergeMatchType.NOT_MATCHED_BY_TARGET);
     RESULT = insert;
+  :}
+  | KW_WHEN KW_NOT KW_MATCHED KW_BY target_or_source_ident:target_or_source merge_then:exprs merge_insert:insert
+  {:
+    // User wrote WHEN NOT MATCHED BY SOURCE with INSERT operation
+    // which doesn't make sense, as there is nothing to insert.
+    if (target_or_source.equals("SOURCE")) {
+      parser.parseError("SOURCE", SqlParserSymbols.KW_INSERT, "UPDATE, DELETE");
+    }
+    insert.setFilterExprs(exprs);
+    insert.setMatchType(TMergeMatchType.NOT_MATCHED_BY_TARGET);
+    RESULT = insert;
+  :}
+  | KW_WHEN KW_NOT KW_MATCHED KW_BY target_or_source_ident:target_or_source merge_then:exprs merge_update_and_delete:matched
+  {:
+    // User wrote WHEN NOT MATCHED BY TARGET with DELETE/UPDATE operation
+    // which doesn't make sense, as there is nothing to delete/update.
+    if (target_or_source.equals("TARGET")) {
+      int kw = SqlParserSymbols.KW_DELETE;
+      if (matched.caseType().equals(TMergeCaseType.UPDATE)) {
+        kw = SqlParserSymbols.KW_UPDATE;
+      }
+      parser.parseError("TARGET", kw, "INSERT");
+    }
+    matched.setMatchType(TMergeMatchType.NOT_MATCHED_BY_SOURCE);
+    matched.setFilterExprs(exprs);
+    RESULT = matched;
   :};
 
-merge_matched ::=
+merge_then ::=
+  KW_AND expr_list:exprs KW_THEN
+  {: RESULT = exprs; :}
+  |
+  KW_THEN
+  {: RESULT = Collections.emptyList(); :};
+
+merge_update_and_delete ::=
   merge_update:update
   {: RESULT = update; :}
   | merge_delete:delete
@@ -2489,6 +2523,17 @@ testcase_ident ::=
     if (!ident.toUpperCase().equals("TESTCASE")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "TESTCASE");
     }
+  :}
+  ;
+
+target_or_source_ident ::=
+  IDENT:ident
+  {:
+    String targetOrSource = ident.toUpperCase();
+    if (!targetOrSource.equals("TARGET") && !targetOrSource.equals("SOURCE")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "TARGET, SOURCE");
+    }
+    RESULT = targetOrSource;
   :}
   ;
 

@@ -63,7 +63,7 @@ when not matched then insert values(source.id, source.user)
 WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |
 03:MERGE
-|  CASE 0: NOT MATCHED
+|  CASE 0: NOT MATCHED BY TARGET
 |  |  result expressions: source.id, source.`user`
 |  |  type: INSERT
 |  row-size=80B cardinality=23
@@ -85,7 +85,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |
 03:MERGE
-|  CASE 0: NOT MATCHED
+|  CASE 0: NOT MATCHED BY TARGET
 |  |  result expressions: source.id, source.`user`
 |  |  type: INSERT
 |  row-size=80B cardinality=23
@@ -349,7 +349,7 @@ MERGE SINK
 |  |  filter predicates: target.id = 2
 |  |  result expressions: target.id, target.`user`, target.action, source.event_time
 |  |  type: UPDATE
-|  CASE 1: NOT MATCHED
+|  CASE 1: NOT MATCHED BY TARGET
 |  |  filter predicates: source.id > 10
 |  |  result expressions: source.id, source.`user`, source.action, target.event_time
 |  |  type: INSERT
@@ -357,7 +357,7 @@ MERGE SINK
 |  |  filter predicates: target.id > 10
 |  |  result expressions: target.id, target.`user`, target.action, target.event_time
 |  |  type: DELETE
-|  CASE 3: NOT MATCHED
+|  CASE 3: NOT MATCHED BY TARGET
 |  |  result expressions: source.id, source.`user`, NULL, NULL
 |  |  type: INSERT
 |  CASE 4: MATCHED
@@ -403,7 +403,7 @@ MERGE SINK
 |  |  filter predicates: target.id = 2
 |  |  result expressions: target.id, target.`user`, target.action, source.event_time
 |  |  type: UPDATE
-|  CASE 1: NOT MATCHED
+|  CASE 1: NOT MATCHED BY TARGET
 |  |  filter predicates: source.id > 10
 |  |  result expressions: source.id, source.`user`, source.action, target.event_time
 |  |  type: INSERT
@@ -411,7 +411,7 @@ MERGE SINK
 |  |  filter predicates: target.id > 10
 |  |  result expressions: target.id, target.`user`, target.action, target.event_time
 |  |  type: DELETE
-|  CASE 3: NOT MATCHED
+|  CASE 3: NOT MATCHED BY TARGET
 |  |  result expressions: source.id, source.`user`, NULL, NULL
 |  |  type: INSERT
 |  CASE 4: MATCHED
@@ -571,7 +571,7 @@ MERGE SINK
 |  CASE 0: MATCHED
 |  |  result expressions: target.id, target.int_col, action, target.date_string_col, target.`year`, target.`month`
 |  |  type: UPDATE
-|  CASE 1: NOT MATCHED
+|  CASE 1: NOT MATCHED BY TARGET
 |  |  result expressions: source.id, NULL, source.action, NULL, NULL, NULL
 |  |  type: INSERT
 |  row-size=120B cardinality=14.62K
@@ -604,7 +604,7 @@ MERGE SINK
 |  CASE 0: MATCHED
 |  |  result expressions: target.id, target.int_col, action, target.date_string_col, target.`year`, target.`month`
 |  |  type: UPDATE
-|  CASE 1: NOT MATCHED
+|  CASE 1: NOT MATCHED BY TARGET
 |  |  result expressions: source.id, NULL, source.action, NULL, NULL, NULL
 |  |  type: INSERT
 |  row-size=120B cardinality=14.62K
@@ -646,7 +646,7 @@ MERGE SINK
 |  CASE 0: MATCHED
 |  |  result expressions: target.id, target.`user`, functional_parquet.iceberg_partition_evolution.string_col, target.event_time
 |  |  type: UPDATE
-|  CASE 1: NOT MATCHED
+|  CASE 1: NOT MATCHED BY TARGET
 |  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
 |  |  type: INSERT
 |  row-size=120B cardinality=14.61K
@@ -687,9 +687,120 @@ MERGE SINK
 |  CASE 0: MATCHED
 |  |  result expressions: target.id, target.`user`, functional_parquet.iceberg_partition_evolution.string_col, target.event_time
 |  |  type: UPDATE
-|  CASE 1: NOT MATCHED
+|  CASE 1: NOT MATCHED BY TARGET
 |  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
 |  |  type: INSERT
+|  row-size=120B cardinality=14.61K
+|
+04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: target.id = functional_parquet.iceberg_partition_evolution.id
+|  row-size=120B cardinality=14.61K
+|
+|--08:EXCHANGE [HASH(functional_parquet.iceberg_partition_evolution.id)]
+|  |
+|  03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+|     HDFS partitions=1/1 files=1460 size=2.49MB
+|     Iceberg snapshot id: 547864005421580562
+|     row-size=40B cardinality=14.60K
+|
+07:EXCHANGE [HASH(target.id)]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=80B cardinality=10
+|
+|--06:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+====
+# Merge into a partitioned Iceberg table containing explicit NOT MATCHED BY TARGET, implicit NOT MATCHED BY TARGET and NOT MATCHED BY SOURCE merge cases
+merge into functional_parquet.iceberg_v2_partitioned_position_deletes target
+using (select * from functional_parquet.iceberg_partition_evolution) source
+on target.id = source.id
+when not matched then insert (id, user, action) values(source.id, source.string_col, concat("something ", source.string_col))
+when not matched by target and target.id < 15 then insert (id, user, action) values(source.id, source.string_col, concat("something ", source.string_col))
+when not matched by source and target.user = 'something' then delete
+when not matched by source then update set target.id = 10;
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+06:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=14.61K
+|
+05:MERGE
+|  CASE 0: NOT MATCHED BY TARGET
+|  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
+|  |  type: INSERT
+|  CASE 1: NOT MATCHED BY TARGET
+|  |  filter predicates: target.id < 15
+|  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
+|  |  type: INSERT
+|  CASE 2: NOT MATCHED BY SOURCE
+|  |  filter predicates: target.`user` = 'something'
+|  |  result expressions: target.id, target.`user`, target.action, target.event_time
+|  |  type: DELETE
+|  CASE 3: NOT MATCHED BY SOURCE
+|  |  result expressions: 10, target.`user`, target.action, target.event_time
+|  |  type: UPDATE
+|  row-size=120B cardinality=14.61K
+|
+04:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: target.id = functional_parquet.iceberg_partition_evolution.id
+|  row-size=120B cardinality=14.61K
+|
+|--03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
+|     HDFS partitions=1/1 files=1460 size=2.49MB
+|     Iceberg snapshot id: 547864005421580562
+|     row-size=40B cardinality=14.60K
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=80B cardinality=10
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+10:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=14.61K
+|
+09:EXCHANGE [HASH(target.action)]
+|
+05:MERGE
+|  CASE 0: NOT MATCHED BY TARGET
+|  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
+|  |  type: INSERT
+|  CASE 1: NOT MATCHED BY TARGET
+|  |  filter predicates: target.id < 15
+|  |  result expressions: functional_parquet.iceberg_partition_evolution.id, functional_parquet.iceberg_partition_evolution.string_col, concat('something ', functional_parquet.iceberg_partition_evolution.string_col), NULL
+|  |  type: INSERT
+|  CASE 2: NOT MATCHED BY SOURCE
+|  |  filter predicates: target.`user` = 'something'
+|  |  result expressions: target.id, target.`user`, target.action, target.event_time
+|  |  type: DELETE
+|  CASE 3: NOT MATCHED BY SOURCE
+|  |  result expressions: 10, target.`user`, target.action, target.event_time
+|  |  type: UPDATE
 |  row-size=120B cardinality=14.61K
 |
 04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]

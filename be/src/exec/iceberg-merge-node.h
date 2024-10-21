@@ -98,17 +98,22 @@ class IcebergMergeNode : public ExecNode {
   /// is a duplicate, the second check tests if the row contains both the target and
   /// the source, or just the source. In the 'BOTH' case, the 'WHEN MATCHED' cases are
   /// tested by their filter evaluators. The evaluation respects the order of cases as
-  /// they are defined in the query. In the 'SOURCE' case, the 'WHEN NOT MATCHED' cases
-  /// are getting checked similarly to the 'BOTH' case. The 'selected_case' pointer
-  /// stores the first matched case. If the 'selected_case' is set, then a new row is
-  /// added to the output row batch, and the output expressions are evaluated into the
-  /// new row. The merge action is also set derived from the type of the selected case.
+  /// they are defined in the query. In the 'SOURCE' case, the
+  /// 'WHEN NOT MATCHED (BY TARGET)' cases are checked, in the 'TARGET' case the
+  /// 'WHEN NOT MATCHED BY SOURCE' cases are checked similarly to the 'BOTH' case.
+  /// The 'selected_case' pointer stores the first matched case. If the 'selected_case'
+  /// is set, then a new row is added to the output row batch, and the output
+  /// expressions are evaluated into the new row. The merge action is also set
+  /// derived from the type of the selected case.
   Status EvaluateCases(RowBatch* output_batch);
   void AddRow(RowBatch* output_batch, IcebergMergeCase* merge_case, TupleRow* row);
+  bool CheckCase(const IcebergMergeCase * merge_case, TupleRow* row);
   bool IsDuplicateRow(TupleRow* actual_row);
 
   std::vector<IcebergMergeCase*> matched_cases_;
-  std::vector<IcebergMergeCase*> not_matched_cases_;
+  std::vector<IcebergMergeCase*> not_matched_by_target_cases_;
+  std::vector<IcebergMergeCase*> not_matched_by_source_cases_;
+  std::vector<IcebergMergeCase*> all_cases_;
   std::unique_ptr<RowBatch> child_row_batch_;
   int child_row_idx_;
   bool child_eos_;
@@ -147,7 +152,8 @@ class IcebergMergeCasePlan {
   /// Filter conjuncts applied after matching the case
   std::vector<ScalarExpr*> filter_conjuncts_;
   std::vector<ScalarExpr*> output_exprs_;
-  TMergeCaseType::type type_{};
+  TMergeCaseType::type case_type_{};
+  TMergeMatchType::type match_type_{};
 };
 
 class IcebergMergeCase {
@@ -164,23 +170,21 @@ class IcebergMergeCase {
   Status Open(RuntimeState* state);
   void Close(RuntimeState* state);
 
-  [[nodiscard]] bool IsMatchedCase() const {
-    return type_ == TMergeCaseType::DELETE || type_ == TMergeCaseType::UPDATE;
-  }
   [[nodiscard]] TIcebergMergeSinkAction::type SinkAction() const {
-    if (type_ == TMergeCaseType::DELETE) {
+    if (case_type_ == TMergeCaseType::DELETE) {
       return TIcebergMergeSinkAction::DELETE;
     }
-    if (type_ == TMergeCaseType::INSERT) {
+    if (case_type_ == TMergeCaseType::INSERT) {
       return TIcebergMergeSinkAction::DATA;
     }
-    DCHECK(type_ == TMergeCaseType::UPDATE);
+    DCHECK(case_type_ == TMergeCaseType::UPDATE);
     return TIcebergMergeSinkAction::BOTH;
   }
 
   std::vector<ScalarExpr*> filter_conjuncts_;
   std::vector<ScalarExpr*> output_exprs_;
-  TMergeCaseType::type type_{};
+  TMergeCaseType::type case_type_{};
+  TMergeMatchType::type match_type_{};
 
   std::vector<ScalarExprEvaluator*> filter_evaluators_;
   std::vector<ScalarExprEvaluator*> output_evaluators_;

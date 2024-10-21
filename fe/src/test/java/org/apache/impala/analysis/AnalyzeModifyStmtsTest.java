@@ -281,7 +281,6 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         + "using functional_parquet.iceberg_non_partitioned "
         + "on target.id = functional_parquet.iceberg_non_partitioned.id "
         + "when matched then delete");
-
     // INSERT
     // Inserting values originated from the target table (NULL values)
     AnalyzesOk("merge into "
@@ -342,6 +341,25 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         + "then insert (id, user) values (s.id, concat(s.user, 'string'))"
         + "when not matched then "
         + "insert values (s.id, s.user, 'ab', s.event_time);");
+    // NOT MATCHED BY TARGET
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id "
+        + "when not matched by target and s.id <= 12 "
+        + "then insert (id, user) values (s.id, 'user')");
+    // NOT MATCHED BY SOURCE
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id "
+        + "when not matched by source "
+        + "then update set user = 'updated'");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id "
+        + "when not matched by source and target.user = 'something' then delete");
 
     // Inline view as target
     AnalysisError("merge into "
