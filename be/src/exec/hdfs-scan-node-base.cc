@@ -17,6 +17,8 @@
 
 #include "exec/hdfs-scan-node-base.h"
 
+#include <functional>
+
 #include "exec/base-sequence-scanner.h"
 #include "exec/hdfs-columnar-scanner.h"
 #include "exec/hdfs-scan-node-mt.h"
@@ -608,7 +610,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
       PROFILE_TotalRawHdfsOpenFileTime.Instantiate(runtime_profile());
   per_read_thread_throughput_counter_ =
       PROFILE_PerReadThreadRawHdfsThroughput.Instantiate(runtime_profile(),
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_,
+      std::bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_,
       hdfs_read_timer_));
   scan_ranges_complete_counter_ =
       PROFILE_ScanRangesComplete.Instantiate(runtime_profile());

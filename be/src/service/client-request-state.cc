@@ -22,6 +22,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <functional>
 #include <limits>
 #include <gutil/strings/substitute.h>
 #include <rapidjson/rapidjson.h>
@@ -152,8 +153,8 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   num_rows_fetched_counter_ = ADD_COUNTER(server_profile_, "NumRowsFetched", TUnit::UNIT);
   row_materialization_rate_ =
       server_profile_->AddDerivedCounter("RowMaterializationRate", TUnit::UNIT_PER_SECOND,
-          bind<int64_t>(&RuntimeProfile::UnitsPerSecond, num_rows_fetched_counter_,
-                                             row_materialization_timer_));
+          std::bind<int64_t>(&RuntimeProfile::UnitsPerSecond, num_rows_fetched_counter_,
+              row_materialization_timer_));
   num_rows_fetched_from_cache_counter_ =
       ADD_COUNTER(server_profile_, "NumRowsFetchedFromCache", TUnit::UNIT);
   client_wait_timer_ = ADD_TIMER(server_profile_, "ClientFetchWaitTimer");

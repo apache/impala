@@ -20,7 +20,6 @@
 #include <fstream>
 #include <sstream>
 #include <boost/algorithm/string.hpp>
-#include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 #include <gnu/libc-version.h>
 #include <sys/stat.h>

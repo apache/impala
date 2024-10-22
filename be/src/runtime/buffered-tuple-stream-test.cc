@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>

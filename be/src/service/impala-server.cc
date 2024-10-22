@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <exception>
+#include <functional>
 #include <sstream>
 #include <string_view>
 #ifdef CALLONCEHACK
@@ -30,7 +31,6 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <boost/bind.hpp>
 #include <boost/unordered_set.hpp>
 #include <gutil/strings/split.h>
 #include <gutil/strings/substitute.h>
@@ -125,6 +125,8 @@ using google::protobuf::RepeatedPtrField;
 using kudu::GetRandomSeed32;
 using kudu::rpc::RpcContext;
 using kudu::security::SecurityDefaults;
+using std::bind;
+using std::placeholders::_2;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;

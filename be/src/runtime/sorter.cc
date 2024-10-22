@@ -17,7 +17,7 @@
 
 #include "runtime/sorter-internal.h"
 
-#include <boost/bind.hpp>
+#include <functional>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
@@ -36,6 +36,9 @@
 #include "common/names.h"
 
 using namespace strings;
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
 
 namespace impala {
 
@@ -1571,7 +1574,7 @@ Status Sorter::CreateMerger(int num_runs, bool external) {
       new SortedRunMerger(*compare_less_than_, output_row_desc_, profile_, external,
           codegend_heapify_helper_fn_));
 
-  vector<function<Status (RowBatch**)>> merge_runs;
+  vector<std::function<Status (RowBatch**)>> merge_runs;
   merge_runs.reserve(num_runs);
   for (int i = 0; i < num_runs; ++i) {
     Run* run = runs_to_merge->front();

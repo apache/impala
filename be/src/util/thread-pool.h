@@ -17,9 +17,8 @@
 
 #pragma once
 
+#include <functional>
 #include <mutex>
-
-#include <boost/bind/mem_fn.hpp>
 
 #include "util/aligned-new.h"
 #include "util/blocking-queue.h"
@@ -36,7 +35,7 @@ class ThreadPool : public CacheLineAligned {
   /// Signature of a work-processing function. Takes the integer id of the thread which is
   /// calling it (ids run from 0 to num_threads - 1) and a reference to the item to
   /// process.
-  typedef boost::function<void (int thread_id, const T& workitem)> WorkFunction;
+  typedef std::function<void (int thread_id, const T& workitem)> WorkFunction;
 
   /// Creates a new thread pool without starting any threads. Code must call
   /// Init() on this thread pool before any calls to Offer().
@@ -71,7 +70,7 @@ class ThreadPool : public CacheLineAligned {
       threadname << thread_prefix_ << "(" << i + 1 << ":" << num_threads_ << ")";
       std::unique_ptr<Thread> t;
       Status status = Thread::Create(group_, threadname.str(),
-          boost::bind<void>(boost::mem_fn(&ThreadPool<T>::WorkerThread), this, i), &t,
+          std::bind<void>(std::mem_fn(&ThreadPool<T>::WorkerThread), this, i), &t,
           fault_injection_eligible_);
       if (!status.ok()) {
         // The thread pool initialization failed. Shutdown any threads that were
@@ -218,16 +217,16 @@ class ThreadPool : public CacheLineAligned {
 };
 
 /// Utility thread-pool that accepts callable work items, and simply invokes them.
-class CallableThreadPool : public ThreadPool<boost::function<void()>> {
+class CallableThreadPool : public ThreadPool<std::function<void()>> {
  public:
   CallableThreadPool(const std::string& group, const std::string& thread_prefix,
       uint32_t num_threads, uint32_t queue_size) :
-      ThreadPool<boost::function<void()>>(
+      ThreadPool<std::function<void()>>(
           group, thread_prefix, num_threads, queue_size, &CallableThreadPool::Worker) {
   }
 
  private:
-  static void Worker(int thread_id, const boost::function<void()>& f) {
+  static void Worker(int thread_id, const std::function<void()>& f) {
     f();
   }
 };

@@ -17,6 +17,8 @@
 
 #include "catalog/catalog-server.h"
 
+#include <functional>
+
 #include <gutil/strings/substitute.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/protocol/TJSONProtocol.h>
@@ -41,8 +43,11 @@
 
 #include "common/names.h"
 
-using boost::bind;
-using boost::mem_fn;
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
 using namespace apache::thrift;
 using namespace rapidjson;
 using namespace strings;

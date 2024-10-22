@@ -18,11 +18,10 @@
 #ifndef IMPALA_UTIL_THREAD_H
 #define IMPALA_UTIL_THREAD_H
 
+#include <functional>
 #include <memory>
 #include <vector>
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread_only.hpp>
 
@@ -78,7 +77,7 @@ class Thread {
   static Status Create(const std::string& category, const std::string& name,
       const F& f, const A1& a1, std::unique_ptr<Thread>* thread,
       bool fault_injection_eligible = false) {
-    return StartThread(category, name, boost::bind(f, a1), thread,
+    return StartThread(category, name, std::bind(f, a1), thread,
         fault_injection_eligible);
   }
 
@@ -86,7 +85,7 @@ class Thread {
   static Status Create(const std::string& category, const std::string& name,
       const F& f, const A1& a1, const A2& a2, std::unique_ptr<Thread>* thread,
       bool fault_injection_eligible = false) {
-    return StartThread(category, name, boost::bind(f, a1, a2), thread,
+    return StartThread(category, name, std::bind(f, a1, a2), thread,
         fault_injection_eligible);
   }
 
@@ -94,7 +93,7 @@ class Thread {
   static Status Create(const std::string& category, const std::string& name,
       const F& f, const A1& a1, const A2& a2, const A3& a3,
       std::unique_ptr<Thread>* thread, bool fault_injection_eligible = false) {
-    return StartThread(category, name, boost::bind(f, a1, a2, a3), thread,
+    return StartThread(category, name, std::bind(f, a1, a2, a3), thread,
         fault_injection_eligible);
   }
 
@@ -102,7 +101,7 @@ class Thread {
   static Status Create(const std::string& category, const std::string& name,
       const F& f, const A1& a1, const A2& a2, const A3& a3, const A4& a4,
       std::unique_ptr<Thread>* thread, bool fault_injection_eligible = false) {
-    return StartThread(category, name, boost::bind(f, a1, a2, a3, a4), thread,
+    return StartThread(category, name, std::bind(f, a1, a2, a3, a4), thread,
         fault_injection_eligible);
   }
 
@@ -110,7 +109,7 @@ class Thread {
   static Status Create(const std::string& category, const std::string& name,
       const F& f, const A1& a1, const A2& a2, const A3& a3, const A4& a4, const A5& a5,
       std::unique_ptr<Thread>* thread, bool fault_injection_eligible = false) {
-    return StartThread(category, name, boost::bind(f, a1, a2, a3, a4, a5), thread,
+    return StartThread(category, name, std::bind(f, a1, a2, a3, a4, a5), thread,
         fault_injection_eligible);
   }
 
@@ -141,7 +140,7 @@ class Thread {
   static const int64_t UNINITIALISED_THREAD_ID = -2;
 
   /// Function object that wraps the user-supplied function to run in a separate thread.
-  typedef boost::function<void ()> ThreadFunctor;
+  typedef std::function<void ()> ThreadFunctor;
 
   /// The actual thread object that runs the user's method via SuperviseThread().
   boost::scoped_ptr<boost::thread> thread_;

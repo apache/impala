@@ -564,7 +564,7 @@ void RuntimeFilterBank::DistributeCompleteFilter(
 
     if (to_coordinator) {
       proxy->UpdateFilterAsync(params, res, controller,
-          boost::bind(
+          std::bind(
               &RuntimeFilterBank::UpdateFilterCompleteCb, this, controller, res, false));
 
       if (complete_filter->RequireSubAggregation()) {
@@ -576,7 +576,7 @@ void RuntimeFilterBank::DistributeCompleteFilter(
       }
     } else {
       proxy->UpdateFilterFromRemoteAsync(params, res, controller,
-          boost::bind(
+          std::bind(
               &RuntimeFilterBank::UpdateFilterCompleteCb, this, controller, res, true));
     }
 

@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <functional>
 #include <sched.h>
-#include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
 #include <sys/stat.h>
 
@@ -44,7 +44,10 @@
 
 #include "common/names.h"
 
+using std::bind;
+using std::mem_fn;
 using std::mt19937;
+using std::placeholders::_1;
 using std::uniform_int_distribution;
 using std::uniform_real_distribution;
 

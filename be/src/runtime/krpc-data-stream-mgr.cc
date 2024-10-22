@@ -17,6 +17,7 @@
 
 #include "runtime/krpc-data-stream-mgr.h"
 
+#include <functional>
 #include <iostream>
 #include <mutex>
 #include <boost/functional/hash.hpp>
@@ -45,6 +46,10 @@
 #include "gen-cpp/data_stream_service.pb.h"
 
 #include "common/names.h"
+
+using std::bind;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 /// This parameter controls the minimum amount of time a closed stream ID will stay in
 /// closed_stream_cache_ before it is evicted. It needs to be set sufficiently high that
@@ -76,7 +81,7 @@ KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
     deserialize_pool_("data-stream-mgr", "deserialize",
         num_deserialization_threads_,
         FLAGS_datastream_service_deserialization_queue_size,
-        boost::bind(&KrpcDataStreamMgr::DeserializeThreadFn, this, _1, _2)) {
+        bind(&KrpcDataStreamMgr::DeserializeThreadFn, this, _1, _2)) {
   MetricGroup* dsm_metrics = metrics->GetOrCreateChildGroup("datastream-manager");
   num_senders_waiting_ =
       dsm_metrics->AddGauge("senders-blocked-on-recvr-creation", 0L);

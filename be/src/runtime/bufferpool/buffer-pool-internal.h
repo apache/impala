@@ -74,6 +74,7 @@
 
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <memory>
 #include <mutex>
@@ -181,8 +182,8 @@ class BufferPool::PageList {
     return page;
   }
 
-  void Iterate(const boost::function<bool(Page*)>& fn) { list_.Iterate(fn); }
-  void IterateFirstN(const boost::function<bool(Page*)>& fn, int n) {
+  void Iterate(const std::function<bool(Page*)>& fn) { list_.Iterate(fn); }
+  void IterateFirstN(const std::function<bool(Page*)>& fn, int n) {
     list_.IterateFirstN(fn, n);
   }
   bool Contains(Page* page) { return list_.Contains(page); }

@@ -18,6 +18,7 @@
 #include "statestore/statestore.h"
 
 #include <algorithm>
+#include <functional>
 #include <tuple>
 #include <utility>
 
@@ -56,8 +57,12 @@ using boost::shared_lock;
 using boost::shared_mutex;
 using boost::upgrade_lock;
 using boost::upgrade_to_unique_lock;
+using std::bind;
 using std::forward_as_tuple;
+using std::mem_fn;
 using std::piecewise_construct;
+using std::placeholders::_1;
+using std::placeholders::_2;
 using namespace apache::thrift;
 using namespace impala;
 using namespace rapidjson;

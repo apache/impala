@@ -22,7 +22,6 @@
 #include <mutex>
 #include <string>
 #include <vector>
-#include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 #include <rapidjson/fwd.h>

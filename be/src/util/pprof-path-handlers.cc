@@ -17,8 +17,8 @@
 
 #include "util/pprof-path-handlers.h"
 
-#include <boost/bind.hpp>
 #include <fstream>
+#include <functional>
 #include <sys/stat.h>
 
 #include "common/logging.h"
@@ -27,6 +27,9 @@
 
 #include "common/names.h"
 
+using std::bind;
+using std::placeholders::_1;
+using std::placeholders::_2;
 using namespace google;
 using namespace impala;
 using namespace rapidjson;

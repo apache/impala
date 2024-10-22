@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
+#include <functional>
 #include <sys/resource.h>
 #include <sys/time.h>
 
@@ -259,7 +260,7 @@ class SamplingCounterPrototype : public ProfileEntryPrototype {
   }
 
   RuntimeProfileBase::Counter* Instantiate(
-      RuntimeProfile* profile, boost::function<int64_t()> sample_fn) {
+      RuntimeProfile* profile, std::function<int64_t()> sample_fn) {
     return profile->AddSamplingCounter(name(), std::move(sample_fn));
   }
 };

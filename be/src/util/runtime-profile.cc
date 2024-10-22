@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -29,7 +30,6 @@
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/bind.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>

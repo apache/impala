@@ -20,7 +20,6 @@
 
 #include <set>
 #include <vector>
-#include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "common/atomic.h"

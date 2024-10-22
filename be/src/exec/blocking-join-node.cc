@@ -18,6 +18,7 @@
 #include "exec/blocking-join-node.h"
 
 #include <algorithm>
+#include <functional>
 #include <sstream>
 
 #include "exec/join-builder.h"
@@ -223,7 +224,7 @@ Status BlockingJoinNode::OpenImpl(RuntimeState* state, JoinBuilder** separate_bu
     // overlapping. We also want to count the builder profile as local time.
     // The separate join build does not have this problem, because
     // the build is executed in a separate fragment with a separate profile tree.
-    runtime_profile_->AddLocalTimeCounter(bind<int64_t>(
+    runtime_profile_->AddLocalTimeCounter(std::bind<int64_t>(
         &BlockingJoinNode::LocalTimeCounterFn, runtime_profile_->total_time_counter(),
         child(0)->runtime_profile()->total_time_counter(),
         child(1)->runtime_profile()->total_time_counter(),

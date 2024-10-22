@@ -17,7 +17,6 @@
 
 #include "runtime/buffered-tuple-stream.inline.h"
 
-#include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"

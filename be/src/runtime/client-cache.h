@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -26,8 +27,6 @@
 #include <string>
 #include <typeinfo>
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/unordered_map.hpp>
 #include <thrift/Thrift.h>
 #include <thrift/transport/TTransportException.h>
@@ -83,8 +82,8 @@ class ClientCacheHelper {
  public:
   /// Callback method which produces a client object when one cannot be found in the
   /// cache. Supplied by the ClientCache wrapper.
-  typedef boost::function<ThriftClientImpl* (const TNetworkAddress& address,
-                                             ClientKey* client_key)> ClientFactory;
+  typedef std::function<ThriftClientImpl* (const TNetworkAddress& address,
+                                           ClientKey* client_key)> ClientFactory;
 
   /// Returns a client for the given address in 'client_key'. If a previously created
   /// client is not available (i.e. there are no entries in the per-host cache), a new
@@ -416,8 +415,9 @@ class ClientCache {
 
   ClientCache(const std::string& service_name = "", bool enable_ssl = false)
       : client_cache_helper_(1, 0, 0, 0, 0) {
-    client_factory_ = boost::bind<ThriftClientImpl*>(
-        boost::mem_fn(&ClientCache::MakeClient), this, _1, _2, service_name, enable_ssl);
+    client_factory_ = std::bind<ThriftClientImpl*>(
+        std::mem_fn(&ClientCache::MakeClient), this, std::placeholders::_1,
+        std::placeholders::_2, service_name, enable_ssl);
   }
 
   /// Create a ClientCache where connections are tried num_tries times, with a pause of
@@ -430,8 +430,9 @@ class ClientCache {
       : client_cache_helper_(
           num_tries, wait_ms, send_timeout_ms, recv_timeout_ms, conn_timeout_ms) {
     DCHECK_GE(conn_timeout_ms, 0);
-    client_factory_ = boost::bind<ThriftClientImpl*>(
-        boost::mem_fn(&ClientCache::MakeClient), this, _1, _2, service_name, enable_ssl);
+    client_factory_ = std::bind<ThriftClientImpl*>(
+        std::mem_fn(&ClientCache::MakeClient), this, std::placeholders::_1,
+        std::placeholders::_2, service_name, enable_ssl);
   }
 
   /// Close all clients connected to the supplied address, (e.g., in

@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <functional>
 #include <memory>
-#include <boost/bind.hpp>
 
 #include "exec/base-sequence-scanner.h"
 
@@ -33,6 +33,9 @@
 
 using namespace impala;
 using namespace impala::io;
+
+using std::bind;
+using std::placeholders::_1;
 
 const int BaseSequenceScanner::HEADER_SIZE = 1024;
 const int BaseSequenceScanner::SYNC_MARKER = -1;

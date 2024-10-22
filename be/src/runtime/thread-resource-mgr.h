@@ -19,10 +19,9 @@
 
 #include <stdlib.h>
 
-#include <mutex>
-#include <boost/function.hpp>
-
+#include <functional>
 #include <list>
+#include <mutex>
 
 #include "common/atomic.h"
 #include "common/status.h"
@@ -114,7 +113,7 @@ class ThreadResourcePool {
   /// when it is called, a thread is available (the quota could have changed again in
   /// between). It is simply that something might have happened (similar to condition
   /// variable semantics).
-  typedef boost::function<void (ThreadResourcePool*)> ThreadAvailableCb;
+  typedef std::function<void (ThreadResourcePool*)> ThreadAvailableCb;
 
   ~ThreadResourcePool() { DCHECK(parent_ == nullptr) << "Must unregister pool"; }
 

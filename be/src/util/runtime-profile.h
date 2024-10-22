@@ -17,10 +17,10 @@
 
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <mutex>
 
-#include <boost/function.hpp>
 #include <rapidjson/document.h>
 #include "common/atomic.h"
 #include "common/status.h"
@@ -164,7 +164,7 @@ class RuntimeProfileBase {
   class AveragedCounter;
   class SummaryStatsCounter;
 
-  typedef boost::function<int64_t()> SampleFunction;
+  typedef std::function<int64_t()> SampleFunction;
 
   virtual ~RuntimeProfileBase();
 

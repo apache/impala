@@ -17,6 +17,8 @@
 
 #include "service/child-query.h"
 
+#include <functional>
+
 #include "common/status-serialization.h"
 #include "service/impala-server.inline.h"
 #include "service/client-request-state.h"
@@ -194,7 +196,7 @@ Status ChildQueryExecutor::ExecAsync(vector<ChildQuery>&& child_queries) {
   if (is_cancelled_) return Status::OK();
   child_queries_ = move(child_queries);
   RETURN_IF_ERROR(Thread::Create("query-exec-state", "async child queries",
-      bind(&ChildQueryExecutor::ExecChildQueries, this), &child_queries_thread_));
+      std::bind(&ChildQueryExecutor::ExecChildQueries, this), &child_queries_thread_));
   is_running_ = true;
   return Status::OK();
 }

@@ -18,8 +18,9 @@
 
 #include "runtime/fragment-instance-state.h"
 
+#include <functional>
 #include <sstream>
-#include <boost/bind.hpp>
+
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/thread/thread_time.hpp>
 #include <thrift/protocol/TDebugProtocol.h>
@@ -58,6 +59,8 @@
 using google::protobuf::RepeatedPtrField;
 using kudu::rpc::RpcContext;
 using namespace apache::thrift;
+using std::bind;
+using std::mem_fn;
 
 namespace impala {
 

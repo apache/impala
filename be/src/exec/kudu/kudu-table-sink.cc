@@ -17,9 +17,9 @@
 
 #include "exec/kudu/kudu-table-sink.h"
 
+#include <functional>
 #include <sstream>
 
-#include <boost/bind.hpp>
 #include <kudu/client/client.h>
 #include <kudu/client/resource_metrics.h>
 #include <kudu/client/write_op.h>
@@ -126,7 +126,7 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
   kudu_apply_timer_ = ADD_TIMER(profile(), "KuduApplyTimer");
   rows_processed_rate_ = profile()->AddDerivedCounter(
       "RowsProcessedRate", TUnit::UNIT_PER_SECOND,
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, total_rows_,
+      std::bind<int64_t>(&RuntimeProfile::UnitsPerSecond, total_rows_,
       profile()->total_time_counter()));
 
   return Status::OK();

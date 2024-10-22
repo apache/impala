@@ -16,6 +16,7 @@
 // under the License.
 
 #include <unistd.h>
+#include <functional>
 #include <mutex>
 
 #include <boost/thread/thread.hpp>
@@ -150,14 +151,14 @@ class MultiThreadTest { // NOLINT: members are not arranged for minimal padding
   void Run() {
     for (int i = 0; i < nthreads_; ++i) {
       threads_.push_back(shared_ptr<thread>(
-          new thread(boost::bind(&MultiThreadTest::InserterThread, this, i))));
+          new thread(std::bind(&MultiThreadTest::InserterThread, this, i))));
       threads_.push_back(shared_ptr<thread>(
-          new thread(boost::bind(&MultiThreadTest::RemoverThread, this))));
+          new thread(std::bind(&MultiThreadTest::RemoverThread, this))));
     }
     // We add an extra thread to ensure that there aren't enough elements in
     // the queue to go around.  This way, we test removal after Shutdown.
     threads_.push_back(shared_ptr<thread>(
-            new thread(boost::bind(
+            new thread(std::bind(
               &MultiThreadTest::RemoverThread, this))));
     for (int i = 0; i < threads_.size(); ++i) {
       threads_[i]->join();

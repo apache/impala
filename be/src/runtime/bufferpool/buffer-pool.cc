@@ -17,9 +17,9 @@
 
 #include "runtime/bufferpool/buffer-pool-internal.h"
 
+#include <functional>
 #include <limits>
 #include <sstream>
-#include <boost/bind.hpp>
 
 #include "common/names.h"
 #include "gutil/strings/substitute.h"
@@ -32,6 +32,9 @@
 #include "util/runtime-profile-counters.h"
 #include "util/scope-exit-trigger.h"
 #include "util/time.h"
+
+using std::bind;
+using std::placeholders::_1;
 
 DEFINE_int32(concurrent_scratch_ios_per_device, 2,
     "Set this to influence the number of concurrent write I/Os issues to write data to "

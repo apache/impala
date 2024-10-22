@@ -17,12 +17,11 @@
 
 #include "util/metrics.h"
 
+#include <functional>
 #include <sstream>
 #include <stack>
 
 #include <boost/algorithm/string/join.hpp>
-#include <boost/bind.hpp>
-#include <boost/mem_fn.hpp>
 #include <boost/math/special_functions/fpclassify.hpp>
 #include <gutil/strings/substitute.h>
 #include <rapidjson/stringbuffer.h>
@@ -36,6 +35,11 @@
 
 #include "common/names.h"
 
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
 using namespace impala;
 using namespace rapidjson;
 using namespace strings;

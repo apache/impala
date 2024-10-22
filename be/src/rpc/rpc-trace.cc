@@ -17,7 +17,8 @@
 
 #include "rpc/rpc-trace.h"
 
-#include <boost/bind.hpp>
+#include <functional>
+
 #include <boost/scoped_ptr.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -34,6 +35,11 @@
 using namespace impala;
 using namespace rapidjson;
 using namespace strings;
+
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 // Metric key format for rpc call duration metrics.
 const string RPC_PROCESSING_TIME_DISTRIBUTION_METRIC_KEY = "rpc-method.$0.call_duration";

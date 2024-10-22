@@ -848,8 +848,8 @@ void Coordinator::BackendState::PublishFilter(FilterState* state,
   state->IncrementNumInflightRpcs(1);
 
   proxy->PublishFilterAsync(rpc_params, &res, &controller,
-      boost::bind(&Coordinator::BackendState::PublishFilterCompleteCb, this, &controller,
-                                state, mem_tracker));
+      std::bind(&Coordinator::BackendState::PublishFilterCompleteCb, this, &controller,
+          state, mem_tracker));
 }
 
 void Coordinator::BackendState::PublishFilterCompleteCb(

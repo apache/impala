@@ -16,9 +16,10 @@
 // under the License.
 
 #include <array>
+#include <fstream>
+#include <functional>
 #include <memory>
 #include <string>
-#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
 #include <openssl/ssl.h>
@@ -54,6 +55,9 @@ DECLARE_bool(cookie_require_secure);
 #include "common/names.h"
 
 using boost::asio::ip::tcp;
+using std::bind;
+using std::placeholders::_1;
+using std::placeholders::_2;
 namespace filesystem = boost::filesystem;
 using namespace impala;
 using namespace rapidjson;

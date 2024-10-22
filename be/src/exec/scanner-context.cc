@@ -149,7 +149,9 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
 
     int64_t read_past_buffer_size = 0;
     int64_t max_buffer_size = io_mgr->max_buffer_size();
-    if (!read_past_size_cb_.empty()) read_past_buffer_size = read_past_size_cb_(offset);
+    if (read_past_size_cb_ != nullptr) {
+      read_past_buffer_size = read_past_size_cb_(offset);
+    }
     if (read_past_buffer_size <= 0) {
       // Either no callback was set or the callback did not return an estimate. Use
       // the default doubling strategy.

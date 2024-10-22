@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <functional>
 #include <mutex>
 #include <string>
 
@@ -104,8 +105,8 @@ class StatestoreSubscriber {
   /// Callbacks may publish new updates to any topic via the
   /// topic_updates parameter, although updates for unknown topics
   /// (i.e. those with no subscribers) will be ignored.
-  typedef boost::function<void (const TopicDeltaMap& state,
-                                std::vector<TTopicDelta>* topic_updates)> UpdateCallback;
+  typedef std::function<void (const TopicDeltaMap& state,
+                              std::vector<TTopicDelta>* topic_updates)> UpdateCallback;
 
   /// Adds a topic to the set of topics that updates will be received for.
   Status AddTopic(const Statestore::TopicId& topic_id, bool is_transient,
@@ -128,7 +129,7 @@ class StatestoreSubscriber {
   /// ignored by coordinators and catalogds after statestore is restarted. In this case,
   /// active_catalogd_version is set as invalid value -1. catalogd_registration has
   /// invalid value and should not be used by callee.
-  typedef boost::function<void (
+  typedef std::function<void (
       bool is_registration_reply, int64_t active_catalogd_version,
       const TCatalogRegistration& catalogd_registration)> UpdateCatalogdCallback;
 
@@ -137,7 +138,7 @@ class StatestoreSubscriber {
 
   /// CompleteRegistrationCallback is invoked when the registration with the statestore
   /// is completed.
-  typedef boost::function<void ()>CompleteRegistrationCallback;
+  typedef std::function<void ()>CompleteRegistrationCallback;
 
   /// Adds a callback for registration completion.
   void AddCompleteRegistrationTopic(const CompleteRegistrationCallback& callback);

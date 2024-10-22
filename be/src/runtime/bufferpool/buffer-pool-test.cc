@@ -16,11 +16,11 @@
 // under the License.
 
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <string>
 #include <vector>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
@@ -52,6 +52,7 @@
 
 using boost::algorithm::join;
 using boost::filesystem::directory_iterator;
+using std::bind;
 using std::mt19937;
 using std::uniform_int_distribution;
 using std::uniform_real_distribution;
@@ -571,7 +572,7 @@ TEST_F(BufferPoolTest, ConcurrentRegistration) {
   // Launch threads, each with a different set of query IDs.
   thread_group workers;
   for (int i = 0; i < num_threads; ++i) {
-    workers.add_thread(new thread(boost::bind(&BufferPoolTest::RegisterQueriesAndClients,
+    workers.add_thread(new thread(bind(&BufferPoolTest::RegisterQueriesAndClients,
         this, &pool, i, queries_per_thread, sum_initial_reservations, reservation_limit,
         &thread_rngs[i])));
   }
@@ -1148,7 +1149,7 @@ TEST_F(BufferPoolTest, ConcurrentPageCreation) {
   // Launch threads, each with a different set of query IDs.
   thread_group workers;
   for (int i = 0; i < num_threads; ++i) {
-    workers.add_thread(new thread(boost::bind(&BufferPoolTest::CreatePageLoop, this,
+    workers.add_thread(new thread(bind(&BufferPoolTest::CreatePageLoop, this,
         &pool, file_group, &global_reservations_, ops_per_thread)));
   }
 

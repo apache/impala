@@ -17,6 +17,8 @@
 
 #include "scheduling/cluster-membership-mgr.h"
 
+#include <functional>
+
 #include <boost/algorithm/string/join.hpp>
 #include <gutil/strings/split.h>
 #include <gutil/strings/stringpiece.h>
@@ -33,6 +35,11 @@ DECLARE_int32(num_expected_executors);
 DECLARE_string(expected_executor_group_sets);
 DECLARE_string(cluster_membership_topic_id);
 DECLARE_int32(cluster_membership_retained_removed_coords);
+
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 namespace {
 using namespace impala;

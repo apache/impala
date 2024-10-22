@@ -15,14 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <functional>
 #include <string>
-#include <boost/bind.hpp>
 
 #include "runtime/thread-resource-mgr.h"
 #include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
 
 #include "common/names.h"
+
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
 
 namespace impala {
 

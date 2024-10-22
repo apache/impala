@@ -17,6 +17,8 @@
 
 #include "scheduling/admission-control-service.h"
 
+#include <functional>
+
 #include "common/constant-strings.h"
 #include "common/names.h"
 #include "common/status-serialization.h"
@@ -38,6 +40,8 @@
 #include "util/promise.h"
 
 using kudu::rpc::RpcContext;
+using std::bind;
+using std::placeholders::_2;
 
 static const string QUEUE_LIMIT_MSG = "(Advanced) Limit on RPC payloads consumption for "
                                       "AdmissionControlService. "

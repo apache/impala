@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <functional>
 #include <string>
-#include <boost/bind.hpp>
 
 #include "runtime/mem-tracker.h"
 #include "testutil/gtest-util.h"
@@ -327,7 +327,7 @@ TEST(MemTestTest, GcFunctions) {
 
   // Attach GcFunction that releases 1 byte
   GcFunctionHelper gc_func_helper(&t);
-  t.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_func_helper));
+  t.AddGcFunction(std::bind(&GcFunctionHelper::GcFunc, &gc_func_helper));
   EXPECT_TRUE(t.TryConsume(2));
   EXPECT_EQ(t.consumption(), 10);
   EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
@@ -351,9 +351,9 @@ TEST(MemTestTest, GcFunctions) {
   // Add more GcFunctions, test that we only call them until the limit is no longer
   // exceeded
   GcFunctionHelper gc_func_helper2(&t);
-  t.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_func_helper2));
+  t.AddGcFunction(std::bind(&GcFunctionHelper::GcFunc, &gc_func_helper2));
   GcFunctionHelper gc_func_helper3(&t);
-  t.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_func_helper3));
+  t.AddGcFunction(std::bind(&GcFunctionHelper::GcFunc, &gc_func_helper3));
   t.Consume(1);
   EXPECT_EQ(t.consumption(), 11);
   EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
@@ -368,11 +368,11 @@ TEST(MemTestTest, GcFunctions) {
 
   // Attach three GcFunctions that each release 1 byte
   GcFunctionHelper gc_extra_func_helper(&t_extra);
-  t_extra.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper));
+  t_extra.AddGcFunction(std::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper));
   GcFunctionHelper gc_extra_func_helper2(&t_extra);
-  t_extra.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper2));
+  t_extra.AddGcFunction(std::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper2));
   GcFunctionHelper gc_extra_func_helper3(&t_extra);
-  t_extra.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper3));
+  t_extra.AddGcFunction(std::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper3));
 
   // Freeing extra bytes for GC doesn't change when we call GC. We can go up to the limit
   // and it will not call GC.

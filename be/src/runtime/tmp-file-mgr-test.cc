@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <mutex>
 #include <numeric>
@@ -48,6 +49,9 @@
 
 using boost::filesystem::path;
 using boost::uuids::random_generator;
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
 
 DECLARE_bool(disk_spill_encryption);
 DECLARE_int64(disk_spill_compression_buffer_limit_bytes);

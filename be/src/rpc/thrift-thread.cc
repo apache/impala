@@ -17,7 +17,7 @@
 
 #include "rpc/thrift-thread.h"
 
-#include <boost/bind.hpp>
+#include <functional>
 #include <sstream>
 
 #include <thrift/concurrency/Exception.h>
@@ -36,7 +36,7 @@ void ThriftThread::start() {
   // makes a copy of its arguments, notably runnable() which is a shared_ptr. That ensures
   // it will live as long as the thread despite passing to RunRunnable by reference.
   Status status = impala::Thread::Create(group_, name_,
-      bind(&ThriftThread::RunRunnable, this, runnable(), &promise), &impala_thread_);
+      std::bind(&ThriftThread::RunRunnable, this, runnable(), &promise), &impala_thread_);
 
   // Thread creation failed. Thrift expects an exception in this case. See
   // the implementation of atc::PosixThreadFactory.cpp or atc::BoostThreadFactory.cpp.

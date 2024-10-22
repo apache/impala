@@ -83,9 +83,9 @@ int ThreadResourcePool::AddThreadAvailableCb(ThreadAvailableCb fn) {
 
 void ThreadResourcePool::RemoveThreadAvailableCb(int id) {
   unique_lock<mutex> l(lock_);
-  DCHECK(!thread_callbacks_[id].empty());
+  DCHECK(thread_callbacks_[id] != nullptr);
   DCHECK_GT(num_callbacks_.Load(), 0);
-  thread_callbacks_[id].clear();
+  thread_callbacks_[id] = nullptr;
   num_callbacks_.Add(-1);
 }
 
@@ -101,7 +101,7 @@ void ThreadResourcePool::InvokeCallbacks() {
     while (num_available_threads() > 0 && num_invoked < num_callbacks_.Load()) {
       DCHECK_LT(next_callback_idx_, thread_callbacks_.size());
       ThreadAvailableCb fn = thread_callbacks_[next_callback_idx_];
-      if (LIKELY(!fn.empty())) {
+      if (LIKELY(fn != nullptr)) {
         ++num_invoked;
         fn(this);
       }

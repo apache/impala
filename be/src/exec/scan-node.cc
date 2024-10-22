@@ -17,8 +17,6 @@
 
 #include "exec/scan-node.h"
 
-#include <boost/bind.hpp>
-
 #include "exec/data-source-scan-node.h"
 #include "exec/hbase/hbase-scan-node.h"
 #include "exec/kudu/kudu-scan-node-mt.h"

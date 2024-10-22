@@ -18,6 +18,7 @@
 
 #include "runtime/query-exec-mgr.h"
 
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -43,6 +44,8 @@
 
 #include "common/names.h"
 
+using std::bind;
+using std::placeholders::_2;
 using std::unordered_set;
 using std::vector;
 using namespace impala;

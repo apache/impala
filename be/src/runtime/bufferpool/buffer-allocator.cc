@@ -17,9 +17,8 @@
 
 #include "runtime/bufferpool/buffer-allocator.h"
 
+#include <functional>
 #include <mutex>
-
-#include <boost/bind.hpp>
 
 #include "common/atomic.h"
 #include "runtime/bufferpool/system-allocator.h"
@@ -31,6 +30,9 @@
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
+
+using std::bind;
+using std::placeholders::_1;
 
 namespace impala {
 

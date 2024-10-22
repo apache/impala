@@ -18,6 +18,7 @@
 #include "runtime/krpc-data-stream-recvr.h"
 
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <queue>
 
@@ -45,7 +46,9 @@
 using kudu::MonoDelta;
 using kudu::MonoTime;
 using kudu::rpc::RpcContext;
+using std::bind;
 using std::condition_variable_any;
+using std::mem_fn;
 
 namespace impala {
 

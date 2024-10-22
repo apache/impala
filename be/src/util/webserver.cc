@@ -21,10 +21,8 @@
 #include <fstream>
 #include <string>
 #include <boost/algorithm/string.hpp>
-#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/mem_fn.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <gssapi/gssapi_krb5.h>
 #include <shared_mutex>
@@ -80,6 +78,9 @@ using boost::algorithm::to_lower;
 using boost::filesystem::exists;
 using boost::upgrade_to_unique_lock;
 using kudu::HttpStatusCode;
+using std::bind;
+using std::placeholders::_1;
+using std::placeholders::_2;
 using namespace google;
 using namespace strings;
 using namespace rapidjson;

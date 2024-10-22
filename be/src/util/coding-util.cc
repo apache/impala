@@ -18,13 +18,13 @@
 #include "util/coding-util.h"
 
 #include <cctype>
+#include <functional>
 #include <iomanip>
 #include <limits>
 #include <sstream>
 #include <unordered_set>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/function.hpp>
 #include <sasl/sasl.h>
 
 #include "common/compiler-util.h"
@@ -40,7 +40,7 @@ namespace impala {
 
 // It is more convenient to maintain the set of characters that are safe to use
 // directly in URLs without escaping
-static function<bool (char)> IsUrlSafe = is_any_of(".-*_");
+static std::function<bool (char)> IsUrlSafe = is_any_of(".-*_");
 
 // Hive selectively encodes characters. This is the whitelist of
 // characters it will encode.

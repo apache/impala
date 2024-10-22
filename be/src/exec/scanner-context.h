@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <functional>
 
 #include <boost/scoped_ptr.hpp>
 
@@ -135,7 +136,7 @@ class ScannerContext {
     ///
     /// The callback takes the file offset of the asynchronous read (this may be more
     /// than file_offset() due to data being assembled in the boundary buffer).
-    typedef boost::function<int (int64_t)> ReadPastSizeCallback;
+    typedef std::function<int (int64_t)> ReadPastSizeCallback;
     void set_read_past_size_cb(ReadPastSizeCallback cb) { read_past_size_cb_ = move(cb); }
 
     /// Return the number of bytes left in the range for this stream.

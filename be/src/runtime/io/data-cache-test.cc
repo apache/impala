@@ -16,9 +16,9 @@
 // under the License.
 
 #include <algorithm>
-#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <fstream>
+#include <functional>
 #include <gflags/gflags.h>
 #include <rapidjson/document.h>
 #include <sys/stat.h>
@@ -141,7 +141,7 @@ class DataCacheBaseTest : public testing::Test {
       num_misses[i] = 0;
       string thread_name = Substitute("thread-$0", i);
       ASSERT_OK(Thread::Create("data-cache-test", thread_name,
-          boost::bind(&DataCacheBaseTest::ThreadFn, this,
+          std::bind(&DataCacheBaseTest::ThreadFn, this,
              use_per_thread_filename ? thread_name : "", cache, max_start_offset,
              &barrier, &num_misses[i], &write_times_us[i]), &thread));
       threads.emplace_back(std::move(thread));

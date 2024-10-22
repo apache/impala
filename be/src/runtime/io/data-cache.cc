@@ -19,6 +19,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <functional>
 #include <mutex>
 #include <string.h>
 #include <unistd.h>
@@ -76,6 +77,9 @@ using kudu::WritableFile;
 using strings::SkipEmpty;
 using strings::Split;
 using boost::shared_mutex;
+using std::bind;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 #ifdef NDEBUG
 #define ENABLE_CHECKSUMMING (false)

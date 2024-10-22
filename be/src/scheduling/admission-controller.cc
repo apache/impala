@@ -17,7 +17,6 @@
 
 #include "scheduling/admission-controller.h"
 
-#include <boost/mem_fn.hpp>
 #include <gutil/strings/stringpiece.h>
 #include <gutil/strings/substitute.h>
 

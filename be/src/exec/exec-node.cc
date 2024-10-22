@@ -18,6 +18,7 @@
 #include "exec/exec-node.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include <functional>
 #include <memory>
 #include <sstream>
 #include <unistd.h>  // for sleep()
@@ -326,7 +327,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
   rows_returned_counter_ = ADD_COUNTER(runtime_profile_, "RowsReturned", TUnit::UNIT);
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
       ROW_THROUGHPUT_COUNTER, TUnit::UNIT_PER_SECOND,
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_,
+      std::bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_,
           runtime_profile()->total_time_counter()));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(conjuncts_, state, pool_, expr_perm_pool(),
       expr_results_pool(), &conjunct_evals_));

@@ -17,9 +17,9 @@
 
 #pragma once
 
+#include <functional>
 #include <map>
 #include <string>
-#include <boost/function.hpp>
 #include <boost/thread/pthread/shared_mutex.hpp>
 #include <shared_mutex>
 #include <rapidjson/fwd.h>
@@ -70,9 +70,9 @@ class Webserver {
   using WebRequest = kudu::WebCallbackRegistry::WebRequest;
   using HttpStatusCode = kudu::HttpStatusCode;
 
-  typedef boost::function<void (const WebRequest& req, rapidjson::Document* json)>
+  typedef std::function<void (const WebRequest& req, rapidjson::Document* json)>
       UrlCallback;
-  typedef boost::function<void (const WebRequest& req, std::stringstream* output,
+  typedef std::function<void (const WebRequest& req, std::stringstream* output,
       HttpStatusCode* response)> RawUrlCallback;
 
   /// Any callback may add a member to their Json output with key ENABLE_RAW_HTML_KEY;

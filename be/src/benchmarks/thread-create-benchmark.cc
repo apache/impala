@@ -17,6 +17,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <functional>
 #include <iostream>
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -25,10 +26,11 @@
 #include "util/stopwatch.h"
 
 #include <boost/thread/thread.hpp>
-#include <boost/bind.hpp>
 
 #include "common/names.h"
 
+using std::bind;
+using std::function;
 using namespace impala;
 
 // Benchmark for thread creation time using native threads and

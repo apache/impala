@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <functional>
 #include <mutex>
 #include <boost/scoped_ptr.hpp>
 
@@ -55,7 +56,7 @@ class SortedRunMerger {
   /// is owned by the supplier (i.e. not SortedRunMerger). eos is indicated by a NULL
   /// batch being returned. The returned batch can have any number of rows (including
   /// zero).
-  typedef boost::function<Status (RowBatch**)> RunBatchSupplierFn;
+  typedef std::function<Status (RowBatch**)> RunBatchSupplierFn;
   typedef void (*HeapifyHelperFn)(SortedRunMerger*, int);
 
   SortedRunMerger(const TupleRowComparator& comparator, const RowDescriptor* row_desc,

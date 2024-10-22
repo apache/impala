@@ -17,7 +17,7 @@
 
 #include "util/runtime-profile-counters.h"
 
-#include <boost/bind.hpp>
+#include <functional>
 
 #include "common/object-pool.h"
 #include "util/periodic-counter-updater.h"
@@ -156,7 +156,7 @@ RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
     const string& name, Counter* src_counter, bool is_system) {
   DCHECK(src_counter != NULL);
   return AddSamplingTimeSeriesCounter(name, src_counter->unit(),
-      bind(&Counter::value, src_counter), is_system);
+      std::bind(&Counter::value, src_counter), is_system);
 }
 
 RuntimeProfile::ChunkedTimeSeriesCounter::ChunkedTimeSeriesCounter(

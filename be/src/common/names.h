@@ -168,15 +168,6 @@ using boost::unordered_map;
 using boost::unordered_set;
 #endif
 
-#ifdef BOOST_FUNCTION_PROLOGUE_HPP
-using boost::function;
-#endif
-
-#ifdef BOOST_BIND_HPP_INCLUDED
-using boost::bind;
-using boost::mem_fn;
-#endif
-
 #ifdef STRINGS_SUBSTITUTE_H_
 using strings::Substitute;
 #endif

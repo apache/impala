@@ -17,10 +17,9 @@
 
 #include <stdlib.h>
 #include <algorithm>
+#include <functional>
 #include <iostream>
 #include <random>
-
-#include <boost/bind.hpp>
 
 #include "common/object-pool.h"
 #include "testutil/gtest-util.h"
@@ -626,7 +625,7 @@ TEST(CountersTest, DerivedCounters) {
 
   RuntimeProfile::DerivedCounter* throughput_counter =
       profile->AddDerivedCounter("throughput", TUnit::BYTES,
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_counter, ticks_counter));
+      std::bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_counter, ticks_counter));
 
   bytes_counter->Set(10);
   EXPECT_EQ(throughput_counter->value(), 10);

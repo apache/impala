@@ -17,6 +17,8 @@
 
 #include "exec/kudu/kudu-scan-node.h"
 
+#include <functional>
+
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "exec/exec-node-util.h"
@@ -36,6 +38,10 @@
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
+
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
 
 DEFINE_int32(kudu_max_row_batches, 0, "The maximum size of the row batch queue, "
     " for Kudu scanners.");

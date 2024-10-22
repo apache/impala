@@ -18,6 +18,7 @@
 #include "exec/hdfs-scan-node.h"
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <sstream>
 
@@ -50,6 +51,10 @@ DEFINE_int32(max_row_batches, 0,
 #ifndef NDEBUG
 DECLARE_bool(skip_file_runtime_filtering);
 #endif
+
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
 
 using namespace impala;
 using namespace impala::io;

@@ -19,9 +19,8 @@
 #ifndef IMPALA_UTIL_INTERNAL_QUEUE_H
 #define IMPALA_UTIL_INTERNAL_QUEUE_H
 
+#include <functional>
 #include <mutex>
-
-#include <boost/function.hpp>
 
 #include "util/fake-lock.h"
 #include "util/spinlock.h"
@@ -267,7 +266,7 @@ class InternalQueueBase {
   // Iterate over elements of queue, calling 'fn' for each element. If 'fn' returns
   // false, terminate iteration. It is invalid to call other InternalQueue methods
   // from 'fn'.
-  void Iterate(const boost::function<bool(T*)>& fn) {
+  void Iterate(const std::function<bool(T*)>& fn) {
     std::lock_guard<LockType> lock(lock_);
     for (Node* current = head_; current != nullptr; current = current->next) {
       if (!fn(reinterpret_cast<T*>(current))) return;
@@ -278,7 +277,7 @@ class InternalQueueBase {
   // larger than the size of the queue, iteration will finish after the last element
   // reached. If 'fn' returns false, terminate iteration. It is invalid to call other
   // InternalQueue methods from 'fn'.
-  void IterateFirstN(const boost::function<bool(T*)>& fn, int n) {
+  void IterateFirstN(const std::function<bool(T*)>& fn, int n) {
     std::lock_guard<LockType> lock(lock_);
     for (Node* current = head_; (current != nullptr) && (n > 0);
          current = current->next) {

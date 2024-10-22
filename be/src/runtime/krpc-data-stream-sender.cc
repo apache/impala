@@ -17,10 +17,9 @@
 
 #include "runtime/krpc-data-stream-sender.h"
 
-#include <boost/bind.hpp>
-
 #include <chrono>
 #include <condition_variable>
+#include <functional>
 #include <iostream>
 #include <thrift/protocol/TDebugProtocol.h>
 
@@ -69,6 +68,7 @@ DEFINE_int64_hidden(data_stream_sender_eos_timeout_ms, 60*60*1000,
     "the timeout.");
 
 using std::condition_variable_any;
+using std::placeholders::_1;
 using namespace apache::thrift;
 using kudu::rpc::RpcController;
 using kudu::rpc::RpcSidecar;
@@ -214,7 +214,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   int CalculateRowBatchCapacity() const;
 
   // The type for a RPC worker function.
-  typedef boost::function<Status()> DoRpcFn;
+  typedef std::function<Status()> DoRpcFn;
 
   bool IsLocal() const { return is_local_; }
   KrpcDataStreamSender* GetParent() { return parent_; }
@@ -499,7 +499,7 @@ void KrpcDataStreamSender::Channel::HandleFailedRPC(const DoRpcFn& rpc_fn,
     RpcMgr* rpc_mgr = ExecEnv::GetInstance()->rpc_mgr();
     // RetryCb() is scheduled to be called in a reactor context.
     rpc_mgr->messenger()->ScheduleOnReactor(
-        boost::bind(&KrpcDataStreamSender::Channel::RetryCb, this, rpc_fn, _1),
+        std::bind(&KrpcDataStreamSender::Channel::RetryCb, this, rpc_fn, _1),
         MonoDelta::FromMilliseconds(FLAGS_rpc_retry_interval_ms));
     return;
   }
@@ -547,7 +547,7 @@ void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
       LogSlowFailedRpc("TransmitData", total_time, controller_status);
     }
     DoRpcFn rpc_fn =
-        boost::bind(&KrpcDataStreamSender::Channel::DoTransmitDataRpc, this);
+        std::bind(&KrpcDataStreamSender::Channel::DoTransmitDataRpc, this);
     const string& prepend =
         Substitute("TransmitData() to $0 failed", NetworkAddressPBToString(address_));
     HandleFailedRPC(rpc_fn, controller_status, prepend);
@@ -585,7 +585,7 @@ Status KrpcDataStreamSender::Channel::DoTransmitDataRpc() {
 
   resp_.Clear();
   proxy_->TransmitDataAsync(req, &resp_, &rpc_controller_,
-      boost::bind(&KrpcDataStreamSender::Channel::TransmitDataCompleteCb, this));
+      std::bind(&KrpcDataStreamSender::Channel::TransmitDataCompleteCb, this));
   // 'req' took ownership of 'header'. Need to release its ownership or 'header' will be
   // deleted by destructor.
   req.release_row_batch_header();
@@ -667,7 +667,7 @@ void KrpcDataStreamSender::Channel::EndDataStreamCompleteCb() {
       LogSlowFailedRpc("EndDataStream", total_time_ns, controller_status);
     }
     DoRpcFn rpc_fn =
-        boost::bind(&KrpcDataStreamSender::Channel::DoEndDataStreamRpc, this);
+        std::bind(&KrpcDataStreamSender::Channel::DoEndDataStreamRpc, this);
     const string& prepend =
         Substitute("EndDataStream() to $0 failed", NetworkAddressPBToString(address_));
     HandleFailedRPC(rpc_fn, controller_status, prepend);
@@ -690,7 +690,7 @@ Status KrpcDataStreamSender::Channel::DoEndDataStreamRpc() {
   eos_resp_.Clear();
   rpc_start_time_ns_ = MonotonicNanos();
   proxy_->EndDataStreamAsync(eos_req, &eos_resp_, &rpc_controller_,
-      boost::bind(&KrpcDataStreamSender::Channel::EndDataStreamCompleteCb, this));
+      std::bind(&KrpcDataStreamSender::Channel::EndDataStreamCompleteCb, this));
   return Status::OK();
 }
 

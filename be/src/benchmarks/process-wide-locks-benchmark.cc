@@ -17,9 +17,9 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <functional>
 #include <iostream>
 
-#include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -112,8 +112,8 @@ void ImpalaThreadStarter(void (*func) (const TUniqueId&, int), int num_threads,
 
   for (int i=0; i < num_threads; ++i) {
     unique_ptr<Thread> thread;
-    function<void ()> f =
-        bind(func, query_ids[i], func_arg);
+    std::function<void ()> f =
+        std::bind(func, query_ids[i], func_arg);
     Status s =
         Thread::Create("mythreadgroup", "thread", f, &thread);
     DCHECK(s.ok());

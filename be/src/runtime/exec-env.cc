@@ -17,6 +17,7 @@
 
 #include "runtime/exec-env.h"
 
+#include <functional>
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
@@ -82,6 +83,11 @@
 
 using boost::algorithm::join;
 using kudu::rpc::GeneratedServiceIf;
+using std::bind;
+using std::mem_fn;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
 using namespace strings;
 
 DEFINE_string(catalog_service_host, "localhost",
