@@ -1210,9 +1210,22 @@ public class HdfsScanNode extends ScanNode {
     totalBytesPerFsEC_ = new TreeMap<>();
 
     Preconditions.checkState((sampleParams_ == null) == (sampledPartitions_ == null));
-    int partitionsSize = getSampledOrRawPartitions().size();
-    boolean allParquet = (partitionsSize > 0) ? true : false;
-    boolean allColumnarFormat = (partitionsSize > 0) ? true : false;
+    // Assume all table files are in parquet format and all in columnar format
+    // until proven otherwise.
+    boolean allParquet = true;
+    boolean allColumnarFormat = true;
+
+    if (this instanceof IcebergScanNode && this.fileFormats_.isEmpty()) {
+      // Iceberg tables always have one partition, even if the scan node contains zero
+      // file descriptors. TODO: IMPALA-13267
+      allParquet = false;
+      allColumnarFormat = false;
+    } else {
+      // If table has no partition, then it is not all parquet, nor it is all columnar.
+      int partitionsSize = getSampledOrRawPartitions().size();
+      allParquet = partitionsSize > 0;
+      allColumnarFormat = partitionsSize > 0;
+    }
     long simpleLimitNumRows = 0; // only used for the simple limit case
     boolean isSimpleLimit = sampleParams_ == null &&
         (analyzer.getQueryCtx().client_request.getQuery_options()
@@ -1230,7 +1243,7 @@ public class HdfsScanNode extends ScanNode {
     String lastFsAuthority = null;
     FileSystem lastFileSytem = null;
     for (FeFsPartition partition : getSampledOrRawPartitions()) {
-      // Save location to local variable beacuse getLocation() can be slow as it needs to
+      // Save location to local variable because getLocation() can be slow as it needs to
       // decompress the partition's location.
       String partitionLocation = partition.getLocation();
       Path partitionPath = new Path(partitionLocation);
