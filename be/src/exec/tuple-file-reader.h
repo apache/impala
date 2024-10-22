@@ -66,6 +66,8 @@ public:
   RuntimeProfile::Counter* read_timer_;
   // Total time spent on deserialization.
   RuntimeProfile::Counter* deserialize_timer_;
+  // Total bytes read
+  RuntimeProfile::Counter* bytes_read_;
 
   std::unique_ptr<kudu::RWFile> reader_;
   size_t offset_ = 0;

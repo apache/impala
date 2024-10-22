@@ -47,11 +47,21 @@ def table_value(seed):
   return '"{0}", {1}, "{2}"'.format(name, age, address)
 
 
+def getCounterValues(profile, key):
+  # This matches lines like these:
+  #     NumTupleCacheHits: 1 (1)
+  #     TupleCacheBytesWritten: 123.00 B (123)
+  # The regex extracts the value inside the parenthesis to get a simple numeric value
+  # rather than a pretty print of the same value.
+  counter_str_list = re.findall(r"{0}{1}: .* \((.*)\)".format(NODE_INDENT, key), profile)
+  return [int(v) for v in counter_str_list]
+
+
 def assertCounter(profile, key, val, num_matches):
   if not isinstance(num_matches, list):
     num_matches = [num_matches]
-  assert profile.count("{0}{1}: {2} ".format(NODE_INDENT, key, val)) in num_matches, \
-      re.findall(r"{0}{1}: .*".format(NODE_INDENT, key), profile)
+  values = getCounterValues(profile, key)
+  assert len([v for v in values if v == val]) in num_matches, values
 
 
 def assertCounters(profile, num_hits, num_halted, num_skipped, num_matches=1):
@@ -150,6 +160,11 @@ class TestTupleCache(TestTupleCacheBase):
     assert result1.data == result2.data
     assertCounters(result1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
     assertCounters(result2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    # Verify that the bytes written by the first profile are the same as the bytes
+    # read by the second profile.
+    bytes_written = getCounterValues(result1.runtime_profile, "TupleCacheBytesWritten")
+    bytes_read = getCounterValues(result2.runtime_profile, "TupleCacheBytesRead")
+    assert sorted(bytes_written) == sorted(bytes_read)
 
   @CustomClusterTestSuite.with_args(
       start_args=CACHE_START_ARGS + " --tuple_cache_capacity=64MB", cluster_size=1,
@@ -167,6 +182,10 @@ class TestTupleCache(TestTupleCacheBase):
     assert result2.success
     assert result1.data == result2.data
     assertCounters(result1.runtime_profile, num_hits=0, num_halted=1, num_skipped=0)
+    bytes_written = getCounterValues(result1.runtime_profile, "TupleCacheBytesWritten")
+    # This is running on a single node, so there should be a single location where
+    # TupleCacheBytesWritten exceeds 0.
+    assert len([v for v in bytes_written if v > 0]) == 1
     assertCounters(result2.runtime_profile, num_hits=0, num_halted=0, num_skipped=1)
 
   @CustomClusterTestSuite.with_args(

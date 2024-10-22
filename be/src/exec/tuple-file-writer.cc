@@ -45,6 +45,8 @@ TupleFileWriter::TupleFileWriter(
     tracker_(new MemTracker(-1, "TupleFileWriter", parent)),
     write_timer_(profile ? ADD_TIMER(profile, "TupleCacheWriteTime") : nullptr),
     serialize_timer_(profile ? ADD_TIMER(profile, "TupleCacheSerializeTime") : nullptr),
+    bytes_written_(profile ?
+        ADD_COUNTER(profile, "TupleCacheBytesWritten", TUnit::BYTES) : nullptr),
     max_file_size_(max_file_size) {}
 
 TupleFileWriter::~TupleFileWriter() {
@@ -139,6 +141,7 @@ Status TupleFileWriter::Write(RuntimeState* state, RowBatch* row_batch) {
   KUDU_RETURN_IF_ERROR(
       tmp_file_->AppendV(kudu::ArrayView<const kudu::Slice>(slices)),
       "Failed to write to cache file");
+  COUNTER_ADD(bytes_written_, num_bytes_to_write);
 
   return Status::OK();
 }

@@ -37,7 +37,9 @@ TupleFileReader::TupleFileReader(
     tracker_(new MemTracker(-1, "TupleFileReader", parent)),
     read_timer_(profile ? ADD_TIMER(profile, "TupleCacheReadTime") : nullptr),
     deserialize_timer_(
-        profile ? ADD_TIMER(profile, "TupleCacheDeserializeTime") : nullptr) {}
+        profile ? ADD_TIMER(profile, "TupleCacheDeserializeTime") : nullptr),
+    bytes_read_(profile ?
+        ADD_COUNTER(profile, "TupleCacheBytesRead", TUnit::BYTES) : nullptr) {}
 
 TupleFileReader::~TupleFileReader() {
   // MemTracker expects an explicit close.
@@ -86,6 +88,9 @@ Status TupleFileReader::GetNext(RuntimeState *state,
   KUDU_RETURN_IF_ERROR(reader_->ReadV(offset_,
       kudu::ArrayView<kudu::Slice>(chunk_lens_slices)),
       "Failed to read cache file");
+  size_t chunk_lens_slices_size = sizeof(header_len) + sizeof(tuple_data_len) +
+      sizeof(tuple_offsets_len);
+  COUNTER_ADD(bytes_read_, chunk_lens_slices_size);
 
   // tuple_data_len can be zero, see IMPALA-13411.
   if (header_len == 0 || tuple_offsets_len == 0) {
@@ -95,7 +100,7 @@ Status TupleFileReader::GetNext(RuntimeState *state,
     DCHECK(false) << err_msg;
     return Status(Substitute("Invalid tuple cache file: $0", err_msg));
   }
-  offset_ += sizeof(header_len) + sizeof(tuple_data_len) + sizeof(tuple_offsets_len);
+  offset_ += chunk_lens_slices_size;
 
   // Now, we know the total size of the variable-length data, and we can read
   // it in a single chunk.
@@ -124,6 +129,7 @@ Status TupleFileReader::GetNext(RuntimeState *state,
   KUDU_RETURN_IF_ERROR(reader_->ReadV(offset_,
       kudu::ArrayView<kudu::Slice>(varlen_data_slices)),
       "Failed to read tuple cache file");
+  COUNTER_ADD(bytes_read_, varlen_size);
   offset_ += varlen_size;
 
   RowBatchHeaderPB header;

@@ -95,6 +95,8 @@ private:
   RuntimeProfile::Counter* write_timer_;
   // Total time spent on serialization.
   RuntimeProfile::Counter* serialize_timer_;
+  // Total bytes written
+  RuntimeProfile::Counter* bytes_written_;
   // Maximum size for the resulting file
   size_t max_file_size_;
   // True if the file reached the maximum size
