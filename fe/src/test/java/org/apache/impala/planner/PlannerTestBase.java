@@ -428,7 +428,10 @@ public class PlannerTestBase extends FrontendTestBase {
         .setMax_fragment_instances_per_node(12)
         .setReplica_preference(TReplicaPreference.REMOTE)
         .setSlot_count_strategy(TSlotCountStrategy.PLANNER_CPU_ASK)
-        .setPlanner_testcase_mode(true);
+        .setPlanner_testcase_mode(true)
+        // Required so that output doesn't vary by whether scanned tables have stats &
+        // numRows property or not.
+        .setDisable_hdfs_num_rows_estimate(true);
   }
 
   protected static Set<PlannerTestOption> tpcdsParquetTestOptions() {

@@ -755,3 +755,46 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_zero_cardinality, OVER
    tuple-ids=0 row-size=96B cardinality=0 cost=0
    in pipelines: 00(GETNEXT)
 ====
+# Partitioned insert with unavailable stats.
+# tpcds_seq_snap does not have stats collected.
+# Exchange node must exist in query plan.
+create table store_sales_without_stats partitioned by (part_col)
+stored as parquet as
+select *, ss_item_sk as part_col
+from tpcds_seq_snap.store_sales
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=102.00MB Threads=13
+Per-Host Resource Estimates: Memory=1.36GB
+F01:PLAN FRAGMENT [HASH(ss_item_sk)] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=1.12GB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[0, 3954235]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_without_stats, OVERWRITE=false, PARTITION-KEYS=(ss_item_sk)]
+|  partitions=unavailable
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk, ss_item_sk
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=3954235
+|
+02:SORT
+|  order by: ss_item_sk ASC NULLS LAST
+|  mem-estimate=128.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=100B cardinality=unavailable cost=0
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(ss_item_sk)]
+|  mem-estimate=12.19MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=100B cardinality=unavailable cost=0
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=20.06MB mem-reservation=8.00MB thread-reservation=1
+max-parallelism=120 segment-costs=[1200000000]
+00:SCAN HDFS [tpcds_seq_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=215.96MB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/1824 rows=unavailable
+     columns missing stats: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=100B cardinality=unavailable cost=1200000000
+   in pipelines: 00(GETNEXT)
+====

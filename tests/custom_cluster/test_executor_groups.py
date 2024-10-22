@@ -944,27 +944,51 @@ class TestExecutorGroups(CustomClusterTestSuite):
     nonexistence of 'not_expected_in_profile' in query profile.
     Caller is reponsible to close self.client at the end of test."""
     result = self.execute_query_expect_success(self.client, query)
+    profile = str(result.runtime_profile)
     for expected_profile in expected_strings_in_profile:
-      assert expected_profile in str(result.runtime_profile)
+      assert expected_profile in profile, (
+        "Expect '{0}' IN query profile but can not find it.\n{1}".format(
+          expected_profile, profile
+        )
+      )
     for not_expected in not_expected_in_profile:
-      assert not_expected not in str(result.runtime_profile)
+      assert not_expected not in profile, (
+        "Expect '{0}' NOT IN query profile but found it.\n{1}".format(
+          expected_profile, profile
+        )
+      )
     return result
 
   def __verify_fs_writers(self, result, expected_num_writers,
                           expected_instances_per_host):
     assert 'HDFS WRITER' in result.exec_summary[0]['operator'], result.runtime_profile
     num_writers = int(result.exec_summary[0]['num_instances'])
-    assert num_writers == expected_num_writers
+    assert num_writers == expected_num_writers, (
+      "Expect {0} num_writers but got {1}.\n{2}".format(
+        expected_num_writers, num_writers, result.runtime_profile)
+    )
     num_hosts = len(expected_instances_per_host)
-    regex = (r'Per Host Number of Fragment Instances:'
-             + (num_hosts * r'.*?\((.*?)\)') + r'.*?\n')
+    instance_count_key = 'Per Host Number of Fragment Instances:'
+    regex = (instance_count_key + (num_hosts * r'.*?\((.*?)\)') + r'.*?\n')
     matches = re.findall(regex, result.runtime_profile)
-    assert len(matches) == 1
-    assert len(matches[0]) == num_hosts
+    assert len(matches) == 1, (
+      "Expect {0} info string matching '{1}' but got {2}.\n{3}".format(
+        1, instance_count_key, len(matches), result.runtime_profile
+      )
+    )
+    assert len(matches[0]) == num_hosts, (
+      "Expect {0} hosts in '{1}' info string but got {2}.\n{3}".format(
+        num_hosts, instance_count_key, len(matches[0]), result.runtime_profile
+      )
+    )
     num_instances_per_host = [int(i) for i in matches[0]]
     num_instances_per_host.sort()
     expected_instances_per_host.sort()
-    assert num_instances_per_host == expected_instances_per_host
+    assert num_instances_per_host == expected_instances_per_host, (
+      "Expect {0} instance distribution but got {1}.\n{2}".format(
+        expected_instances_per_host, num_instances_per_host, result.runtime_profile
+      )
+    )
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
@@ -1363,25 +1387,28 @@ class TestExecutorGroups(CustomClusterTestSuite):
       ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
        "Verdict: Match", "CpuAsk: 1", "CpuAskBounded: 1", "|  partitions=6"])
     self.__verify_fs_writers(result, 1, [0, 1])
+    # END testing insert + MAX_FS_WRITER
+
+    self._verify_query_num_for_resource_pool("root.tiny", 1)
+    self._verify_query_num_for_resource_pool("root.small", 2)
+    self._verify_query_num_for_resource_pool("root.large", 1)
+    self._verify_total_admitted_queries("root.tiny", 4)
+    self._verify_total_admitted_queries("root.small", 3)
+    self._verify_total_admitted_queries("root.large", 4)
+
+    # Starting from this point, do not validate request pool assignment and fs writers
+    # distribution, because different target file system may come up with different
+    # cardinality, cost, and parallelism. Successful query execution is sufficient.
 
     # Test partitioned insert overwrite, with unknown partition estimate.
-    result = self._run_query_and_verify_profile(
+    # Cardinality is calculated using byte-based estimation.
+    self._run_query_and_verify_profile(
       ("insert overwrite {0}.{1} ({2}) partition (ss_store_sk) "
        "select {3} from {0}.{4} "
        "where ss_store_sk=1").format(
          unique_database, "test_ctas7", store_sales_no_part_col, store_sales_columns,
          "test_ctas4"),
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Verdict: Match", "CpuAsk: 9", "CpuAskBounded: 9", "|  partitions=unavailable"])
-    self.__verify_fs_writers(result, 3, [0, 3, 3, 3])
-    # END testing insert + MAX_FS_WRITER
-
-    self._verify_query_num_for_resource_pool("root.tiny", 1)
-    self._verify_query_num_for_resource_pool("root.small", 2)
-    self._verify_query_num_for_resource_pool("root.large", 2)
-    self._verify_total_admitted_queries("root.tiny", 4)
-    self._verify_total_admitted_queries("root.small", 3)
-    self._verify_total_admitted_queries("root.large", 5)
+      ["|  partitions=unavailable"])
 
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_two(self):

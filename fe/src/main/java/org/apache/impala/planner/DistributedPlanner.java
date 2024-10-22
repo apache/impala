@@ -201,10 +201,10 @@ public class DistributedPlanner {
       List<PlanFragment> fragments)
       throws ImpalaException {
     boolean isComputeCost = analyzer.getQueryOptions().isCompute_processing_cost();
-    boolean enforce_hdfs_writer_limit = dmlStmt.getTargetTable() instanceof FeFsTable
+    boolean enforceHdfsWriterLimit = dmlStmt.getTargetTable() instanceof FeFsTable
         && (analyzer.getQueryOptions().getMax_fs_writers() > 0 || isComputeCost);
 
-    if (dmlStmt.hasNoShuffleHint() && !enforce_hdfs_writer_limit) return inputFragment;
+    if (dmlStmt.hasNoShuffleHint() && !enforceHdfsWriterLimit) return inputFragment;
 
     List<Expr> partitionExprs = new ArrayList<>(dmlStmt.getPartitionKeyExprs());
     // Ignore constants for the sake of partitioning.
@@ -214,10 +214,10 @@ public class DistributedPlanner {
     // Kudu tables here (IMPALA-5254).
     DataPartition inputPartition = inputFragment.getDataPartition();
     if (!partitionExprs.isEmpty()
-        && analyzer.setsHaveValueTransfer(inputPartition.getPartitionExprs(),
-            partitionExprs, true)
+        && analyzer.setsHaveValueTransfer(
+            inputPartition.getPartitionExprs(), partitionExprs, true)
         && !(dmlStmt.getTargetTable() instanceof FeKuduTable)
-        && !enforce_hdfs_writer_limit) {
+        && !enforceHdfsWriterLimit) {
       return inputFragment;
     }
 
@@ -234,7 +234,7 @@ public class DistributedPlanner {
     boolean hasHdfsScanORUnion = !hdfsScanNodes.isEmpty() || !unionNodes.isEmpty();
 
     int expectedNumInputInstance = inputFragment.getNumInstances();
-    if (enforce_hdfs_writer_limit && isComputeCost) {
+    if (enforceHdfsWriterLimit && isComputeCost) {
       // Default to minParallelism * numNodes if cardinality or average row size is
       // unknown.
       int minInstances = IntMath.saturatedMultiply(
@@ -249,7 +249,7 @@ public class DistributedPlanner {
         // Both cardinality and avg row size is known.
         costBasedMaxWriter = HdfsTableSink.bytesBasedNumWriters(
             inputFragment.getNumNodes(), maxInstances, isPartitioned, numPartitions,
-            root.getInputCardinality(), root.getAvgRowSize());
+            root.getCardinality(), root.getAvgRowSize());
       }
 
       if (maxHdfsWriters > 0) {
@@ -260,16 +260,19 @@ public class DistributedPlanner {
         maxHdfsWriters = costBasedMaxWriter;
       }
       LOG.trace("isPartitioned={} numDistinctPartition={} costBasedMaxWriter={} "
-              + "maxHdfsWriters={}",
-          isPartitioned, numPartitions, costBasedMaxWriter, maxHdfsWriters);
+              + "maxHdfsWriters={} inputCardinality={}",
+          isPartitioned, numPartitions, costBasedMaxWriter, maxHdfsWriters,
+          root.getCardinality());
       Preconditions.checkState(maxHdfsWriters > 0);
       dmlStmt.setMaxTableSinks(maxHdfsWriters);
       // At this point, parallelism of writer fragment is fixed and will not be adjusted
       // by costing phase.
 
       if (!hdfsScanNodes.isEmpty() && fragments.size() == 1) {
-        // If input fragment have HdfsScanNode and input fragment is the only fragment in
-        // the plan, check for opportunity to collocate scan nodes and table sink.
+        // If input fragment have HdfsScanNode, and input fragment is the only fragment in
+        // the plan, and the scan cost is low, expectedNumInputInstance can be lowered
+        // down. This can increase chance to  colocate scan nodes and table sinks
+        // (case 3 below).
         // Since the actual costing phase only happens later after distributed plan
         // created, this code redundantly compute the scan cost ahead of costing phase
         // to help estimate the scan parallelism.
@@ -281,9 +284,7 @@ public class DistributedPlanner {
               maxScanThread, scanCost.getNumInstanceMax(inputFragment.getNumNodes()));
         }
         maxScanThread = Math.min(maxInstances, maxScanThread);
-        // Override expectedNumInputInstance so that collocation may happen
-        // (case 3 in branch below).
-        expectedNumInputInstance = maxScanThread;
+        expectedNumInputInstance = Math.min(maxScanThread, expectedNumInputInstance);
       }
     }
 
@@ -295,7 +296,7 @@ public class DistributedPlanner {
         // TODO: make a more sophisticated decision here for partitioned tables and when
         // we have info about tablet locations.
         if (partitionExprs.isEmpty()) return inputFragment;
-      } else if (!enforce_hdfs_writer_limit || !hasHdfsScanORUnion
+      } else if (!enforceHdfsWriterLimit || !hasHdfsScanORUnion
           || (expectedNumInputInstance <= maxHdfsWriters)) {
         // Only consider skipping the addition of an exchange node if
         // 1. The hdfs writer limit does not apply
@@ -306,13 +307,15 @@ public class DistributedPlanner {
         // Basically covering all cases where we don't mind restricting the parallelism
         // of their instances.
         Preconditions.checkState(
-            expectedNumInputInstance <= inputFragment.getNumInstances());
-        int input_instances = expectedNumInputInstance;
-        if (enforce_hdfs_writer_limit && !hasHdfsScanORUnion) {
+            expectedNumInputInstance <= inputFragment.getNumInstances(),
+            "expectedNumInputInstance (%s) > inputFragment.getNumInstances() (%s)",
+            expectedNumInputInstance, inputFragment.getNumInstances());
+        int inputInstances = expectedNumInputInstance;
+        if (enforceHdfsWriterLimit && !hasHdfsScanORUnion) {
           // For an internal fragment we enforce an upper limit based on the
           // resulting maxHdfsWriters.
           Preconditions.checkState(maxHdfsWriters > 0);
-          input_instances = Math.min(input_instances, maxHdfsWriters);
+          inputInstances = Math.min(inputInstances, maxHdfsWriters);
         }
         // If the existing partition exprs are a subset of the table partition exprs,
         // check if it is distributed across all nodes. If so, don't repartition.
@@ -324,7 +327,7 @@ public class DistributedPlanner {
         if (Expr.isSubset(inputPartition.getPartitionExprs(), partitionExprs)) {
           long numInputPartitions =
               getNumDistinctValues(inputPartition.getPartitionExprs());
-          if (numInputPartitions >= input_instances) { return inputFragment; }
+          if (numInputPartitions >= inputInstances) { return inputFragment; }
         }
 
         // Don't repartition if we know we have fewer partitions than nodes
@@ -335,7 +338,7 @@ public class DistributedPlanner {
         // size in the particular file format of the output table/partition.
         // We should always know on how many nodes our input is running.
         Preconditions.checkState(expectedNumInputInstance != -1);
-        if (numPartitions > 0 && numPartitions <= input_instances) {
+        if (numPartitions > 0 && numPartitions <= inputInstances) {
           return inputFragment;
         }
       }
@@ -347,7 +350,7 @@ public class DistributedPlanner {
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition;
     if (partitionExprs.isEmpty()) {
-      if (enforce_hdfs_writer_limit
+      if (enforceHdfsWriterLimit
           && inputFragment.getDataPartition().getType() == TPartitionType.RANDOM) {
         // This ensures the parallelism of the writers is maintained while maintaining
         // legacy behavior(when not using MAX_FS_WRITER query option).
