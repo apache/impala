@@ -25,11 +25,13 @@ import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlSetOperator;
+import org.apache.calcite.sql.SqlPrefixOperator;
 import org.apache.calcite.sql.fun.ImpalaGroupingFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
 import org.apache.calcite.sql.fun.SqlCountAggFunction;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
@@ -164,6 +166,18 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
           DIVIDE_ADJUSTED_RETURN_TYPE_NULLABLE,
           InferTypes.FIRST_KNOWN,
           OperandTypes.DIVISION_OPERATOR);
+
+  // UNARY_MINUS is the same as the one in Calcite. We need it in
+  // our custom operators because "subtract" is here, and all
+  // operators with "-" need to be in the same operator table.
+  public static final SqlPrefixOperator UNARY_MINUS =
+      new SqlPrefixOperator(
+          "-",
+          SqlKind.MINUS_PREFIX,
+          80,
+          ReturnTypes.ARG0,
+          InferTypes.RETURN_TYPE,
+          OperandTypes.NUMERIC_OR_INTERVAL);
 
   public static final SqlBinaryOperator PERCENT_REMAINDER =
       new SqlBinaryOperator(

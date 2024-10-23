@@ -57,8 +57,12 @@ public class FunctionResolver {
   public static Map<SqlKind, String> CALCITE_KIND_TO_IMPALA_FUNC =
       ImmutableMap.<SqlKind, String> builder()
       .put(SqlKind.EQUALS, "eq")
+      .put(SqlKind.IS_FALSE, "isfalse")
+      .put(SqlKind.IS_NOT_FALSE, "isnotfalse")
       .put(SqlKind.IS_NOT_NULL, "is_not_null_pred")
+      .put(SqlKind.IS_NOT_TRUE, "isnottrue")
       .put(SqlKind.IS_NULL, "is_null_pred")
+      .put(SqlKind.IS_TRUE, "istrue")
       .put(SqlKind.GREATER_THAN, "gt")
       .put(SqlKind.GREATER_THAN_OR_EQUAL, "ge")
       .put(SqlKind.LESS_THAN, "lt")
@@ -66,9 +70,12 @@ public class FunctionResolver {
       .put(SqlKind.NOT_EQUALS, "ne")
       .put(SqlKind.PLUS, "add")
       .put(SqlKind.MINUS, "subtract")
+      .put(SqlKind.MINUS_PREFIX, "negative")
       .put(SqlKind.TIMES, "multiply")
       .put(SqlKind.DIVIDE, "divide")
       .put(SqlKind.SUM0, "sum_init_zero")
+      .put(SqlKind.POSIX_REGEX_CASE_SENSITIVE, "regexp")
+      .put(SqlKind.POSIX_REGEX_CASE_INSENSITIVE, "iregexp")
       .build();
 
   // Map of Calcite names to an Impala function name when the names are different
@@ -90,6 +97,7 @@ public class FunctionResolver {
   public static Set<String> SPECIAL_PROCESSING_FUNCTIONS =
       ImmutableSet.<String> builder()
       .add("grouping_id")
+      .add("count")
       .build();
 
   public static Function getSupertypeFunction(RexCall call) {
@@ -180,6 +188,20 @@ public class FunctionResolver {
     if (lowercaseName.equals("grouping_id")) {
       return AggregateFunction.createRewrittenBuiltin(BuiltinsDb.getInstance(),
           lowercaseName, impalaArgTypes, Type.BIGINT, true, false, true);
+    }
+
+    // Hack.  The count function can have more than one parameter when it is
+    // of the form "count(distinct c1, c2)"  However, the function resolver only
+    // contains count functions with one parameter. It is only later on in
+    // the compilation that the AggregateInfo class changes the multiple
+    // parameters into one parameter. But we still have to deal with resolving
+    // count here.  So we just grab the first parameter so that it resolves
+    // properly.
+    if (lowercaseName.equals("count")) {
+      if (impalaArgTypes.size() > 1) {
+        impalaArgTypes = Lists.newArrayList(impalaArgTypes.get(0));
+      }
+      return getImpalaFunction(lowercaseName, impalaArgTypes, exactMatch);
     }
 
     throw new RuntimeException("Special function not found: " + lowercaseName);

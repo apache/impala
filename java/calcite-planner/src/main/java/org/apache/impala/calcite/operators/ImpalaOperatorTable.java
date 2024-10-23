@@ -79,6 +79,10 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       .add("covar_samp")
       .add("coalesce")
       .add("lag")
+      .add("trim")
+      .add("extract")
+      .add("regr_count")
+      .add("localtime")
       .build();
 
   private static ImpalaOperatorTable INSTANCE;
@@ -94,7 +98,7 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
     ImpalaCustomOperatorTable.instance().lookupOperatorOverloads(opName, category, syntax,
         operatorList, nameMatcher);
 
-    if (operatorList.size() == 1) {
+    if (operatorList.size() >= 1) {
       return;
     }
 

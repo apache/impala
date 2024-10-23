@@ -3970,7 +3970,6 @@ SqlCall StringAggFunctionCall() :
     (
         <ARRAY_AGG> { s = span(); op = SqlLibraryOperators.ARRAY_AGG; }
     |   <ARRAY_CONCAT_AGG> { s = span(); op = SqlLibraryOperators.ARRAY_CONCAT_AGG; }
-    |   <GROUP_CONCAT> { s = span(); op = SqlLibraryOperators.GROUP_CONCAT; }
     |   <STRING_AGG> { s = span(); op = SqlLibraryOperators.STRING_AGG; }
     )
     <LPAREN>
@@ -6178,16 +6177,6 @@ SqlNode BuiltinFunctionCall() :
             return f.createCall(s.end(this), args);
         }
     |
-        <EXTRACT> { s = span(); }
-        <LPAREN> unit = TimeUnitOrName() {
-            args.add(unit);
-        }
-        <FROM>
-        AddExpression(args, ExprContext.ACCEPT_SUB_QUERY)
-        <RPAREN> {
-            return SqlStdOperatorTable.EXTRACT.createCall(s.end(this), args);
-        }
-    |
         <POSITION> { s = span(); }
         <LPAREN>
         // FIXME jvs 31-Aug-2006:  FRG-192:  This should be
@@ -6293,65 +6282,6 @@ SqlNode BuiltinFunctionCall() :
         <RPAREN> {
             return SqlStdOperatorTable.SUBSTRING.createCall(
                 s.end(this), args);
-        }
-    |
-        <TRIM> {
-            SqlLiteral flag = null;
-            SqlNode trimChars = null;
-            s = span();
-        }
-        <LPAREN>
-        [
-            LOOKAHEAD(2)
-            [
-                <BOTH> {
-                    s.add(this);
-                    flag = SqlTrimFunction.Flag.BOTH.symbol(getPos());
-                }
-            |
-                <TRAILING> {
-                    s.add(this);
-                    flag = SqlTrimFunction.Flag.TRAILING.symbol(getPos());
-                }
-            |
-                <LEADING> {
-                    s.add(this);
-                    flag = SqlTrimFunction.Flag.LEADING.symbol(getPos());
-                }
-            ]
-            [ trimChars = Expression(ExprContext.ACCEPT_SUB_QUERY) ]
-            (
-                <FROM> {
-                    if (null == flag && null == trimChars) {
-                        throw SqlUtil.newContextException(getPos(),
-                            RESOURCE.illegalFromEmpty());
-                    }
-                }
-            |
-                <RPAREN> {
-                    // This is to handle the case of TRIM(x)
-                    // (FRG-191).
-                    if (flag == null) {
-                        flag = SqlTrimFunction.Flag.BOTH.symbol(SqlParserPos.ZERO);
-                    }
-                    args.add(flag);
-                    args.add(null); // no trim chars
-                    args.add(trimChars); // reinterpret trimChars as source
-                    return SqlStdOperatorTable.TRIM.createCall(s.end(this),
-                        args);
-                }
-            )
-        ]
-        e = Expression(ExprContext.ACCEPT_SUB_QUERY) {
-            if (flag == null) {
-                flag = SqlTrimFunction.Flag.BOTH.symbol(SqlParserPos.ZERO);
-            }
-            args.add(flag);
-            args.add(trimChars);
-            args.add(e);
-        }
-        <RPAREN> {
-            return SqlStdOperatorTable.TRIM.createCall(s.end(this), args);
         }
     |
         node = ContainsSubstrFunctionCall() { return node; }
@@ -7535,7 +7465,6 @@ SqlIdentifier ReservedFunctionName() :
     |   <LEFT>
     |   <LAST_VALUE>
     |   <LN>
-    |   <LOCALTIME>
     |   <LOCALTIMESTAMP>
     |   <LOWER>
     |   <MAX>
@@ -7552,9 +7481,6 @@ SqlIdentifier ReservedFunctionName() :
     |   <PERCENT_RANK>
     |   <POWER>
     |   <RANK>
-    |   <REGR_COUNT>
-    |   <REGR_SXX>
-    |   <REGR_SYY>
     |   <RIGHT>
     |   <ROW_NUMBER>
     |   <SECOND>
@@ -7589,7 +7515,6 @@ SqlIdentifier ContextVariable() :
     |   <CURRENT_TIME>
     |   <CURRENT_TIMESTAMP>
     |   <CURRENT_USER>
-    |   <LOCALTIME>
     |   <LOCALTIMESTAMP>
     |   <SESSION_USER>
     |   <SYSTEM_USER>
@@ -7808,6 +7733,10 @@ SqlBinaryOperator BinaryRowOperator() :
 |   <LE> { return SqlStdOperatorTable.LESS_THAN_OR_EQUAL; }
 |   <GE> { return SqlStdOperatorTable.GREATER_THAN_OR_EQUAL; }
 |   <NE> { return SqlStdOperatorTable.NOT_EQUALS; }
+|   <REGEXP> { return SqlStdOperatorTable.POSIX_REGEX_CASE_SENSITIVE; }
+|   LOOKAHEAD(2) <NOT> <REGEXP> { return SqlStdOperatorTable.NEGATED_POSIX_REGEX_CASE_SENSITIVE; }
+|   <IREGEXP> { return SqlStdOperatorTable.POSIX_REGEX_CASE_INSENSITIVE; }
+|   LOOKAHEAD(2) <NOT> <IREGEXP> { return SqlStdOperatorTable.NEGATED_POSIX_REGEX_CASE_INSENSITIVE; }
 |   <NE2> {
         if (!this.conformance.isBangEqualAllowed()) {
             throw SqlUtil.newContextException(getPos(), RESOURCE.bangEqualNotAllowed());
@@ -8822,6 +8751,8 @@ void NonReservedKeyWord2of3() :
 |   < VERTICAL_BAR: "|" >
 |   < CARET: "^" >
 |   < DOLLAR: "$" >
+|   < REGEXP : "REGEXP" >
+|   < IREGEXP : "IREGEXP" >
 <#list (parser.binaryOperatorsTokens!default.parser.binaryOperatorsTokens) as operator>
 |   ${operator}
 </#list>

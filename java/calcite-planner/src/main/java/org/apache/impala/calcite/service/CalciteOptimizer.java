@@ -36,6 +36,7 @@ import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.calcite.rules.ConvertToCNFRules;
 import org.apache.impala.calcite.rules.ExtractLiteralAgg;
 import org.apache.impala.calcite.rules.ImpalaMinusToDistinctRule;
+import org.apache.impala.calcite.rules.RewriteRexOverRule;
 import org.apache.impala.common.ImpalaException;
 
 import org.slf4j.Logger;
@@ -147,6 +148,7 @@ public class CalciteOptimizer implements CompilerStep {
     RelNode retRelNode = plan;
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     builder.addRuleCollection(ImmutableList.of(
+        RewriteRexOverRule.INSTANCE,
         new ExtractLiteralAgg()
         ));
 
