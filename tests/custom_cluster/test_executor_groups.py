@@ -1250,7 +1250,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # END test slot count strategy
 
     # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.tiny", 17)
+    self._verify_query_num_for_resource_pool("root.tiny", 18)
     self._verify_query_num_for_resource_pool("root.small", 3)
     self._verify_query_num_for_resource_pool("root.large", 7)
     self._verify_total_admitted_queries("root.tiny", 18)
@@ -1389,9 +1389,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self.__verify_fs_writers(result, 1, [0, 1])
     # END testing insert + MAX_FS_WRITER
 
-    self._verify_query_num_for_resource_pool("root.tiny", 1)
-    self._verify_query_num_for_resource_pool("root.small", 2)
-    self._verify_query_num_for_resource_pool("root.large", 1)
+    self._verify_query_num_for_resource_pool("root.tiny", 4)
+    self._verify_query_num_for_resource_pool("root.small", 3)
+    self._verify_query_num_for_resource_pool("root.large", 4)
     self._verify_total_admitted_queries("root.tiny", 4)
     self._verify_total_admitted_queries("root.small", 3)
     self._verify_total_admitted_queries("root.large", 4)

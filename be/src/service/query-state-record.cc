@@ -118,8 +118,11 @@ void QueryStateRecord::Init(const ClientRequestState& query_handle) {
   last_active_time_ms = query_handle.last_active_ms();
   // For statement types other than QUERY/DML, show an empty string for resource pool
   // to indicate that they are not subjected to admission control.
-  // TODO: CTAS query has stmt_type == DDL, but query_exec_request.stmt_type == DML.
-  if (stmt_type == TStmtType::QUERY || stmt_type == TStmtType::DML) {
+  // CTAS query has stmt_type == DDL and query_exec_request.stmt_type == DML,
+  // so resource pool should be displayed too.
+  if (stmt_type == TStmtType::QUERY || stmt_type == TStmtType::DML
+      || (stmt_type == TStmtType::DDL
+          && request.query_exec_request.stmt_type == TStmtType::DML)) {
     resource_pool = query_handle.request_pool();
   }
   user_has_profile_access = query_handle.user_has_profile_access();
