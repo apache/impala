@@ -1045,6 +1045,17 @@ tblproperties ('format-version'='2');
 insert into iceberg_v2_positional_update_all_rows values (1,'a'), (2,'b'), (3,'c')
 update iceberg_v2_positional_update_all_rows set s = upper(s);
 
+iceberg_with_puffin_stats:
+Created similarly to iceberg_v2_no_deletes.
+With Impala:
+ create table iceberg_with_puffin_stats(i INT, d DECIMAL(9, 0)) stored as iceberg;
+ insert into iceberg_with_puffin_stats values (1, 1), (2, 2);
+With Trino:
+ use iceberg.default;
+ analyze iceberg_with_puffin_stats;
+And then converted the table with 'convert_to_iceberg.sh' and 'avro_iceberg_convert.sh'
+described under the section of 'iceberg_v2_no_deletes.'.
+
 iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations*:
 - 'iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations'
 - 'iceberg_test/hadoop_catalog/ice/iceberg_multiple_storage_locations_data'

@@ -60,6 +60,10 @@ def rewrite_metadata(prefix, unique_database, metadata_dir):
       metadata['metadata-log'] = \
           list(map(partial(add_prefix_to_mlog, table_params), metadata['metadata-log']))
 
+    if 'statistics' in metadata:
+      metadata['statistics'] = list(map(
+          partial(add_prefix_to_statistics, table_params), metadata['statistics']))
+
     with open(mfile + '.tmp', 'w') as f:
       json.dump(metadata, f, indent=2)
     os.rename(mfile + '.tmp', mfile)
@@ -135,6 +139,12 @@ def add_prefix_to_mlog(table_params, metadata_log):
   metadata_log['metadata-file'] = generate_new_path(
       table_params, metadata_log['metadata-file'])
   return metadata_log
+
+
+def add_prefix_to_statistics(table_params, statistics):
+  statistics['statistics-path'] = generate_new_path(
+      table_params, statistics['statistics-path'])
+  return statistics
 
 
 def add_prefix_to_snapshot_entry(table_params, entry):

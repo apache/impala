@@ -1,8 +1,8 @@
 {
   "format-version" : 1,
-  "table-uuid" : "1804053c-6ba0-48df-8d22-f1bd139a3635",
-  "location" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats",
-  "last-updated-ms" : 1725612488531,
+  "table-uuid" : "8368b5fe-0726-4010-869d-cbbdfb5d511b",
+  "location" : "/test-warehouse/iceberg_with_puffin_stats",
+  "last-updated-ms" : 1730124581193,
   "last-column-id" : 2,
   "schema" : {
     "type" : "struct",

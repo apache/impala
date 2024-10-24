@@ -1,8 +1,8 @@
 {
   "format-version" : 1,
-  "table-uuid" : "1804053c-6ba0-48df-8d22-f1bd139a3635",
-  "location" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats",
-  "last-updated-ms" : 1725612500133,
+  "table-uuid" : "8368b5fe-0726-4010-869d-cbbdfb5d511b",
+  "location" : "/test-warehouse/iceberg_with_puffin_stats",
+  "last-updated-ms" : 1730125063894,
   "last-column-id" : 2,
   "schema" : {
     "type" : "struct",
@@ -49,24 +49,24 @@
   } ],
   "properties" : {
     "engine.hive.enabled" : "true",
-    "impala.events.catalogServiceId" : "a6b8da59a60e425a:ad0468614a61e340",
+    "impala.events.catalogServiceId" : "58de66debfc6442a:9e804e3402019553",
     "external.table.purge" : "TRUE",
-    "impala.events.catalogVersion" : "4097",
+    "impala.events.catalogVersion" : "845",
     "write.format.default" : "parquet",
     "hive.metastore.table.owner" : "danielbecker",
     "OBJCAPABILITIES" : "EXTREAD,EXTWRITE",
     "storage_handler" : "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler"
   },
-  "current-snapshot-id" : 1880359224532128423,
+  "current-snapshot-id" : 8614787612208071008,
   "refs" : {
     "main" : {
-      "snapshot-id" : 1880359224532128423,
+      "snapshot-id" : 8614787612208071008,
       "type" : "branch"
     }
   },
   "snapshots" : [ {
-    "snapshot-id" : 1880359224532128423,
-    "timestamp-ms" : 1725612500115,
+    "snapshot-id" : 8614787612208071008,
+    "timestamp-ms" : 1730125063881,
     "summary" : {
       "operation" : "append",
       "added-data-files" : "1",
@@ -80,16 +80,16 @@
       "total-position-deletes" : "0",
       "total-equality-deletes" : "0"
     },
-    "manifest-list" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats/metadata/snap-1880359224532128423-1-11cd04ec-55ea-40aa-a89b-197c3c275e7a.avro",
+    "manifest-list" : "/test-warehouse/iceberg_with_puffin_stats/metadata/snap-8614787612208071008-1-989a6a68-ca7b-4339-adc2-cb5ba2656f0c.avro",
     "schema-id" : 0
   } ],
   "statistics" : [ ],
   "snapshot-log" : [ {
-    "timestamp-ms" : 1725612500115,
-    "snapshot-id" : 1880359224532128423
+    "timestamp-ms" : 1730125063881,
+    "snapshot-id" : 8614787612208071008
   } ],
   "metadata-log" : [ {
-    "timestamp-ms" : 1725612488531,
-    "metadata-file" : "/test-warehouse/iceberg_test/iceberg_with_puffin_stats/metadata/00000-c1fdc549-6895-4b22-987b-b1c229294749.metadata.json"
+    "timestamp-ms" : 1730124581193,
+    "metadata-file" : "/test-warehouse/iceberg_with_puffin_stats/metadata/00000-e9800290-7a3b-45bb-b0e0-5747e1d43167.metadata.json"
   } ]
 }

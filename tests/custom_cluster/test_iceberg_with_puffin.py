@@ -27,6 +27,7 @@ import sys
 import tempfile
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.file_utils import create_iceberg_table_from_directory
 
 
 class TestIcebergWithPuffinStatsStartupFlag(CustomClusterTestSuite):
@@ -40,18 +41,21 @@ class TestIcebergWithPuffinStatsStartupFlag(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       catalogd_args='--disable_reading_puffin_stats=true')
   @pytest.mark.execute_serially
-  def test_disable_reading_puffin(self):
-    self._read_ndv_stats_expect_result([-1, -1])
+  def test_disable_reading_puffin(self, unique_database):
+    self._read_ndv_stats_expect_result(unique_database, [-1, -1])
 
   @CustomClusterTestSuite.with_args(
       catalogd_args='--disable_reading_puffin_stats=false')
   @pytest.mark.execute_serially
   def test_enable_reading_puffin(self, unique_database):
-    self._read_ndv_stats_expect_result([2, 2])
+    self._read_ndv_stats_expect_result(unique_database, [2, 2])
 
-  def _read_ndv_stats_expect_result(self, expected_ndv_stats):
-    tbl_name = "functional_parquet.iceberg_with_puffin_stats"
-    show_col_stats_stmt = "show column stats {}".format(tbl_name)
+  def _read_ndv_stats_expect_result(self, unique_database, expected_ndv_stats):
+    tbl_name = "iceberg_with_puffin_stats"
+    create_iceberg_table_from_directory(self.client, unique_database, tbl_name, "parquet")
+
+    full_tbl_name = "{}.{}".format(unique_database, tbl_name)
+    show_col_stats_stmt = "show column stats {}".format(full_tbl_name)
     query_result = self.execute_query(show_col_stats_stmt)
 
     rows = query_result.get_data().split("\n")
