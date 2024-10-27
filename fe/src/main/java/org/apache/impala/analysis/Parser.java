@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.io.StringReader;
 
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ParseException;
 import org.apache.impala.thrift.TQueryOptions;
 
 /**
@@ -27,13 +28,6 @@ import org.apache.impala.thrift.TQueryOptions;
  * the expected class and exceptions to an ParseException.
  */
 public class Parser {
-  @SuppressWarnings("serial")
-  public static class ParseException extends AnalysisException {
-    public ParseException(String msg, Exception e) {
-      super(msg, e);
-    }
-  }
-
   /**
    * Parse the statement using default options. Used for testing and for
    * parsing internally-generated statements. See the full version for details.

@@ -20,6 +20,7 @@ package org.apache.impala.calcite.service;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -27,6 +28,7 @@ import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.validate.ImpalaConformance;
+import org.apache.impala.common.AnalysisException;
 
 
 import org.slf4j.Logger;
@@ -63,10 +65,14 @@ public class CalciteValidator implements CompilerStep {
             );
   }
 
-  public SqlNode validate(SqlNode parsedNode) {
-    // Validate the initial AST
-    SqlNode node = sqlValidator.validate(parsedNode);
-    return node;
+  public SqlNode validate(SqlNode parsedNode) throws AnalysisException {
+    try {
+      // Validate the initial AST
+      SqlNode node = sqlValidator.validate(parsedNode);
+      return node;
+    } catch (CalciteContextException e) {
+      throw new AnalysisException(e.getMessage(), e.getCause());
+    }
   }
 
   public RelDataTypeFactory getTypeFactory() {

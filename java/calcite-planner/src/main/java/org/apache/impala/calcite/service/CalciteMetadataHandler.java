@@ -46,6 +46,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.UnsupportedFeatureException;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -135,6 +136,12 @@ public class CalciteMetadataHandler implements CompilerStep {
       FeTable feTable = db.getTable(tableName.getTbl());
       if (feTable == null) {
         continue;
+      }
+      if (!(feTable instanceof HdfsTable)) {
+        throw new UnsupportedFeatureException(
+            "Table " + feTable.getFullName() + " has unsupported type " +
+            feTable.getClass().getSimpleName() + ". The Calcite planner only supports " +
+            "HDFS tables.");
       }
 
       // populate the dbschema with its table, creating the dbschema if it's the

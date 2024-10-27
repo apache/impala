@@ -24,7 +24,6 @@ import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.SelectStmt;
 import org.apache.impala.calcite.functions.FunctionResolver;
@@ -33,8 +32,8 @@ import org.apache.impala.calcite.rel.node.NodeWithExprs;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.ParseException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.service.JniFrontend;
@@ -42,8 +41,6 @@ import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
@@ -62,9 +59,6 @@ public class CalciteJniFrontend extends JniFrontend {
 
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteJniFrontend.class.getName());
-
-  private final static TBinaryProtocol.Factory protocolFactory_ =
-      new TBinaryProtocol.Factory();
 
   private static Pattern SEMI_JOIN = Pattern.compile("\\bsemi\\sjoin\\b",
       Pattern.CASE_INSENSITIVE);
@@ -137,29 +131,20 @@ public class CalciteJniFrontend extends JniFrontend {
       TExecRequest execRequest = execRequestCreator.create(rootNode);
       markEvent(mdHandler, execRequest, queryCtx, "Created exec request");
 
-      TSerializer serializer = new TSerializer(protocolFactory_);
-      byte[] serializedRequest = serializer.serialize(execRequest);
+      byte[] serializedRequest = JniUtil.serializeToThrift(execRequest);
       queryCtx.getTimeline().markEvent("Serialized request");
 
       return serializedRequest;
-    } catch (SqlParseException e) {
+    } catch (ParseException e) {
       // do a quick parse just to make sure it's not a select stmt. If it is
       // a select statement, we fail the query since all select statements
       // should be run through the Calcite Planner.
       if (Parser.parse(queryCtx.getStmt()) instanceof SelectStmt) {
-        throw new InternalException(e.getMessage());
+        throw e;
       }
       LOG.info("Calcite planner failed to parse query: " + queryCtx.getStmt());
       LOG.info("Going to use original Impala planner.");
       return runThroughOriginalPlanner(thriftQueryContext, queryCtx);
-    } catch (Exception e) {
-      LOG.info("Calcite planner failed.");
-      LOG.info("Exception: " + e);
-      if (e != null) {
-        LOG.info("Stack Trace:" + ExceptionUtils.getStackTrace(e));
-        throw new InternalException(e.getMessage());
-      }
-      throw new RuntimeException(e);
     }
   }
 
@@ -195,7 +180,7 @@ public class CalciteJniFrontend extends JniFrontend {
     public QueryContext(byte[] thriftQueryContext,
         Frontend frontend) throws ImpalaException {
       this.queryCtx_ = new TQueryCtx();
-      JniUtil.deserializeThrift(protocolFactory_, queryCtx_, thriftQueryContext);
+      JniUtil.deserializeThrift(queryCtx_, thriftQueryContext);
 
       // hack to match the code in Frontend.java:
       // If unset, set MT_DOP to 0 to simplify the rest of the code.

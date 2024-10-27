@@ -23,6 +23,7 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.impala.calcite.parser.ImpalaSqlParserImpl;
 import org.apache.impala.calcite.validate.ImpalaConformance;
+import org.apache.impala.common.ParseException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,17 +42,21 @@ public class CalciteQueryParser implements CompilerStep {
     this.queryCtx_ = queryCtx;
   }
 
-  public SqlNode parse() throws SqlParseException {
-    // Create an SQL parser
-    SqlParser parser = SqlParser.create(queryCtx_.getStmt(),
-        SqlParser.config().withParserFactory(ImpalaSqlParserImpl.FACTORY)
-                .withConformance(ImpalaConformance.INSTANCE)
-                .withQuoting(Quoting.BACK_TICK_BACKSLASH)
-                );
+  public SqlNode parse() throws ParseException {
+    try {
+      // Create an SQL parser
+      SqlParser parser = SqlParser.create(queryCtx_.getStmt(),
+          SqlParser.config().withParserFactory(ImpalaSqlParserImpl.FACTORY)
+              .withConformance(ImpalaConformance.INSTANCE)
+              .withQuoting(Quoting.BACK_TICK_BACKSLASH)
+              );
 
-    // Parse the query into an AST
-    SqlNode sqlNode = parser.parseQuery();
-    return sqlNode;
+      // Parse the query into an AST
+      SqlNode sqlNode = parser.parseQuery();
+      return sqlNode;
+    } catch (SqlParseException e) {
+      throw new ParseException(e.getMessage());
+    }
   }
 
   public void logDebug(Object resultObject) {

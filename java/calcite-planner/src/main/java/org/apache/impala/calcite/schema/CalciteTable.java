@@ -88,12 +88,17 @@ public class CalciteTable extends RelOptAbstractTable
     }
   }
 
-  private static RelDataType buildColumnsForRelDataType(FeTable table) {
+  private static RelDataType buildColumnsForRelDataType(FeTable table)
+      throws ImpalaException {
     RelDataTypeFactory typeFactory = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
 
     RelDataTypeFactory.Builder builder = new RelDataTypeFactory.Builder(typeFactory);
     // skip clustering columns, save them for the end
     for (Column column : table.getColumnsInHiveOrder()) {
+      if (column.getType().isComplexType()) {
+        throw new UnsupportedFeatureException(
+            "Calcite does not support complex types yet.");
+      }
       RelDataType type =
           ImpalaTypeConverter.createRelDataType(typeFactory, column.getType());
       builder.add(column.getName(), type);
