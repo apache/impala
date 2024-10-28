@@ -88,3 +88,14 @@ select * from v as v3, w as w1, w as w2 where v3.p < w1.p + w2.p;
 ---- RESULTS: VERIFY_IS_SUBSET
 '00:SEQUENCE'
 ====
+---- QUERY
+EXPLAIN with d1 as (
+  select id_col from functional.date_tbl where
+    cast('1998-08-04' as date) between date_col and (date_col + INTERVAL 14 days)),
+d2 as (
+  select id_col from functional.date_tbl where
+    cast('1998-08-04' as date) between date_col and (date_col + INTERVAL 14 days))
+select d1.id_col, d2.id_col from d1, d2;
+---- RESULTS: VERIFY_IS_SUBSET
+'00:SEQUENCE'
+====

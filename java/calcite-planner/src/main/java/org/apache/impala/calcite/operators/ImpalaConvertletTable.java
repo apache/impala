@@ -16,10 +16,12 @@
  */
 package org.apache.impala.calcite.operators;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
@@ -31,7 +33,9 @@ import org.apache.calcite.sql2rel.ReflectiveConvertletTable;
 import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
+import org.checkerframework.checker.initialization.qual.UnknownInitialization;
 
 import java.util.List;
 import java.util.Set;
@@ -61,6 +65,7 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     registerOp(SqlStdOperatorTable.IS_NOT_DISTINCT_FROM, this::convertIsNotDistinctFrom);
     registerOp(ImpalaConcatOrOperator.INSTANCE, this::convertConcatOr);
     registerOp(SqlStdOperatorTable.SQRT, this::convertSqrt);
+    registerOp(SqlStdOperatorTable.PLUS, this::convertPlus);
   }
 
   @Override
@@ -87,6 +92,11 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     // Registered convertlets need to call our convertlet rather than the
     // StandardConvertletTable convertlet which will not find the function.
     if (IMPALA_OVERRIDE_CONVERTLETS.contains(call.getOperator().getName())) {
+      return super.get(call);
+    }
+
+    // Use custom PLUS handling to work around CALCITE-5207.
+    if (call.getOperator().equals(SqlStdOperatorTable.PLUS)) {
       return super.get(call);
     }
 
@@ -158,5 +168,49 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr1));
     return rexBuilder.makeCall(returnType, SqlStdOperatorTable.SQRT,
         operands);
+  }
+
+  /**
+   * Convertlet for the DATETIME PLUS operator to work around CALCITE-5207.
+   */
+  private RexNode convertPlus(
+      @UnknownInitialization ImpalaConvertletTable this,
+      SqlRexContext cx, SqlCall call) {
+    final RexNode rex = StandardConvertletTable.INSTANCE.convertCall(cx, call);
+    switch (rex.getType().getSqlTypeName()) {
+    case DATE:
+    case TIME:
+    case TIMESTAMP:
+      // Use special "+" operator for datetime + interval.
+      // Re-order operands, if necessary, so that interval is second.
+      final RexBuilder rexBuilder = cx.getRexBuilder();
+      List<RexNode> operands = ((RexCall) rex).getOperands();
+      if (operands.size() == 2) {
+        final SqlTypeName sqlTypeName = operands.get(0).getType().getSqlTypeName();
+        switch (sqlTypeName) {
+        case INTERVAL_YEAR:
+        case INTERVAL_YEAR_MONTH:
+        case INTERVAL_MONTH:
+        case INTERVAL_DAY:
+        case INTERVAL_DAY_HOUR:
+        case INTERVAL_DAY_MINUTE:
+        case INTERVAL_DAY_SECOND:
+        case INTERVAL_HOUR:
+        case INTERVAL_HOUR_MINUTE:
+        case INTERVAL_HOUR_SECOND:
+        case INTERVAL_MINUTE:
+        case INTERVAL_MINUTE_SECOND:
+        case INTERVAL_SECOND:
+          operands = ImmutableList.of(operands.get(1), operands.get(0));
+          break;
+        default:
+          break;
+        }
+      }
+      return rexBuilder.makeCall(rex.getType(),
+          ImpalaCustomOperatorTable.DATETIME_PLUS, operands);
+    default:
+      return rex;
+    }
   }
 }

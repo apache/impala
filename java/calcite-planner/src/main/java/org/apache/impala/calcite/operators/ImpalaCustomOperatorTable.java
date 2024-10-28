@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlSetOperator;
 import org.apache.calcite.sql.SqlPrefixOperator;
 import org.apache.calcite.sql.fun.ImpalaGroupingFunction;
+import org.apache.calcite.sql.fun.ImpalaSqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
 import org.apache.calcite.sql.fun.SqlCountAggFunction;
 import org.apache.calcite.sql.type.InferTypes;
@@ -249,6 +250,9 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
       new SqlSetOperator("INTERSECT ALL", SqlKind.INTERSECT, 12, true);
 
   public static final ImpalaNdvFunction NDV = new ImpalaNdvFunction();
+
+  public static final ImpalaSqlDatetimePlusOperator DATETIME_PLUS =
+      new ImpalaSqlDatetimePlusOperator();
 
   public static ImpalaCustomOperatorTable instance() {
     return INSTANCE.get();
