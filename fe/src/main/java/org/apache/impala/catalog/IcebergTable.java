@@ -456,22 +456,6 @@ public class IcebergTable extends Table implements FeIcebergTable {
       }
 
       refreshLastUsedTime();
-
-      // Let's reset the storage descriptors, so we don't update the table unnecessarily.
-      FeIcebergTable.resetIcebergStorageDescriptor(msTable_, msTbl);
-      // Avoid updating HMS if the schema didn't change.
-      if (msTable_.equals(msTbl)) return;
-
-      // Update the table schema in HMS.
-      try {
-        updateTimestampProperty(msTable_, TBL_PROP_LAST_DDL_TIME);
-        msTable_.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS,
-            StatsSetupConst.TRUE);
-        msClient.alter_table(msTable_.getDbName(), msTable_.getTableName(), msTable_);
-        catalogTimeline.markEvent("Updated table schema in Metastore");
-      } catch (TException e) {
-        throw new TableLoadingException(e.getMessage());
-      }
     } finally {
       context.stop();
     }
