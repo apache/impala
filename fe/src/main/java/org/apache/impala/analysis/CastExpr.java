@@ -433,7 +433,7 @@ public class CastExpr extends Expr {
    */
   @Override
   public Expr ignoreImplicitCast() {
-    if (isImplicit_) {
+    if (isImplicit()) {
       // we don't expect to see to consecutive implicit casts
       Preconditions.checkState(
           !(getChild(0) instanceof CastExpr) || !((CastExpr) getChild(0)).isImplicit());
