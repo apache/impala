@@ -1,5 +1,5 @@
 <!--
-.. title: Impala's Living on Iceberg
+.. title: Impalas living on Iceberg
 .. slug: impalas-living-on-iceberg
 .. date: 2024-10-07 16:00:00 UTC-06:00
 .. tags: ccna24

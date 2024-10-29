@@ -43,7 +43,11 @@ under the License.
         <h3 class="p-name entry-title"><a href="{{ post.permalink() }}" class="u-url">{{ post.title()|e }}</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
-            {% if author_pages_generated %}
+            {% if author_pages_generated and multiple_authors_per_post %}
+                {%- for author in post.authors() %}
+                <a href="{{ _link('author', author) }}">{{ author|e }}</a>
+                {% endfor %}
+            {% elif author_pages_generated %}
                 <a href="{{ _link('author', post.author()) }}">{{ post.author()|e }}</a>
             {% else %}
                 {{ post.author()|e }}

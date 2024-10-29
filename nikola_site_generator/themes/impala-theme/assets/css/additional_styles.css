@@ -22,6 +22,10 @@ body {
   padding-bottom: 40px;
 }
 
+.byline a:not(:last-child):after {
+  content: ",";
+}
+
 /* Custom container */
 .container-narrow {
   margin: 0 auto;

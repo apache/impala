@@ -5,15 +5,14 @@
 <meta name="keywords" content="hadoop, impala, sql, mpp, bi, big data, open source">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta charset="utf-8">
-<title>Impalas living on Iceberg | Apache Impala</title>
-<link href="../../assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
-<link href="../../assets/css/bootstrap-responsive.min.css" rel="stylesheet" type="text/css">
-<!-- order is significant to prevent overwriting of some bootstrap-defined css styles --><link href="../../assets/css/additional_styles.css" rel="stylesheet" type="text/css">
+<meta name="description" content="Apache Impala is a modern, open source, distributed SQL query engine for open data and table formats.">
+<title>Apache Impala (old posts, page 1) | Apache Impala</title>
+<link href="assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
+<link href="assets/css/bootstrap-responsive.min.css" rel="stylesheet" type="text/css">
+<!-- order is significant to prevent overwriting of some bootstrap-defined css styles --><link href="assets/css/additional_styles.css" rel="stylesheet" type="text/css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script><meta content="#5670d4" name="theme-color">
-<link rel="canonical" href="https://impala.apache.org/blog/posts/impalas-living-on-iceberg/">
-<meta name="author" content="Gabor Kaszab">
-<link rel="prev" href="../this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" title="This Impala not only reads, but modifies and optimizes Iceberg tables" type="text/html">
-<link rel="next" href="../intelligent-utilization-aware-autoscaling-for-impala-virtual-compute-clusters/" title="Intelligent Utilization Aware Autoscaling for Impala Virtual Compute Clusters" type="text/html">
+<link rel="canonical" href="https://impala.apache.org/blog/index-1.html">
+<link rel="prev" href="." type="text/html">
 </head>
 <body id="index" class="home">
     <div class="container">
@@ -56,41 +55,44 @@
     </nav></header>
 </div>
 <!-- masthead -->
-        <main id="content"><article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h3 class="p-name entry-title" itemprop="headline name"><a href="." class="u-url">Impalas living on Iceberg</a></h3>
-
+        <main id="content"><h3>All articles</h3>
+<div class="postindex">
+    <hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/" class="u-url">Impala: A Modern, Open-Source SQL Engine for Hadoop</a></h3>
         <div class="metadata">
-            <p class="byline author vcard">
-                <span class="byline-name fn">
-                        <a href="../../authors/gabor-kaszab/">Gabor Kaszab</a>
-                </span>
-            </p>
-            <p class="dateline"><a href="." rel="bookmark"><time class="published dt-published" datetime="2024-10-07T16:00:00-06:00" itemprop="datePublished" title="2024-10-07 16:00">2024-10-07 16:00</time></a></p>
+            <p class="byline author vcard"><span class="byline-name fn">
+                <a href="authors/impala-dev/">Impala Dev</a>
+            </span></p>
+            <p class="dateline"><a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/" rel="bookmark"><time class="published dt-published" datetime="2015-01-05T23:00:00-07:00" title="2015-01-05 23:00">2015-01-05 23:00</time></a></p>
         </div>
-    </header><div class="e-content entry-content" itemprop="articleBody text">
-    <p>Apache Impala is a horizontally scalable database engine renowned for its emphasis on query
-efficiency. Over recent years, the Impala team has dedicated substantial effort to support Iceberg
-tables. Impala can read, write, modify, and optimize Iceberg tables. Additionally, it facilitates
-schema and partition evolution through DDL statements.</p>
-<p>Attendees can anticipate a comprehensive overview of all Iceberg-related features within Impala,
-along with insights into forthcoming developments expected this year. Given Impala's Java/C++ hybrid
-architecture — where the frontend, responsible for analysis and planning, is Java-based while
-backend executors are coded in C++ — the integration process encountered its own set of challenges.
-This presentation will delve into some details of this integration work, shedding light on the
-technical nuances.</p>
-<p>[<a href="https://impala.apache.org/gh-docs/ccna24-impalas_living_on_iceberg.pdf">slides</a>]</p>
-<p><em>Appeared in <a href="https://communityovercode.org/schedule/#sz-tab-45572">Community Over Code NA 2024</a></em></p>
+    </header><div class="p-summary entry-summary">
+    <p>
+  <i>Presented at
+    <a href="https://www.cidrdb.org/cidr2015/program.html" target="_blank">The Conference on
+    Innovative Data Systems Research (CIDR) 2015</a>.
+  </i>
+</p>
+
+<h4>ABSTRACT</h4>
+<p>Cloudera Impala is a modern, open-source MPP SQL engine architected from the ground up for the
+Hadoop data processing environment. Impala provides low latency and high concurrency for BI/analytic
+read-mostly queries on Hadoop, not delivered by batch frameworks such as Apache Hive. This paper
+presents Impala from a user’s perspective, gives an overview of its architecture and main components
+and briefly demonstrates its superior performance compared against other popular SQL-on-Hadoop
+systems.</p>
+
+<p>
+  <a href="https://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper28.pdf" target="_blank">Paper</a> |
+  <a href="https://www.cidrdb.org/cidr2015/Slides/28_CIDR15_Slides_Paper28.pdf" target="_blank">Slides</a>
+</p>
     </div>
-    <aside class="postpromonav"><nav><ul itemprop="keywords" class="tags">
-<li><a class="tag p-category" href="../../categories/ccna24/" rel="tag">ccna24</a></li>
-        </ul>
-<ul class="pager hidden-print">
+    </article>
+</div>
+        <nav class="postindexpager"><ul class="pager">
 <li class="previous">
-                <a href="../this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/" rel="prev" title="This Impala not only reads, but modifies and optimizes Iceberg tables">Previous post</a>
+                <a href="." rel="prev">Newer posts</a>
             </li>
-            <li class="next">
-                <a href="../intelligent-utilization-aware-autoscaling-for-impala-virtual-compute-clusters/" rel="next" title="Intelligent Utilization Aware Autoscaling for Impala Virtual Compute Clusters">Next post</a>
-            </li>
-        </ul></nav></aside></article></main><footer id="footer"><p> </p>
+        </ul></nav></main><footer id="footer"><p> </p>
     <div class="navbar">
       <div class="navbar-inner">
         <div class="container">
