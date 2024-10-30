@@ -140,14 +140,15 @@ class TestTupleCacheBase(CustomClusterTestSuite):
     return impalaservice.get_metric_value('impala.tuple-cache.' + suffix)
 
 
-class TestTupleCache(TestTupleCacheBase):
+class TestTupleCacheOptions(TestTupleCacheBase):
+  """Tests Impala with different tuple cache startup options."""
+
   @classmethod
   def add_test_dimensions(cls):
-    super(TestTupleCache, cls).add_test_dimensions()
+    super(TestTupleCacheOptions, cls).add_test_dimensions()
     add_mandatory_exec_option(cls, 'mt_dop', 1)
 
   @CustomClusterTestSuite.with_args(cluster_size=1)
-  @pytest.mark.execute_serially
   def test_cache_disabled(self, vector, unique_database):
     self.client.set_configuration(vector.get_value('exec_option'))
     fq_table = "{0}.cache_disabled".format(unique_database)
@@ -162,30 +163,8 @@ class TestTupleCache(TestTupleCacheBase):
     assertCounters(result2.runtime_profile, num_hits=0, num_halted=0, num_skipped=1)
 
   @CustomClusterTestSuite.with_args(
-      start_args=CACHE_START_ARGS, cluster_size=1)
-  @pytest.mark.execute_serially
-  def test_create_and_select(self, vector, unique_database):
-    self.client.set_configuration(vector.get_value('exec_option'))
-    fq_table = "{0}.create_and_select".format(unique_database)
-    self.create_table(fq_table)
-    result1 = self.execute_query("SELECT * from {0}".format(fq_table))
-    result2 = self.execute_query("SELECT * from {0}".format(fq_table))
-
-    assert result1.success
-    assert result2.success
-    assert result1.data == result2.data
-    assertCounters(result1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
-    assertCounters(result2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-    # Verify that the bytes written by the first profile are the same as the bytes
-    # read by the second profile.
-    bytes_written = getCounterValues(result1.runtime_profile, "TupleCacheBytesWritten")
-    bytes_read = getCounterValues(result2.runtime_profile, "TupleCacheBytesRead")
-    assert sorted(bytes_written) == sorted(bytes_read)
-
-  @CustomClusterTestSuite.with_args(
       start_args=CACHE_START_ARGS + " --tuple_cache_capacity=64MB", cluster_size=1,
       impalad_args="--cache_force_single_shard")
-  @pytest.mark.execute_serially
   def test_cache_halted_select(self, vector):
     # The cache is set to the minimum cache size, so run a SQL that produces enough
     # data to exceed the cache size and halt caching.
@@ -207,7 +186,6 @@ class TestTupleCache(TestTupleCacheBase):
   @CustomClusterTestSuite.with_args(
     start_args=CACHE_START_ARGS, cluster_size=1,
     impalad_args="--tuple_cache_ignore_query_options=true")
-  @pytest.mark.execute_serially
   def test_failpoints(self, vector, unique_database):
     fq_table = "{0}.failpoints".format(unique_database)
     # Scale 20 gets us enough rows to force multiple RowBatches (needed for the
@@ -270,8 +248,123 @@ class TestTupleCache(TestTupleCacheBase):
 
     assert hit_error
 
-  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
-  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      start_args=CACHE_START_ARGS, cluster_size=1,
+      impalad_args='--tuple_cache_exempt_query_options=max_errors,exec_time_limit_s')
+  def test_custom_exempt_query_options(self, vector, unique_database):
+    """Custom list of exempt query options share cache entry"""
+    fq_table = "{0}.query_options".format(unique_database)
+    self.create_table(fq_table)
+    query = "SELECT * from {0}".format(fq_table)
+
+    errors_10 = dict(vector.get_value('exec_option'))
+    errors_10['max_errors'] = '10'
+    exec_time_limit = dict(vector.get_value('exec_option'))
+    exec_time_limit['exec_time_limit_s'] = '30'
+
+    exempt1 = self.execute_query(query, query_options=errors_10)
+    exempt2 = self.execute_query(query, query_options=exec_time_limit)
+    exempt3 = self.execute_query(query, query_options=vector.get_value('exec_option'))
+    assert exempt1.success
+    assert exempt2.success
+    assert exempt1.data == exempt2.data
+    assert exempt1.data == exempt3.data
+    assertCounters(exempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(exempt2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(exempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+
+
+@CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
+class TestTupleCacheSingle(TestTupleCacheBase):
+  """Tests Impala with a single executor and mt_dop=1."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTupleCacheSingle, cls).add_test_dimensions()
+    add_mandatory_exec_option(cls, 'mt_dop', 1)
+
+  def test_create_and_select(self, vector, unique_database):
+    self.client.set_configuration(vector.get_value('exec_option'))
+    fq_table = "{0}.create_and_select".format(unique_database)
+    self.create_table(fq_table)
+    result1 = self.execute_query("SELECT * from {0}".format(fq_table))
+    result2 = self.execute_query("SELECT * from {0}".format(fq_table))
+
+    assert result1.success
+    assert result2.success
+    assert result1.data == result2.data
+    assertCounters(result1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(result2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    # Verify that the bytes written by the first profile are the same as the bytes
+    # read by the second profile.
+    bytes_written = getCounterValues(result1.runtime_profile, "TupleCacheBytesWritten")
+    bytes_read = getCounterValues(result2.runtime_profile, "TupleCacheBytesRead")
+    assert sorted(bytes_written) == sorted(bytes_read)
+
+  def test_non_exempt_query_options(self, vector, unique_database):
+    """Non-exempt query options result in different cache entries"""
+    fq_table = "{0}.query_options".format(unique_database)
+    self.create_table(fq_table)
+    query = "SELECT * from {0}".format(fq_table)
+
+    strict_true = dict(vector.get_value('exec_option'))
+    strict_true['strict_mode'] = 'true'
+    strict_false = dict(vector.get_value('exec_option'))
+    strict_false['strict_mode'] = 'false'
+
+    noexempt1 = self.execute_query(query, query_options=strict_false)
+    noexempt2 = self.execute_query(query, query_options=strict_true)
+    noexempt3 = self.execute_query(query, query_options=strict_false)
+    noexempt4 = self.execute_query(query, query_options=strict_true)
+    noexempt5 = self.execute_query(query, query_options=vector.get_value('exec_option'))
+
+    assert noexempt1.success
+    assert noexempt2.success
+    assert noexempt3.success
+    assert noexempt4.success
+    assert noexempt5.success
+    assert noexempt1.data == noexempt2.data
+    assert noexempt1.data == noexempt3.data
+    assert noexempt1.data == noexempt4.data
+    assert noexempt1.data == noexempt5.data
+    assertCounters(noexempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(noexempt2.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(noexempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(noexempt4.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(noexempt5.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+
+  def test_exempt_query_options(self, vector, unique_database):
+    """Exempt query options share cache entry"""
+    fq_table = "{0}.query_options".format(unique_database)
+    self.create_table(fq_table)
+    query = "SELECT * from {0}".format(fq_table)
+
+    codegen_false = dict(vector.get_value('exec_option'))
+    codegen_false['disable_codegen'] = 'true'
+    codegen_true = dict(vector.get_value('exec_option'))
+    codegen_true['disable_codegen'] = 'false'
+
+    exempt1 = self.execute_query(query, query_options=codegen_true)
+    exempt2 = self.execute_query(query, query_options=codegen_false)
+    exempt3 = self.execute_query(query, query_options=vector.get_value('exec_option'))
+    assert exempt1.success
+    assert exempt2.success
+    assert exempt1.data == exempt2.data
+    assert exempt1.data == exempt3.data
+    assertCounters(exempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
+    assertCounters(exempt2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+    assertCounters(exempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+
+
+@CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
+class TestTupleCacheCluster(TestTupleCacheBase):
+  """Tests Impala with 3 executors and mt_dop=1."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTupleCacheCluster, cls).add_test_dimensions()
+    add_mandatory_exec_option(cls, 'mt_dop', 1)
+
   def test_runtime_filters(self, vector, unique_database):
     """
     This tests that adding files to a table results in different runtime filter keys.
@@ -366,8 +459,6 @@ class TestTupleCache(TestTupleCacheBase):
     assert rerun_cache_keys == two_cache_keys
     assert rerun_two_files_result.data == two_files_result.data
 
-  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
-  @pytest.mark.execute_serially
   def test_runtime_filter_reload(self, vector, unique_database):
     """
     This tests that reloading files to a table results in matching runtime filter keys.
@@ -406,91 +497,8 @@ class TestTupleCache(TestTupleCacheBase):
     assert base_cache_keys == reload_cache_keys
     # Skips verifying cache hits as fragments may not be assigned to the same nodes.
 
-  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
-  @pytest.mark.execute_serially
-  def test_non_exempt_query_options(self, vector, unique_database):
-    """Non-exempt query options result in different cache entries"""
-    fq_table = "{0}.query_options".format(unique_database)
-    self.create_table(fq_table)
-    query = "SELECT * from {0}".format(fq_table)
 
-    strict_true = dict(vector.get_value('exec_option'))
-    strict_true['strict_mode'] = 'true'
-    strict_false = dict(vector.get_value('exec_option'))
-    strict_false['strict_mode'] = 'false'
-
-    noexempt1 = self.execute_query(query, query_options=strict_false)
-    noexempt2 = self.execute_query(query, query_options=strict_true)
-    noexempt3 = self.execute_query(query, query_options=strict_false)
-    noexempt4 = self.execute_query(query, query_options=strict_true)
-    noexempt5 = self.execute_query(query, query_options=vector.get_value('exec_option'))
-
-    assert noexempt1.success
-    assert noexempt2.success
-    assert noexempt3.success
-    assert noexempt4.success
-    assert noexempt5.success
-    assert noexempt1.data == noexempt2.data
-    assert noexempt1.data == noexempt3.data
-    assert noexempt1.data == noexempt4.data
-    assert noexempt1.data == noexempt5.data
-    assertCounters(noexempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
-    assertCounters(noexempt2.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
-    assertCounters(noexempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-    assertCounters(noexempt4.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-    assertCounters(noexempt5.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-
-  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
-  @pytest.mark.execute_serially
-  def test_exempt_query_options(self, vector, unique_database):
-    """Exempt query options share cache entry"""
-    fq_table = "{0}.query_options".format(unique_database)
-    self.create_table(fq_table)
-    query = "SELECT * from {0}".format(fq_table)
-
-    codegen_false = dict(vector.get_value('exec_option'))
-    codegen_false['disable_codegen'] = 'true'
-    codegen_true = dict(vector.get_value('exec_option'))
-    codegen_true['disable_codegen'] = 'false'
-
-    exempt1 = self.execute_query(query, query_options=codegen_true)
-    exempt2 = self.execute_query(query, query_options=codegen_false)
-    exempt3 = self.execute_query(query, query_options=vector.get_value('exec_option'))
-    assert exempt1.success
-    assert exempt2.success
-    assert exempt1.data == exempt2.data
-    assert exempt1.data == exempt3.data
-    assertCounters(exempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
-    assertCounters(exempt2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-    assertCounters(exempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-
-  @CustomClusterTestSuite.with_args(
-      start_args=CACHE_START_ARGS, cluster_size=1,
-      impalad_args='--tuple_cache_exempt_query_options=max_errors,exec_time_limit_s')
-  @pytest.mark.execute_serially
-  def test_custom_exempt_query_options(self, vector, unique_database):
-    """Custom list of exempt query options share cache entry"""
-    fq_table = "{0}.query_options".format(unique_database)
-    self.create_table(fq_table)
-    query = "SELECT * from {0}".format(fq_table)
-
-    errors_10 = dict(vector.get_value('exec_option'))
-    errors_10['max_errors'] = '10'
-    exec_time_limit = dict(vector.get_value('exec_option'))
-    exec_time_limit['exec_time_limit_s'] = '30'
-
-    exempt1 = self.execute_query(query, query_options=errors_10)
-    exempt2 = self.execute_query(query, query_options=exec_time_limit)
-    exempt3 = self.execute_query(query, query_options=vector.get_value('exec_option'))
-    assert exempt1.success
-    assert exempt2.success
-    assert exempt1.data == exempt2.data
-    assert exempt1.data == exempt3.data
-    assertCounters(exempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
-    assertCounters(exempt2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-    assertCounters(exempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
-
-
+@CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
 class TestTupleCacheRuntimeKeysBasic(TestTupleCacheBase):
   """Simpler tests that run on a single node with mt_dop=0 or mt_dop=1."""
 
@@ -499,9 +507,6 @@ class TestTupleCacheRuntimeKeysBasic(TestTupleCacheBase):
     super(TestTupleCacheRuntimeKeysBasic, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'mt_dop', [0, 1])
 
-  @CustomClusterTestSuite.with_args(
-    start_args=CACHE_START_ARGS, cluster_size=1)
-  @pytest.mark.execute_serially
   def test_scan_range_basics(self, vector, unique_database):
     """
     This tests that adding/removing files to a table results in different keys.
@@ -574,9 +579,6 @@ class TestTupleCacheRuntimeKeysBasic(TestTupleCacheBase):
     assert rerun_two_files_compile_key == two_files_compile_key
     assert rerun_two_files_result.data == two_files_result.data
 
-  @CustomClusterTestSuite.with_args(
-    start_args=CACHE_START_ARGS, cluster_size=1)
-  @pytest.mark.execute_serially
   def test_scan_range_partitioned(self, vector):
     """
     This tests a basic partitioned case where the query is identical except that
@@ -614,15 +616,15 @@ class TestTupleCacheRuntimeKeysBasic(TestTupleCacheBase):
     assert year2010_result.data[0].find("2009") == -1
 
 
-class TestTupleCacheRuntimeKeys(TestTupleCacheBase):
+@CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
+class TestTupleCacheFullCluster(TestTupleCacheBase):
+  """Test with 3 executors and a range of mt_dop values."""
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestTupleCacheRuntimeKeys, cls).add_test_dimensions()
+    super(TestTupleCacheFullCluster, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'mt_dop', [0, 1, 2])
 
-  @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
-  @pytest.mark.execute_serially
   def test_scan_range_distributed(self, vector, unique_database):
     """
     This tests the distributed case where there are multiple fragment instances
@@ -634,6 +636,10 @@ class TestTupleCacheRuntimeKeys(TestTupleCacheBase):
     mt_dop = vector.get_value('exec_option')['mt_dop']
     fq_table = "{0}.scan_range_distributed".format(unique_database)
     query = "SELECT * from {0}".format(fq_table)
+
+    entries_baseline = {
+      impalad: self.get_tuple_cache_metric(impalad.service, "entries-in-use")
+      for impalad in self.cluster.impalads}
 
     # Create a table with several files so that we always have enough work for multiple
     # fragment instances
@@ -652,11 +658,11 @@ class TestTupleCacheRuntimeKeys(TestTupleCacheBase):
     # Every cache key has the same compile key
     unique_compile_keys = set([key.split("_")[0] for key in unique_cache_keys])
     assert len(unique_compile_keys) == 1
-    # Verify the cache metrics for each impalad. Since we started from scratch, the
-    # number of entries in the cache should be the same as the number of cache keys.
+    # Verify the cache metrics for each impalad. Determine number of new cache entries,
+    # which should be the same as the number of cache keys.
     for impalad in self.cluster.impalads:
       entries_in_use = self.get_tuple_cache_metric(impalad.service, "entries-in-use")
-      assert entries_in_use == max(mt_dop, 1)
+      assert entries_in_use - entries_baseline[impalad] == max(mt_dop, 1)
     assert_deterministic_scan(vector, before_result.runtime_profile)
 
     # Insert another row, which creates a file / scan range
@@ -690,10 +696,11 @@ class TestTupleCacheRuntimeKeys(TestTupleCacheBase):
     all_cache_keys = unique_cache_keys.union(after_insert_unique_cache_keys)
     total_entries_in_use = 0
     for impalad in self.cluster.impalads:
-      entries_in_use = self.get_tuple_cache_metric(impalad.service, "entries-in-use")
-      assert entries_in_use >= max(mt_dop, 1)
-      assert entries_in_use <= (2 * max(mt_dop, 1))
-      total_entries_in_use += entries_in_use
+      new_entries_in_use = self.get_tuple_cache_metric(impalad.service, "entries-in-use")
+      new_entries_in_use -= entries_baseline[impalad]
+      assert new_entries_in_use >= max(mt_dop, 1)
+      assert new_entries_in_use <= (2 * max(mt_dop, 1))
+      total_entries_in_use += new_entries_in_use
     assert total_entries_in_use >= len(all_cache_keys)
     assert_deterministic_scan(vector, after_insert_result.runtime_profile)
 
@@ -714,16 +721,15 @@ class TestTupleCacheRuntimeKeys(TestTupleCacheBase):
     assert len(different_rows) == 1
 
 
-class TestTupleCacheCountStar(TestTupleCacheBase):
+@CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
+class TestTupleCacheMtdop(TestTupleCacheBase):
+  """Test with single executor and mt_dop=0 or 2."""
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestTupleCacheCountStar, cls).add_test_dimensions()
+    super(TestTupleCacheMtdop, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'mt_dop', [0, 2])
 
-  @CustomClusterTestSuite.with_args(
-    start_args=CACHE_START_ARGS, cluster_size=1)
-  @pytest.mark.execute_serially
   def test_tuple_cache_count_star(self, vector, unique_database):
     """
     This test is a regression test for IMPALA-13411 to see whether it hits
@@ -741,17 +747,6 @@ class TestTupleCacheCountStar(TestTupleCacheBase):
     result2 = self.execute_query(query)
     assert result1.success and result2.success
 
-
-class TestTupleCacheComputeStats(TestTupleCacheBase):
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestTupleCacheComputeStats, cls).add_test_dimensions()
-    add_exec_option_dimension(cls, 'mt_dop', [0, 2])
-
-  @CustomClusterTestSuite.with_args(
-    start_args=CACHE_START_ARGS, cluster_size=1)
-  @pytest.mark.execute_serially
   def test_tuple_cache_key_with_stats(self, vector, unique_database):
     """
     This test verifies if compute stats affect the tuple cache key.
