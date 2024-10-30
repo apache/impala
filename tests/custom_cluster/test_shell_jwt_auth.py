@@ -62,7 +62,8 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS,
     impala_log_dir="{jwt_auth_success}",
-    tmp_dir_placeholders=["jwt_auth_success"])
+    tmp_dir_placeholders=["jwt_auth_success"],
+    disable_log_buffering=True)
   def test_jwt_auth_valid(self, vector):
     """Asserts the Impala shell can authenticate to Impala using JWT authentication.
     Also executes a query to ensure the authentication was successful."""
@@ -97,7 +98,8 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS,
     impala_log_dir="{jwt_auth_fail}",
-    tmp_dir_placeholders=["jwt_auth_fail"])
+    tmp_dir_placeholders=["jwt_auth_fail"],
+    disable_log_buffering=True)
   def test_jwt_auth_expired(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""
@@ -136,7 +138,8 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS,
     impala_log_dir="{jwt_auth_invalid_jwk}",
-    tmp_dir_placeholders=["jwt_auth_invalid_jwk"])
+    tmp_dir_placeholders=["jwt_auth_invalid_jwk"],
+    disable_log_buffering=True)
   def test_jwt_auth_invalid_jwk(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""

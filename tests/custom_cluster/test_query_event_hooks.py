@@ -35,7 +35,8 @@ class TestHooks(CustomClusterTestSuite):
       impalad_args=("--query_event_hook_classes={0} -logbuflevel=-1 ".format(DUMMY_HOOK)
                     + "--minidump_path={query_event_hooks_minidump}"),
       catalogd_args="--minidump_path={query_event_hooks_minidump}",
-      tmp_dir_placeholders=['query_event_hooks_log', 'query_event_hooks_minidump'])
+      tmp_dir_placeholders=['query_event_hooks_log', 'query_event_hooks_minidump'],
+      disable_log_buffering=True)
   def test_query_event_hooks_execute(self):
     """
     Tests that the post query execution hook actually executes by using a
@@ -81,7 +82,8 @@ class TestHooksStartupFail(CustomClusterTestSuite):
       impalad_args=("--query_event_hook_classes={0} ".format(FAILING_HOOK)
                     + "--minidump_path={hook_startup_fail_minidump}"),
       catalogd_args="--minidump_path={hook_startup_fail_minidump}",
-      tmp_dir_placeholders=['hook_startup_fail_log', 'hook_startup_fail_minidump'])
+      tmp_dir_placeholders=['hook_startup_fail_log', 'hook_startup_fail_minidump'],
+      disable_log_buffering=True)
   def test_hook_startup_fail(self):
     """
     Tests that exception during QueryEventHook.onImpalaStart will prevent
@@ -103,7 +105,8 @@ class TestHooksStartupFail(CustomClusterTestSuite):
                     + "--minidump_path={hook_instantiation_fail_minidump}"),
       catalogd_args="--minidump_path={hook_instantiation_fail_minidump}",
       tmp_dir_placeholders=['hook_instantiation_fail_log',
-                            'hook_instantiation_fail_minidump'])
+                            'hook_instantiation_fail_minidump'],
+      disable_log_buffering=True)
   def test_hook_instantiation_fail(self):
     """
     Tests that failure to instantiate a QueryEventHook will prevent

@@ -21,17 +21,13 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import logging
-import os
 import pytest
-import re
-import sys
 import uuid
 import socket
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfBuildType
-from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.patterns import print_id
 from time import sleep
 
@@ -47,6 +43,7 @@ from ErrorCodes.ttypes import TErrorCode
 LOG = logging.getLogger('custom_statestore_test')
 STATESTORE_SERVICE_PORT = 24000
 CATALOG_SERVICE_PORT = 26000
+
 
 # A simple wrapper class to launch a cluster where we can tune various
 # startup parameters of the statestored to test correct boundary-value
@@ -128,7 +125,8 @@ class TestCustomStatestore(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--statestore_subscriber_use_resolved_address=true",
-      catalogd_args="--statestore_subscriber_use_resolved_address=true")
+      catalogd_args="--statestore_subscriber_use_resolved_address=true",
+      disable_log_buffering=True)
   def test_subscriber_with_resolved_address(self, vector):
     # Ensure cluster has started up by running a query.
     result = self.execute_query("select count(*) from functional_parquet.alltypes")

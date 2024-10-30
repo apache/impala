@@ -46,7 +46,9 @@ class TestQueryExpiration(CustomClusterTestSuite):
         % (waiting, len(in_flight_queries), expect_waiting)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--idle_query_timeout=8 --logbuflevel=-1")
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--idle_query_timeout=8",
+      disable_log_buffering=True)
   def test_query_expiration(self, vector):
     """Confirm that single queries expire if not fetched"""
     impalad = self.cluster.get_first_impalad()

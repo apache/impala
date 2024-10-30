@@ -94,7 +94,8 @@ class TestLateQueryStateInit(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--sort_runtime_filter_aggregator_candidates=true --logbuflevel=-1")
+    impalad_args="--sort_runtime_filter_aggregator_candidates=true",
+    disable_log_buffering=True)
   def test_late_query_state_init(self, vector):
     """Test that distributed runtime filter aggregation still works
     when remote query state of intermediate aggregator node is late to initialize."""

@@ -58,13 +58,15 @@ class TestRE2MaxMem(CustomClusterTestSuite):
         self._test_re2_max_mem(True, True)
 
     @pytest.mark.execute_serially
-    @CustomClusterTestSuite.with_args(cluster_size=1)
+    @CustomClusterTestSuite.with_args(cluster_size=1,
+        disable_log_buffering=True)
     def test_re2_max_mem_not_specified(self):
         # default max_mem set by re2's regex engine is 8 MiB
         self._test_re2_max_mem(False, True)
 
     @pytest.mark.execute_serially
     @CustomClusterTestSuite.with_args(cluster_size=1,
-        impalad_args="--re2_mem_limit=200MB")
+        impalad_args="--re2_mem_limit=200MB",
+        disable_log_buffering=True)
     def test_dfa_not_out_of_mem(self):
         self._test_re2_max_mem(False, False)

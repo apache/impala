@@ -203,7 +203,8 @@ class TestRestart(CustomClusterTestSuite):
     statestored_args="--statestore_update_frequency_ms=2000",
     impalad_args=("--wait_for_new_catalog_service_id_timeout_sec={} \
                   --wait_for_new_catalog_service_id_max_iterations=-1"
-                  .format(WAIT_FOR_CATALOG_UPDATE_TIMEOUT_SEC)))
+                  .format(WAIT_FOR_CATALOG_UPDATE_TIMEOUT_SEC)),
+    disable_log_buffering=True)
   def test_restart_catalogd_while_handling_rpc_response_with_timeout(self,
       unique_database):
     """Regression test for IMPALA-12267. We'd like to cause a situation where
@@ -268,7 +269,8 @@ class TestRestart(CustomClusterTestSuite):
         STATESTORE_UPDATE_FREQ_SEC * 1000),
     impalad_args=("--wait_for_new_catalog_service_id_timeout_sec=-1 \
                   --wait_for_new_catalog_service_id_max_iterations={}"
-                  .format(WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS)))
+                  .format(WAIT_FOR_CATALOG_UPDATE_MAX_ITERATIONS)),
+    disable_log_buffering=True)
   def test_restart_catalogd_while_handling_rpc_response_with_max_iters(self,
       unique_database):
     """We create the same situation as described in
@@ -897,7 +899,8 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
           --shutdown_deadline_s={deadline} \
           --hostname={hostname}".format(grace_period=IDLE_SHUTDOWN_GRACE_PERIOD_S,
             deadline=EXEC_SHUTDOWN_DEADLINE_S, hostname=socket.gethostname()),
-      cluster_size=1)
+      cluster_size=1,
+      disable_log_buffering=True)
   def test_shutdown_signal(self):
     """Test that an idle impalad shuts down in a timely manner after the shutdown grace
     period elapses."""
@@ -920,7 +923,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
         self.EXEC_SHUTDOWN_DEADLINE_S))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True)
   def test_sending_multiple_shutdown_signals(self):
     """Test that multiple IMPALA_SHUTDOWN_SIGNAL signals are all handeled without
     crashing the process."""

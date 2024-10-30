@@ -118,7 +118,8 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
-      catalogd_args="--catalog_topic_mode=minimal")
+      catalogd_args="--catalog_topic_mode=minimal",
+      disable_log_buffering=True)
   def test_restart_catalogd(self, unique_database):
     """
     Tests for the behavior of LocalCatalog when catalogd restarts.
@@ -161,8 +162,9 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
-    catalogd_args="--catalog_topic_mode=minimal "
-                  "--enable_incremental_metadata_updates=true")
+    catalogd_args=("--catalog_topic_mode=minimal "
+                   "--enable_incremental_metadata_updates=true"),
+    disable_log_buffering=True)
   def test_invalidate_stale_partitions(self, unique_database):
     """
     Test that partition level invalidations are sent from catalogd and processed
@@ -578,7 +580,7 @@ class TestLocalCatalogObservability(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
     catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=0",
-    cluster_size=1)
+    cluster_size=1, disable_log_buffering=True)
   def test_invalidate_stale_partition_on_reload(self, unique_database):
     test_tbl = unique_database + ".test_invalidate_table"
     self.client.execute(

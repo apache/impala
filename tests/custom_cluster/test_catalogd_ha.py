@@ -368,7 +368,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_restart_statestore(self):
     """The test case for restarting statestore after the cluster is created with
     catalogd HA enabled."""

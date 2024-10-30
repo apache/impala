@@ -34,6 +34,8 @@ class TestQueryLive(CustomClusterTestSuite):
   def setup_method(self, method):
     super(TestQueryLive, self).setup_method(method)
     self.wait_for_wm_init_complete()
+    # Wait few seconds until sys.impala_query_live is queryable.
+    self.wait_for_table_to_appear('sys', 'impala_query_live', 30)
 
   def assert_describe_extended(self):
     describe_ext_result = self.execute_query('describe extended sys.impala_query_live')
@@ -200,7 +202,8 @@ class TestQueryLive(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt")
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
   def test_alter(self):
     """Asserts alter works on query live table."""
     column_desc = 'test_alter\tstring\t'
@@ -331,7 +334,8 @@ class TestQueryLive(CustomClusterTestSuite):
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",
                                     cluster_size=3,
-                                    num_exclusive_coordinators=2)
+                                    num_exclusive_coordinators=2,
+                                    disable_log_buffering=True)
   def test_missing_coordinator(self):
     """Asserts scans finish if a coordinator disappears mid-schedule. Depends on
     test config of statestore_heartbeat_frequency_ms=50."""

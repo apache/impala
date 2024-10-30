@@ -27,8 +27,6 @@ from tests.common.custom_cluster_test_suite import (
     DEFAULT_CLUSTER_SIZE)
 from tests.common.skip import SkipIf
 from tests.util.event_processor_utils import EventProcessorUtils
-from tests.util.filesystem_utils import IS_ISILON, IS_LOCAL
-
 
 NUM_SUBSCRIBERS = DEFAULT_CLUSTER_SIZE + 1
 
@@ -117,7 +115,8 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args='--use_local_catalog --catalog_topic_mode=minimal',
-    catalogd_args='--catalog_topic_mode=minimal')
+    catalogd_args='--catalog_topic_mode=minimal',
+    disable_log_buffering=True)
   def test_hms_client_retries(self):
     """Test that a running query will trigger the retry logic in
     RetryingMetaStoreClient."""
@@ -151,6 +150,7 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
     self.run_hive_metastore()
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
 
 @SkipIf.is_test_jdk
 class TestCatalogHMSFailures(CustomClusterTestSuite):

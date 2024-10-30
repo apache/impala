@@ -24,6 +24,7 @@ from tests.common.skip import SkipIf, SkipIfNotHdfsMinicluster
 from tests.common.test_result_verifier import assert_codegen_cache_hit
 from tests.util.filesystem_utils import get_fs_path
 
+
 @SkipIf.not_hdfs
 @SkipIfNotHdfsMinicluster.scheduling
 class TestCodegenCache(CustomClusterTestSuite):
@@ -146,14 +147,16 @@ class TestCodegenCache(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-          impalad_args=SYMBOL_EMITTER_TESTS_IMPALAD_ARGS + "--asm_module_dir=/dev/null")
+          impalad_args=SYMBOL_EMITTER_TESTS_IMPALAD_ARGS + "--asm_module_dir=/dev/null",
+          disable_log_buffering=True)
   # Regression test for IMPALA-12260.
   def test_codegen_cache_with_asm_module_dir(self, vector):
     self._test_codegen_cache_with_symbol_emitter(vector)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-          impalad_args=SYMBOL_EMITTER_TESTS_IMPALAD_ARGS + "--perf_map")
+          impalad_args=SYMBOL_EMITTER_TESTS_IMPALAD_ARGS + "--perf_map",
+          disable_log_buffering=True)
   # Regression test for IMPALA-12260.
   def test_codegen_cache_with_perf_map(self, vector):
     self._test_codegen_cache_with_symbol_emitter(vector)

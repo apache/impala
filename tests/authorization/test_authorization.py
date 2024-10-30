@@ -89,7 +89,8 @@ class TestAuthorization(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       "--server_name=server1 --authorization_policy_file=ignored_file",
-      impala_log_dir="{deprecated_flags}", tmp_dir_placeholders=['deprecated_flags'])
+      impala_log_dir="{deprecated_flags}", tmp_dir_placeholders=['deprecated_flags'],
+      disable_log_buffering=True)
   def test_deprecated_flags(self):
     assert_file_in_dir_contains(self.impala_log_dir, "Ignoring removed flag "
                                                      "authorization_policy_file")

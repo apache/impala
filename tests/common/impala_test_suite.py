@@ -178,6 +178,11 @@ EXEC_OPTION_NAMES = set([val.lower()
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
+
+  # If True, call to assert_log_contains() will print WARN log for possibility of
+  # not disabling glog buffering (--logbuflevel=-1).
+  _warn_assert_log = False
+
   @classmethod
   def add_test_dimensions(cls):
     """
@@ -525,6 +530,11 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def __do_replacements(self, s, use_db=None, extra=None):
     globs = globals()
+    # following assignment are purposefully redundant to avoid flake8 warnings (F401).
+    globs['FILESYSTEM_PREFIX'] = FILESYSTEM_PREFIX
+    globs['FILESYSTEM_URI_SCHEME'] = FILESYSTEM_URI_SCHEME
+    globs['S3_BUCKET_NAME'] = S3_BUCKET_NAME
+    globs['S3GUARD_ENABLED'] = S3GUARD_ENABLED
     repl = dict(('$' + k, globs[k]) for k in [
         "FILESYSTEM_PREFIX",
         "FILESYSTEM_NAME",
@@ -1356,6 +1366,13 @@ class ImpalaTestSuite(BaseTestSuite):
     Returns the result of the very last call to line_regex.search or None if
     expected_count is 0 or the line_regex did not match any lines.
     """
+    if (self._warn_assert_log):
+      LOG.warning(
+          "{} calls assert_log_contains() with timeout_s={}. Make sure that glog "
+          "buffering has been disabled (--logbuflevel=-1), or "
+          "CustomClusterTestSuite.with_args is set with disable_log_buffering=True, "
+          "or timeout_s is sufficient.".format(self.__class__.__name__, timeout_s))
+
     pattern = re.compile(line_regex)
     start_time = time.time()
     while True:

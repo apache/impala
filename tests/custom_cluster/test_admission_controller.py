@@ -826,7 +826,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="--logbuflevel=-1 " + impalad_admission_ctrl_flags(max_requests=1,
         max_queued=1, pool_max_mem=PROC_MEM_TEST_LIMIT),
-    statestored_args=_STATESTORED_ARGS)
+    statestored_args=_STATESTORED_ARGS,
+    disable_log_buffering=True)
   def test_cancellation(self):
     """ Test to confirm that all Async cancellation windows are hit and are able to
     succesfully cancel the query"""

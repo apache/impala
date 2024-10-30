@@ -34,7 +34,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import copy_files_to_hdfs_dir
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIf
 from tests.common.test_dimensions import (create_client_protocol_dimension,
-    create_exec_option_dimension, create_orc_dimension)
+    create_orc_dimension)
 from tests.common.test_vector import ImpalaTestVector
 from tests.shell.util import run_impala_shell_cmd
 from tests.util.hdfs_util import NAMENODE
@@ -77,7 +77,8 @@ class TestRanger(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impala_log_dir=tempfile.mkdtemp(prefix="ranger_audit_xff", dir=os.getenv("LOG_DIR")),
     impalad_args=(IMPALAD_ARGS + " --use_xff_address_as_origin=true"),
-    catalogd_args=CATALOGD_ARGS)
+    catalogd_args=CATALOGD_ARGS,
+    disable_log_buffering=True)
   def test_xff_ranger_audit(self):
     """
     Tests XFF client IP is included in ranger audit logs when using hs2-http protocol
@@ -2125,7 +2126,8 @@ class TestRanger(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} {1}".format(IMPALAD_ARGS,
                                   "--allow_catalog_cache_op_from_masked_users=true"),
-    catalogd_args=CATALOGD_ARGS)
+    catalogd_args=CATALOGD_ARGS,
+    disable_log_buffering=True)
   def test_allow_metadata_update(self, unique_name):
     self.__test_allow_catalog_cache_op_from_masked_users(unique_name)
 
@@ -2133,7 +2135,8 @@ class TestRanger(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} {1}".format(LOCAL_CATALOG_IMPALAD_ARGS,
                                   "--allow_catalog_cache_op_from_masked_users=true"),
-    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS)
+    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS,
+    disable_log_buffering=True)
   def test_allow_metadata_update_local_catalog(self, unique_name):
     self.__test_allow_catalog_cache_op_from_masked_users(unique_name)
 

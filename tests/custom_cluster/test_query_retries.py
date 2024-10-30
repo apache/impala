@@ -596,6 +596,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(disable_log_buffering=True)
   def test_query_retry_reaches_spool_limit(self):
     """Test retryable queries with results spooling enabled and
     spool_all_results_for_retries=true that reach spooling mem limit will return rows and

@@ -30,7 +30,6 @@ from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
-from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.retry import retry
 from tests.util.workload_management import assert_query
@@ -679,7 +678,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
                                                  "--shutdown_deadline_s=15 "
                                                  "--debug_actions="
                                                  "WM_SHUTDOWN_DELAY:SLEEP@5000",
-                                    catalogd_args="--enable_workload_mgmt")
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
   def test_flush_on_shutdown(self, vector):
     """Asserts that queries that have completed but are not yet written to the query
        log table are flushed to the table before the coordinator exits. Graceful shutdown
@@ -730,7 +730,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
                                                  "--shutdown_deadline_s=15 "
                                                  "--debug_actions="
                                                  "WM_SHUTDOWN_DELAY:SLEEP@10000",
-                                    catalogd_args="--enable_workload_mgmt")
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
   def test_shutdown_flush_timed_out(self, vector):
     """Asserts that queries that have completed but are not yet written to the query
        log table are lost if the completed queries queue drain takes too long and that

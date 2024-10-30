@@ -45,18 +45,21 @@ class TestLoggingCore(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-      impalad_args="--max_error_logs_per_instance=2")
+      impalad_args="--max_error_logs_per_instance=2",
+      disable_log_buffering=True)
   def test_max_errors(self):
     self._test_max_errors(2, 4, True)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-      impalad_args="--max_error_logs_per_instance=3")
+      impalad_args="--max_error_logs_per_instance=3",
+      disable_log_buffering=True)
   def test_max_errors_0(self):
     self._test_max_errors(3, 0, True)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
-      impalad_args="--max_error_logs_per_instance=2")
+      impalad_args="--max_error_logs_per_instance=2",
+      disable_log_buffering=True)
   def test_max_errors_no_downgrade(self):
     self._test_max_errors(2, -1, False)

@@ -101,28 +101,32 @@ class TestPartitionDeletion(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--statestore_update_frequency_ms=2000",
     impalad_args="--use_local_catalog=false",
-    catalogd_args="--catalog_topic_mode=full --hms_event_polling_interval_s=0")
+    catalogd_args="--catalog_topic_mode=full --hms_event_polling_interval_s=0",
+    disable_log_buffering=True)
   def test_legacy_catalog_no_event_processing(self, unique_database):
     self._test_partition_deletion(unique_database)
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--statestore_update_frequency_ms=2000",
     impalad_args="--use_local_catalog=false",
-    catalogd_args="--catalog_topic_mode=full --hms_event_polling_interval_s=1")
+    catalogd_args="--catalog_topic_mode=full --hms_event_polling_interval_s=1",
+    disable_log_buffering=True)
   def test_legacy_catalog_with_event_processing(self, unique_database):
     self._test_partition_deletion(unique_database)
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--statestore_update_frequency_ms=2000",
     impalad_args="--use_local_catalog=true",
-    catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=0")
+    catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=0",
+    disable_log_buffering=True)
   def test_local_catalog_no_event_processing(self, unique_database):
     self._test_partition_deletion(unique_database)
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--statestore_update_frequency_ms=2000",
     impalad_args="--use_local_catalog=true",
-    catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=1")
+    catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=1",
+    disable_log_buffering=True)
   def test_local_catalog_with_event_processing(self, unique_database):
     self._test_partition_deletion(unique_database)
 

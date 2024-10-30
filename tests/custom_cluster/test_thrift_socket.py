@@ -77,7 +77,8 @@ class TestThriftSocket(CustomClusterTestSuite):
     return 'functional-query'
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args=IDLE_ARGS, cluster_size=1)
+  @CustomClusterTestSuite.with_args(
+      impalad_args=IDLE_ARGS, cluster_size=1, disable_log_buffering=True)
   def test_peek_timeout_no_ssl(self):
     # Iterate over test vector within test function to avoid restarting cluster.
     for protocol_dim in create_client_protocol_dimension():
@@ -93,7 +94,8 @@ class TestThriftSocket(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(statestored_args=SSL_ARGS,
                                     catalogd_args=SSL_ARGS,
                                     impalad_args=(SSL_ARGS + IDLE_ARGS),
-                                    cluster_size=1)
+                                    cluster_size=1,
+                                    disable_log_buffering=True)
   def test_peek_timeout_ssl(self):
     # Iterate over test vector within test function to avoid restarting cluster.
     for protocol_dim in create_client_protocol_dimension():

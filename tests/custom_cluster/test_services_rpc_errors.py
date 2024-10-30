@@ -36,7 +36,7 @@ class TestStatestoreRpcErrors(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       " --debug_actions=REGISTER_SUBSCRIBER_FIRST_ATTEMPT:FAIL@1.0")
-  def test_register_subscriber_rpc_error(self, vector):
+  def test_register_subscriber_rpc_error(self):
     self.assert_impalad_log_contains("INFO",
         "Injected RPC error.*Debug Action: REGISTER_SUBSCRIBER_FIRST_ATTEMPT")
 
@@ -46,8 +46,9 @@ class TestStatestoreRpcErrors(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      " --debug_actions=GET_PROTOCOL_VERSION_FIRST_ATTEMPT:FAIL@1.0")
-  def test_get_protocol_version_rpc_error(self, vector):
+      impalad_args=" --debug_actions=GET_PROTOCOL_VERSION_FIRST_ATTEMPT:FAIL@1.0",
+      disable_log_buffering=True)
+  def test_get_protocol_version_rpc_error(self):
     self.assert_impalad_log_contains("INFO",
         "Injected RPC error.*Debug Action: GET_PROTOCOL_VERSION_FIRST_ATTEMPT")
 
@@ -71,8 +72,9 @@ class TestCatalogRpcErrors(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      " --debug_actions=CATALOG_RPC_FIRST_ATTEMPT:FAIL@1.0")
-  def test_register_subscriber_rpc_error(self, vector, unique_database):
+      impalad_args=" --debug_actions=CATALOG_RPC_FIRST_ATTEMPT:FAIL@1.0",
+      disable_log_buffering=True)
+  def test_register_subscriber_rpc_error(self, unique_database):
     """Validate that RPCs to the catalogd are retried by injecting a failure into the
     first RPC attempt for any catalogd RPC. Run a variety of queries that require
     catalogd interaction to ensure all RPCs are retried."""

@@ -309,13 +309,13 @@ class TestDataCache(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LRU", keep_across_restarts=True),
-      start_args=CACHE_START_ARGS, cluster_size=1)
+      start_args=CACHE_START_ARGS, cluster_size=1, disable_log_buffering=True)
   def test_data_cache_readonly_lru(self, vector):
     self.__test_data_cache_readonly(vector)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LIRS", keep_across_restarts=True),
-      start_args=CACHE_START_ARGS, cluster_size=1)
+      start_args=CACHE_START_ARGS, cluster_size=1, disable_log_buffering=True)
   def test_data_cache_readonly_lirs(self, vector):
     self.__test_data_cache_readonly(vector)

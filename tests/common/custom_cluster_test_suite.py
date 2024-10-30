@@ -74,6 +74,8 @@ TMP_DIR_PLACEHOLDERS = 'tmp_dir_placeholders'
 # startup fails with "num_known_live_backends did not reach expected value in time", then
 # the test passes. Any other exception is raised.
 EXPECT_STARTUP_FAIL = 'expect_startup_fail'
+# If True, add '--logbuflevel=-1' into all impala daemon args.
+DISABLE_LOG_BUFFERING = 'disable_log_buffering'
 
 # Args that accept additional formatting to supply temporary dir path.
 ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
@@ -138,7 +140,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
       impalad_graceful_shutdown=False, tmp_dir_placeholders=[],
-      expect_startup_fail=False):
+      expect_startup_fail=False, disable_log_buffering=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -170,14 +172,16 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.__dict__[IMPALAD_TIMEOUT_S] = impalad_timeout_s
       if expect_cores is not None:
         func.__dict__[EXPECT_CORES] = expect_cores
-      if reset_ranger is not False:
+      if reset_ranger:
         func.__dict__[RESET_RANGER] = True
-      if impalad_graceful_shutdown is not False:
+      if impalad_graceful_shutdown:
         func.__dict__[IMPALAD_GRACEFUL_SHUTDOWN] = True
       if tmp_dir_placeholders:
         func.__dict__[TMP_DIR_PLACEHOLDERS] = tmp_dir_placeholders
       if expect_startup_fail:
         func.__dict__[EXPECT_STARTUP_FAIL] = True
+      if disable_log_buffering:
+        func.__dict__[DISABLE_LOG_BUFFERING] = True
       return func
     return decorate
 
@@ -208,6 +212,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   def setup_method(self, method):
     cluster_args = list()
+    disable_log_buffering = method.__dict__.get(DISABLE_LOG_BUFFERING, False)
+    self._warn_assert_log = not disable_log_buffering
 
     if TMP_DIR_PLACEHOLDERS in method.__dict__:
       # Create all requested temporary dirs.
@@ -221,10 +227,15 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       # log, which doesn't start until after the grace period has passed.
       cluster_args.append(
           "--impalad=--shutdown_grace_period_s=0 --shutdown_deadline_s=15")
-    for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS, JVM_ARGS]:
+    impala_daemons = [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS]
+    for arg in (impala_daemons + [JVM_ARGS]):
+      val = ''
+      if arg in impala_daemons and disable_log_buffering:
+        val += '--logbuflevel=-1 '
       if arg in method.__dict__:
-        val = (method.__dict__[arg] if arg not in ACCEPT_FORMATTING
+        val += (method.__dict__[arg] if arg not in ACCEPT_FORMATTING
                else method.__dict__[arg].format(**self.TMP_DIRS))
+      if val:
         cluster_args.append("--%s=%s " % (arg, val))
     if START_ARGS in method.__dict__:
       cluster_args.extend(method.__dict__[START_ARGS].split())
@@ -300,7 +311,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
               "Unexpected exception: {}".format(e)
         else:
           raise e
-
 
   def teardown_method(self, method):
     if method.__dict__.get(IMPALAD_GRACEFUL_SHUTDOWN, False):

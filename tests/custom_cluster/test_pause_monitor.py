@@ -25,7 +25,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 class TestPauseMonitor(CustomClusterTestSuite):
   """Class for pause monitor tests."""
 
-  @CustomClusterTestSuite.with_args("--logbuflevel=-1")
+  @CustomClusterTestSuite.with_args(disable_log_buffering=True)
   def test_jvm_pause_monitor_logs_entries(self):
     """This test injects a non-GC pause and confirms that that the JVM pause
     monitor detects and logs it."""
