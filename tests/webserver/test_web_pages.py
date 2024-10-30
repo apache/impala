@@ -1117,8 +1117,10 @@ class TestWebPage(ImpalaTestSuite):
     except Exception as e:
       re.match("UDF ERROR: Cannot divide decimal by zero", str(e))
 
-    # Failed query should be completed.
-    response_json = self.get_queries()
+    # Cancel and fetch requests can return before cancellation is finalized. Retry for
+    # slow environments like ASAN.
+    response_json = self.try_until("query failure", self.get_queries,
+        lambda resp: resp['num_in_flight_queries'] == 0)
     assert response_json['num_in_flight_queries'] == 0
     assert response_json['num_waiting_queries'] == 0
 
