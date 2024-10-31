@@ -160,6 +160,7 @@ public class ParallelFileMetadataLoader {
         } else {
           partBuilder.setFileDescriptors(loader.getLoadedFds());
         }
+        partBuilder.setFileMetadataStats(loader.getFileMetadataStats());
       }
     }
   }

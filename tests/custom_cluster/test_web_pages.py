@@ -32,6 +32,7 @@ from tests.common.skip import SkipIfFS
 from tests.shell.util import run_impala_shell_cmd
 
 SMALL_QUERY_LOG_SIZE_IN_BYTES = 40 * 1024
+CATALOG_URL = "http://localhost:25020/catalog"
 
 
 class TestWebPage(CustomClusterTestSuite):
@@ -505,3 +506,43 @@ class TestWebPage(CustomClusterTestSuite):
     self.execute_query("invalidate metadata")
     page = requests.get("http://localhost:25020/events").text
     assert "Unexpected exception" not in page, "Still see error message:\n" + page
+
+  def _test_catalog_tables_stats_after_describe(self, table_full_name, num_files):
+    """Test the lists of tables with Most Number of Files and Highest Memory Requirements
+    in the catalog page. Start a new cluster to make sure the table is not loaded before
+    DESCRIBE."""
+
+    def get_table_metric(content, list_name, key):
+      table_list = content[list_name]
+      for table in table_list:
+        if table["name"] == table_full_name:
+          return table[key]
+      return None
+
+    # The table is not in the lists after the cluster starts
+    content = self.get_debug_page(CATALOG_URL + "?json")
+    assert get_table_metric(content, "large_tables", "mem_estimate") is None
+    assert get_table_metric(content, "high_file_count_tables", "num_files") is None
+
+    self.client.execute("DESCRIBE {0}".format(table_full_name))
+    content = self.get_debug_page(CATALOG_URL + "?json")
+    assert get_table_metric(content, "large_tables", "mem_estimate") > 0
+    assert get_table_metric(content, "high_file_count_tables", "num_files") == num_files
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--catalog_topic_mode=full",
+    impalad_args="--use_local_catalog=false")
+  def test_catalog_tables_stats_legacy_catalog(self):
+    self._test_catalog_tables_stats_after_describe("functional.alltypes", 24)
+    self._test_catalog_tables_stats_after_describe(
+        "functional_parquet.iceberg_lineitem_sixblocks", 4)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--catalog_topic_mode=minimal",
+    impalad_args="--use_local_catalog=true")
+  def test_catalog_tables_stats_local_catalog(self):
+    self._test_catalog_tables_stats_after_describe("functional.alltypes", 24)
+    self._test_catalog_tables_stats_after_describe(
+        "functional_parquet.iceberg_lineitem_sixblocks", 4)

@@ -58,8 +58,10 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsTable.FileMetadataStats;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -354,18 +356,11 @@ public class HdfsTable extends Table implements FeFsTable {
   // level.
   public final static class FileMetadataStats {
     // Number of files in a table/partition.
-    public long numFiles;
+    public long numFiles = 0;
     // Number of blocks in a table/partition.
-    public long numBlocks;
+    public long numBlocks = 0;
     // Total size (in bytes) of all files in a table/partition.
-    public long totalFileBytes;
-
-    // Unsets the storage stats to indicate that their values are unknown.
-    public void unset() {
-      numFiles = -1;
-      numBlocks = -1;
-      totalFileBytes = -1;
-    }
+    public long totalFileBytes = 0;
 
     // Initializes the values of the storage stats.
     public void init() {
@@ -378,6 +373,25 @@ public class HdfsTable extends Table implements FeFsTable {
       numFiles = stats.numFiles;
       numBlocks = stats.numBlocks;
       totalFileBytes = stats.totalFileBytes;
+    }
+
+    public void merge(FileMetadataStats other) {
+      numFiles += other.numFiles;
+      numBlocks += other.numBlocks;
+      totalFileBytes += other.totalFileBytes;
+    }
+
+    public void remove(FileMetadataStats other) {
+      numFiles -= other.numFiles;
+      numBlocks -= other.numBlocks;
+      totalFileBytes -= other.totalFileBytes;
+    }
+
+    // Accumulate the statistics of the fd into this FileMetadataStats.
+    public void accumulate(FileDescriptor fd) {
+      numBlocks += fd.getNumFileBlocks();
+      totalFileBytes += fd.getFileLength();
+      ++numFiles;
     }
   }
 
@@ -423,21 +437,6 @@ public class HdfsTable extends Table implements FeFsTable {
       }
     }
     return true;
-  }
-
-  /**
-   * Updates the storage stats of this table based on the partition information.
-   * This is used only for the frontend tests that do not spawn a separate Catalog
-   * instance.
-   */
-  public void computeHdfsStatsForTesting() {
-    Preconditions.checkState(fileMetadataStats_.numFiles == -1
-        && fileMetadataStats_.totalFileBytes == -1);
-    fileMetadataStats_.init();
-    for (HdfsPartition partition: partitionMap_.values()) {
-      fileMetadataStats_.numFiles += partition.getNumFileDescriptors();
-      fileMetadataStats_.totalFileBytes += partition.getSize();
-    }
   }
 
   @Override
@@ -1039,8 +1038,7 @@ public class HdfsTable extends Table implements FeFsTable {
     if (partitionMap_.containsKey(partition.getId())) return false;
     if (partition.getFileFormat() == HdfsFileFormat.AVRO) hasAvroData_ = true;
     partitionMap_.put(partition.getId(), partition);
-    fileMetadataStats_.totalFileBytes += partition.getSize();
-    fileMetadataStats_.numFiles += partition.getNumFileDescriptors();
+    fileMetadataStats_.merge(partition.getFileMetadataStats());
     updatePartitionMdAndColStats(partition);
     lastCompactionId_ = Math.max(lastCompactionId_, partition.getLastCompactionId());
     return true;
@@ -1132,8 +1130,7 @@ public class HdfsTable extends Table implements FeFsTable {
   private HdfsPartition dropPartition(HdfsPartition partition,
       boolean removeCacheDirective) {
     if (partition == null) return null;
-    fileMetadataStats_.totalFileBytes -= partition.getSize();
-    fileMetadataStats_.numFiles -= partition.getNumFileDescriptors();
+    fileMetadataStats_.remove(partition.getFileMetadataStats());
     Preconditions.checkArgument(partition.getPartitionValues().size() ==
         numClusteringCols_);
     Long partitionId = partition.getId();
@@ -1216,6 +1213,25 @@ public class HdfsTable extends Table implements FeFsTable {
     HdfsStorageDescriptor hdfsStorageDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
     prototypePartition_ = HdfsPartition.prototypePartition(this, hdfsStorageDescriptor);
+  }
+
+  private void updateMetrics() {
+    long memUsageEstimate = 0;
+    int numPartitions = partitionMap_.values().size();
+    memUsageEstimate += numPartitions * PER_PARTITION_MEM_USAGE_BYTES;
+    FileMetadataStats newStats = new FileMetadataStats();
+    for (HdfsPartition partition: partitionMap_.values()) {
+      if (partition.hasIncrementalStats()) {
+        memUsageEstimate += getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
+        hasIncrementalStats_ = true;
+      }
+      newStats.merge(partition.getFileMetadataStats());
+    }
+    fileMetadataStats_.set(newStats);
+    memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
+        fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
+    setEstimatedMetadataSize(memUsageEstimate);
+    setNumFiles(fileMetadataStats_.numFiles);
   }
 
   @Override
@@ -1349,7 +1365,7 @@ public class HdfsTable extends Table implements FeFsTable {
         if (loadParams.getLoadTableSchema()) {
           setAvroSchema(msClient, msTbl, catalogTimeline);
         }
-        fileMetadataStats_.unset();
+        updateMetrics();
         refreshLastUsedTime();
         // Make sure all the partition modifications are done.
         Preconditions.checkState(dirtyPartitions_.isEmpty());
@@ -2463,61 +2479,23 @@ public class HdfsTable extends Table implements FeFsTable {
    * partitions in the refPartitions set (the backend doesn't need metadata for
    * unreferenced partitions). In addition, metadata that is not used by the backend will
    * be omitted.
-   *
-   * To prevent the catalog from hitting an OOM error while trying to
-   * serialize large partition incremental stats, we estimate the stats size and filter
-   * the incremental stats data from partition objects if the estimate exceeds
-   * --inc_stats_size_limit_bytes. This function also collects storage related statistics
-   *  (e.g. number of blocks, files, etc) in order to compute an estimate of the metadata
-   *  size of this table.
    */
   public THdfsTable getTHdfsTable(ThriftObjectType type, Set<Long> refPartitions) {
     if (type == ThriftObjectType.FULL) {
       // "full" implies all partitions should be included.
       Preconditions.checkArgument(refPartitions == null);
     }
-    long memUsageEstimate = 0;
-    int numPartitions =
-        (refPartitions == null) ? partitionMap_.values().size() : refPartitions.size();
-    memUsageEstimate += numPartitions * PER_PARTITION_MEM_USAGE_BYTES;
-    FileMetadataStats stats = new FileMetadataStats();
     Map<Long, THdfsPartition> idToPartition = new HashMap<>();
     for (HdfsPartition partition: partitionMap_.values()) {
       long id = partition.getId();
       if (refPartitions == null || refPartitions.contains(id)) {
         THdfsPartition tHdfsPartition = FeCatalogUtils.fsPartitionToThrift(
             partition, type);
-        if (partition.hasIncrementalStats()) {
-          memUsageEstimate += getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
-          hasIncrementalStats_ = true;
-        }
-        if (type == ThriftObjectType.FULL) {
-          Preconditions.checkState(tHdfsPartition.isSetNum_blocks() &&
-              tHdfsPartition.isSetTotal_file_size_bytes());
-          stats.numBlocks += tHdfsPartition.getNum_blocks();
-          stats.numFiles +=
-              tHdfsPartition.isSetFile_desc() ? tHdfsPartition.getFile_desc().size() : 0;
-          stats.numFiles += tHdfsPartition.isSetInsert_file_desc() ?
-              tHdfsPartition.getInsert_file_desc().size() : 0;
-          stats.numFiles += tHdfsPartition.isSetDelete_file_desc() ?
-              tHdfsPartition.getDelete_file_desc().size() : 0;
-          stats.totalFileBytes += tHdfsPartition.getTotal_file_size_bytes();
-        }
         idToPartition.put(id, tHdfsPartition);
       }
     }
-    if (type == ThriftObjectType.FULL) fileMetadataStats_.set(stats);
-
     THdfsPartition prototypePartition = FeCatalogUtils.fsPartitionToThrift(
         prototypePartition_, ThriftObjectType.DESCRIPTOR_ONLY);
-
-    memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
-        fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
-    if (type == ThriftObjectType.FULL) {
-      // These metrics only make sense when we are collecting a FULL object.
-      setEstimatedMetadataSize(memUsageEstimate);
-      setNumFiles(fileMetadataStats_.numFiles);
-    }
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         getNullPartitionKeyValue(), nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);

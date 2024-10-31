@@ -49,6 +49,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.iceberg.ContentFile;
 import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsTable.FileMetadataStats;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
@@ -121,6 +122,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   private void loadInternal() throws CatalogException, IOException {
     loadedFds_ = new ArrayList<>();
     loadStats_ = new LoadStats(partDir_);
+    fileMetadataStats_ = new FileMetadataStats();
 
     // Process the existing Fd ContentFile and return the newly added ContentFile
     Iterable<ContentFile<?>> newContentFiles = loadContentFilesWithOldFds();
@@ -144,7 +146,9 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       if (FileSystemUtil.supportsStorageIds(fsForPath)) {
         filesSupportsStorageIds.add(Pair.create(fsForPath, contentFile));
       } else {
-        loadedFds_.add(createFd(fsForPath, contentFile, null, null));
+        FileDescriptor fd = createFd(fsForPath, contentFile, null, null);
+        loadedFds_.add(fd);
+        fileMetadataStats_.accumulate(fd);
         ++loadStats_.loadedFiles;
       }
     }
@@ -162,8 +166,10 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       Path path = FileSystemUtil.createFullyQualifiedPath(
           new Path(contentFileInfo.getSecond().path().toString()));
       FileStatus stat = nameToFileStatus.get(path);
-      loadedFds_.add(createFd(contentFileInfo.getFirst(), contentFileInfo.getSecond(),
-          stat, numUnknownDiskIds));
+      FileDescriptor fd = createFd(contentFileInfo.getFirst(),
+          contentFileInfo.getSecond(), stat, numUnknownDiskIds);
+      loadedFds_.add(fd);
+      fileMetadataStats_.accumulate(fd);
     }
     loadStats_.loadedFiles += filesSupportsStorageIds.size();
     loadStats_.unknownDiskIds += numUnknownDiskIds.getRef();
@@ -192,7 +198,8 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
         newContentFiles.add(contentFile);
       } else {
         ++loadStats_.skippedFiles;
-        loadedFds_.add(Preconditions.checkNotNull(fd));
+        loadedFds_.add(fd);
+        fileMetadataStats_.accumulate(fd);
       }
     }
     return newContentFiles;

@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsTable.FileMetadataStats;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -77,6 +78,10 @@ public class FileMetadataLoader {
   private List<FileDescriptor> loadedDeleteDeltaFds_;
   protected LoadStats loadStats_;
   protected String debugAction_;
+
+  // File statistics for the partition. It will be initialized each time loadInternal()
+  // gets called.
+  protected FileMetadataStats fileMetadataStats_ = null;
 
   /**
    * @param partDir the dir for which to fetch file metadata
@@ -177,6 +182,7 @@ public class FileMetadataLoader {
   private void loadInternal() throws CatalogException, IOException {
     Preconditions.checkState(loadStats_ == null, "already loaded");
     loadStats_ = new LoadStats(partDir_);
+    fileMetadataStats_ = new FileMetadataStats();
     FileSystem fs = partDir_.getFileSystem(CONF);
 
     // If we don't have any prior FDs from which we could re-use old block location info,
@@ -223,6 +229,7 @@ public class FileMetadataLoader {
         FileDescriptor fd = getFileDescriptor(fs, listWithLocations, numUnknownDiskIds,
             fileStatus);
         loadedFds_.add(Preconditions.checkNotNull(fd));
+        fileMetadataStats_.accumulate(fd);
       }
       if (writeIds_ != null) {
         loadedInsertDeltaFds_ = new ArrayList<>();
@@ -240,6 +247,10 @@ public class FileMetadataLoader {
         LOG.trace(loadStats_.debugString());
       }
     }
+  }
+
+  public FileMetadataStats getFileMetadataStats() {
+    return fileMetadataStats_;
   }
 
   /**

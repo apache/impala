@@ -56,6 +56,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
+import org.apache.impala.catalog.HdfsTable.FileMetadataStats;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.common.FileSystemUtil;
@@ -765,6 +766,9 @@ public class HdfsPartition extends CatalogObjectImpl
   // -1 means there is no previous refresh event happened
   private final long lastRefreshEventId_;
 
+  // File statistics corresponding to the encoded file descriptors.
+  private FileMetadataStats fileMetadataStats_ = null;
+
   /**
    * Constructor.  Needed for third party extensions that want to use their own builder
    * to construct the object.
@@ -785,7 +789,7 @@ public class HdfsPartition extends CatalogObjectImpl
         isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
         partitionStats, hasIncrementalStats, numRows, writeId,
         inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
-        /*lastRefreshEventId*/-1L);
+        /*lastRefreshEventId*/-1L, /*fileMetadataStats*/null);
   }
 
   protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
@@ -804,7 +808,7 @@ public class HdfsPartition extends CatalogObjectImpl
         isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
         partitionStats, hasIncrementalStats, numRows, writeId,
         inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
-        /*lastRefreshEventId*/-1L);
+        /*lastRefreshEventId*/-1L, /*fileMetadataStats*/null);
   }
 
   protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
@@ -817,7 +821,7 @@ public class HdfsPartition extends CatalogObjectImpl
       CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
       byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
       InFlightEvents inFlightEvents, long createEventId, long lastCompactionId,
-      long lastRefreshEventId) {
+      long lastRefreshEventId, FileMetadataStats fileMetadataStats) {
     table_ = table;
     id_ = id;
     prevId_ = prevId;
@@ -844,6 +848,7 @@ public class HdfsPartition extends CatalogObjectImpl
     } else {
       partName_ = partName;
     }
+    fileMetadataStats_ = fileMetadataStats;
   }
 
   public long getCreateEventId() { return createEventId_; }
@@ -1063,6 +1068,10 @@ public class HdfsPartition extends CatalogObjectImpl
            encodedDeleteFileDescriptors_.size();
   }
 
+  public FileMetadataStats getFileMetadataStats() {
+    return Preconditions.checkNotNull(fileMetadataStats_);
+  }
+
   @Override
   public boolean hasFileDescriptors() {
     return !encodedFileDescriptors_.isEmpty() ||
@@ -1168,6 +1177,9 @@ public class HdfsPartition extends CatalogObjectImpl
 
   @Override
   public long getSize() {
+    if (fileMetadataStats_ != null) {
+      return fileMetadataStats_.totalFileBytes;
+    }
     long result = 0;
     for (HdfsPartition.FileDescriptor fileDescriptor: getFileDescriptors()) {
       result += fileDescriptor.getFileLength();
@@ -1301,6 +1313,9 @@ public class HdfsPartition extends CatalogObjectImpl
     private long lastRefreshEventId_ = -1L;
     private InFlightEvents inFlightEvents_ = new InFlightEvents();
 
+    // File statistics for the partition, initialized to all zeros.
+    private FileMetadataStats fileMetadataStats_ = new FileMetadataStats();
+
     @Nullable
     private HdfsPartition oldInstance_ = null;
     // True if we are generating a minimal partition instance for
@@ -1369,7 +1384,7 @@ public class HdfsPartition extends CatalogObjectImpl
           encodedDeleteFileDescriptors_, location_, isMarkedCached_, accessLevel_,
           hmsParameters_, cachedMsPartitionDescriptor_, partitionStats_,
           hasIncrementalStats_, numRows_, writeId_, inFlightEvents_, createEventId_,
-          lastCompactionId_, lastRefreshEventId_);
+          lastCompactionId_, lastRefreshEventId_, fileMetadataStats_);
     }
 
     public Builder setId(long id) {
@@ -1595,6 +1610,7 @@ public class HdfsPartition extends CatalogObjectImpl
     }
 
     public Builder setFileDescriptors(HdfsPartition partition) {
+      fileMetadataStats_.set(partition.getFileMetadataStats());
       encodedFileDescriptors_ = partition.encodedFileDescriptors_;
       encodedInsertFileDescriptors_ = partition.encodedInsertFileDescriptors_;
       encodedDeleteFileDescriptors_ = partition.encodedDeleteFileDescriptors_;
@@ -1620,6 +1636,13 @@ public class HdfsPartition extends CatalogObjectImpl
     public Builder setFileDescriptors(ImmutableList<byte[]> encodedDescriptors) {
       encodedFileDescriptors_ = encodedDescriptors;
       return this;
+    }
+
+    public void setFileMetadataStats(FileMetadataStats fileMetadataStats) {
+      // The fileMetadataStats will not be shared by more than one HdfsPartition even if
+      // the FileMetadataLoader is reused, because a new FileMetadataStats will be
+      // created each time the file metadata of a partition gets loaded.
+      fileMetadataStats_ = fileMetadataStats;
     }
 
     public HdfsFileFormat getFileFormat() {
@@ -1733,13 +1756,25 @@ public class HdfsPartition extends CatalogObjectImpl
       }
 
       if (thriftPartition.isSetFile_desc()) {
-        setFileDescriptors(fdsFromThrift(thriftPartition.getFile_desc()));
+        List<FileDescriptor> fds = fdsFromThrift(thriftPartition.getFile_desc());
+        setFileDescriptors(fds);
+        for (FileDescriptor fd: fds) {
+          fileMetadataStats_.accumulate(fd);
+        }
       }
       if (thriftPartition.isSetInsert_file_desc()) {
-        setInsertFileDescriptors(fdsFromThrift(thriftPartition.getInsert_file_desc()));
+        List<FileDescriptor> fds = fdsFromThrift(thriftPartition.getInsert_file_desc());
+        setInsertFileDescriptors(fds);
+        for (FileDescriptor fd: fds) {
+          fileMetadataStats_.accumulate(fd);
+        }
       }
       if (thriftPartition.isSetDelete_file_desc()) {
-        setDeleteFileDescriptors(fdsFromThrift(thriftPartition.getDelete_file_desc()));
+        List<FileDescriptor> fds = fdsFromThrift(thriftPartition.getDelete_file_desc());
+        setDeleteFileDescriptors(fds);
+        for (FileDescriptor fd: fds) {
+          fileMetadataStats_.accumulate(fd);
+        }
       }
 
       accessLevel_ = thriftPartition.isSetAccess_level() ?

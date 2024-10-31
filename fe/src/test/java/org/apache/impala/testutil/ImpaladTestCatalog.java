@@ -135,9 +135,6 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     }
     Preconditions.checkNotNull(newTbl);
     Preconditions.checkState(newTbl.isLoaded());
-    if (newTbl instanceof HdfsTable) {
-      ((HdfsTable) newTbl).computeHdfsStatsForTesting();
-    }
     db.addTable(newTbl);
     return newTbl;
   }
