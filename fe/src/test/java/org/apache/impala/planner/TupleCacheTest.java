@@ -26,12 +26,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
+
+import com.google.common.collect.Lists;
 
 /**
  * Test the planner's tuple cache node keys and eligibility
@@ -139,21 +142,51 @@ public class TupleCacheTest extends PlannerTestBase {
         "select a.id from functional.alltypes a, functional.alltypes b",
         "select a.id from functional.alltypes a, functional.alltypes b limit 10");
 
-    // TODO: Random functions should make a location ineligible
+    // Random functions should make a location ineligible
     // rand()/random()/uuid()
-    // verifyCacheIneligible(
-    //     "select id from functional.alltypes where id < 7300 * rand()");
-    // verifyCacheIneligible(
-    //     "select id from functional.alltypes where id < 7300 * random()");
-    // verifyCacheIneligible(
-    //     "select id from functional.alltypes where string_col != uuid()");
+    verifyCacheIneligible(
+        "select id from functional.alltypes where id < 7300 * rand()");
+    verifyCacheIneligible(
+        "select id from functional.alltypes where id < 7300 * random()");
+    verifyCacheIneligible(
+        "select id from functional.alltypes where string_col != uuid()");
 
-    // TODO: Time functions are replaced by constant folding
+    // NOTE: Expression rewrites can replace the constant functions with constants,
+    // so the following tests only work for enable_expr_rewrites=false (which is the
+    // default for getPlan()). If they are replaced with a constant, then the constant
+    // is hashed into the cache key. This can lead to cache misses, but it does not
+    // lead to incorrect results.
+
     // now()/current_date()/current_timestamp()/unix_timestamp()/utc_timestamp()/etc.
-    // verifyCacheIneligible(
-    //     "select timestamp_col from functional.alltypes where timestamp_col < now()");
-    // verifyCacheIneligible(
-    //     "select date_col from functional.date_tbl where date_col < current_date()");
+    verifyCacheIneligible(
+        "select timestamp_col from functional.alltypes where timestamp_col < now()");
+    verifyCacheIneligible(
+        "select date_col from functional.date_tbl where date_col < current_date()");
+
+    // Mixed-case equivalent to check that it is not case sensitive
+    verifyCacheIneligible(
+        "select date_col from functional.date_tbl where date_col < CURRENT_date()");
+
+    // System / session information can change over time (e.g. different sessions/users
+    // can be connected to different coordinators, etc).
+    verifyCacheIneligible(
+        "select string_col from functional.alltypes where string_col = current_user()");
+    verifyCacheIneligible(
+        "select string_col from functional.alltypes where string_col = coordinator()");
+
+    // AI functions are nondeterministic
+    verifyCacheIneligible(
+       "select string_col from functional.alltypes " +
+       "where string_col = ai_generate_text_default(string_col)");
+
+    // UDFs are considered nondeterministic
+    addTestFunction("TestUdf", Lists.newArrayList(Type.INT), false);
+    verifyCacheIneligible(
+       "select string_col from functional.alltypes where TestUdf(int_col) = int_col");
+
+    // Mixing eligible conjuncts with ineligible conjuncts doesn't change the eligibility
+    verifyCacheIneligible(
+       "select * from functional.alltypes where id < 5 and string_col = current_user()");
   }
 
   /**

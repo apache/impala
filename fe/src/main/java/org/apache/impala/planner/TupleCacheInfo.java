@@ -99,6 +99,7 @@ public class TupleCacheInfo {
     // way. In future, this can support locations that are deterministic (e.g.
     // limits on a sorted input).
     LIMIT,
+    NONDETERMINISTIC_FN,
   }
   private EnumSet<IneligibilityReason> ineligibilityReasons_;
 

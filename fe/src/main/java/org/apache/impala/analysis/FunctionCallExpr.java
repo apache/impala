@@ -33,7 +33,9 @@ import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.TAggregateExpr;
 import org.apache.impala.thrift.TColumnType;
@@ -47,6 +49,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 public class FunctionCallExpr extends Expr {
@@ -137,19 +140,43 @@ public class FunctionCallExpr extends Expr {
     return functionCallExpr;
   }
 
+  /** Returns the function name if this is a built-in. Otherwise, it returns null.
+   * NOTE: This function can be used before the FunctionName is analyzed, so the function
+   * has not been validated. It can be used to compare against valid builtin functions.
+   */
+  private static String getBuiltinFunctionName(FunctionName fnName) {
+    if (fnName.getFnNamePath() != null) {
+      if (fnName.getFnNamePath().size() == 1) {
+        return fnName.getFnNamePath().get(0);
+      } else if (fnName.getFnNamePath().size() == 2) {
+        if (fnName.getFnNamePath().get(0).equals(BuiltinsDb.NAME)) {
+          return fnName.getFnNamePath().get(1);
+        }
+      }
+    } else {
+      if (fnName.getDb() == null || fnName.getDb().equals(BuiltinsDb.NAME)) {
+        return fnName.getFunction();
+      }
+    }
+    // Invalid or not a builtin function
+    return null;
+  }
+
   /** Returns true if fnName is a built-in with given name. */
   private static boolean functionNameEqualsBuiltin(FunctionName fnName, String name) {
-    // We could either have a function path, or the function name and optional database.
-    if (fnName.getFnNamePath() != null) {
-      return fnName.getFnNamePath().size() == 1
-             && fnName.getFnNamePath().get(0).equalsIgnoreCase(name)
-          || fnName.getFnNamePath().size() == 2
-             && fnName.getFnNamePath().get(0).equals(BuiltinsDb.NAME)
-             && fnName.getFnNamePath().get(1).equalsIgnoreCase(name);
-    } else {
-      return (fnName.getDb() == null || fnName.getDb().equals(BuiltinsDb.NAME)) &&
-          fnName.getFunction().equalsIgnoreCase(name);
-    }
+    String fnNameStr = getBuiltinFunctionName(fnName);
+    if (fnNameStr == null) return false;
+    return fnNameStr.equalsIgnoreCase(name);
+  }
+
+  /** Returns true if fnName is a built-in with a name in the provided set of
+   * lower-case function names.
+   */
+  private static boolean functionNameInBuiltinSet(FunctionName fnName,
+      Set<String> lowerCaseNames) {
+    String fnNameStr = getBuiltinFunctionName(fnName);
+    if (fnNameStr == null) return false;
+    return lowerCaseNames.contains(fnNameStr.toLowerCase());
   }
 
   /**
@@ -355,35 +382,61 @@ public class FunctionCallExpr extends Expr {
    * about user defined functions.
    */
   public boolean isNondeterministicBuiltinFn() {
-    return functionNameEqualsBuiltin(fnName_, "rand") ||
-        functionNameEqualsBuiltin(fnName_, "random") ||
-        functionNameEqualsBuiltin(fnName_, "uuid");
+    return functionNameInBuiltinSet(fnName_, ImmutableSet.of("rand", "random", "uuid"));
+  }
+
+  /**
+   * Returns true if function is non-deterministic over time, i.e. it may produce
+   * different results for the same inputs in a different query execution. This is a more
+   * expansive definition than isNondeterministicBuiltinFn(), because there are many
+   * functions that can be deterministic inside a single query execution that would vary
+   * over time. For example, timestamp functions and session/system information functions
+   * are not deterministic over time.
+   */
+  public boolean isNondeterministicAcrossQueries() {
+    // UDFs are not known to be deterministic over time
+    // TODO: Provide a way to mark UDFs as deterministic over time
+    if (!fnName_.isBuiltin()) return true;
+
+    // TODO: rand()/random() is actually deterministic in scan nodes, because it resets
+    // the RNG for each scan range. This can be improved to consider rand()/random()
+    // deterministic in that context.
+    if (isNondeterministicBuiltinFn()) return true;
+
+    // Functions that vary across different query invocations / different sessions / etc
+    Set knownNondeterministicFns =
+        ImmutableSet.of(
+            // Current timestamp functions
+            "current_date", "current_timestamp", "now", "timeofday", "unix_timestamp",
+            "utc_timestamp",
+            // Session / system information
+            "coordinator", "current_database", "current_session", "current_user",
+            "effective_user", "logged_in_user", "pid", "user", "version",
+            // AI Functions
+            "ai_generate_text", "ai_generate_text_default");
+    return functionNameInBuiltinSet(fnName_, knownNondeterministicFns);
   }
 
   /**
    * Returns true if function is a conditional builtin function
    */
   public boolean isConditionalBuiltinFn() {
-    return functionNameEqualsBuiltin(fnName_, "coalesce") ||
-        functionNameEqualsBuiltin(fnName_, "decode") ||
-        functionNameEqualsBuiltin(fnName_, "if") ||
-        functionNameEqualsBuiltin(fnName_, "ifnull") ||
-        functionNameEqualsBuiltin(fnName_, "isfalse") ||
-        functionNameEqualsBuiltin(fnName_, "isnotfalse") ||
-        functionNameEqualsBuiltin(fnName_, "isnottrue") ||
-        functionNameEqualsBuiltin(fnName_, "isnull") ||
-        functionNameEqualsBuiltin(fnName_, "istrue") ||
-        functionNameEqualsBuiltin(fnName_, "nonnullvalue") ||
-        functionNameEqualsBuiltin(fnName_, "nullif") ||
-        functionNameEqualsBuiltin(fnName_, "nullifzero") ||
-        functionNameEqualsBuiltin(fnName_, "nullvalue") ||
-        functionNameEqualsBuiltin(fnName_, "nvl") ||
-        functionNameEqualsBuiltin(fnName_, "nvl2") ||
-        functionNameEqualsBuiltin(fnName_, "zeroifnull");
+    return functionNameInBuiltinSet(fnName_,
+        ImmutableSet.of("coalesce", "decode", "if", "ifnull", "isfalse", "isnotfalse",
+            "isnottrue", "isnull", "istrue", "nonnullvalue", "nullif", "nullifzero",
+            "nullvalue", "nvl", "nvl2", "zeroifnull"));
+  }
+
+  @Override protected void toThrift(TExprNode msg) {
+    Preconditions.checkState(false,
+        "Unexpected use of old FunctionCallExpr::toThrift() signature");
   }
 
   @Override
-  protected void toThrift(TExprNode msg) {
+  protected void toThrift(TExprNode msg, ThriftSerializationCtx serialCtx) {
+    if (serialCtx.isTupleCache() && isNondeterministicAcrossQueries()) {
+      serialCtx.setTupleCachingIneligible(IneligibilityReason.NONDETERMINISTIC_FN);
+    }
     if (isAggregateFunction() || isAnalyticFnCall_) {
       msg.node_type = TExprNodeType.AGGREGATE_EXPR;
       List<TColumnType> aggFnArgTypes = Lists.newArrayList();
