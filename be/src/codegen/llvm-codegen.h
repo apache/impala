@@ -539,7 +539,7 @@ class LlvmCodeGen {
   // 'incoming_block2'.
   static llvm::PHINode* CreateBinaryPhiNode(LlvmBuilder* builder, llvm::Value* value1,
       llvm::Value* value2, llvm::BasicBlock* incoming_block1,
-      llvm::BasicBlock* incoming_block2, const std::string& name = "");
+      llvm::BasicBlock* incoming_block2, const std::string& name);
 
   /// Returns a constant int of 'byte_size' bytes based on 'low_bits' and 'high_bits'
   /// which stand for the lower and upper 64-bits of the constant respectively. For

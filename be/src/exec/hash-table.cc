@@ -1149,8 +1149,9 @@ Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur,
         builder.SetInsertPoint(continue_block);
         // Use phi node to reconcile that we could have come from the string-null
         // path and string not null paths.
-        llvm::PHINode* phi_node = LlvmCodeGen::CreateBinaryPhiNode(&builder,
-            string_hash_result, str_null_result, not_null_block, null_block);
+        llvm::PHINode* phi_node =
+            LlvmCodeGen::CreateBinaryPhiNode(&builder, string_hash_result,
+                str_null_result, not_null_block, null_block, "str_null_phi");
 
         hash_result = phi_node;
       } else {

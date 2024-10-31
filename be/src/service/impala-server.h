@@ -1232,8 +1232,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Decompresses the profile in the given QueryStateRecord into the specified format.
   /// The decompressed profile is added to the given RuntimeProfileOutput.
   Status DecompressToProfile(TRuntimeProfileFormat::type format,
-      const std::shared_ptr<QueryStateRecord>& query_record,
-      RuntimeProfileOutput* profile);
+      const QueryStateRecord& query_record, RuntimeProfileOutput* profile);
 
   void WaitForNewCatalogServiceId(
       const TUniqueId& cur_service_id, std::unique_lock<std::mutex>* ver_lock);

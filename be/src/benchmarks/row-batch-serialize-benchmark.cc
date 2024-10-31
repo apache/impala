@@ -285,8 +285,8 @@ class RowBatchSerializeBenchmark {
   static void TestSerialize(int batch_size, void* data) {
     SerializeArgs* args = reinterpret_cast<SerializeArgs*>(data);
     for (int iter = 0; iter < batch_size; ++iter) {
-      OutboundRowBatch row_batch(char_mem_tracker_allocator);
-      TrackedString compression_scratch(*char_mem_tracker_allocator.get());
+      OutboundRowBatch row_batch(*char_mem_tracker_allocator);
+      TrackedString compression_scratch(*char_mem_tracker_allocator);
       ABORT_IF_ERROR(args->batch->Serialize(&row_batch, args->full_dedup,
           &compression_scratch));
     }
@@ -295,8 +295,8 @@ class RowBatchSerializeBenchmark {
   static void TestSerializeBaseline(int batch_size, void* data) {
     RowBatch* batch = reinterpret_cast<RowBatch*>(data);
     for (int iter = 0; iter < batch_size; ++iter) {
-      OutboundRowBatch row_batch(char_mem_tracker_allocator);
-      TrackedString compression_scratch(*char_mem_tracker_allocator.get());
+      OutboundRowBatch row_batch(*char_mem_tracker_allocator);
+      TrackedString compression_scratch(*char_mem_tracker_allocator);
       RowBatchSerializeBaseline::Serialize(batch, &row_batch, &compression_scratch);
     }
   }
@@ -342,22 +342,22 @@ class RowBatchSerializeBenchmark {
     RowBatch* no_dup_batch =
         obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, tracker.get()));
     FillBatch(no_dup_batch, 12345, 1, -1);
-    TrackedString compression_scratch(*char_mem_tracker_allocator.get());
+    TrackedString compression_scratch(*char_mem_tracker_allocator);
 
-    OutboundRowBatch no_dup_row_batch(char_mem_tracker_allocator);
+    OutboundRowBatch no_dup_row_batch(*char_mem_tracker_allocator);
     ABORT_IF_ERROR(no_dup_batch->Serialize(&no_dup_row_batch, &compression_scratch));
 
     RowBatch* adjacent_dup_batch =
         obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, tracker.get()));
     FillBatch(adjacent_dup_batch, 12345, 5, -1);
-    OutboundRowBatch adjacent_dup_row_batch(char_mem_tracker_allocator);
+    OutboundRowBatch adjacent_dup_row_batch(*char_mem_tracker_allocator);
     ABORT_IF_ERROR(adjacent_dup_batch->Serialize(&adjacent_dup_row_batch,
         false, &compression_scratch));
 
     RowBatch* dup_batch = obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, tracker.get()));
     // Non-adjacent duplicates.
     FillBatch(dup_batch, 12345, 1, NUM_ROWS / 5);
-    OutboundRowBatch dup_row_batch(char_mem_tracker_allocator);
+    OutboundRowBatch dup_row_batch(*char_mem_tracker_allocator);
     ABORT_IF_ERROR(dup_batch->Serialize(&dup_row_batch, true, &compression_scratch));
 
     int baseline;

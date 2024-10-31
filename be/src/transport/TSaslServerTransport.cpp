@@ -42,27 +42,11 @@ DEFINE_int32(sasl_connect_tcp_timeout_ms, 300000, "(Advanced) The underlying TSo
 using namespace sasl;
 
 namespace apache { namespace thrift { namespace transport {
-TSaslServerTransport::TSaslServerTransport(std::shared_ptr<TTransport> transport)
-   : TSaslTransport(move(transport)) {
-}
 
-TSaslServerTransport::TSaslServerTransport(string mechanism,
-                                           string protocol,
-                                           string serverName,
-                                           string realm,
-                                           unsigned flags,
-                                           map<string, string> props,
-                                           vector<struct sasl_callback> callbacks,
-                                           std::shared_ptr<TTransport> transport)
-     : TSaslTransport(move(transport)) {
-  addServerDefinition(move(mechanism), move(protocol), move(serverName), move(realm),
-      flags, move(props), move(callbacks));
-}
-
-TSaslServerTransport:: TSaslServerTransport(
+TSaslServerTransport::TSaslServerTransport(
     std::map<std::string, TSaslServerDefinition*> serverMap,
     std::shared_ptr<TTransport> transport)
-    : TSaslTransport(move(transport)), serverDefinitionMap_(move(serverMap)) { }
+  : TSaslTransport(move(transport)), serverDefinitionMap_(move(serverMap)) {}
 
 /**
  * Set the server for this transport

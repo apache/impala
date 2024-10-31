@@ -81,8 +81,8 @@ class RowBatchSerializeTest : public testing::Test {
       bool print_batches, bool full_dedup = false) {
     if (print_batches) cout << PrintBatch(batch) << endl;
 
-    TrackedString compression_scratch(*char_mem_tracker_allocator_.get());
-    OutboundRowBatch row_batch(char_mem_tracker_allocator_);
+    TrackedString compression_scratch(*char_mem_tracker_allocator_);
+    OutboundRowBatch row_batch(*char_mem_tracker_allocator_);
     RETURN_IF_ERROR(batch->Serialize(&row_batch, full_dedup, &compression_scratch));
 
     RowBatch deserialized_batch(&row_desc, row_batch, tracker_.get());
@@ -617,8 +617,8 @@ void RowBatchSerializeTest::TestDupRemoval(bool full_dedup) {
   CreateTuples(tuple_desc, batch->tuple_data_pool(), num_distinct_tuples, 0, 10, &tuples);
   AddTuplesToRowBatch(num_rows, tuples, repeats, batch);
 
-  TrackedString compression_scratch(*char_mem_tracker_allocator_.get());
-  OutboundRowBatch row_batch(char_mem_tracker_allocator_);
+  TrackedString compression_scratch(*char_mem_tracker_allocator_);
+  OutboundRowBatch row_batch(*char_mem_tracker_allocator_);
   EXPECT_OK(batch->Serialize(&row_batch, full_dedup, &compression_scratch));
   // Serialized data should only have one copy of each tuple.
   int64_t total_byte_size = 0; // Total size without duplication
@@ -757,8 +757,8 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   EXPECT_TRUE(UseFullDedup(batch));
   LOG(INFO) << "Serializing row batch";
 
-  TrackedString compression_scratch(*char_mem_tracker_allocator_.get());
-  OutboundRowBatch row_batch(char_mem_tracker_allocator_);
+  TrackedString compression_scratch(*char_mem_tracker_allocator_);
+  OutboundRowBatch row_batch(*char_mem_tracker_allocator_);
   EXPECT_OK(batch->Serialize(&row_batch, &compression_scratch));
   LOG(INFO) << "Serialized batch size: " << row_batch.TupleDataAsSlice().size();
   LOG(INFO) << "Serialized batch uncompressed size: "

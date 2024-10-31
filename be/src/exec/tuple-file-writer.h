@@ -21,6 +21,8 @@
 #include <limits>
 #include <memory>
 
+#include "runtime/mem-tracker.h"
+#include "runtime/outbound-row-batch.h"
 #include "util/runtime-profile.h"
 
 #include "common/status.h"
@@ -31,7 +33,6 @@ namespace kudu {
 
 namespace impala {
 
-class MemTracker;
 class RowBatch;
 class RuntimeState;
 class TupleReadWriteTest;
@@ -91,6 +92,10 @@ private:
   std::string temp_suffix_;
   // MemTracker for OutboundRowBatches.
   std::shared_ptr<MemTracker> tracker_;
+  // Allocator (using tracker_) for OutboundRowBatches.
+  std::unique_ptr<CharMemTrackerAllocator> allocator_;
+  // Buffer used for serializing row batches.
+  std::unique_ptr<OutboundRowBatch> out_batch_;
   // Total write time by the writer.
   RuntimeProfile::Counter* write_timer_;
   // Total time spent on serialization.

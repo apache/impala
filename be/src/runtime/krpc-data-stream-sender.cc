@@ -397,7 +397,7 @@ Status KrpcDataStreamSender::Channel::Init(
   RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
 
   // Init outbound_batch_.
-  outbound_batch_.reset(new OutboundRowBatch(allocator));
+  outbound_batch_.reset(new OutboundRowBatch(*allocator));
 
   return Status::OK();
 }
@@ -910,12 +910,12 @@ Status KrpcDataStreamSender::Prepare(
   string process_address =
        NetworkAddressPBToString(ExecEnv::GetInstance()->krpc_address());
 
-  serialization_batch_.reset(new OutboundRowBatch(char_mem_tracker_allocator_));
+  serialization_batch_.reset(new OutboundRowBatch(*char_mem_tracker_allocator_));
   if (partition_type_ == TPartitionType::UNPARTITIONED) {
-    in_flight_batch_.reset(new OutboundRowBatch(char_mem_tracker_allocator_));
+    in_flight_batch_.reset(new OutboundRowBatch(*char_mem_tracker_allocator_));
   }
 
-  compression_scratch_.reset(new TrackedString(*char_mem_tracker_allocator_.get()));
+  compression_scratch_.reset(new TrackedString(*char_mem_tracker_allocator_));
 
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state, char_mem_tracker_allocator_));
@@ -1031,7 +1031,8 @@ Status KrpcDataStreamSenderConfig::CodegenHashRow(
 
     // Picks the input value to hash function
     builder.SetInsertPoint(hash_val_block);
-    llvm::PHINode* val_ptr_phi = rwi.CodegenNullPhiNode(native_ptr, null_ptr);
+    llvm::PHINode* val_ptr_phi =
+        rwi.CodegenNullPhiNode(native_ptr, null_ptr, "val_ptr_phi");
 
     // Creates a global constant of the partition expression's ColumnType. It has to be a
     // constant for constant propagation and dead code elimination in 'get_hash_value_fn'

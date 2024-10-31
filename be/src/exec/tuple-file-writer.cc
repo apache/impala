@@ -43,6 +43,8 @@ TupleFileWriter::TupleFileWriter(
   : path_(move(path)),
     temp_suffix_(filesystem::unique_path(UNIQUE_PATH_SUFFIX).string()),
     tracker_(new MemTracker(-1, "TupleFileWriter", parent)),
+    allocator_(new CharMemTrackerAllocator(tracker_)),
+    out_batch_(new OutboundRowBatch(*allocator_)),
     write_timer_(profile ? ADD_TIMER(profile, "TupleCacheWriteTime") : nullptr),
     serialize_timer_(profile ? ADD_TIMER(profile, "TupleCacheSerializeTime") : nullptr),
     bytes_written_(profile ?
@@ -61,7 +63,9 @@ TupleFileWriter::~TupleFileWriter() {
     DCHECK(state_ == State::Committed || state_ == State::Aborted);
     DCHECK(!kudu::Env::Default()->FileExists(TempPath()));
   }
-  // MemTracker expects an explicit close.
+  // MemTracker expects an explicit close. Consumers need to be released first.
+  out_batch_.reset();
+  allocator_.reset();
   if (tracker_) tracker_->Close();
 }
 
@@ -79,29 +83,29 @@ Status TupleFileWriter::Write(RuntimeState* state, RowBatch* row_batch) {
   DCHECK_EQ(state_, State::InProgress);
   SCOPED_TIMER(write_timer_);
   // serialize and write row batch
-  OutboundRowBatch out(make_shared<CharMemTrackerAllocator>(tracker_));
   {
     SCOPED_TIMER(serialize_timer_);
-    // Passing in nullptr for 'compression_scrtach' disables compression.
-    RETURN_IF_ERROR(row_batch->Serialize(&out, /* compression_scratch */ nullptr));
+    // Passing in nullptr for 'compression_scratch' disables compression.
+    RETURN_IF_ERROR(
+        row_batch->Serialize(out_batch_.get(), /* compression_scratch */ nullptr));
   }
 
-  if (out.header()->num_rows() == 0) {
-    DCHECK_EQ(out.header()->uncompressed_size(), 0);
+  if (out_batch_->header()->num_rows() == 0) {
+    DCHECK_EQ(out_batch_->header()->uncompressed_size(), 0);
     return Status::OK();
   }
 
   // Collect all of the pieces that we would want to write, then determine if writing
   // them would exceed the max file size.
   std::string header_buf;
-  if (!out.header()->SerializeToString(&header_buf)) {
+  if (!out_batch_->header()->SerializeToString(&header_buf)) {
     return Status(TErrorCode::INTERNAL_ERROR,
         "Could not serialize RowBatchHeaderPB to string");
   }
   size_t header_len = header_buf.size();
   DCHECK_GT(header_len, 0);
-  kudu::Slice tuple_data = out.TupleDataAsSlice();
-  kudu::Slice tuple_offsets = out.TupleOffsetsAsSlice();
+  kudu::Slice tuple_data = out_batch_->TupleDataAsSlice();
+  kudu::Slice tuple_offsets = out_batch_->TupleOffsetsAsSlice();
   // tuple_data_len is possible to be 0, see IMPALA-13411.
   size_t tuple_data_len = tuple_data.size();
   size_t tuple_offsets_len = tuple_offsets.size();

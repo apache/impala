@@ -227,7 +227,7 @@ void TAcceptQueueServer::CleanupAndClose(const string& error,
 }
 
 // New.
-void TAcceptQueueServer::SetupConnection(const shared_ptr<TAcceptQueueEntry>& entry) {
+void TAcceptQueueServer::SetupConnection(TAcceptQueueEntry* entry) {
   DCHECK(entry != nullptr);
   if (metrics_enabled_) queue_size_metric_->Increment(-1);
   shared_ptr<TTransport> io_transport;
@@ -348,7 +348,7 @@ void TAcceptQueueServer::serve() {
       "setup-worker", FLAGS_accepted_cnxn_setup_thread_pool_size,
       FLAGS_accepted_cnxn_queue_depth,
       [this](int tid, const shared_ptr<TAcceptQueueEntry>& item) {
-        this->SetupConnection(item);
+        this->SetupConnection(item.get());
       });
   // Initialize the thread pool
   Status status = connection_setup_pool.Init();

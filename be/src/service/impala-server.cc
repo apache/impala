@@ -842,7 +842,7 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     RETURN_IF_ERROR(GetQueryRecord(query_id, &query_record, &retried_query_record));
     RETURN_IF_ERROR(CheckProfileAccess(user, query_record->effective_user,
         query_record->user_has_profile_access));
-    RETURN_IF_ERROR(DecompressToProfile(format, query_record, original_profile));
+    RETURN_IF_ERROR(DecompressToProfile(format, *query_record, original_profile));
 
     // Set the profile for the retried query.
     if (query_record->was_retried) {
@@ -856,7 +856,8 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
       DCHECK(status.ok());
       RETURN_IF_ERROR(status);
 
-      RETURN_IF_ERROR(DecompressToProfile(format, retried_query_record, retried_profile));
+      RETURN_IF_ERROR(
+          DecompressToProfile(format, *retried_query_record, retried_profile));
     }
   }
   return Status::OK();
@@ -885,30 +886,30 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     RETURN_IF_ERROR(GetQueryRecord(query_id, &query_record));
     RETURN_IF_ERROR(CheckProfileAccess(user, query_record->effective_user,
         query_record->user_has_profile_access));
-    RETURN_IF_ERROR(DecompressToProfile(format, query_record, profile));
+    RETURN_IF_ERROR(DecompressToProfile(format, *query_record, profile));
   }
   return Status::OK();
 }
 
 Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
-    const shared_ptr<QueryStateRecord>& query_record, RuntimeProfileOutput* profile) {
+    const QueryStateRecord& query_record, RuntimeProfileOutput* profile) {
   if (format == TRuntimeProfileFormat::BASE64) {
-    Base64Encode(query_record->compressed_profile, profile->string_output);
+    Base64Encode(query_record.compressed_profile, profile->string_output);
   } else if (format == TRuntimeProfileFormat::THRIFT) {
     RETURN_IF_ERROR(RuntimeProfile::DecompressToThrift(
-        query_record->compressed_profile, profile->thrift_output));
+        query_record.compressed_profile, profile->thrift_output));
   } else if (format == TRuntimeProfileFormat::JSON) {
     ObjectPool tmp_pool;
     RuntimeProfile* tmp_profile;
     RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
-        query_record->compressed_profile, &tmp_pool, &tmp_profile));
+        query_record.compressed_profile, &tmp_pool, &tmp_profile));
     tmp_profile->ToJson(profile->json_output);
   } else {
     DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
     ObjectPool tmp_pool;
     RuntimeProfile* tmp_profile;
     RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
-        query_record->compressed_profile, &tmp_pool, &tmp_profile));
+        query_record.compressed_profile, &tmp_pool, &tmp_profile));
     tmp_profile->PrettyPrint(profile->string_output);
   }
   return Status::OK();

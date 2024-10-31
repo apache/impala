@@ -103,25 +103,6 @@ class TSaslServerTransport : public TSaslTransport {
 
  public:
 
-  /**
-   * Constructs a new TSaslTransport to act as a server.
-   * transport: the underlying transport used to read and write data.
-   *
-   */
-  TSaslServerTransport(std::shared_ptr<TTransport> transport);
-
-  /**
-   * Construct a new TSaslTrasnport, passing in the components of the definition.
-   */
-  TSaslServerTransport(std::string mechanism,
-                       std::string protocol,
-                       std::string serverName,
-                       std::string realm,
-                       unsigned flags,
-                       std::map<std::string, std::string> props,
-                       std::vector<struct sasl_callback> callbacks,
-                       std::shared_ptr<TTransport> transport);
-
   /* Add a definition to a server transport */
   void addServerDefinition(std::string mechanism,
                            std::string protocol,

@@ -971,11 +971,11 @@ CodegenAnyVal CodegenAnyVal::CreateFromReadWriteInfo(
 
     llvm::Value* ptr_null = llvm::Constant::getNullValue(ptr->getType());
     llvm::PHINode* ptr_phi = LlvmCodeGen::CreateBinaryPhiNode(builder, ptr, ptr_null,
-        non_null_incoming_block, read_write_info.null_block());
+        non_null_incoming_block, read_write_info.null_block(), "ptr_phi");
 
     llvm::Value* len_null = llvm::ConstantInt::get(len->getType(), 0);
     llvm::PHINode* len_phi = LlvmCodeGen::CreateBinaryPhiNode(builder, len, len_null,
-        non_null_incoming_block, read_write_info.null_block());
+        non_null_incoming_block, read_write_info.null_block(), "len_phi");
 
     result.SetPtr(ptr_phi);
     result.SetLen(len_phi);
@@ -984,22 +984,22 @@ CodegenAnyVal CodegenAnyVal::CreateFromReadWriteInfo(
         read_write_info.GetTimeAndDate().time_of_day->getType(), 0);
     llvm::PHINode* time_of_day_phi = LlvmCodeGen::CreateBinaryPhiNode(builder,
         read_write_info.GetTimeAndDate().time_of_day, time_of_day_null,
-        non_null_incoming_block, read_write_info.null_block());
+        non_null_incoming_block, read_write_info.null_block(), "time_of_day_phi");
 
     llvm::Value* date_null = llvm::ConstantInt::get(
         read_write_info.GetTimeAndDate().date->getType(), 0);
-    llvm::PHINode* date_phi = LlvmCodeGen::CreateBinaryPhiNode(builder,
-        read_write_info.GetTimeAndDate().date, date_null, non_null_incoming_block,
-        read_write_info.null_block());
+    llvm::PHINode* date_phi =
+        LlvmCodeGen::CreateBinaryPhiNode(builder, read_write_info.GetTimeAndDate().date,
+            date_null, non_null_incoming_block, read_write_info.null_block(), "date_phi");
 
     result.SetTimeOfDay(time_of_day_phi);
     result.SetDate(date_phi);
   } else {
     llvm::Value* null = llvm::Constant::getNullValue(
         read_write_info.GetSimpleVal()->getType());
-    llvm::PHINode* val_phi = LlvmCodeGen::CreateBinaryPhiNode(builder,
-        read_write_info.GetSimpleVal(), null, non_null_incoming_block,
-        read_write_info.null_block());
+    llvm::PHINode* val_phi =
+        LlvmCodeGen::CreateBinaryPhiNode(builder, read_write_info.GetSimpleVal(), null,
+            non_null_incoming_block, read_write_info.null_block(), "val_phi");
 
     result.SetVal(val_phi);
   }
