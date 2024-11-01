@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 import pytest
 import random
 import re
@@ -99,6 +100,21 @@ def assert_deterministic_scan(vector, profile):
 
 
 class TestTupleCacheBase(CustomClusterTestSuite):
+  @classmethod
+  def setup_class(cls):
+    super(TestTupleCacheBase, cls).setup_class()
+    # Unset this environment variable to ensure it doesn't affect
+    # the test like test_cache_disabled.
+    cls.org_tuple_cache_dir = os.getenv("TUPLE_CACHE_DIR")
+    if cls.org_tuple_cache_dir is not None:
+      os.unsetenv("TUPLE_CACHE_DIR")
+
+  @classmethod
+  def teardown_class(cls):
+    if cls.org_tuple_cache_dir is not None:
+      os.environ["TUPLE_CACHE_DIR"] = cls.org_tuple_cache_dir
+    super(TestTupleCacheBase, cls).teardown_class()
+
   @classmethod
   def get_workload(cls):
     return 'functional-query'
