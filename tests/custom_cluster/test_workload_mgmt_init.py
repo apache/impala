@@ -58,10 +58,10 @@ class TestWorkloadManagementInitBase(CustomClusterTestSuite):
        function blocks until the workload management init process completes. If
        additional_impalad_opts is specified, that string is appended to the impala_args
        startup flag."""
-    coord_opts = "--impalad_args=--enable_workload_mgmt "
+    coord_opts = "--impalad_args=--enable_workload_mgmt --logbuflevel=-1 "
     coord_opts += additional_impalad_opts
 
-    catalog_opts = "--catalogd_args=--enable_workload_mgmt "
+    catalog_opts = "--catalogd_args=--enable_workload_mgmt --logbuflevel=-1 "
     catalog_opts += additional_catalogd_opts
 
     if schema_version:
@@ -175,7 +175,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     self.assert_catalogd_log_contains("INFO", r"Workload management table .*? will be "
         r"upgraded", expected_count=0)
 
-  @CustomClusterTestSuite.with_args(cluster_size=1,
+  @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --workload_mgmt_schema_version=1.0.0",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_schema_version=1.0.0 "
@@ -191,7 +191,8 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     self.run_test_case('QueryTest/workload-management-log-v1.0.0', vector, self.WM_DB)
     self.run_test_case('QueryTest/workload-management-live-v1.0.0', vector, self.WM_DB)
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
+      impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
   def test_create_on_version_1_1_0(self, vector):
@@ -280,7 +281,8 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
           TQueryTableColumn.AGGREGATE_COLUMNS: "NULL",
           TQueryTableColumn.ORDERBY_COLUMNS: "NULL"})
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
+      impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt "
                     "--query_log_table_props=\"foo=bar,foo1=bar1\" "
                     "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
@@ -291,7 +293,8 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     self.assert_table_prop(self.QUERY_TBL_LOG, "foo", "bar")
     self.assert_table_prop(self.QUERY_TBL_LIVE, "foo", "bar")
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
+      impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
   def test_create_from_scratch(self):
@@ -374,7 +377,8 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
        sys.impala_query_live table contains an invalid value."""
     self._run_invalid_table_prop_test(self.QUERY_TBL_LIVE, "wm_schema_version")
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
+      impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt")
   def test_upgrade_to_latest_from_previous_binary(self):
     """Simulated an upgrade situation from workload management tables created by previous
@@ -408,7 +412,8 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
         "impala-server.completed-queries.written", 2, 60)
     assert_query(self.QUERY_TBL_LOG, client, impalad=impalad, query_id=res.query_id)
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
+      impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt")
   def test_start_at_1_0_0(self):
     """Tests the situation where workload management tables were created by the original

@@ -101,7 +101,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
     self._assert_all(vector, query_text, expected_tables_queried, expected_select,
         expected_where, expected_join, expected_aggregate, expected_orderby)
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_tpcds_1(self, vector):
@@ -133,7 +134,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["customer.c_customer_id"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_tpcds_3(self, vector):
@@ -163,7 +165,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["date_dim.d_year", "store_sales.ss_ext_sales_price", "item.i_brand_id"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_tpcds_51(self, vector):
@@ -195,7 +198,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["web_sales.ws_item_sk", "store_sales.ss_item_sk", "date_dim.d_date"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_tpcds_62(self, vector):
@@ -228,7 +232,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["warehouse.w_warehouse_name", "ship_mode.sm_type", "web_site.web_name"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_tpcds_64(self, vector):
@@ -298,7 +303,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["item.i_product_name", "store.s_store_name", "store_sales.ss_wholesale_cost"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_tpcds_66(self, vector):
@@ -343,7 +349,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["warehouse.w_warehouse_name"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_tpcds_75(self, vector):
@@ -397,7 +404,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
          "web_returns.wr_return_amt", "web_returns.wr_return_quantity",
          "web_sales.ws_ext_sales_price", "web_sales.ws_quantity"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_sql_having(self, vector):
@@ -414,7 +422,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         ["store_sales.ss_item_sk", "store_sales.ss_quantity"],
         ["store_sales.ss_quantity"])
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_complex_types(self, vector):
@@ -430,7 +439,8 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         [],
         "functional")
 
-  @CustomClusterTestSuite.with_args(cluster_size=1, impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
       catalogd_args="--enable_workload_mgmt")
   def test_arithmetic(self, vector):
