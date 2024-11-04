@@ -52,7 +52,7 @@ class TestWorkloadManagementInitBase(CustomClusterTestSuite):
   def restart_cluster(self, schema_version="", wait_for_init_complete=True,
       cluster_size=3, additional_impalad_opts="", wait_for_backends=True,
       additional_catalogd_opts="", expect_startup_err=False):
-    """Wraps the existing customer cluster _start_impala_cluster function to restart the
+    """Wraps the existing custom cluster _start_impala_cluster function to restart the
        Impala cluster. Specifies coordinator/catalog startup flags to enable workload
        management and set the schema version. If wait_for_init_complete is True, this
        function blocks until the workload management init process completes. If

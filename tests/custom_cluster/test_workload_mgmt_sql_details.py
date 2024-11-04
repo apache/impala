@@ -450,8 +450,39 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         "group by tinyint_col, smallint_col",
         ["alltypes"],
         ["alltypes.tinyint_col", "alltypes.smallint_col", "alltypes.float_col"],
-        ['alltypes.smallint_col', 'alltypes.tinyint_col'],
+        ["alltypes.smallint_col", "alltypes.tinyint_col"],
         [],
-        ['alltypes.smallint_col', 'alltypes.tinyint_col'],
+        ["alltypes.smallint_col", "alltypes.tinyint_col"],
         [],
         "functional")
+
+  @CustomClusterTestSuite.with_args(start_args="--use_calcite_planner=true",
+      cluster_size=1, impalad_graceful_shutdown=True,
+      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
+      catalogd_args="--enable_workload_mgmt")
+  def test_tpcds_8_decimal(self, vector):
+    """Runs the tpcds-decimal_v2-q8 query using the calcite planner and asserts the query
+       completes successfully. See IMPALA-13505 for details on why this query in
+       particular is tested."""
+
+    client = self.get_client(vector.get_value("protocol"))
+    assert client.execute("use tpcds").success
+
+    res = client.execute("SELECT s_store_name, sum(ss_net_profit) FROM store_sales,"
+        "date_dim, store, (SELECT ca_zip FROM (SELECT SUBSTRING(ca_zip, 1, 5) ca_zip "
+        "FROM customer_address WHERE SUBSTRING(ca_zip, 1, 5) IN ("
+        "'24128', '76232', '65084', '87816', '83926', '77556', '20548',"
+        "'26231', '43848', '15126', '91137', '61265', '98294', '25782', '17920',"
+        "'18426', '98235', '40081', '84093', '28577', '55565', '17183', '54601') "
+        "INTERSECT SELECT ca_zip FROM (SELECT SUBSTRING(ca_zip, 1, 5) ca_zip, "
+        "count(*) cnt FROM customer_address, customer "
+        "WHERE ca_address_sk = c_current_addr_sk AND c_preferred_cust_flag='Y' "
+        "GROUP BY ca_zip HAVING count(*) > 10)A1)A2) V1 "
+        "WHERE ss_store_sk = s_store_sk AND ss_sold_date_sk = d_date_sk AND d_qoy = 2 "
+        "AND d_year = 1998 AND (SUBSTRING(s_zip, 1, 2) = SUBSTRING(V1.ca_zip, 1, 2)) "
+        "GROUP BY s_store_name ORDER BY s_store_name LIMIT 100")
+    assert res.success
+
+    # Wait for the query to be written to the completed queries table.
+    self.cluster.get_first_impalad().service.wait_for_metric_value(
+        "impala-server.completed-queries.written", 1, 60)

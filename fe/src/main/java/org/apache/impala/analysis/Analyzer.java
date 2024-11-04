@@ -4693,6 +4693,12 @@ public class Analyzer {
       if (sourceExpr instanceof SlotRef) {
         SlotRef sourceSlotRef = (SlotRef) sourceExpr;
         if (sourceSlotRef.getDesc().getSourceExprs().size() == 0) {
+          // Ensure the resolved path is defined before using it.
+          if (sourceSlotRef.getResolvedPath() == null) {
+            return; // Note, since this statement is within a lambda function, this return
+                    // skips to the next item in the stream forEach loop.
+          }
+
           // First case - source expression represents an actual column.
           // Only record the field name and drop any complex type sub items.
           clause.getColumnList(globalState_)
