@@ -121,6 +121,7 @@ import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.SourceStringReader;
 import org.apache.calcite.util.Util;
 import org.apache.calcite.util.trace.CalciteTrace;
+import org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -4890,7 +4891,7 @@ SqlNode PeriodConstructor() :
 SqlLiteral IntervalLiteral() :
 {
     final String p;
-    final SqlIntervalQualifier intervalQualifier;
+    final ImpalaSqlIntervalQualifier intervalQualifier;
     int sign = 1;
     final Span s;
 }
@@ -4914,7 +4915,7 @@ SqlLiteral IntervalLiteral() :
 SqlNode IntervalLiteralOrExpression() :
 {
     final String p;
-    final SqlIntervalQualifier intervalQualifier;
+    final ImpalaSqlIntervalQualifier intervalQualifier;
     int sign = 1;
     final Span s;
     SqlNode e;
@@ -5027,7 +5028,34 @@ TimeUnit Second() :
     <SECONDS> { return warn(TimeUnit.SECOND); }
 }
 
-SqlIntervalQualifier IntervalQualifier() :
+TimeUnit MilliSecond() :
+{
+}
+{
+    <MILLISECOND> { return TimeUnit.MILLISECOND; }
+|
+    <MILLISECONDS> { return warn(TimeUnit.MILLISECOND); }
+}
+
+TimeUnit MicroSecond() :
+{
+}
+{
+    <MICROSECOND> { return TimeUnit.MICROSECOND; }
+|
+    <MICROSECONDS> { return warn(TimeUnit.MICROSECOND); }
+}
+
+TimeUnit NanoSecond() :
+{
+}
+{
+    <NANOSECOND> { return TimeUnit.NANOSECOND; }
+|
+    <NANOSECONDS> { return warn(TimeUnit.NANOSECOND); }
+}
+
+ImpalaSqlIntervalQualifier IntervalQualifier() :
 {
     final Span s;
     final TimeUnit start;
@@ -5093,15 +5121,39 @@ SqlIntervalQualifier IntervalQualifier() :
         |   { startPrec = -1; }
         )
         { end = null; }
+    |
+        start = MilliSecond() { s = span(); }
+        (
+            <LPAREN> startPrec = UnsignedIntLiteral()
+            <RPAREN>
+        |   { startPrec = -1; }
+        )
+        { end = null; }
+    |
+        start = MicroSecond() { s = span(); }
+        (
+            <LPAREN> startPrec = UnsignedIntLiteral()
+            <RPAREN>
+        |   { startPrec = -1; }
+        )
+        { end = null; }
+    |
+        start = NanoSecond() { s = span(); }
+        (
+            <LPAREN> startPrec = UnsignedIntLiteral()
+            <RPAREN>
+        |   { startPrec = -1; }
+        )
+        { end = null; }
     )
     {
-        return new SqlIntervalQualifier(start, startPrec, end, secondFracPrec,
+        return new ImpalaSqlIntervalQualifier(start, startPrec, end, secondFracPrec,
             s.end(this));
     }
 }
 
 /** Interval qualifier without 'TO unit'. */
-SqlIntervalQualifier IntervalQualifierStart() :
+ImpalaSqlIntervalQualifier IntervalQualifierStart() :
 {
     final Span s;
     final TimeUnit start;
@@ -5118,6 +5170,9 @@ SqlIntervalQualifier IntervalQualifierStart() :
         |   start = Day()
         |   start = Hour()
         |   start = Minute()
+        |   start = MilliSecond()
+        |   start = MicroSecond()
+        |   start = NanoSecond()
         )
         { s = span(); }
         startPrec = PrecisionOpt()
@@ -5129,14 +5184,14 @@ SqlIntervalQualifier IntervalQualifierStart() :
         ]
     )
     {
-        return new SqlIntervalQualifier(start, startPrec, null, secondFracPrec,
+        return new ImpalaSqlIntervalQualifier(start, startPrec, null, secondFracPrec,
             s.end(this));
     }
 }
 
 /** Parses a built-in time unit (e.g. "YEAR")
  * or user-defined time frame (e.g. "MINUTE15")
- * and in each case returns a {@link SqlIntervalQualifier}.
+ * and in each case returns a {@link ImpalaSqlIntervalQualifier}.
  *
  * <p>The units are used in several functions, incuding CEIL, FLOOR, EXTRACT.
  * Includes NANOSECOND, MILLISECOND, which were previously allowed in EXTRACT
@@ -5149,9 +5204,9 @@ SqlIntervalQualifier IntervalQualifierStart() :
  * parsed as identifiers and can be resolved in the validator if they are
  * registered as abbreviations in your time frame set.
  */
-SqlIntervalQualifier TimeUnitOrName() : {
+ImpalaSqlIntervalQualifier TimeUnitOrName() : {
     final SqlIdentifier unitName;
-    final SqlIntervalQualifier intervalQualifier;
+    final ImpalaSqlIntervalQualifier intervalQualifier;
 }
 {
     // When we see a time unit that is also a non-reserved keyword, such as
@@ -5166,13 +5221,13 @@ SqlIntervalQualifier TimeUnitOrName() : {
         return intervalQualifier;
     }
 |   unitName = SimpleIdentifier() {
-        return new SqlIntervalQualifier(unitName.getSimple(),
+        return new ImpalaSqlIntervalQualifier(unitName.getSimple(),
             unitName.getParserPosition());
     }
 }
 
 /** Parses a built-in time unit (e.g. "YEAR")
- * and returns a {@link SqlIntervalQualifier}.
+ * and returns a {@link ImpalaSqlIntervalQualifier}.
  *
  * <p>Includes {@code WEEK} and {@code WEEK(SUNDAY)} through
   {@code WEEK(SATURDAY)}.
@@ -5181,42 +5236,42 @@ SqlIntervalQualifier TimeUnitOrName() : {
  * parsed as identifiers and can be resolved in the validator if they are
  * registered as abbreviations in your time frame set.
  */
-SqlIntervalQualifier TimeUnit() : {
+ImpalaSqlIntervalQualifier TimeUnit() : {
     final Span span;
     final String w;
 }
 {
-    <NANOSECOND> { return new SqlIntervalQualifier(TimeUnit.NANOSECOND, null, getPos()); }
-|   <MICROSECOND> { return new SqlIntervalQualifier(TimeUnit.MICROSECOND, null, getPos()); }
-|   <MILLISECOND> { return new SqlIntervalQualifier(TimeUnit.MILLISECOND, null, getPos()); }
-|   <SECOND> { return new SqlIntervalQualifier(TimeUnit.SECOND, null, getPos()); }
-|   <MINUTE> { return new SqlIntervalQualifier(TimeUnit.MINUTE, null, getPos()); }
-|   <HOUR> { return new SqlIntervalQualifier(TimeUnit.HOUR, null, getPos()); }
-|   <DAY> { return new SqlIntervalQualifier(TimeUnit.DAY, null, getPos()); }
-|   <DAYOFWEEK> { return new SqlIntervalQualifier(TimeUnit.DOW, null, getPos()); }
-|   <DAYOFYEAR> { return new SqlIntervalQualifier(TimeUnit.DOY, null, getPos()); }
-|   <DOW> { return new SqlIntervalQualifier(TimeUnit.DOW, null, getPos()); }
-|   <DOY> { return new SqlIntervalQualifier(TimeUnit.DOY, null, getPos()); }
-|   <ISODOW> { return new SqlIntervalQualifier(TimeUnit.ISODOW, null, getPos()); }
-|   <ISOYEAR> { return new SqlIntervalQualifier(TimeUnit.ISOYEAR, null, getPos()); }
+    <NANOSECOND> { return new ImpalaSqlIntervalQualifier(TimeUnit.NANOSECOND, null, getPos()); }
+|   <MICROSECOND> { return new ImpalaSqlIntervalQualifier(TimeUnit.MICROSECOND, null, getPos()); }
+|   <MILLISECOND> { return new ImpalaSqlIntervalQualifier(TimeUnit.MILLISECOND, null, getPos()); }
+|   <SECOND> { return new ImpalaSqlIntervalQualifier(TimeUnit.SECOND, null, getPos()); }
+|   <MINUTE> { return new ImpalaSqlIntervalQualifier(TimeUnit.MINUTE, null, getPos()); }
+|   <HOUR> { return new ImpalaSqlIntervalQualifier(TimeUnit.HOUR, null, getPos()); }
+|   <DAY> { return new ImpalaSqlIntervalQualifier(TimeUnit.DAY, null, getPos()); }
+|   <DAYOFWEEK> { return new ImpalaSqlIntervalQualifier(TimeUnit.DOW, null, getPos()); }
+|   <DAYOFYEAR> { return new ImpalaSqlIntervalQualifier(TimeUnit.DOY, null, getPos()); }
+|   <DOW> { return new ImpalaSqlIntervalQualifier(TimeUnit.DOW, null, getPos()); }
+|   <DOY> { return new ImpalaSqlIntervalQualifier(TimeUnit.DOY, null, getPos()); }
+|   <ISODOW> { return new ImpalaSqlIntervalQualifier(TimeUnit.ISODOW, null, getPos()); }
+|   <ISOYEAR> { return new ImpalaSqlIntervalQualifier(TimeUnit.ISOYEAR, null, getPos()); }
 |   <WEEK> { span = span(); }
     (
         // There is a choice between "WEEK(weekday)" and "WEEK". We prefer
         // the former, and the parser will look ahead for '('.
         LOOKAHEAD(2)
         <LPAREN> w = weekdayName() <RPAREN> {
-            return new SqlIntervalQualifier(w, span.end(this));
+            return new ImpalaSqlIntervalQualifier(w, span.end(this));
         }
     |
-        { return new SqlIntervalQualifier(TimeUnit.WEEK, null, getPos()); }
+        { return new ImpalaSqlIntervalQualifier(TimeUnit.WEEK, null, getPos()); }
     )
-|   <MONTH> { return new SqlIntervalQualifier(TimeUnit.MONTH, null, getPos()); }
-|   <QUARTER> { return new SqlIntervalQualifier(TimeUnit.QUARTER, null, getPos()); }
-|   <YEAR> { return new SqlIntervalQualifier(TimeUnit.YEAR, null, getPos()); }
-|   <EPOCH> { return new SqlIntervalQualifier(TimeUnit.EPOCH, null, getPos()); }
-|   <DECADE> { return new SqlIntervalQualifier(TimeUnit.DECADE, null, getPos()); }
-|   <CENTURY> { return new SqlIntervalQualifier(TimeUnit.CENTURY, null, getPos()); }
-|   <MILLENNIUM> { return new SqlIntervalQualifier(TimeUnit.MILLENNIUM, null, getPos()); }
+|   <MONTH> { return new ImpalaSqlIntervalQualifier(TimeUnit.MONTH, null, getPos()); }
+|   <QUARTER> { return new ImpalaSqlIntervalQualifier(TimeUnit.QUARTER, null, getPos()); }
+|   <YEAR> { return new ImpalaSqlIntervalQualifier(TimeUnit.YEAR, null, getPos()); }
+|   <EPOCH> { return new ImpalaSqlIntervalQualifier(TimeUnit.EPOCH, null, getPos()); }
+|   <DECADE> { return new ImpalaSqlIntervalQualifier(TimeUnit.DECADE, null, getPos()); }
+|   <CENTURY> { return new ImpalaSqlIntervalQualifier(TimeUnit.CENTURY, null, getPos()); }
+|   <MILLENNIUM> { return new ImpalaSqlIntervalQualifier(TimeUnit.MILLENNIUM, null, getPos()); }
 }
 
 String weekdayName() :
@@ -6098,7 +6153,7 @@ SqlNode BuiltinFunctionCall() :
     SqlNode e;
     final Span s;
     SqlDataTypeSpec dt;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
     final SqlNode node;
     final SqlLiteral style; // mssql convert 'style' operand
     final SqlFunction f;
@@ -6853,7 +6908,7 @@ SqlCall DateDiffFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <DATE_DIFF> { s = span(); }
@@ -6875,7 +6930,7 @@ SqlCall TimestampAddFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <TIMESTAMPADD> { s = span(); }
@@ -6898,7 +6953,7 @@ SqlCall TimestampDiffFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <TIMESTAMPDIFF> { s = span(); }
@@ -6926,7 +6981,7 @@ SqlCall TimestampDiff3FunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <TIMESTAMP_DIFF> { s = span(); }
@@ -6948,7 +7003,7 @@ SqlCall DatetimeDiffFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <DATETIME_DIFF> { s = span(); }
@@ -6970,7 +7025,7 @@ SqlCall DateTruncFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <DATE_TRUNC> { s = span(); }
@@ -6998,7 +7053,7 @@ SqlCall TimestampTruncFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <TIMESTAMP_TRUNC> { s = span(); }
@@ -7018,7 +7073,7 @@ SqlCall TimeDiffFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <TIME_DIFF> { s = span(); }
@@ -7040,7 +7095,7 @@ SqlNode DatetimeTruncFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
     final SqlNode literal;
 }
 {
@@ -7061,7 +7116,7 @@ SqlCall TimeTruncFunctionCall() :
 {
     final List<SqlNode> args = new ArrayList<SqlNode>();
     final Span s;
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
 }
 {
     <TIME_TRUNC> { s = span(); }
@@ -7376,7 +7431,7 @@ SqlNode StandardFloorCeilOptions(Span s, boolean floorFlag) :
 {
     SqlNode e;
     final List<SqlNode> args = new ArrayList<SqlNode>();
-    final SqlIntervalQualifier unit;
+    final ImpalaSqlIntervalQualifier unit;
     SqlCall function;
     final Span s1;
 }
@@ -8187,7 +8242,9 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < MESSAGE_TEXT: "MESSAGE_TEXT" >
 |   < METHOD: "METHOD" >
 |   < MICROSECOND: "MICROSECOND" >
+|   < MICROSECONDS: "MICROSECONDS" >
 |   < MILLISECOND: "MILLISECOND" >
+|   < MILLISECONDS: "MILLISECONDS" >
 |   < MILLENNIUM: "MILLENNIUM" >
 |   < MIN: "MIN" >
 |   < MINUTE: "MINUTE" >
@@ -8205,6 +8262,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < NAME: "NAME" >
 |   < NAMES: "NAMES" >
 |   < NANOSECOND: "NANOSECOND" >
+|   < NANOSECONDS: "NANOSECONDS" >
 |   < NATIONAL: "NATIONAL" >
 |   < NATURAL: "NATURAL" >
 |   < NCHAR: "NCHAR" >

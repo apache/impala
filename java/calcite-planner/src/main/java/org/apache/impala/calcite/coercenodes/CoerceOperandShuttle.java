@@ -349,6 +349,12 @@ public class CoerceOperandShuttle extends RexShuttle {
     RelDataType fromType = node.getType();
 
 
+    // no need to cast if type is interval, this will get handled when
+    // changing to the physical Expr object.
+    if (SqlTypeUtil.isInterval(fromType)) {
+      return node;
+    }
+
     // No need to cast if types are the same
     if (fromType.getSqlTypeName().equals(toType.getSqlTypeName())) {
       return node;

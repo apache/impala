@@ -24,6 +24,7 @@ parser: {
   # List of additional classes and packages to import.
   # Example: "org.apache.calcite.sql.*", "java.util.List".
   imports: [
+    "org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier"
   ]
 
   # List of new keywords. Example: "DATABASES", "TABLES". If the keyword is
