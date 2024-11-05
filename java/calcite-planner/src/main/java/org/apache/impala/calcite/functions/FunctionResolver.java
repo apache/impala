@@ -209,13 +209,27 @@ public class FunctionResolver {
     // return value as its only operand. This operand needs to be calculated based
     // on its parameters (see getCaseArgs method comment) if we are looking for a
     // non-exact match (the best case function that would work if casting the operands).
-    if (name.equals("case")) {
+    // The decode statement is also special in that the 3rd parameter is going to
+    // contain the return value
+    int caseOperandNum = getCaseOperandNum(name);
+    if (caseOperandNum != -1) {
       return exactMatch
-          ? Lists.newArrayList(ImpalaTypeConverter.createImpalaType(argTypes.get(1)))
-          : getCaseArgs(argTypes);
+          ? Lists.newArrayList(ImpalaTypeConverter.createImpalaType(
+              argTypes.get(caseOperandNum)))
+          : getCaseArgs(name, argTypes);
     }
 
     return ImpalaTypeConverter.getNormalizedImpalaTypes(argTypes);
+  }
+
+  private static int getCaseOperandNum(String name) {
+    if (name.equals("case")) {
+      return 1;
+    }
+    if (name.equals("decode")) {
+      return 2;
+    }
+    return -1;
   }
 
   /**
@@ -223,7 +237,10 @@ public class FunctionResolver {
    * all the "then" clauses (and the default clause) and calculated the
    * most compatible type which it will use as its return value.
    */
-  private static List<Type> getCaseArgs(List<RelDataType> argTypes) {
+  private static List<Type> getCaseArgs(String name, List<RelDataType> argTypes) {
+    // Only handles the "case" function, not the "decode".
+    Preconditions.checkState(name.equals("case"));
+
     int numOperands = argTypes.size();
     Type compatibleType = Type.NULL;
     for (int i = 0; i < numOperands; ++i) {
@@ -240,7 +257,7 @@ public class FunctionResolver {
   /**
    * shouldSkipOperand checks to see if we should skip this operand from casting.
    * Currently it only checks for CASE.  CASE will have some boolean operands which
-   * will never need casting. TODO: support DECODE
+   * will never need casting.
    */
   public static boolean shouldSkipOperandForCase(int numOperands, int i) {
     // The even number parameters are the boolean checks, but the last parameter

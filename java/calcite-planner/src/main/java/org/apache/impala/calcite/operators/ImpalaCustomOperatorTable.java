@@ -222,6 +222,8 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   // validator needs to search for the explicit_cast function while validating.
   public static final ImpalaCastFunction EXPLICIT_CAST = ImpalaCastFunction.INSTANCE;
 
+  public static final ImpalaDecodeFunction DECODE = ImpalaDecodeFunction.INSTANCE;
+
   public static ImpalaCustomOperatorTable instance() {
     return INSTANCE.get();
   }

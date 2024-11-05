@@ -43,6 +43,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.functions.ImplicitTypeChecker;
+import org.apache.impala.calcite.operators.ImpalaDecodeFunction;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 
 import java.math.BigDecimal;
@@ -107,6 +108,12 @@ public class CoerceOperandShuttle extends RexShuttle {
     // Certain operators will never need casting for their operands.
     if (!isCastingNeeded(castedOperandsCall)) {
       return castedOperandsCall;
+    }
+
+    // had to special case decode since the casting is different from common
+    // functions.
+    if (castedOperandsCall.getOperator().getName().equals("DECODE")) {
+      return castDecodedFunction(castedOperandsCall, factory, rexBuilder);
     }
 
     Function fn = FunctionResolver.getSupertypeFunction(castedOperandsCall);
@@ -324,17 +331,23 @@ public class CoerceOperandShuttle extends RexShuttle {
     return fn.functionName().equals("case");
   }
 
+  private static RexNode castOperand(RexNode node, Type toImpalaType,
+      RelDataTypeFactory factory, RexBuilder rexBuilder) {
+
+    RelDataType toType = ImpalaTypeConverter.getRelDataType(toImpalaType);
+    return castOperand(node, toType, factory, rexBuilder);
+  }
+
   /**
    * castOperand takes a RexNode and a toType and returns the RexNode
    * with a potential cast wrapper.  If the types match, then the
    * original RexNode is returned. If the toType is an incompatible
    * type, this method returns null.
    */
-  private static RexNode castOperand(RexNode node, Type toImpalaType,
+  private static RexNode castOperand(RexNode node, RelDataType toType,
       RelDataTypeFactory factory, RexBuilder rexBuilder) {
     RelDataType fromType = node.getType();
 
-    RelDataType toType = ImpalaTypeConverter.getRelDataType(toImpalaType);
 
     // No need to cast if types are the same
     if (fromType.getSqlTypeName().equals(toType.getSqlTypeName())) {
@@ -358,5 +371,58 @@ public class CoerceOperandShuttle extends RexShuttle {
         decimalType.decimalPrecision(), decimalType.decimalScale());
     }
     return rexBuilder.makeCast(toType, node);
+  }
+
+  /**
+   * Special casting function for the decode operator. While the case operator
+   * has its operands as boolean types, the operands within the decode operator
+   * can be any compatible type with the search operator. Therefore, all operands
+   * need to be checked to see if they need to be cast to a compatible type, not
+   * just the return parameters.
+   */
+  private static RexNode castDecodedFunction(RexCall decodeCall,
+      RelDataTypeFactory factory, RexBuilder rexBuilder) {
+    List<RexNode> operands = decodeCall.getOperands();
+    List<RelDataType> argTypes =
+        Util.transform(operands, RexNode::getType);
+    List<RexNode> newOperands = new ArrayList<>(operands.size());
+
+    // Grab the compatible search operand from all the search operands
+    RelDataType searchOperand =
+        ImpalaDecodeFunction.getCompatibleSearchOperand(argTypes, factory);
+    // Grab the compatible return operand from all the return operands
+    RelDataType returnType =
+        ImpalaDecodeFunction.getCompatibleReturnType(argTypes, factory);
+
+    boolean hasElse = (argTypes.size() % 2 == 0);
+    int numNonElseParams = hasElse ? argTypes.size() - 1 : argTypes.size();
+
+
+    // start by potentially casting all the search operands. Check the first one outside
+    // of the loop.
+    newOperands.add(castOperand(operands.get(0), searchOperand, factory, rexBuilder));
+
+    // Now we loop through all the operands, alternating between search type
+    // and return type. We don't include the last one in case there is an
+    // else parameter
+    for (int i = 1; i < numNonElseParams; ++i) {
+      // Alternate between return and search
+      RelDataType toType = (i % 2 == 0) ? returnType : searchOperand;
+      newOperands.add(castOperand(operands.get(i), toType, factory, rexBuilder));
+    }
+
+    // Check the else param for casting
+    if (hasElse) {
+      int elseParam = operands.size() - 1;
+      newOperands.add(castOperand(operands.get(elseParam), returnType, factory,
+          rexBuilder));
+    }
+
+    // If any operand was casted, create the new RexNode, otherwise, just send back
+    // the existing one.
+    return operands.equals(newOperands)
+        ? decodeCall
+        : (RexCall) rexBuilder.makeCall(returnType, decodeCall.getOperator(),
+            newOperands);
   }
 }

@@ -33,6 +33,7 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CaseWhenClause;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.TimestampArithmeticExpr;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
@@ -110,6 +111,10 @@ public class RexCallConverter {
           impalaRetType);
     }
 
+    if (fn.functionName().equals("decode")) {
+      return createDecodeExpr(fn, params, impalaRetType);
+    }
+
     switch (rexCall.getOperator().getKind()) {
       case CASE:
         return createCaseExpr(fn, params, impalaRetType);
@@ -168,6 +173,15 @@ public class RexCallConverter {
     // need to analyze the expression before creating the cast around it.
     params.get(0).analyze(analyzer);
     return new AnalyzedCastExpr(impalaRetType, params.get(0));
+  }
+
+  private static Expr createDecodeExpr(Function fn, List<Expr> params,
+       Type impalaRetType) throws ImpalaException {
+    // case expression is wrapped with a function, which is how the Impala
+    // analyzer Expr code expects to handle the decode function.
+    FunctionCallExpr decodeExpr =
+        new AnalyzedFunctionCallExpr(fn, params, impalaRetType);
+    return new AnalyzedCaseExpr(fn, impalaRetType, decodeExpr);
   }
 
   private static Expr createCaseExpr(Function fn, List<Expr> params, Type retType) {
