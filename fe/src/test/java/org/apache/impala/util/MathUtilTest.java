@@ -53,19 +53,19 @@ public class MathUtilTest {
     for (long c1 : validCard) {
       for (long c2 : validCard) {
         assertEquals(c1 + " * " + c2, MathUtil.saturatingMultiply(c1, c2),
-            MathUtil.saturatingMultiplyCardinalites(c1, c2));
+            MathUtil.saturatingMultiplyCardinalities(c1, c2));
       }
     }
     // Case 2: One argument is valid, the other is unknown.
     for (long c : validCard) {
       assertEquals(c + " * " + unknown, unknown,
-          MathUtil.saturatingMultiplyCardinalites(c, unknown));
+          MathUtil.saturatingMultiplyCardinalities(c, unknown));
       assertEquals(unknown + " * " + c, unknown,
-          MathUtil.saturatingMultiplyCardinalites(unknown, c));
+          MathUtil.saturatingMultiplyCardinalities(unknown, c));
     }
     // Case 3: both argument is unknown.
     assertEquals(unknown + " * " + unknown, unknown,
-        MathUtil.saturatingMultiplyCardinalites(unknown, unknown));
+        MathUtil.saturatingMultiplyCardinalities(unknown, unknown));
   }
 
   @Test

@@ -263,7 +263,7 @@ PLAN-ROOT SINK
 |  output: sum(CAST(ss_quantity AS BIGINT)), sum(ss_wholesale_cost), sum(ss_sales_price)
 |  group by: d_year, ss_item_sk, ss_customer_sk
 |  mem-estimate=536.75MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=56B cardinality=9.42M
+|  tuple-ids=3 row-size=56B cardinality=2.88M
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
 04:HASH JOIN [INNER JOIN]

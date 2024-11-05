@@ -110,6 +110,7 @@ abstract public class ScanNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
+    analyzer.registerTupleProducingNode(desc_.getId(), this);
     hasHardEstimates_ = !hasScanConjuncts() && !isAccessingCollectionType();
   }
 

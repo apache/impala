@@ -232,6 +232,10 @@ public class IcebergScanPlanner {
         outputExprs, false);
     unionNode.addChild(dataScanNode, outputExprs);
     unionNode.addChild(joinNode, outputExprs);
+    // One of joinNode's ScanNode child is already associated with tblRef_.getId().
+    // Unset previous mapping so that unionNode will be acknowledged as the first
+    // producer node.
+    analyzer_.unsetProducingNode(tblRef_.getId());
     unionNode.init(analyzer_);
     // Verify that the children are passed through.
     Preconditions.checkState(unionNode.getChildCount() == 2);

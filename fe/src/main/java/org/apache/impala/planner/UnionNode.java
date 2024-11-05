@@ -34,7 +34,6 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TUnionNode;
-import org.apache.impala.util.ExprUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,6 +117,7 @@ public class UnionNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
+    analyzer.registerTupleProducingNode(tupleId_, this);
     long totalChildCardinality = 0;
     boolean haveChildWithCardinality = false;
     hasHardEstimates_ = true;

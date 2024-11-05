@@ -490,6 +490,7 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # left join followed by right join and then aggregate
+# cardinality of agg node is 0 because functional.alltypesnopart is empty.
 select x.tinyint_col, count(x.day)
 from (
        select a.day day, c.tinyint_col tinyint_col
@@ -509,12 +510,12 @@ PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=5]
 |  order by: count(x.`day`) ASC
-|  row-size=9B cardinality=1
+|  row-size=9B cardinality=0
 |
 09:AGGREGATE [FINALIZE]
 |  output: count(day)
 |  group by: tinyint_col
-|  row-size=9B cardinality=1
+|  row-size=9B cardinality=0
 |
 08:SELECT
 |  predicates: day >= 6
@@ -562,12 +563,12 @@ PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=5]
 |  order by: count(x.`day`) ASC
-|  row-size=9B cardinality=1
+|  row-size=9B cardinality=0
 |
 09:AGGREGATE [FINALIZE]
 |  output: count(day)
 |  group by: tinyint_col
-|  row-size=9B cardinality=1
+|  row-size=9B cardinality=0
 |
 08:SELECT
 |  predicates: day >= 6

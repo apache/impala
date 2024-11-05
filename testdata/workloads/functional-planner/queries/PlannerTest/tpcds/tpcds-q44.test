@@ -115,7 +115,7 @@ PLAN-ROOT SINK
 |  |  |  |  group by: ss_store_sk
 |  |  |  |  limit: 2
 |  |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  |  tuple-ids=19 row-size=12B cardinality=2
+|  |  |  |  tuple-ids=19 row-size=12B cardinality=1
 |  |  |  |  in pipelines: 12(GETNEXT), 11(OPEN)
 |  |  |  |
 |  |  |  11:SCAN HDFS [tpcds_parquet.store_sales]
@@ -200,7 +200,7 @@ PLAN-ROOT SINK
 |  |  |  |  group by: ss_store_sk
 |  |  |  |  limit: 2
 |  |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  |  tuple-ids=6 row-size=12B cardinality=2
+|  |  |  |  tuple-ids=6 row-size=12B cardinality=1
 |  |  |  |  in pipelines: 03(GETNEXT), 02(OPEN)
 |  |  |  |
 |  |  |  02:SCAN HDFS [tpcds_parquet.store_sales]
@@ -370,7 +370,7 @@ PLAN-ROOT SINK
 |  |  37:EXCHANGE [UNPARTITIONED]
 |  |  |  limit: 2
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=19 row-size=12B cardinality=2
+|  |  |  tuple-ids=19 row-size=12B cardinality=1
 |  |  |  in pipelines: 36(GETNEXT)
 |  |  |
 |  |  F10:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=3
@@ -380,12 +380,12 @@ PLAN-ROOT SINK
 |  |  |  group by: ss_store_sk
 |  |  |  limit: 2
 |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=19 row-size=12B cardinality=2
+|  |  |  tuple-ids=19 row-size=12B cardinality=1
 |  |  |  in pipelines: 36(GETNEXT), 11(OPEN)
 |  |  |
 |  |  35:EXCHANGE [HASH(ss_store_sk)]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=18 row-size=12B cardinality=6
+|  |  |  tuple-ids=18 row-size=12B cardinality=1
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -394,7 +394,7 @@ PLAN-ROOT SINK
 |  |  |  output: avg(ss_net_profit)
 |  |  |  group by: ss_store_sk
 |  |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=18 row-size=12B cardinality=6
+|  |  |  tuple-ids=18 row-size=12B cardinality=1
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  11:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
@@ -528,7 +528,7 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |  28:EXCHANGE [UNPARTITIONED]
 |  |  limit: 2
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=6 row-size=12B cardinality=2
+|  |  tuple-ids=6 row-size=12B cardinality=1
 |  |  in pipelines: 27(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=3
@@ -538,12 +538,12 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |  |  group by: ss_store_sk
 |  |  limit: 2
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6 row-size=12B cardinality=2
+|  |  tuple-ids=6 row-size=12B cardinality=1
 |  |  in pipelines: 27(GETNEXT), 02(OPEN)
 |  |
 |  26:EXCHANGE [HASH(ss_store_sk)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=5 row-size=12B cardinality=6
+|  |  tuple-ids=5 row-size=12B cardinality=1
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -552,7 +552,7 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=5 row-size=12B cardinality=6
+|  |  tuple-ids=5 row-size=12B cardinality=1
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  02:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
@@ -737,7 +737,7 @@ PLAN-ROOT SINK
 |  |  37:EXCHANGE [UNPARTITIONED]
 |  |  |  limit: 2
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=19 row-size=12B cardinality=2
+|  |  |  tuple-ids=19 row-size=12B cardinality=1
 |  |  |  in pipelines: 36(GETNEXT)
 |  |  |
 |  |  F10:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=6
@@ -747,12 +747,12 @@ PLAN-ROOT SINK
 |  |  |  group by: ss_store_sk
 |  |  |  limit: 2
 |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=19 row-size=12B cardinality=2
+|  |  |  tuple-ids=19 row-size=12B cardinality=1
 |  |  |  in pipelines: 36(GETNEXT), 11(OPEN)
 |  |  |
 |  |  35:EXCHANGE [HASH(ss_store_sk)]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=18 row-size=12B cardinality=6
+|  |  |  tuple-ids=18 row-size=12B cardinality=1
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -761,7 +761,7 @@ PLAN-ROOT SINK
 |  |  |  output: avg(ss_net_profit)
 |  |  |  group by: ss_store_sk
 |  |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=18 row-size=12B cardinality=6
+|  |  |  tuple-ids=18 row-size=12B cardinality=1
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  11:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
@@ -910,7 +910,7 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |  28:EXCHANGE [UNPARTITIONED]
 |  |  limit: 2
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=6 row-size=12B cardinality=2
+|  |  tuple-ids=6 row-size=12B cardinality=1
 |  |  in pipelines: 27(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [HASH(ss_store_sk)] hosts=3 instances=6
@@ -920,12 +920,12 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |  |  group by: ss_store_sk
 |  |  limit: 2
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=6 row-size=12B cardinality=2
+|  |  tuple-ids=6 row-size=12B cardinality=1
 |  |  in pipelines: 27(GETNEXT), 02(OPEN)
 |  |
 |  26:EXCHANGE [HASH(ss_store_sk)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=5 row-size=12B cardinality=6
+|  |  tuple-ids=5 row-size=12B cardinality=1
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -934,7 +934,7 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |  |  output: avg(ss_net_profit)
 |  |  group by: ss_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=5 row-size=12B cardinality=6
+|  |  tuple-ids=5 row-size=12B cardinality=1
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  02:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]

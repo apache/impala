@@ -217,37 +217,37 @@ select
  order by w_warehouse_name
  limit 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=37.50MB Threads=6
+Max Per-Host Resource Reservation: Memory=36.56MB Threads=6
 Per-Host Resource Estimates: Memory=586MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=585.75MB mem-reservation=37.50MB thread-reservation=6 runtime-filters-memory=8.00MB
+|  Per-Host Resources: mem-estimate=585.75MB mem-reservation=36.56MB thread-reservation=6 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`, sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / w_warehouse_sq_ft), sum(feb_sales / w_warehouse_sq_ft), sum(mar_sales / w_warehouse_sq_ft), sum(apr_sales / w_warehouse_sq_ft), sum(may_sales / w_warehouse_sq_ft), sum(jun_sales / w_warehouse_sq_ft), sum(jul_sales / w_warehouse_sq_ft), sum(aug_sales / w_warehouse_sq_ft), sum(sep_sales / w_warehouse_sq_ft), sum(oct_sales / w_warehouse_sq_ft), sum(nov_sales / w_warehouse_sq_ft), sum(dec_sales / w_warehouse_sq_ft), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 22:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC
-|  mem-estimate=69.68KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=15 row-size=714B cardinality=100
+|  mem-estimate=6.97KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=15 row-size=714B cardinality=10
 |  in pipelines: 22(GETNEXT), 21(OPEN)
 |
 21:AGGREGATE [FINALIZE]
 |  output: sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(feb_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(mar_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(apr_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(may_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jun_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jul_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(aug_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(sep_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(oct_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(nov_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(dec_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, year
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=14 row-size=714B cardinality=1.96K
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=14 row-size=714B cardinality=10
 |  in pipelines: 21(GETNEXT), 10(OPEN), 20(OPEN)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=522B cardinality=1.96K
+|  tuple-ids=12 row-size=522B cardinality=10
 |  in pipelines: 10(GETNEXT), 20(GETNEXT)
 |
 |--20:AGGREGATE [FINALIZE]
 |  |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=11 row-size=510B cardinality=980
+|  |  tuple-ids=11 row-size=510B cardinality=5
 |  |  in pipelines: 20(GETNEXT), 11(OPEN)
 |  |
 |  19:HASH JOIN [INNER JOIN]
@@ -346,7 +346,7 @@ PLAN-ROOT SINK
 |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=5 row-size=510B cardinality=980
+|  tuple-ids=5 row-size=510B cardinality=5
 |  in pipelines: 10(GETNEXT), 01(OPEN)
 |
 09:HASH JOIN [INNER JOIN]
@@ -442,9 +442,9 @@ PLAN-ROOT SINK
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=64.52MB Threads=23
-Per-Host Resource Estimates: Memory=1.09GB
+Per-Host Resource Estimates: Memory=1.08GB
 F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.23MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`, sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / w_warehouse_sq_ft), sum(feb_sales / w_warehouse_sq_ft), sum(mar_sales / w_warehouse_sq_ft), sum(apr_sales / w_warehouse_sq_ft), sum(may_sales / w_warehouse_sq_ft), sum(jun_sales / w_warehouse_sq_ft), sum(jul_sales / w_warehouse_sq_ft), sum(aug_sales / w_warehouse_sq_ft), sum(sep_sales / w_warehouse_sq_ft), sum(oct_sales / w_warehouse_sq_ft), sum(nov_sales / w_warehouse_sq_ft), sum(dec_sales / w_warehouse_sq_ft), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -452,54 +452,54 @@ PLAN-ROOT SINK
 37:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: w_warehouse_name ASC
 |  limit: 100
-|  mem-estimate=233.43KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=15 row-size=714B cardinality=100
+|  mem-estimate=23.34KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=15 row-size=714B cardinality=10
 |  in pipelines: 22(GETNEXT)
 |
 F13:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=12.55MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
 22:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC
-|  mem-estimate=69.68KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=15 row-size=714B cardinality=100
+|  mem-estimate=6.97KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=15 row-size=714B cardinality=10
 |  in pipelines: 22(GETNEXT), 36(OPEN)
 |
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(jan_sales), sum:merge(feb_sales), sum:merge(mar_sales), sum:merge(apr_sales), sum:merge(may_sales), sum:merge(jun_sales), sum:merge(jul_sales), sum:merge(aug_sales), sum:merge(sep_sales), sum:merge(oct_sales), sum:merge(nov_sales), sum:merge(dec_sales), sum:merge(jan_sales / w_warehouse_sq_ft), sum:merge(feb_sales / w_warehouse_sq_ft), sum:merge(mar_sales / w_warehouse_sq_ft), sum:merge(apr_sales / w_warehouse_sq_ft), sum:merge(may_sales / w_warehouse_sq_ft), sum:merge(jun_sales / w_warehouse_sq_ft), sum:merge(jul_sales / w_warehouse_sq_ft), sum:merge(aug_sales / w_warehouse_sq_ft), sum:merge(sep_sales / w_warehouse_sq_ft), sum:merge(oct_sales / w_warehouse_sq_ft), sum:merge(nov_sales / w_warehouse_sq_ft), sum:merge(dec_sales / w_warehouse_sq_ft), sum:merge(jan_net), sum:merge(feb_net), sum:merge(mar_net), sum:merge(apr_net), sum:merge(may_net), sum:merge(jun_net), sum:merge(jul_net), sum:merge(aug_net), sum:merge(sep_net), sum:merge(oct_net), sum:merge(nov_net), sum:merge(dec_net)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14 row-size=714B cardinality=1.96K
+|  tuple-ids=14 row-size=714B cardinality=10
 |  in pipelines: 36(GETNEXT), 28(OPEN), 34(OPEN)
 |
 35:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)]
-|  mem-estimate=2.55MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=14 row-size=714B cardinality=1.96K
+|  mem-estimate=23.34KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=14 row-size=714B cardinality=10
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 F12:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=30.01MB mem-reservation=3.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=28.42MB mem-reservation=3.94MB thread-reservation=1
 21:AGGREGATE [STREAMING]
 |  output: sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(feb_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(mar_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(apr_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(may_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jun_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jul_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(aug_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(sep_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(oct_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(nov_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(dec_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, year
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14 row-size=714B cardinality=1.96K
+|  tuple-ids=14 row-size=714B cardinality=10
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=522B cardinality=1.96K
+|  tuple-ids=12 row-size=522B cardinality=10
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 |--34:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN d_moy = 1 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_net_paid * cs_quantity ELSE 0 END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=11 row-size=510B cardinality=980
+|  |  tuple-ids=11 row-size=510B cardinality=5
 |  |  in pipelines: 34(GETNEXT), 11(OPEN)
 |  |
 |  33:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  |  mem-estimate=1.60MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=11 row-size=510B cardinality=980
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=11 row-size=510B cardinality=5
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -508,7 +508,7 @@ Per-Host Resources: mem-estimate=30.01MB mem-reservation=3.94MB thread-reservati
 |  |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=11 row-size=510B cardinality=980
+|  |  tuple-ids=11 row-size=510B cardinality=5
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  19:HASH JOIN [INNER JOIN, BROADCAST]
@@ -635,12 +635,12 @@ Per-Host Resources: mem-estimate=30.01MB mem-reservation=3.94MB thread-reservati
 |  output: sum:merge(CASE WHEN d_moy = 1 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=510B cardinality=980
+|  tuple-ids=5 row-size=510B cardinality=5
 |  in pipelines: 28(GETNEXT), 01(OPEN)
 |
 27:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  mem-estimate=1.20MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=510B cardinality=980
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=510B cardinality=5
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -649,7 +649,7 @@ Per-Host Resources: mem-estimate=251.77MB mem-reservation=21.75MB thread-reserva
 |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=510B cardinality=980
+|  tuple-ids=5 row-size=510B cardinality=5
 |  in pipelines: 01(GETNEXT)
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
@@ -773,9 +773,9 @@ Per-Host Resources: mem-estimate=251.77MB mem-reservation=21.75MB thread-reserva
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=88.02MB Threads=21
-Per-Host Resource Estimates: Memory=336MB
+Per-Host Resource Estimates: Memory=331MB
 F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.23MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`, sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / w_warehouse_sq_ft), sum(feb_sales / w_warehouse_sq_ft), sum(mar_sales / w_warehouse_sq_ft), sum(apr_sales / w_warehouse_sq_ft), sum(may_sales / w_warehouse_sq_ft), sum(jun_sales / w_warehouse_sq_ft), sum(jul_sales / w_warehouse_sq_ft), sum(aug_sales / w_warehouse_sq_ft), sum(sep_sales / w_warehouse_sq_ft), sum(oct_sales / w_warehouse_sq_ft), sum(nov_sales / w_warehouse_sq_ft), sum(dec_sales / w_warehouse_sq_ft), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -783,54 +783,54 @@ PLAN-ROOT SINK
 37:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: w_warehouse_name ASC
 |  limit: 100
-|  mem-estimate=233.43KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=15 row-size=714B cardinality=100
+|  mem-estimate=23.34KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=15 row-size=714B cardinality=10
 |  in pipelines: 22(GETNEXT)
 |
 F13:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=12.55MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
 22:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC
-|  mem-estimate=69.68KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=15 row-size=714B cardinality=100
+|  mem-estimate=6.97KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=15 row-size=714B cardinality=10
 |  in pipelines: 22(GETNEXT), 36(OPEN)
 |
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(jan_sales), sum:merge(feb_sales), sum:merge(mar_sales), sum:merge(apr_sales), sum:merge(may_sales), sum:merge(jun_sales), sum:merge(jul_sales), sum:merge(aug_sales), sum:merge(sep_sales), sum:merge(oct_sales), sum:merge(nov_sales), sum:merge(dec_sales), sum:merge(jan_sales / w_warehouse_sq_ft), sum:merge(feb_sales / w_warehouse_sq_ft), sum:merge(mar_sales / w_warehouse_sq_ft), sum:merge(apr_sales / w_warehouse_sq_ft), sum:merge(may_sales / w_warehouse_sq_ft), sum:merge(jun_sales / w_warehouse_sq_ft), sum:merge(jul_sales / w_warehouse_sq_ft), sum:merge(aug_sales / w_warehouse_sq_ft), sum:merge(sep_sales / w_warehouse_sq_ft), sum:merge(oct_sales / w_warehouse_sq_ft), sum:merge(nov_sales / w_warehouse_sq_ft), sum:merge(dec_sales / w_warehouse_sq_ft), sum:merge(jan_net), sum:merge(feb_net), sum:merge(mar_net), sum:merge(apr_net), sum:merge(may_net), sum:merge(jun_net), sum:merge(jul_net), sum:merge(aug_net), sum:merge(sep_net), sum:merge(oct_net), sum:merge(nov_net), sum:merge(dec_net)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, `year`
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14 row-size=714B cardinality=1.96K
+|  tuple-ids=14 row-size=714B cardinality=10
 |  in pipelines: 36(GETNEXT), 28(OPEN), 34(OPEN)
 |
 35:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,ship_carriers,`year`)]
-|  mem-estimate=2.55MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=14 row-size=714B cardinality=1.96K
+|  mem-estimate=23.34KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=14 row-size=714B cardinality=10
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 F12:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=30.01MB mem-reservation=3.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=28.42MB mem-reservation=3.94MB thread-reservation=1
 21:AGGREGATE [STREAMING]
 |  output: sum(jan_sales), sum(feb_sales), sum(mar_sales), sum(apr_sales), sum(may_sales), sum(jun_sales), sum(jul_sales), sum(aug_sales), sum(sep_sales), sum(oct_sales), sum(nov_sales), sum(dec_sales), sum(jan_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(feb_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(mar_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(apr_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(may_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jun_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jul_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(aug_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(sep_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(oct_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(nov_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(dec_sales / CAST(w_warehouse_sq_ft AS DECIMAL(10,0))), sum(jan_net), sum(feb_net), sum(mar_net), sum(apr_net), sum(may_net), sum(jun_net), sum(jul_net), sum(aug_net), sum(sep_net), sum(oct_net), sum(nov_net), sum(dec_net)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, ship_carriers, year
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=14 row-size=714B cardinality=1.96K
+|  tuple-ids=14 row-size=714B cardinality=10
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=522B cardinality=1.96K
+|  tuple-ids=12 row-size=522B cardinality=10
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 |--34:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN d_moy = 1 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_ext_list_price * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN cs_net_paid * cs_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN cs_net_paid * cs_quantity ELSE 0 END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=11 row-size=510B cardinality=980
+|  |  tuple-ids=11 row-size=510B cardinality=5
 |  |  in pipelines: 34(GETNEXT), 11(OPEN)
 |  |
 |  33:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  |  mem-estimate=1.60MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=11 row-size=510B cardinality=980
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=11 row-size=510B cardinality=5
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -840,7 +840,7 @@ Per-Instance Resources: mem-estimate=30.01MB mem-reservation=3.94MB thread-reser
 |  |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_ext_list_price * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN cs_net_paid * CAST(cs_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=11 row-size=510B cardinality=980
+|  |  tuple-ids=11 row-size=510B cardinality=5
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  19:HASH JOIN [INNER JOIN, BROADCAST]
@@ -999,12 +999,12 @@ Per-Instance Resources: mem-estimate=30.01MB mem-reservation=3.94MB thread-reser
 |  output: sum:merge(CASE WHEN d_moy = 1 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_sales_price * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 1 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 2 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 3 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 4 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 5 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 6 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 7 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 8 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 9 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 10 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 11 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END), sum:merge(CASE WHEN d_moy = 12 THEN ws_net_paid_inc_tax * ws_quantity ELSE 0 END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=510B cardinality=980
+|  tuple-ids=5 row-size=510B cardinality=5
 |  in pipelines: 28(GETNEXT), 01(OPEN)
 |
 27:EXCHANGE [HASH(w_warehouse_name,w_warehouse_sq_ft,w_city,w_county,w_state,w_country,d_year)]
-|  mem-estimate=1.20MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=510B cardinality=980
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=510B cardinality=5
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1014,7 +1014,7 @@ Per-Instance Resources: mem-estimate=48.02MB mem-reservation=10.00MB thread-rese
 |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_sales_price * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN ws_net_paid_inc_tax * CAST(ws_quantity AS DECIMAL(10,0)) ELSE CAST(0 AS DECIMAL(18,2)) END)
 |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country, d_year
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=510B cardinality=980
+|  tuple-ids=5 row-size=510B cardinality=5
 |  in pipelines: 01(GETNEXT)
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]

@@ -39,6 +39,8 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import javax.annotation.Nullable;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
@@ -51,7 +53,6 @@ import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.FeCatalog;
@@ -67,7 +68,6 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.IcebergTimeTravelTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
@@ -89,10 +89,13 @@ import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.planner.JoinNode;
 import org.apache.impala.planner.PlanNode;
+import org.apache.impala.planner.ScanNode;
+import org.apache.impala.planner.UnionNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
-import org.apache.impala.rewrite.CountStarToConstRule;
-import org.apache.impala.rewrite.SimplifyCastExprRule;
 import org.apache.impala.rewrite.ConvertToCNFRule;
+import org.apache.impala.rewrite.CountDistinctToNdvRule;
+import org.apache.impala.rewrite.CountStarToConstRule;
+import org.apache.impala.rewrite.DefaultNdvScaleRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -102,11 +105,10 @@ import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
+import org.apache.impala.rewrite.SimplifyCastExprRule;
 import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
-import org.apache.impala.rewrite.CountDistinctToNdvRule;
-import org.apache.impala.rewrite.DefaultNdvScaleRule;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAccessEvent;
@@ -543,6 +545,10 @@ public class Analyzer {
 
     // Tracks all privilege requests on catalog objects.
     private final Set<PrivilegeRequest> privilegeReqs = new LinkedHashSet<>();
+
+    // Tracks TupleId to ScanNode/UnionNode that produce it.
+    // Populated in computeStats() method of either ScanNode or UnionNode only.
+    private final Map<TupleId, PlanNode> tupleIdToProducerNode = new HashMap<>();
 
     // List of PrivilegeRequest to custom authorization failure error message.
     // Tracks all privilege requests on catalog objects that need a custom
@@ -4794,6 +4800,34 @@ public class Analyzer {
       }
     }
     return hasNullRejectingTid;
+  }
+
+  /**
+   * Register 'node' as the producer PlanNode for 'tupleId'.
+   * 'node' must be an instance of ScanNode or UnionNode. If different 'node' is
+   * registered with the same 'tupleId', then the first one win and the latter is
+   * ignored.
+   */
+  public void registerTupleProducingNode(TupleId tupleId, PlanNode node) {
+    Preconditions.checkArgument((node instanceof ScanNode) || (node instanceof UnionNode),
+        "node must be ScanNode or UnionNode instance");
+    globalState_.tupleIdToProducerNode.putIfAbsent(tupleId, node);
+  }
+
+  /**
+   * Remove mapping for 'tupleId' to producer PlanNode that previously registered, if any.
+   * Returns the PlanNode previously associated the key, or null if there was none.
+   */
+  public @Nullable PlanNode unsetProducingNode(TupleId tupleId) {
+    return globalState_.tupleIdToProducerNode.remove(tupleId);
+  }
+
+  /**
+   * Return the first PlanNode (an instance of ScanNode or UnionNode) that register
+   * itself as the producer of 'tupleId'. Return null if none is ever registered.
+   */
+  public @Nullable PlanNode getProducingNode(TupleId tupleId) {
+    return globalState_.tupleIdToProducerNode.get(tupleId);
   }
 
   private static boolean differentLenCharTypes(Type t1, Type t2) {

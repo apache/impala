@@ -650,7 +650,7 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=4
+|  row-size=16B cardinality=6
 |
 |--06:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]
 |     HDFS partitions=1/1 files=1 size=625B
@@ -659,7 +659,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=4
+|  row-size=16B cardinality=6
 |
 04:UNION
 |  pass-through-operands: all
@@ -689,7 +689,7 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  hash predicates: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=4
+|  row-size=16B cardinality=6
 |
 |--11:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s)]
 |  |
@@ -700,13 +700,13 @@ PLAN-ROOT SINK
 |
 10:AGGREGATE [FINALIZE]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=4
+|  row-size=16B cardinality=6
 |
 09:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s)]
 |
 05:AGGREGATE [STREAMING]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
-|  row-size=16B cardinality=4
+|  row-size=16B cardinality=6
 |
 04:UNION
 |  pass-through-operands: all

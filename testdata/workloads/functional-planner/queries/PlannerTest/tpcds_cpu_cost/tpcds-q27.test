@@ -24,10 +24,10 @@ select  i_item_id,
 # end query 27 in stream 0 using template query27.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=128.31MB Threads=1
-Per-Host Resource Estimates: Memory=1.22GB
+Per-Host Resource Estimates: Memory=947MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=1.22GB mem-reservation=128.31MB thread-reservation=1 runtime-filters-memory=4.00MB
-|  max-parallelism=1 segment-costs=[1201406617, 34419344, 70334652, 700]
+|  Per-Instance Resources: mem-estimate=947.46MB mem-reservation=128.31MB thread-reservation=1 runtime-filters-memory=4.00MB
+|  max-parallelism=1 segment-costs=[1201406617, 8031185, 14873781, 700]
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END, aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN 0 WHEN 8 THEN 1 WHEN 10 THEN 1 END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_quantity) WHEN 8 THEN avg(ss_quantity) WHEN 10 THEN avg(ss_quantity) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_list_price) WHEN 8 THEN avg(ss_list_price) WHEN 10 THEN avg(ss_list_price) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_coupon_amt) WHEN 8 THEN avg(ss_coupon_amt) WHEN 10 THEN avg(ss_coupon_amt) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_sales_price) WHEN 8 THEN avg(ss_sales_price) WHEN 10 THEN avg(ss_sales_price) END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=700
@@ -35,14 +35,14 @@ PLAN-ROOT SINK
 11:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END ASC, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END ASC
 |  mem-estimate=5.57KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=57B cardinality=100 cost=70334652
+|  tuple-ids=12 row-size=57B cardinality=100 cost=14873781
 |  in pipelines: 11(GETNEXT), 10(OPEN)
 |
 10:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(8 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(10 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_quantity) WHEN CAST(8 AS INT) THEN avg(ss_quantity) WHEN CAST(10 AS INT) THEN avg(ss_quantity) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_list_price) WHEN CAST(8 AS INT) THEN avg(ss_list_price) WHEN CAST(10 AS INT) THEN avg(ss_list_price) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_coupon_amt) WHEN CAST(8 AS INT) THEN avg(ss_coupon_amt) WHEN CAST(10 AS INT) THEN avg(ss_coupon_amt) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_sales_price) WHEN CAST(8 AS INT) THEN avg(ss_sales_price) WHEN CAST(10 AS INT) THEN avg(ss_sales_price) END)
 |  group by: CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN i_item_id WHEN CAST(8 AS INT) THEN i_item_id WHEN CAST(10 AS INT) THEN NULL END, CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN s_state WHEN CAST(8 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL END, CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) END
-|  mem-estimate=387.57MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=11 row-size=61B cardinality=5.57M cost=34419344
+|  mem-estimate=90.43MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=11 row-size=61B cardinality=1.30M cost=8031185
 |  in pipelines: 10(GETNEXT), 09(OPEN)
 |
 09:AGGREGATE [FINALIZE]
@@ -56,7 +56,7 @@ PLAN-ROOT SINK
 |    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=853.02MB mem-reservation=69.94MB thread-reservation=0
-|  tuple-ids=5N,7N,9N row-size=202B cardinality=5.57M cost=200681725
+|  tuple-ids=5N,7N,9N row-size=202B cardinality=1.30M cost=200681725
 |  in pipelines: 09(GETNEXT), 00(OPEN)
 |
 08:HASH JOIN [INNER JOIN]
@@ -152,8 +152,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=32B cardinality=88.49M(filtered from 8.64G) cost=814154735
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.54GB Threads=22
-Per-Host Resource Estimates: Memory=2.20GB
+Max Per-Host Resource Reservation: Memory=1.53GB Threads=22
+Per-Host Resource Estimates: Memory=2.12GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[736] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -169,19 +169,19 @@ PLAN-ROOT SINK
 |  in pipelines: 11(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(i_item_id) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(NULL) END,CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(s_state) WHEN 7 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=168.59MB mem-reservation=74.69MB thread-reservation=1
-max-parallelism=10 segment-costs=[40227379, 34419344, 70334652, 180] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=89.08MB mem-reservation=57.69MB thread-reservation=1
+max-parallelism=10 segment-costs=[9383715, 8031185, 14873781, 180] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 11:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END ASC, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END ASC
 |  mem-estimate=5.57KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=57B cardinality=100 cost=70334652
+|  tuple-ids=12 row-size=57B cardinality=100 cost=14873781
 |  in pipelines: 11(GETNEXT), 10(OPEN)
 |
 10:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(8 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(10 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_quantity) WHEN CAST(8 AS INT) THEN avg(ss_quantity) WHEN CAST(10 AS INT) THEN avg(ss_quantity) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_list_price) WHEN CAST(8 AS INT) THEN avg(ss_list_price) WHEN CAST(10 AS INT) THEN avg(ss_list_price) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_coupon_amt) WHEN CAST(8 AS INT) THEN avg(ss_coupon_amt) WHEN CAST(10 AS INT) THEN avg(ss_coupon_amt) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_sales_price) WHEN CAST(8 AS INT) THEN avg(ss_sales_price) WHEN CAST(10 AS INT) THEN avg(ss_sales_price) END)
 |  group by: CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN i_item_id WHEN CAST(8 AS INT) THEN i_item_id WHEN CAST(10 AS INT) THEN NULL END, CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN s_state WHEN CAST(8 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL END, CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) END
-|  mem-estimate=38.76MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=11 row-size=61B cardinality=5.57M cost=34419344
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=11 row-size=61B cardinality=1.30M cost=8031185
 |  in pipelines: 10(GETNEXT), 17(OPEN)
 |
 17:AGGREGATE [FINALIZE]
@@ -194,19 +194,19 @@ max-parallelism=10 segment-costs=[40227379, 34419344, 70334652, 180] cpu-compari
 |  Class 2
 |    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |    group by: NULL, NULL
-|  mem-estimate=129.83MB mem-reservation=40.69MB thread-reservation=0
-|  tuple-ids=6N,8N,10N row-size=202B cardinality=5.57M cost=34026152
+|  mem-estimate=54.00MB mem-reservation=40.69MB thread-reservation=0
+|  tuple-ids=6N,8N,10N row-size=202B cardinality=1.30M cost=7936762
 |  in pipelines: 17(GETNEXT), 00(OPEN)
 |
 16:EXCHANGE [HASH(CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(i_item_id) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(NULL) END,CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(s_state) WHEN 7 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) END)]
 |  mem-estimate=35.08MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5N,7N,9N row-size=202B cardinality=5.57M cost=6201227
+|  tuple-ids=5N,7N,9N row-size=202B cardinality=1.30M cost=1446953
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=119.33MB mem-reservation=78.00MB thread-reservation=1
-max-parallelism=150 segment-costs=[1423870966, 81026251] cpu-comparison-result=120 [max(120 (self) vs 56 (sum children))]
+max-parallelism=150 segment-costs=[1423870966, 18906136] cpu-comparison-result=120 [max(120 (self) vs 56 (sum children))]
 09:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
@@ -218,7 +218,7 @@ max-parallelism=150 segment-costs=[1423870966, 81026251] cpu-comparison-result=1
 |    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=94.97MB mem-reservation=70.00MB thread-reservation=0
-|  tuple-ids=5N,7N,9N row-size=202B cardinality=5.57M cost=424311047
+|  tuple-ids=5N,7N,9N row-size=202B cardinality=1.30M cost=424311047
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -382,8 +382,8 @@ max-parallelism=150 segment-costs=[1423870966, 81026251] cpu-comparison-result=1
    tuple-ids=0 row-size=32B cardinality=88.49M(filtered from 8.64G) cost=814154735
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.54GB Threads=22
-Per-Host Resource Estimates: Memory=2.20GB
+Max Per-Host Resource Reservation: Memory=1.53GB Threads=22
+Per-Host Resource Estimates: Memory=2.12GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[736] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -399,19 +399,19 @@ PLAN-ROOT SINK
 |  in pipelines: 11(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(i_item_id) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(NULL) END,CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(s_state) WHEN 7 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=168.59MB mem-reservation=74.69MB thread-reservation=1
-max-parallelism=10 segment-costs=[40227379, 34419344, 70334652, 180] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=89.08MB mem-reservation=57.69MB thread-reservation=1
+max-parallelism=10 segment-costs=[9383715, 8031185, 14873781, 180] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 11:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END ASC, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END ASC
 |  mem-estimate=5.57KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=57B cardinality=100 cost=70334652
+|  tuple-ids=12 row-size=57B cardinality=100 cost=14873781
 |  in pipelines: 11(GETNEXT), 10(OPEN)
 |
 10:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(8 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(10 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_quantity) WHEN CAST(8 AS INT) THEN avg(ss_quantity) WHEN CAST(10 AS INT) THEN avg(ss_quantity) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_list_price) WHEN CAST(8 AS INT) THEN avg(ss_list_price) WHEN CAST(10 AS INT) THEN avg(ss_list_price) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_coupon_amt) WHEN CAST(8 AS INT) THEN avg(ss_coupon_amt) WHEN CAST(10 AS INT) THEN avg(ss_coupon_amt) END), aggif(valid_tid(6,8,10) IN (CAST(6 AS INT), CAST(8 AS INT), CAST(10 AS INT)), CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN avg(ss_sales_price) WHEN CAST(8 AS INT) THEN avg(ss_sales_price) WHEN CAST(10 AS INT) THEN avg(ss_sales_price) END)
 |  group by: CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN i_item_id WHEN CAST(8 AS INT) THEN i_item_id WHEN CAST(10 AS INT) THEN NULL END, CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN s_state WHEN CAST(8 AS INT) THEN NULL WHEN CAST(10 AS INT) THEN NULL END, CASE valid_tid(6,8,10) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) END
-|  mem-estimate=38.76MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=11 row-size=61B cardinality=5.57M cost=34419344
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=11 row-size=61B cardinality=1.30M cost=8031185
 |  in pipelines: 10(GETNEXT), 17(OPEN)
 |
 17:AGGREGATE [FINALIZE]
@@ -424,19 +424,19 @@ max-parallelism=10 segment-costs=[40227379, 34419344, 70334652, 180] cpu-compari
 |  Class 2
 |    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |    group by: NULL, NULL
-|  mem-estimate=129.83MB mem-reservation=40.69MB thread-reservation=0
-|  tuple-ids=6N,8N,10N row-size=202B cardinality=5.57M cost=34026152
+|  mem-estimate=54.00MB mem-reservation=40.69MB thread-reservation=0
+|  tuple-ids=6N,8N,10N row-size=202B cardinality=1.30M cost=7936762
 |  in pipelines: 17(GETNEXT), 00(OPEN)
 |
 16:EXCHANGE [HASH(CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(i_item_id) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(NULL) END,CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(s_state) WHEN 7 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) END)]
 |  mem-estimate=35.08MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5N,7N,9N row-size=202B cardinality=5.57M cost=6201227
+|  tuple-ids=5N,7N,9N row-size=202B cardinality=1.30M cost=1446953
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=119.33MB mem-reservation=78.00MB thread-reservation=1
-max-parallelism=150 segment-costs=[1423870966, 81026251] cpu-comparison-result=120 [max(120 (self) vs 56 (sum children))]
+max-parallelism=150 segment-costs=[1423870966, 18906136] cpu-comparison-result=120 [max(120 (self) vs 56 (sum children))]
 09:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
@@ -448,7 +448,7 @@ max-parallelism=150 segment-costs=[1423870966, 81026251] cpu-comparison-result=1
 |    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=94.97MB mem-reservation=70.00MB thread-reservation=0
-|  tuple-ids=5N,7N,9N row-size=202B cardinality=5.57M cost=424311047
+|  tuple-ids=5N,7N,9N row-size=202B cardinality=1.30M cost=424311047
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

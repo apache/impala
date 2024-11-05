@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -461,25 +462,17 @@ public class HdfsScanNode extends ScanNode {
     // compute scan range locations with optional sampling
     computeScanRangeLocations(analyzer);
 
-    if (hasParquet(fileFormats_)) {
-      // Compute min-max conjuncts only if the PARQUET_READ_STATISTICS query option is
-      // set to true.
-      if (analyzer.getQueryOptions().parquet_read_statistics) {
-        computeStatsTupleAndConjuncts(analyzer);
-      }
+    boolean hasParquetFormat = hasParquet(fileFormats_);
+    if ((hasParquetFormat && analyzer.getQueryOptions().parquet_read_statistics)
+        || (hasOrc(fileFormats_) && analyzer.getQueryOptions().orc_read_statistics)) {
+      // Compute min-max conjuncts only if the PARQUET_READ_STATISTICS
+      // or ORC_READ_STATISTICS query option is set to true.
+      computeStatsTupleAndConjuncts(analyzer);
+    }
+    if (hasParquetFormat && analyzer.getQueryOptions().parquet_dictionary_filtering) {
       // Compute dictionary conjuncts only if the PARQUET_DICTIONARY_FILTERING query
       // option is set to true.
-      if (analyzer.getQueryOptions().parquet_dictionary_filtering) {
-        computeDictionaryFilterConjuncts(analyzer);
-      }
-    }
-
-    if (hasOrc(fileFormats_)) {
-      // Compute min-max conjuncts only if the ORC_READ_STATISTICS query option is
-      // set to true.
-      if (analyzer.getQueryOptions().orc_read_statistics) {
-        computeStatsTupleAndConjuncts(analyzer);
-      }
+      computeDictionaryFilterConjuncts(analyzer);
     }
 
     computeMemLayout(analyzer);
@@ -726,10 +719,12 @@ public class HdfsScanNode extends ScanNode {
     // Skip the slot ref if it refers to an array's "pos" field.
     if (slotDesc.isArrayPosRef()) return;
     if (inPred.isNotIn()) return;
+    boolean inPredRegistered = false;
     if (hasOrc(fileFormats_)) {
       if (isUnsupportedStatsType(slotDesc.getType())) return;
       addStatsOriginalConjunct(slotDesc.getParent(), inPred);
       buildInListStatsPredicate(analyzer, slotRef, inPred);
+      inPredRegistered = true;
     }
 
     if (!hasParquet(fileFormats_)) return;
@@ -756,7 +751,10 @@ public class HdfsScanNode extends ScanNode {
     BinaryPredicate maxBound = new BinaryPredicate(BinaryPredicate.Operator.LE,
         children.get(0).clone(), max.clone());
 
-    addStatsOriginalConjunct(slotDesc.getParent(), inPred);
+    if (!inPredRegistered) {
+      addStatsOriginalConjunct(slotDesc.getParent(), inPred);
+      inPredRegistered = true;
+    }
     buildBinaryStatsPredicate(analyzer, slotRef, minBound, minBound.getOp());
     buildBinaryStatsPredicate(analyzer, slotRef, maxBound, maxBound.getOp());
   }
@@ -2733,5 +2731,39 @@ public class HdfsScanNode extends ScanNode {
 
   public boolean usesDeterministicScanRangeAssignment() {
     return deterministicScanRangeAssignment_;
+  }
+
+  // Remove any expression in 'exprs' that has matching equality predicate,
+  // is-null predicate, or simple in-list predicate in statsOriginalConjuncts_.
+  // Return NDV multiple of expression that are filtered out after considering
+  // those predicates, or 1 if nothing is filtered out.
+  public long filterExprWithStatsConjunct(TupleDescriptor tupleDesc, List<Expr> exprs) {
+    long ndvMult = 1;
+    List<Expr> statsConjuncts = statsOriginalConjuncts_.get(tupleDesc);
+    if (statsConjuncts == null || exprs.isEmpty()) return ndvMult;
+
+    int originalSize = exprs.size();
+    for (Expr statsConjunct : statsConjuncts) {
+      for (Iterator<Expr> it = exprs.iterator(); it.hasNext();) {
+        Expr groupingExpr = it.next();
+        if (!groupingExpr.equals(statsConjunct.getChild(0))) continue;
+        if (statsConjunct instanceof BinaryPredicate
+            && BinaryPredicate.IS_EQ_PREDICATE.apply((BinaryPredicate) statsConjunct)) {
+          // This is an equality predicate.
+          it.remove();
+        } else if (statsConjunct instanceof InPredicate) {
+          // This is a simple in-list predicate.
+          Preconditions.checkState(statsConjunct.getChildCount() > 1,
+              "InPredicate must have at least two child expressions");
+          ndvMult = MathUtil.saturatingMultiplyCardinalities(
+              ndvMult, statsConjunct.getChildCount() - 1);
+          it.remove();
+        } else if (statsConjunct instanceof IsNullPredicate) {
+          // This is an is-null predicate.
+          it.remove();
+        }
+      }
+    }
+    return ndvMult;
   }
 }

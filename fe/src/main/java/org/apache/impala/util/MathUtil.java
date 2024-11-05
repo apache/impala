@@ -36,7 +36,7 @@ public class MathUtil {
   // Multiply two cardinality numbers like saturatingMultiply() but with additional
   // precondition check that both must be a valid cardinality value.
   // Return -1 if any argument is -1.
-  public static long saturatingMultiplyCardinalites(
+  public static long saturatingMultiplyCardinalities(
       long cardinality1, long cardinality2) {
     Preconditions.checkArgument(
         cardinality1 >= -1, "cardinality1 is invalid: %s", cardinality1);

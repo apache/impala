@@ -2510,3 +2510,120 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> o_custkey
    row-size=8B cardinality=1.50M
 ====
+# Test grouping with equality stats predicate on grouping expression.
+select ss_customer_sk, count(*)
+from tpcds_parquet.store_sales
+where ss_customer_sk = 1
+group by ss_customer_sk;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=1
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.39MB
+   predicates: ss_customer_sk = 1
+   row-size=4B cardinality=30
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=1
+|
+02:EXCHANGE [HASH(ss_customer_sk)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=1
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.39MB
+   predicates: ss_customer_sk = 1
+   row-size=4B cardinality=30
+====
+# Test grouping with in-list stats predicate on grouping expression.
+select ss_customer_sk, count(*)
+from tpcds_parquet.store_sales
+where ss_customer_sk in (1, 2, 3, 4, 5)
+group by ss_customer_sk;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=5
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.39MB
+   predicates: ss_customer_sk IN (1, 2, 3, 4, 5)
+   row-size=4B cardinality=159
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=5
+|
+02:EXCHANGE [HASH(ss_customer_sk)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=5
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=199.39MB
+   predicates: ss_customer_sk IN (1, 2, 3, 4, 5)
+   row-size=4B cardinality=159
+====
+# Test grouping with is-null stats predicate on grouping expression.
+select ss_customer_sk, count(*)
+from tpcds_orc_def.store_sales
+where ss_customer_sk is null
+group by ss_customer_sk;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=1
+|
+00:SCAN HDFS [tpcds_orc_def.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=101.97MB
+   predicates: ss_customer_sk IS NULL
+   row-size=4B cardinality=unavailable
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=1
+|
+02:EXCHANGE [HASH(ss_customer_sk)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_customer_sk
+|  row-size=12B cardinality=1
+|
+00:SCAN HDFS [tpcds_orc_def.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=101.97MB
+   predicates: ss_customer_sk IS NULL
+   row-size=4B cardinality=unavailable
+====

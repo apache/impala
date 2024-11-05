@@ -1365,7 +1365,7 @@ PLAN-ROOT SINK
 07:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=4
+|  tuple-ids=1 row-size=16B cardinality=6
 |  in pipelines: 05(GETNEXT), 06(OPEN)
 |
 |--06:SCAN HDFS [functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files]
@@ -1382,7 +1382,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [FINALIZE]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
 |  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=4
+|  tuple-ids=1 row-size=16B cardinality=6
 |  in pipelines: 05(GETNEXT), 03(OPEN), 00(OPEN)
 |
 04:UNION
@@ -1438,7 +1438,7 @@ PLAN-ROOT SINK
 |
 12:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=4
+|  tuple-ids=1 row-size=16B cardinality=6
 |  in pipelines: 10(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s)] hosts=2 instances=2
@@ -1446,7 +1446,7 @@ Per-Host Resources: mem-estimate=130.02MB mem-reservation=35.94MB thread-reserva
 07:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  hash predicates: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s IS NOT DISTINCT FROM functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=4
+|  tuple-ids=1 row-size=16B cardinality=6
 |  in pipelines: 10(GETNEXT), 06(OPEN)
 |
 |--11:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s)]
@@ -1470,12 +1470,12 @@ Per-Host Resources: mem-estimate=130.02MB mem-reservation=35.94MB thread-reserva
 10:AGGREGATE [FINALIZE]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
 |  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=4
+|  tuple-ids=1 row-size=16B cardinality=6
 |  in pipelines: 10(GETNEXT), 03(OPEN), 00(OPEN)
 |
 09:EXCHANGE [HASH(functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i,functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s)]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=4
+|  tuple-ids=1 row-size=16B cardinality=6
 |  in pipelines: 03(GETNEXT), 00(GETNEXT)
 |
 F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1483,7 +1483,7 @@ Per-Host Resources: mem-estimate=192.17MB mem-reservation=34.03MB thread-reserva
 05:AGGREGATE [STREAMING]
 |  group by: functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.i, functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files.s
 |  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=4
+|  tuple-ids=1 row-size=16B cardinality=6
 |  in pipelines: 03(GETNEXT), 00(GETNEXT)
 |
 04:UNION
