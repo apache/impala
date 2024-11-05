@@ -454,8 +454,8 @@ public class PlannerTestBase extends FrontendTestBase {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
     if (query.isEmpty()) {
-      throw new IllegalStateException("Cannot plan empty query in line: " +
-          testCase.getStartingLineNum());
+      throw new IllegalStateException("Cannot plan empty query in " +
+          testCase.getFileNameAndLineNum());
     }
     // Set up the query context. Note that we need to deep copy it before planning each
     // time since planning modifies it.
@@ -604,12 +604,14 @@ public class PlannerTestBase extends FrontendTestBase {
       String planDiff = TestUtils.compareOutput(
           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, resultFilters);
       if (!planDiff.isEmpty()) {
-        errorLog.append(String.format("\nSection %s of query at line %d:\n%s\n\n%s",
-            section, testCase.getStartingLineNum(), query, planDiff));
-        // Append the VERBOSE explain plan because it contains details about
-        // tuples/sizes/cardinality for easier debugging.
-        String verbosePlan = getVerboseExplainPlan(queryCtx);
-        errorLog.append("\nVerbose plan:\n" + verbosePlan);
+        errorLog.append(String.format("\nSection %s of query at %s:\n%s\n\n%s",
+            section, testCase.getFileNameAndLineNum(), query, planDiff));
+        if (!testOptions.contains(PlannerTestOption.EXTENDED_EXPLAIN)) {
+          // Append the VERBOSE explain plan because it contains details about
+          // tuples/sizes/cardinality for easier debugging.
+          String verbosePlan = getVerboseExplainPlan(queryCtx);
+          errorLog.append("\nVerbose plan:\n" + verbosePlan);
+        }
       }
     }
     return execRequest;

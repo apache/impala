@@ -852,8 +852,14 @@ class ImpalaTestSuite(BaseTestSuite):
             vector.get_value('table_format').file_format, result_section='DML_RESULTS',
             update_section=pytest.config.option.update_results)
     if pytest.config.option.update_results:
-      output_file = os.path.join(EE_TEST_LOGS_DIR,
-                                 test_file_name.replace('/', '_') + ".test")
+      # Print updated test results to path like
+      # $EE_TEST_LOGS_DIR/impala_updated_results/tpcds/queries/tpcds-decimal_v2-q98.test
+      output_file = os.path.join(
+        EE_TEST_LOGS_DIR, 'impala_updated_results',
+        self.get_relative_path(self.get_workload(), test_file_name))
+      output_dir = os.path.dirname(output_file)
+      if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
       write_test_file(output_file, sections, encoding=encoding)
 
   def get_query_lineage(self, query_id, lineage_dir):
@@ -1054,13 +1060,18 @@ class ImpalaTestSuite(BaseTestSuite):
     # Check the results
     assert (result is not None) and (result == expected)
 
+  def get_relative_path(self, workload, test_file_name):
+    """Return path to [test_file_name].test relative to WORKLOAD_DIR."""
+    return os.path.join(workload, 'queries', test_file_name + '.test')
+
   def load_query_test_file(self, workload, file_name, valid_section_names=None,
       encoding=None):
     """
     Loads/Reads the specified query test file. Accepts the given section names as valid.
     Uses a default list of valid section names if valid_section_names is None.
     """
-    test_file_path = os.path.join(WORKLOAD_DIR, workload, 'queries', file_name + '.test')
+    test_file_path = os.path.join(
+        WORKLOAD_DIR, self.get_relative_path(workload, file_name))
     LOG.info("Loading query test file: %s", test_file_path)
     if not os.path.isfile(test_file_path):
       assert False, 'Test file not found: %s' % file_name

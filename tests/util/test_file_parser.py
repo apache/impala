@@ -364,6 +364,7 @@ def write_test_file(test_file_name, test_file_sections, encoding=None):
           test_file_text.append(section_value)
     test_file_text.append(SECTION_DELIMITER)
     test_file.write(('\n').join(test_file_text))
+    test_file.write('\n')  # end file with a newline
 
 
 def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=[]):

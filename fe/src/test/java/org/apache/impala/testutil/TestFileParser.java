@@ -114,15 +114,19 @@ public class TestFileParser {
         Maps.newEnumMap(Section.class);
 
     // Line number in the test case file where this case started
+    private final String fileName;
     private final int startLineNum;
     private TQueryOptions options;
 
-    public TestCase(int lineNum, TQueryOptions options) {
+    public TestCase(String fileName, int lineNum, TQueryOptions options) {
+      this.fileName = fileName;
       this.startLineNum = lineNum;
       this.options = options;
     }
 
     public int getStartingLineNum() { return startLineNum; }
+
+    public String getFileNameAndLineNum() { return fileName + ":" + startLineNum;}
 
     public TQueryOptions getOptions() { return this.options; }
 
@@ -276,7 +280,7 @@ public class TestFileParser {
     Section currentSection = Section.QUERY;
     ArrayList<String> sectionContents = Lists.newArrayList();
     // Each test case in the test file has its own copy of query options.
-    TestCase currentTestCase = new TestCase(lineNum, options.deepCopy());
+    TestCase currentTestCase = new TestCase(fileName, lineNum, options.deepCopy());
     int sectionCount = 0;
 
     while (scanner.hasNextLine()) {
