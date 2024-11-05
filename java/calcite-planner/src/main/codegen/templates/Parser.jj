@@ -123,6 +123,7 @@ import org.apache.calcite.util.Util;
 import org.apache.calcite.util.trace.CalciteTrace;
 import org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
+import org.apache.impala.calcite.operators.ImpalaConcatOrOperator;
 import org.apache.impala.calcite.util.ParserUtil;
 
 import com.google.common.collect.ImmutableList;
@@ -7740,17 +7741,17 @@ SqlBinaryOperator BinaryRowOperator() :
         }
         return SqlStdOperatorTable.NOT_EQUALS;
     }
-|   <PLUS> { return SqlStdOperatorTable.PLUS; }
-|   <MINUS> { return SqlStdOperatorTable.MINUS; }
-|   <STAR> { return SqlStdOperatorTable.MULTIPLY; }
-|   <SLASH> { return SqlStdOperatorTable.DIVIDE; }
+|   <PLUS> { return ImpalaCustomOperatorTable.PLUS; }
+|   <MINUS> { return ImpalaCustomOperatorTable.MINUS; }
+|   <STAR> { return ImpalaCustomOperatorTable.MULTIPLY; }
+|   <SLASH> { return ImpalaCustomOperatorTable.DIVIDE; }
 |   <PERCENT_REMAINDER> {
         if (!this.conformance.isPercentRemainderAllowed()) {
             throw SqlUtil.newContextException(getPos(), RESOURCE.percentRemainderNotAllowed());
         }
         return SqlStdOperatorTable.PERCENT_REMAINDER;
     }
-|   <CONCAT> { return SqlStdOperatorTable.CONCAT; }
+|   <CONCAT> { return ImpalaCustomOperatorTable.CONCAT_OR; }
 |   <AND> { return SqlStdOperatorTable.AND; }
 |   <OR> { return SqlStdOperatorTable.OR; }
 |   LOOKAHEAD(2) <IS> <DISTINCT> <FROM> { return SqlStdOperatorTable.IS_DISTINCT_FROM; }

@@ -222,15 +222,7 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   public static final SqlAggFunction GROUPING_ID =
       new ImpalaGroupingIdFunction();
 
-  public static final SqlBinaryOperator CONCAT =
-      new SqlBinaryOperator(
-          "||",
-          SqlKind.OTHER,
-          60,
-          true,
-          STRING_TYPE,
-          null,
-          OperandTypes.STRING_SAME_SAME_OR_ARRAY_SAME_SAME);
+  public static final ImpalaConcatOrOperator CONCAT_OR = ImpalaConcatOrOperator.INSTANCE;
 
   // The explicit cast function was created to deal with the cast function using
   // Impala behavior. The operator is in the operator table because the Calcite

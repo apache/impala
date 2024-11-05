@@ -104,6 +104,10 @@ public class RexCallConverter {
       return null;
     }
 
+    if (fn.functionName().equals("or")) {
+      return createCompoundExpr(rexCall, params);
+    }
+
     Type impalaRetType = ImpalaTypeConverter.createImpalaType(fn.getReturnType(),
         rexCall.getType().getPrecision(), rexCall.getType().getScale());
 

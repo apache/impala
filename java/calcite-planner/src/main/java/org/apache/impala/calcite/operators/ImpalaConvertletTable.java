@@ -16,6 +16,7 @@
  */
 package org.apache.impala.calcite.operators;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
@@ -23,7 +24,9 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql2rel.ReflectiveConvertletTable;
 import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
@@ -31,6 +34,7 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * ImpalaConvertletTable adds the ability to override any converlets in the
@@ -39,6 +43,13 @@ import java.util.List;
  * RexNodes from SqlNodes.
  */
 public class ImpalaConvertletTable extends ReflectiveConvertletTable {
+
+  // Map of Calcite names to an Impala function name when the names are different
+  public static Set<String> IMPALA_OVERRIDE_CONVERTLETS =
+      ImmutableSet.<String> builder()
+      .add("||")
+      .build();
+
   public static final ImpalaConvertletTable INSTANCE =
       new ImpalaConvertletTable();
 
@@ -47,6 +58,7 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     registerOp(ImpalaCastFunction.INSTANCE, this::convertExplicitCast);
     registerOp(SqlStdOperatorTable.IS_DISTINCT_FROM, this::convertIsDistinctFrom);
     registerOp(SqlStdOperatorTable.IS_NOT_DISTINCT_FROM, this::convertIsNotDistinctFrom);
+    registerOp(ImpalaConcatOrOperator.INSTANCE, this::convertConcatOr);
   }
 
   @Override
@@ -67,6 +79,12 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     // EXPLICIT_CAST convertlet has to be handled by our convertlet. Operation
     // was registered in the constructor and it will call convertExplicitCast
     if (call.getOperator().getName().equals("EXPLICIT_CAST")) {
+      return super.get(call);
+    }
+
+    // Registered convertlets need to call our convertlet rather than the
+    // StandardConvertletTable convertlet which will not find the function.
+    if (IMPALA_OVERRIDE_CONVERTLETS.contains(call.getOperator().getName())) {
       return super.get(call);
     }
 
@@ -107,5 +125,25 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
         cx.getValidator().getValidatedNodeTypeIfKnown(call);
     List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr));
     return rexBuilder.makeCall(returnType, ImpalaCastFunction.INSTANCE, operands);
+  }
+
+  /**
+   * Convertlet to decide whether the || operator is an "or" or a "concat".
+   * If the return type is BOOLEAN, then we know it's an OR.
+   */
+  protected RexNode convertConcatOr (
+      SqlRexContext cx, SqlCall call) {
+    final SqlNode expr1 = call.operand(0);
+    final SqlNode expr2 = call.operand(1);
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    RelDataType returnType =
+        cx.getValidator().getValidatedNodeTypeIfKnown(call);
+    List<RexNode> operands = Lists.newArrayList(
+        cx.convertExpression(expr1),
+        cx.convertExpression(expr2));
+    SqlOperator op = returnType.getSqlTypeName().equals(SqlTypeName.BOOLEAN)
+        ? SqlStdOperatorTable.OR
+        : SqlStdOperatorTable.CONCAT;
+    return rexBuilder.makeCall(returnType, op, operands);
   }
 }
