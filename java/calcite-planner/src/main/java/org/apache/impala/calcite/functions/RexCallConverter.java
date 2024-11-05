@@ -79,6 +79,10 @@ public class RexCallConverter {
         return createCastExpr(rexCall, params, analyzer);
     }
 
+    if (rexCall.getOperator().getName().toLowerCase().equals("explicit_cast")) {
+      return createCastExpr(rexCall, params, analyzer);
+    }
+
     String funcName = rexCall.getOperator().getName().toLowerCase();
 
     // Date addition expressions have special handling.

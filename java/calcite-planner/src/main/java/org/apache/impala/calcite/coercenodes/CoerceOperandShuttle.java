@@ -232,6 +232,10 @@ public class CoerceOperandShuttle extends RexShuttle {
       return false;
     }
 
+    if (rexCall.getOperator().getName().equals("EXPLICIT_CAST")) {
+      return false;
+    }
+
     return true;
   }
 

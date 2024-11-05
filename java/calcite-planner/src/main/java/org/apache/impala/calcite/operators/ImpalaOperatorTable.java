@@ -96,6 +96,18 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
     }
 
     String lowercaseOpName = opName.getSimple().toLowerCase();
+
+    // A little hack. We need our own version of "cast" when it is explicit. But
+    // we need to use a different name for the function ("explicit_cast") and a
+    // different type (SqlKind.OTHER instead of SqlKind.CAST) in order to avoid
+    // conflict problems within Calcite processing. In order to find our operator,
+    // we look for "cast" and use the "explicit_cast" name as defined in
+    // ImpalaCastFunction
+    if (lowercaseOpName.equals("cast")) {
+      operatorList.add(ImpalaCastFunction.INSTANCE);
+      return;
+    }
+
     if (!USE_IMPALA_OPERATOR.contains(lowercaseOpName)) {
       // Check Calcite operator table for existence.
       SqlStdOperatorTable.instance().lookupOperatorOverloads(opName, category, syntax,

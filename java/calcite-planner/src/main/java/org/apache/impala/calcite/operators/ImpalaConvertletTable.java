@@ -16,13 +16,20 @@
  */
 package org.apache.impala.calcite.operators;
 
+import com.google.common.collect.Lists;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql2rel.ReflectiveConvertletTable;
+import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 
+import java.util.List;
 /**
  *
  */
@@ -32,6 +39,7 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
 
   public ImpalaConvertletTable() {
     addAlias(ImpalaCustomOperatorTable.PERCENT_REMAINDER, SqlStdOperatorTable.MOD);
+    registerOp(ImpalaCastFunction.INSTANCE, this::convertExplicitCast);
   }
 
   @Override
@@ -44,7 +52,22 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
       return super.get(call);
     }
 
+    // EXPLICIT_CAST convertlet has to be handled by our convertlet. Operation
+    // was registered in the constructor and it will call convertExplicitCast
+    if (call.getOperator().getName().equals("EXPLICIT_CAST")) {
+      return super.get(call);
+    }
+
     return StandardConvertletTable.INSTANCE.get(call);
   }
 
+  protected RexNode convertExplicitCast(
+      SqlRexContext cx, SqlCall call) {
+    final SqlNode expr = call.operand(0);
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    RelDataType returnType =
+        cx.getValidator().getValidatedNodeTypeIfKnown(call);
+    List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr));
+    return rexBuilder.makeCall(returnType, ImpalaCastFunction.INSTANCE, operands);
+  }
 }

@@ -125,7 +125,7 @@ public class CommonOperatorFunctions {
   }
 
   // return true if any operand type is nullable.
-  private static boolean isNullable(List<RelDataType> operandTypes) {
+  public static boolean isNullable(List<RelDataType> operandTypes) {
     return operandTypes.stream().anyMatch(rdt -> rdt.isNullable());
   }
 }

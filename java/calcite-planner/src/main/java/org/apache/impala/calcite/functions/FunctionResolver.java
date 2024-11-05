@@ -74,6 +74,7 @@ public class FunctionResolver {
   // Map of Calcite names to an Impala function name when the names are different
   public static Map<String, String> CALCITE_NAME_TO_IMPALA_FUNC =
       ImmutableMap.<String, String> builder()
+      .put("explicit_cast", "cast")
       .put("||", "concat")
       .build();
 
