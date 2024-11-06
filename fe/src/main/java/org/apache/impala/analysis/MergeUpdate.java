@@ -123,6 +123,15 @@ public class MergeUpdate extends MergeCase {
   }
 
   @Override
+  public void reset() {
+    super.reset();
+    for (Pair<SlotRef, Expr> expr : assignmentExprs_) {
+      expr.first.reset();
+      expr.second.reset();
+    }
+  }
+
+  @Override
   public MergeUpdate clone() {
     return new MergeUpdate(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
         targetTableName_, targetTableColumns_, targetTableRef_, assignmentExprs_,

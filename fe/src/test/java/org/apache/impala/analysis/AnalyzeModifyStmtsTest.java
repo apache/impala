@@ -378,6 +378,12 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
         + "using functional_parquet.iceberg_non_partitioned s "
         + "on target.id = s.id when not matched by source then update set *");
+    // Query rewrite in the source subquery
+    AnalyzesOk("merge into functional_parquet.iceberg_partition_evolution t "
+        + "using (select * from functional_parquet.iceberg_non_partitioned where "
+        + "id in (select max(id) from functional_parquet.iceberg_non_partitioned)) s "
+        + "on t.id = s.id "
+        + "when matched and s.id > 2 then delete");
 
     // Inline view as target
     AnalysisError("merge into "
@@ -479,13 +485,6 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
             + "on t.id = s.id "
             + "when matched and s.id then delete",
         "Filter expression requires return type 'BOOLEAN'. Actual type is 'INT'");
-    // Subquery rewrite in query statement
-    AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
-            + "using (select * from functional_parquet.iceberg_non_partitioned where "
-            + "id in (select max(id) from functional_parquet.iceberg_non_partitioned)) s "
-            + "on t.id = s.id "
-            + "when matched and s.id > 2 then delete",
-        "Unable to rewrite MERGE query statement");
     // UPDATE SET * with different column lists
     AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
             + "using functional_parquet.iceberg_non_partitioned s "

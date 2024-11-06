@@ -24,6 +24,7 @@ import java.util.StringJoiner;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TMergeCaseType;
 import org.apache.impala.thrift.TMergeMatchType;
@@ -134,8 +135,10 @@ public abstract class MergeCase extends StatementBase {
   @Override
   public void reset() {
     super.reset();
-    filterExprs_ = Collections.emptyList();
     resultExprs_ = Collections.emptyList();
+    for(Expr expr : filterExprs_) {
+      expr.reset();
+    }
   }
 
   @Override
@@ -144,8 +147,13 @@ public abstract class MergeCase extends StatementBase {
   @Override
   public List<Expr> getResultExprs() { return resultExprs_; }
 
-  public TMergeMatchType matchType(){
+  public TMergeMatchType matchType() {
     return matchType_;
+  }
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    rewriter.rewriteList(filterExprs_, analyzer_);
+    rewriter.rewriteList(resultExprs_, analyzer_);
   }
 
   public String matchTypeAsString() {

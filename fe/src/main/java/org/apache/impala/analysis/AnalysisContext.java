@@ -435,7 +435,7 @@ public class AnalysisContext {
     }
     public boolean requiresExprRewrite() {
       return isQueryStmt() || isInsertStmt() || isCreateTableAsSelectStmt()
-          || isUpdateStmt() || isDeleteStmt() || isOptimizeStmt();
+          || isUpdateStmt() || isDeleteStmt() || isOptimizeStmt() || isMergeStmt();
     }
     public boolean requiresSetOperationRewrite() {
       return analyzer_.containsSetOperation() && !isCreateViewStmt() && !isAlterViewStmt()

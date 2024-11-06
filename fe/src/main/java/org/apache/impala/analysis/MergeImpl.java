@@ -94,4 +94,6 @@ public interface MergeImpl {
    */
   PlanNode getPlanNode(PlannerContext ctx, PlanNode child, Analyzer analyzer)
       throws ImpalaException;
+
+  void reset();
 }

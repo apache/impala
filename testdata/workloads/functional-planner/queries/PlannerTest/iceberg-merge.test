@@ -831,3 +831,185 @@ MERGE SINK
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ====
+# Merge into a partitioned Iceberg table using multiple merge cases and using a query that will be rewritten as source
+merge into functional_parquet.iceberg_v2_partitioned_position_deletes target
+using (select distinct 1 id, "string value" string_col
+from functional.alltypesagg a
+where exists
+  (select id
+   from functional.alltypestiny b
+   where a.tinyint_col = b.tinyint_col and a.string_col = b.string_col
+   group by rollup(id, int_col, bool_col)
+   having int_col is null)
+and tinyint_col < 10) source
+on target.id = source.id
+when matched then update set action = string_col
+when not matched then insert (id, user, action) values(source.id, source.string_col, concat("something ", source.string_col))
+---- PLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+11:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=11
+|
+10:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.`user`, 'string value', target.event_time
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED BY TARGET
+|  |  result expressions: 1, 'string value', concat('something ', 'string value'), NULL
+|  |  type: INSERT
+|  row-size=93B cardinality=11
+|
+09:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: target.id = 1
+|  row-size=93B cardinality=11
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  group by: 1, 'string value'
+|  |  row-size=13B cardinality=1
+|  |
+|  07:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: a.tinyint_col = CASE valid_tid(3,4,5,6) WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col WHEN 6 THEN b.tinyint_col END, a.string_col = CASE valid_tid(3,4,5,6) WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col WHEN 6 THEN b.string_col END
+|  |  runtime filters: RF000 <- CASE valid_tid(3,4,5,6) WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col WHEN 6 THEN b.tinyint_col END, RF001 <- CASE valid_tid(3,4,5,6) WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col WHEN 6 THEN b.string_col END
+|  |  row-size=16B cardinality=1
+|  |
+|  |--06:AGGREGATE [FINALIZE]
+|  |  |  group by: CASE valid_tid(3,4,5,6) WHEN 3 THEN id WHEN 4 THEN id WHEN 5 THEN id WHEN 6 THEN NULL END, CASE valid_tid(3,4,5,6) WHEN 3 THEN int_col WHEN 4 THEN int_col WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(3,4,5,6) WHEN 3 THEN bool_col WHEN 4 THEN NULL WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(3,4,5,6) WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col WHEN 6 THEN b.tinyint_col END, CASE valid_tid(3,4,5,6) WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col WHEN 6 THEN b.string_col END, CASE valid_tid(3,4,5,6) WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 END
+|  |  |  having: CASE valid_tid(3,4,5,6) WHEN 3 THEN int_col WHEN 4 THEN int_col WHEN 5 THEN NULL WHEN 6 THEN NULL END IS NULL
+|  |  |  row-size=26B cardinality=1
+|  |  |
+|  |  05:AGGREGATE [FINALIZE]
+|  |  |  Class 0
+|  |  |    group by: id, int_col, bool_col, b.tinyint_col, b.string_col
+|  |  |  Class 1
+|  |  |    group by: id, int_col, NULL, b.tinyint_col, b.string_col
+|  |  |  Class 2
+|  |  |    group by: id, NULL, NULL, b.tinyint_col, b.string_col
+|  |  |  Class 3
+|  |  |    group by: NULL, NULL, NULL, b.tinyint_col, b.string_col
+|  |  |  row-size=92B cardinality=28
+|  |  |
+|  |  04:SCAN HDFS [functional.alltypestiny b]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     row-size=23B cardinality=8
+|  |
+|  03:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     predicates: tinyint_col < 10
+|     runtime filters: RF000 -> a.tinyint_col, RF001 -> a.string_col
+|     row-size=16B cardinality=1.10K
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=80B cardinality=10
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+---- DISTRIBUTEDPLAN
+MERGE SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+20:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=81B cardinality=11
+|
+19:EXCHANGE [HASH(target.action)]
+|
+10:MERGE
+|  CASE 0: MATCHED
+|  |  result expressions: target.id, target.`user`, 'string value', target.event_time
+|  |  type: UPDATE
+|  CASE 1: NOT MATCHED BY TARGET
+|  |  result expressions: 1, 'string value', concat('something ', 'string value'), NULL
+|  |  type: INSERT
+|  row-size=93B cardinality=11
+|
+09:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: target.id = 1
+|  row-size=93B cardinality=11
+|
+|--18:EXCHANGE [HASH(1)]
+|  |
+|  16:AGGREGATE [FINALIZE]
+|  |  group by: 1, 'string value'
+|  |  row-size=13B cardinality=1
+|  |
+|  15:EXCHANGE [HASH(1,'string value')]
+|  |
+|  08:AGGREGATE [STREAMING]
+|  |  group by: 1, 'string value'
+|  |  row-size=13B cardinality=1
+|  |
+|  07:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  hash predicates: a.tinyint_col = CASE valid_tid(3,4,5,6) WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col WHEN 6 THEN b.tinyint_col END, a.string_col = CASE valid_tid(3,4,5,6) WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col WHEN 6 THEN b.string_col END
+|  |  runtime filters: RF000 <- CASE valid_tid(3,4,5,6) WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col WHEN 6 THEN b.tinyint_col END, RF001 <- CASE valid_tid(3,4,5,6) WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col WHEN 6 THEN b.string_col END
+|  |  row-size=16B cardinality=1
+|  |
+|  |--14:EXCHANGE [BROADCAST]
+|  |  |
+|  |  06:AGGREGATE [FINALIZE]
+|  |  |  group by: CASE valid_tid(3,4,5,6) WHEN 3 THEN id WHEN 4 THEN id WHEN 5 THEN id WHEN 6 THEN NULL END, CASE valid_tid(3,4,5,6) WHEN 3 THEN int_col WHEN 4 THEN int_col WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(3,4,5,6) WHEN 3 THEN bool_col WHEN 4 THEN NULL WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(3,4,5,6) WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col WHEN 6 THEN b.tinyint_col END, CASE valid_tid(3,4,5,6) WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col WHEN 6 THEN b.string_col END, CASE valid_tid(3,4,5,6) WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 END
+|  |  |  having: CASE valid_tid(3,4,5,6) WHEN 3 THEN int_col WHEN 4 THEN int_col WHEN 5 THEN NULL WHEN 6 THEN NULL END IS NULL
+|  |  |  row-size=26B cardinality=1
+|  |  |
+|  |  13:AGGREGATE [FINALIZE]
+|  |  |  Class 0
+|  |  |    group by: id, int_col, bool_col, b.tinyint_col, b.string_col
+|  |  |  Class 1
+|  |  |    group by: id, int_col, NULL, b.tinyint_col, b.string_col
+|  |  |  Class 2
+|  |  |    group by: id, NULL, NULL, b.tinyint_col, b.string_col
+|  |  |  Class 3
+|  |  |    group by: NULL, NULL, NULL, b.tinyint_col, b.string_col
+|  |  |  row-size=92B cardinality=28
+|  |  |
+|  |  12:EXCHANGE [HASH(CASE valid_tid(3,4,5,6) WHEN 3 THEN murmur_hash(id) WHEN 4 THEN murmur_hash(id) WHEN 5 THEN murmur_hash(id) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5,6) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5,6) WHEN 3 THEN murmur_hash(bool_col) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5,6) WHEN 3 THEN murmur_hash(b.tinyint_col) WHEN 4 THEN murmur_hash(b.tinyint_col) WHEN 5 THEN murmur_hash(b.tinyint_col) WHEN 6 THEN murmur_hash(b.tinyint_col) END,CASE valid_tid(3,4,5,6) WHEN 3 THEN murmur_hash(b.string_col) WHEN 4 THEN murmur_hash(b.string_col) WHEN 5 THEN murmur_hash(b.string_col) WHEN 6 THEN murmur_hash(b.string_col) END)]
+|  |  |
+|  |  05:AGGREGATE [STREAMING]
+|  |  |  Class 0
+|  |  |    group by: id, int_col, bool_col, b.tinyint_col, b.string_col
+|  |  |  Class 1
+|  |  |    group by: id, int_col, NULL, b.tinyint_col, b.string_col
+|  |  |  Class 2
+|  |  |    group by: id, NULL, NULL, b.tinyint_col, b.string_col
+|  |  |  Class 3
+|  |  |    group by: NULL, NULL, NULL, b.tinyint_col, b.string_col
+|  |  |  row-size=92B cardinality=28
+|  |  |
+|  |  04:SCAN HDFS [functional.alltypestiny b]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     row-size=23B cardinality=8
+|  |
+|  03:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     predicates: tinyint_col < 10
+|     runtime filters: RF000 -> a.tinyint_col, RF001 -> a.string_col
+|     row-size=16B cardinality=1.10K
+|
+17:EXCHANGE [HASH(target.id)]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=80B cardinality=10
+|
+|--11:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=20
+====

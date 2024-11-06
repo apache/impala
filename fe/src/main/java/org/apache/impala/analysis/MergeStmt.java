@@ -25,6 +25,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.PlannerContext;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TMergeCaseType;
 import org.apache.impala.thrift.TMergeMatchType;
 import org.apache.impala.thrift.TSortingOrder;
@@ -41,9 +42,7 @@ import org.apache.impala.thrift.TSortingOrder;
 public class MergeStmt extends DmlStatementBase {
   private static final int MERGE_CASE_LIMIT = 1000;
   private TableRef targetTableRef_;
-  private TableRef originalTargetTableRef_;
   private TableRef sourceTableRef_;
-  private TableRef originalSourceTableRef_;
   private final List<MergeCase> cases_;
   private final Expr onClause_;
   private MergeImpl impl_;
@@ -51,9 +50,7 @@ public class MergeStmt extends DmlStatementBase {
   public MergeStmt(TableRef target, TableRef source, Expr onClause,
       List<MergeCase> cases) {
     targetTableRef_ = target;
-    originalTargetTableRef_ = target;
     sourceTableRef_ = source;
-    originalSourceTableRef_ = source;
     onClause_ = onClause;
     cases_ = cases;
   }
@@ -80,13 +77,16 @@ public class MergeStmt extends DmlStatementBase {
 
     table_ = targetTableRef_.getTable();
 
-    if (table_ instanceof FeIcebergTable) {
-      impl_ = new IcebergMergeImpl(this, targetTableRef_, sourceTableRef_, onClause_);
-      setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
-    } else {
-      throw new AnalysisException(String.format(
-          "Target table must be an Iceberg table: %s", table_.getFullName()));
+    if (impl_ == null) {
+      if (table_ instanceof FeIcebergTable) {
+        impl_ = new IcebergMergeImpl(this, targetTableRef_, sourceTableRef_, onClause_);
+        setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
+      } else {
+        throw new AnalysisException(String.format(
+            "Target table must be an Iceberg table: %s", table_.getFullName()));
+      }
     }
+
     impl_.analyze(analyzer);
 
     for (MergeCase mergeCase : getCases()) {
@@ -99,7 +99,7 @@ public class MergeStmt extends DmlStatementBase {
   public void collectTableRefs(List<TableRef> tblRefs) {
     super.collectTableRefs(tblRefs);
     if (sourceTableRef_ instanceof InlineViewRef) {
-      ((InlineViewRef) sourceTableRef_).queryStmt_.collectTableRefs(tblRefs, true);
+      ((InlineViewRef) sourceTableRef_).queryStmt_.collectTableRefs(tblRefs);
     } else {
       tblRefs.add(sourceTableRef_);
     }
@@ -144,11 +144,22 @@ public class MergeStmt extends DmlStatementBase {
   @Override
   public void reset() {
     super.reset();
-    targetTableRef_ = originalTargetTableRef_;
-    sourceTableRef_ = originalSourceTableRef_;
+    impl_.reset();
     onClause_.reset();
     for (MergeCase mergeCase : cases_) {
       mergeCase.reset();
+    }
+  }
+  @Override
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    return getQueryStmt().resolveTableMask(analyzer);
+  }
+
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    getQueryStmt().rewriteExprs(rewriter);
+    for (MergeCase mergeCase : cases_) {
+      mergeCase.rewriteExprs(rewriter);
     }
   }
 

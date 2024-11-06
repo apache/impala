@@ -98,6 +98,12 @@ public class MergeInsert extends MergeCase {
   public TMergeCaseType caseType() { return TMergeCaseType.INSERT; }
 
   @Override
+  public void reset() {
+    super.reset();
+    selectList_.reset();
+  }
+
+  @Override
   public MergeInsert clone() {
     return new MergeInsert(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
         targetTableName_, targetTableColumns_, targetTableRef_, columnPermutation_,

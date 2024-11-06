@@ -68,12 +68,12 @@ public class IcebergMergeImpl implements MergeImpl {
   private static final String MERGE_ACTION_TUPLE_NAME = "merge-action";
 
   private final MergeStmt mergeStmt_;
-  private final TableRef targetTableRef_;
-  private final TableRef sourceTableRef_;
+  private TableRef targetTableRef_;
+  private TableRef sourceTableRef_;
   private final Expr on_;
   private FeIcebergTable icebergTable_;
   private IcebergPositionDeleteTable icebergPositionalDeleteTable_;
-  private QueryStmt queryStmt_;
+  private SelectStmt queryStmt_;
   private int deleteTableId_;
   private final FeTable table_;
   private TupleDescriptor mergeActionTuple_;
@@ -101,9 +101,20 @@ public class IcebergMergeImpl implements MergeImpl {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (queryStmt_ != null ) {
+      Preconditions.checkState(queryStmt_.fromClause_.size() == 2);
+      sourceTableRef_ = analyzer.resolveTableRef(sourceTableRef_);
+      targetTableRef_ = analyzer.resolveTableRef(targetTableRef_);
+      queryStmt_.fromClause_.set(0, targetTableRef_);
+      queryStmt_.fromClause_.set(1, sourceTableRef_);
+    }
     setJoinParams();
-
     targetTableRef_.analyze(analyzer);
+
+    if (targetTableRef_.isTableMaskingView()) {
+      targetTableRef_= ((InlineViewRef)targetTableRef_).getUnMaskedTableRef();
+    }
+
     FeTable table = targetTableRef_.getTable();
     Preconditions.checkState(table instanceof FeIcebergTable);
     icebergTable_ = (FeIcebergTable) table;
@@ -236,6 +247,15 @@ public class IcebergMergeImpl implements MergeImpl {
   }
 
   @Override
+  public void reset() {
+    queryStmt_.reset();
+    // TableRef resets are replacing references instead of resetting the object state
+    targetTableRef_ = queryStmt_.fromClause_.get(0);
+    sourceTableRef_ = queryStmt_.fromClause_.get(1);
+    targetPartitionExpressions_.clear();
+  }
+
+  @Override
   public DataSink createDataSink() {
     if (mergeStmt_.hasOnlyDeleteCases()) { return createDeleteSink(); }
     if (mergeStmt_.hasOnlyInsertCases()) { return createInsertSink(); }
@@ -281,7 +301,7 @@ public class IcebergMergeImpl implements MergeImpl {
    *
    * @return Query statement that contains every target and source columns
    */
-  public QueryStmt prepareQuery() {
+  public SelectStmt prepareQuery() {
     List<SelectListItem> selectListItems = Lists.newArrayList();
     SelectList selectList = new SelectList(selectListItems);
     // Straight join hint is required to fix the join sides.
@@ -331,9 +351,9 @@ public class IcebergMergeImpl implements MergeImpl {
     selectListItems.add(sourceColumns);
 
     rowPresentExpression_ = rowPresentExpression;
-    targetPartitionMetaExpressions_.addAll(partitionMetaExpressions);
-    targetPositionMetaExpressions_.addAll(positionMetaExpressions);
-    targetExpressions_.addAll(targetSlotRefs);
+    targetPartitionMetaExpressions_ = partitionMetaExpressions;
+    targetPositionMetaExpressions_ = positionMetaExpressions;
+    targetExpressions_ = targetSlotRefs;
 
     FromClause fromClause =
         new FromClause(Lists.newArrayList(targetTableRef_, sourceTableRef_));

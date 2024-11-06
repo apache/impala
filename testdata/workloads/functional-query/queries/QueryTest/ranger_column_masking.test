@@ -709,6 +709,28 @@ select * from $UNIQUE_DB.masked_iceberg;
 INT, STRING
 ====
 ---- QUERY
+# Test MERGE stmt for Iceberg target when source is a masked table.
+merge into $UNIQUE_DB.masked_iceberg target using alltypestiny source on target.id = cast(source.id + 100 as int)
+when matched then update set target.string_col = source.string_col
+when not matched then insert values (cast(source.id + 100 as int), "string");
+select * from $UNIQUE_DB.masked_iceberg;
+---- RESULTS
+0,'0aaa'
+1,'NULL'
+3,'NULL'
+5,'NULL'
+100,'0aaa'
+200,'1aaa'
+300,'0aaa'
+400,'1aaa'
+500,'0aaa'
+600,'1aaa'
+700,'0aaa'
+800,'string'
+---- TYPES
+INT, STRING
+====
+---- QUERY
 # Test on CreateView. Should not mask the columns when used in sql generations.
 create view $UNIQUE_DB.masked_view as select * from alltypestiny;
 show create view $UNIQUE_DB.masked_view;

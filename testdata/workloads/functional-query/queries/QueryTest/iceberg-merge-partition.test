@@ -300,4 +300,42 @@ when matched and source.id < 4 then update set *
 ---- TYPES
 INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
 ====
-
+---- QUERY
+# Merge into partitioned target table from an inline view that is guaranteed to be rewritten
+# query using an update to set the value of int_col
+merge into target_part target using (select distinct 3 id, "string value" string_col
+from functional.alltypesagg a
+where exists
+  (select id
+   from functional.alltypestiny b
+   where a.tinyint_col = b.tinyint_col and a.string_col = b.string_col
+   group by rollup(id, int_col, bool_col)
+   having int_col is null)
+and tinyint_col < 10) source on target.id = source.id
+when matched then update set string_col = source.string_col
+when not matched by source and target.id > 7 then delete
+---- DML_RESULTS: target_part
+0,true,0,0,0,2009-01-01,'0'
+1,false,1,1.100000023841858,10,2009-01-01,'1'
+2,true,2,2.200000047683716,20,2009-01-01,'2'
+3,false,0,0,0,2009-01-01,'string value'
+5,false,5,5.5,50,2009-01-01,'5'
+6,true,6,6.599999904632568,60,2009-01-01,'6'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned target table from source table using a matched
+# case with a between filter predicate
+merge into target_part target using source on target.id = source.id
+when matched and target.id between 2 and 3 then update set string_col = "different string value"
+---- DML_RESULTS: target_part
+0,true,0,0,0,2009-01-01,'0'
+1,false,1,1.100000023841858,10,2009-01-01,'1'
+2,true,2,2.200000047683716,20,2009-01-01,'different string value'
+3,false,0,0,0,2009-01-01,'different string value'
+5,false,5,5.5,50,2009-01-01,'5'
+6,true,6,6.599999904632568,60,2009-01-01,'6'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
