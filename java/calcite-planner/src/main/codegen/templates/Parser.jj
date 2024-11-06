@@ -123,6 +123,7 @@ import org.apache.calcite.util.Util;
 import org.apache.calcite.util.trace.CalciteTrace;
 import org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
+import org.apache.impala.calcite.util.ParserUtil;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -4611,10 +4612,14 @@ SqlNode StringLiteral() :
         p = SqlParserUtil.stripQuotes(getToken(0).image, DQ, DQ, "\\\"",
             Casing.UNCHANGED);
         try {
+            p = ParserUtil.replaceEscapedChars(p);
             return SqlLiteral.createCharString(p, charSet, getPos());
         } catch (java.nio.charset.UnsupportedCharsetException e) {
             throw SqlUtil.newContextException(getPos(),
                 RESOURCE.unknownCharacterSet(charSet));
+        } catch (ParserUtil.MalformedUnicodeEscape e) {
+            throw SqlUtil.newContextException(getPos(),
+                RESOURCE.unicodeEscapeMalformed(e.i));
         }
     }
 |
@@ -4623,10 +4628,14 @@ SqlNode StringLiteral() :
         p = SqlParserUtil.stripQuotes(getToken(0).image, "'", "'", "\\'",
             Casing.UNCHANGED);
         try {
+            p = ParserUtil.replaceEscapedChars(p);
             return SqlLiteral.createCharString(p, charSet, getPos());
         } catch (java.nio.charset.UnsupportedCharsetException e) {
             throw SqlUtil.newContextException(getPos(),
                 RESOURCE.unknownCharacterSet(charSet));
+        } catch (ParserUtil.MalformedUnicodeEscape e) {
+            throw SqlUtil.newContextException(getPos(),
+                RESOURCE.unicodeEscapeMalformed(e.i));
         }
     }
 }
