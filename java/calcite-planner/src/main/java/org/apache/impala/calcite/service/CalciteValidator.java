@@ -26,6 +26,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
+import org.apache.impala.calcite.type.ImpalaTypeCoercionFactory;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.validate.ImpalaConformance;
 import org.apache.impala.common.AnalysisException;
@@ -62,6 +63,8 @@ public class CalciteValidator implements CompilerStep {
             // without this)
             .withIdentifierExpansion(true)
             .withConformance(ImpalaConformance.INSTANCE)
+            .withTypeCoercionEnabled(true)
+            .withTypeCoercionFactory(new ImpalaTypeCoercionFactory())
             );
   }
 

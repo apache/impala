@@ -33,6 +33,7 @@ import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.thrift.TPrimitiveType;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -376,15 +377,16 @@ public class ImpalaTypeConverter {
     return factory.createTypeWithNullability(rdt, false);
   }
 
-  public static RelDataType getCompatibleType(List<RelDataType> dataTypes,
+  public static RelDataType getCompatibleType(Collection<RelDataType> dataTypes,
       RelDataTypeFactory factory) {
     Preconditions.checkState(dataTypes.size() > 0);
-    if (dataTypes.size() == 1) {
-      return dataTypes.get(0);
-    }
-    RelDataType commonType = dataTypes.get(0);
-    for (int i = 1; i < dataTypes.size(); ++i) {
-      commonType = getCompatibleType(commonType, dataTypes.get(i), factory);
+    RelDataType commonType = null;
+    for (RelDataType dataType : dataTypes) {
+      if (commonType == null) {
+        commonType = dataType;
+        continue;
+      }
+      commonType = getCompatibleType(commonType, dataType, factory);
     }
     return commonType;
   }

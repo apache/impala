@@ -33,6 +33,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.calcite.coercenodes.CoerceNodes;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
+import org.apache.impala.calcite.rules.CombineValuesNodesRule;
 import org.apache.impala.calcite.rules.ConvertToCNFRules;
 import org.apache.impala.calcite.rules.ExtractLiteralAgg;
 import org.apache.impala.calcite.rules.ImpalaMinusToDistinctRule;
@@ -94,7 +95,8 @@ public class CalciteOptimizer implements CompilerStep {
         new ConvertToCNFRules.FilterConvertToCNFRule(),
         new ConvertToCNFRules.JoinConvertToCNFRule(),
         new ConvertToCNFRules.ProjectConvertToCNFRule(),
-        ImpalaMinusToDistinctRule.Config.DEFAULT.toRule()
+        ImpalaMinusToDistinctRule.Config.DEFAULT.toRule(),
+        new CombineValuesNodesRule()
         ));
 
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
