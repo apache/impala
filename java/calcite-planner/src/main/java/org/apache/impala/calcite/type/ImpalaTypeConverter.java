@@ -237,9 +237,9 @@ public class ImpalaTypeConverter {
         return Type.VARCHAR;
       case BOOLEAN:
         return Type.BOOLEAN;
-      case REAL:
       case FLOAT:
         return Type.FLOAT;
+      case REAL:
       case DOUBLE:
         return Type.DOUBLE;
       case DECIMAL:
@@ -291,9 +291,9 @@ public class ImpalaTypeConverter {
       case BIGINT:
         return Type.BIGINT;
       case FLOAT:
-      case REAL:
         return Type.FLOAT;
       case DOUBLE:
+      case REAL:
         return Type.DOUBLE;
       case TIMESTAMP:
         return Type.TIMESTAMP;
