@@ -83,6 +83,7 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       .add("extract")
       .add("regr_count")
       .add("localtime")
+      .add("translate")
       .build();
 
   private static ImpalaOperatorTable INSTANCE;

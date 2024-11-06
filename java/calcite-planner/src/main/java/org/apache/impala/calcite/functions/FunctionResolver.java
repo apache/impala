@@ -76,6 +76,8 @@ public class FunctionResolver {
       .put(SqlKind.SUM0, "sum_init_zero")
       .put(SqlKind.POSIX_REGEX_CASE_SENSITIVE, "regexp")
       .put(SqlKind.POSIX_REGEX_CASE_INSENSITIVE, "iregexp")
+      .put(SqlKind.IS_NOT_DISTINCT_FROM, "notdistinct")
+      .put(SqlKind.IS_DISTINCT_FROM, "distinctfrom")
       .build();
 
   // Map of Calcite names to an Impala function name when the names are different

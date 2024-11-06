@@ -25,6 +25,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.fun.SqlPosixRegexOperator;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.impala.analysis.Analyzer;
@@ -118,6 +119,9 @@ public class RexCallConverter {
     switch (rexCall.getOperator().getKind()) {
       case CASE:
         return createCaseExpr(fn, params, impalaRetType);
+      case POSIX_REGEX_CASE_SENSITIVE:
+      case POSIX_REGEX_CASE_INSENSITIVE:
+        return createRegexExpr(fn, params, impalaRetType, rexCall);
       default:
         return new AnalyzedFunctionCallExpr(fn, params, impalaRetType);
     }
@@ -207,6 +211,15 @@ public class RexCallConverter {
     BinaryPredicate.Operator op = BINARY_OP_MAP.get(sqlKind);
     Preconditions.checkNotNull(op, "Unknown Calcite op: " + sqlKind);
     return new AnalyzedBinaryCompExpr(fn, op, params.get(0), params.get(1));
+  }
+
+  private static Expr createRegexExpr(Function fn, List<Expr> params,
+       Type impalaRetType, RexCall rexCall) throws ImpalaException {
+    SqlPosixRegexOperator op = (SqlPosixRegexOperator) rexCall.getOperator();
+    Expr regexpExpr = new AnalyzedFunctionCallExpr(fn, params, impalaRetType);
+    return op.isNegated()
+        ? new CompoundPredicate(CompoundPredicate.Operator.NOT, regexpExpr, null)
+        : regexpExpr;
   }
 
   private static Expr createTimestampExpr(RexCall rexCall, List<Expr> params) {

@@ -6234,23 +6234,6 @@ SqlNode BuiltinFunctionCall() :
             }
         )
     |
-        <TRANSLATE> { s = span(); }
-        <LPAREN>
-        AddExpression(args, ExprContext.ACCEPT_SUB_QUERY)
-        (
-            <USING> name = SimpleIdentifier() { args.add(name); }
-            <RPAREN> {
-                return SqlStdOperatorTable.TRANSLATE.createCall(s.end(this),
-                    args);
-            }
-        |
-            ( <COMMA> AddExpression(args, ExprContext.ACCEPT_SUB_QUERY) )*
-            <RPAREN> {
-                return SqlLibraryOperators.TRANSLATE3.createCall(s.end(this),
-                    args);
-            }
-        )
-    |
         <OVERLAY> { s = span(); }
         <LPAREN> AddExpression(args, ExprContext.ACCEPT_SUB_QUERY)
         <PLACING> AddExpression(args, ExprContext.ACCEPT_SUB_QUERY)
@@ -7733,6 +7716,7 @@ SqlBinaryOperator BinaryRowOperator() :
 |   <LE> { return SqlStdOperatorTable.LESS_THAN_OR_EQUAL; }
 |   <GE> { return SqlStdOperatorTable.GREATER_THAN_OR_EQUAL; }
 |   <NE> { return SqlStdOperatorTable.NOT_EQUALS; }
+|   <NULL_SAFE_EQUAL> { return SqlStdOperatorTable.IS_NOT_DISTINCT_FROM; }
 |   <REGEXP> { return SqlStdOperatorTable.POSIX_REGEX_CASE_SENSITIVE; }
 |   LOOKAHEAD(2) <NOT> <REGEXP> { return SqlStdOperatorTable.NEGATED_POSIX_REGEX_CASE_SENSITIVE; }
 |   <IREGEXP> { return SqlStdOperatorTable.POSIX_REGEX_CASE_INSENSITIVE; }
@@ -7780,6 +7764,7 @@ SqlPrefixOperator PrefixRowOperator() :
     <PLUS> { return SqlStdOperatorTable.UNARY_PLUS; }
 |   <MINUS> { return SqlStdOperatorTable.UNARY_MINUS; }
 |   <NOT> { return SqlStdOperatorTable.NOT; }
+|   <BANG_NOT> { return SqlStdOperatorTable.NOT; }
 |   <EXISTS> { return SqlStdOperatorTable.EXISTS; }
 |   <UNIQUE> { return SqlStdOperatorTable.UNIQUE; }
 }
@@ -7871,6 +7856,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < ATTRIBUTES: "ATTRIBUTES" >
 |   < AUTHORIZATION: "AUTHORIZATION" >
 |   < AVG: "AVG" >
+|   < BANG_NOT: "!" >
 |   < BEFORE: "BEFORE" >
 |   < BEGIN: "BEGIN" >
 |   < BEGIN_FRAME: "BEGIN_FRAME" >
@@ -8483,7 +8469,6 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < TRANSACTIONS_ROLLED_BACK: "TRANSACTIONS_ROLLED_BACK" >
 |   < TRANSFORM: "TRANSFORM" >
 |   < TRANSFORMS: "TRANSFORMS" >
-|   < TRANSLATE: "TRANSLATE" >
 |   < TRANSLATE_REGEX: "TRANSLATE_REGEX" >
 |   < TRANSLATION: "TRANSLATION" >
 |   < TREAT: "TREAT" >
@@ -8751,6 +8736,7 @@ void NonReservedKeyWord2of3() :
 |   < VERTICAL_BAR: "|" >
 |   < CARET: "^" >
 |   < DOLLAR: "$" >
+|   < NULL_SAFE_EQUAL: "<=>" >
 |   < REGEXP : "REGEXP" >
 |   < IREGEXP : "IREGEXP" >
 <#list (parser.binaryOperatorsTokens!default.parser.binaryOperatorsTokens) as operator>

@@ -21,6 +21,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql2rel.ReflectiveConvertletTable;
@@ -30,8 +31,12 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 
 import java.util.List;
+
 /**
- *
+ * ImpalaConvertletTable adds the ability to override any converlets in the
+ * StandardConvertlet table provided by Calcite. The convertlets are executed in
+ * the step where Calcite converts the SqlNode tree into a RelNode tree and creating
+ * RexNodes from SqlNodes.
  */
 public class ImpalaConvertletTable extends ReflectiveConvertletTable {
   public static final ImpalaConvertletTable INSTANCE =
@@ -40,6 +45,8 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
   public ImpalaConvertletTable() {
     addAlias(ImpalaCustomOperatorTable.PERCENT_REMAINDER, SqlStdOperatorTable.MOD);
     registerOp(ImpalaCastFunction.INSTANCE, this::convertExplicitCast);
+    registerOp(SqlStdOperatorTable.IS_DISTINCT_FROM, this::convertIsDistinctFrom);
+    registerOp(SqlStdOperatorTable.IS_NOT_DISTINCT_FROM, this::convertIsNotDistinctFrom);
   }
 
   @Override
@@ -52,6 +59,11 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
       return super.get(call);
     }
 
+    if (call.getOperator().getKind().equals(SqlKind.IS_DISTINCT_FROM) ||
+        call.getOperator().getKind().equals(SqlKind.IS_NOT_DISTINCT_FROM)) {
+      return super.get(call);
+    }
+
     // EXPLICIT_CAST convertlet has to be handled by our convertlet. Operation
     // was registered in the constructor and it will call convertExplicitCast
     if (call.getOperator().getName().equals("EXPLICIT_CAST")) {
@@ -59,6 +71,32 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     }
 
     return StandardConvertletTable.INSTANCE.get(call);
+  }
+
+  protected RexNode convertIsDistinctFrom(
+      SqlRexContext cx, SqlCall call) {
+    final SqlNode expr1 = call.operand(0);
+    final SqlNode expr2 = call.operand(1);
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    RelDataType returnType =
+        cx.getValidator().getValidatedNodeTypeIfKnown(call);
+    List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr1),
+        cx.convertExpression(expr2));
+    return rexBuilder.makeCall(returnType, SqlStdOperatorTable.IS_DISTINCT_FROM,
+        operands);
+  }
+
+  protected RexNode convertIsNotDistinctFrom(
+      SqlRexContext cx, SqlCall call) {
+    final SqlNode expr1 = call.operand(0);
+    final SqlNode expr2 = call.operand(1);
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    RelDataType returnType =
+        cx.getValidator().getValidatedNodeTypeIfKnown(call);
+    List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr1),
+        cx.convertExpression(expr2));
+    return rexBuilder.makeCall(returnType, SqlStdOperatorTable.IS_NOT_DISTINCT_FROM,
+        operands);
   }
 
   protected RexNode convertExplicitCast(
