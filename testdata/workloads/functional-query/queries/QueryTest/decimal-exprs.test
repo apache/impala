@@ -553,3 +553,21 @@ select typeof(mod(9.6, 3));
 ---- RESULTS
 'DECIMAL(4,1)'
 ====
+---- QUERY
+# make sure coalesce function works ok
+set decimal_v2=true;
+select coalesce(cast(18.11 as decimal(4,2)), cast(18.1 as decimal(3,1)))
+---- RESULTS
+18.11
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# make sure coalesce function works ok
+set decimal_v2=true;
+select coalesce(cast(18.1 as decimal(3,1)), cast(18.11 as decimal(4,2)))
+---- RESULTS
+18.10
+---- TYPES
+DECIMAL
+====

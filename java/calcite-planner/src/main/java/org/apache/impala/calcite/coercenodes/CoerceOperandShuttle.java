@@ -130,17 +130,17 @@ public class CoerceOperandShuttle extends RexShuttle {
     // returns a decimal type. The Decimal type from the function resolver would
     // have to calculate the precision and scale based on operand types. If
     // necessary, this code should be added later.
-    Preconditions.checkState(retType.getSqlTypeName() != SqlTypeName.DECIMAL ||
-        castedOperandsCall.getType().getSqlTypeName() == SqlTypeName.DECIMAL);
+    Preconditions.checkState(!SqlTypeUtil.isDecimal(retType) ||
+        SqlTypeUtil.isDecimal(castedOperandsCall.getType()));
 
     // So if the original return type is Decimal and the function resolves to
     // decimal, the precision and scale are saved from the original function.
-    if (retType.getSqlTypeName().equals(SqlTypeName.DECIMAL)) {
+    if (SqlTypeUtil.isDecimal(retType)) {
       retType = castedOperandsCall.getType();
     }
 
-    List<RexNode> newOperands =
-        getCastedArgTypes(fn, castedOperandsCall.getOperands(), factory, rexBuilder);
+    List<RexNode> newOperands = getCastedArgTypes(fn, castedOperandsCall.getOperands(),
+        retType, factory, rexBuilder);
 
     // keep the original call if nothing changed, else build a new RexCall.
     return retType.equals(castedOperandsCall.getType())
@@ -165,7 +165,7 @@ public class CoerceOperandShuttle extends RexShuttle {
     RelDataType retType = getReturnType(castedOver, fn.getReturnType());
 
     List<RexNode> newOperands =
-        getCastedArgTypes(fn, castedOver.getOperands(), factory, rexBuilder);
+        getCastedArgTypes(fn, castedOver.getOperands(), retType, factory, rexBuilder);
 
     return retType.equals(castedOver.getType()) &&
            newOperands.equals(castedOver.getOperands())
@@ -215,12 +215,12 @@ public class CoerceOperandShuttle extends RexShuttle {
     // returns a decimal type. The Decimal type from the function resolver would
     // have to calculate the precision and scale based on operand types. If
     // necessary, this code should be added later.
-    Preconditions.checkState(retType.getSqlTypeName() != SqlTypeName.DECIMAL ||
-        rexNode.getType().getSqlTypeName() == SqlTypeName.DECIMAL);
+    Preconditions.checkState(!SqlTypeUtil.isDecimal(retType) ||
+        SqlTypeUtil.isDecimal(rexNode.getType()));
 
     // So if the original return type is Decimal and the function resolves to
     // decimal, the precision and scale are saved from the original function.
-    if (retType.getSqlTypeName().equals(SqlTypeName.DECIMAL)) {
+    if (SqlTypeUtil.isDecimal(retType)) {
       retType = rexNode.getType();
     }
 
@@ -283,8 +283,7 @@ public class CoerceOperandShuttle extends RexShuttle {
    * Return a list of the operands, casting whenever needed.
    */
   private static List<RexNode> getCastedArgTypes(Function fn, List<RexNode> operands,
-      RelDataTypeFactory factory, RexBuilder rexBuilder) {
-
+      RelDataType retType, RelDataTypeFactory factory, RexBuilder rexBuilder) {
     List<RelDataType> argTypes = Util.transform(operands, RexNode::getType);
     List<RexNode> newOperands = new ArrayList<>();
     // The "Case" operator is special because the operands alternate between
@@ -292,6 +291,7 @@ public class CoerceOperandShuttle extends RexShuttle {
     // boolean, so they don't need casting.
     boolean isCaseFunction = isCaseFunction(fn);
     boolean castedOperand = false;
+    Preconditions.checkState(argTypes.size() == 0 || fn.getNumArgs() > 0);
     for (int i = 0; i < argTypes.size(); ++i) {
       if (isCaseFunction &&
           FunctionResolver.shouldSkipOperandForCase(argTypes.size(), i)) {
@@ -299,10 +299,15 @@ public class CoerceOperandShuttle extends RexShuttle {
         newOperands.add(operands.get(i));
         continue;
       }
-      // if there are varargs, the last arg in the signature will match all
-      // remaining args.
-      int sigIndex = getArgIndex(fn, i, isCaseFunction);
-      RexNode operand = castOperand(operands.get(i), fn.getArgs()[sigIndex],
+
+      // in the case of varargs, take the last argument in the signature.
+      int indexToUse = Math.min(i, fn.getNumArgs() - 1);
+      Type toImpalaType = fn.getArgs()[indexToUse];
+      RelDataType toType = useReturnTypeForCastingArg(fn, argTypes.get(indexToUse))
+          ? retType
+          : getCastedToType(argTypes.get(i), toImpalaType, factory);
+
+      RexNode operand = castOperand(operands.get(i), toType,
           factory, rexBuilder);
       Preconditions.checkNotNull(operand);
       newOperands.add(operand);
@@ -314,28 +319,36 @@ public class CoerceOperandShuttle extends RexShuttle {
     return castedOperand ? newOperands : operands;
   }
 
-  /**
-   * Return the argIndex.  If it's a case statement, the index is always 0
-   * If there are varargs, the last index returns if the "i" value passed
-   * in overflows the size of the operands.
-   */
-  private static int getArgIndex(Function fn, int i, boolean isCaseFn) {
-    if (isCaseFn) {
-      return 0;
+  private static boolean useReturnTypeForCastingArg(Function fn, RelDataType argType) {
+    // case functions use the precalculated return type from the function resolver.
+    if (isCaseFunction(fn)) {
+      return true;
     }
 
-    return Math.min(i, fn.getNumArgs() - 1);
+    // For functions that have decimal varargs and return a decimal
+    // (e.g. greatest, least), the type has been calculated at validation time.
+    return SqlTypeUtil.isDecimal(argType) &&
+        fn.getReturnType().isDecimal() && fn.hasVarArgs();
   }
 
   private static boolean isCaseFunction(Function fn) {
     return fn.functionName().equals("case");
   }
 
-  private static RexNode castOperand(RexNode node, Type toImpalaType,
-      RelDataTypeFactory factory, RexBuilder rexBuilder) {
+  private static RelDataType getCastedToType(RelDataType fromType,
+      Type toImpalaType, RelDataTypeFactory factory) {
 
-    RelDataType toType = ImpalaTypeConverter.getRelDataType(toImpalaType);
-    return castOperand(node, toType, factory, rexBuilder);
+    if (!toImpalaType.isDecimal() || SqlTypeUtil.isNull(fromType)) {
+      return ImpalaTypeConverter.getRelDataType(toImpalaType);
+    }
+
+    // Integer based type needs special conversion to Decimal types based on the
+    // size of the type of Integer (e.g. TINYINT, SMALLINT, etc...), but don't change
+    // the type if the from type is also DECIMAL.
+    ScalarType impalaType = (ScalarType) ImpalaTypeConverter.createImpalaType(fromType);
+    ScalarType decimalType = impalaType.getMinResolutionDecimal();
+    return factory.createSqlType(SqlTypeName.DECIMAL,
+        decimalType.decimalPrecision(), decimalType.decimalScale());
   }
 
   /**
@@ -356,11 +369,17 @@ public class CoerceOperandShuttle extends RexShuttle {
     }
 
     // No need to cast if types are the same
-    if (fromType.getSqlTypeName().equals(toType.getSqlTypeName())) {
+    if (fromType.getSqlTypeName().equals(toType.getSqlTypeName()) &&
+        fromType.getPrecision() == toType.getPrecision() &&
+        fromType.getScale() == toType.getScale()) {
       return node;
     }
 
-    if (fromType.getSqlTypeName().equals(SqlTypeName.NULL)) {
+    if (SqlTypeUtil.isNull(fromType)) {
+      if (SqlTypeUtil.isDecimal(toType)) {
+        Type impalaType = ImpalaTypeConverter.createImpalaType(Type.DECIMAL, 1, 0);
+        toType = ImpalaTypeConverter.createRelDataType(impalaType);
+      }
       return rexBuilder.makeCast(toType, node);
     }
 
@@ -368,14 +387,6 @@ public class CoerceOperandShuttle extends RexShuttle {
       return null;
     }
 
-    // Integer based type needs special conversion to Decimal types based on the
-    // size of the type of Integer (e.g. TINYINT, SMALLINT, etc...)
-    if (toType.getSqlTypeName().equals(SqlTypeName.DECIMAL)) {
-      ScalarType impalaType = (ScalarType) ImpalaTypeConverter.createImpalaType(fromType);
-      ScalarType decimalType = impalaType.getMinResolutionDecimal();
-      toType = factory.createSqlType(SqlTypeName.DECIMAL,
-        decimalType.decimalPrecision(), decimalType.decimalScale());
-    }
     return rexBuilder.makeCast(toType, node);
   }
 

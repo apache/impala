@@ -3379,3 +3379,14 @@ select cast(round(1/3, 20) as string);
 ---- TYPES
 string
 ====
+---- QUERY
+select
+greatest(cast(18.3 as decimal(3,1)), cast(19.44 as decimal(4,2))),
+least(cast(18.3 as decimal(3,1)), cast(19.44 as decimal(4,2))),
+greatest(cast(19.44 as decimal(4,2)), cast(18.3 as decimal(3,1))),
+least(cast(19.44 as decimal(4,2)), cast(18.3 as decimal(3,1)));
+---- RESULTS
+19.44,18.30,19.44,18.30
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====

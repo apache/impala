@@ -49,7 +49,6 @@ import java.util.List;
  * operators.
  */
 public class CommonOperatorFunctions {
-
   // Allow any count because this is used for all functions. Validation for specific
   // number of parameters will be done when Impala function resolving is done.
   public static SqlOperandCountRange ANY_COUNT_RANGE = SqlOperandCountRanges.any();
@@ -70,8 +69,10 @@ public class CommonOperatorFunctions {
           + name + "; operand types: " + operandTypes);
     }
 
-    RelDataType returnType =
-        ImpalaTypeConverter.getRelDataType(fn.getReturnType());
+    RelDataType returnType = fn.getReturnType().equals(Type.DECIMAL)
+        ? ImpalaTypeConverter.getCompatibleType(operandTypes, factory)
+        : ImpalaTypeConverter.getRelDataType(fn.getReturnType());
+
     return isNullable(operandTypes)
         ? returnType
         : factory.createTypeWithNullability(returnType, true);
