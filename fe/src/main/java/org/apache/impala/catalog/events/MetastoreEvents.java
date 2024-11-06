@@ -585,6 +585,8 @@ public class MetastoreEvents {
     // logger format compatible string to prepend to a log formatted message
     private static final String LOG_FORMAT_EVENT_ID_TYPE = "EventId: {} EventType: {} ";
 
+    protected static final String CLUSTER_WIDE_TARGET = "CLUSTER_WIDE";
+
     // CatalogServiceCatalog instance on which the event needs to be acted upon
     protected final CatalogServiceCatalog catalog_;
 
@@ -655,7 +657,7 @@ public class MetastoreEvents {
     public String getTableName() { return tblName_; }
 
     public String getTargetName() {
-      if (dbName_ == null && tblName_ == null) return "CLUSTER_WIDE";
+      if (dbName_ == null && tblName_ == null) return CLUSTER_WIDE_TARGET;
       if (tblName_ == null) return dbName_;
       return dbName_ + "." + tblName_;
     }

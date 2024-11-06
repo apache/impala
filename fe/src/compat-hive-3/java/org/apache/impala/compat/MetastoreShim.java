@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -833,6 +834,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     private final CommitTxnMessage commitTxnMessage_;
     private final long txnId_;
     private Set<TableWriteId> tableWriteIds_ = Collections.emptySet();
+    private final Set<String> tableNames_ = new HashSet<>();
 
     public CommitTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
@@ -844,6 +846,12 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       txnId_ = commitTxnMessage_.getTxnId();
       LOG.info("EventId: {} EventType: COMMIT_TXN transaction id: {}", getEventId(),
           txnId_);
+    }
+
+    @Override
+    public String getTargetName() {
+      if (tableNames_.isEmpty()) return CLUSTER_WIDE_TARGET;
+      return tableNames_.stream().sorted().collect(Collectors.joining(","));
     }
 
     @Override
@@ -907,6 +915,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
             getEventId(),
             Collections.singletonList(tableWriteId.getWriteId()),
             MutableValidWriteIdList.WriteIdStatus.COMMITTED);
+        tableNames_.add(tableWriteId.getDbName() + "." + tableWriteId.getTblName());
       }
     }
 
@@ -921,6 +930,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
         TableName tableName = new TableName(tbl.getDbName(), tbl.getTableName());
         parts.add(commitTxnMessage_.getPartitionObj(i));
         tableNameToIdxs.computeIfAbsent(tableName, k -> new ArrayList<>()).add(i);
+        tableNames_.add(tableName.toString());
       }
       for (Map.Entry<TableName, List<Integer>> entry : tableNameToIdxs.entrySet()) {
         org.apache.hadoop.hive.metastore.api.Table tbl =

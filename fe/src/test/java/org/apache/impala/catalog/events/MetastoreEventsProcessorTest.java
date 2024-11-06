@@ -4261,6 +4261,110 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  @Test
+  public void testCommitTxnEventTargetName() throws Exception {
+    String tblName = "test_commit_txn";
+    String partTblName = "test_commit_txn_part";
+    String insertNonPartTbl =
+        "insert into table " + TEST_DB_NAME + '.' + tblName + " values('a', 'b')";
+    String insertPartTbl = String.format(
+        "insert into table %s.%s partition(p1='a') values('a', 'b')",
+        TEST_DB_NAME, partTblName);
+    createDatabase(TEST_DB_NAME, null);
+    createTransactionalTable(TEST_DB_NAME, tblName, false);
+    createTransactionalTable(TEST_DB_NAME, partTblName, true);
+    eventsProcessor_.processEvents();
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      // 1. Test on an empty COMMIT_TXN event
+      long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+      // OPEN_TXN event is filtered out. So we will just receive one event of COMMIT_TXN
+      List<NotificationEvent> hmsEvents = eventsProcessor_.getNextMetastoreEvents();
+      assertEquals("COMMIT_TXN", hmsEvents.get(0).getEventType());
+      List<MetastoreEvent> filteredEvents =
+          eventsProcessor_.getEventsFactory().getFilteredEvents(
+              hmsEvents, eventsProcessor_.getMetrics());
+
+      filteredEvents.get(0).process();
+      assertEquals(MetastoreEvent.CLUSTER_WIDE_TARGET,
+          filteredEvents.get(0).getTargetName());
+      eventsProcessor_.start(filteredEvents.get(0).getEventId());
+
+      // 2. COMMIT_TXN event with one non-partitioned table
+      try (HiveJdbcClientPool jdbcClientPool = HiveJdbcClientPool.create(1);
+           HiveJdbcClientPool.HiveJdbcClient hiveClient = jdbcClientPool.getClient()) {
+        hiveClient.executeSql(insertNonPartTbl);
+      }
+      hmsEvents = eventsProcessor_.getNextMetastoreEvents();
+      assertEquals(3, hmsEvents.size());
+      assertEquals("ALLOC_WRITE_ID_EVENT", hmsEvents.get(0).getEventType());
+      assertEquals("ALTER_TABLE", hmsEvents.get(1).getEventType());
+      assertEquals("COMMIT_TXN", hmsEvents.get(2).getEventType());
+      filteredEvents = eventsProcessor_.getEventsFactory().getFilteredEvents(
+          hmsEvents, eventsProcessor_.getMetrics());
+      filteredEvents.get(0).process();
+      filteredEvents.get(1).process();
+      filteredEvents.get(2).process();
+      assertEquals(TEST_DB_NAME + "." + tblName, filteredEvents.get(2).getTargetName());
+      eventsProcessor_.start(filteredEvents.get(2).getEventId());
+
+      // 3. COMMIT_TXN event with one partitioned table
+      try (HiveJdbcClientPool jdbcClientPool = HiveJdbcClientPool.create(1);
+           HiveJdbcClientPool.HiveJdbcClient hiveClient = jdbcClientPool.getClient()) {
+        hiveClient.executeSql(insertPartTbl);
+      }
+      hmsEvents = eventsProcessor_.getNextMetastoreEvents();
+      assertEquals(3, hmsEvents.size());
+      assertEquals("ALLOC_WRITE_ID_EVENT", hmsEvents.get(0).getEventType());
+      assertEquals("ADD_PARTITION", hmsEvents.get(1).getEventType());
+      assertEquals("COMMIT_TXN", hmsEvents.get(2).getEventType());
+      filteredEvents = eventsProcessor_.getEventsFactory().getFilteredEvents(
+          hmsEvents, eventsProcessor_.getMetrics());
+      filteredEvents.get(0).process();
+      filteredEvents.get(1).process();
+      filteredEvents.get(2).process();
+      assertEquals(TEST_DB_NAME + "." + partTblName,
+          filteredEvents.get(2).getTargetName());
+      eventsProcessor_.start(filteredEvents.get(2).getEventId());
+
+      // 4. COMMIT_TXN event with multiple tables
+      txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      // Insert the non-partitioned table
+      long writeId = MetastoreShim.allocateTableWriteId(client.getHiveClient(),
+          txnId, TEST_DB_NAME, tblName);
+      loadTable(tblName);
+      HdfsTable tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, tblName);
+      simulateInsertIntoTransactionalTableFromFS(
+          tbl.getMetaStoreTable(), null, 1, txnId, writeId);
+      // Insert the partitioned table
+      writeId = MetastoreShim.allocateTableWriteId(client.getHiveClient(),
+          txnId, TEST_DB_NAME, partTblName);
+      loadTable(partTblName);
+      tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, partTblName);
+      Partition partition = client.getHiveClient().getPartition(
+            TEST_DB_NAME, partTblName, Arrays.asList("a"));
+      simulateInsertIntoTransactionalTableFromFS(
+          tbl.getMetaStoreTable(), partition, 1, txnId, writeId);
+      MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+      // simulateInsertIntoTransactionalTableFromFS() won't generate ALTER events.
+      // So we just have ALLOC_WRITE_ID_EVENT and COMMIT_TXN events.
+      hmsEvents = eventsProcessor_.getNextMetastoreEvents();
+      assertEquals(3, hmsEvents.size());
+      assertEquals("ALLOC_WRITE_ID_EVENT", hmsEvents.get(0).getEventType());
+      assertEquals("ALLOC_WRITE_ID_EVENT", hmsEvents.get(1).getEventType());
+      assertEquals("COMMIT_TXN", hmsEvents.get(2).getEventType());
+      filteredEvents = eventsProcessor_.getEventsFactory().getFilteredEvents(
+          hmsEvents, eventsProcessor_.getMetrics());
+      for (int i = 0; i < 3; i++) {
+        filteredEvents.get(i).process();
+      }
+      assertEquals(
+          TEST_DB_NAME + "." + tblName + "," + TEST_DB_NAME + "." + partTblName,
+          filteredEvents.get(2).getTargetName());
+      eventsProcessor_.start(filteredEvents.get(2).getEventId());
+    }
+  }
+
   private void createDatabase(String catName, String dbName,
       Map<String, String> params) throws TException {
     try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
