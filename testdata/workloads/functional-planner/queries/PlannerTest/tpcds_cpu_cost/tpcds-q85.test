@@ -116,7 +116,7 @@ PLAN-ROOT SINK
 |  in pipelines: 05(GETNEXT), 07(OPEN)
 |
 |--07:SCAN HDFS [tpcds_partitioned_parquet_snap.reason]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     stored statistics:
 |       table: rows=67 size=2.49KB
 |       columns: all
@@ -134,7 +134,7 @@ PLAN-ROOT SINK
 |  in pipelines: 05(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page]
-|     HDFS partitions=1/1 files=1 size=5.45KB
+|     HDFS partitions=1/1 files=1 size=72.76KB
 |     stored statistics:
 |       table: rows=3.60K size=72.76KB
 |       columns: all
@@ -191,7 +191,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 01(GETNEXT), 04(OPEN)
 |  |  |
 |  |  |--04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd2]
-|  |  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |  |     predicates: cd2.cd_marital_status = 'S' OR cd2.cd_marital_status = 'D' AND cd2.cd_education_status = 'Advanced Degree' OR cd2.cd_marital_status = 'W' AND cd2.cd_education_status = '4 yr Degree', cd2.cd_education_status = '2 yr Degree' OR cd2.cd_marital_status = 'D' AND cd2.cd_education_status = 'Advanced Degree' OR cd2.cd_marital_status = 'W' AND cd2.cd_education_status = '4 yr Degree'
 |  |  |     stored statistics:
 |  |  |       table: rows=1.92M size=11.15MB
@@ -210,7 +210,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 01(GETNEXT), 03(OPEN)
 |  |  |
 |  |  |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd1]
-|  |  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |  |     predicates: cd1.cd_marital_status = 'S' OR cd1.cd_marital_status = 'D' AND cd1.cd_education_status = 'Advanced Degree' OR cd1.cd_marital_status = 'W' AND cd1.cd_education_status = '4 yr Degree', cd1.cd_education_status = '2 yr Degree' OR cd1.cd_marital_status = 'D' AND cd1.cd_education_status = 'Advanced Degree' OR cd1.cd_marital_status = 'W' AND cd1.cd_education_status = '4 yr Degree'
 |  |  |     runtime filters: RF016[min_max] -> cd1.cd_marital_status, RF017[min_max] -> cd1.cd_education_status, RF013[bloom] -> cd1.cd_marital_status, RF014[bloom] -> cd1.cd_education_status
 |  |  |     stored statistics:
@@ -222,7 +222,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 03(GETNEXT)
 |  |  |
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns]
-|  |     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     runtime filters: RF019[min_max] -> wr_refunded_cdemo_sk, RF015[min_max] -> wr_returning_cdemo_sk, RF001[min_max] -> wr_reason_sk, RF018[bloom] -> wr_refunded_cdemo_sk, RF012[bloom] -> wr_returning_cdemo_sk, RF000[bloom] -> wr_reason_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
@@ -234,7 +234,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     predicates: ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |     runtime filters: RF010[min_max] -> ws_item_sk, RF011[min_max] -> ws_order_number, RF003[min_max] -> ws_web_page_sk, RF008[bloom] -> ws_item_sk, RF009[bloom] -> ws_order_number, RF004[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_web_page_sk
 |     stored statistics:
@@ -248,7 +248,7 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
-   HDFS partitions=1/1 files=1 size=1.16MB
+   HDFS partitions=1/1 files=1 size=307.36MB
    predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    runtime filters: RF007[min_max] -> ca_address_sk, RF006[bloom] -> ca_address_sk
    stored statistics:
@@ -335,7 +335,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=163 [max(20
 |  Per-Instance Resources: mem-estimate=16.13MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[22]
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     stored statistics:
 |       table: rows=67 size=2.49KB
 |       columns: all
@@ -370,7 +370,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=163 [max(20
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[323]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page, RANDOM]
-|     HDFS partitions=1/1 files=1 size=5.45KB
+|     HDFS partitions=1/1 files=1 size=72.76KB
 |     stored statistics:
 |       table: rows=3.60K size=72.76KB
 |       columns: all
@@ -497,7 +497,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=163 [max(20
 |  |  |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[533840]
 |  |  |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd2, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |  |     predicates: cd2.cd_marital_status = 'S' OR cd2.cd_marital_status = 'D' AND cd2.cd_education_status = 'Advanced Degree' OR cd2.cd_marital_status = 'W' AND cd2.cd_education_status = '4 yr Degree', cd2.cd_education_status = '2 yr Degree' OR cd2.cd_marital_status = 'D' AND cd2.cd_education_status = 'Advanced Degree' OR cd2.cd_marital_status = 'W' AND cd2.cd_education_status = '4 yr Degree'
 |  |  |     stored statistics:
 |  |  |       table: rows=1.92M size=11.15MB
@@ -534,7 +534,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=163 [max(20
 |  |  |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[533840]
 |  |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd1, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |  |     predicates: cd1.cd_marital_status = 'S' OR cd1.cd_marital_status = 'D' AND cd1.cd_education_status = 'Advanced Degree' OR cd1.cd_marital_status = 'W' AND cd1.cd_education_status = '4 yr Degree', cd1.cd_education_status = '2 yr Degree' OR cd1.cd_marital_status = 'D' AND cd1.cd_education_status = 'Advanced Degree' OR cd1.cd_marital_status = 'W' AND cd1.cd_education_status = '4 yr Degree'
 |  |  |     runtime filters: RF016[min_max] -> cd1.cd_marital_status, RF017[min_max] -> cd1.cd_education_status, RF013[bloom] -> cd1.cd_marital_status, RF014[bloom] -> cd1.cd_education_status
 |  |  |     stored statistics:
@@ -546,7 +546,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=163 [max(20
 |  |  |     in pipelines: 03(GETNEXT)
 |  |  |
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
-|  |     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     runtime filters: RF019[min_max] -> wr_refunded_cdemo_sk, RF015[min_max] -> wr_returning_cdemo_sk, RF001[min_max] -> wr_reason_sk, RF018[bloom] -> wr_refunded_cdemo_sk, RF012[bloom] -> wr_returning_cdemo_sk, RF000[bloom] -> wr_reason_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
@@ -558,7 +558,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=163 [max(20
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     predicates: ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |     runtime filters: RF010[min_max] -> ws_item_sk, RF011[min_max] -> ws_order_number, RF003[min_max] -> ws_web_page_sk, RF008[bloom] -> ws_item_sk, RF009[bloom] -> ws_order_number, RF004[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_web_page_sk
 |     stored statistics:
@@ -581,7 +581,7 @@ Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-res
 Per-Instance Resources: mem-estimate=17.84MB mem-reservation=128.00KB thread-reservation=1
 max-parallelism=10 segment-costs=[5566700]
 05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.16MB
+   HDFS partitions=1/1 files=1 size=307.36MB
    predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    runtime filters: RF007[min_max] -> ca_address_sk, RF006[bloom] -> ca_address_sk
    stored statistics:
@@ -668,7 +668,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=173 [max(20
 |  Per-Instance Resources: mem-estimate=16.13MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[22]
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     stored statistics:
 |       table: rows=67 size=2.49KB
 |       columns: all
@@ -703,7 +703,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=173 [max(20
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[323]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page, RANDOM]
-|     HDFS partitions=1/1 files=1 size=5.45KB
+|     HDFS partitions=1/1 files=1 size=72.76KB
 |     stored statistics:
 |       table: rows=3.60K size=72.76KB
 |       columns: all
@@ -829,7 +829,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=173 [max(20
 |  |  |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[533840]
 |  |  |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd2, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |  |     predicates: cd2.cd_marital_status = 'S' OR cd2.cd_marital_status = 'D' AND cd2.cd_education_status = 'Advanced Degree' OR cd2.cd_marital_status = 'W' AND cd2.cd_education_status = '4 yr Degree', cd2.cd_education_status = '2 yr Degree' OR cd2.cd_marital_status = 'D' AND cd2.cd_education_status = 'Advanced Degree' OR cd2.cd_marital_status = 'W' AND cd2.cd_education_status = '4 yr Degree'
 |  |  |     stored statistics:
 |  |  |       table: rows=1.92M size=11.15MB
@@ -866,7 +866,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=173 [max(20
 |  |  |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[533840]
 |  |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd1, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |  |     predicates: cd1.cd_marital_status = 'S' OR cd1.cd_marital_status = 'D' AND cd1.cd_education_status = 'Advanced Degree' OR cd1.cd_marital_status = 'W' AND cd1.cd_education_status = '4 yr Degree', cd1.cd_education_status = '2 yr Degree' OR cd1.cd_marital_status = 'D' AND cd1.cd_education_status = 'Advanced Degree' OR cd1.cd_marital_status = 'W' AND cd1.cd_education_status = '4 yr Degree'
 |  |  |     runtime filters: RF016[min_max] -> cd1.cd_marital_status, RF017[min_max] -> cd1.cd_education_status, RF013[bloom] -> cd1.cd_marital_status, RF014[bloom] -> cd1.cd_education_status
 |  |  |     stored statistics:
@@ -878,7 +878,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=173 [max(20
 |  |  |     in pipelines: 03(GETNEXT)
 |  |  |
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
-|  |     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     runtime filters: RF019[min_max] -> wr_refunded_cdemo_sk, RF015[min_max] -> wr_returning_cdemo_sk, RF001[min_max] -> wr_reason_sk, RF018[bloom] -> wr_refunded_cdemo_sk, RF012[bloom] -> wr_returning_cdemo_sk, RF000[bloom] -> wr_reason_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
@@ -899,7 +899,7 @@ max-parallelism=10 segment-costs=[131750, 241] cpu-comparison-result=173 [max(20
 |  Per-Instance Resources: mem-estimate=17.41MB mem-reservation=128.00KB thread-reservation=1
 |  max-parallelism=210 segment-costs=[2025971678]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     predicates: ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ws_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ws_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ws_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |     runtime filters: RF010[min_max] -> ws_item_sk, RF011[min_max] -> ws_order_number, RF003[min_max] -> ws_web_page_sk, RF008[bloom] -> ws_item_sk, RF009[bloom] -> ws_order_number, RF004[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_web_page_sk
 |     stored statistics:
@@ -922,7 +922,7 @@ Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-res
 Per-Instance Resources: mem-estimate=17.84MB mem-reservation=128.00KB thread-reservation=1
 max-parallelism=10 segment-costs=[5566700]
 05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.16MB
+   HDFS partitions=1/1 files=1 size=307.36MB
    predicates: ca_state IN ('OK', 'TX', 'MO', 'GA', 'KS', 'NC', 'VA', 'WI', 'WV'), ca_country = 'United States'
    runtime filters: RF007[min_max] -> ca_address_sk, RF006[bloom] -> ca_address_sk
    stored statistics:

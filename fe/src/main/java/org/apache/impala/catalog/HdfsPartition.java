@@ -1420,7 +1420,7 @@ public class HdfsPartition extends CatalogObjectImpl
         isMarkedCached_ = HdfsCachingUtil.getCacheDirectiveId(
             msPartition.getParameters()) != null;
         numRows_ = FeCatalogUtils.getRowCount(msPartition.getParameters());
-        if (table_.getDebugMetadataScale() > 1.0 && numRows_ > 0) {
+        if (table_.getDebugMetadataScale() > -1.0 && numRows_ > 0) {
           numRows_ *= table_.getDebugMetadataScale();
         }
         hmsParameters_ = msPartition.getParameters();

@@ -49,7 +49,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     predicates: r_reason_desc = 'reason 64'
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -69,7 +69,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
@@ -81,7 +81,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G
@@ -164,7 +164,7 @@ max-parallelism=830 segment-costs=[8297732388, 58929854] cpu-comparison-result=1
 |  Per-Instance Resources: mem-estimate=16.13MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[18]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     predicates: r_reason_desc = 'reason 64'
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -202,7 +202,7 @@ max-parallelism=830 segment-costs=[8297732388, 58929854] cpu-comparison-result=1
 |  Per-Instance Resources: mem-estimate=20.69MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=190 segment-costs=[1806773027]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
@@ -222,7 +222,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=21.47MB mem-reservation=8.00MB thread-reservation=1
 max-parallelism=1824 segment-costs=[20791140047]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G
@@ -305,7 +305,7 @@ max-parallelism=830 segment-costs=[8297732388, 58929854] cpu-comparison-result=1
 |  Per-Instance Resources: mem-estimate=16.13MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[18]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     predicates: r_reason_desc = 'reason 64'
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -343,7 +343,7 @@ max-parallelism=830 segment-costs=[8297732388, 58929854] cpu-comparison-result=1
 |  Per-Instance Resources: mem-estimate=20.69MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=190 segment-costs=[1806773027]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
@@ -363,7 +363,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=21.47MB mem-reservation=8.00MB thread-reservation=1
 max-parallelism=1824 segment-costs=[20791140047]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G

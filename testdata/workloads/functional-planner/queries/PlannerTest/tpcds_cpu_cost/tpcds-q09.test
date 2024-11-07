@@ -72,7 +72,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 30(GETNEXT), 29(OPEN)
 |  |
 |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -97,7 +97,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 28(GETNEXT), 27(OPEN)
 |  |
 |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -122,7 +122,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 26(GETNEXT), 25(OPEN)
 |  |
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -147,7 +147,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 24(GETNEXT), 23(OPEN)
 |  |
 |  23:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -172,7 +172,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 22(GETNEXT), 21(OPEN)
 |  |
 |  21:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -197,7 +197,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 20(GETNEXT), 19(OPEN)
 |  |
 |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -222,7 +222,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 18(GETNEXT), 17(OPEN)
 |  |
 |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -247,7 +247,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 16(GETNEXT), 15(OPEN)
 |  |
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -272,7 +272,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 14(GETNEXT), 13(OPEN)
 |  |
 |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -297,7 +297,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 12(GETNEXT), 11(OPEN)
 |  |
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -322,7 +322,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 10(GETNEXT), 09(OPEN)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -347,7 +347,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 08(GETNEXT), 07(OPEN)
 |  |
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -372,7 +372,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT), 05(OPEN)
 |  |
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -397,7 +397,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 04(GETNEXT), 03(OPEN)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -416,7 +416,7 @@ PLAN-ROOT SINK
 |  in pipelines: 02(GETNEXT), 00(OPEN)
 |
 |--00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     predicates: r_reason_sk = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -435,7 +435,7 @@ PLAN-ROOT SINK
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -499,7 +499,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 30(GETNEXT), 29(OPEN)
 |  |
 |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -554,7 +554,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 28(GETNEXT), 27(OPEN)
 |  |
 |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -609,7 +609,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 26(GETNEXT), 25(OPEN)
 |  |
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -664,7 +664,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 24(GETNEXT), 23(OPEN)
 |  |
 |  23:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -719,7 +719,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 22(GETNEXT), 21(OPEN)
 |  |
 |  21:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -774,7 +774,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 20(GETNEXT), 19(OPEN)
 |  |
 |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -829,7 +829,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 18(GETNEXT), 17(OPEN)
 |  |
 |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -884,7 +884,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 16(GETNEXT), 15(OPEN)
 |  |
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -939,7 +939,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 14(GETNEXT), 13(OPEN)
 |  |
 |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -994,7 +994,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 12(GETNEXT), 11(OPEN)
 |  |
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1049,7 +1049,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 10(GETNEXT), 09(OPEN)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1104,7 +1104,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 08(GETNEXT), 07(OPEN)
 |  |
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1159,7 +1159,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT), 05(OPEN)
 |  |
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1214,7 +1214,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 04(GETNEXT), 03(OPEN)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1249,7 +1249,7 @@ PLAN-ROOT SINK
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[5]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     predicates: r_reason_sk = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -1282,7 +1282,7 @@ max-parallelism=110 segment-costs=[1043704170, 1]
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -1346,7 +1346,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 30(GETNEXT), 29(OPEN)
 |  |
 |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1401,7 +1401,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 28(GETNEXT), 27(OPEN)
 |  |
 |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1456,7 +1456,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 26(GETNEXT), 25(OPEN)
 |  |
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1511,7 +1511,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 24(GETNEXT), 23(OPEN)
 |  |
 |  23:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1566,7 +1566,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 22(GETNEXT), 21(OPEN)
 |  |
 |  21:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1621,7 +1621,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 20(GETNEXT), 19(OPEN)
 |  |
 |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1676,7 +1676,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 18(GETNEXT), 17(OPEN)
 |  |
 |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1731,7 +1731,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 16(GETNEXT), 15(OPEN)
 |  |
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1786,7 +1786,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 14(GETNEXT), 13(OPEN)
 |  |
 |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1841,7 +1841,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 12(GETNEXT), 11(OPEN)
 |  |
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1896,7 +1896,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 10(GETNEXT), 09(OPEN)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1951,7 +1951,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 08(GETNEXT), 07(OPEN)
 |  |
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2006,7 +2006,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT), 05(OPEN)
 |  |
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2061,7 +2061,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 04(GETNEXT), 03(OPEN)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2096,7 +2096,7 @@ PLAN-ROOT SINK
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[5]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.92KB
+|     HDFS partitions=1/1 files=1 size=2.49KB
 |     predicates: r_reason_sk = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -2129,7 +2129,7 @@ max-parallelism=110 segment-costs=[1043704170, 1]
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
    stored statistics:
      table: rows=8.64G size=389.90GB

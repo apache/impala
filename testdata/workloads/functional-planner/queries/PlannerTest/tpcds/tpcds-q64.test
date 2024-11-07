@@ -209,9 +209,9 @@ PLAN-ROOT SINK
 |  |  in pipelines: 56(GETNEXT), 58(OPEN)
 |  |
 |  |--58:SCAN HDFS [tpcds_parquet.income_band ib2]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -227,9 +227,9 @@ PLAN-ROOT SINK
 |  |  in pipelines: 56(GETNEXT), 57(OPEN)
 |  |
 |  |--57:SCAN HDFS [tpcds_parquet.income_band ib1]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -577,9 +577,9 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT), 19(OPEN)
 |
 |--19:SCAN HDFS [tpcds_parquet.income_band ib2]
-|     HDFS partitions=1/1 files=1 size=1.21KB
+|     HDFS partitions=1/1 files=1 size=1.22KB
 |     stored statistics:
-|       table: rows=20 size=1.21KB
+|       table: rows=20 size=1.22KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=20
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -595,9 +595,9 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT), 18(OPEN)
 |
 |--18:SCAN HDFS [tpcds_parquet.income_band ib1]
-|     HDFS partitions=1/1 files=1 size=1.21KB
+|     HDFS partitions=1/1 files=1 size=1.22KB
 |     stored statistics:
-|       table: rows=20 size=1.21KB
+|       table: rows=20 size=1.22KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=20
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -1032,9 +1032,9 @@ Per-Host Resources: mem-estimate=75.11MB mem-reservation=46.00MB thread-reservat
 |  |  F53:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Host Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=2
 |  |  58:SCAN HDFS [tpcds_parquet.income_band ib2, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -1057,9 +1057,9 @@ Per-Host Resources: mem-estimate=75.11MB mem-reservation=46.00MB thread-reservat
 |  |  F52:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Host Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=2
 |  |  57:SCAN HDFS [tpcds_parquet.income_band ib1, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -1614,9 +1614,9 @@ Per-Host Resources: mem-estimate=48.81MB mem-reservation=42.69MB thread-reservat
 |  F24:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=2
 |  19:SCAN HDFS [tpcds_parquet.income_band ib2, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.21KB
+|     HDFS partitions=1/1 files=1 size=1.22KB
 |     stored statistics:
-|       table: rows=20 size=1.21KB
+|       table: rows=20 size=1.22KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=20
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -1639,9 +1639,9 @@ Per-Host Resources: mem-estimate=48.81MB mem-reservation=42.69MB thread-reservat
 |  F23:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=2
 |  18:SCAN HDFS [tpcds_parquet.income_band ib1, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.21KB
+|     HDFS partitions=1/1 files=1 size=1.22KB
 |     stored statistics:
-|       table: rows=20 size=1.21KB
+|       table: rows=20 size=1.22KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=20
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
@@ -2260,9 +2260,9 @@ Per-Instance Resources: mem-estimate=26.83MB mem-reservation=12.00MB thread-rese
 |  |  F53:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  |  58:SCAN HDFS [tpcds_parquet.income_band ib2, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
@@ -2293,9 +2293,9 @@ Per-Instance Resources: mem-estimate=26.83MB mem-reservation=12.00MB thread-rese
 |  |  F52:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  |  57:SCAN HDFS [tpcds_parquet.income_band ib1, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
@@ -2988,9 +2988,9 @@ Per-Instance Resources: mem-estimate=27.11MB mem-reservation=17.00MB thread-rese
 |  F24:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  19:SCAN HDFS [tpcds_parquet.income_band ib2, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.21KB
+|     HDFS partitions=1/1 files=1 size=1.22KB
 |     stored statistics:
-|       table: rows=20 size=1.21KB
+|       table: rows=20 size=1.22KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=20
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
@@ -3021,9 +3021,9 @@ Per-Instance Resources: mem-estimate=27.11MB mem-reservation=17.00MB thread-rese
 |  F23:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
 |  18:SCAN HDFS [tpcds_parquet.income_band ib1, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.21KB
+|     HDFS partitions=1/1 files=1 size=1.22KB
 |     stored statistics:
-|       table: rows=20 size=1.21KB
+|       table: rows=20 size=1.22KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=20
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0

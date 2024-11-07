@@ -132,7 +132,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     predicates: ws_item_sk IS NOT NULL
 |     runtime filters: RF002[bloom] -> ws_sold_date_sk
 |     stored statistics:
@@ -189,7 +189,7 @@ PLAN-ROOT SINK
 |     in pipelines: 07(GETNEXT)
 |
 06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_item_sk IS NOT NULL
    runtime filters: RF000[bloom] -> ss_sold_date_sk
    stored statistics:
@@ -357,7 +357,7 @@ max-parallelism=38311000 segment-costs=[383109971185632]
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     predicates: ws_item_sk IS NOT NULL
 |     runtime filters: RF002[bloom] -> ws_sold_date_sk
 |     stored statistics:
@@ -455,7 +455,7 @@ max-parallelism=1824 segment-costs=[56515544083, 17805178445] cpu-comparison-res
 |     in pipelines: 07(GETNEXT)
 |
 06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_item_sk IS NOT NULL
    runtime filters: RF000[bloom] -> ss_sold_date_sk
    stored statistics:
@@ -623,7 +623,7 @@ max-parallelism=38311000 segment-costs=[383109971185632]
 |  |     in pipelines: 01(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     predicates: ws_item_sk IS NOT NULL
 |     runtime filters: RF002[bloom] -> ws_sold_date_sk
 |     stored statistics:
@@ -721,7 +721,7 @@ max-parallelism=1824 segment-costs=[56515544083, 17805178445] cpu-comparison-res
 |     in pipelines: 07(GETNEXT)
 |
 06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_item_sk IS NOT NULL
    runtime filters: RF000[bloom] -> ss_sold_date_sk
    stored statistics:

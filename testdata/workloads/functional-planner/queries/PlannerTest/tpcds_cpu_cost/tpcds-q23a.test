@@ -106,7 +106,7 @@ PLAN-ROOT SINK
 |  |  |  |  in pipelines: 37(GETNEXT), 38(OPEN)
 |  |  |  |
 |  |  |  |--38:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
-|  |  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=30.00M size=1.55GB
 |  |  |  |       columns: all
@@ -137,7 +137,7 @@ PLAN-ROOT SINK
 |  |  |  |     in pipelines: 39(GETNEXT)
 |  |  |  |
 |  |  |  37:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     runtime filters: RF029[min_max] -> ss_customer_sk, RF030[bloom] -> ss_sold_date_sk, RF028[bloom] -> ss_customer_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -164,7 +164,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 33(GETNEXT), 34(OPEN)
 |  |  |
 |  |  |--34:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
-|  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |     stored statistics:
 |  |  |       table: rows=30.00M size=1.55GB
 |  |  |       columns: all
@@ -174,7 +174,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 34(GETNEXT)
 |  |  |
 |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF027[min_max] -> ss_customer_sk, RF026[bloom] -> ss_customer_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -215,7 +215,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 27(GETNEXT), 29(OPEN)
 |  |  |
 |  |  |--29:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
 |  |  |       columns: all
@@ -246,7 +246,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 28(GETNEXT)
 |  |  |
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF023[min_max] -> ss_item_sk, RF024[bloom] -> ss_sold_date_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -279,7 +279,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 26(GETNEXT)
 |  |
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     runtime filters: RF017[min_max] -> ws_bill_customer_sk, RF019[min_max] -> ws_item_sk, RF020[bloom] -> ws_sold_date_sk
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -325,7 +325,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 13(GETNEXT), 14(OPEN)
 |  |  |
 |  |  |--14:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
-|  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |     stored statistics:
 |  |  |       table: rows=30.00M size=1.55GB
 |  |  |       columns: all
@@ -356,7 +356,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 15(GETNEXT)
 |  |  |
 |  |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF013[min_max] -> ss_customer_sk, RF014[bloom] -> ss_sold_date_sk, RF012[bloom] -> ss_customer_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -383,7 +383,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 09(GETNEXT), 10(OPEN)
 |  |
 |  |--10:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |     stored statistics:
 |  |       table: rows=30.00M size=1.55GB
 |  |       columns: all
@@ -393,7 +393,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 10(GETNEXT)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF011[min_max] -> ss_customer_sk, RF010[bloom] -> ss_customer_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -434,7 +434,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 03(GETNEXT), 05(OPEN)
 |  |
 |  |--05:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
@@ -465,7 +465,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF007[min_max] -> ss_item_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -498,7 +498,7 @@ PLAN-ROOT SINK
 |     in pipelines: 02(GETNEXT)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF001[min_max] -> cs_bill_customer_sk, RF003[min_max] -> cs_item_sk, RF004[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -651,7 +651,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  |  |  38:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=30.00M size=1.55GB
 |  |  |  |       columns: all
@@ -699,7 +699,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  |     in pipelines: 39(GETNEXT)
 |  |  |  |
 |  |  |  37:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     runtime filters: RF029[min_max] -> ss_customer_sk, RF030[bloom] -> ss_sold_date_sk, RF028[bloom] -> ss_customer_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -759,7 +759,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  |  34:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |     stored statistics:
 |  |  |       table: rows=30.00M size=1.55GB
 |  |  |       columns: all
@@ -769,7 +769,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |     in pipelines: 34(GETNEXT)
 |  |  |
 |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF027[min_max] -> ss_customer_sk, RF026[bloom] -> ss_customer_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -883,7 +883,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[663353]
 |  |  |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
 |  |  |       columns: all
@@ -931,7 +931,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |     in pipelines: 28(GETNEXT)
 |  |  |
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF023[min_max] -> ss_item_sk, RF024[bloom] -> ss_sold_date_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -981,7 +981,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |     in pipelines: 26(GETNEXT)
 |  |
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     runtime filters: RF017[min_max] -> ws_bill_customer_sk, RF019[min_max] -> ws_item_sk, RF020[bloom] -> ws_sold_date_sk
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -1099,7 +1099,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |     stored statistics:
 |  |  |       table: rows=30.00M size=1.55GB
 |  |  |       columns: all
@@ -1147,7 +1147,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |     in pipelines: 15(GETNEXT)
 |  |  |
 |  |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF013[min_max] -> ss_customer_sk, RF014[bloom] -> ss_sold_date_sk, RF012[bloom] -> ss_customer_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -1207,7 +1207,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  10:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |     stored statistics:
 |  |       table: rows=30.00M size=1.55GB
 |  |       columns: all
@@ -1217,7 +1217,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |     in pipelines: 10(GETNEXT)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF011[min_max] -> ss_customer_sk, RF010[bloom] -> ss_customer_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1331,7 +1331,7 @@ max-parallelism=109 segment-costs=[1083724189]
 |  |  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=4 segment-costs=[663353]
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
@@ -1379,7 +1379,7 @@ max-parallelism=109 segment-costs=[1083724189]
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF007[min_max] -> ss_item_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1429,7 +1429,7 @@ max-parallelism=109 segment-costs=[1083724189]
 |     in pipelines: 02(GETNEXT)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF001[min_max] -> cs_bill_customer_sk, RF003[min_max] -> cs_item_sk, RF004[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -1582,7 +1582,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  |  |  38:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=30.00M size=1.55GB
 |  |  |  |       columns: all
@@ -1630,7 +1630,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  |     in pipelines: 39(GETNEXT)
 |  |  |  |
 |  |  |  37:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     runtime filters: RF029[min_max] -> ss_customer_sk, RF030[bloom] -> ss_sold_date_sk, RF028[bloom] -> ss_customer_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -1690,7 +1690,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  |  34:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |     stored statistics:
 |  |  |       table: rows=30.00M size=1.55GB
 |  |  |       columns: all
@@ -1700,7 +1700,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |     in pipelines: 34(GETNEXT)
 |  |  |
 |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF027[min_max] -> ss_customer_sk, RF026[bloom] -> ss_customer_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -1814,7 +1814,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[663353]
 |  |  |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
 |  |  |       columns: all
@@ -1862,7 +1862,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |     in pipelines: 28(GETNEXT)
 |  |  |
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF023[min_max] -> ss_item_sk, RF024[bloom] -> ss_sold_date_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -1912,7 +1912,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |     in pipelines: 26(GETNEXT)
 |  |
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     runtime filters: RF017[min_max] -> ws_bill_customer_sk, RF019[min_max] -> ws_item_sk, RF020[bloom] -> ws_sold_date_sk
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -2030,7 +2030,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |  |     stored statistics:
 |  |  |       table: rows=30.00M size=1.55GB
 |  |  |       columns: all
@@ -2078,7 +2078,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  |     in pipelines: 15(GETNEXT)
 |  |  |
 |  |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF013[min_max] -> ss_customer_sk, RF014[bloom] -> ss_sold_date_sk, RF012[bloom] -> ss_customer_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -2138,7 +2138,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[2700000]
 |  |  10:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |     stored statistics:
 |  |       table: rows=30.00M size=1.55GB
 |  |       columns: all
@@ -2148,7 +2148,7 @@ max-parallelism=109 segment-costs=[317220421, 1] cpu-comparison-result=742 [max(
 |  |     in pipelines: 10(GETNEXT)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF011[min_max] -> ss_customer_sk, RF010[bloom] -> ss_customer_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2262,7 +2262,7 @@ max-parallelism=109 segment-costs=[1083724189]
 |  |  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=4 segment-costs=[663353]
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
@@ -2310,7 +2310,7 @@ max-parallelism=109 segment-costs=[1083724189]
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF007[min_max] -> ss_item_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2360,7 +2360,7 @@ max-parallelism=109 segment-costs=[1083724189]
 |     in pipelines: 02(GETNEXT)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF001[min_max] -> cs_bill_customer_sk, RF003[min_max] -> cs_item_sk, RF004[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=4.32G size=280.96GB

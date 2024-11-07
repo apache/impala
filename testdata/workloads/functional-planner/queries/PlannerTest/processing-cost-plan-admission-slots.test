@@ -151,10 +151,10 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=1 segment-costs=[10483]
 |  |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=2.17MB
+|  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |     predicates: d_year = CAST(2000 AS INT)
 |  |     stored statistics:
-|  |       table: rows=73.05K size=2.17MB
+|  |       table: rows=73.05K size=2.15MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     parquet statistics predicates: d_year = CAST(2000 AS INT)
@@ -164,10 +164,10 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |     in pipelines: 07(GETNEXT)
 |  |
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=15.43MB
 |     runtime filters: RF008[bloom] -> sr_returned_date_sk
 |     stored statistics:
-|       table: rows=287.51K size=33.63MB
+|       table: rows=287.51K size=15.43MB
 |       partitions: 2004/2004 rows=287.51K
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=10.01K est-scan-range=373(filtered from 2004)
@@ -202,11 +202,11 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1]
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=9.93KB
 |     predicates: s_state = 'TN'
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_sk
 |     stored statistics:
-|       table: rows=12 size=9.81KB
+|       table: rows=12 size=9.93KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=12
 |     parquet statistics predicates: s_state = 'TN'
@@ -307,10 +307,10 @@ max-parallelism=3 segment-costs=[351629, 110283] cpu-comparison-result=4 [max(3 
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[10483]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|     HDFS partitions=1/1 files=1 size=2.17MB
+|     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_year = CAST(2000 AS INT)
 |     stored statistics:
-|       table: rows=73.05K size=2.17MB
+|       table: rows=73.05K size=2.15MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     parquet statistics predicates: d_year = CAST(2000 AS INT)
@@ -320,10 +320,10 @@ max-parallelism=3 segment-costs=[351629, 110283] cpu-comparison-result=4 [max(3 
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-   HDFS partitions=2004/2004 files=2004 size=33.63MB
+   HDFS partitions=2004/2004 files=2004 size=15.43MB
    runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_customer_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_customer_sk, RF006[bloom] -> sr_returned_date_sk
    stored statistics:
-     table: rows=287.51K size=33.63MB
+     table: rows=287.51K size=15.43MB
      partitions: 2004/2004 rows=287.51K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=10.01K est-scan-range=373(filtered from 2004)
@@ -480,10 +480,10 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=1 segment-costs=[10483]
 |  |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=2.17MB
+|  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |     predicates: d_year = CAST(2000 AS INT)
 |  |     stored statistics:
-|  |       table: rows=73.05K size=2.17MB
+|  |       table: rows=73.05K size=2.15MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     parquet statistics predicates: d_year = CAST(2000 AS INT)
@@ -493,10 +493,10 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |     in pipelines: 07(GETNEXT)
 |  |
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=15.43MB
 |     runtime filters: RF008[bloom] -> sr_returned_date_sk
 |     stored statistics:
-|       table: rows=287.51K size=33.63MB
+|       table: rows=287.51K size=15.43MB
 |       partitions: 2004/2004 rows=287.51K
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=10.01K est-scan-range=373(filtered from 2004)
@@ -531,11 +531,11 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1]
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=9.93KB
 |     predicates: s_state = 'TN'
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_sk
 |     stored statistics:
-|       table: rows=12 size=9.81KB
+|       table: rows=12 size=9.93KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=12
 |     parquet statistics predicates: s_state = 'TN'
@@ -636,10 +636,10 @@ max-parallelism=3 segment-costs=[351629, 110283] cpu-comparison-result=4 [max(3 
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[10483]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|     HDFS partitions=1/1 files=1 size=2.17MB
+|     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_year = CAST(2000 AS INT)
 |     stored statistics:
-|       table: rows=73.05K size=2.17MB
+|       table: rows=73.05K size=2.15MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     parquet statistics predicates: d_year = CAST(2000 AS INT)
@@ -649,10 +649,10 @@ max-parallelism=3 segment-costs=[351629, 110283] cpu-comparison-result=4 [max(3 
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-   HDFS partitions=2004/2004 files=2004 size=33.63MB
+   HDFS partitions=2004/2004 files=2004 size=15.43MB
    runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_customer_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_customer_sk, RF006[bloom] -> sr_returned_date_sk
    stored statistics:
-     table: rows=287.51K size=33.63MB
+     table: rows=287.51K size=15.43MB
      partitions: 2004/2004 rows=287.51K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=10.01K est-scan-range=373(filtered from 2004)
@@ -802,10 +802,10 @@ Per-Instance Resources: mem-estimate=504.82KB mem-reservation=0B thread-reservat
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=2.17MB
+|  |     HDFS partitions=1/1 files=1 size=2.15MB
 |  |     predicates: d_year = CAST(2000 AS INT)
 |  |     stored statistics:
-|  |       table: rows=73.05K size=2.17MB
+|  |       table: rows=73.05K size=2.15MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |  |     parquet statistics predicates: d_year = CAST(2000 AS INT)
@@ -815,10 +815,10 @@ Per-Instance Resources: mem-estimate=504.82KB mem-reservation=0B thread-reservat
 |  |     in pipelines: 07(GETNEXT)
 |  |
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=15.43MB
 |     runtime filters: RF008[bloom] -> sr_returned_date_sk
 |     stored statistics:
-|       table: rows=287.51K size=33.63MB
+|       table: rows=287.51K size=15.43MB
 |       partitions: 2004/2004 rows=287.51K
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=10.01K est-scan-range=373(filtered from 2004)
@@ -851,11 +851,11 @@ Per-Instance Resources: mem-estimate=504.82KB mem-reservation=0B thread-reservat
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=9.93KB
 |     predicates: s_state = 'TN'
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_sk
 |     stored statistics:
-|       table: rows=12 size=9.81KB
+|       table: rows=12 size=9.93KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=12
 |     parquet statistics predicates: s_state = 'TN'
@@ -950,10 +950,10 @@ Per-Instance Resources: mem-estimate=26.33MB mem-reservation=2.12MB thread-reser
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|     HDFS partitions=1/1 files=1 size=2.17MB
+|     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_year = CAST(2000 AS INT)
 |     stored statistics:
-|       table: rows=73.05K size=2.17MB
+|       table: rows=73.05K size=2.15MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
 |     parquet statistics predicates: d_year = CAST(2000 AS INT)
@@ -963,10 +963,10 @@ Per-Instance Resources: mem-estimate=26.33MB mem-reservation=2.12MB thread-reser
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-   HDFS partitions=2004/2004 files=2004 size=33.63MB
+   HDFS partitions=2004/2004 files=2004 size=15.43MB
    runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_customer_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_store_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_customer_sk, RF006[bloom] -> sr_returned_date_sk
    stored statistics:
-     table: rows=287.51K size=33.63MB
+     table: rows=287.51K size=15.43MB
      partitions: 2004/2004 rows=287.51K
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=10.01K est-scan-range=373(filtered from 2004)

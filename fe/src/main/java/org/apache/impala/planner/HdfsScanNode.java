@@ -61,6 +61,7 @@ import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -2040,6 +2041,12 @@ public class HdfsScanNode extends ScanNode {
           .append(String.format("partition predicates: %s\n",
               Expr.getExplainString(partitionConjuncts_, detailLevel)));
       }
+      long testTableSize = -1;
+      if (desc_.getTable() instanceof Table
+          && ((Table) desc_.getTable()).getDebugMetadataScale() > -1.0) {
+        // This is in testing mode.
+        testTableSize = desc_.getTable().getTTableStats().total_file_bytes;
+      }
       String partMetaTemplate = "partitions=%d/%d files=%d size=%s\n";
       String erasureCodeTemplate = "erasure coded: files=%d size=%s\n";
       if (!numPartitionsPerFs_.isEmpty()) {
@@ -2050,9 +2057,14 @@ public class HdfsScanNode extends ScanNode {
           FileSystemUtil.FsType fsType = partsPerFs.getKey();
           output.append(detailPrefix);
           output.append(fsType).append(" ");
+          long bytesToDisplay = totalBytesPerFs_.get(fsType);
+          if (testTableSize > -1) {
+            bytesToDisplay = (long) ((double) partsPerFs.getValue()
+                / table.getPartitions().size() * testTableSize);
+          }
           output.append(String.format(partMetaTemplate, partsPerFs.getValue(),
               table.getPartitions().size(), totalFilesPerFs_.get(fsType),
-              PrintUtils.printBytes(totalBytesPerFs_.get(fsType))));
+              PrintUtils.printBytes(bytesToDisplay)));
 
           // Report the total number of erasure coded files and total bytes, if any.
           if (totalFilesPerFsEC_.containsKey(fsType)) {

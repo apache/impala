@@ -87,7 +87,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.call_center]
-|     HDFS partitions=1/1 files=1 size=10.16KB
+|     HDFS partitions=1/1 files=1 size=16.57KB
 |     stored statistics:
 |       table: rows=48 size=16.57KB
 |       columns: all
@@ -123,7 +123,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse]
-|     HDFS partitions=1/1 files=1 size=4.38KB
+|     HDFS partitions=1/1 files=1 size=5.99KB
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF001[min_max] -> cs_ship_date_sk, RF003[min_max] -> cs_call_center_sk, RF005[min_max] -> cs_ship_mode_sk, RF007[min_max] -> cs_warehouse_sk, RF000[bloom] -> cs_ship_date_sk, RF002[bloom] -> cs_call_center_sk, RF004[bloom] -> cs_ship_mode_sk, RF006[bloom] -> cs_warehouse_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -256,7 +256,7 @@ max-parallelism=1600 segment-costs=[15955190797, 19642] cpu-comparison-result=12
 |  Per-Instance Resources: mem-estimate=16.13MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[16]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.call_center, RANDOM]
-|     HDFS partitions=1/1 files=1 size=10.16KB
+|     HDFS partitions=1/1 files=1 size=16.57KB
 |     stored statistics:
 |       table: rows=48 size=16.57KB
 |       columns: all
@@ -326,7 +326,7 @@ max-parallelism=1600 segment-costs=[15955190797, 19642] cpu-comparison-result=12
 |  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[8]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
-|     HDFS partitions=1/1 files=1 size=4.38KB
+|     HDFS partitions=1/1 files=1 size=5.99KB
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -336,7 +336,7 @@ max-parallelism=1600 segment-costs=[15955190797, 19642] cpu-comparison-result=12
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF001[min_max] -> cs_ship_date_sk, RF003[min_max] -> cs_call_center_sk, RF005[min_max] -> cs_ship_mode_sk, RF007[min_max] -> cs_warehouse_sk, RF000[bloom] -> cs_ship_date_sk, RF002[bloom] -> cs_call_center_sk, RF004[bloom] -> cs_ship_mode_sk, RF006[bloom] -> cs_warehouse_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -459,7 +459,7 @@ max-parallelism=1600 segment-costs=[15955190797, 19642] cpu-comparison-result=12
 |  Per-Instance Resources: mem-estimate=16.13MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[16]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.call_center, RANDOM]
-|     HDFS partitions=1/1 files=1 size=10.16KB
+|     HDFS partitions=1/1 files=1 size=16.57KB
 |     stored statistics:
 |       table: rows=48 size=16.57KB
 |       columns: all
@@ -529,7 +529,7 @@ max-parallelism=1600 segment-costs=[15955190797, 19642] cpu-comparison-result=12
 |  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[8]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
-|     HDFS partitions=1/1 files=1 size=4.38KB
+|     HDFS partitions=1/1 files=1 size=5.99KB
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -539,7 +539,7 @@ max-parallelism=1600 segment-costs=[15955190797, 19642] cpu-comparison-result=12
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF001[min_max] -> cs_ship_date_sk, RF003[min_max] -> cs_call_center_sk, RF005[min_max] -> cs_ship_mode_sk, RF007[min_max] -> cs_warehouse_sk, RF000[bloom] -> cs_ship_date_sk, RF002[bloom] -> cs_call_center_sk, RF004[bloom] -> cs_ship_mode_sk, RF006[bloom] -> cs_warehouse_sk
    stored statistics:
      table: rows=4.32G size=280.96GB

@@ -129,9 +129,9 @@ max-parallelism=18 segment-costs=[89349069, 168856871]
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.18MB
+   HDFS partitions=1824/1824 files=1824 size=200.96MB
    stored statistics:
-     table: rows=2.88M size=199.18MB
+     table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -159,9 +159,9 @@ F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
 max-parallelism=1 segment-costs=[28]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.21KB
+   HDFS partitions=1/1 files=1 size=1.22KB
    stored statistics:
-     table: rows=20 size=1.21KB
+     table: rows=20 size=1.22KB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=20
    mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
@@ -190,9 +190,9 @@ F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
 max-parallelism=1 segment-costs=[28]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.21KB
+   HDFS partitions=1/1 files=1 size=1.22KB
    stored statistics:
-     table: rows=20 size=1.21KB
+     table: rows=20 size=1.22KB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=20
    limit: 1000000000

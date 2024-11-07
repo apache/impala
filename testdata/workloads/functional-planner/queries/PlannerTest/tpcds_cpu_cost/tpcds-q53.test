@@ -78,7 +78,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -117,7 +117,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 |--00:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -128,7 +128,7 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_item_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_item_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -232,7 +232,7 @@ max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[120]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -305,7 +305,7 @@ max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max
 |  Per-Instance Resources: mem-estimate=16.30MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[206353]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -316,7 +316,7 @@ max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max
 |     in pipelines: 00(GETNEXT)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_item_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_item_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -420,7 +420,7 @@ max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[120]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -493,7 +493,7 @@ max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max
 |  Per-Instance Resources: mem-estimate=16.30MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[206353]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -504,7 +504,7 @@ max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max
 |     in pipelines: 00(GETNEXT)
 |
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_item_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_item_sk
    stored statistics:
      table: rows=8.64G size=389.90GB

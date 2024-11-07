@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -36,7 +36,6 @@
 # TODO: generalise to other warnings
 # * clang-tidy
 
-from __future__ import absolute_import, division, print_function
 from argparse import ArgumentParser
 from collections import defaultdict
 import json
@@ -44,7 +43,7 @@ import os
 from os import environ
 import os.path
 import re
-from subprocess import check_call, check_output, Popen, PIPE
+from subprocess import check_call, check_output, DEVNULL, Popen, PIPE
 import virtualenv
 
 FLAKE8_VERSION = "3.9.2"
@@ -100,6 +99,11 @@ FBS_FILE_COMMENT = (
     "statestore. Basically only new fields can be added and should be added at the end "
     "of a table definition.\n"
     "https://flatbuffers.dev/flatbuffers_guide_writing_schema.html")
+PLANNER_TEST_TABLE_STATS = (
+    "Table numRows and totalSize is changed in this planner test. It is unnecessary to "
+    "change them. Consider running testdata/bin/restore-stats-on-planner-tests.py "
+    "script to restore them to consistent values.")
+UNCOMMITTED_CHANGE = "Uncommitted change detected!"
 COMMENT_REVISION_SIDE = "REVISION"
 COMMENT_PARENT_SIDE = "PARENT"
 
@@ -366,6 +370,33 @@ def get_flatbuffers_compatibility_comments(base_revision, revision):
   return comments
 
 
+def get_planner_tests_comments():
+  comments = defaultdict(lambda: [])
+  # First, check that testdata/ dir is clean.
+  diff = check_output(
+      ["git", "diff", "--numstat", "--", "testdata"],
+      universal_newlines=True)
+  for diff_line in diff.splitlines():
+    _, _, path = diff_line.split()
+    comments[path].append(get_comment_input(UNCOMMITTED_CHANGE))
+  if len(comments) > 0:
+    return comments
+
+  # All clean. Run script and comment any changes.
+  check_call(['./testdata/bin/restore-stats-on-planner-tests.py'], stdout=DEVNULL)
+  diff = check_output(
+      ["git", "diff", "--numstat", "--", "testdata"],
+      universal_newlines=True)
+  for diff_line in diff.splitlines():
+    _, _, path = diff_line.split()
+    if os.path.splitext(path)[1] == ".test":
+      comments[path].append(get_comment_input(PLANNER_TEST_TABLE_STATS))
+
+  # Restore testdata/ dir.
+  check_call(['git', 'checkout', 'testdata'])
+  return comments
+
+
 def post_review_to_gerrit(review_input):
   """Post a review to the gerrit patchset. 'review_input' is a ReviewInput JSON object
   containing the review comments. The gerrit change and patchset are picked up from
@@ -408,11 +439,12 @@ if __name__ == "__main__":
   merge_comments(comments, get_misc_comments(base_revision, revision, args.dryrun))
   merge_comments(
     comments, get_catalog_compatibility_comments(base_revision, revision, args.dryrun))
+  merge_comments(comments, get_planner_tests_comments())
   review_input = {"comments": comments}
   if len(comments) > 0:
     review_input["message"] = (
         "gerrit-auto-critic failed. You can reproduce it locally using command:\n\n"
-        "  python2 bin/jenkins/critique-gerrit-review.py --dryrun\n\n"
+        "  python3 bin/jenkins/critique-gerrit-review.py --dryrun\n\n"
         "To run it, you might need a virtual env with virtualenv installed.")
   print(json.dumps(review_input, indent=True))
   if not args.dryrun:

@@ -82,7 +82,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 16(GETNEXT), 15(OPEN)
 |  |
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(30 AS INT), ss_quantity >= CAST(26 AS INT), (ss_list_price >= CAST(49 AS DECIMAL(3,0)) AND ss_list_price <= CAST(59 AS DECIMAL(5,0)) OR ss_coupon_amt >= CAST(2950 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(3950 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(52 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(72 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -114,7 +114,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 13(GETNEXT), 12(OPEN)
 |  |
 |  12:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(25 AS INT), ss_quantity >= CAST(21 AS INT), (ss_list_price >= CAST(180 AS DECIMAL(5,0)) AND ss_list_price <= CAST(190 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(17430 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(18430 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(57 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(77 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -146,7 +146,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 10(GETNEXT), 09(OPEN)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(16 AS INT), (ss_list_price >= CAST(135 AS DECIMAL(5,0)) AND ss_list_price <= CAST(145 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(4905 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(5905 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(27 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(47 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -178,7 +178,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 07(GETNEXT), 06(OPEN)
 |  |
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(15 AS INT), ss_quantity >= CAST(11 AS INT), (ss_list_price >= CAST(183 AS DECIMAL(5,0)) AND ss_list_price <= CAST(193 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(13456 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(14456 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(31 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(51 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -210,7 +210,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 04(GETNEXT), 03(OPEN)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(10 AS INT), ss_quantity >= CAST(6 AS INT), (ss_list_price >= CAST(71 AS DECIMAL(3,0)) AND ss_list_price <= CAST(81 AS DECIMAL(5,0)) OR ss_coupon_amt >= CAST(14775 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(15775 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(38 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(58 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -237,7 +237,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_quantity <= CAST(5 AS INT), ss_quantity >= CAST(0 AS INT), (ss_list_price >= CAST(189 AS DECIMAL(5,0)) AND ss_list_price <= CAST(199 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(4483 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(5483 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(24 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(44 AS DECIMAL(5,0)))
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -324,7 +324,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 15(GETNEXT)
 |  |
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(30 AS INT), ss_quantity >= CAST(26 AS INT), (ss_list_price >= CAST(49 AS DECIMAL(3,0)) AND ss_list_price <= CAST(59 AS DECIMAL(5,0)) OR ss_coupon_amt >= CAST(2950 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(3950 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(52 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(72 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -401,7 +401,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  12:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(25 AS INT), ss_quantity >= CAST(21 AS INT), (ss_list_price >= CAST(180 AS DECIMAL(5,0)) AND ss_list_price <= CAST(190 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(17430 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(18430 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(57 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(77 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -478,7 +478,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(16 AS INT), (ss_list_price >= CAST(135 AS DECIMAL(5,0)) AND ss_list_price <= CAST(145 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(4905 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(5905 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(27 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(47 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -555,7 +555,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(15 AS INT), ss_quantity >= CAST(11 AS INT), (ss_list_price >= CAST(183 AS DECIMAL(5,0)) AND ss_list_price <= CAST(193 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(13456 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(14456 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(31 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(51 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -632,7 +632,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(10 AS INT), ss_quantity >= CAST(6 AS INT), (ss_list_price >= CAST(71 AS DECIMAL(3,0)) AND ss_list_price <= CAST(81 AS DECIMAL(5,0)) OR ss_coupon_amt >= CAST(14775 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(15775 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(38 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(58 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -688,7 +688,7 @@ max-parallelism=310 segment-costs=[3038520751, 36514]
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_quantity <= CAST(5 AS INT), ss_quantity >= CAST(0 AS INT), (ss_list_price >= CAST(189 AS DECIMAL(5,0)) AND ss_list_price <= CAST(199 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(4483 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(5483 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(24 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(44 AS DECIMAL(5,0)))
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -775,7 +775,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 15(GETNEXT)
 |  |
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(30 AS INT), ss_quantity >= CAST(26 AS INT), (ss_list_price >= CAST(49 AS DECIMAL(3,0)) AND ss_list_price <= CAST(59 AS DECIMAL(5,0)) OR ss_coupon_amt >= CAST(2950 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(3950 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(52 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(72 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -852,7 +852,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  12:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(25 AS INT), ss_quantity >= CAST(21 AS INT), (ss_list_price >= CAST(180 AS DECIMAL(5,0)) AND ss_list_price <= CAST(190 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(17430 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(18430 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(57 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(77 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -929,7 +929,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(16 AS INT), (ss_list_price >= CAST(135 AS DECIMAL(5,0)) AND ss_list_price <= CAST(145 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(4905 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(5905 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(27 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(47 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1006,7 +1006,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(15 AS INT), ss_quantity >= CAST(11 AS INT), (ss_list_price >= CAST(183 AS DECIMAL(5,0)) AND ss_list_price <= CAST(193 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(13456 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(14456 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(31 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(51 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1083,7 +1083,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: ss_quantity <= CAST(10 AS INT), ss_quantity >= CAST(6 AS INT), (ss_list_price >= CAST(71 AS DECIMAL(3,0)) AND ss_list_price <= CAST(81 AS DECIMAL(5,0)) OR ss_coupon_amt >= CAST(14775 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(15775 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(38 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(58 AS DECIMAL(5,0)))
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1139,7 +1139,7 @@ max-parallelism=310 segment-costs=[3038520751, 36514]
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_quantity <= CAST(5 AS INT), ss_quantity >= CAST(0 AS INT), (ss_list_price >= CAST(189 AS DECIMAL(5,0)) AND ss_list_price <= CAST(199 AS DECIMAL(10,0)) OR ss_coupon_amt >= CAST(4483 AS DECIMAL(5,0)) AND ss_coupon_amt <= CAST(5483 AS DECIMAL(10,0)) OR ss_wholesale_cost >= CAST(24 AS DECIMAL(3,0)) AND ss_wholesale_cost <= CAST(44 AS DECIMAL(5,0)))
    stored statistics:
      table: rows=8.64G size=389.90GB

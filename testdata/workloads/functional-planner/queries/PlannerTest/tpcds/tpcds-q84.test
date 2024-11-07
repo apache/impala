@@ -47,10 +47,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 02(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN HDFS [tpcds_parquet.income_band]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     parquet statistics predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
@@ -175,10 +175,10 @@ Per-Host Resources: mem-estimate=26.95MB mem-reservation=4.94MB thread-reservati
 |  |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Host Resources: mem-estimate=48.06MB mem-reservation=24.00KB thread-reservation=2
 |  |  03:SCAN HDFS [tpcds_parquet.income_band, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     parquet statistics predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
@@ -335,10 +335,10 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Instance Resources: mem-estimate=16.06MB mem-reservation=24.00KB thread-reservation=1
 |  |  03:SCAN HDFS [tpcds_parquet.income_band, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.21KB
+|  |     HDFS partitions=1/1 files=1 size=1.22KB
 |  |     predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)
 |  |     stored statistics:
-|  |       table: rows=20 size=1.21KB
+|  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     parquet statistics predicates: ib_lower_bound >= CAST(38128 AS INT), ib_upper_bound <= CAST(88128 AS INT)

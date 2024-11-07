@@ -90,7 +90,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 02(GETNEXT), 01(OPEN)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: ((i_category = 'Women' AND ((i_color IN ('beige', 'spring') AND i_units IN ('Tsp', 'Ton') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('white', 'pale') AND i_units IN ('Box', 'Dram') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('midnight', 'frosted') AND i_units IN ('Bunch', 'Carton') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('azure', 'goldenrod') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('petite', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('brown', 'hot') AND i_units IN ('Tbl', 'Cup') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('powder', 'honeydew') AND i_units IN ('Bundle', 'Unknown') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('antique', 'purple') AND i_units IN ('N/A', 'Dozen') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('lavender', 'tomato') AND i_units IN ('Lb', 'Oz') AND i_size IN ('petite', 'extra large'))))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -101,7 +101,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item i1]
-   HDFS partitions=1/1 files=1 size=1.73MB
+   HDFS partitions=1/1 files=1 size=33.54MB
    predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    stored statistics:
      table: rows=360.00K size=33.54MB
@@ -207,7 +207,7 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: ((i_category = 'Women' AND ((i_color IN ('beige', 'spring') AND i_units IN ('Tsp', 'Ton') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('white', 'pale') AND i_units IN ('Box', 'Dram') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('midnight', 'frosted') AND i_units IN ('Bunch', 'Carton') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('azure', 'goldenrod') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('petite', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('brown', 'hot') AND i_units IN ('Tbl', 'Cup') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('powder', 'honeydew') AND i_units IN ('Bundle', 'Unknown') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('antique', 'purple') AND i_units IN ('N/A', 'Dozen') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('lavender', 'tomato') AND i_units IN ('Lb', 'Oz') AND i_size IN ('petite', 'extra large'))))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -218,7 +218,7 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item i1, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.73MB
+   HDFS partitions=1/1 files=1 size=33.54MB
    predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    stored statistics:
      table: rows=360.00K size=33.54MB
@@ -324,7 +324,7 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: ((i_category = 'Women' AND ((i_color IN ('beige', 'spring') AND i_units IN ('Tsp', 'Ton') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('white', 'pale') AND i_units IN ('Box', 'Dram') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('midnight', 'frosted') AND i_units IN ('Bunch', 'Carton') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('azure', 'goldenrod') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('petite', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('brown', 'hot') AND i_units IN ('Tbl', 'Cup') AND i_size IN ('petite', 'extra large')) OR (i_color IN ('powder', 'honeydew') AND i_units IN ('Bundle', 'Unknown') AND i_size IN ('large', 'economy'))) OR (i_category = 'Men' AND i_color IN ('antique', 'purple') AND i_units IN ('N/A', 'Dozen') AND i_size IN ('small', 'N/A')) OR (i_category = 'Men' AND i_color IN ('lavender', 'tomato') AND i_units IN ('Lb', 'Oz') AND i_size IN ('petite', 'extra large'))))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -335,7 +335,7 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item i1, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.73MB
+   HDFS partitions=1/1 files=1 size=33.54MB
    predicates: i_manufact_id <= CAST(772 AS INT), i_manufact_id >= CAST(732 AS INT)
    stored statistics:
      table: rows=360.00K size=33.54MB

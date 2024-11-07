@@ -92,7 +92,7 @@ PLAN-ROOT SINK
 |  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 00(OPEN)
 |
 |--00:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: i_manager_id = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -131,7 +131,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -164,7 +164,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 06(GETNEXT)
 |  |
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
-|     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF006[bloom] -> cs_sold_date_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -197,7 +197,7 @@ PLAN-ROOT SINK
 |     in pipelines: 03(GETNEXT)
 |
 02:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-   HDFS partitions=1824/1824 files=1824 size=84.18MB
+   HDFS partitions=1824/1824 files=1824 size=145.75GB
    runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_item_sk, RF004[bloom] -> ws_sold_date_sk
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -319,7 +319,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[156564]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: i_manager_id = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -375,7 +375,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -425,7 +425,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |  |     in pipelines: 06(GETNEXT)
 |  |
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-|     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF006[bloom] -> cs_sold_date_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -475,7 +475,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |     in pipelines: 03(GETNEXT)
 |
 02:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=84.18MB
+   HDFS partitions=1824/1824 files=1824 size=145.75GB
    runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_item_sk, RF004[bloom] -> ws_sold_date_sk
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -597,7 +597,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[156564]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: i_manager_id = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -653,7 +653,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -703,7 +703,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |  |     in pipelines: 06(GETNEXT)
 |  |
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-|     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF006[bloom] -> cs_sold_date_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -753,7 +753,7 @@ max-parallelism=90 segment-costs=[889919871, 3225455] cpu-comparison-result=90 [
 |     in pipelines: 03(GETNEXT)
 |
 02:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=84.18MB
+   HDFS partitions=1824/1824 files=1824 size=145.75GB
    runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_item_sk, RF004[bloom] -> ws_sold_date_sk
    stored statistics:
      table: rows=2.16G size=145.75GB

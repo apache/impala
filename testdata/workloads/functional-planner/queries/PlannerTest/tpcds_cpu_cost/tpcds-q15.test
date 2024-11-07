@@ -52,7 +52,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
-|     HDFS partitions=1/1 files=1 size=1.16MB
+|     HDFS partitions=1/1 files=1 size=307.36MB
 |     stored statistics:
 |       table: rows=15.00M size=307.36MB
 |       columns: all
@@ -70,7 +70,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
-|     HDFS partitions=1/1 files=1 size=5.49MB
+|     HDFS partitions=1/1 files=1 size=1.55GB
 |     runtime filters: RF001[min_max] -> c_current_addr_sk, RF000[bloom] -> c_current_addr_sk
 |     stored statistics:
 |       table: rows=30.00M size=1.55GB
@@ -102,7 +102,7 @@ PLAN-ROOT SINK
 |     in pipelines: 03(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF003[min_max] -> cs_bill_customer_sk, RF002[bloom] -> cs_bill_customer_sk, RF004[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -188,7 +188,7 @@ max-parallelism=80 segment-costs=[750824853, 26855] cpu-comparison-result=80 [ma
 |  Per-Instance Resources: mem-estimate=16.15MB mem-reservation=128.00KB thread-reservation=1
 |  max-parallelism=10 segment-costs=[4117500]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.16MB
+|     HDFS partitions=1/1 files=1 size=307.36MB
 |     stored statistics:
 |       table: rows=15.00M size=307.36MB
 |       columns: all
@@ -224,7 +224,7 @@ max-parallelism=80 segment-costs=[750824853, 26855] cpu-comparison-result=80 [ma
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=1.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[4752000]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|     HDFS partitions=1/1 files=1 size=5.49MB
+|     HDFS partitions=1/1 files=1 size=1.55GB
 |     runtime filters: RF001[min_max] -> c_current_addr_sk, RF000[bloom] -> c_current_addr_sk
 |     stored statistics:
 |       table: rows=30.00M size=1.55GB
@@ -273,7 +273,7 @@ max-parallelism=80 segment-costs=[750824853, 26855] cpu-comparison-result=80 [ma
 |     in pipelines: 03(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF003[min_max] -> cs_bill_customer_sk, RF002[bloom] -> cs_bill_customer_sk, RF004[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -358,7 +358,7 @@ max-parallelism=50 segment-costs=[431051689, 26855] cpu-comparison-result=170 [m
 |  Per-Instance Resources: mem-estimate=23.62MB mem-reservation=128.00KB thread-reservation=1
 |  max-parallelism=10 segment-costs=[43914000]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.16MB
+|     HDFS partitions=1/1 files=1 size=307.36MB
 |     stored statistics:
 |       table: rows=15.00M size=307.36MB
 |       columns: all
@@ -403,7 +403,7 @@ max-parallelism=187 segment-costs=[1906326833]
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=1.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[4752000]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|     HDFS partitions=1/1 files=1 size=5.49MB
+|     HDFS partitions=1/1 files=1 size=1.55GB
 |     runtime filters: RF001[min_max] -> c_current_addr_sk, RF000[bloom] -> c_current_addr_sk
 |     stored statistics:
 |       table: rows=30.00M size=1.55GB
@@ -452,7 +452,7 @@ max-parallelism=187 segment-costs=[1906326833]
 |     in pipelines: 03(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-   HDFS partitions=1831/1831 files=1831 size=150.82MB
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
    runtime filters: RF003[min_max] -> cs_bill_customer_sk, RF002[bloom] -> cs_bill_customer_sk, RF004[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=4.32G size=280.96GB

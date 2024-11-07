@@ -62,7 +62,7 @@ PLAN-ROOT SINK
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 |--00:SCAN HDFS [tpcds_partitioned_parquet_snap.call_center]
-|     HDFS partitions=1/1 files=1 size=10.16KB
+|     HDFS partitions=1/1 files=1 size=16.57KB
 |     stored statistics:
 |       table: rows=48 size=16.57KB
 |       columns: all
@@ -108,7 +108,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 01(GETNEXT), 05(OPEN)
 |  |
 |  |--05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics]
-|  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |     predicates: ((cd_marital_status = 'M' AND cd_education_status = 'Unknown') OR (cd_marital_status = 'W' AND cd_education_status = 'Advanced Degree'))
 |  |     stored statistics:
 |  |       table: rows=1.92M size=11.15MB
@@ -127,7 +127,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 01(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |     runtime filters: RF007[min_max] -> c_current_cdemo_sk, RF005[min_max] -> c_current_hdemo_sk, RF006[bloom] -> c_current_cdemo_sk, RF004[bloom] -> c_current_hdemo_sk
 |  |     stored statistics:
 |  |       table: rows=30.00M size=1.55GB
@@ -159,7 +159,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns]
-|     HDFS partitions=2060/2060 files=2060 size=30.47MB
+|     HDFS partitions=2060/2060 files=2060 size=32.77GB
 |     runtime filters: RF009[min_max] -> cr_returning_customer_sk, RF001[min_max] -> cr_call_center_sk, RF010[bloom] -> cr_returned_date_sk, RF008[bloom] -> cr_returning_customer_sk, RF000[bloom] -> cr_call_center_sk
 |     stored statistics:
 |       table: rows=432.02M size=32.77GB
@@ -171,7 +171,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
-   HDFS partitions=1/1 files=1 size=1.16MB
+   HDFS partitions=1/1 files=1 size=307.36MB
    predicates: ca_gmt_offset = CAST(-6 AS DECIMAL(3,0))
    runtime filters: RF003[min_max] -> ca_address_sk, RF002[bloom] -> ca_address_sk
    stored statistics:
@@ -256,7 +256,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  Per-Instance Resources: mem-estimate=16.34MB mem-reservation=32.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[42]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.call_center, RANDOM]
-|     HDFS partitions=1/1 files=1 size=10.16KB
+|     HDFS partitions=1/1 files=1 size=16.57KB
 |     stored statistics:
 |       table: rows=48 size=16.57KB
 |       columns: all
@@ -353,7 +353,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[470617]
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |     predicates: ((cd_marital_status = 'M' AND cd_education_status = 'Unknown') OR (cd_marital_status = 'W' AND cd_education_status = 'Advanced Degree'))
 |  |     stored statistics:
 |  |       table: rows=1.92M size=11.15MB
@@ -390,7 +390,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  |  Per-Instance Resources: mem-estimate=16.78MB mem-reservation=1.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[53280000]
 |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |     runtime filters: RF007[min_max] -> c_current_cdemo_sk, RF005[min_max] -> c_current_hdemo_sk, RF006[bloom] -> c_current_cdemo_sk, RF004[bloom] -> c_current_hdemo_sk
 |  |     stored statistics:
 |  |       table: rows=30.00M size=1.55GB
@@ -448,7 +448,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
-|     HDFS partitions=2060/2060 files=2060 size=30.47MB
+|     HDFS partitions=2060/2060 files=2060 size=32.77GB
 |     runtime filters: RF009[min_max] -> cr_returning_customer_sk, RF001[min_max] -> cr_call_center_sk, RF010[bloom] -> cr_returned_date_sk, RF008[bloom] -> cr_returning_customer_sk, RF000[bloom] -> cr_call_center_sk
 |     stored statistics:
 |       table: rows=432.02M size=32.77GB
@@ -469,7 +469,7 @@ Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-res
 Per-Instance Resources: mem-estimate=16.47MB mem-reservation=128.00KB thread-reservation=1
 max-parallelism=10 segment-costs=[2266071]
 04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.16MB
+   HDFS partitions=1/1 files=1 size=307.36MB
    predicates: ca_gmt_offset = CAST(-6 AS DECIMAL(3,0))
    runtime filters: RF003[min_max] -> ca_address_sk, RF002[bloom] -> ca_address_sk
    stored statistics:
@@ -554,7 +554,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  Per-Instance Resources: mem-estimate=16.34MB mem-reservation=32.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[42]
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.call_center, RANDOM]
-|     HDFS partitions=1/1 files=1 size=10.16KB
+|     HDFS partitions=1/1 files=1 size=16.57KB
 |     stored statistics:
 |       table: rows=48 size=16.57KB
 |       columns: all
@@ -651,7 +651,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[470617]
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=7.49MB
+|  |     HDFS partitions=1/1 files=1 size=11.15MB
 |  |     predicates: ((cd_marital_status = 'M' AND cd_education_status = 'Unknown') OR (cd_marital_status = 'W' AND cd_education_status = 'Advanced Degree'))
 |  |     stored statistics:
 |  |       table: rows=1.92M size=11.15MB
@@ -688,7 +688,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  |  Per-Instance Resources: mem-estimate=16.78MB mem-reservation=1.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[53280000]
 |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.49MB
+|  |     HDFS partitions=1/1 files=1 size=1.55GB
 |  |     runtime filters: RF007[min_max] -> c_current_cdemo_sk, RF005[min_max] -> c_current_hdemo_sk, RF006[bloom] -> c_current_cdemo_sk, RF004[bloom] -> c_current_hdemo_sk
 |  |     stored statistics:
 |  |       table: rows=30.00M size=1.55GB
@@ -746,7 +746,7 @@ max-parallelism=10 segment-costs=[179857, 14782] cpu-comparison-result=73 [max(2
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
-|     HDFS partitions=2060/2060 files=2060 size=30.47MB
+|     HDFS partitions=2060/2060 files=2060 size=32.77GB
 |     runtime filters: RF009[min_max] -> cr_returning_customer_sk, RF001[min_max] -> cr_call_center_sk, RF010[bloom] -> cr_returned_date_sk, RF008[bloom] -> cr_returning_customer_sk, RF000[bloom] -> cr_call_center_sk
 |     stored statistics:
 |       table: rows=432.02M size=32.77GB
@@ -767,7 +767,7 @@ Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-res
 Per-Instance Resources: mem-estimate=16.47MB mem-reservation=128.00KB thread-reservation=1
 max-parallelism=10 segment-costs=[2266071]
 04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-   HDFS partitions=1/1 files=1 size=1.16MB
+   HDFS partitions=1/1 files=1 size=307.36MB
    predicates: ca_gmt_offset = CAST(-6 AS DECIMAL(3,0))
    runtime filters: RF003[min_max] -> ca_address_sk, RF002[bloom] -> ca_address_sk
    stored statistics:

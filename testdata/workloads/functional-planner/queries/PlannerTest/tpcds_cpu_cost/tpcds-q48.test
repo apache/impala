@@ -91,7 +91,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -131,7 +131,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
-|     HDFS partitions=1/1 files=1 size=1.16MB
+|     HDFS partitions=1/1 files=1 size=307.36MB
 |     predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
 |     stored statistics:
 |       table: rows=15.00M size=307.36MB
@@ -153,7 +153,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics]
-|     HDFS partitions=1/1 files=1 size=7.49MB
+|     HDFS partitions=1/1 files=1 size=11.15MB
 |     predicates: cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree'
 |     stored statistics:
 |       table: rows=1.92M size=11.15MB
@@ -164,7 +164,7 @@ PLAN-ROOT SINK
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_addr_sk, RF007[min_max] -> ss_cdemo_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk, RF006[bloom] -> ss_cdemo_sk
    stored statistics:
@@ -233,7 +233,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[120]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -307,7 +307,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |  Per-Instance Resources: mem-estimate=16.18MB mem-reservation=128.00KB thread-reservation=1
 |  max-parallelism=10 segment-costs=[5305997]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.16MB
+|     HDFS partitions=1/1 files=1 size=307.36MB
 |     predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
 |     stored statistics:
 |       table: rows=15.00M size=307.36MB
@@ -346,7 +346,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[533840]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
-|     HDFS partitions=1/1 files=1 size=7.49MB
+|     HDFS partitions=1/1 files=1 size=11.15MB
 |     predicates: cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree'
 |     stored statistics:
 |       table: rows=1.92M size=11.15MB
@@ -357,7 +357,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_addr_sk, RF007[min_max] -> ss_cdemo_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk, RF006[bloom] -> ss_cdemo_sk
    stored statistics:
@@ -426,7 +426,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[120]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -500,7 +500,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |  Per-Instance Resources: mem-estimate=16.18MB mem-reservation=128.00KB thread-reservation=1
 |  max-parallelism=10 segment-costs=[5305997]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.16MB
+|     HDFS partitions=1/1 files=1 size=307.36MB
 |     predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
 |     stored statistics:
 |       table: rows=15.00M size=307.36MB
@@ -539,7 +539,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[533840]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
-|     HDFS partitions=1/1 files=1 size=7.49MB
+|     HDFS partitions=1/1 files=1 size=11.15MB
 |     predicates: cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree'
 |     stored statistics:
 |       table: rows=1.92M size=11.15MB
@@ -550,7 +550,7 @@ max-parallelism=160 segment-costs=[1592308701, 1] cpu-comparison-result=120 [max
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_addr_sk, RF007[min_max] -> ss_cdemo_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk, RF006[bloom] -> ss_cdemo_sk
    stored statistics:

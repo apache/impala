@@ -219,8 +219,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // Test only stats that will be injected in place of stats obtained from HMS.
   protected SideloadTableStats testStats_ = null;
 
-  // Scale factor to multiply table stats with. Only used for testing.
-  protected double testMetadataScale_ = 1.0;
+  // Scale factor to multiply table stats with.
+  // Only used for large-scale planner test simulation (see IMPALA-12726).
+  // Valid value for testing should be > 0.
+  // In non test environment, value should remain unchanged at -1.0.
+  protected double testMetadataScale_ = -1.0;
 
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {

@@ -90,7 +90,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
@@ -108,7 +108,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     predicates: s_state IN ('OH', 'WV', 'PA', 'TN', 'MN', 'MO', 'NM', 'MI')
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -142,7 +142,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    runtime filters: RF001[min_max] -> ss_item_sk, RF003[min_max] -> ss_store_sk, RF000[bloom] -> ss_item_sk, RF002[bloom] -> ss_store_sk, RF004[bloom] -> ss_sold_date_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -271,7 +271,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |  Per-Instance Resources: mem-estimate=16.18MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[140022]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
@@ -306,7 +306,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[180]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     predicates: s_state IN ('OH', 'WV', 'PA', 'TN', 'MN', 'MO', 'NM', 'MI')
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -357,7 +357,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    runtime filters: RF001[min_max] -> ss_item_sk, RF003[min_max] -> ss_store_sk, RF000[bloom] -> ss_item_sk, RF002[bloom] -> ss_store_sk, RF004[bloom] -> ss_sold_date_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -486,7 +486,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |  Per-Instance Resources: mem-estimate=16.18MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[140022]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.73MB
+|     HDFS partitions=1/1 files=1 size=33.54MB
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
@@ -521,7 +521,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[180]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|     HDFS partitions=1/1 files=1 size=9.81KB
+|     HDFS partitions=1/1 files=1 size=119.76KB
 |     predicates: s_state IN ('OH', 'WV', 'PA', 'TN', 'MN', 'MO', 'NM', 'MI')
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -572,7 +572,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=199.33MB
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
    runtime filters: RF001[min_max] -> ss_item_sk, RF003[min_max] -> ss_store_sk, RF000[bloom] -> ss_item_sk, RF002[bloom] -> ss_store_sk, RF004[bloom] -> ss_sold_date_sk
    stored statistics:
      table: rows=8.64G size=389.90GB

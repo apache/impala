@@ -79,7 +79,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 08(GETNEXT), 11(OPEN)
 |  |
 |  |--11:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page]
-|  |     HDFS partitions=1/1 files=1 size=5.45KB
+|  |     HDFS partitions=1/1 files=1 size=72.76KB
 |  |     predicates: web_page.wp_char_count <= CAST(5200 AS INT), web_page.wp_char_count >= CAST(5000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=3.60K size=72.76KB
@@ -113,7 +113,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     runtime filters: RF011[min_max] -> ws_ship_hdemo_sk, RF009[min_max] -> ws_web_page_sk, RF007[min_max] -> ws_sold_time_sk, RF010[bloom] -> ws_ship_hdemo_sk, RF008[bloom] -> ws_web_page_sk, RF006[bloom] -> ws_sold_time_sk
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -160,7 +160,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page]
-|     HDFS partitions=1/1 files=1 size=5.45KB
+|     HDFS partitions=1/1 files=1 size=72.76KB
 |     predicates: web_page.wp_char_count <= CAST(5200 AS INT), web_page.wp_char_count >= CAST(5000 AS INT)
 |     stored statistics:
 |       table: rows=3.60K size=72.76KB
@@ -194,7 +194,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-   HDFS partitions=1824/1824 files=1824 size=84.18MB
+   HDFS partitions=1824/1824 files=1824 size=145.75GB
    runtime filters: RF005[min_max] -> ws_ship_hdemo_sk, RF003[min_max] -> ws_web_page_sk, RF001[min_max] -> ws_sold_time_sk, RF004[bloom] -> ws_ship_hdemo_sk, RF002[bloom] -> ws_web_page_sk, RF000[bloom] -> ws_sold_time_sk
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -327,7 +327,7 @@ PLAN-ROOT SINK
 |  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=16.00KB thread-reservation=1
 |  |  max-parallelism=1 segment-costs=[632]
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.45KB
+|  |     HDFS partitions=1/1 files=1 size=72.76KB
 |  |     predicates: web_page.wp_char_count <= CAST(5200 AS INT), web_page.wp_char_count >= CAST(5000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=3.60K size=72.76KB
@@ -378,7 +378,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     runtime filters: RF011[min_max] -> ws_ship_hdemo_sk, RF009[min_max] -> ws_web_page_sk, RF007[min_max] -> ws_sold_time_sk, RF010[bloom] -> ws_ship_hdemo_sk, RF008[bloom] -> ws_web_page_sk, RF006[bloom] -> ws_sold_time_sk
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -474,7 +474,7 @@ max-parallelism=60 segment-costs=[529201061, 1] cpu-comparison-result=60 [max(60
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[632]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page, RANDOM]
-|     HDFS partitions=1/1 files=1 size=5.45KB
+|     HDFS partitions=1/1 files=1 size=72.76KB
 |     predicates: web_page.wp_char_count <= CAST(5200 AS INT), web_page.wp_char_count >= CAST(5000 AS INT)
 |     stored statistics:
 |       table: rows=3.60K size=72.76KB
@@ -525,7 +525,7 @@ max-parallelism=60 segment-costs=[529201061, 1] cpu-comparison-result=60 [max(60
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=84.18MB
+   HDFS partitions=1824/1824 files=1824 size=145.75GB
    runtime filters: RF005[min_max] -> ws_ship_hdemo_sk, RF003[min_max] -> ws_web_page_sk, RF001[min_max] -> ws_sold_time_sk, RF004[bloom] -> ws_ship_hdemo_sk, RF002[bloom] -> ws_web_page_sk, RF000[bloom] -> ws_sold_time_sk
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -658,7 +658,7 @@ PLAN-ROOT SINK
 |  |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=16.00KB thread-reservation=1
 |  |  max-parallelism=1 segment-costs=[632]
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=5.45KB
+|  |     HDFS partitions=1/1 files=1 size=72.76KB
 |  |     predicates: web_page.wp_char_count <= CAST(5200 AS INT), web_page.wp_char_count >= CAST(5000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=3.60K size=72.76KB
@@ -709,7 +709,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     runtime filters: RF011[min_max] -> ws_ship_hdemo_sk, RF009[min_max] -> ws_web_page_sk, RF007[min_max] -> ws_sold_time_sk, RF010[bloom] -> ws_ship_hdemo_sk, RF008[bloom] -> ws_web_page_sk, RF006[bloom] -> ws_sold_time_sk
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -805,7 +805,7 @@ max-parallelism=60 segment-costs=[529201061, 1] cpu-comparison-result=60 [max(60
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[632]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.web_page, RANDOM]
-|     HDFS partitions=1/1 files=1 size=5.45KB
+|     HDFS partitions=1/1 files=1 size=72.76KB
 |     predicates: web_page.wp_char_count <= CAST(5200 AS INT), web_page.wp_char_count >= CAST(5000 AS INT)
 |     stored statistics:
 |       table: rows=3.60K size=72.76KB
@@ -856,7 +856,7 @@ max-parallelism=60 segment-costs=[529201061, 1] cpu-comparison-result=60 [max(60
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=84.18MB
+   HDFS partitions=1824/1824 files=1824 size=145.75GB
    runtime filters: RF005[min_max] -> ws_ship_hdemo_sk, RF003[min_max] -> ws_web_page_sk, RF001[min_max] -> ws_sold_time_sk, RF004[bloom] -> ws_ship_hdemo_sk, RF002[bloom] -> ws_web_page_sk, RF000[bloom] -> ws_sold_time_sk
    stored statistics:
      table: rows=2.16G size=145.75GB

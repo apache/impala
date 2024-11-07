@@ -150,7 +150,7 @@ PLAN-ROOT SINK
 |  |  |  |  in pipelines: 39(GETNEXT), 40(OPEN)
 |  |  |  |
 |  |  |  |--40:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |  |     predicates: i_category = 'Sports'
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=360.00K size=33.54MB
@@ -163,7 +163,7 @@ PLAN-ROOT SINK
 |  |  |  |     in pipelines: 40(GETNEXT)
 |  |  |  |
 |  |  |  39:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |  |     runtime filters: RF055[min_max] -> ws_item_sk, RF054[bloom] -> ws_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=2.16G size=145.75GB
@@ -175,7 +175,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 39(GETNEXT)
 |  |  |
 |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns]
-|  |     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     runtime filters: RF050[min_max] -> wr_item_sk, RF051[min_max] -> wr_order_number
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
@@ -223,7 +223,7 @@ PLAN-ROOT SINK
 |  |  |  |  in pipelines: 32(GETNEXT), 33(OPEN)
 |  |  |  |
 |  |  |  |--33:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |  |     predicates: i_category = 'Sports'
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=360.00K size=33.54MB
@@ -236,7 +236,7 @@ PLAN-ROOT SINK
 |  |  |  |     in pipelines: 33(GETNEXT)
 |  |  |  |
 |  |  |  32:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     runtime filters: RF047[min_max] -> ss_item_sk, RF046[bloom] -> ss_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -248,7 +248,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 32(GETNEXT)
 |  |  |
 |  |  35:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
-|  |     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|  |     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |  |     runtime filters: RF042[min_max] -> sr_item_sk, RF043[min_max] -> sr_ticket_number
 |  |     stored statistics:
 |  |       table: rows=863.99M size=48.14GB
@@ -296,7 +296,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 25(GETNEXT), 26(OPEN)
 |  |  |
 |  |  |--26:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
@@ -309,7 +309,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 26(GETNEXT)
 |  |  |
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
-|  |     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|  |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |  |     runtime filters: RF039[min_max] -> cs_item_sk, RF038[bloom] -> cs_item_sk
 |  |     stored statistics:
 |  |       table: rows=4.32G size=280.96GB
@@ -321,7 +321,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 25(GETNEXT)
 |  |
 |  28:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns]
-|     HDFS partitions=2060/2060 files=2060 size=30.47MB
+|     HDFS partitions=2060/2060 files=2060 size=32.77GB
 |     runtime filters: RF034[min_max] -> cr_item_sk, RF035[min_max] -> cr_order_number, RF032[bloom] -> cr_item_sk, RF033[bloom] -> cr_order_number
 |     stored statistics:
 |       table: rows=432.02M size=32.77GB
@@ -388,7 +388,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 15(GETNEXT), 16(OPEN)
 |  |  |
 |  |  |--16:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |  |     stored statistics:
@@ -402,7 +402,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 16(GETNEXT)
 |  |  |
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
-|  |     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |     runtime filters: RF031[min_max] -> ws_item_sk, RF030[bloom] -> ws_item_sk
 |  |     stored statistics:
 |  |       table: rows=2.16G size=145.75GB
@@ -414,7 +414,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 15(GETNEXT)
 |  |
 |  18:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns]
-|     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |     runtime filters: RF026[min_max] -> wr_item_sk, RF027[min_max] -> wr_order_number
 |     stored statistics:
 |       table: rows=216.00M size=16.74GB
@@ -462,7 +462,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 08(GETNEXT), 09(OPEN)
 |  |  |
 |  |  |--09:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |  |     stored statistics:
@@ -476,7 +476,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 09(GETNEXT)
 |  |  |
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF023[min_max] -> ss_item_sk, RF022[bloom] -> ss_item_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -488,7 +488,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 08(GETNEXT)
 |  |
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |     runtime filters: RF018[min_max] -> sr_item_sk, RF019[min_max] -> sr_ticket_number
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
@@ -536,7 +536,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 01(GETNEXT), 02(OPEN)
 |  |
 |  |--02:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
-|  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     predicates: i_category = 'Sports'
 |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |     stored statistics:
@@ -550,7 +550,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
-|     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     runtime filters: RF015[min_max] -> cs_item_sk, RF014[bloom] -> cs_item_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -562,7 +562,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 04:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns]
-   HDFS partitions=2060/2060 files=2060 size=30.47MB
+   HDFS partitions=2060/2060 files=2060 size=32.77GB
    runtime filters: RF010[min_max] -> cr_item_sk, RF011[min_max] -> cr_order_number, RF008[bloom] -> cr_item_sk, RF009[bloom] -> cr_order_number
    stored statistics:
      table: rows=432.02M size=32.77GB
@@ -761,7 +761,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  |  40:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |  |     predicates: i_category = 'Sports'
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=360.00K size=33.54MB
@@ -774,7 +774,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |     in pipelines: 40(GETNEXT)
 |  |  |  |
 |  |  |  39:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |  |     runtime filters: RF055[min_max] -> ws_item_sk, RF054[bloom] -> ws_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=2.16G size=145.75GB
@@ -794,7 +794,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=256.00KB thread-reservation=1
 |  |  max-parallelism=50 segment-costs=[451704816]
 |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
-|  |     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     runtime filters: RF050[min_max] -> wr_item_sk, RF051[min_max] -> wr_order_number
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
@@ -894,7 +894,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |  |     predicates: i_category = 'Sports'
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=360.00K size=33.54MB
@@ -907,7 +907,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |     in pipelines: 33(GETNEXT)
 |  |  |  |
 |  |  |  32:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     runtime filters: RF047[min_max] -> ss_item_sk, RF046[bloom] -> ss_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -927,7 +927,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=190 segment-costs=[1806773027]
 |  |  35:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|  |     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|  |     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |  |     runtime filters: RF042[min_max] -> sr_item_sk, RF043[min_max] -> sr_ticket_number
 |  |     stored statistics:
 |  |       table: rows=863.99M size=48.14GB
@@ -1027,7 +1027,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  26:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
@@ -1040,7 +1040,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |     in pipelines: 26(GETNEXT)
 |  |  |
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-|  |     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|  |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |  |     runtime filters: RF039[min_max] -> cs_item_sk, RF038[bloom] -> cs_item_sk
 |  |     stored statistics:
 |  |       table: rows=4.32G size=280.96GB
@@ -1061,7 +1061,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=32.00KB thread-reservation=1
 |  max-parallelism=100 segment-costs=[903433931]
 |  28:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
-|     HDFS partitions=2060/2060 files=2060 size=30.47MB
+|     HDFS partitions=2060/2060 files=2060 size=32.77GB
 |     runtime filters: RF034[min_max] -> cr_item_sk, RF035[min_max] -> cr_order_number, RF032[bloom] -> cr_item_sk, RF033[bloom] -> cr_order_number
 |     stored statistics:
 |       table: rows=432.02M size=32.77GB
@@ -1217,7 +1217,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  16:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |  |     stored statistics:
@@ -1231,7 +1231,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |     in pipelines: 16(GETNEXT)
 |  |  |
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |     runtime filters: RF031[min_max] -> ws_item_sk, RF030[bloom] -> ws_item_sk
 |  |     stored statistics:
 |  |       table: rows=2.16G size=145.75GB
@@ -1251,7 +1251,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=256.00KB thread-reservation=1
 |  max-parallelism=50 segment-costs=[451704816]
 |  18:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
-|     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |     runtime filters: RF026[min_max] -> wr_item_sk, RF027[min_max] -> wr_order_number
 |     stored statistics:
 |       table: rows=216.00M size=16.74GB
@@ -1351,7 +1351,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |  |     stored statistics:
@@ -1365,7 +1365,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |     in pipelines: 09(GETNEXT)
 |  |  |
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF023[min_max] -> ss_item_sk, RF022[bloom] -> ss_item_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -1385,7 +1385,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=190 segment-costs=[1806773027]
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |     runtime filters: RF018[min_max] -> sr_item_sk, RF019[min_max] -> sr_ticket_number
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
@@ -1485,7 +1485,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=4 segment-costs=[148858]
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     predicates: i_category = 'Sports'
 |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |     stored statistics:
@@ -1499,7 +1499,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-|     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     runtime filters: RF015[min_max] -> cs_item_sk, RF014[bloom] -> cs_item_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -1520,7 +1520,7 @@ Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-r
 Per-Instance Resources: mem-estimate=27.25MB mem-reservation=32.00KB thread-reservation=1
 max-parallelism=100 segment-costs=[903433931]
 04:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
-   HDFS partitions=2060/2060 files=2060 size=30.47MB
+   HDFS partitions=2060/2060 files=2060 size=32.77GB
    runtime filters: RF010[min_max] -> cr_item_sk, RF011[min_max] -> cr_order_number, RF008[bloom] -> cr_item_sk, RF009[bloom] -> cr_order_number
    stored statistics:
      table: rows=432.02M size=32.77GB
@@ -1719,7 +1719,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  |  40:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |  |     predicates: i_category = 'Sports'
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=360.00K size=33.54MB
@@ -1732,7 +1732,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |     in pipelines: 40(GETNEXT)
 |  |  |  |
 |  |  |  39:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |  |     runtime filters: RF055[min_max] -> ws_item_sk, RF054[bloom] -> ws_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=2.16G size=145.75GB
@@ -1752,7 +1752,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=256.00KB thread-reservation=1
 |  |  max-parallelism=50 segment-costs=[451704816]
 |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
-|  |     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     runtime filters: RF050[min_max] -> wr_item_sk, RF051[min_max] -> wr_order_number
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
@@ -1852,7 +1852,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |  |     predicates: i_category = 'Sports'
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=360.00K size=33.54MB
@@ -1865,7 +1865,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  |     in pipelines: 33(GETNEXT)
 |  |  |  |
 |  |  |  32:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     runtime filters: RF047[min_max] -> ss_item_sk, RF046[bloom] -> ss_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -1885,7 +1885,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=190 segment-costs=[1806773027]
 |  |  35:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|  |     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|  |     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |  |     runtime filters: RF042[min_max] -> sr_item_sk, RF043[min_max] -> sr_ticket_number
 |  |     stored statistics:
 |  |       table: rows=863.99M size=48.14GB
@@ -1985,7 +1985,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  26:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
@@ -1998,7 +1998,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  |  |     in pipelines: 26(GETNEXT)
 |  |  |
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-|  |     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|  |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |  |     runtime filters: RF039[min_max] -> cs_item_sk, RF038[bloom] -> cs_item_sk
 |  |     stored statistics:
 |  |       table: rows=4.32G size=280.96GB
@@ -2019,7 +2019,7 @@ max-parallelism=4600 segment-costs=[45945066147, 220] cpu-comparison-result=1440
 |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=32.00KB thread-reservation=1
 |  max-parallelism=100 segment-costs=[903433931]
 |  28:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
-|     HDFS partitions=2060/2060 files=2060 size=30.47MB
+|     HDFS partitions=2060/2060 files=2060 size=32.77GB
 |     runtime filters: RF034[min_max] -> cr_item_sk, RF035[min_max] -> cr_order_number, RF032[bloom] -> cr_item_sk, RF033[bloom] -> cr_order_number
 |     stored statistics:
 |       table: rows=432.02M size=32.77GB
@@ -2175,7 +2175,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  16:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |  |     stored statistics:
@@ -2189,7 +2189,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |     in pipelines: 16(GETNEXT)
 |  |  |
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=84.18MB
+|  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |     runtime filters: RF031[min_max] -> ws_item_sk, RF030[bloom] -> ws_item_sk
 |  |     stored statistics:
 |  |       table: rows=2.16G size=145.75GB
@@ -2209,7 +2209,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=256.00KB thread-reservation=1
 |  max-parallelism=50 segment-costs=[451704816]
 |  18:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
-|     HDFS partitions=2114/2114 files=2114 size=20.70MB
+|     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |     runtime filters: RF026[min_max] -> wr_item_sk, RF027[min_max] -> wr_order_number
 |     stored statistics:
 |       table: rows=216.00M size=16.74GB
@@ -2309,7 +2309,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  |  max-parallelism=4 segment-costs=[148858]
 |  |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: i_category = 'Sports'
 |  |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |  |     stored statistics:
@@ -2323,7 +2323,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  |     in pipelines: 09(GETNEXT)
 |  |  |
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
-|  |     HDFS partitions=1824/1824 files=1824 size=199.33MB
+|  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     runtime filters: RF023[min_max] -> ss_item_sk, RF022[bloom] -> ss_item_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -2343,7 +2343,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  Per-Instance Resources: mem-estimate=27.25MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=190 segment-costs=[1806773027]
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
-|     HDFS partitions=2004/2004 files=2004 size=33.63MB
+|     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |     runtime filters: RF018[min_max] -> sr_item_sk, RF019[min_max] -> sr_ticket_number
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
@@ -2443,7 +2443,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |  Per-Instance Resources: mem-estimate=16.16MB mem-reservation=512.00KB thread-reservation=1
 |  |  max-parallelism=4 segment-costs=[148858]
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=1.73MB
+|  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     predicates: i_category = 'Sports'
 |  |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_brand_id, RF005[min_max] -> tpcds_partitioned_parquet_snap.item.i_category_id, RF006[min_max] -> tpcds_partitioned_parquet_snap.item.i_class_id, RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact_id
 |  |     stored statistics:
@@ -2457,7 +2457,7 @@ max-parallelism=120 segment-costs=[2607739492, 793346183] cpu-comparison-result=
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
-|     HDFS partitions=1831/1831 files=1831 size=150.82MB
+|     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     runtime filters: RF015[min_max] -> cs_item_sk, RF014[bloom] -> cs_item_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -2478,7 +2478,7 @@ Per-Host Shared Resources: mem-estimate=17.00MB mem-reservation=17.00MB thread-r
 Per-Instance Resources: mem-estimate=27.25MB mem-reservation=32.00KB thread-reservation=1
 max-parallelism=100 segment-costs=[903433931]
 04:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
-   HDFS partitions=2060/2060 files=2060 size=30.47MB
+   HDFS partitions=2060/2060 files=2060 size=32.77GB
    runtime filters: RF010[min_max] -> cr_item_sk, RF011[min_max] -> cr_order_number, RF008[bloom] -> cr_item_sk, RF009[bloom] -> cr_order_number
    stored statistics:
      table: rows=432.02M size=32.77GB
