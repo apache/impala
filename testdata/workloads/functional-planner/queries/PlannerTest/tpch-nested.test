@@ -818,7 +818,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE
 |  output: sum(l_extendedprice * l_discount)
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=3
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
    HDFS partitions=1/1 files=4 size=289.07MB
@@ -2086,7 +2086,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
-|  row-size=32B cardinality=1
+|  row-size=32B cardinality=3
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -2209,7 +2209,7 @@ PLAN-ROOT SINK
 |  |
 |  05:AGGREGATE
 |  |  output: max(sum(l_extendedprice * (1 - l_discount)))
-|  |  row-size=16B cardinality=1
+|  |  row-size=16B cardinality=3
 |  |
 |  13:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(l_extendedprice * (1 - l_discount))
@@ -2459,7 +2459,7 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE
 |  output: sum(l_extendedprice)
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=3
 |
 05:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  hash predicates: p_partkey = l_partkey
@@ -2686,7 +2686,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: sum(l_extendedprice * (1 - l_discount))
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=3
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -2827,7 +2827,7 @@ PLAN-ROOT SINK
 |
 12:AGGREGATE [STREAMING]
 |  group by: s_name, s_address
-|  row-size=67B cardinality=10.00K
+|  row-size=67B cardinality=28.93K
 |
 11:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
@@ -3043,7 +3043,7 @@ PLAN-ROOT SINK
 19:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: s_name
-|  row-size=38B cardinality=9.96K
+|  row-size=38B cardinality=29.89K
 |
 18:SUBPLAN
 |  row-size=146B cardinality=15.00M
@@ -3249,7 +3249,7 @@ PLAN-ROOT SINK
 |  |
 |  02:AGGREGATE
 |  |  output: avg(c_acctbal)
-|  |  row-size=8B cardinality=1
+|  |  row-size=8B cardinality=3
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer c]
 |     HDFS partitions=1/1 files=4 size=289.07MB

@@ -396,8 +396,8 @@ PLAN-ROOT SINK
 |  in pipelines: 32(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(i_item_id)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=15.32MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[613440, 2712566, 167] cpu-comparison-result=216 [max(10 (self) vs 216 (sum children))]
+Per-Instance Resources: mem-estimate=15.61MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[636137, 2712566, 167] cpu-comparison-result=216 [max(10 (self) vs 216 (sum children))]
 32:TOP-N [LIMIT=100]
 |  order by: item_id ASC, sr_item_qty ASC
 |  mem-estimate=5.08KB mem-reservation=0B thread-reservation=0
@@ -805,19 +805,19 @@ max-parallelism=10 segment-costs=[613440, 2712566, 167] cpu-comparison-result=21
 |  in pipelines: 38(GETNEXT), 00(OPEN)
 |
 37:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=5.32MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=7 row-size=36B cardinality=185.57K cost=51347
+|  mem-estimate=5.61MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=36B cardinality=267.60K cost=74044
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=27.56MB mem-reservation=2.50MB thread-reservation=1
-max-parallelism=120 segment-costs=[1127582378, 525833] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+max-parallelism=120 segment-costs=[1127582378, 758271] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CAST(sr_return_quantity AS BIGINT))
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=7 row-size=36B cardinality=185.57K cost=776388
+|  tuple-ids=7 row-size=36B cardinality=267.60K cost=776388
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -995,8 +995,8 @@ PLAN-ROOT SINK
 |  in pipelines: 32(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(i_item_id)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=15.32MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[613440, 2712566, 167] cpu-comparison-result=216 [max(10 (self) vs 216 (sum children))]
+Per-Instance Resources: mem-estimate=15.61MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[636137, 2712566, 167] cpu-comparison-result=216 [max(10 (self) vs 216 (sum children))]
 32:TOP-N [LIMIT=100]
 |  order by: item_id ASC, sr_item_qty ASC
 |  mem-estimate=5.08KB mem-reservation=0B thread-reservation=0
@@ -1404,19 +1404,19 @@ max-parallelism=10 segment-costs=[613440, 2712566, 167] cpu-comparison-result=21
 |  in pipelines: 38(GETNEXT), 00(OPEN)
 |
 37:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=5.32MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=7 row-size=36B cardinality=185.57K cost=51347
+|  mem-estimate=5.61MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=36B cardinality=267.60K cost=74044
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=27.56MB mem-reservation=2.50MB thread-reservation=1
-max-parallelism=120 segment-costs=[1127582378, 525833] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+max-parallelism=120 segment-costs=[1127582378, 758271] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CAST(sr_return_quantity AS BIGINT))
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=7 row-size=36B cardinality=185.57K cost=776388
+|  tuple-ids=7 row-size=36B cardinality=267.60K cost=776388
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [LEFT SEMI JOIN, BROADCAST]

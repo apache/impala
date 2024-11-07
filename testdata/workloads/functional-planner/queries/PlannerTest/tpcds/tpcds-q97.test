@@ -151,7 +151,7 @@ PLAN-ROOT SINK
 |
 16:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1
+|  tuple-ids=8 row-size=24B cardinality=3
 |  in pipelines: 09(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk)] hosts=3 instances=3
@@ -159,7 +159,7 @@ Per-Host Resources: mem-estimate=95.05MB mem-reservation=85.00MB thread-reservat
 09:AGGREGATE
 |  output: sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1
+|  tuple-ids=8 row-size=24B cardinality=3
 |  in pipelines: 09(GETNEXT), 12(OPEN)
 |
 08:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
@@ -303,7 +303,7 @@ PLAN-ROOT SINK
 |
 16:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1
+|  tuple-ids=8 row-size=24B cardinality=6
 |  in pipelines: 09(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk)] hosts=3 instances=6
@@ -311,7 +311,7 @@ Per-Instance Resources: mem-estimate=27.09MB mem-reservation=17.00MB thread-rese
 09:AGGREGATE
 |  output: sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1
+|  tuple-ids=8 row-size=24B cardinality=6
 |  in pipelines: 09(GETNEXT), 12(OPEN)
 |
 08:HASH JOIN [FULL OUTER JOIN, PARTITIONED]

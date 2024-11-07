@@ -1239,7 +1239,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: t2.id
-|  row-size=12B cardinality=99
+|  row-size=12B cardinality=297
 |
 04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: t2.id = t3.id
@@ -1298,7 +1298,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: t1.int_col
-|  row-size=12B cardinality=10
+|  row-size=12B cardinality=30
 |
 04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: t1.int_col = t3.int_col

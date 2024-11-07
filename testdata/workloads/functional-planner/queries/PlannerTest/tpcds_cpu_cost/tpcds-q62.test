@@ -145,7 +145,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=132.98MB Threads=22
-Per-Host Resource Estimates: Memory=546MB
+Per-Host Resource Estimates: Memory=548MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.09MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[843] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -161,8 +161,8 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=20.98MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[282111, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=22.39MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[368409, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: substr(w_warehouse_name, 1, 20) ASC, sm_type ASC, web_name ASC
 |  mem-estimate=8.75KB mem-reservation=0B thread-reservation=0
@@ -177,19 +177,19 @@ max-parallelism=10 segment-costs=[282111, 8155, 266] cpu-comparison-result=120 [
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)]
-|  mem-estimate=10.98MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=90B cardinality=1.39K cost=725
+|  mem-estimate=12.39MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=90B cardinality=166.32K cost=87023
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=29.66MB mem-reservation=2.12MB thread-reservation=1
-max-parallelism=790 segment-costs=[7867530603, 8711] cpu-comparison-result=120 [max(120 (self) vs 44 (sum children))]
+max-parallelism=790 segment-costs=[7867530603, 1045327] cpu-comparison-result=120 [max(120 (self) vs 44 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(30 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(30 AS BIGINT)) AND (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(60 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(60 AS BIGINT)) AND (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(90 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(90 AS BIGINT)) AND (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  group by: substr(w_warehouse_name, CAST(1 AS BIGINT), CAST(20 AS BIGINT)), sm_type, web_name
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=90B cardinality=1.39K cost=3520230777
+|  tuple-ids=5 row-size=90B cardinality=166.32K cost=3520230777
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -348,7 +348,7 @@ max-parallelism=790 segment-costs=[7867530603, 8711] cpu-comparison-result=120 [
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=132.98MB Threads=22
-Per-Host Resource Estimates: Memory=546MB
+Per-Host Resource Estimates: Memory=548MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.09MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[843] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -364,8 +364,8 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=20.98MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[282111, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=22.39MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[368409, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: substr(w_warehouse_name, 1, 20) ASC, sm_type ASC, web_name ASC
 |  mem-estimate=8.75KB mem-reservation=0B thread-reservation=0
@@ -380,19 +380,19 @@ max-parallelism=10 segment-costs=[282111, 8155, 266] cpu-comparison-result=120 [
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)]
-|  mem-estimate=10.98MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=90B cardinality=1.39K cost=725
+|  mem-estimate=12.39MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=90B cardinality=166.32K cost=87023
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
 Per-Instance Resources: mem-estimate=29.66MB mem-reservation=2.12MB thread-reservation=1
-max-parallelism=790 segment-costs=[7867530603, 8711] cpu-comparison-result=120 [max(120 (self) vs 44 (sum children))]
+max-parallelism=790 segment-costs=[7867530603, 1045327] cpu-comparison-result=120 [max(120 (self) vs 44 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(30 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(30 AS BIGINT)) AND (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(60 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(60 AS BIGINT)) AND (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(90 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(90 AS BIGINT)) AND (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) <= CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(ws_ship_date_sk AS BIGINT) - CAST(ws_sold_date_sk AS BIGINT) > CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  group by: substr(w_warehouse_name, CAST(1 AS BIGINT), CAST(20 AS BIGINT)), sm_type, web_name
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=90B cardinality=1.39K cost=3520230777
+|  tuple-ids=5 row-size=90B cardinality=166.32K cost=3520230777
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

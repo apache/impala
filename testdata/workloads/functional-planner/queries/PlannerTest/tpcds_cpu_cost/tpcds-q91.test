@@ -201,7 +201,7 @@ PLAN-ROOT SINK
 |
 F09:PLAN FRAGMENT [HASH(cc_call_center_id,cc_name,cc_manager,cd_marital_status,cd_education_status)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=22.00MB mem-reservation=13.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[25098, 7558, 4668] cpu-comparison-result=73 [max(10 (self) vs 73 (sum children))]
+max-parallelism=10 segment-costs=[32260, 7558, 4668] cpu-comparison-result=73 [max(10 (self) vs 73 (sum children))]
 14:SORT
 |  order by: sum(cr_net_loss) DESC
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
@@ -216,18 +216,18 @@ max-parallelism=10 segment-costs=[25098, 7558, 4668] cpu-comparison-result=73 [m
 |  in pipelines: 24(GETNEXT), 04(OPEN)
 |
 23:EXCHANGE [HASH(cc_call_center_id,cc_name,cc_manager,cd_marital_status,cd_education_status)]
-|  mem-estimate=1.32MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=7 row-size=129B cardinality=1.68K cost=1180
+|  mem-estimate=1.44MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=129B cardinality=11.87K cost=8342
 |  in pipelines: 04(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(ca_address_sk)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=17.15MB mem-reservation=2.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[140486, 14782] cpu-comparison-result=73 [max(20 (self) vs 73 (sum children))]
+max-parallelism=10 segment-costs=[140486, 104446] cpu-comparison-result=73 [max(20 (self) vs 73 (sum children))]
 13:AGGREGATE [STREAMING]
 |  output: sum(cr_net_loss)
 |  group by: cc_call_center_id, cc_name, cc_manager, cd_marital_status, cd_education_status
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=7 row-size=129B cardinality=1.68K cost=82010
+|  tuple-ids=7 row-size=129B cardinality=11.87K cost=82010
 |  in pipelines: 04(GETNEXT)
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -499,7 +499,7 @@ PLAN-ROOT SINK
 |
 F09:PLAN FRAGMENT [HASH(cc_call_center_id,cc_name,cc_manager,cd_marital_status,cd_education_status)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=22.00MB mem-reservation=13.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[25098, 7558, 4668] cpu-comparison-result=73 [max(10 (self) vs 73 (sum children))]
+max-parallelism=10 segment-costs=[32260, 7558, 4668] cpu-comparison-result=73 [max(10 (self) vs 73 (sum children))]
 14:SORT
 |  order by: sum(cr_net_loss) DESC
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
@@ -514,18 +514,18 @@ max-parallelism=10 segment-costs=[25098, 7558, 4668] cpu-comparison-result=73 [m
 |  in pipelines: 24(GETNEXT), 04(OPEN)
 |
 23:EXCHANGE [HASH(cc_call_center_id,cc_name,cc_manager,cd_marital_status,cd_education_status)]
-|  mem-estimate=1.32MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=7 row-size=129B cardinality=1.68K cost=1180
+|  mem-estimate=1.44MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=129B cardinality=11.87K cost=8342
 |  in pipelines: 04(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(ca_address_sk)] hosts=10 instances=10
 Per-Instance Resources: mem-estimate=17.15MB mem-reservation=2.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[140486, 14782] cpu-comparison-result=73 [max(20 (self) vs 73 (sum children))]
+max-parallelism=10 segment-costs=[140486, 104446] cpu-comparison-result=73 [max(20 (self) vs 73 (sum children))]
 13:AGGREGATE [STREAMING]
 |  output: sum(cr_net_loss)
 |  group by: cc_call_center_id, cc_name, cc_manager, cd_marital_status, cd_education_status
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=7 row-size=129B cardinality=1.68K cost=82010
+|  tuple-ids=7 row-size=129B cardinality=11.87K cost=82010
 |  in pipelines: 04(GETNEXT)
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]

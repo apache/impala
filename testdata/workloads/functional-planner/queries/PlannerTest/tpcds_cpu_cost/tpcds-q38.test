@@ -229,8 +229,8 @@ PLAN-ROOT SINK
 Max Per-Host Resource Reservation: Memory=4.69GB Threads=109
 Per-Host Resource Estimates: Memory=101.23GB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[8, 0] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
+|  Per-Instance Resources: mem-estimate=184.84KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -243,17 +243,17 @@ PLAN-ROOT SINK
 |  in pipelines: 36(GETNEXT), 20(OPEN)
 |
 35:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1 cost=0
+|  mem-estimate=168.84KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=16 row-size=8B cardinality=120 cost=17
 |  in pipelines: 20(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(c_last_name,c_first_name,d_date)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=1.19GB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=4920 segment-costs=[49154165112, 7498180101, 1] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
+max-parallelism=4920 segment-costs=[49154165112, 7498180101, 123] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 20:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1 cost=555185749
+|  tuple-ids=16 row-size=8B cardinality=120 cost=555185749
 |  in pipelines: 20(GETNEXT), 24(OPEN)
 |
 19:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -629,8 +629,8 @@ max-parallelism=1824 segment-costs=[54753163494, 24500370827] cpu-comparison-res
 Max Per-Host Resource Reservation: Memory=4.66GB Threads=132
 Per-Host Resource Estimates: Memory=100.06GB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[8, 0] cpu-comparison-result=480 [max(1 (self) vs 480 (sum children))]
+|  Per-Instance Resources: mem-estimate=184.84KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=480 [max(1 (self) vs 480 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -643,17 +643,17 @@ PLAN-ROOT SINK
 |  in pipelines: 37(GETNEXT), 20(OPEN)
 |
 36:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1 cost=0
+|  mem-estimate=168.84KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=16 row-size=8B cardinality=120 cost=17
 |  in pipelines: 20(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(c_last_name,c_first_name,d_date)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=1.19GB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=4920 segment-costs=[49154165112, 7498180101, 1] cpu-comparison-result=480 [max(120 (self) vs 480 (sum children))]
+max-parallelism=4920 segment-costs=[49154165112, 7498180101, 123] cpu-comparison-result=480 [max(120 (self) vs 480 (sum children))]
 20:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1 cost=555185749
+|  tuple-ids=16 row-size=8B cardinality=120 cost=555185749
 |  in pipelines: 20(GETNEXT), 24(OPEN)
 |
 19:HASH JOIN [INNER JOIN, PARTITIONED]

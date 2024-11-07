@@ -119,11 +119,11 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=12B cardinality=73.14M(filtered from 4.32G) cost=12638882
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=175.88MB Threads=9
-Per-Host Resource Estimates: Memory=547MB
+Max Per-Host Resource Reservation: Memory=272.31MB Threads=10
+Per-Host Resource Estimates: Memory=947MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[768] cpu-comparison-result=25 [max(1 (self) vs 25 (sum children))]
+|  max-parallelism=1 segment-costs=[768] cpu-comparison-result=30 [max(1 (self) vs 30 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_category, i_class, i_current_price, sum(cs_ext_sales_price), sum(cs_ext_sales_price) * CAST(100 AS DECIMAL(3,0)) / sum(sum(cs_ext_sales_price))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=700
@@ -137,7 +137,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(i_class)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=24.78MB mem-reservation=16.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=30 [max(10 (self) vs 30 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100 / sum(sum(cs_ext_sales_price)) ASC
 |  mem-estimate=20.93KB mem-reservation=0B thread-reservation=0
@@ -163,29 +163,29 @@ max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=2
 |  in pipelines: 12(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=20.76MB mem-reservation=8.50MB thread-reservation=1
-max-parallelism=10 segment-costs=[25630784, 4782688] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=360.84MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=10 segment-costs=[42860487, 4782688] cpu-comparison-result=30 [max(10 (self) vs 30 (sum children))]
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=344.91MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=198B cardinality=360.00K cost=25262416
 |  in pipelines: 12(GETNEXT), 00(OPEN)
 |
 11:EXCHANGE [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)]
-|  mem-estimate=10.76MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=360.00K cost=368368
+|  mem-estimate=15.93MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=17.20M cost=17598071
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
-Per-Instance Resources: mem-estimate=188.84MB mem-reservation=35.00MB thread-reservation=1
-max-parallelism=20 segment-costs=[175406369, 4782688] cpu-comparison-result=25 [max(20 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=133.86MB mem-reservation=35.00MB thread-reservation=1
+max-parallelism=30 segment-costs=[175406369, 228483356] cpu-comparison-result=30 [max(30 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=164.94MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=360.00K cost=108018538
+|  mem-estimate=109.96MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=17.20M cost=108018538
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -197,13 +197,13 @@ max-parallelism=20 segment-costs=[175406369, 4782688] cpu-comparison-result=25 [
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=79.74MB mem-reservation=69.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=113.74MB mem-reservation=103.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[251530]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_item_sk
 |  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
-|  |  mem-estimate=68.00MB mem-reservation=68.00MB spill-buffer=2.00MB thread-reservation=0 cost=108000
+|  |  mem-estimate=102.00MB mem-reservation=102.00MB spill-buffer=2.00MB thread-reservation=0 cost=108000
 |  |
 |  10:EXCHANGE [BROADCAST]
 |  |  mem-estimate=10.74MB mem-reservation=0B thread-reservation=0
@@ -235,13 +235,13 @@ max-parallelism=20 segment-costs=[175406369, 4782688] cpu-comparison-result=25 [
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=4.89MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[71]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
 |  |  runtime filters: RF002[bloom] <- d_date_sk
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0 cost=31
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=31
 |  |
 |  09:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -276,11 +276,11 @@ max-parallelism=20 segment-costs=[175406369, 4782688] cpu-comparison-result=25 [
    tuple-ids=0 row-size=12B cardinality=73.14M(filtered from 4.32G) cost=12638882
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=175.88MB Threads=9
-Per-Host Resource Estimates: Memory=547MB
+Max Per-Host Resource Reservation: Memory=272.31MB Threads=10
+Per-Host Resource Estimates: Memory=947MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[768] cpu-comparison-result=25 [max(1 (self) vs 25 (sum children))]
+|  max-parallelism=1 segment-costs=[768] cpu-comparison-result=30 [max(1 (self) vs 30 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_category, i_class, i_current_price, sum(cs_ext_sales_price), sum(cs_ext_sales_price) * CAST(100 AS DECIMAL(3,0)) / sum(sum(cs_ext_sales_price))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=700
@@ -294,7 +294,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(i_class)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=24.78MB mem-reservation=16.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=30 [max(10 (self) vs 30 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100 / sum(sum(cs_ext_sales_price)) ASC
 |  mem-estimate=20.93KB mem-reservation=0B thread-reservation=0
@@ -320,29 +320,29 @@ max-parallelism=10 segment-costs=[3620186, 4106309, 592] cpu-comparison-result=2
 |  in pipelines: 12(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=20.76MB mem-reservation=8.50MB thread-reservation=1
-max-parallelism=10 segment-costs=[25630784, 4782688] cpu-comparison-result=25 [max(10 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=360.84MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=10 segment-costs=[42860487, 4782688] cpu-comparison-result=30 [max(10 (self) vs 30 (sum children))]
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=344.91MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=198B cardinality=360.00K cost=25262416
 |  in pipelines: 12(GETNEXT), 00(OPEN)
 |
 11:EXCHANGE [HASH(i_item_id,i_item_desc,i_category,i_class,i_current_price)]
-|  mem-estimate=10.76MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=360.00K cost=368368
+|  mem-estimate=15.93MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=17.20M cost=17598071
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
-Per-Instance Resources: mem-estimate=188.84MB mem-reservation=35.00MB thread-reservation=1
-max-parallelism=20 segment-costs=[175406369, 4782688] cpu-comparison-result=25 [max(20 (self) vs 25 (sum children))]
+Per-Instance Resources: mem-estimate=133.86MB mem-reservation=35.00MB thread-reservation=1
+max-parallelism=30 segment-costs=[175406369, 228483356] cpu-comparison-result=30 [max(30 (self) vs 25 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=164.94MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=198B cardinality=360.00K cost=108018538
+|  mem-estimate=109.96MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=198B cardinality=17.20M cost=108018538
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -354,13 +354,13 @@ max-parallelism=20 segment-costs=[175406369, 4782688] cpu-comparison-result=25 [
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=79.74MB mem-reservation=69.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=113.74MB mem-reservation=103.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[251530]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_item_sk
 |  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
-|  |  mem-estimate=68.00MB mem-reservation=68.00MB spill-buffer=2.00MB thread-reservation=0 cost=108000
+|  |  mem-estimate=102.00MB mem-reservation=102.00MB spill-buffer=2.00MB thread-reservation=0 cost=108000
 |  |
 |  10:EXCHANGE [BROADCAST]
 |  |  mem-estimate=10.74MB mem-reservation=0B thread-reservation=0
@@ -392,13 +392,13 @@ max-parallelism=20 segment-costs=[175406369, 4782688] cpu-comparison-result=25 [
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=4.89MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=6.83MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[71]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
 |  |  runtime filters: RF002[bloom] <- d_date_sk
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0 cost=31
+|  |  mem-estimate=5.81MB mem-reservation=5.81MB spill-buffer=64.00KB thread-reservation=0 cost=31
 |  |
 |  09:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0

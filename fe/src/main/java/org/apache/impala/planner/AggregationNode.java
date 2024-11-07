@@ -272,8 +272,6 @@ public class AggregationNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    // TODO: IMPALA-2945: this doesn't correctly take into account duplicate keys on
-    // multiple nodes in a pre-aggregation.
     cardinality_ = 0;
     aggInputCardinality_ = getFirstAggInputCardinality();
     Preconditions.checkState(aggInputCardinality_ >= -1, aggInputCardinality_);
@@ -296,6 +294,8 @@ public class AggregationNode extends PlanNode {
 
     boolean unknownEstimate = false;
     final boolean canCompleteEarly = canCompleteEarly();
+    final boolean estimatePreaggDuplicate =
+        isPreagg_ && analyzer.getQueryOptions().isEstimate_duplicate_in_preagg();
     aggClassNumGroups_ = Lists.newArrayList();
     aggClassOutputCardinality_ = Lists.newArrayList();
     int aggIdx = 0;
@@ -309,10 +309,6 @@ public class AggregationNode extends PlanNode {
         numGroups =
             estimateNumGroups(groupingExprs, aggInputCardinality_, preaggNumgroup);
       } else {
-        // TODO: This numGroups is a global estimate accross all data. If this is
-        // a preaggregation node with N instances, actual number can be as high as
-        // N * numGroups. But N is unknown until later phase of planning. Preaggregation
-        // node can also stream rows, which will produce more rows than N * numGroups.
         numGroups =
             estimateNumGroups(groupingExprs, aggInputCardinality_, this, analyzer);
       }
@@ -350,9 +346,9 @@ public class AggregationNode extends PlanNode {
           aggOutputCard = smallestValidCardinality(aggOutputCard, getLimit());
         }
         aggClassOutputCardinality_.add(aggOutputCard);
-        // TODO: IMPALA-2945: Use aggClassOutputCardinality_ to calculate cardinality.
-        // Currently, we only consider aggClassOutputCardinality_ for costing.
-        cardinality_ = checkedAdd(cardinality_, numGroups);
+        // IMPALA-2945: Behavior change if estimatePreaggDuplicate is true.
+        cardinality_ =
+            checkedAdd(cardinality_, estimatePreaggDuplicate ? aggOutputCard : numGroups);
       }
       aggIdx++;
     }
@@ -369,8 +365,13 @@ public class AggregationNode extends PlanNode {
       cardinality_ = applyConjunctsSelectivity(cardinality_);
       cardAfterConjunct = cardinality_;
     }
-    // IMPALA-2581: preAgg node can have limit.
-    cardinality_ = capCardinalityAtLimit(cardinality_);
+
+    // IMPALA-2945: Behavior change if estimatePreaggDuplicate is true.
+    // limit is already accounted by estimatePreaggCardinality().
+    if (!estimatePreaggDuplicate) {
+      // IMPALA-2581: preAgg node can have limit.
+      cardinality_ = capCardinalityAtLimit(cardinality_);
+    }
 
     if (LOG.isTraceEnabled()) {
       LOG.trace("{} cardinality=[BeforeConjunct={} AfterConjunct={} AfterLimit={}]",
@@ -862,23 +863,6 @@ public class AggregationNode extends PlanNode {
     return output;
   }
 
-  private long getAggClassNumGroup(
-      @Nullable AggregationNode prevAgg, AggregateInfo aggInfo) {
-    if (prevAgg == null) {
-      return aggInputCardinality_;
-    } else {
-      // This aggInfo should be in-line with aggInfo of prevAgg
-      // (sizes are validated in getPrevAggInputNode).
-      int aggIdx = aggInfos_.indexOf(aggInfo);
-      long aggClassNumGroup = prevAgg.aggClassNumGroups_.get(aggIdx);
-      if (aggClassNumGroup <= -1) {
-        return aggInputCardinality_;
-      } else {
-        return Math.min(aggInputCardinality_, aggClassNumGroup);
-      }
-    }
-  }
-
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
     processingCost_ = ProcessingCost.zero();
@@ -913,10 +897,22 @@ public class AggregationNode extends PlanNode {
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     resourceProfiles_ = Lists.newArrayListWithCapacity(aggInfos_.size());
     resourceProfiles_.clear();
-    AggregationNode preaggNode = getPreAggNodeChild();
+    // IMPALA-2945: Behavior change if estimatePreaggDuplicate is true.
+    boolean estimatePreaggDuplicate = queryOptions.isEstimate_duplicate_in_preagg();
+    AggregationNode prevAggNode = getPreAggNodeChild();
+    int aggIdx = 0;
     for (AggregateInfo aggInfo : aggInfos_) {
-      resourceProfiles_.add(computeAggClassResourceProfile(
-          queryOptions, aggInfo, getAggClassNumGroup(preaggNode, aggInfo)));
+      long inputCardinality = aggInputCardinality_;
+      if (prevAggNode != null) {
+        long aggClassOutputCardinality = estimatePreaggDuplicate ?
+            prevAggNode.aggClassOutputCardinality_.get(aggIdx) :
+            prevAggNode.aggClassNumGroups_.get(aggIdx);
+        inputCardinality =
+            smallestValidCardinality(inputCardinality, aggClassOutputCardinality);
+      }
+      resourceProfiles_.add(
+          computeAggClassResourceProfile(queryOptions, aggInfo, inputCardinality));
+      aggIdx++;
     }
     if (aggInfos_.size() == 1) {
       nodeResourceProfile_ = resourceProfiles_.get(0);

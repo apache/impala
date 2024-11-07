@@ -325,8 +325,8 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  |  in pipelines: 24(GETNEXT), 09(OPEN), 10(OPEN)
 |  |
 |  23:EXCHANGE [HASH(d_week_seq)]
-|  |  mem-estimate=761.85KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=16 row-size=116B cardinality=10.64K
+|  |  mem-estimate=1.53MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=16 row-size=116B cardinality=31.93K
 |  |  in pipelines: 09(GETNEXT), 10(GETNEXT)
 |  |
 |  F08:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -335,7 +335,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  |  group by: d_week_seq
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=16 row-size=116B cardinality=10.64K
+|  |  tuple-ids=16 row-size=116B cardinality=31.93K
 |  |  in pipelines: 09(GETNEXT), 10(GETNEXT)
 |  |
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -429,8 +429,8 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  in pipelines: 20(GETNEXT), 01(OPEN), 02(OPEN)
 |
 19:EXCHANGE [HASH(d_week_seq)]
-|  mem-estimate=761.85KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=116B cardinality=10.64K
+|  mem-estimate=1.53MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=116B cardinality=31.93K
 |  in pipelines: 01(GETNEXT), 02(GETNEXT)
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -439,7 +439,7 @@ Per-Host Resources: mem-estimate=113.67MB mem-reservation=12.75MB thread-reserva
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  group by: d_week_seq
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=6 row-size=116B cardinality=10.64K
+|  tuple-ids=6 row-size=116B cardinality=31.93K
 |  in pipelines: 01(GETNEXT), 02(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -585,8 +585,8 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  |  in pipelines: 24(GETNEXT), 09(OPEN), 10(OPEN)
 |  |
 |  23:EXCHANGE [HASH(d_week_seq)]
-|  |  mem-estimate=761.85KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=16 row-size=116B cardinality=10.64K
+|  |  mem-estimate=1.53MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=16 row-size=116B cardinality=31.93K
 |  |  in pipelines: 09(GETNEXT), 10(GETNEXT)
 |  |
 |  F08:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -596,7 +596,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  |  group by: d_week_seq
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=16 row-size=116B cardinality=10.64K
+|  |  tuple-ids=16 row-size=116B cardinality=31.93K
 |  |  in pipelines: 09(GETNEXT), 10(GETNEXT)
 |  |
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -708,8 +708,8 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  in pipelines: 20(GETNEXT), 01(OPEN), 02(OPEN)
 |
 19:EXCHANGE [HASH(d_week_seq)]
-|  mem-estimate=761.85KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=116B cardinality=10.64K
+|  mem-estimate=1.53MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=116B cardinality=31.93K
 |  in pipelines: 01(GETNEXT), 02(GETNEXT)
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -719,7 +719,7 @@ Per-Instance Resources: mem-estimate=59.41MB mem-reservation=7.00MB thread-reser
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  group by: d_week_seq
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=6 row-size=116B cardinality=10.64K
+|  tuple-ids=6 row-size=116B cardinality=31.93K
 |  in pipelines: 01(GETNEXT), 02(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

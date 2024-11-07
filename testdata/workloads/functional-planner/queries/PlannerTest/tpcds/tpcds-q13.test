@@ -196,7 +196,7 @@ PLAN-ROOT SINK
 |
 18:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=40B cardinality=1
+|  tuple-ids=6 row-size=40B cardinality=3
 |  in pipelines: 11(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(ss_cdemo_sk)] hosts=3 instances=3
@@ -204,7 +204,7 @@ Per-Host Resources: mem-estimate=19.61MB mem-reservation=12.44MB thread-reservat
 11:AGGREGATE
 |  output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=6 row-size=40B cardinality=1
+|  tuple-ids=6 row-size=40B cardinality=3
 |  in pipelines: 11(GETNEXT), 00(OPEN)
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
@@ -382,7 +382,7 @@ PLAN-ROOT SINK
 |
 18:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=40B cardinality=1
+|  tuple-ids=6 row-size=40B cardinality=6
 |  in pipelines: 11(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(ss_cdemo_sk)] hosts=3 instances=6
@@ -390,7 +390,7 @@ Per-Instance Resources: mem-estimate=802.87KB mem-reservation=0B thread-reservat
 11:AGGREGATE
 |  output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=6 row-size=40B cardinality=1
+|  tuple-ids=6 row-size=40B cardinality=6
 |  in pipelines: 11(GETNEXT), 00(OPEN)
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]

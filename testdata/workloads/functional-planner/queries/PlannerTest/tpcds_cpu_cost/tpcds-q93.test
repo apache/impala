@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=10 instances=50 (adjusted from 120)
 Per-Instance Resources: mem-estimate=45.17MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=50 segment-costs=[128411460, 459933248, 83] cpu-comparison-result=181 [max(50 (self) vs 181 (sum children))]
+max-parallelism=50 segment-costs=[147165928, 459933248, 83] cpu-comparison-result=181 [max(50 (self) vs 181 (sum children))]
 06:TOP-N [LIMIT=100]
 |  order by: sum(act_sales) ASC, ss_customer_sk ASC
 |  mem-estimate=1.95KB mem-reservation=0B thread-reservation=0
@@ -125,17 +125,17 @@ max-parallelism=50 segment-costs=[128411460, 459933248, 83] cpu-comparison-resul
 |
 10:EXCHANGE [HASH(ss_customer_sk)]
 |  mem-estimate=11.17MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=20B cardinality=32.68M cost=6637451
+|  tuple-ids=4 row-size=20B cardinality=125.02M cost=25391919
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_item_sk,ss_ticket_number)] hosts=10 instances=50 (adjusted from 120)
 Per-Instance Resources: mem-estimate=76.13MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=830 segment-costs=[8297732700, 58929854] cpu-comparison-result=181 [max(170 (self) vs 181 (sum children))]
+max-parallelism=830 segment-costs=[8297732700, 225439237] cpu-comparison-result=181 [max(170 (self) vs 181 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN sr_return_quantity IS NOT NULL THEN CAST((CAST(ss_quantity AS BIGINT) - CAST(sr_return_quantity AS BIGINT)) AS DECIMAL(19,0)) * ss_sales_price ELSE CAST((CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price) AS DECIMAL(27,2)) END)
 |  group by: ss_customer_sk
 |  mem-estimate=58.16MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=20B cardinality=32.68M cost=363121159
+|  tuple-ids=4 row-size=20B cardinality=125.02M cost=363121159
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -250,7 +250,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=10 instances=50 (adjusted from 120)
 Per-Instance Resources: mem-estimate=45.17MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=50 segment-costs=[128411460, 459933248, 83] cpu-comparison-result=181 [max(50 (self) vs 181 (sum children))]
+max-parallelism=50 segment-costs=[147165928, 459933248, 83] cpu-comparison-result=181 [max(50 (self) vs 181 (sum children))]
 06:TOP-N [LIMIT=100]
 |  order by: sum(act_sales) ASC, ss_customer_sk ASC
 |  mem-estimate=1.95KB mem-reservation=0B thread-reservation=0
@@ -266,17 +266,17 @@ max-parallelism=50 segment-costs=[128411460, 459933248, 83] cpu-comparison-resul
 |
 10:EXCHANGE [HASH(ss_customer_sk)]
 |  mem-estimate=11.17MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=20B cardinality=32.68M cost=6637451
+|  tuple-ids=4 row-size=20B cardinality=125.02M cost=25391919
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_item_sk,ss_ticket_number)] hosts=10 instances=50 (adjusted from 120)
 Per-Instance Resources: mem-estimate=76.13MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=830 segment-costs=[8297732700, 58929854] cpu-comparison-result=181 [max(170 (self) vs 181 (sum children))]
+max-parallelism=830 segment-costs=[8297732700, 225439237] cpu-comparison-result=181 [max(170 (self) vs 181 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN sr_return_quantity IS NOT NULL THEN CAST((CAST(ss_quantity AS BIGINT) - CAST(sr_return_quantity AS BIGINT)) AS DECIMAL(19,0)) * ss_sales_price ELSE CAST((CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price) AS DECIMAL(27,2)) END)
 |  group by: ss_customer_sk
 |  mem-estimate=58.16MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=20B cardinality=32.68M cost=363121159
+|  tuple-ids=4 row-size=20B cardinality=125.02M cost=363121159
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

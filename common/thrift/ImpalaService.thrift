@@ -973,6 +973,10 @@ enum TImpalaQueryOptions {
   // If True, enable tuple analysis for both preaggregation and final aggregation node.
   // Enabling this feature can lower cardinality estimate of multi-column grouping.
   ENABLE_TUPLE_ANALYSIS_IN_AGGREGATE = 184
+
+  // If True, account for probability of having duplicate grouping key exist in multiple
+  // nodes during preaggreation.
+  ESTIMATE_DUPLICATE_IN_PREAGG = 185
 }
 
 // The summary of a DML statement.

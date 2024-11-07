@@ -426,12 +426,12 @@ Per-Host Resources: mem-estimate=10.26MB mem-reservation=1.94MB thread-reservati
 |  output: sum:merge(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=8.85K
+|  tuple-ids=26 row-size=44B cardinality=8.65K
 |  in pipelines: 55(GETNEXT), 39(OPEN), 46(OPEN), 53(OPEN)
 |
 54:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=270.81KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=8.85K
+|  mem-estimate=267.92KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=44B cardinality=8.65K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -440,7 +440,7 @@ Per-Host Resources: mem-estimate=20.78MB mem-reservation=3.94MB thread-reservati
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=8.85K
+|  tuple-ids=26 row-size=44B cardinality=8.65K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 00:UNION
@@ -924,8 +924,8 @@ Per-Instance Resources: mem-estimate=10.41MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 55(GETNEXT), 39(OPEN), 46(OPEN), 53(OPEN)
 |
 54:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=414.81KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=8.85K
+|  mem-estimate=424.12KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=44B cardinality=9.50K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -934,7 +934,7 @@ Per-Instance Resources: mem-estimate=21.48MB mem-reservation=3.94MB thread-reser
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=8.85K
+|  tuple-ids=26 row-size=44B cardinality=9.50K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 00:UNION

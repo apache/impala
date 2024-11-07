@@ -368,8 +368,8 @@ max-parallelism=10 segment-costs=[75699697, 42670965, 25050821] cpu-comparison-r
 |  |  in pipelines: 49(GETNEXT)
 |  |
 |  F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=96.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[8, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
+|  Per-Instance Resources: mem-estimate=180.25KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[30, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
 |  49:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(netpaid)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -377,17 +377,17 @@ max-parallelism=10 segment-costs=[75699697, 42670965, 25050821] cpu-comparison-r
 |  |  in pipelines: 49(GETNEXT), 25(OPEN)
 |  |
 |  48:EXCHANGE [UNPARTITIONED]
-|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1 cost=0
+|  |  mem-estimate=164.25KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=16B cardinality=120 cost=22
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F18:PLAN FRAGMENT [HASH(c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size)] hosts=10 instances=70 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=541.28MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=750 segment-costs=[7418435974, 77261318, 1] cpu-comparison-result=285 [max(70 (self) vs 285 (sum children))]
+|  max-parallelism=750 segment-costs=[7418435974, 77261318, 185] cpu-comparison-result=285 [max(70 (self) vs 285 (sum children))]
 |  25:AGGREGATE
 |  |  output: avg(sum(ss_net_paid))
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1 cost=77261318
+|  |  tuple-ids=18 row-size=16B cardinality=120 cost=77261318
 |  |  in pipelines: 25(GETNEXT), 47(OPEN)
 |  |
 |  47:AGGREGATE [FINALIZE]
@@ -929,8 +929,8 @@ max-parallelism=10 segment-costs=[75699697, 42670965, 25050821] cpu-comparison-r
 |  |  in pipelines: 49(GETNEXT)
 |  |
 |  F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=96.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[8, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
+|  Per-Instance Resources: mem-estimate=180.25KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[30, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
 |  49:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(netpaid)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -938,17 +938,17 @@ max-parallelism=10 segment-costs=[75699697, 42670965, 25050821] cpu-comparison-r
 |  |  in pipelines: 49(GETNEXT), 25(OPEN)
 |  |
 |  48:EXCHANGE [UNPARTITIONED]
-|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1 cost=0
+|  |  mem-estimate=164.25KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=16B cardinality=120 cost=22
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F18:PLAN FRAGMENT [HASH(c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size)] hosts=10 instances=70 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=541.28MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=750 segment-costs=[7418435974, 77261318, 1] cpu-comparison-result=285 [max(70 (self) vs 285 (sum children))]
+|  max-parallelism=750 segment-costs=[7418435974, 77261318, 185] cpu-comparison-result=285 [max(70 (self) vs 285 (sum children))]
 |  25:AGGREGATE
 |  |  output: avg(sum(ss_net_paid))
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1 cost=77261318
+|  |  tuple-ids=18 row-size=16B cardinality=120 cost=77261318
 |  |  in pipelines: 25(GETNEXT), 47(OPEN)
 |  |
 |  47:AGGREGATE [FINALIZE]

@@ -22,7 +22,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE
 |  output: min(`month`), max(`year`), ndv(`day`)
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=3
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -70,7 +70,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [STREAMING]
 |  output: ndv(`day`)
 |  group by: `year`
-|  row-size=12B cardinality=1
+|  row-size=12B cardinality=3
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -191,7 +191,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: min(a.`month`)
-|  row-size=4B cardinality=1
+|  row-size=4B cardinality=3
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.`year` = b.`year`

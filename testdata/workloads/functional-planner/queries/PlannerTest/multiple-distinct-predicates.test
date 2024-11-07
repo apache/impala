@@ -79,7 +79,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=21
+|  row-size=15B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -164,7 +164,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=21
+|  row-size=15B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -250,7 +250,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=21
+|  row-size=15B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -336,7 +336,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=21
+|  row-size=15B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB

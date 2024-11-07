@@ -136,7 +136,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=37.77MB Threads=12
-Per-Host Resource Estimates: Memory=470MB
+Per-Host Resource Estimates: Memory=471MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -151,7 +151,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(w_state,i_item_id)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=10.44MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.85MB mem-reservation=1.94MB thread-reservation=1
 10:TOP-N [LIMIT=100]
 |  order by: w_state ASC, i_item_id ASC
 |  mem-estimate=7.23KB mem-reservation=0B thread-reservation=0
@@ -166,8 +166,8 @@ Per-Host Resources: mem-estimate=10.44MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(w_state,i_item_id)]
-|  mem-estimate=447.28KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=8.85K
+|  mem-estimate=871.09KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=74B cardinality=26.45K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -176,7 +176,7 @@ Per-Host Resources: mem-estimate=270.42MB mem-reservation=27.31MB thread-reserva
 |  output: sum(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: w_state, i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=8.85K
+|  tuple-ids=5 row-size=74B cardinality=26.45K
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -312,7 +312,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(w_state,i_item_id)] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=10.44MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.85MB mem-reservation=1.94MB thread-reservation=1
 10:TOP-N [LIMIT=100]
 |  order by: w_state ASC, i_item_id ASC
 |  mem-estimate=7.23KB mem-reservation=0B thread-reservation=0
@@ -327,8 +327,8 @@ Per-Instance Resources: mem-estimate=10.44MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(w_state,i_item_id)]
-|  mem-estimate=447.28KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=8.85K
+|  mem-estimate=871.09KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=74B cardinality=26.45K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -338,7 +338,7 @@ Per-Instance Resources: mem-estimate=58.91MB mem-reservation=10.00MB thread-rese
 |  output: sum(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: w_state, i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=8.85K
+|  tuple-ids=5 row-size=74B cardinality=26.45K
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

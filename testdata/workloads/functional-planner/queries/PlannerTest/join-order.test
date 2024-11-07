@@ -344,7 +344,7 @@ PLAN-ROOT SINK
 11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: n_name
-|  row-size=35B cardinality=25
+|  row-size=35B cardinality=75
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n_regionkey = r_regionkey
@@ -607,7 +607,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
-|  row-size=28B cardinality=5
+|  row-size=28B cardinality=15
 |
 02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -679,7 +679,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
-|  row-size=28B cardinality=5
+|  row-size=28B cardinality=15
 |
 02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -747,7 +747,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
-|  row-size=28B cardinality=5
+|  row-size=28B cardinality=15
 |
 02:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -814,7 +814,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=2
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n_nationkey

@@ -379,7 +379,7 @@ PLAN-ROOT SINK
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=7.51GB Threads=253
-Per-Host Resource Estimates: Memory=101.50GB
+Per-Host Resource Estimates: Memory=129.00GB
 F25:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.92MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[440] cpu-comparison-result=960 [max(1 (self) vs 960 (sum children))]
@@ -574,8 +574,8 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |  in pipelines: 48(GETNEXT)
 |  |
 |  F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-|  Per-Instance Resources: mem-estimate=95.98MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[690690485, 105419400] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+|  Per-Instance Resources: mem-estimate=606.14MB mem-reservation=34.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[1005785180, 105419400] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 |  21:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=38 row-size=44B cardinality=30.00M cost=4955400
@@ -584,23 +584,23 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  48:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_list_price - ws_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=43.19MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=553.34MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=37 row-size=169B cardinality=30.00M cost=664015288
 |  |  in pipelines: 48(GETNEXT), 23(OPEN)
 |  |
 |  47:EXCHANGE [HASH(c_customer_id,c_first_name,c_last_name,c_preferred_cust_flag,c_birth_country,c_login,c_email_address,d_year)]
 |  |  mem-estimate=30.29MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=37 row-size=169B cardinality=30.00M cost=26675197
+|  |  tuple-ids=37 row-size=169B cardinality=384.37M cost=341769892
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=533.79MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=270 segment-costs=[2600192196, 342246771] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
+|  max-parallelism=440 segment-costs=[2600192196, 4384958733] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
 |  27:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_list_price - ws_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  mem-estimate=438.88MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=37 row-size=169B cardinality=30.00M cost=2299149579
+|  |  tuple-ids=37 row-size=169B cardinality=384.37M cost=2299149579
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  26:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -613,7 +613,7 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |
 |  |--F30:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=70.45MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  |  max-parallelism=270 segment-costs=[54467197]
+|  |  |  max-parallelism=440 segment-costs=[54467197]
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=03
 |  |  |  build expressions: c_customer_sk
@@ -721,8 +721,8 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |  in pipelines: 41(GETNEXT)
 |  |
 |  F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-|  Per-Instance Resources: mem-estimate=118.46MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[1956761766, 202654192] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+|  Per-Instance Resources: mem-estimate=1.91GB mem-reservation=34.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[3091124881, 202654192] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 |  07:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=18 row-size=92B cardinality=30.00M cost=9517103
@@ -731,23 +731,23 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  41:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_list_price - ss_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=43.19MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=1.84GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=13 row-size=169B cardinality=30.00M cost=1930086569
 |  |  in pipelines: 41(GETNEXT), 09(OPEN)
 |  |
 |  40:EXCHANGE [HASH(c_customer_id,c_first_name,c_last_name,c_preferred_cust_flag,c_birth_country,c_login,c_email_address,d_year)]
 |  |  mem-estimate=30.29MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=169B cardinality=30.00M cost=26675197
+|  |  tuple-ids=13 row-size=169B cardinality=1.31G cost=1161038312
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=1.80GB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=940 segment-costs=[9345196195, 342246771] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
+|  max-parallelism=1490 segment-costs=[9345196195, 14896294857] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
 |  13:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_list_price - ss_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  mem-estimate=1.71GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=13 row-size=169B cardinality=30.00M cost=8141744291
+|  |  tuple-ids=13 row-size=169B cardinality=1.31G cost=8141744291
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  12:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -760,7 +760,7 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |
 |  |--F33:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=70.45MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  |  max-parallelism=940 segment-costs=[54467197]
+|  |  |  max-parallelism=1490 segment-costs=[54467197]
 |  |  JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=04
 |  |  |  build expressions: c_customer_sk
@@ -979,7 +979,7 @@ max-parallelism=374 segment-costs=[5731769480]
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=7.51GB Threads=253
-Per-Host Resource Estimates: Memory=101.50GB
+Per-Host Resource Estimates: Memory=129.00GB
 F25:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.92MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[440] cpu-comparison-result=960 [max(1 (self) vs 960 (sum children))]
@@ -1174,8 +1174,8 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |  in pipelines: 48(GETNEXT)
 |  |
 |  F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-|  Per-Instance Resources: mem-estimate=95.98MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[690690485, 105419400] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+|  Per-Instance Resources: mem-estimate=606.14MB mem-reservation=34.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[1005785180, 105419400] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 |  21:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=38 row-size=44B cardinality=30.00M cost=4955400
@@ -1184,23 +1184,23 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  48:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_list_price - ws_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=43.19MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=553.34MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=37 row-size=169B cardinality=30.00M cost=664015288
 |  |  in pipelines: 48(GETNEXT), 23(OPEN)
 |  |
 |  47:EXCHANGE [HASH(c_customer_id,c_first_name,c_last_name,c_preferred_cust_flag,c_birth_country,c_login,c_email_address,d_year)]
 |  |  mem-estimate=30.29MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=37 row-size=169B cardinality=30.00M cost=26675197
+|  |  tuple-ids=37 row-size=169B cardinality=384.37M cost=341769892
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=533.79MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=270 segment-costs=[2600192196, 342246771] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
+|  max-parallelism=440 segment-costs=[2600192196, 4384958733] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
 |  27:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_list_price - ws_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  mem-estimate=438.88MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=37 row-size=169B cardinality=30.00M cost=2299149579
+|  |  tuple-ids=37 row-size=169B cardinality=384.37M cost=2299149579
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  26:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1213,7 +1213,7 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |
 |  |--F30:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=70.45MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  |  max-parallelism=270 segment-costs=[54467197]
+|  |  |  max-parallelism=440 segment-costs=[54467197]
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=03
 |  |  |  build expressions: c_customer_sk
@@ -1321,8 +1321,8 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |  in pipelines: 41(GETNEXT)
 |  |
 |  F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-|  Per-Instance Resources: mem-estimate=118.46MB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=120 segment-costs=[1956761766, 202654192] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+|  Per-Instance Resources: mem-estimate=1.91GB mem-reservation=34.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[3091124881, 202654192] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 |  07:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=18 row-size=92B cardinality=30.00M cost=9517103
@@ -1331,23 +1331,23 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  41:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_list_price - ss_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=43.19MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=1.84GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=13 row-size=169B cardinality=30.00M cost=1930086569
 |  |  in pipelines: 41(GETNEXT), 09(OPEN)
 |  |
 |  40:EXCHANGE [HASH(c_customer_id,c_first_name,c_last_name,c_preferred_cust_flag,c_birth_country,c_login,c_email_address,d_year)]
 |  |  mem-estimate=30.29MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=169B cardinality=30.00M cost=26675197
+|  |  tuple-ids=13 row-size=169B cardinality=1.31G cost=1161038312
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=10 instances=120
 |  Per-Instance Resources: mem-estimate=1.80GB mem-reservation=34.00MB thread-reservation=1
-|  max-parallelism=940 segment-costs=[9345196195, 342246771] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
+|  max-parallelism=1490 segment-costs=[9345196195, 14896294857] cpu-comparison-result=240 [max(240 (self) vs 141 (sum children))]
 |  13:AGGREGATE [STREAMING]
 |  |  output: sum(ss_ext_list_price - ss_ext_discount_amt)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  mem-estimate=1.71GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=13 row-size=169B cardinality=30.00M cost=8141744291
+|  |  tuple-ids=13 row-size=169B cardinality=1.31G cost=8141744291
 |  |  in pipelines: 09(GETNEXT)
 |  |
 |  12:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1360,7 +1360,7 @@ max-parallelism=380 segment-costs=[3707613664, 230] cpu-comparison-result=960 [m
 |  |
 |  |--F33:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=10 instances=120
 |  |  |  Per-Instance Resources: mem-estimate=70.45MB mem-reservation=50.00MB thread-reservation=1 runtime-filters-memory=16.00MB
-|  |  |  max-parallelism=940 segment-costs=[54467197]
+|  |  |  max-parallelism=1490 segment-costs=[54467197]
 |  |  JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=04
 |  |  |  build expressions: c_customer_sk

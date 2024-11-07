@@ -731,8 +731,8 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS
 |  in pipelines: 06(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(c_custkey,c_nationkey)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=11.33MB mem-reservation=4.75MB thread-reservation=1
-max-parallelism=2 segment-costs=[928243, 251160] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
+Per-Instance Resources: mem-estimate=11.42MB mem-reservation=4.75MB thread-reservation=1
+max-parallelism=2 segment-costs=[930185, 251160] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
 06:AGGREGATE [FINALIZE]
 |  output: max:merge(o_totalprice)
 |  group by: c_custkey, c_nationkey
@@ -741,19 +741,19 @@ max-parallelism=2 segment-costs=[928243, 251160] cpu-comparison-result=3 [max(2 
 |  in pipelines: 06(GETNEXT), 00(OPEN)
 |
 05:EXCHANGE [HASH(c_custkey,c_nationkey)]
-|  mem-estimate=1.33MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=2 row-size=18B cardinality=150.00K cost=29085
+|  mem-estimate=1.42MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=160.02K cost=31027
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=26.17MB mem-reservation=13.00MB thread-reservation=1
-max-parallelism=2 segment-costs=[7499075, 251160] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
+max-parallelism=2 segment-costs=[7499075, 267937] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
 03:AGGREGATE [STREAMING]
 |  output: max(o_totalprice)
 |  group by: c_custkey, c_nationkey
 |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=2 row-size=18B cardinality=150.00K cost=1038882
+|  tuple-ids=2 row-size=18B cardinality=160.02K cost=1038882
 |  in pipelines: 00(GETNEXT)
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]

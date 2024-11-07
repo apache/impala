@@ -241,7 +241,7 @@ PLAN-ROOT SINK
 |
 35:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1
+|  tuple-ids=16 row-size=8B cardinality=3
 |  in pipelines: 20(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(c_last_name,c_first_name,d_date)] hosts=3 instances=3
@@ -249,7 +249,7 @@ Per-Host Resources: mem-estimate=171.11MB mem-reservation=102.00MB thread-reserv
 20:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1
+|  tuple-ids=16 row-size=8B cardinality=3
 |  in pipelines: 20(GETNEXT), 24(OPEN)
 |
 19:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
@@ -544,7 +544,7 @@ PLAN-ROOT SINK
 |
 35:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1
+|  tuple-ids=16 row-size=8B cardinality=6
 |  in pipelines: 20(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(c_last_name,c_first_name,d_date)] hosts=3 instances=6
@@ -552,7 +552,7 @@ Per-Instance Resources: mem-estimate=44.36MB mem-reservation=34.00MB thread-rese
 20:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=16 row-size=8B cardinality=1
+|  tuple-ids=16 row-size=8B cardinality=6
 |  in pipelines: 20(GETNEXT), 24(OPEN)
 |
 19:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]

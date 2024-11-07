@@ -134,7 +134,7 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(ca_zip)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=10.15MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.23MB mem-reservation=1.94MB thread-reservation=1
 08:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC
 |  mem-estimate=3.22KB mem-reservation=0B thread-reservation=0
@@ -149,8 +149,8 @@ Per-Host Resources: mem-estimate=10.15MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 15(GETNEXT), 00(OPEN)
 |
 14:EXCHANGE [HASH(ca_zip)]
-|  mem-estimate=153.55KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=33B cardinality=3.96K
+|  mem-estimate=238.65KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=33B cardinality=11.88K
 |  in pipelines: 00(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=3 instances=3
@@ -159,7 +159,7 @@ Per-Host Resources: mem-estimate=17.21MB mem-reservation=5.88MB thread-reservati
 |  output: sum(cs_sales_price)
 |  group by: ca_zip
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=33B cardinality=3.96K
+|  tuple-ids=4 row-size=33B cardinality=11.88K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -283,7 +283,7 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(ca_zip)] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=10.15MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.23MB mem-reservation=1.94MB thread-reservation=1
 08:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC
 |  mem-estimate=3.22KB mem-reservation=0B thread-reservation=0
@@ -298,8 +298,8 @@ Per-Instance Resources: mem-estimate=10.15MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 15(GETNEXT), 00(OPEN)
 |
 14:EXCHANGE [HASH(ca_zip)]
-|  mem-estimate=153.55KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=33B cardinality=3.96K
+|  mem-estimate=238.65KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=33B cardinality=11.88K
 |  in pipelines: 00(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=3 instances=3
@@ -308,7 +308,7 @@ Per-Instance Resources: mem-estimate=12.06MB mem-reservation=2.00MB thread-reser
 |  output: sum(cs_sales_price)
 |  group by: ca_zip
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=33B cardinality=3.96K
+|  tuple-ids=4 row-size=33B cardinality=11.88K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]

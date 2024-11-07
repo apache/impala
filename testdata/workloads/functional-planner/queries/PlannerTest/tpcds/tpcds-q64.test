@@ -957,7 +957,7 @@ Per-Host Resources: mem-estimate=75.11MB mem-reservation=46.00MB thread-reservat
 |  |  |  in pipelines: 136(GETNEXT)
 |  |  |
 |  |  F56:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
-|  |  Per-Host Resources: mem-estimate=10.36MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=10.81MB mem-reservation=1.94MB thread-reservation=1
 |  |  136:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  group by: cs_item_sk
@@ -967,8 +967,8 @@ Per-Host Resources: mem-estimate=75.11MB mem-reservation=46.00MB thread-reservat
 |  |  |  in pipelines: 136(GETNEXT), 41(OPEN)
 |  |  |
 |  |  135:EXCHANGE [HASH(cs_item_sk)]
-|  |  |  mem-estimate=366.05KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=27 row-size=40B cardinality=17.98K
+|  |  |  mem-estimate=834.15KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=27 row-size=40B cardinality=53.92K
 |  |  |  in pipelines: 41(GETNEXT)
 |  |  |
 |  |  F54:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -977,7 +977,7 @@ Per-Host Resources: mem-estimate=75.11MB mem-reservation=46.00MB thread-reservat
 |  |  |  output: sum(cs_ext_list_price), sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  group by: cs_item_sk
 |  |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=27 row-size=40B cardinality=17.98K
+|  |  |  tuple-ids=27 row-size=40B cardinality=53.92K
 |  |  |  in pipelines: 41(GETNEXT)
 |  |  |
 |  |  43:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1538,7 +1538,7 @@ Per-Host Resources: mem-estimate=48.81MB mem-reservation=42.69MB thread-reservat
 |  |  in pipelines: 106(GETNEXT)
 |  |
 |  F27:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=10.36MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.81MB mem-reservation=1.94MB thread-reservation=1
 |  106:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  group by: cs_item_sk
@@ -1548,8 +1548,8 @@ Per-Host Resources: mem-estimate=48.81MB mem-reservation=42.69MB thread-reservat
 |  |  in pipelines: 106(GETNEXT), 02(OPEN)
 |  |
 |  105:EXCHANGE [HASH(cs_item_sk)]
-|  |  mem-estimate=366.05KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=40B cardinality=17.98K
+|  |  mem-estimate=834.15KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=40B cardinality=53.92K
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F25:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1558,7 +1558,7 @@ Per-Host Resources: mem-estimate=48.81MB mem-reservation=42.69MB thread-reservat
 |  |  output: sum(cs_ext_list_price), sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  group by: cs_item_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=4 row-size=40B cardinality=17.98K
+|  |  tuple-ids=4 row-size=40B cardinality=53.92K
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2168,7 +2168,7 @@ Per-Instance Resources: mem-estimate=26.83MB mem-reservation=12.00MB thread-rese
 |  |  |  in pipelines: 136(GETNEXT)
 |  |  |
 |  |  F56:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=10.36MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=10.81MB mem-reservation=1.94MB thread-reservation=1
 |  |  136:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  group by: cs_item_sk
@@ -2178,8 +2178,8 @@ Per-Instance Resources: mem-estimate=26.83MB mem-reservation=12.00MB thread-rese
 |  |  |  in pipelines: 136(GETNEXT), 41(OPEN)
 |  |  |
 |  |  135:EXCHANGE [HASH(cs_item_sk)]
-|  |  |  mem-estimate=366.05KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=27 row-size=40B cardinality=17.98K
+|  |  |  mem-estimate=834.15KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=27 row-size=40B cardinality=53.92K
 |  |  |  in pipelines: 41(GETNEXT)
 |  |  |
 |  |  F54:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2189,7 +2189,7 @@ Per-Instance Resources: mem-estimate=26.83MB mem-reservation=12.00MB thread-rese
 |  |  |  output: sum(cs_ext_list_price), sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  group by: cs_item_sk
 |  |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=27 row-size=40B cardinality=17.98K
+|  |  |  tuple-ids=27 row-size=40B cardinality=53.92K
 |  |  |  in pipelines: 41(GETNEXT)
 |  |  |
 |  |  43:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2895,7 +2895,7 @@ Per-Instance Resources: mem-estimate=27.11MB mem-reservation=17.00MB thread-rese
 |  |  in pipelines: 106(GETNEXT)
 |  |
 |  F27:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
-|  Per-Instance Resources: mem-estimate=10.36MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.81MB mem-reservation=1.94MB thread-reservation=1
 |  106:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  group by: cs_item_sk
@@ -2905,8 +2905,8 @@ Per-Instance Resources: mem-estimate=27.11MB mem-reservation=17.00MB thread-rese
 |  |  in pipelines: 106(GETNEXT), 02(OPEN)
 |  |
 |  105:EXCHANGE [HASH(cs_item_sk)]
-|  |  mem-estimate=366.05KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=40B cardinality=17.98K
+|  |  mem-estimate=834.15KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=40B cardinality=53.92K
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F25:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2916,7 +2916,7 @@ Per-Instance Resources: mem-estimate=27.11MB mem-reservation=17.00MB thread-rese
 |  |  output: sum(cs_ext_list_price), sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  group by: cs_item_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=4 row-size=40B cardinality=17.98K
+|  |  tuple-ids=4 row-size=40B cardinality=53.92K
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]

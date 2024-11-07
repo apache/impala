@@ -159,7 +159,7 @@ PLAN-ROOT SINK
 |
 F06:PLAN FRAGMENT [HASH(w_state,i_item_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=44.76MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[32280018, 28837420, 225] cpu-comparison-result=126 [max(10 (self) vs 126 (sum children))]
+max-parallelism=10 segment-costs=[37527052, 28837420, 225] cpu-comparison-result=126 [max(10 (self) vs 126 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: w_state ASC, i_item_id ASC
 |  mem-estimate=7.23KB mem-reservation=0B thread-reservation=0
@@ -175,17 +175,17 @@ max-parallelism=10 segment-costs=[32280018, 28837420, 225] cpu-comparison-result
 |
 16:EXCHANGE [HASH(w_state,i_item_id)]
 |  mem-estimate=10.76MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=2.41M cost=1089208
+|  tuple-ids=5 row-size=74B cardinality=14.03M cost=6336242
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(cs_item_sk,cs_order_number)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=102.63MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=110 segment-costs=[1044734340, 12739523] cpu-comparison-result=126 [max(50 (self) vs 126 (sum children))]
+max-parallelism=110 segment-costs=[1044734340, 74109479] cpu-comparison-result=126 [max(50 (self) vs 126 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN d_date < DATE '1999-02-02' THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN d_date >= DATE '1999-02-02' THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: w_state, i_item_id
 |  mem-estimate=88.49MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=2.41M cost=84325553
+|  tuple-ids=5 row-size=74B cardinality=14.03M cost=84325553
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -375,7 +375,7 @@ PLAN-ROOT SINK
 |
 F06:PLAN FRAGMENT [HASH(w_state,i_item_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=44.76MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[32280018, 28837420, 225] cpu-comparison-result=126 [max(10 (self) vs 126 (sum children))]
+max-parallelism=10 segment-costs=[37527052, 28837420, 225] cpu-comparison-result=126 [max(10 (self) vs 126 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: w_state ASC, i_item_id ASC
 |  mem-estimate=7.23KB mem-reservation=0B thread-reservation=0
@@ -391,17 +391,17 @@ max-parallelism=10 segment-costs=[32280018, 28837420, 225] cpu-comparison-result
 |
 16:EXCHANGE [HASH(w_state,i_item_id)]
 |  mem-estimate=10.76MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=2.41M cost=1089208
+|  tuple-ids=5 row-size=74B cardinality=14.03M cost=6336242
 |  in pipelines: 00(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(cs_item_sk,cs_order_number)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=102.63MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=110 segment-costs=[1044734340, 12739523] cpu-comparison-result=126 [max(50 (self) vs 126 (sum children))]
+max-parallelism=110 segment-costs=[1044734340, 74109479] cpu-comparison-result=126 [max(50 (self) vs 126 (sum children))]
 09:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN d_date < DATE '1999-02-02' THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN d_date >= DATE '1999-02-02' THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: w_state, i_item_id
 |  mem-estimate=88.49MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=74B cardinality=2.41M cost=84325553
+|  tuple-ids=5 row-size=74B cardinality=14.03M cost=84325553
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

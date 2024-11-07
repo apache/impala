@@ -36,6 +36,7 @@ order by
 limit 100
 ---- QUERYOPTIONS
 ENABLE_TUPLE_ANALYSIS_IN_AGGREGATE=false
+ESTIMATE_DUPLICATE_IN_PREAGG=false
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=16.27MB Threads=7
 Per-Host Resource Estimates: Memory=315MB

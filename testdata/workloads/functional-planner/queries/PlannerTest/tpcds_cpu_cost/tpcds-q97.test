@@ -129,8 +129,8 @@ PLAN-ROOT SINK
 Max Per-Host Resource Reservation: Memory=2.15GB Threads=53
 Per-Host Resource Estimates: Memory=48.64GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
+|  Per-Instance Resources: mem-estimate=410.03KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[51, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -143,17 +143,17 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT), 09(OPEN)
 |
 16:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1 cost=0
+|  mem-estimate=394.03KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=120 cost=26
 |  in pipelines: 09(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=1009.71MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=5230 segment-costs=[52275927885, 7286100529, 2] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+max-parallelism=5230 segment-costs=[52275927885, 7286100529, 247] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 09:AGGREGATE
 |  output: sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1 cost=2721602766
+|  tuple-ids=8 row-size=24B cardinality=120 cost=2721602766
 |  in pipelines: 09(GETNEXT), 12(OPEN)
 |
 08:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
@@ -317,8 +317,8 @@ max-parallelism=1824 segment-costs=[56272761904, 8902589222] cpu-comparison-resu
 Max Per-Host Resource Reservation: Memory=2.15GB Threads=53
 Per-Host Resource Estimates: Memory=48.64GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
+|  Per-Instance Resources: mem-estimate=410.03KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[51, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -331,17 +331,17 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT), 09(OPEN)
 |
 16:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1 cost=0
+|  mem-estimate=394.03KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=120 cost=26
 |  in pipelines: 09(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ss_customer_sk,ss_item_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=1009.71MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=5230 segment-costs=[52275927885, 7286100529, 2] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+max-parallelism=5230 segment-costs=[52275927885, 7286100529, 247] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 09:AGGREGATE
 |  output: sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN ss_customer_sk IS NOT NULL AND cs_bill_customer_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1 cost=2721602766
+|  tuple-ids=8 row-size=24B cardinality=120 cost=2721602766
 |  in pipelines: 09(GETNEXT), 12(OPEN)
 |
 08:HASH JOIN [FULL OUTER JOIN, PARTITIONED]

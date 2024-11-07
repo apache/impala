@@ -217,8 +217,8 @@ Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservati
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)]
-|  mem-estimate=646.37KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K
+|  mem-estimate=782.06KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=3.00K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -234,7 +234,7 @@ Per-Host Resources: mem-estimate=106.09MB mem-reservation=17.75MB thread-reserva
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=3.00K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -397,8 +397,8 @@ Per-Instance Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reser
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)]
-|  mem-estimate=1.20MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K
+|  mem-estimate=1.53MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=6.01K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -415,7 +415,7 @@ Per-Instance Resources: mem-estimate=50.68MB mem-reservation=8.00MB thread-reser
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=6.01K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

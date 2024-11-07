@@ -224,8 +224,8 @@ max-parallelism=20 segment-costs=[145321673, 104] cpu-comparison-result=231 [max
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(ctr2.ctr_store_sk)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=11.50MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[24754, 49] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
+|  Per-Instance Resources: mem-estimate=12.49MB mem-reservation=1.94MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[40536, 49] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  25:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_store_sk
@@ -234,18 +234,18 @@ max-parallelism=20 segment-costs=[145321673, 104] cpu-comparison-result=231 [max
 |  |  in pipelines: 25(GETNEXT), 23(OPEN)
 |  |
 |  24:EXCHANGE [HASH(ctr2.ctr_store_sk)]
-|  |  mem-estimate=1.50MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=10 row-size=20B cardinality=653 cost=132
+|  |  mem-estimate=2.49MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=10 row-size=20B cardinality=78.36K cost=15914
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F08:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=10 instances=100 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=78.22MB mem-reservation=36.00MB thread-reservation=1
-|  max-parallelism=100 segment-costs=[984830336, 47241885, 1177] cpu-comparison-result=110 [max(100 (self) vs 110 (sum children))]
+|  max-parallelism=100 segment-costs=[984830336, 47241885, 141298] cpu-comparison-result=110 [max(100 (self) vs 110 (sum children))]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(sum(SR_FEE))
 |  |  group by: sr_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=10 row-size=20B cardinality=653 cost=47241885
+|  |  tuple-ids=10 row-size=20B cardinality=78.36K cost=47241885
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  23:AGGREGATE [FINALIZE]
@@ -527,8 +527,8 @@ max-parallelism=20 segment-costs=[145321673, 104] cpu-comparison-result=231 [max
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(ctr2.ctr_store_sk)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=11.50MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[24754, 49] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
+|  Per-Instance Resources: mem-estimate=12.49MB mem-reservation=1.94MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[40536, 49] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  25:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_store_sk
@@ -537,18 +537,18 @@ max-parallelism=20 segment-costs=[145321673, 104] cpu-comparison-result=231 [max
 |  |  in pipelines: 25(GETNEXT), 23(OPEN)
 |  |
 |  24:EXCHANGE [HASH(ctr2.ctr_store_sk)]
-|  |  mem-estimate=1.50MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=10 row-size=20B cardinality=653 cost=132
+|  |  mem-estimate=2.49MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=10 row-size=20B cardinality=78.36K cost=15914
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F08:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=10 instances=100 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=78.22MB mem-reservation=36.00MB thread-reservation=1
-|  max-parallelism=100 segment-costs=[984830336, 47241885, 1177] cpu-comparison-result=110 [max(100 (self) vs 110 (sum children))]
+|  max-parallelism=100 segment-costs=[984830336, 47241885, 141298] cpu-comparison-result=110 [max(100 (self) vs 110 (sum children))]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(sum(SR_FEE))
 |  |  group by: sr_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=10 row-size=20B cardinality=653 cost=47241885
+|  |  tuple-ids=10 row-size=20B cardinality=78.36K cost=47241885
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  23:AGGREGATE [FINALIZE]

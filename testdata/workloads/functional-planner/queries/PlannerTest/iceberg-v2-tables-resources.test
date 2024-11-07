@@ -973,7 +973,7 @@ PLAN-ROOT SINK
 |
 05:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=1
+|  tuple-ids=1 row-size=8B cardinality=2
 |  in pipelines: 03(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -981,7 +981,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
 03:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=1
+|  tuple-ids=1 row-size=8B cardinality=2
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
@@ -2324,7 +2324,7 @@ PLAN-ROOT SINK
 |  |
 |  16:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=5 row-size=8B cardinality=1
+|  |  tuple-ids=5 row-size=8B cardinality=2
 |  |  in pipelines: 08(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -2332,7 +2332,7 @@ PLAN-ROOT SINK
 |  08:AGGREGATE
 |  |  output: count(*)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=5 row-size=8B cardinality=1
+|  |  tuple-ids=5 row-size=8B cardinality=2
 |  |  in pipelines: 08(GETNEXT), 05(OPEN)
 |  |
 |  07:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
@@ -2396,7 +2396,7 @@ PLAN-ROOT SINK
 |
 12:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=1
+|  tuple-ids=1 row-size=8B cardinality=2
 |  in pipelines: 03(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -2404,7 +2404,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
 03:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=1
+|  tuple-ids=1 row-size=8B cardinality=2
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]

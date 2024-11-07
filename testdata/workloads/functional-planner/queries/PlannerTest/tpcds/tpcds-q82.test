@@ -120,8 +120,8 @@ PLAN-ROOT SINK
    tuple-ids=1 row-size=16B cardinality=1.17M
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=69.19MB Threads=10
-Per-Host Resource Estimates: Memory=317MB
+Max Per-Host Resource Reservation: Memory=71.06MB Threads=10
+Per-Host Resource Estimates: Memory=318MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -136,7 +136,7 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_current_price)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=11.53MB mem-reservation=2.88MB thread-reservation=1
+Per-Host Resources: mem-estimate=12.77MB mem-reservation=4.75MB thread-reservation=1
 08:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
 |  mem-estimate=14.11KB mem-reservation=0B thread-reservation=0
@@ -145,13 +145,13 @@ Per-Host Resources: mem-estimate=11.53MB mem-reservation=2.88MB thread-reservati
 |
 13:AGGREGATE [FINALIZE]
 |  group by: i_item_id, i_item_desc, i_current_price
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=4 row-size=144B cardinality=18.00K
 |  in pipelines: 13(GETNEXT), 01(OPEN)
 |
 12:EXCHANGE [HASH(i_item_id,i_item_desc,i_current_price)]
-|  mem-estimate=1.53MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=144B cardinality=18.00K
+|  mem-estimate=2.77MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=144B cardinality=36.00K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -159,7 +159,7 @@ Per-Host Resources: mem-estimate=168.99MB mem-reservation=55.88MB thread-reserva
 07:AGGREGATE [STREAMING]
 |  group by: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=65.80MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=144B cardinality=18.00K
+|  tuple-ids=4 row-size=144B cardinality=36.00K
 |  in pipelines: 01(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -259,8 +259,8 @@ Per-Host Resources: mem-estimate=168.99MB mem-reservation=55.88MB thread-reserva
    tuple-ids=1 row-size=16B cardinality=1.17M
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=78.50MB Threads=10
-Per-Host Resource Estimates: Memory=200MB
+Max Per-Host Resource Reservation: Memory=80.38MB Threads=10
+Per-Host Resource Estimates: Memory=201MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -275,7 +275,7 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_current_price)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=11.53MB mem-reservation=2.88MB thread-reservation=1
+Per-Instance Resources: mem-estimate=12.77MB mem-reservation=4.75MB thread-reservation=1
 08:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
 |  mem-estimate=14.11KB mem-reservation=0B thread-reservation=0
@@ -284,13 +284,13 @@ Per-Instance Resources: mem-estimate=11.53MB mem-reservation=2.88MB thread-reser
 |
 13:AGGREGATE [FINALIZE]
 |  group by: i_item_id, i_item_desc, i_current_price
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=4 row-size=144B cardinality=18.00K
 |  in pipelines: 13(GETNEXT), 01(OPEN)
 |
 12:EXCHANGE [HASH(i_item_id,i_item_desc,i_current_price)]
-|  mem-estimate=1.53MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=144B cardinality=18.00K
+|  mem-estimate=2.77MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=144B cardinality=36.00K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -299,7 +299,7 @@ Per-Instance Resources: mem-estimate=98.96MB mem-reservation=50.00MB thread-rese
 07:AGGREGATE [STREAMING]
 |  group by: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=65.80MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=144B cardinality=18.00K
+|  tuple-ids=4 row-size=144B cardinality=36.00K
 |  in pipelines: 01(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

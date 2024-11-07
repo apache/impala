@@ -756,6 +756,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   185: optional bool enable_tuple_analysis_in_aggregate = true
+
+  // See comment in ImpalaService.thrift
+  186: optional bool estimate_duplicate_in_preagg = true
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

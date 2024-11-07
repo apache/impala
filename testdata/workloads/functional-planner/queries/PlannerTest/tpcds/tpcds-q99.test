@@ -169,7 +169,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(w_substr,sm_type,cc_name)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.07MB mem-reservation=1.94MB thread-reservation=1
 10:TOP-N [LIMIT=100]
 |  order by: w_substr ASC, sm_type ASC, lower(cc_name) ASC
 |  materialized: lower(cc_name)
@@ -185,8 +185,8 @@ Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(w_substr,sm_type,cc_name)]
-|  mem-estimate=23.19KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=95B cardinality=72
+|  mem-estimate=69.56KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=95B cardinality=216
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -195,7 +195,7 @@ Per-Host Resources: mem-estimate=262.91MB mem-reservation=17.75MB thread-reserva
 |  output: sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(30 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(30 AS BIGINT)) AND (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(60 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(60 AS BIGINT)) AND (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(90 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(90 AS BIGINT)) AND (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  group by: substring(w_warehouse_name, CAST(1 AS BIGINT), CAST(20 AS BIGINT)), sm_type, cc_name
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=95B cardinality=72
+|  tuple-ids=6 row-size=95B cardinality=216
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -328,7 +328,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(w_substr,sm_type,cc_name)] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.07MB mem-reservation=1.94MB thread-reservation=1
 10:TOP-N [LIMIT=100]
 |  order by: w_substr ASC, sm_type ASC, lower(cc_name) ASC
 |  materialized: lower(cc_name)
@@ -344,8 +344,8 @@ Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(w_substr,sm_type,cc_name)]
-|  mem-estimate=23.19KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=95B cardinality=72
+|  mem-estimate=69.56KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=95B cardinality=216
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -355,7 +355,7 @@ Per-Instance Resources: mem-estimate=59.16MB mem-reservation=6.00MB thread-reser
 |  output: sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(30 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(30 AS BIGINT)) AND (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(60 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(60 AS BIGINT)) AND (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(90 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(90 AS BIGINT)) AND (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) <= CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(cs_ship_date_sk AS BIGINT) - CAST(cs_sold_date_sk AS BIGINT) > CAST(120 AS BIGINT)) THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT))
 |  group by: substring(w_warehouse_name, CAST(1 AS BIGINT), CAST(20 AS BIGINT)), sm_type, cc_name
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=95B cardinality=72
+|  tuple-ids=6 row-size=95B cardinality=216
 |  in pipelines: 00(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

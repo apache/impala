@@ -363,7 +363,7 @@ Per-Host Resources: mem-estimate=22.02MB mem-reservation=13.94MB thread-reservat
 |  |
 |  47:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1
+|  |  tuple-ids=18 row-size=16B cardinality=3
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [HASH(c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size)] hosts=3 instances=3
@@ -371,7 +371,7 @@ Per-Host Resources: mem-estimate=22.02MB mem-reservation=13.94MB thread-reservat
 |  25:AGGREGATE
 |  |  output: avg(sum(ss_net_paid))
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1
+|  |  tuple-ids=18 row-size=16B cardinality=3
 |  |  in pipelines: 25(GETNEXT), 46(OPEN)
 |  |
 |  46:AGGREGATE [FINALIZE]
@@ -799,7 +799,7 @@ Per-Instance Resources: mem-estimate=22.00MB mem-reservation=13.94MB thread-rese
 |  |
 |  47:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1
+|  |  tuple-ids=18 row-size=16B cardinality=6
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [HASH(c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size)] hosts=3 instances=6
@@ -807,7 +807,7 @@ Per-Instance Resources: mem-estimate=22.00MB mem-reservation=13.94MB thread-rese
 |  25:AGGREGATE
 |  |  output: avg(sum(ss_net_paid))
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=18 row-size=16B cardinality=1
+|  |  tuple-ids=18 row-size=16B cardinality=6
 |  |  in pipelines: 25(GETNEXT), 46(OPEN)
 |  |
 |  46:AGGREGATE [FINALIZE]

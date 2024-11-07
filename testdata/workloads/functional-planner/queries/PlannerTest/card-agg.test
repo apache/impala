@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: l_partkey, l_linenumber
-|  row-size=20B cardinality=1.40M
+|  row-size=20B cardinality=3.20M
 |
 00:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -205,7 +205,7 @@ PLAN-ROOT SINK
 |    group by: l_orderkey
 |  Class 1
 |    group by: l_partkey
-|  row-size=16B cardinality=1.76M
+|  row-size=16B cardinality=3.99M
 |
 00:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -285,7 +285,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(l_suppkey)
 |    group by: l_partkey
-|  row-size=48B cardinality=601.55K
+|  row-size=48B cardinality=1.80M
 |
 05:AGGREGATE
 |  Class 0
@@ -347,7 +347,7 @@ PLAN-ROOT SINK
 |  row-size=80B cardinality=18.00M
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=194.00MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    row-size=40B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -408,7 +408,7 @@ PLAN-ROOT SINK
 |  row-size=80B cardinality=18.00M
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=194.00MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    row-size=40B cardinality=6.00M
 ====
 # Mixed grouping and non-grouping aggregations.
@@ -487,7 +487,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    output: count(*)
-|  row-size=16B cardinality=7.31K
+|  row-size=16B cardinality=7.33K
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB

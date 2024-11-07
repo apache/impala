@@ -199,8 +199,8 @@ max-parallelism=10 segment-costs=[3503, 6626, 204] cpu-comparison-result=120 [ma
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=52.88MB mem-reservation=7.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[179045, 6118, 4512] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=55.54MB mem-reservation=7.75MB thread-reservation=1
+max-parallelism=10 segment-costs=[303840, 6118, 4512] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN sum(ss_net_profit) WHEN CAST(5 AS INT) THEN sum(ss_net_profit) WHEN CAST(6 AS INT) THEN sum(ss_net_profit) END), aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN sum(ss_ext_sales_price) WHEN CAST(5 AS INT) THEN sum(ss_ext_sales_price) WHEN CAST(6 AS INT) THEN sum(ss_ext_sales_price) END), aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(6 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(6 AS INT) THEN CAST(1 AS TINYINT) END)
 |  group by: CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN i_category WHEN CAST(5 AS INT) THEN i_category WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN i_class WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) END
@@ -223,14 +223,14 @@ max-parallelism=10 segment-costs=[179045, 6118, 4512] cpu-comparison-result=120 
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)]
-|  mem-estimate=22.88MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K cost=1048
+|  mem-estimate=25.54MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=120.12K cost=125843
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 Per-Instance Resources: mem-estimate=53.80MB mem-reservation=14.00MB thread-reservation=1
-max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+max-parallelism=374 segment-costs=[6602771919, 1636865] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
@@ -242,7 +242,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K cost=4258848317
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=120.12K cost=4258848317
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -414,8 +414,8 @@ max-parallelism=10 segment-costs=[3503, 6626, 204] cpu-comparison-result=120 [ma
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=52.88MB mem-reservation=7.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[179045, 6118, 4512] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=55.54MB mem-reservation=7.75MB thread-reservation=1
+max-parallelism=10 segment-costs=[303840, 6118, 4512] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN sum(ss_net_profit) WHEN CAST(5 AS INT) THEN sum(ss_net_profit) WHEN CAST(6 AS INT) THEN sum(ss_net_profit) END), aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN sum(ss_ext_sales_price) WHEN CAST(5 AS INT) THEN sum(ss_ext_sales_price) WHEN CAST(6 AS INT) THEN sum(ss_ext_sales_price) END), aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(6 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(4,5,6) IN (CAST(4 AS INT), CAST(5 AS INT), CAST(6 AS INT)), CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(6 AS INT) THEN CAST(1 AS TINYINT) END)
 |  group by: CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN i_category WHEN CAST(5 AS INT) THEN i_category WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN i_class WHEN CAST(5 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL END, CASE valid_tid(4,5,6) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) END
@@ -438,14 +438,14 @@ max-parallelism=10 segment-costs=[179045, 6118, 4512] cpu-comparison-result=120 
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)]
-|  mem-estimate=22.88MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K cost=1048
+|  mem-estimate=25.54MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=120.12K cost=125843
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 Per-Instance Resources: mem-estimate=53.80MB mem-reservation=14.00MB thread-reservation=1
-max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
+max-parallelism=374 segment-costs=[6602771919, 1636865] cpu-comparison-result=120 [max(120 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
@@ -457,7 +457,7 @@ max-parallelism=374 segment-costs=[6602771919, 13640] cpu-comparison-result=120 
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=4N,5N,6N row-size=188B cardinality=1.00K cost=4258848317
+|  tuple-ids=4N,5N,6N row-size=188B cardinality=120.12K cost=4258848317
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

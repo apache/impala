@@ -26,7 +26,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [STREAMING]
 |  group by: int_col, tinyint_col
-|  row-size=5B cardinality=100
+|  row-size=5B cardinality=300
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -824,7 +824,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [STREAMING]
 |  output: min(int_col), min(tinyint_col), max(int_col), sum(bigint_col), sum(int_col)
 |  group by: bool_col
-|  row-size=26B cardinality=2
+|  row-size=26B cardinality=6
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -2120,7 +2120,7 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=3
 |
 05:SELECT
 |  predicates: id IS NULL, tinyint_col != 5
@@ -2954,7 +2954,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [STREAMING]
 |  output: count(bigint_col)
 |  group by: string_col, int_col
-|  row-size=25B cardinality=100
+|  row-size=25B cardinality=300
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -3005,7 +3005,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [STREAMING]
 |  group by: string_col, int_col, bigint_col
-|  row-size=25B cardinality=1.00K
+|  row-size=25B cardinality=2.74K
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -3042,7 +3042,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer t]
-   HDFS partitions=1/1 files=4 size=289.02MB
+   HDFS partitions=1/1 files=4 size=289.07MB
    row-size=20B cardinality=150.00K
 ====
 # IMPALA-8718: No more collection slots in the output of the inline view of analytics.
@@ -3083,11 +3083,11 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer t]
-|     HDFS partitions=1/1 files=4 size=289.02MB
+|     HDFS partitions=1/1 files=4 size=289.07MB
 |     row-size=20B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer leftside]
-   HDFS partitions=1/1 files=4 size=289.02MB
+   HDFS partitions=1/1 files=4 size=289.07MB
    row-size=38B cardinality=150.00K
 ====
 # IMPALA-10406: Query with analytic functions doesn't need to materialize the predicates bounded to kudu

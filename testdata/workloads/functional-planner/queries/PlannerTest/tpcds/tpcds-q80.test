@@ -531,11 +531,11 @@ Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservati
 |
 61:EXCHANGE [HASH(CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(channel) WHEN 27 THEN murmur_hash(channel) WHEN 28 THEN murmur_hash(NULL) END,CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(id) WHEN 27 THEN murmur_hash(NULL) WHEN 28 THEN murmur_hash(NULL) END)]
 |  mem-estimate=1.46MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.56K
+|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.57K
 |  in pipelines: 46(GETNEXT), 53(GETNEXT), 60(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=43.19MB mem-reservation=7.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=43.73MB mem-reservation=7.94MB thread-reservation=1
 37:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(sales), sum(returns), sum(profit)
@@ -547,7 +547,7 @@ Per-Host Resources: mem-estimate=43.19MB mem-reservation=7.94MB thread-reservati
 |    output: sum(sales), sum(returns), sum(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.56K
+|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.57K
 |  in pipelines: 46(GETNEXT), 53(GETNEXT), 60(GETNEXT)
 |
 00:UNION
@@ -564,7 +564,7 @@ Per-Host Resources: mem-estimate=43.19MB mem-reservation=7.94MB thread-reservati
 |  |
 |  59:EXCHANGE [HASH(web_site_id)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=22 row-size=76B cardinality=15
+|  |  tuple-ids=22 row-size=76B cardinality=30
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -573,7 +573,7 @@ Per-Host Resources: mem-estimate=43.19MB mem-reservation=7.94MB thread-reservati
 |  |  output: sum(ws_ext_sales_price), sum(coalesce(wr_return_amt, CAST(0 AS DECIMAL(7,2)))), sum(ws_net_profit - coalesce(wr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: web_site_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=76B cardinality=15
+|  |  tuple-ids=22 row-size=76B cardinality=30
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  35:HASH JOIN [INNER JOIN, BROADCAST]
@@ -729,8 +729,8 @@ Per-Host Resources: mem-estimate=43.19MB mem-reservation=7.94MB thread-reservati
 |  |  in pipelines: 53(GETNEXT), 13(OPEN)
 |  |
 |  52:EXCHANGE [HASH(cp_catalog_page_id)]
-|  |  mem-estimate=525.47KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=11.54K
+|  |  mem-estimate=1.06MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=14 row-size=76B cardinality=34.02K
 |  |  in pipelines: 13(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -739,7 +739,7 @@ Per-Host Resources: mem-estimate=43.19MB mem-reservation=7.94MB thread-reservati
 |  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, CAST(0 AS DECIMAL(7,2)))), sum(cs_net_profit - coalesce(cr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: cp_catalog_page_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=11.54K
+|  |  tuple-ids=14 row-size=76B cardinality=34.02K
 |  |  in pipelines: 13(GETNEXT)
 |  |
 |  23:HASH JOIN [INNER JOIN, BROADCAST]
@@ -896,7 +896,7 @@ Per-Host Resources: mem-estimate=43.19MB mem-reservation=7.94MB thread-reservati
 |
 45:EXCHANGE [HASH(s_store_id)]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=76B cardinality=6
+|  tuple-ids=6 row-size=76B cardinality=18
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -905,7 +905,7 @@ Per-Host Resources: mem-estimate=141.64MB mem-reservation=34.75MB thread-reserva
 |  output: sum(ss_ext_sales_price), sum(coalesce(sr_return_amt, CAST(0 AS DECIMAL(7,2)))), sum(ss_net_profit - coalesce(sr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  group by: s_store_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=76B cardinality=6
+|  tuple-ids=6 row-size=76B cardinality=18
 |  in pipelines: 01(GETNEXT)
 |
 11:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1055,7 +1055,7 @@ Per-Host Resources: mem-estimate=141.64MB mem-reservation=34.75MB thread-reserva
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=231.50MB Threads=39
-Per-Host Resource Estimates: Memory=736MB
+Per-Host Resource Estimates: Memory=737MB
 F23:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -1100,11 +1100,11 @@ Per-Instance Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reser
 |
 61:EXCHANGE [HASH(CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(channel) WHEN 27 THEN murmur_hash(channel) WHEN 28 THEN murmur_hash(NULL) END,CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(id) WHEN 27 THEN murmur_hash(NULL) WHEN 28 THEN murmur_hash(NULL) END)]
 |  mem-estimate=2.13MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.56K
+|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.58K
 |  in pipelines: 46(GETNEXT), 53(GETNEXT), 60(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=45.86MB mem-reservation=7.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=46.40MB mem-reservation=7.94MB thread-reservation=1
 37:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(sales), sum(returns), sum(profit)
@@ -1116,7 +1116,7 @@ Per-Instance Resources: mem-estimate=45.86MB mem-reservation=7.94MB thread-reser
 |    output: sum(sales), sum(returns), sum(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.56K
+|  tuple-ids=26N,27N,28N row-size=216B cardinality=11.58K
 |  in pipelines: 46(GETNEXT), 53(GETNEXT), 60(GETNEXT)
 |
 00:UNION
@@ -1133,7 +1133,7 @@ Per-Instance Resources: mem-estimate=45.86MB mem-reservation=7.94MB thread-reser
 |  |
 |  59:EXCHANGE [HASH(web_site_id)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=22 row-size=76B cardinality=15
+|  |  tuple-ids=22 row-size=76B cardinality=30
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1143,7 +1143,7 @@ Per-Instance Resources: mem-estimate=45.86MB mem-reservation=7.94MB thread-reser
 |  |  output: sum(ws_ext_sales_price), sum(coalesce(wr_return_amt, CAST(0 AS DECIMAL(7,2)))), sum(ws_net_profit - coalesce(wr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: web_site_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=76B cardinality=15
+|  |  tuple-ids=22 row-size=76B cardinality=30
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  35:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1340,8 +1340,8 @@ Per-Instance Resources: mem-estimate=45.86MB mem-reservation=7.94MB thread-reser
 |  |  in pipelines: 53(GETNEXT), 13(OPEN)
 |  |
 |  52:EXCHANGE [HASH(cp_catalog_page_id)]
-|  |  mem-estimate=525.47KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=11.54K
+|  |  mem-estimate=1.06MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=14 row-size=76B cardinality=34.02K
 |  |  in pipelines: 13(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1351,7 +1351,7 @@ Per-Instance Resources: mem-estimate=45.86MB mem-reservation=7.94MB thread-reser
 |  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, CAST(0 AS DECIMAL(7,2)))), sum(cs_net_profit - coalesce(cr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: cp_catalog_page_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=11.54K
+|  |  tuple-ids=14 row-size=76B cardinality=34.02K
 |  |  in pipelines: 13(GETNEXT)
 |  |
 |  23:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1548,8 +1548,8 @@ Per-Instance Resources: mem-estimate=45.86MB mem-reservation=7.94MB thread-reser
 |  in pipelines: 46(GETNEXT), 01(OPEN)
 |
 45:EXCHANGE [HASH(s_store_id)]
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=76B cardinality=6
+|  mem-estimate=17.77KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=76B cardinality=36
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1559,7 +1559,7 @@ Per-Instance Resources: mem-estimate=27.88MB mem-reservation=6.00MB thread-reser
 |  output: sum(ss_ext_sales_price), sum(coalesce(sr_return_amt, CAST(0 AS DECIMAL(7,2)))), sum(ss_net_profit - coalesce(sr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  group by: s_store_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=76B cardinality=6
+|  tuple-ids=6 row-size=76B cardinality=36
 |  in pipelines: 01(GETNEXT)
 |
 11:HASH JOIN [INNER JOIN, BROADCAST]

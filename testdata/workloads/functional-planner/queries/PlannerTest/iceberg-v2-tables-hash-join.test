@@ -432,7 +432,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=2
 |
 02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  row-size=20B cardinality=6
@@ -1229,7 +1229,7 @@ PLAN-ROOT SINK
 |  |
 |  08:AGGREGATE
 |  |  output: count(*)
-|  |  row-size=8B cardinality=1
+|  |  row-size=8B cardinality=2
 |  |
 |  07:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  |  row-size=20B cardinality=6
@@ -1265,7 +1265,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=2
 |
 02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  row-size=20B cardinality=6

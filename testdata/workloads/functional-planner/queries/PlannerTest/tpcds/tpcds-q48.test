@@ -166,7 +166,7 @@ PLAN-ROOT SINK
 |
 15:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=8B cardinality=1
+|  tuple-ids=5 row-size=8B cardinality=3
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(ss_cdemo_sk)] hosts=3 instances=3
@@ -174,7 +174,7 @@ Per-Host Resources: mem-estimate=19.70MB mem-reservation=12.44MB thread-reservat
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=8B cardinality=1
+|  tuple-ids=5 row-size=8B cardinality=3
 |  in pipelines: 09(GETNEXT), 00(OPEN)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -323,7 +323,7 @@ PLAN-ROOT SINK
 |
 15:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=8B cardinality=1
+|  tuple-ids=5 row-size=8B cardinality=6
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(ss_cdemo_sk)] hosts=3 instances=6
@@ -331,7 +331,7 @@ Per-Instance Resources: mem-estimate=825.95KB mem-reservation=0B thread-reservat
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=5 row-size=8B cardinality=1
+|  tuple-ids=5 row-size=8B cardinality=6
 |  in pipelines: 09(GETNEXT), 00(OPEN)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

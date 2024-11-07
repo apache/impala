@@ -476,7 +476,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=2
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=20B cardinality=2
@@ -1261,7 +1261,7 @@ PLAN-ROOT SINK
 |  |
 |  08:AGGREGATE
 |  |  output: count(*)
-|  |  row-size=8B cardinality=1
+|  |  row-size=8B cardinality=2
 |  |
 |  07:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  |  row-size=20B cardinality=2
@@ -1295,7 +1295,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=2
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=20B cardinality=2

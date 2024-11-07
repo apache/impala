@@ -522,8 +522,8 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  in pipelines: 73(GETNEXT), 30(OPEN)
 |  |
 |  72:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=152.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=1.82K
+|  |  mem-estimate=196.96KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=3.65K
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F26:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=2 instances=2
@@ -532,7 +532,7 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=1.82K
+|  |  tuple-ids=28 row-size=50B cardinality=3.65K
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  34:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -630,8 +630,8 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  in pipelines: 67(GETNEXT), 24(OPEN)
 |  |
 |  66:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=152.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=1.82K
+|  |  mem-estimate=196.96KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=3.65K
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  F21:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=2 instances=2
@@ -640,7 +640,7 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=1.82K
+|  |  tuple-ids=23 row-size=50B cardinality=3.65K
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  28:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -738,8 +738,8 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  in pipelines: 61(GETNEXT), 18(OPEN)
 |  |
 |  60:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=152.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=1.82K
+|  |  mem-estimate=196.96KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=3.65K
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=2 instances=2
@@ -748,7 +748,7 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=1.82K
+|  |  tuple-ids=18 row-size=50B cardinality=3.65K
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  22:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -846,8 +846,8 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  in pipelines: 55(GETNEXT), 12(OPEN)
 |  |
 |  54:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=191.56KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=1.82K
+|  |  mem-estimate=250.92KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=5.47K
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -856,7 +856,7 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=1.82K
+|  |  tuple-ids=13 row-size=50B cardinality=5.47K
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -948,8 +948,8 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  in pipelines: 49(GETNEXT), 06(OPEN)
 |  |
 |  48:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=191.56KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=1.82K
+|  |  mem-estimate=250.92KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=5.47K
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -958,7 +958,7 @@ Per-Host Resources: mem-estimate=25.87MB mem-reservation=25.69MB thread-reservat
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=1.82K
+|  |  tuple-ids=8 row-size=50B cardinality=5.47K
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  10:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1042,8 +1042,8 @@ Per-Host Resources: mem-estimate=10.63MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 45(GETNEXT), 00(OPEN)
 |
 44:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  mem-estimate=191.56KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=1.82K
+|  mem-estimate=250.92KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=5.47K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1052,7 +1052,7 @@ Per-Host Resources: mem-estimate=51.16MB mem-reservation=17.69MB thread-reservat
 |  output: sum(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
 |  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=1.82K
+|  tuple-ids=3 row-size=50B cardinality=5.47K
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1175,8 +1175,8 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  in pipelines: 73(GETNEXT), 30(OPEN)
 |  |
 |  72:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=152.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=1.82K
+|  |  mem-estimate=196.96KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=28 row-size=50B cardinality=3.65K
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F26:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=2 instances=2
@@ -1185,7 +1185,7 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=28 row-size=50B cardinality=1.82K
+|  |  tuple-ids=28 row-size=50B cardinality=3.65K
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  34:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1308,8 +1308,8 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  in pipelines: 67(GETNEXT), 24(OPEN)
 |  |
 |  66:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=152.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=1.82K
+|  |  mem-estimate=196.96KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=23 row-size=50B cardinality=3.65K
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  F21:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=2 instances=2
@@ -1318,7 +1318,7 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=23 row-size=50B cardinality=1.82K
+|  |  tuple-ids=23 row-size=50B cardinality=3.65K
 |  |  in pipelines: 24(GETNEXT)
 |  |
 |  28:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1442,8 +1442,8 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  in pipelines: 61(GETNEXT), 18(OPEN)
 |  |
 |  60:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=152.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=1.82K
+|  |  mem-estimate=196.96KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=18 row-size=50B cardinality=3.65K
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ws_bill_addr_sk)] hosts=2 instances=2
@@ -1452,7 +1452,7 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=18 row-size=50B cardinality=1.82K
+|  |  tuple-ids=18 row-size=50B cardinality=3.65K
 |  |  in pipelines: 18(GETNEXT)
 |  |
 |  22:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1576,8 +1576,8 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  in pipelines: 55(GETNEXT), 12(OPEN)
 |  |
 |  54:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=353.45KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=1.82K
+|  |  mem-estimate=501.85KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=13 row-size=50B cardinality=10.95K
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1587,7 +1587,7 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=50B cardinality=1.82K
+|  |  tuple-ids=13 row-size=50B cardinality=10.95K
 |  |  in pipelines: 12(GETNEXT)
 |  |
 |  16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1704,8 +1704,8 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  in pipelines: 49(GETNEXT), 06(OPEN)
 |  |
 |  48:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  |  mem-estimate=353.45KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=1.82K
+|  |  mem-estimate=501.85KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8 row-size=50B cardinality=10.95K
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1715,7 +1715,7 @@ Per-Instance Resources: mem-estimate=12.51MB mem-reservation=12.00MB thread-rese
 |  |  output: sum(ss_ext_sales_price)
 |  |  group by: ca_county, d_qoy, d_year
 |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=8 row-size=50B cardinality=1.82K
+|  |  tuple-ids=8 row-size=50B cardinality=10.95K
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  10:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1816,8 +1816,8 @@ Per-Instance Resources: mem-estimate=11.26MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 45(GETNEXT), 00(OPEN)
 |
 44:EXCHANGE [HASH(ca_county,d_qoy,d_year)]
-|  mem-estimate=353.45KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=1.82K
+|  mem-estimate=501.85KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=50B cardinality=10.95K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1827,7 +1827,7 @@ Per-Instance Resources: mem-estimate=27.26MB mem-reservation=6.00MB thread-reser
 |  output: sum(ss_ext_sales_price)
 |  group by: ca_county, d_qoy, d_year
 |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=3 row-size=50B cardinality=1.82K
+|  tuple-ids=3 row-size=50B cardinality=10.95K
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

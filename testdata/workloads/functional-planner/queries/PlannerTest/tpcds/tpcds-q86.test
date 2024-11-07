@@ -192,8 +192,8 @@ Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservati
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_category) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_class) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) END)]
-|  mem-estimate=364.54KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K
+|  mem-estimate=439.57KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3N,4N,5N row-size=140B cardinality=2.00K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -209,7 +209,7 @@ Per-Host Resources: mem-estimate=134.00MB mem-reservation=20.81MB thread-reserva
 |    output: sum(ws_net_paid)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K
+|  tuple-ids=3N,4N,5N row-size=140B cardinality=2.00K
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -343,8 +343,8 @@ Per-Instance Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reser
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_category) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_class) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) END)]
-|  mem-estimate=364.54KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K
+|  mem-estimate=439.57KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3N,4N,5N row-size=140B cardinality=2.00K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -361,7 +361,7 @@ Per-Instance Resources: mem-estimate=63.18MB mem-reservation=14.00MB thread-rese
 |    output: sum(ws_net_paid)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
-|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K
+|  tuple-ids=3N,4N,5N row-size=140B cardinality=2.00K
 |  in pipelines: 00(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

@@ -1329,12 +1329,12 @@ Per-Host Resources: mem-estimate=60.00MB mem-reservation=23.81MB thread-reservat
 |  in pipelines: 206(GETNEXT), 146(OPEN), 172(OPEN), 198(OPEN)
 |
 205:EXCHANGE [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)]
-|  mem-estimate=8.50MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=101.43K
+|  mem-estimate=8.91MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=106.81K
 |  in pipelines: 146(GETNEXT), 172(GETNEXT), 198(GETNEXT)
 |
 F75:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=63.77MB mem-reservation=17.94MB thread-reservation=1
 124:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(sales), sum(number_sales)
@@ -1352,7 +1352,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |    output: sum(sales), sum(number_sales)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=50.00MB mem-reservation=16.00MB thread-reservation=0
-|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=101.43K
+|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=106.81K
 |  in pipelines: 146(GETNEXT), 172(GETNEXT), 198(GETNEXT)
 |
 00:UNION
@@ -1381,7 +1381,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |
 |  |  202:EXCHANGE [UNPARTITIONED]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=98 row-size=16B cardinality=1
+|  |  |  tuple-ids=98 row-size=16B cardinality=3
 |  |  |  in pipelines: 122(GETNEXT)
 |  |  |
 |  |  F73:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1389,7 +1389,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  122:AGGREGATE
 |  |  |  output: avg(CAST(quantity AS DECIMAL(10,0)) * list_price)
 |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  tuple-ids=98 row-size=16B cardinality=1
+|  |  |  tuple-ids=98 row-size=16B cardinality=3
 |  |  |  in pipelines: 122(GETNEXT), 113(OPEN), 116(OPEN), 119(OPEN)
 |  |  |
 |  |  112:UNION
@@ -1521,8 +1521,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  in pipelines: 198(GETNEXT), 83(OPEN)
 |  |
 |  197:EXCHANGE [HASH(i_brand_id,i_class_id,i_category_id)]
-|  |  mem-estimate=396.41KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=88 row-size=36B cardinality=18.00K
+|  |  mem-estimate=520.40KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=88 row-size=36B cardinality=25.05K
 |  |  in pipelines: 83(GETNEXT)
 |  |
 |  F50:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1531,7 +1531,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  output: sum(CAST(ws_quantity AS DECIMAL(10,0)) * ws_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=88 row-size=36B cardinality=18.00K
+|  |  tuple-ids=88 row-size=36B cardinality=25.05K
 |  |  in pipelines: 83(GETNEXT)
 |  |
 |  110:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -1547,7 +1547,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  in pipelines: 184(GETNEXT)
 |  |  |
 |  |  F56:PLAN FRAGMENT [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)] hosts=3 instances=3
-|  |  Per-Host Resources: mem-estimate=16.54MB mem-reservation=7.75MB thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=16.68MB mem-reservation=7.75MB thread-reservation=1
 |  |  107:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  |  hash predicates: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
 |  |  |  fk/pk conjuncts: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
@@ -1585,7 +1585,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 193(GETNEXT)
 |  |  |  |
 |  |  |  F64:PLAN FRAGMENT [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)] hosts=2 instances=2
-|  |  |  Per-Host Resources: mem-estimate=10.19MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Host Resources: mem-estimate=10.24MB mem-reservation=1.94MB thread-reservation=1
 |  |  |  193:AGGREGATE [FINALIZE]
 |  |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
@@ -1593,8 +1593,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 193(GETNEXT), 98(OPEN)
 |  |  |  |
 |  |  |  192:EXCHANGE [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)]
-|  |  |  |  mem-estimate=137.47KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=167 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=242.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=167 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 98(GETNEXT)
 |  |  |  |
 |  |  |  F61:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1602,7 +1602,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  105:AGGREGATE [STREAMING]
 |  |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=167 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=167 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 98(GETNEXT)
 |  |  |  |
 |  |  |  102:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1681,7 +1681,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 188(GETNEXT)
 |  |  |  |
 |  |  |  F60:PLAN FRAGMENT [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)] hosts=3 instances=3
-|  |  |  Per-Host Resources: mem-estimate=10.19MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Host Resources: mem-estimate=10.25MB mem-reservation=1.94MB thread-reservation=1
 |  |  |  188:AGGREGATE [FINALIZE]
 |  |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
@@ -1689,8 +1689,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 188(GETNEXT), 93(OPEN)
 |  |  |  |
 |  |  |  187:EXCHANGE [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)]
-|  |  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=166 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=166 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 93(GETNEXT)
 |  |  |  |
 |  |  |  F57:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1698,7 +1698,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  103:AGGREGATE [STREAMING]
 |  |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=166 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=166 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 93(GETNEXT)
 |  |  |  |
 |  |  |  97:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1772,8 +1772,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  in pipelines: 184(GETNEXT), 87(OPEN)
 |  |  |
 |  |  183:EXCHANGE [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)]
-|  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=75 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=75 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 87(GETNEXT)
 |  |  |
 |  |  F53:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1781,7 +1781,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  92:AGGREGATE [STREAMING]
 |  |  |  group by: iss.i_brand_id, iss.i_class_id, iss.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=75 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=75 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 87(GETNEXT)
 |  |  |
 |  |  91:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1935,7 +1935,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |
 |  |  176:EXCHANGE [UNPARTITIONED]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=64 row-size=16B cardinality=1
+|  |  |  tuple-ids=64 row-size=16B cardinality=3
 |  |  |  in pipelines: 81(GETNEXT)
 |  |  |
 |  |  F48:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1943,7 +1943,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  81:AGGREGATE
 |  |  |  output: avg(CAST(quantity AS DECIMAL(10,0)) * list_price)
 |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  tuple-ids=64 row-size=16B cardinality=1
+|  |  |  tuple-ids=64 row-size=16B cardinality=3
 |  |  |  in pipelines: 81(GETNEXT), 72(OPEN), 75(OPEN), 78(OPEN)
 |  |  |
 |  |  71:UNION
@@ -2075,8 +2075,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  in pipelines: 172(GETNEXT), 42(OPEN)
 |  |
 |  171:EXCHANGE [HASH(i_brand_id,i_class_id,i_category_id)]
-|  |  mem-estimate=330.94KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=54 row-size=36B cardinality=18.00K
+|  |  mem-estimate=622.45KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=54 row-size=36B cardinality=42.88K
 |  |  in pipelines: 42(GETNEXT)
 |  |
 |  F25:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2085,7 +2085,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  output: sum(CAST(cs_quantity AS DECIMAL(10,0)) * cs_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=54 row-size=36B cardinality=18.00K
+|  |  tuple-ids=54 row-size=36B cardinality=42.88K
 |  |  in pipelines: 42(GETNEXT)
 |  |
 |  69:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -2101,7 +2101,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  in pipelines: 158(GETNEXT)
 |  |  |
 |  |  F31:PLAN FRAGMENT [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)] hosts=3 instances=3
-|  |  Per-Host Resources: mem-estimate=16.54MB mem-reservation=7.75MB thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=16.68MB mem-reservation=7.75MB thread-reservation=1
 |  |  66:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  |  hash predicates: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
 |  |  |  fk/pk conjuncts: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
@@ -2139,7 +2139,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 167(GETNEXT)
 |  |  |  |
 |  |  |  F39:PLAN FRAGMENT [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)] hosts=2 instances=2
-|  |  |  Per-Host Resources: mem-estimate=10.19MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Host Resources: mem-estimate=10.24MB mem-reservation=1.94MB thread-reservation=1
 |  |  |  167:AGGREGATE [FINALIZE]
 |  |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
@@ -2147,8 +2147,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 167(GETNEXT), 57(OPEN)
 |  |  |  |
 |  |  |  166:EXCHANGE [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)]
-|  |  |  |  mem-estimate=137.47KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=146 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=242.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=146 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 57(GETNEXT)
 |  |  |  |
 |  |  |  F36:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -2156,7 +2156,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  64:AGGREGATE [STREAMING]
 |  |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=146 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=146 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 57(GETNEXT)
 |  |  |  |
 |  |  |  61:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2235,7 +2235,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 162(GETNEXT)
 |  |  |  |
 |  |  |  F35:PLAN FRAGMENT [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)] hosts=3 instances=3
-|  |  |  Per-Host Resources: mem-estimate=10.19MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Host Resources: mem-estimate=10.25MB mem-reservation=1.94MB thread-reservation=1
 |  |  |  162:AGGREGATE [FINALIZE]
 |  |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
@@ -2243,8 +2243,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  |  in pipelines: 162(GETNEXT), 52(OPEN)
 |  |  |  |
 |  |  |  161:EXCHANGE [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)]
-|  |  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=145 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=145 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 52(GETNEXT)
 |  |  |  |
 |  |  |  F32:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2252,7 +2252,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  62:AGGREGATE [STREAMING]
 |  |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=145 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=145 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 52(GETNEXT)
 |  |  |  |
 |  |  |  56:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2326,8 +2326,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  |  in pipelines: 158(GETNEXT), 46(OPEN)
 |  |  |
 |  |  157:EXCHANGE [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)]
-|  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=41 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=41 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 46(GETNEXT)
 |  |  |
 |  |  F28:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2335,7 +2335,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |  51:AGGREGATE [STREAMING]
 |  |  |  group by: iss.i_brand_id, iss.i_class_id, iss.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=41 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=41 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 46(GETNEXT)
 |  |  |
 |  |  50:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2489,7 +2489,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  |
 |  150:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=30 row-size=16B cardinality=1
+|  |  tuple-ids=30 row-size=16B cardinality=3
 |  |  in pipelines: 40(GETNEXT)
 |  |
 |  F23:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2497,7 +2497,7 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  40:AGGREGATE
 |  |  output: avg(CAST(quantity AS DECIMAL(10,0)) * list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=30 row-size=16B cardinality=1
+|  |  tuple-ids=30 row-size=16B cardinality=3
 |  |  in pipelines: 40(GETNEXT), 31(OPEN), 34(OPEN), 37(OPEN)
 |  |
 |  30:UNION
@@ -2629,8 +2629,8 @@ Per-Host Resources: mem-estimate=63.45MB mem-reservation=17.94MB thread-reservat
 |  in pipelines: 146(GETNEXT), 01(OPEN)
 |
 145:EXCHANGE [HASH(i_brand_id,i_class_id,i_category_id)]
-|  mem-estimate=330.94KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=20 row-size=36B cardinality=18.00K
+|  mem-estimate=725.95KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=20 row-size=36B cardinality=51.71K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2639,7 +2639,7 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_list_price), count(*)
 |  group by: i_brand_id, i_class_id, i_category_id
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=20 row-size=36B cardinality=18.00K
+|  tuple-ids=20 row-size=36B cardinality=51.71K
 |  in pipelines: 01(GETNEXT)
 |
 28:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -2655,7 +2655,7 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  in pipelines: 132(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=21.54MB mem-reservation=12.75MB thread-reservation=1 runtime-filters-memory=5.00MB
+|  Per-Host Resources: mem-estimate=21.68MB mem-reservation=12.75MB thread-reservation=1 runtime-filters-memory=5.00MB
 |  25:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash predicates: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
 |  |  fk/pk conjuncts: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
@@ -2694,7 +2694,7 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  |  in pipelines: 141(GETNEXT)
 |  |  |
 |  |  F14:PLAN FRAGMENT [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)] hosts=2 instances=2
-|  |  Per-Host Resources: mem-estimate=10.19MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=10.24MB mem-reservation=1.94MB thread-reservation=1
 |  |  141:AGGREGATE [FINALIZE]
 |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
@@ -2702,8 +2702,8 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  |  in pipelines: 141(GETNEXT), 16(OPEN)
 |  |  |
 |  |  140:EXCHANGE [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)]
-|  |  |  mem-estimate=137.47KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=125 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=242.94KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=125 row-size=12B cardinality=36.00K
 |  |  |  in pipelines: 16(GETNEXT)
 |  |  |
 |  |  F11:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -2711,7 +2711,7 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  23:AGGREGATE [STREAMING]
 |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=125 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=125 row-size=12B cardinality=36.00K
 |  |  |  in pipelines: 16(GETNEXT)
 |  |  |
 |  |  20:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2790,7 +2790,7 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  |  in pipelines: 136(GETNEXT)
 |  |  |
 |  |  F10:PLAN FRAGMENT [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)] hosts=3 instances=3
-|  |  Per-Host Resources: mem-estimate=10.19MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=10.25MB mem-reservation=1.94MB thread-reservation=1
 |  |  136:AGGREGATE [FINALIZE]
 |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
@@ -2798,8 +2798,8 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  |  in pipelines: 136(GETNEXT), 11(OPEN)
 |  |  |
 |  |  135:EXCHANGE [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)]
-|  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=124 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=124 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2807,7 +2807,7 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  21:AGGREGATE [STREAMING]
 |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=124 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=124 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  15:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2881,8 +2881,8 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  |  in pipelines: 132(GETNEXT), 05(OPEN)
 |  |
 |  131:EXCHANGE [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)]
-|  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=7 row-size=12B cardinality=18.00K
+|  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=7 row-size=12B cardinality=54.00K
 |  |  in pipelines: 05(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -2890,7 +2890,7 @@ Per-Host Resources: mem-estimate=67.86MB mem-reservation=12.81MB thread-reservat
 |  10:AGGREGATE [STREAMING]
 |  |  group by: iss.i_brand_id, iss.i_class_id, iss.i_category_id
 |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=7 row-size=12B cardinality=18.00K
+|  |  tuple-ids=7 row-size=12B cardinality=54.00K
 |  |  in pipelines: 05(GETNEXT)
 |  |
 |  09:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3040,7 +3040,7 @@ PLAN-ROOT SINK
 |  in pipelines: 126(GETNEXT)
 |
 F76:PLAN FRAGMENT [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=60.00MB mem-reservation=16.31MB thread-reservation=1
+Per-Instance Resources: mem-estimate=60.60MB mem-reservation=16.31MB thread-reservation=1
 126:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC
 |  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
@@ -3075,12 +3075,12 @@ Per-Instance Resources: mem-estimate=60.00MB mem-reservation=16.31MB thread-rese
 |  in pipelines: 206(GETNEXT), 146(OPEN), 172(OPEN), 198(OPEN)
 |
 205:EXCHANGE [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)]
-|  mem-estimate=9.26MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=101.43K
+|  mem-estimate=10.60MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=119.01K
 |  in pipelines: 146(GETNEXT), 172(GETNEXT), 198(GETNEXT)
 |
 F75:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=67.31MB mem-reservation=13.94MB thread-reservation=1
 124:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(sales), sum(number_sales)
@@ -3098,7 +3098,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |    output: sum(sales), sum(number_sales)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=50.00MB mem-reservation=12.00MB thread-reservation=0
-|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=101.43K
+|  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=119.01K
 |  in pipelines: 146(GETNEXT), 172(GETNEXT), 198(GETNEXT)
 |
 00:UNION
@@ -3134,7 +3134,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |
 |  |  202:EXCHANGE [UNPARTITIONED]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=98 row-size=16B cardinality=1
+|  |  |  tuple-ids=98 row-size=16B cardinality=6
 |  |  |  in pipelines: 122(GETNEXT)
 |  |  |
 |  |  F73:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -3142,7 +3142,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  122:AGGREGATE
 |  |  |  output: avg(CAST(quantity AS DECIMAL(10,0)) * list_price)
 |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  tuple-ids=98 row-size=16B cardinality=1
+|  |  |  tuple-ids=98 row-size=16B cardinality=6
 |  |  |  in pipelines: 122(GETNEXT), 113(OPEN), 116(OPEN), 119(OPEN)
 |  |  |
 |  |  112:UNION
@@ -3298,8 +3298,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  in pipelines: 198(GETNEXT), 83(OPEN)
 |  |
 |  197:EXCHANGE [HASH(i_brand_id,i_class_id,i_category_id)]
-|  |  mem-estimate=396.41KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=88 row-size=36B cardinality=18.00K
+|  |  mem-estimate=520.40KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=88 row-size=36B cardinality=25.05K
 |  |  in pipelines: 83(GETNEXT)
 |  |
 |  F50:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -3309,7 +3309,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  output: sum(CAST(ws_quantity AS DECIMAL(10,0)) * ws_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=88 row-size=36B cardinality=18.00K
+|  |  tuple-ids=88 row-size=36B cardinality=25.05K
 |  |  in pipelines: 83(GETNEXT)
 |  |
 |  110:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -3333,7 +3333,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  in pipelines: 184(GETNEXT)
 |  |  |
 |  |  F56:PLAN FRAGMENT [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=10.16MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reservation=1
 |  |  107:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  |  hash-table-id=37
 |  |  |  hash predicates: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
@@ -3395,8 +3395,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  |  in pipelines: 193(GETNEXT), 98(OPEN)
 |  |  |  |
 |  |  |  192:EXCHANGE [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)]
-|  |  |  |  mem-estimate=137.47KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=167 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=242.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=167 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 98(GETNEXT)
 |  |  |  |
 |  |  |  F61:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -3404,7 +3404,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  105:AGGREGATE [STREAMING]
 |  |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=167 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=167 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 98(GETNEXT)
 |  |  |  |
 |  |  |  102:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3515,8 +3515,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  |  in pipelines: 188(GETNEXT), 93(OPEN)
 |  |  |  |
 |  |  |  187:EXCHANGE [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)]
-|  |  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=166 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=166 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 93(GETNEXT)
 |  |  |  |
 |  |  |  F57:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -3524,7 +3524,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  103:AGGREGATE [STREAMING]
 |  |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=166 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=166 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 93(GETNEXT)
 |  |  |  |
 |  |  |  97:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3614,8 +3614,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  in pipelines: 184(GETNEXT), 87(OPEN)
 |  |  |
 |  |  183:EXCHANGE [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)]
-|  |  |  mem-estimate=166.31KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=75 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=517.88KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=75 row-size=12B cardinality=108.00K
 |  |  |  in pipelines: 87(GETNEXT)
 |  |  |
 |  |  F53:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -3623,7 +3623,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  92:AGGREGATE [STREAMING]
 |  |  |  group by: iss.i_brand_id, iss.i_class_id, iss.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=75 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=75 row-size=12B cardinality=108.00K
 |  |  |  in pipelines: 87(GETNEXT)
 |  |  |
 |  |  91:HASH JOIN [INNER JOIN, BROADCAST]
@@ -3816,7 +3816,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |
 |  |  176:EXCHANGE [UNPARTITIONED]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=64 row-size=16B cardinality=1
+|  |  |  tuple-ids=64 row-size=16B cardinality=6
 |  |  |  in pipelines: 81(GETNEXT)
 |  |  |
 |  |  F48:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -3824,7 +3824,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  81:AGGREGATE
 |  |  |  output: avg(CAST(quantity AS DECIMAL(10,0)) * list_price)
 |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  tuple-ids=64 row-size=16B cardinality=1
+|  |  |  tuple-ids=64 row-size=16B cardinality=6
 |  |  |  in pipelines: 81(GETNEXT), 72(OPEN), 75(OPEN), 78(OPEN)
 |  |  |
 |  |  71:UNION
@@ -3980,8 +3980,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  in pipelines: 172(GETNEXT), 42(OPEN)
 |  |
 |  171:EXCHANGE [HASH(i_brand_id,i_class_id,i_category_id)]
-|  |  mem-estimate=330.94KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=54 row-size=36B cardinality=18.00K
+|  |  mem-estimate=622.45KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=54 row-size=36B cardinality=42.88K
 |  |  in pipelines: 42(GETNEXT)
 |  |
 |  F25:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -3991,7 +3991,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  output: sum(CAST(cs_quantity AS DECIMAL(10,0)) * cs_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=54 row-size=36B cardinality=18.00K
+|  |  tuple-ids=54 row-size=36B cardinality=42.88K
 |  |  in pipelines: 42(GETNEXT)
 |  |
 |  69:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -4015,7 +4015,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  in pipelines: 158(GETNEXT)
 |  |  |
 |  |  F31:PLAN FRAGMENT [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=10.16MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reservation=1
 |  |  66:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  |  hash-table-id=25
 |  |  |  hash predicates: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
@@ -4077,8 +4077,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  |  in pipelines: 167(GETNEXT), 57(OPEN)
 |  |  |  |
 |  |  |  166:EXCHANGE [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)]
-|  |  |  |  mem-estimate=137.47KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=146 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=242.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=146 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 57(GETNEXT)
 |  |  |  |
 |  |  |  F36:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -4086,7 +4086,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  64:AGGREGATE [STREAMING]
 |  |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=146 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=146 row-size=12B cardinality=36.00K
 |  |  |  |  in pipelines: 57(GETNEXT)
 |  |  |  |
 |  |  |  61:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4197,8 +4197,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  |  in pipelines: 162(GETNEXT), 52(OPEN)
 |  |  |  |
 |  |  |  161:EXCHANGE [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)]
-|  |  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=145 row-size=12B cardinality=18.00K
+|  |  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=145 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 52(GETNEXT)
 |  |  |  |
 |  |  |  F32:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -4206,7 +4206,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  62:AGGREGATE [STREAMING]
 |  |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=145 row-size=12B cardinality=18.00K
+|  |  |  |  tuple-ids=145 row-size=12B cardinality=54.00K
 |  |  |  |  in pipelines: 52(GETNEXT)
 |  |  |  |
 |  |  |  56:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4296,8 +4296,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  |  in pipelines: 158(GETNEXT), 46(OPEN)
 |  |  |
 |  |  157:EXCHANGE [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)]
-|  |  |  mem-estimate=166.31KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=41 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=517.88KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=41 row-size=12B cardinality=108.00K
 |  |  |  in pipelines: 46(GETNEXT)
 |  |  |
 |  |  F28:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -4305,7 +4305,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |  51:AGGREGATE [STREAMING]
 |  |  |  group by: iss.i_brand_id, iss.i_class_id, iss.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=41 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=41 row-size=12B cardinality=108.00K
 |  |  |  in pipelines: 46(GETNEXT)
 |  |  |
 |  |  50:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4498,7 +4498,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  |
 |  150:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=30 row-size=16B cardinality=1
+|  |  tuple-ids=30 row-size=16B cardinality=6
 |  |  in pipelines: 40(GETNEXT)
 |  |
 |  F23:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -4506,7 +4506,7 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  40:AGGREGATE
 |  |  output: avg(CAST(quantity AS DECIMAL(10,0)) * list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=30 row-size=16B cardinality=1
+|  |  tuple-ids=30 row-size=16B cardinality=6
 |  |  in pipelines: 40(GETNEXT), 31(OPEN), 34(OPEN), 37(OPEN)
 |  |
 |  30:UNION
@@ -4662,8 +4662,8 @@ Per-Instance Resources: mem-estimate=66.53MB mem-reservation=13.94MB thread-rese
 |  in pipelines: 146(GETNEXT), 01(OPEN)
 |
 145:EXCHANGE [HASH(i_brand_id,i_class_id,i_category_id)]
-|  mem-estimate=450.94KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=20 row-size=36B cardinality=18.00K
+|  mem-estimate=1.22MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=20 row-size=36B cardinality=85.74K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -4673,7 +4673,7 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_list_price), count(*)
 |  group by: i_brand_id, i_class_id, i_category_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=20 row-size=36B cardinality=18.00K
+|  tuple-ids=20 row-size=36B cardinality=85.74K
 |  in pipelines: 01(GETNEXT)
 |
 28:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -4697,7 +4697,7 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  |  in pipelines: 132(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=10.16MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reservation=1
 |  25:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash-table-id=13
 |  |  hash predicates: iss.i_brand_id = i_brand_id, iss.i_category_id = i_category_id, iss.i_class_id = i_class_id
@@ -4760,8 +4760,8 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  |  |  in pipelines: 141(GETNEXT), 16(OPEN)
 |  |  |
 |  |  140:EXCHANGE [HASH(iws.i_brand_id,iws.i_class_id,iws.i_category_id)]
-|  |  |  mem-estimate=137.47KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=125 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=242.94KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=125 row-size=12B cardinality=36.00K
 |  |  |  in pipelines: 16(GETNEXT)
 |  |  |
 |  |  F11:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -4769,7 +4769,7 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  |  23:AGGREGATE [STREAMING]
 |  |  |  group by: iws.i_brand_id, iws.i_class_id, iws.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=125 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=125 row-size=12B cardinality=36.00K
 |  |  |  in pipelines: 16(GETNEXT)
 |  |  |
 |  |  20:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4880,8 +4880,8 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  |  |  in pipelines: 136(GETNEXT), 11(OPEN)
 |  |  |
 |  |  135:EXCHANGE [HASH(ics.i_brand_id,ics.i_class_id,ics.i_category_id)]
-|  |  |  mem-estimate=118.31KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=124 row-size=12B cardinality=18.00K
+|  |  |  mem-estimate=258.94KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=124 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -4889,7 +4889,7 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  |  21:AGGREGATE [STREAMING]
 |  |  |  group by: ics.i_brand_id, ics.i_class_id, ics.i_category_id
 |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=124 row-size=12B cardinality=18.00K
+|  |  |  tuple-ids=124 row-size=12B cardinality=54.00K
 |  |  |  in pipelines: 11(GETNEXT)
 |  |  |
 |  |  15:HASH JOIN [INNER JOIN, BROADCAST]
@@ -4979,8 +4979,8 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  |  in pipelines: 132(GETNEXT), 05(OPEN)
 |  |
 |  131:EXCHANGE [HASH(iss.i_brand_id,iss.i_class_id,iss.i_category_id)]
-|  |  mem-estimate=166.31KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=7 row-size=12B cardinality=18.00K
+|  |  mem-estimate=517.88KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=7 row-size=12B cardinality=108.00K
 |  |  in pipelines: 05(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -4988,7 +4988,7 @@ Per-Instance Resources: mem-estimate=26.94MB mem-reservation=3.00MB thread-reser
 |  10:AGGREGATE [STREAMING]
 |  |  group by: iss.i_brand_id, iss.i_class_id, iss.i_category_id
 |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=7 row-size=12B cardinality=18.00K
+|  |  tuple-ids=7 row-size=12B cardinality=108.00K
 |  |  in pipelines: 05(GETNEXT)
 |  |
 |  09:HASH JOIN [INNER JOIN, BROADCAST]

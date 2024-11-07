@@ -61,7 +61,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [STREAMING]
 |  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(*)
 |  group by: l_returnflag, l_linestatus
-|  row-size=122B cardinality=6
+|  row-size=122B cardinality=18
 |
 00:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -89,7 +89,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [STREAMING]
 |  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(*)
 |  group by: l_returnflag, l_linestatus
-|  row-size=122B cardinality=6
+|  row-size=122B cardinality=36
 |
 00:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -785,7 +785,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
-|  row-size=28B cardinality=5
+|  row-size=28B cardinality=15
 |
 02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -828,7 +828,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
-|  row-size=28B cardinality=5
+|  row-size=28B cardinality=30
 |
 02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -971,7 +971,7 @@ PLAN-ROOT SINK
 11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: n_name
-|  row-size=35B cardinality=25
+|  row-size=35B cardinality=75
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n_regionkey = r_regionkey
@@ -1060,7 +1060,7 @@ PLAN-ROOT SINK
 11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: n_name
-|  row-size=35B cardinality=25
+|  row-size=35B cardinality=150
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n_regionkey = r_regionkey
@@ -1185,7 +1185,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE
 |  output: sum(l_extendedprice * l_discount)
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=3
 |
 00:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -1204,7 +1204,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE
 |  output: sum(l_extendedprice * l_discount)
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=6
 |
 00:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -2043,7 +2043,7 @@ PLAN-ROOT SINK
 11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity)
 |  group by: n_name, year(o_orderdate)
-|  row-size=39B cardinality=61.70K
+|  row-size=39B cardinality=176.78K
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
@@ -2131,7 +2131,7 @@ PLAN-ROOT SINK
 11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity)
 |  group by: n_name, year(o_orderdate)
-|  row-size=39B cardinality=61.70K
+|  row-size=39B cardinality=291.73K
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
@@ -2851,7 +2851,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN o_orderpriority IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END), sum(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
 |  group by: l_shipmode
-|  row-size=32B cardinality=7
+|  row-size=32B cardinality=21
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -2893,7 +2893,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN o_orderpriority IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END), sum(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
 |  group by: l_shipmode
-|  row-size=32B cardinality=7
+|  row-size=32B cardinality=42
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -3123,7 +3123,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
-|  row-size=32B cardinality=1
+|  row-size=32B cardinality=3
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
@@ -3156,7 +3156,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
-|  row-size=32B cardinality=1
+|  row-size=32B cardinality=6
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
@@ -3285,7 +3285,7 @@ PLAN-ROOT SINK
 |  |
 |  05:AGGREGATE
 |  |  output: max(sum(l_extendedprice * (1 - l_discount)))
-|  |  row-size=16B cardinality=1
+|  |  row-size=16B cardinality=3
 |  |
 |  13:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(l_extendedprice * (1 - l_discount))
@@ -3297,7 +3297,7 @@ PLAN-ROOT SINK
 |  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_extendedprice * (1 - l_discount))
 |  |  group by: l_suppkey
-|  |  row-size=24B cardinality=9.71K
+|  |  row-size=24B cardinality=29.14K
 |  |
 |  03:SCAN HDFS [tpch.lineitem]
 |     HDFS partitions=1/1 files=1 size=718.94MB
@@ -3325,7 +3325,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_suppkey
-|  row-size=24B cardinality=9.71K
+|  row-size=24B cardinality=29.14K
 |
 01:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -3362,7 +3362,7 @@ PLAN-ROOT SINK
 |  |
 |  05:AGGREGATE
 |  |  output: max(sum(l_extendedprice * (1 - l_discount)))
-|  |  row-size=16B cardinality=1
+|  |  row-size=16B cardinality=6
 |  |
 |  13:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(l_extendedprice * (1 - l_discount))
@@ -3374,7 +3374,7 @@ PLAN-ROOT SINK
 |  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_extendedprice * (1 - l_discount))
 |  |  group by: l_suppkey
-|  |  row-size=24B cardinality=9.71K
+|  |  row-size=24B cardinality=58.27K
 |  |
 |  03:SCAN HDFS [tpch.lineitem]
 |     HDFS partitions=1/1 files=1 size=718.94MB
@@ -3406,7 +3406,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_suppkey
-|  row-size=24B cardinality=9.71K
+|  row-size=24B cardinality=58.27K
 |
 01:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -3678,7 +3678,7 @@ PLAN-ROOT SINK
    row-size=16B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=42.75MB Threads=8
-Per-Host Resource Estimates: Memory=622MB
+Per-Host Resource Estimates: Memory=624MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -3689,7 +3689,7 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE
 |  output: sum(l_extendedprice)
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=3
 |
 05:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
@@ -3726,7 +3726,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: avg(l_quantity)
 |  group by: l_partkey
-|  row-size=16B cardinality=200.52K
+|  row-size=16B cardinality=601.52K
 |
 02:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -3734,7 +3734,7 @@ PLAN-ROOT SINK
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=74.62MB Threads=11
-Per-Host Resource Estimates: Memory=446MB
+Per-Host Resource Estimates: Memory=456MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -3745,7 +3745,7 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE
 |  output: sum(l_extendedprice)
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=6
 |
 05:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
@@ -3790,7 +3790,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [STREAMING]
 |  output: avg(l_quantity)
 |  group by: l_partkey
-|  row-size=16B cardinality=200.52K
+|  row-size=16B cardinality=1.19M
 |
 02:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -3887,7 +3887,7 @@ PLAN-ROOT SINK
    row-size=16B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=219.75MB Threads=11
-Per-Host Resource Estimates: Memory=1020MB
+Per-Host Resource Estimates: Memory=1.00GB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3926,7 +3926,7 @@ PLAN-ROOT SINK
 |  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
-|  |  row-size=24B cardinality=1.56M
+|  |  row-size=24B cardinality=3.39M
 |  |
 |  03:SCAN HDFS [tpch.lineitem]
 |     HDFS partitions=1/1 files=1 size=718.94MB
@@ -3962,8 +3962,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF004 -> l_orderkey
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=325.75MB Threads=16
-Per-Host Resource Estimates: Memory=842MB
+Max Per-Host Resource Reservation: Memory=359.75MB Threads=16
+Per-Host Resource Estimates: Memory=876MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4006,7 +4006,7 @@ PLAN-ROOT SINK
 |  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
-|  |  row-size=24B cardinality=1.56M
+|  |  row-size=24B cardinality=4.43M
 |  |
 |  03:SCAN HDFS [tpch.lineitem]
 |     HDFS partitions=1/1 files=1 size=718.94MB
@@ -4125,7 +4125,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: sum(l_extendedprice * (1 - l_discount))
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=3
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -4158,7 +4158,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  output: sum(l_extendedprice * (1 - l_discount))
-|  row-size=16B cardinality=1
+|  row-size=16B cardinality=6
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -4330,7 +4330,7 @@ PLAN-ROOT SINK
 |
 09:AGGREGATE [STREAMING]
 |  group by: tpch.partsupp.ps_suppkey
-|  row-size=8B cardinality=9.71K
+|  row-size=8B cardinality=27.25K
 |
 07:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
@@ -4426,7 +4426,7 @@ PLAN-ROOT SINK
 |
 09:AGGREGATE [STREAMING]
 |  group by: tpch.partsupp.ps_suppkey
-|  row-size=8B cardinality=9.71K
+|  row-size=8B cardinality=43.46K
 |
 07:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
@@ -4941,7 +4941,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [STREAMING]
 |  group by: tpch.orders.o_custkey
-|  row-size=8B cardinality=98.39K
+|  row-size=8B cardinality=196.68K
 |
 03:SCAN HDFS [tpch.orders]
    HDFS partitions=1/1 files=1 size=162.56MB
@@ -5018,7 +5018,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [STREAMING]
 |  group by: tpch.orders.o_custkey
-|  row-size=8B cardinality=98.39K
+|  row-size=8B cardinality=196.68K
 |
 03:SCAN HDFS [tpch.orders]
    HDFS partitions=1/1 files=1 size=162.56MB

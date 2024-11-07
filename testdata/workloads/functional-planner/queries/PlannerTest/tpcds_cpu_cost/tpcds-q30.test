@@ -266,8 +266,8 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  in pipelines: 33(GETNEXT)
 |  |
 |  F13:PLAN FRAGMENT [HASH(ctr2.ctr_state)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=10.13MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[1935, 5] cpu-comparison-result=51 [max(10 (self) vs 51 (sum children))]
+|  Per-Instance Resources: mem-estimate=11.01MB mem-reservation=1.94MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[3447, 5] cpu-comparison-result=51 [max(10 (self) vs 51 (sum children))]
 |  33:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_state
@@ -276,18 +276,18 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  in pipelines: 33(GETNEXT), 31(OPEN)
 |  |
 |  32:EXCHANGE [HASH(ctr2.ctr_state)]
-|  |  mem-estimate=50.95KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=12 row-size=30B cardinality=51 cost=12
+|  |  mem-estimate=1.01MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=12 row-size=30B cardinality=6.12K cost=1524
 |  |  in pipelines: 31(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [HASH(wr_returning_customer_sk,ca_state)] hosts=10 instances=30 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=75.04MB mem-reservation=36.00MB thread-reservation=1
-|  max-parallelism=30 segment-costs=[227526879, 10802104, 124] cpu-comparison-result=51 [max(30 (self) vs 51 (sum children))]
+|  max-parallelism=30 segment-costs=[227526879, 10802104, 14976] cpu-comparison-result=51 [max(30 (self) vs 51 (sum children))]
 |  14:AGGREGATE [STREAMING]
 |  |  output: avg(sum(wr_return_amt))
 |  |  group by: ca_state
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=12 row-size=30B cardinality=51 cost=10802104
+|  |  tuple-ids=12 row-size=30B cardinality=6.12K cost=10802104
 |  |  in pipelines: 31(GETNEXT)
 |  |
 |  31:AGGREGATE [FINALIZE]
@@ -655,8 +655,8 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  in pipelines: 33(GETNEXT)
 |  |
 |  F13:PLAN FRAGMENT [HASH(ctr2.ctr_state)] hosts=10 instances=10 (adjusted from 120)
-|  Per-Instance Resources: mem-estimate=10.13MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[1935, 5] cpu-comparison-result=51 [max(10 (self) vs 51 (sum children))]
+|  Per-Instance Resources: mem-estimate=11.01MB mem-reservation=1.94MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[3447, 5] cpu-comparison-result=51 [max(10 (self) vs 51 (sum children))]
 |  33:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_state
@@ -665,18 +665,18 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  in pipelines: 33(GETNEXT), 31(OPEN)
 |  |
 |  32:EXCHANGE [HASH(ctr2.ctr_state)]
-|  |  mem-estimate=50.95KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=12 row-size=30B cardinality=51 cost=12
+|  |  mem-estimate=1.01MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=12 row-size=30B cardinality=6.12K cost=1524
 |  |  in pipelines: 31(GETNEXT)
 |  |
 |  F12:PLAN FRAGMENT [HASH(wr_returning_customer_sk,ca_state)] hosts=10 instances=30 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=75.04MB mem-reservation=36.00MB thread-reservation=1
-|  max-parallelism=30 segment-costs=[227526879, 10802104, 124] cpu-comparison-result=51 [max(30 (self) vs 51 (sum children))]
+|  max-parallelism=30 segment-costs=[227526879, 10802104, 14976] cpu-comparison-result=51 [max(30 (self) vs 51 (sum children))]
 |  14:AGGREGATE [STREAMING]
 |  |  output: avg(sum(wr_return_amt))
 |  |  group by: ca_state
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=12 row-size=30B cardinality=51 cost=10802104
+|  |  tuple-ids=12 row-size=30B cardinality=6.12K cost=10802104
 |  |  in pipelines: 31(GETNEXT)
 |  |
 |  31:AGGREGATE [FINALIZE]

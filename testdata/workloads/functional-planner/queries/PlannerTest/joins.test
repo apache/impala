@@ -959,7 +959,7 @@ PLAN-ROOT SINK
 |  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: int_col, bool_col
-|  |  row-size=13B cardinality=20
+|  |  row-size=13B cardinality=60
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     HDFS partitions=24/24 files=24 size=478.45KB
@@ -1043,7 +1043,7 @@ PLAN-ROOT SINK
 |  03:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: int_col, bool_col
-|  |  row-size=13B cardinality=20
+|  |  row-size=13B cardinality=60
 |  |
 |  02:SCAN HDFS [functional.alltypes]
 |     HDFS partitions=24/24 files=24 size=478.45KB
@@ -1532,7 +1532,7 @@ PLAN-ROOT SINK
 |  |
 |  03:AGGREGATE [STREAMING]
 |  |  group by: bigint_col
-|  |  row-size=8B cardinality=2
+|  |  row-size=8B cardinality=6
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     HDFS partitions=4/4 files=4 size=460B
@@ -1546,7 +1546,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [STREAMING]
 |  group by: int_col
-|  row-size=4B cardinality=10
+|  row-size=4B cardinality=30
 |
 00:SCAN HDFS [functional.alltypessmall]
    HDFS partitions=4/4 files=4 size=6.32KB
@@ -2036,7 +2036,7 @@ PLAN-ROOT SINK
 |  |
 |  01:AGGREGATE [STREAMING]
 |  |  group by: tinyint_col, int_col
-|  |  row-size=5B cardinality=4
+|  |  row-size=5B cardinality=8
 |  |
 |  00:SCAN HDFS [functional.alltypestiny]
 |     HDFS partitions=4/4 files=4 size=460B
@@ -2094,7 +2094,7 @@ PLAN-ROOT SINK
 |  |
 |  01:AGGREGATE [STREAMING]
 |  |  group by: tinyint_col, int_col
-|  |  row-size=5B cardinality=4
+|  |  row-size=5B cardinality=8
 |  |
 |  00:SCAN HDFS [functional.alltypestiny]
 |     HDFS partitions=4/4 files=4 size=460B
@@ -2164,7 +2164,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [STREAMING]
 |  group by: bigint_col, string_col
-|  row-size=21B cardinality=4
+|  row-size=21B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    HDFS partitions=4/4 files=4 size=460B
@@ -2199,7 +2199,7 @@ PLAN-ROOT SINK
 |  |
 |  03:AGGREGATE [STREAMING]
 |  |  group by: b.string_col, b.int_col
-|  |  row-size=17B cardinality=100
+|  |  row-size=17B cardinality=300
 |  |
 |  02:SCAN HDFS [functional.alltypes b]
 |     HDFS partitions=24/24 files=24 size=478.45KB
@@ -2213,7 +2213,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [STREAMING]
 |  group by: int_col, string_col
-|  row-size=17B cardinality=4
+|  row-size=17B cardinality=8
 |
 00:SCAN HDFS [functional.alltypestiny]
    HDFS partitions=4/4 files=4 size=460B
@@ -2246,7 +2246,7 @@ PLAN-ROOT SINK
 |  |
 |  02:AGGREGATE [STREAMING]
 |  |  group by: int_col, string_col
-|  |  row-size=17B cardinality=4
+|  |  row-size=17B cardinality=8
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     HDFS partitions=4/4 files=4 size=460B

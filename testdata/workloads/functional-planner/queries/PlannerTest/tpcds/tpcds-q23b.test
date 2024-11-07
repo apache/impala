@@ -695,7 +695,7 @@ Per-Host Resources: mem-estimate=10.34MB mem-reservation=1.94MB thread-reservati
 |  |  |  |  in pipelines: 89(GETNEXT)
 |  |  |  |
 |  |  |  F30:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=3
-|  |  |  Per-Host Resources: mem-estimate=11.26MB mem-reservation=2.88MB thread-reservation=1
+|  |  |  Per-Host Resources: mem-estimate=13.55MB mem-reservation=2.88MB thread-reservation=1
 |  |  |  89:AGGREGATE [FINALIZE]
 |  |  |  |  output: sum:merge(ss_quantity * ss_sales_price), max:merge(tpcds_cmax)
 |  |  |  |  group by: c_customer_sk
@@ -705,8 +705,8 @@ Per-Host Resources: mem-estimate=10.34MB mem-reservation=1.94MB thread-reservati
 |  |  |  |  in pipelines: 89(GETNEXT), 36(OPEN)
 |  |  |  |
 |  |  |  88:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  |  mem-estimate=1.26MB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=39 row-size=36B cardinality=100.00K
+|  |  |  |  mem-estimate=3.55MB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=39 row-size=36B cardinality=299.98K
 |  |  |  |  in pipelines: 36(GETNEXT)
 |  |  |  |
 |  |  |  F23:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -715,7 +715,7 @@ Per-Host Resources: mem-estimate=10.34MB mem-reservation=1.94MB thread-reservati
 |  |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price), max(max(csales))
 |  |  |  |  group by: c_customer_sk
 |  |  |  |  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
-|  |  |  |  tuple-ids=39 row-size=36B cardinality=100.00K
+|  |  |  |  tuple-ids=39 row-size=36B cardinality=299.98K
 |  |  |  |  in pipelines: 36(GETNEXT)
 |  |  |  |
 |  |  |  46:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -738,15 +738,15 @@ Per-Host Resources: mem-estimate=10.34MB mem-reservation=1.94MB thread-reservati
 |  |  |  |  |
 |  |  |  |  85:EXCHANGE [UNPARTITIONED]
 |  |  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=1
+|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=3
 |  |  |  |  |  in pipelines: 44(GETNEXT)
 |  |  |  |  |
 |  |  |  |  F28:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=3
-|  |  |  |  Per-Host Resources: mem-estimate=10.71MB mem-reservation=2.88MB thread-reservation=1
+|  |  |  |  Per-Host Resources: mem-estimate=11.98MB mem-reservation=2.88MB thread-reservation=1
 |  |  |  |  44:AGGREGATE
 |  |  |  |  |  output: max(sum(ss_quantity * ss_sales_price))
 |  |  |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=1
+|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=3
 |  |  |  |  |  in pipelines: 44(GETNEXT), 84(OPEN)
 |  |  |  |  |
 |  |  |  |  84:AGGREGATE [FINALIZE]
@@ -757,8 +757,8 @@ Per-Host Resources: mem-estimate=10.34MB mem-reservation=1.94MB thread-reservati
 |  |  |  |  |  in pipelines: 84(GETNEXT), 38(OPEN)
 |  |  |  |  |
 |  |  |  |  83:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  |  |  mem-estimate=723.04KB mem-reservation=0B thread-reservation=0
-|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=100.00K
+|  |  |  |  |  mem-estimate=1.98MB mem-reservation=0B thread-reservation=0
+|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=299.88K
 |  |  |  |  |  in pipelines: 38(GETNEXT)
 |  |  |  |  |
 |  |  |  |  F25:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -767,7 +767,7 @@ Per-Host Resources: mem-estimate=10.34MB mem-reservation=1.94MB thread-reservati
 |  |  |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price)
 |  |  |  |  |  group by: c_customer_sk
 |  |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=100.00K
+|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=299.88K
 |  |  |  |  |  in pipelines: 38(GETNEXT)
 |  |  |  |  |
 |  |  |  |  42:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1082,7 +1082,7 @@ Per-Host Resources: mem-estimate=71.94MB mem-reservation=39.88MB thread-reservat
 |  |  |  in pipelines: 68(GETNEXT)
 |  |  |
 |  |  F13:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=3
-|  |  Per-Host Resources: mem-estimate=11.26MB mem-reservation=2.88MB thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=13.55MB mem-reservation=2.88MB thread-reservation=1
 |  |  68:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(ss_quantity * ss_sales_price), max:merge(tpcds_cmax)
 |  |  |  group by: c_customer_sk
@@ -1092,8 +1092,8 @@ Per-Host Resources: mem-estimate=71.94MB mem-reservation=39.88MB thread-reservat
 |  |  |  in pipelines: 68(GETNEXT), 10(OPEN)
 |  |  |
 |  |  67:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  mem-estimate=1.26MB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=18 row-size=36B cardinality=100.00K
+|  |  |  mem-estimate=3.55MB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=18 row-size=36B cardinality=299.98K
 |  |  |  in pipelines: 10(GETNEXT)
 |  |  |
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1102,7 +1102,7 @@ Per-Host Resources: mem-estimate=71.94MB mem-reservation=39.88MB thread-reservat
 |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price), max(max(csales))
 |  |  |  group by: c_customer_sk
 |  |  |  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
-|  |  |  tuple-ids=18 row-size=36B cardinality=100.00K
+|  |  |  tuple-ids=18 row-size=36B cardinality=299.98K
 |  |  |  in pipelines: 10(GETNEXT)
 |  |  |
 |  |  20:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1125,15 +1125,15 @@ Per-Host Resources: mem-estimate=71.94MB mem-reservation=39.88MB thread-reservat
 |  |  |  |
 |  |  |  64:EXCHANGE [UNPARTITIONED]
 |  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=16 row-size=16B cardinality=1
+|  |  |  |  tuple-ids=16 row-size=16B cardinality=3
 |  |  |  |  in pipelines: 18(GETNEXT)
 |  |  |  |
 |  |  |  F11:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=3
-|  |  |  Per-Host Resources: mem-estimate=10.71MB mem-reservation=2.88MB thread-reservation=1
+|  |  |  Per-Host Resources: mem-estimate=11.98MB mem-reservation=2.88MB thread-reservation=1
 |  |  |  18:AGGREGATE
 |  |  |  |  output: max(sum(ss_quantity * ss_sales_price))
 |  |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  |  tuple-ids=16 row-size=16B cardinality=1
+|  |  |  |  tuple-ids=16 row-size=16B cardinality=3
 |  |  |  |  in pipelines: 18(GETNEXT), 63(OPEN)
 |  |  |  |
 |  |  |  63:AGGREGATE [FINALIZE]
@@ -1144,8 +1144,8 @@ Per-Host Resources: mem-estimate=71.94MB mem-reservation=39.88MB thread-reservat
 |  |  |  |  in pipelines: 63(GETNEXT), 12(OPEN)
 |  |  |  |
 |  |  |  62:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  |  mem-estimate=723.04KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=14 row-size=20B cardinality=100.00K
+|  |  |  |  mem-estimate=1.98MB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=14 row-size=20B cardinality=299.88K
 |  |  |  |  in pipelines: 12(GETNEXT)
 |  |  |  |
 |  |  |  F08:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1154,7 +1154,7 @@ Per-Host Resources: mem-estimate=71.94MB mem-reservation=39.88MB thread-reservat
 |  |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price)
 |  |  |  |  group by: c_customer_sk
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=14 row-size=20B cardinality=100.00K
+|  |  |  |  tuple-ids=14 row-size=20B cardinality=299.88K
 |  |  |  |  in pipelines: 12(GETNEXT)
 |  |  |  |
 |  |  |  16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1388,7 +1388,7 @@ Per-Host Resources: mem-estimate=61.76MB mem-reservation=43.19MB thread-reservat
    in pipelines: 04(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=530.38MB Threads=67
-Per-Host Resource Estimates: Memory=1.18GB
+Per-Host Resource Estimates: Memory=1.21GB
 F35:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -1523,7 +1523,7 @@ Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reser
 |  |  |  |  in pipelines: 89(GETNEXT)
 |  |  |  |
 |  |  |  F30:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=6
-|  |  |  Per-Instance Resources: mem-estimate=11.38MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Instance Resources: mem-estimate=17.04MB mem-reservation=1.94MB thread-reservation=1
 |  |  |  89:AGGREGATE [FINALIZE]
 |  |  |  |  output: sum:merge(ss_quantity * ss_sales_price), max:merge(tpcds_cmax)
 |  |  |  |  group by: c_customer_sk
@@ -1533,8 +1533,8 @@ Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reser
 |  |  |  |  in pipelines: 89(GETNEXT), 36(OPEN)
 |  |  |  |
 |  |  |  88:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  |  mem-estimate=1.38MB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=39 row-size=36B cardinality=100.00K
+|  |  |  |  mem-estimate=7.04MB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=39 row-size=36B cardinality=595.07K
 |  |  |  |  in pipelines: 36(GETNEXT)
 |  |  |  |
 |  |  |  F23:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1543,7 +1543,7 @@ Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reser
 |  |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price), max(max(csales))
 |  |  |  |  group by: c_customer_sk
 |  |  |  |  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
-|  |  |  |  tuple-ids=39 row-size=36B cardinality=100.00K
+|  |  |  |  tuple-ids=39 row-size=36B cardinality=595.07K
 |  |  |  |  in pipelines: 36(GETNEXT)
 |  |  |  |
 |  |  |  46:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -1573,15 +1573,15 @@ Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reser
 |  |  |  |  |
 |  |  |  |  85:EXCHANGE [UNPARTITIONED]
 |  |  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=1
+|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=6
 |  |  |  |  |  in pipelines: 44(GETNEXT)
 |  |  |  |  |
 |  |  |  |  F28:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=6
-|  |  |  |  Per-Instance Resources: mem-estimate=10.78MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  |  Per-Instance Resources: mem-estimate=13.88MB mem-reservation=1.94MB thread-reservation=1
 |  |  |  |  44:AGGREGATE
 |  |  |  |  |  output: max(sum(ss_quantity * ss_sales_price))
 |  |  |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=1
+|  |  |  |  |  tuple-ids=37 row-size=16B cardinality=6
 |  |  |  |  |  in pipelines: 44(GETNEXT), 84(OPEN)
 |  |  |  |  |
 |  |  |  |  84:AGGREGATE [FINALIZE]
@@ -1592,8 +1592,8 @@ Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reser
 |  |  |  |  |  in pipelines: 84(GETNEXT), 38(OPEN)
 |  |  |  |  |
 |  |  |  |  83:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  |  |  mem-estimate=795.04KB mem-reservation=0B thread-reservation=0
-|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=100.00K
+|  |  |  |  |  mem-estimate=3.88MB mem-reservation=0B thread-reservation=0
+|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=588.15K
 |  |  |  |  |  in pipelines: 38(GETNEXT)
 |  |  |  |  |
 |  |  |  |  F25:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1603,7 +1603,7 @@ Per-Instance Resources: mem-estimate=10.51MB mem-reservation=1.94MB thread-reser
 |  |  |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price)
 |  |  |  |  |  group by: c_customer_sk
 |  |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=100.00K
+|  |  |  |  |  tuple-ids=35 row-size=20B cardinality=588.15K
 |  |  |  |  |  in pipelines: 38(GETNEXT)
 |  |  |  |  |
 |  |  |  |  42:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1993,7 +1993,7 @@ Per-Instance Resources: mem-estimate=54.32MB mem-reservation=36.00MB thread-rese
 |  |  |  in pipelines: 68(GETNEXT)
 |  |  |
 |  |  F13:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=11.38MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=17.04MB mem-reservation=1.94MB thread-reservation=1
 |  |  68:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(ss_quantity * ss_sales_price), max:merge(tpcds_cmax)
 |  |  |  group by: c_customer_sk
@@ -2003,8 +2003,8 @@ Per-Instance Resources: mem-estimate=54.32MB mem-reservation=36.00MB thread-rese
 |  |  |  in pipelines: 68(GETNEXT), 10(OPEN)
 |  |  |
 |  |  67:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  mem-estimate=1.38MB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=18 row-size=36B cardinality=100.00K
+|  |  |  mem-estimate=7.04MB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=18 row-size=36B cardinality=595.07K
 |  |  |  in pipelines: 10(GETNEXT)
 |  |  |
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -2013,7 +2013,7 @@ Per-Instance Resources: mem-estimate=54.32MB mem-reservation=36.00MB thread-rese
 |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price), max(max(csales))
 |  |  |  group by: c_customer_sk
 |  |  |  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
-|  |  |  tuple-ids=18 row-size=36B cardinality=100.00K
+|  |  |  tuple-ids=18 row-size=36B cardinality=595.07K
 |  |  |  in pipelines: 10(GETNEXT)
 |  |  |
 |  |  20:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -2043,15 +2043,15 @@ Per-Instance Resources: mem-estimate=54.32MB mem-reservation=36.00MB thread-rese
 |  |  |  |
 |  |  |  64:EXCHANGE [UNPARTITIONED]
 |  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=16 row-size=16B cardinality=1
+|  |  |  |  tuple-ids=16 row-size=16B cardinality=6
 |  |  |  |  in pipelines: 18(GETNEXT)
 |  |  |  |
 |  |  |  F11:PLAN FRAGMENT [HASH(c_customer_sk)] hosts=3 instances=6
-|  |  |  Per-Instance Resources: mem-estimate=10.78MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Instance Resources: mem-estimate=13.88MB mem-reservation=1.94MB thread-reservation=1
 |  |  |  18:AGGREGATE
 |  |  |  |  output: max(sum(ss_quantity * ss_sales_price))
 |  |  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  |  |  tuple-ids=16 row-size=16B cardinality=1
+|  |  |  |  tuple-ids=16 row-size=16B cardinality=6
 |  |  |  |  in pipelines: 18(GETNEXT), 63(OPEN)
 |  |  |  |
 |  |  |  63:AGGREGATE [FINALIZE]
@@ -2062,8 +2062,8 @@ Per-Instance Resources: mem-estimate=54.32MB mem-reservation=36.00MB thread-rese
 |  |  |  |  in pipelines: 63(GETNEXT), 12(OPEN)
 |  |  |  |
 |  |  |  62:EXCHANGE [HASH(c_customer_sk)]
-|  |  |  |  mem-estimate=795.04KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=14 row-size=20B cardinality=100.00K
+|  |  |  |  mem-estimate=3.88MB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=14 row-size=20B cardinality=588.15K
 |  |  |  |  in pipelines: 12(GETNEXT)
 |  |  |  |
 |  |  |  F08:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -2073,7 +2073,7 @@ Per-Instance Resources: mem-estimate=54.32MB mem-reservation=36.00MB thread-rese
 |  |  |  |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price)
 |  |  |  |  group by: c_customer_sk
 |  |  |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  |  tuple-ids=14 row-size=20B cardinality=100.00K
+|  |  |  |  tuple-ids=14 row-size=20B cardinality=588.15K
 |  |  |  |  in pipelines: 12(GETNEXT)
 |  |  |  |
 |  |  |  16:HASH JOIN [INNER JOIN, BROADCAST]

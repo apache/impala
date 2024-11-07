@@ -161,15 +161,15 @@ PLAN-ROOT SINK
 |
 19:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=16B cardinality=1
+|  tuple-ids=8 row-size=16B cardinality=2
 |  in pipelines: 10(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ws_item_sk)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=13.23MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=13.37MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
 10:AGGREGATE
 |  output: sum(ws_ext_discount_amt)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=16B cardinality=1
+|  tuple-ids=8 row-size=16B cardinality=2
 |  in pipelines: 10(GETNEXT), 14(OPEN)
 |
 09:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
@@ -269,8 +269,8 @@ Per-Host Resources: mem-estimate=13.23MB mem-reservation=4.88MB thread-reservati
 |  in pipelines: 14(GETNEXT), 03(OPEN)
 |
 13:EXCHANGE [HASH(ws_item_sk)]
-|  mem-estimate=180.43KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=16B cardinality=17.98K
+|  mem-estimate=320.86KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=16B cardinality=35.95K
 |  in pipelines: 03(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -279,7 +279,7 @@ Per-Host Resources: mem-estimate=110.15MB mem-reservation=13.94MB thread-reserva
 |  output: avg(ws_ext_discount_amt)
 |  group by: ws_item_sk
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=16B cardinality=17.98K
+|  tuple-ids=5 row-size=16B cardinality=35.95K
 |  in pipelines: 03(GETNEXT)
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -343,15 +343,15 @@ PLAN-ROOT SINK
 |
 19:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=16B cardinality=1
+|  tuple-ids=8 row-size=16B cardinality=2
 |  in pipelines: 10(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(ws_item_sk)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=10.18MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.31MB mem-reservation=1.94MB thread-reservation=1
 10:AGGREGATE
 |  output: sum(ws_ext_discount_amt)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=16B cardinality=1
+|  tuple-ids=8 row-size=16B cardinality=2
 |  in pipelines: 10(GETNEXT), 14(OPEN)
 |
 09:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
@@ -476,8 +476,8 @@ Per-Instance Resources: mem-estimate=10.18MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 14(GETNEXT), 03(OPEN)
 |
 13:EXCHANGE [HASH(ws_item_sk)]
-|  mem-estimate=180.43KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=16B cardinality=17.98K
+|  mem-estimate=320.86KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=16B cardinality=35.95K
 |  in pipelines: 03(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -487,7 +487,7 @@ Per-Instance Resources: mem-estimate=42.16MB mem-reservation=10.00MB thread-rese
 |  output: avg(ws_ext_discount_amt)
 |  group by: ws_item_sk
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=16B cardinality=17.98K
+|  tuple-ids=5 row-size=16B cardinality=35.95K
 |  in pipelines: 03(GETNEXT)
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]

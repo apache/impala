@@ -230,7 +230,7 @@ PLAN-ROOT SINK
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=49.44MB Threads=19
-Per-Host Resource Estimates: Memory=625MB
+Per-Host Resource Estimates: Memory=626MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -245,7 +245,7 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=11.89MB mem-reservation=2.88MB thread-reservation=1
+Per-Host Resources: mem-estimate=12.60MB mem-reservation=2.88MB thread-reservation=1
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -260,8 +260,8 @@ Per-Host Resources: mem-estimate=11.89MB mem-reservation=2.88MB thread-reservati
 |  in pipelines: 27(GETNEXT), 01(OPEN), 07(OPEN), 11(OPEN)
 |
 26:EXCHANGE [HASH(channel,col_name,d_year,d_qoy,i_category)]
-|  mem-estimate=1.89MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=70.56K
+|  mem-estimate=2.60MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=101.06K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -270,7 +270,7 @@ Per-Host Resources: mem-estimate=70.93MB mem-reservation=16.69MB thread-reservat
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
 |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=70.56K
+|  tuple-ids=11 row-size=74B cardinality=101.06K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 00:UNION
@@ -481,7 +481,7 @@ Per-Host Resources: mem-estimate=70.93MB mem-reservation=16.69MB thread-reservat
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=73.81MB Threads=20
-Per-Host Resource Estimates: Memory=290MB
+Per-Host Resource Estimates: Memory=292MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -496,7 +496,7 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=12.11MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=13.21MB mem-reservation=1.94MB thread-reservation=1
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -511,8 +511,8 @@ Per-Instance Resources: mem-estimate=12.11MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 27(GETNEXT), 01(OPEN), 07(OPEN), 11(OPEN)
 |
 26:EXCHANGE [HASH(channel,col_name,d_year,d_qoy,i_category)]
-|  mem-estimate=2.11MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=70.56K
+|  mem-estimate=3.21MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=11 row-size=74B cardinality=117.32K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -522,7 +522,7 @@ Per-Instance Resources: mem-estimate=27.83MB mem-reservation=4.00MB thread-reser
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=70.56K
+|  tuple-ids=11 row-size=74B cardinality=117.32K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 00:UNION

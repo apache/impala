@@ -276,7 +276,7 @@ PLAN-ROOT SINK
 |
 F12:PLAN FRAGMENT [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=21.19GB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=119640 segment-costs=[1132077171799, 1196340444652, 473] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
+max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, i_item_desc ASC, w_warehouse_name ASC, d1.d_week_seq ASC
 |  mem-estimate=16.47KB mem-reservation=0B thread-reservation=0
@@ -292,17 +292,17 @@ max-parallelism=119640 segment-costs=[1132077171799, 1196340444652, 473] cpu-com
 |
 34:EXCHANGE [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)]
 |  mem-estimate=30.23MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=11 row-size=169B cardinality=59.29G cost=52585503130
+|  tuple-ids=11 row-size=169B cardinality=535.62G cost=475029863157
 |  in pipelines: 00(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=146.88GB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=410120 segment-costs=[4101117248955, 674520565757] cpu-comparison-result=360 [max(240 (self) vs 360 (sum children))]
+max-parallelism=609330 segment-costs=[4101117248955, 6093265120169] cpu-comparison-result=360 [max(240 (self) vs 360 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
 |  mem-estimate=146.76GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=11 row-size=169B cardinality=59.29G cost=3268693778097
+|  tuple-ids=11 row-size=169B cardinality=535.62G cost=3268693778097
 |  in pipelines: 00(GETNEXT)
 |
 20:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -420,7 +420,7 @@ max-parallelism=410120 segment-costs=[4101117248955, 674520565757] cpu-compariso
 |
 |--F17:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=470.04MB mem-reservation=36.00MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=410120 segment-costs=[1224458532]
+|  |  max-parallelism=609330 segment-costs=[1224458532]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: inv_item_sk, inv_date_sk
@@ -713,7 +713,7 @@ PLAN-ROOT SINK
 |
 F12:PLAN FRAGMENT [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=21.19GB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=119640 segment-costs=[1132077171799, 1196340444652, 473] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
+max-parallelism=155460 segment-costs=[1554521531826, 1196340444652, 473] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, i_item_desc ASC, w_warehouse_name ASC, d1.d_week_seq ASC
 |  mem-estimate=16.47KB mem-reservation=0B thread-reservation=0
@@ -729,17 +729,17 @@ max-parallelism=119640 segment-costs=[1132077171799, 1196340444652, 473] cpu-com
 |
 34:EXCHANGE [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)]
 |  mem-estimate=30.23MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=11 row-size=169B cardinality=59.29G cost=52585503130
+|  tuple-ids=11 row-size=169B cardinality=535.62G cost=475029863157
 |  in pipelines: 00(GETNEXT)
 |
 F08:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=146.88GB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=410120 segment-costs=[4101117248955, 674520565757] cpu-comparison-result=360 [max(240 (self) vs 360 (sum children))]
+max-parallelism=609330 segment-costs=[4101117248955, 6093265120169] cpu-comparison-result=360 [max(240 (self) vs 360 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
 |  mem-estimate=146.76GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=11 row-size=169B cardinality=59.29G cost=3268693778097
+|  tuple-ids=11 row-size=169B cardinality=535.62G cost=3268693778097
 |  in pipelines: 00(GETNEXT)
 |
 20:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -857,7 +857,7 @@ max-parallelism=410120 segment-costs=[4101117248955, 674520565757] cpu-compariso
 |
 |--F17:PLAN FRAGMENT [HASH(cs_item_sk,d2.d_date_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=470.04MB mem-reservation=36.00MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=410120 segment-costs=[1224458532]
+|  |  max-parallelism=609330 segment-costs=[1224458532]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: inv_item_sk, inv_date_sk

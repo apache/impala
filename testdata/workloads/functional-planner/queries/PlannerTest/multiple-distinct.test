@@ -74,7 +74,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
-|  row-size=7B cardinality=30
+|  row-size=7B cardinality=90
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -156,7 +156,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
-|  row-size=7B cardinality=30
+|  row-size=7B cardinality=90
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -238,7 +238,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
-|  row-size=7B cardinality=30
+|  row-size=7B cardinality=90
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -320,7 +320,7 @@ PLAN-ROOT SINK
 |    group by: int_col
 |  Class 2
 |    group by: smallint_col
-|  row-size=7B cardinality=30
+|  row-size=7B cardinality=90
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -396,7 +396,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(smallint_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -416,7 +416,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
-|  row-size=31B cardinality=300
+|  row-size=31B cardinality=900
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -492,7 +492,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(smallint_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -512,7 +512,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
-|  row-size=31B cardinality=300
+|  row-size=31B cardinality=900
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -588,7 +588,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(smallint_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -608,7 +608,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
-|  row-size=31B cardinality=300
+|  row-size=31B cardinality=900
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -684,7 +684,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(smallint_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -704,7 +704,7 @@ PLAN-ROOT SINK
 |    group by: bigint_col, int_col
 |  Class 2
 |    group by: bigint_col, smallint_col
-|  row-size=31B cardinality=300
+|  row-size=31B cardinality=900
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -786,7 +786,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count(int_col)
-|  row-size=11B cardinality=21
+|  row-size=11B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -869,7 +869,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: count(int_col)
-|  row-size=11B cardinality=21
+|  row-size=11B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -952,7 +952,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg(int_col)
-|  row-size=11B cardinality=21
+|  row-size=11B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -1034,7 +1034,7 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: avg(int_col)
-|  row-size=11B cardinality=21
+|  row-size=11B cardinality=63
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -1111,7 +1111,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -1133,7 +1133,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(int_col)
 |    group by: bigint_col
-|  row-size=35B cardinality=210
+|  row-size=35B cardinality=630
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -1211,7 +1211,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count:merge(int_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -1233,7 +1233,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: count(int_col)
 |    group by: bigint_col
-|  row-size=35B cardinality=210
+|  row-size=35B cardinality=630
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -1311,7 +1311,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -1333,7 +1333,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(int_col)
 |    group by: bigint_col
-|  row-size=35B cardinality=210
+|  row-size=35B cardinality=630
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -1410,7 +1410,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg:merge(int_col)
 |    group by: bigint_col
-|  row-size=48B cardinality=30
+|  row-size=48B cardinality=90
 |
 05:AGGREGATE
 |  Class 0
@@ -1432,7 +1432,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: avg(int_col)
 |    group by: bigint_col
-|  row-size=35B cardinality=210
+|  row-size=35B cardinality=630
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB

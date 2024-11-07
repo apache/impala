@@ -125,7 +125,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=38.20MB Threads=10
-Per-Host Resource Estimates: Memory=275MB
+Per-Host Resource Estimates: Memory=277MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -140,7 +140,7 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(w_warehouse_name,i_item_id)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=11.39MB mem-reservation=2.88MB thread-reservation=1
+Per-Host Resources: mem-estimate=12.63MB mem-reservation=2.88MB thread-reservation=1
 08:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC, i_item_id ASC
 |  mem-estimate=7.18KB mem-reservation=0B thread-reservation=0
@@ -156,8 +156,8 @@ Per-Host Resources: mem-estimate=11.39MB mem-reservation=2.88MB thread-reservati
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(w_warehouse_name,i_item_id)]
-|  mem-estimate=1.39MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=74B cardinality=35.42K
+|  mem-estimate=2.63MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=74B cardinality=70.83K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -166,7 +166,7 @@ Per-Host Resources: mem-estimate=147.42MB mem-reservation=29.81MB thread-reserva
 |  output: sum(CAST(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: w_warehouse_name, i_item_id
 |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=4 row-size=74B cardinality=35.42K
+|  tuple-ids=4 row-size=74B cardinality=70.83K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -262,7 +262,7 @@ Per-Host Resources: mem-estimate=147.42MB mem-reservation=29.81MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=47.02MB Threads=9
-Per-Host Resource Estimates: Memory=124MB
+Per-Host Resource Estimates: Memory=126MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -277,7 +277,7 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(w_warehouse_name,i_item_id)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=11.39MB mem-reservation=2.88MB thread-reservation=1
+Per-Instance Resources: mem-estimate=12.63MB mem-reservation=2.88MB thread-reservation=1
 08:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC, i_item_id ASC
 |  mem-estimate=7.18KB mem-reservation=0B thread-reservation=0
@@ -293,8 +293,8 @@ Per-Instance Resources: mem-estimate=11.39MB mem-reservation=2.88MB thread-reser
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(w_warehouse_name,i_item_id)]
-|  mem-estimate=1.39MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4 row-size=74B cardinality=35.42K
+|  mem-estimate=2.63MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=74B cardinality=70.83K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -304,7 +304,7 @@ Per-Instance Resources: mem-estimate=42.61MB mem-reservation=21.00MB thread-rese
 |  output: sum(CAST(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: w_warehouse_name, i_item_id
 |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=4 row-size=74B cardinality=35.42K
+|  tuple-ids=4 row-size=74B cardinality=70.83K
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

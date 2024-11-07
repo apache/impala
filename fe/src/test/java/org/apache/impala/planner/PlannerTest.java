@@ -1276,7 +1276,9 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setPreagg_bytes_limit(64 * 1024 * 1024);
     options.setExplain_level(TExplainLevel.EXTENDED);
-    runPlannerTestFile("preagg-bytes-limit", "tpch_parquet", options);
+    runPlannerTestFile("preagg-bytes-limit", "tpch_parquet", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
   /**

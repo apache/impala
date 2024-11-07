@@ -2,7 +2,7 @@
 select distinct l_orderkey, l_partkey, l_suppkey from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.08MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=110.08MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, l_suppkey
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -13,10 +13,10 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(l_orderkey,l_partkey,l_suppkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=86.39MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=78.76MB mem-reservation=34.00MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  group by: l_orderkey, l_partkey, l_suppkey
-|  mem-estimate=76.31MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=68.68MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=24B cardinality=6.00M
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -26,10 +26,10 @@ Per-Host Resources: mem-estimate=86.39MB mem-reservation=34.00MB thread-reservat
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=297.23MB mem-reservation=50.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=291.84MB mem-reservation=50.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey
-|  mem-estimate=57.23MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=51.51MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=24B cardinality=6.00M
 |  in pipelines: 00(GETNEXT)
 |
@@ -47,7 +47,7 @@ Per-Host Resources: mem-estimate=297.23MB mem-reservation=50.00MB thread-reserva
 select distinct l_suppkey from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=61.29KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: l_suppkey
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -58,7 +58,7 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(l_suppkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.11MB mem-reservation=1.94MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  group by: l_suppkey
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
@@ -66,16 +66,16 @@ Per-Host Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:EXCHANGE [HASH(l_suppkey)]
-|  mem-estimate=61.29KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=9.71K
+|  mem-estimate=111.88KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=29.14K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=90.00MB mem-reservation=6.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=90.14MB mem-reservation=6.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  group by: l_suppkey
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=9.71K
+|  tuple-ids=1 row-size=8B cardinality=29.14K
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
@@ -94,7 +94,7 @@ select distinct l_orderkey, l_partkey, l_suppkey from tpch_parquet.lineitem
 DEFAULT_SPILLABLE_BUFFER_SIZE=8M
 ---- DISTRIBUTEDPLAN
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.08MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=110.08MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, l_suppkey
 |  mem-estimate=100.00MB mem-reservation=16.00MB spill-buffer=8.00MB thread-reservation=0
@@ -118,7 +118,7 @@ Per-Host Resources: mem-estimate=146.08MB mem-reservation=136.00MB thread-reserv
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=308.00MB mem-reservation=84.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=308.33MB mem-reservation=84.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey
 |  mem-estimate=68.00MB mem-reservation=68.00MB spill-buffer=4.00MB thread-reservation=0

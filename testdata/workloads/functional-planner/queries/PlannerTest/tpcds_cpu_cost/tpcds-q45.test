@@ -157,10 +157,10 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=220.26M(filtered from 2.16G) cost=50747879
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.85GB Threads=28
-Per-Host Resource Estimates: Memory=4.16GB
+Max Per-Host Resource Reservation: Memory=1.88GB Threads=29
+Per-Host Resource Estimates: Memory=4.23GB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.24MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.30MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[337] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: ca_zip, ca_county, sum(ws_sales_price)
@@ -169,13 +169,13 @@ PLAN-ROOT SINK
 23:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_zip ASC, ca_county ASC
 |  limit: 100
-|  mem-estimate=246.55KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=308.05KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=9 row-size=59B cardinality=100 cost=37
 |  in pipelines: 13(GETNEXT)
 |
-F07:PLAN FRAGMENT [HASH(ca_zip,ca_county)] hosts=10 instances=40 (adjusted from 120)
+F07:PLAN FRAGMENT [HASH(ca_zip,ca_county)] hosts=10 instances=50 (adjusted from 120)
 Per-Instance Resources: mem-estimate=51.38MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=40 segment-costs=[336949348, 201601849, 185] cpu-comparison-result=120 [max(40 (self) vs 120 (sum children))]
+max-parallelism=50 segment-costs=[404470111, 201601849, 185] cpu-comparison-result=120 [max(50 (self) vs 120 (sum children))]
 13:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC, ca_county ASC
 |  mem-estimate=5.76KB mem-reservation=0B thread-reservation=0
@@ -191,18 +191,18 @@ max-parallelism=40 segment-costs=[336949348, 201601849, 185] cpu-comparison-resu
 |
 21:EXCHANGE [HASH(ca_zip,ca_county)]
 |  mem-estimate=17.38MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=59B cardinality=15.00M cost=5734835
+|  tuple-ids=8 row-size=59B cardinality=191.61M cost=73255598
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=18.00MB mem-reservation=18.00MB thread-reservation=0 runtime-filters-memory=18.00MB
-Per-Instance Resources: mem-estimate=111.53MB mem-reservation=34.12MB thread-reservation=1
-max-parallelism=170 segment-costs=[1652502478, 64684700] cpu-comparison-result=120 [max(120 (self) vs 75 (sum children))]
+Per-Instance Resources: mem-estimate=113.99MB mem-reservation=34.12MB thread-reservation=1
+max-parallelism=170 segment-costs=[1652502478, 826268909] cpu-comparison-result=120 [max(120 (self) vs 75 (sum children))]
 12:AGGREGATE [STREAMING]
 |  output: sum(ws_sales_price)
 |  group by: ca_zip, ca_county
 |  mem-estimate=85.69MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=59B cardinality=15.00M cost=1146073039
+|  tuple-ids=8 row-size=59B cardinality=191.61M cost=1146073039
 |  in pipelines: 00(GETNEXT)
 |
 11:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -420,10 +420,10 @@ max-parallelism=170 segment-costs=[1652502478, 64684700] cpu-comparison-result=1
    tuple-ids=0 row-size=16B cardinality=220.26M(filtered from 2.16G) cost=50747879
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.79GB Threads=70
-Per-Host Resource Estimates: Memory=4.05GB
+Max Per-Host Resource Reservation: Memory=1.82GB Threads=71
+Per-Host Resource Estimates: Memory=4.13GB
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.24MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.30MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[337] cpu-comparison-result=320 [max(1 (self) vs 320 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: ca_zip, ca_county, sum(ws_sales_price)
@@ -432,13 +432,13 @@ PLAN-ROOT SINK
 25:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_zip ASC, ca_county ASC
 |  limit: 100
-|  mem-estimate=246.55KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=308.05KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=9 row-size=59B cardinality=100 cost=37
 |  in pipelines: 13(GETNEXT)
 |
-F09:PLAN FRAGMENT [HASH(ca_zip,ca_county)] hosts=10 instances=40 (adjusted from 120)
+F09:PLAN FRAGMENT [HASH(ca_zip,ca_county)] hosts=10 instances=50 (adjusted from 120)
 Per-Instance Resources: mem-estimate=51.38MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=40 segment-costs=[336949348, 201601849, 185] cpu-comparison-result=320 [max(40 (self) vs 320 (sum children))]
+max-parallelism=50 segment-costs=[404470111, 201601849, 185] cpu-comparison-result=320 [max(50 (self) vs 320 (sum children))]
 13:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC, ca_county ASC
 |  mem-estimate=5.76KB mem-reservation=0B thread-reservation=0
@@ -454,17 +454,17 @@ max-parallelism=40 segment-costs=[336949348, 201601849, 185] cpu-comparison-resu
 |
 23:EXCHANGE [HASH(ca_zip,ca_county)]
 |  mem-estimate=17.38MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=59B cardinality=15.00M cost=5734835
+|  tuple-ids=8 row-size=59B cardinality=191.61M cost=73255598
 |  in pipelines: 00(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=115.37MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=150 segment-costs=[1431666587, 64684700] cpu-comparison-result=320 [max(320 (self) vs 295 (sum children))]
+Per-Instance Resources: mem-estimate=117.83MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=150 segment-costs=[1431666587, 826268909] cpu-comparison-result=320 [max(320 (self) vs 295 (sum children))]
 12:AGGREGATE [STREAMING]
 |  output: sum(ws_sales_price)
 |  group by: ca_zip, ca_county
 |  mem-estimate=85.69MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=59B cardinality=15.00M cost=1146073039
+|  tuple-ids=8 row-size=59B cardinality=191.61M cost=1146073039
 |  in pipelines: 00(GETNEXT)
 |
 11:HASH JOIN [LEFT OUTER JOIN, BROADCAST]

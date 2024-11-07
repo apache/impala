@@ -271,8 +271,8 @@ Per-Host Resources: mem-estimate=10.38MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 29(GETNEXT), 09(OPEN)
 |
 28:EXCHANGE [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating)]
-|  mem-estimate=390.95KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=79B cardinality=5.60K
+|  mem-estimate=391.20KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=12 row-size=79B cardinality=5.61K
 |  in pipelines: 09(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=3 instances=3
@@ -281,7 +281,7 @@ Per-Host Resources: mem-estimate=18.75MB mem-reservation=8.81MB thread-reservati
 |  output: count(*)
 |  group by: cd_gender, cd_marital_status, cd_education_status, cd_purchase_estimate, cd_credit_rating
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=12 row-size=79B cardinality=5.60K
+|  tuple-ids=12 row-size=79B cardinality=5.61K
 |  in pipelines: 09(GETNEXT)
 |
 16:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]
@@ -545,8 +545,8 @@ Per-Instance Resources: mem-estimate=10.38MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 29(GETNEXT), 09(OPEN)
 |
 28:EXCHANGE [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating)]
-|  mem-estimate=390.95KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=79B cardinality=5.60K
+|  mem-estimate=391.20KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=12 row-size=79B cardinality=5.61K
 |  in pipelines: 09(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=3 instances=3
@@ -555,7 +555,7 @@ Per-Instance Resources: mem-estimate=11.64MB mem-reservation=2.00MB thread-reser
 |  output: count(*)
 |  group by: cd_gender, cd_marital_status, cd_education_status, cd_purchase_estimate, cd_credit_rating
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=12 row-size=79B cardinality=5.60K
+|  tuple-ids=12 row-size=79B cardinality=5.61K
 |  in pipelines: 09(GETNEXT)
 |
 16:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]

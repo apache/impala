@@ -265,7 +265,7 @@ from store_sales group by ss_store_sk, ss_sold_date_sk
 limit 5
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=470.62MB Threads=16
-Per-Host Resource Estimates: Memory=677MB
+Per-Host Resource Estimates: Memory=701MB
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=6.02MB mem-reservation=6.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[5, 3954244] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -287,8 +287,8 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_5_part_1_row_per_part,
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(ss_store_sk,ss_sold_date_sk)] hosts=10 instances=30 (adjusted from 120)
-Per-Instance Resources: mem-estimate=14.16MB mem-reservation=2.88MB thread-reservation=1
-max-parallelism=30 segment-costs=[202012003, 7] cpu-comparison-result=120 [max(30 (self) vs 120 (sum children))]
+Per-Instance Resources: mem-estimate=22.34MB mem-reservation=2.88MB thread-reservation=1
+max-parallelism=30 segment-costs=[228190932, 7] cpu-comparison-result=120 [max(30 (self) vs 120 (sum children))]
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: ss_store_sk, ss_sold_date_sk
@@ -298,18 +298,18 @@ max-parallelism=30 segment-costs=[202012003, 7] cpu-comparison-result=120 [max(3
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:EXCHANGE [HASH(ss_store_sk,ss_sold_date_sk)]
-|  mem-estimate=4.16MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=1.19M cost=219990
+|  mem-estimate=12.34MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=16B cardinality=142.93M cost=26398919
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=52.34MB mem-reservation=38.00MB thread-reservation=1
-max-parallelism=1360 segment-costs=[13514707828, 1840920]
+max-parallelism=1360 segment-costs=[13514707828, 220910505]
 01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: ss_store_sk, ss_sold_date_sk
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=1.19M cost=12519387294
+|  tuple-ids=1 row-size=16B cardinality=142.93M cost=12519387294
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]

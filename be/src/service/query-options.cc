@@ -1326,6 +1326,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_enable_tuple_analysis_in_aggregate(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ESTIMATE_DUPLICATE_IN_PREAGG: {
+        query_options->__set_estimate_duplicate_in_preagg(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {
