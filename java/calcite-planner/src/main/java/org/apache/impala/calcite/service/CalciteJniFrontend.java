@@ -84,6 +84,10 @@ public class CalciteJniFrontend extends JniFrontend {
 
     QueryContext queryCtx = new QueryContext(thriftQueryContext, getFrontend());
 
+    if (!optionSupportedInCalcite(queryCtx)) {
+      return runThroughOriginalPlanner(thriftQueryContext, queryCtx);
+    }
+
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
       LOG.info("Using Calcite Planner for the following query: " + queryCtx.getStmt());
 
@@ -164,6 +168,20 @@ public class CalciteJniFrontend extends JniFrontend {
     if (LOG.isDebugEnabled()) {
       compilerStep.logDebug(stepResult);
     }
+  }
+
+  private boolean optionSupportedInCalcite(QueryContext queryCtx) {
+    // IMPALA-13530
+    if (!queryCtx.getTQueryCtx().getClient_request().getQuery_options().isDecimal_v2()) {
+      return false;
+    }
+
+    // IMPALA-13529
+    if (queryCtx.getTQueryCtx().getClient_request().getQuery_options()
+        .isAppx_count_distinct()) {
+      return false;
+    }
+    return true;
   }
 
   private static void loadCalciteImpalaFunctions() {
