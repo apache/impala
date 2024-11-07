@@ -10,7 +10,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -39,7 +39,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -95,7 +95,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col))
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -124,7 +124,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col))
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -181,7 +181,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -210,7 +210,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -267,7 +267,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -296,7 +296,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
-|  row-size=28B cardinality=0
+|  row-size=28B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -357,7 +357,7 @@ PLAN-ROOT SINK
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=657
+|  row-size=56B cardinality=73
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -369,7 +369,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=6.57K
+|  row-size=136B cardinality=2.19K
 |
 01:AGGREGATE
 |  Class 0
@@ -394,7 +394,7 @@ PLAN-ROOT SINK
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=657
+|  row-size=56B cardinality=73
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -406,7 +406,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=6.57K
+|  row-size=136B cardinality=2.19K
 |
 06:EXCHANGE [HASH(CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(date_string_col) WHEN 4 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(timestamp_col) WHEN 4 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END)]
 |
@@ -420,7 +420,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=6.57K
+|  row-size=136B cardinality=2.19K
 |
 05:AGGREGATE
 |  Class 0
@@ -464,7 +464,7 @@ PLAN-ROOT SINK
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=657
+|  row-size=56B cardinality=73
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -476,7 +476,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=6.57K
+|  row-size=136B cardinality=2.19K
 |
 01:AGGREGATE
 |  Class 0
@@ -501,7 +501,7 @@ PLAN-ROOT SINK
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
 |  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
 |  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=657
+|  row-size=56B cardinality=73
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -513,7 +513,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=6.57K
+|  row-size=136B cardinality=2.19K
 |
 06:EXCHANGE [HASH(CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(date_string_col) WHEN 4 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(timestamp_col) WHEN 4 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END)]
 |
@@ -527,7 +527,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=6.57K
+|  row-size=136B cardinality=2.19K
 |
 05:AGGREGATE
 |  Class 0

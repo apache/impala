@@ -69,6 +69,13 @@ public class PlannerTest extends PlannerTestBase {
     assignment.close();
   }
 
+  private void runCardinalityVerifyingTest(String test_file) {
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hdfs_num_rows_estimate(true); // Needed for deterministic estimate.
+    runPlannerTestFile(
+        test_file, options, ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
   /**
    * Scan node cardinality test
    */
@@ -157,32 +164,32 @@ public class PlannerTest extends PlannerTestBase {
     // TODO: Multiple distinct in subqueries.
     // TODO: Multiple distinct lineage tests.
     // TODO: Multiple distinct and SHUFFLE_DISTINCT_EXPRS tests
-    runPlannerTestFile("multiple-distinct");
+    runCardinalityVerifyingTest("multiple-distinct");
   }
 
   @Test
   public void testMultipleDistinctMaterialization() {
-    runPlannerTestFile("multiple-distinct-materialization");
+    runCardinalityVerifyingTest("multiple-distinct-materialization");
   }
 
   @Test
   public void testMultipleDistinctPredicates() {
-    runPlannerTestFile("multiple-distinct-predicates");
+    runCardinalityVerifyingTest("multiple-distinct-predicates");
   }
 
   @Test
   public void testMultipleDistinctLimit() {
-    runPlannerTestFile("multiple-distinct-limit");
+    runCardinalityVerifyingTest("multiple-distinct-limit");
   }
 
   @Test
   public void testShuffleByDistinctExprs() {
-    runPlannerTestFile("shuffle-by-distinct-exprs");
+    runCardinalityVerifyingTest("shuffle-by-distinct-exprs");
   }
 
   @Test
   public void testAggregation() {
-    runPlannerTestFile("aggregation");
+    runCardinalityVerifyingTest("aggregation");
   }
 
   @Test
@@ -376,10 +383,7 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testJoinsWithHDFSNumRowsEstDisabled() {
-    TQueryOptions options = defaultQueryOptions();
-    options.setDisable_hdfs_num_rows_estimate(true);
-    runPlannerTestFile("joins", options,
-        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+    runCardinalityVerifyingTest("joins");
   }
 
   @Test

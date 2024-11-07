@@ -114,6 +114,14 @@ public class AggregationNode extends PlanNode {
   // can not be estimated.
   private List<Long> aggClassNumGroups_;
 
+  // Determine whether to do tuple-based cardinality estimation or skip it.
+  // This flag is here to avoid severe cardinality and memory estimation after
+  // introduction of tuple-based analysis (IMPALA-13405).
+  // May set to true in computeStats() and will stay true during lifetime of this
+  // AggregationNode.
+  // TODO: IMPALA-13542
+  private boolean skipTupleBasedAnalysis_ = false;
+
   public AggregationNode(
       PlanNodeId id, PlanNode input, MultiAggregateInfo multiAggInfo, AggPhase aggPhase) {
     super(id, "AGGREGATE");
@@ -259,14 +267,22 @@ public class AggregationNode extends PlanNode {
           getId(), preaggNode.getId(), aggInfos_.size(), preaggNode.aggInfos_.size());
     }
 
+    // DistributedPlanner.java may transfer conjunct to merge phase aggregation later.
+    // Keep skipping tuple-based analysis to maintain same number as single node plan.
+    // TODO: IMPALA-13542
+    skipTupleBasedAnalysis_ |= !conjuncts_.isEmpty();
+
     boolean unknownEstimate = false;
     aggClassNumGroups_ = Lists.newArrayList();
     int aggIdx = 0;
     for (AggregateInfo aggInfo : aggInfos_) {
       // Compute the cardinality for this set of grouping exprs.
       long numGroups = -1;
+      long preaggNumgroup = -1;
       if (preaggNode != null) {
-        numGroups = preaggNode.aggClassNumGroups_.get(aggIdx);
+        preaggNumgroup = preaggNode.aggClassNumGroups_.get(aggIdx);
+        numGroups = estimateNumGroups(
+            aggInfo.getGroupingExprs(), aggInputCardinality_, preaggNumgroup);
       } else {
         // TODO: This numGroups is a global estimate accross all data. If this is
         // a preaggregation node with N instances, actual number can be as high as
@@ -278,10 +294,10 @@ public class AggregationNode extends PlanNode {
       Preconditions.checkState(numGroups >= -1, numGroups);
 
       if (LOG.isTraceEnabled()) {
-        LOG.trace(
-            "{} aggPhase={} aggInputCardinality={} aggIdx={} numGroups={} aggInfo={}",
+        LOG.trace("{} aggPhase={} aggInputCardinality={} aggIdx={} numGroups={} "
+                + "preaggNumGroup={} aggInfo={}",
             getDisplayLabel(), aggPhase_, aggInputCardinality_, aggIdx, numGroups,
-            aggInfo.debugString());
+            preaggNumgroup, aggInfo.debugString());
       }
 
       aggClassNumGroups_.add(numGroups);
@@ -310,13 +326,34 @@ public class AggregationNode extends PlanNode {
 
   /**
    * Estimate the number of groups that will be present for the provided grouping
+   * expressions, input cardinality, and num group estimate from preaggregation phase.
+   */
+  public static long estimateNumGroups(
+      List<Expr> groupingExprs, long aggInputCardinality, long preaggNumGroup) {
+    Preconditions.checkArgument(aggInputCardinality >= -1, aggInputCardinality);
+    if (groupingExprs.isEmpty()) {
+      return NON_GROUPING_AGG_NUM_GROUPS;
+    } else {
+      return lowerNumGroupsByInputCardinality(preaggNumGroup, aggInputCardinality);
+    }
+  }
+
+  /**
+   * Estimate the number of groups that will be present for the provided grouping
    * expressions and input cardinality.
    * Returns -1 if a reasonable cardinality estimate cannot be produced.
    */
   public static long estimateNumGroups(
       List<Expr> groupingExprs, long aggInputCardinality, PlanNode planNode) {
     Preconditions.checkArgument(aggInputCardinality >= -1, aggInputCardinality);
-    if (groupingExprs.isEmpty()) { return NON_GROUPING_AGG_NUM_GROUPS; }
+    if (groupingExprs.isEmpty()) return NON_GROUPING_AGG_NUM_GROUPS;
+    if (planNode instanceof AggregationNode
+        && ((AggregationNode) planNode).skipTupleBasedAnalysis_) {
+      // This AggregationNode has been planned with non-empty conjunct before.
+      // Skip tuple based to avoid severe underestimation.
+      // TODO: IMPALA-13542
+      return estimateNumGroups(groupingExprs, aggInputCardinality);
+    }
 
     // This is prone to overestimation, because we keep multiplying cardinalities,
     // even if the grouping exprs are functionally dependent (example:
@@ -424,7 +461,16 @@ public class AggregationNode extends PlanNode {
     if (aggInputCardinality >= 0) {
       numGroups = Math.min(aggInputCardinality, numGroups);
     }
-    return numGroups;
+    return lowerNumGroupsByInputCardinality(numGroups, aggInputCardinality);
+  }
+
+  private static long lowerNumGroupsByInputCardinality(
+      long numGroups, long aggInputCardinality) {
+    if (aggInputCardinality >= 0) {
+      return Math.min(numGroups, aggInputCardinality);
+    } else {
+      return numGroups;
+    }
   }
 
   /**

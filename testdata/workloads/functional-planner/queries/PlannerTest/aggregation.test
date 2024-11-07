@@ -10,7 +10,7 @@ PLAN-ROOT SINK
 |  row-size=34B cardinality=1
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=1B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -26,7 +26,7 @@ PLAN-ROOT SINK
 |  row-size=34B cardinality=1
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=1B cardinality=11.00K
 ====
 # with grouping
@@ -43,7 +43,7 @@ PLAN-ROOT SINK
 |  row-size=35B cardinality=9.07K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=9B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -63,7 +63,7 @@ PLAN-ROOT SINK
 |  row-size=35B cardinality=9.07K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=9B cardinality=11.00K
 ====
 # avg substitution
@@ -76,36 +76,36 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=10]
 |  order by: avg(zip) ASC
-|  row-size=16B cardinality=0
+|  row-size=16B cardinality=1
 |
 01:AGGREGATE [FINALIZE]
 |  output: avg(id), count(id), avg(zip)
 |  having: count(id) > 0
-|  row-size=24B cardinality=0
+|  row-size=24B cardinality=1
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=12B cardinality=0
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=10]
 |  order by: avg(zip) ASC
-|  row-size=16B cardinality=0
+|  row-size=16B cardinality=1
 |
 04:AGGREGATE [FINALIZE]
 |  output: avg:merge(id), count:merge(id), avg:merge(zip)
 |  having: count(id) > 0
-|  row-size=24B cardinality=0
+|  row-size=24B cardinality=1
 |
 03:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: avg(id), count(id), avg(zip)
-|  row-size=24B cardinality=0
+|  row-size=24B cardinality=1
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=12B cardinality=0
 ====
 # Test correct removal of redundant group-by expressions (IMPALA-817)
@@ -123,7 +123,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=10
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=4B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -144,7 +144,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=11.00K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=4B cardinality=11.00K
 ====
 # Tests that a having predicate triggers slot materialization (IMPALA-846).
@@ -168,11 +168,11 @@ PLAN-ROOT SINK
 |  row-size=17B cardinality=5.84K
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=6B cardinality=8
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.smallint_col
    row-size=11B cardinality=7.30K
 ====
@@ -194,7 +194,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=12B cardinality=7.30K
 ====
 # test distributed aggregation over unions (IMPALA-831)
@@ -217,11 +217,11 @@ PLAN-ROOT SINK
 |  row-size=0B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=0B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -242,11 +242,11 @@ PLAN-ROOT SINK
 |  row-size=0B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=0B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # non-distinct agg with grouping over a union
@@ -270,11 +270,11 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=8B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=8B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -300,11 +300,11 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=8B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=8B cardinality=7.30K
 ====
 # distinct agg without grouping over a union
@@ -331,11 +331,11 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=4B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -366,11 +366,11 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=4B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
 # distinct agg with grouping over a union
@@ -399,11 +399,11 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=12B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -439,11 +439,11 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=12B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=12B cardinality=7.30K
 ====
 # mixed distinct and non-distinct agg without grouping over a union
@@ -471,11 +471,11 @@ PLAN-ROOT SINK
 |  row-size=6B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=6B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=6B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -508,11 +508,11 @@ PLAN-ROOT SINK
 |  row-size=6B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=6B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=6B cardinality=7.30K
 ====
 # mixed distinct and non-distinct agg with grouping over a union
@@ -542,11 +542,11 @@ PLAN-ROOT SINK
 |  row-size=14B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=14B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=14B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -584,11 +584,11 @@ PLAN-ROOT SINK
 |  row-size=14B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=14B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=14B cardinality=7.30K
 ====
 # mixed distinct and non-distinct agg with grouping over a union distinct
@@ -622,11 +622,11 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -674,11 +674,11 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
 # Mixed distinct and non-distinct agg with intermediate type different from input type
@@ -698,7 +698,7 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=200.52K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    row-size=24B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -726,7 +726,7 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=200.52K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    row-size=24B cardinality=6.00M
 ====
 # test that aggregations are not placed below an unpartitioned exchange with a limit
@@ -739,7 +739,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    limit: 10
    row-size=0B cardinality=10
 ---- DISTRIBUTEDPLAN
@@ -753,7 +753,7 @@ PLAN-ROOT SINK
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    limit: 10
    row-size=0B cardinality=10
 ====
@@ -775,11 +775,11 @@ PLAN-ROOT SINK
 |  row-size=0B cardinality=10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=0B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -797,11 +797,11 @@ PLAN-ROOT SINK
 |  row-size=0B cardinality=10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=0B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # test that limits are applied at the top-level merge aggregation node for non-grouping
@@ -840,11 +840,11 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=9
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=4B cardinality=8
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    runtime filters: RF000 -> t1.id
    row-size=4B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
@@ -888,11 +888,11 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=4B cardinality=8
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    runtime filters: RF000 -> t1.id
    row-size=4B cardinality=11.00K
 ====
@@ -913,10 +913,10 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  group by: tinyint_col, smallint_col, int_col + int_col, coalesce(bigint_col, `year`)
 |  having: int_col + int_col = coalesce(bigint_col, `year`), smallint_col = int_col + int_col
-|  row-size=19B cardinality=730
+|  row-size=19B cardinality=73
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.tinyint_col = functional.alltypes.smallint_col
    row-size=19B cardinality=730
 ====
@@ -934,7 +934,7 @@ PLAN-ROOT SINK
 |  row-size=13B cardinality=2
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=1B cardinality=8
 ====
 # IMPALA-1917: Test NULL literals inside inline view with grouping aggregation.
@@ -955,7 +955,7 @@ PLAN-ROOT SINK
 |  row-size=6B cardinality=4
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=5B cardinality=8
 ====
 # test simple group_concat with distinct
@@ -972,7 +972,7 @@ PLAN-ROOT SINK
 |  row-size=15B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -998,7 +998,7 @@ PLAN-ROOT SINK
 |  row-size=15B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ====
 # test group_concat and a group by
@@ -1022,7 +1022,7 @@ PLAN-ROOT SINK
 |  row-size=23B cardinality=1.10K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    predicates: `day` = id % 100
    row-size=23B cardinality=1.10K
 ---- DISTRIBUTEDPLAN
@@ -1046,7 +1046,7 @@ PLAN-ROOT SINK
 |  row-size=23B cardinality=1.10K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    predicates: `day` = id % 100
    row-size=23B cardinality=1.10K
 ====
@@ -1067,7 +1067,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=10.21K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=20B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -1097,7 +1097,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=10.21K
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=20B cardinality=11.00K
 ====
 # test group_concat distinct with other non-distinct aggregate functions
@@ -1115,7 +1115,7 @@ PLAN-ROOT SINK
 |  row-size=23B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -1143,7 +1143,7 @@ PLAN-ROOT SINK
 |  row-size=23B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ====
 # test group_concat distinct with other aggregate functions, with custom separator
@@ -1162,7 +1162,7 @@ PLAN-ROOT SINK
 |  row-size=23B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=19B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -1190,7 +1190,7 @@ PLAN-ROOT SINK
 |  row-size=23B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=19B cardinality=11.00K
 ====
 # test group_concat distinct with other aggregate functions, with custom separator
@@ -1212,7 +1212,7 @@ PLAN-ROOT SINK
 |  row-size=36B cardinality=10
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=28B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -1244,7 +1244,7 @@ PLAN-ROOT SINK
 |  row-size=36B cardinality=10
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=28B cardinality=11.00K
 ====
 # test multiple group_concat distinct, each with a different separator
@@ -1262,7 +1262,7 @@ PLAN-ROOT SINK
 |  row-size=15B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -1288,7 +1288,7 @@ PLAN-ROOT SINK
 |  row-size=15B cardinality=963
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    row-size=15B cardinality=11.00K
 ====
 # IMPALA-852: Aggregation only in the HAVING clause.
@@ -1299,10 +1299,10 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  having: count(*) > 0
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=0B cardinality=8
 ====
 # Grouping aggregation where input is partitioned on grouping expr.
@@ -1325,7 +1325,7 @@ PLAN-ROOT SINK
 |  group by: c_custkey
 |  having: count(*) < 150000
 |  limit: 1000000
-|  row-size=16B cardinality=15.00K
+|  row-size=16B cardinality=9.15K
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: c_custkey = o_custkey
@@ -1335,13 +1335,13 @@ PLAN-ROOT SINK
 |--05:EXCHANGE [HASH(o_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.orders]
-|     partitions=1/1 files=2 size=54.07MB
+|     HDFS partitions=1/1 files=2 size=54.21MB
 |     row-size=8B cardinality=1.50M
 |
 04:EXCHANGE [HASH(c_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.customer]
-   partitions=1/1 files=1 size=12.31MB
+   HDFS partitions=1/1 files=1 size=12.34MB
    predicates: c_nationkey = 16
    runtime filters: RF000 -> c_custkey
    row-size=10B cardinality=6.00K
@@ -1361,13 +1361,13 @@ PLAN-ROOT SINK
 |  output: count:merge(c_custkey)
 |  having: count(c_custkey) > 50
 |  limit: 50
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 07:EXCHANGE [UNPARTITIONED]
 |
 04:AGGREGATE
 |  output: count(c_custkey)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 03:AGGREGATE
 |  group by: c_custkey
@@ -1381,13 +1381,13 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(c_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.31MB
+|     HDFS partitions=1/1 files=1 size=12.34MB
 |     row-size=8B cardinality=150.00K
 |
 05:EXCHANGE [HASH(o_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   partitions=1/1 files=2 size=54.07MB
+   HDFS partitions=1/1 files=2 size=54.21MB
    runtime filters: RF000 -> o_custkey
    row-size=8B cardinality=1.50M
 ====
@@ -1416,7 +1416,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE
 |  group by: c_custkey, c_custkey
-|  row-size=16B cardinality=1.50M
+|  row-size=16B cardinality=150.00K
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: o_custkey = c_custkey
@@ -1426,13 +1426,13 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(c_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.31MB
+|     HDFS partitions=1/1 files=1 size=12.34MB
 |     row-size=8B cardinality=150.00K
 |
 05:EXCHANGE [HASH(o_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   partitions=1/1 files=2 size=54.07MB
+   HDFS partitions=1/1 files=2 size=54.21MB
    runtime filters: RF000 -> o_custkey
    row-size=8B cardinality=1.50M
 ====
@@ -1469,7 +1469,7 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.31MB
+|     HDFS partitions=1/1 files=1 size=12.34MB
 |     row-size=35B cardinality=150.00K
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1480,14 +1480,14 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(o_orderkey,o_clerk)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.orders]
-|     partitions=1/1 files=2 size=54.07MB
+|     HDFS partitions=1/1 files=2 size=54.21MB
 |     runtime filters: RF000 -> o_custkey, RF001 -> o_comment
 |     row-size=104B cardinality=1.50M
 |
 06:EXCHANGE [HASH(l_orderkey,l_returnflag)]
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    runtime filters: RF004 -> l_orderkey, RF005 -> l_returnflag
    row-size=21B cardinality=5.76M(filtered from 6.00M)
 ====
@@ -1522,13 +1522,13 @@ PLAN-ROOT SINK
 |--05:EXCHANGE [HASH(t2.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=4B cardinality=100
 |
 04:EXCHANGE [HASH(t1.id)]
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
 # IMPALA-4263: Grouping agg is placed in the join fragment and has no merge step.
@@ -1554,13 +1554,13 @@ PLAN-ROOT SINK
 |--05:EXCHANGE [HASH(t2.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=4B cardinality=100
 |
 04:EXCHANGE [HASH(t1.id)]
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
 # IMPALA-4263: Grouping agg is placed in the second join fragment and has no merge step.
@@ -1591,7 +1591,7 @@ PLAN-ROOT SINK
 |--09:EXCHANGE [HASH(t3.id)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny t3]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=4B cardinality=8
 |
 08:EXCHANGE [HASH(t2.id)]
@@ -1603,13 +1603,13 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(t2.int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=8B cardinality=100
 |
 06:EXCHANGE [HASH(t1.int_col)]
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
 # IMPALA-10096: use the original ordinal if the group by ordinal reference is a
@@ -1666,7 +1666,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: 3, id
-|  row-size=18B cardinality=10
+|  row-size=17B cardinality=10
 |
 00:SCAN HDFS [functional.dimtbl]
    HDFS partitions=1/1 files=1 size=171B
@@ -1690,6 +1690,823 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales a]
    partition predicates: ss_sold_date_sk > 245263
-   HDFS partitions=1823/1824 files=1823 size=195.68MB
+   HDFS partitions=1823/1824 files=1823 size=336.51MB
    row-size=16B cardinality=2.75M
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(ss_ticket_number)
+|  group by: ss_item_sk, ss_item_sk + 300
+|  row-size=24B cardinality=2.75M
+|
+02:EXCHANGE [HASH(ss_item_sk,ss_item_sk + 300)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(ss_ticket_number)
+|  group by: ss_item_sk, ss_item_sk + 300
+|  row-size=24B cardinality=2.75M
+|
+00:SCAN HDFS [tpcds.store_sales a]
+   partition predicates: ss_sold_date_sk > 245263
+   HDFS partitions=1823/1824 files=1823 size=336.51MB
+   row-size=16B cardinality=2.75M
+====
+# Baseline for next similar test cases below that do 2-phase aggregation.
+# The query output is:
+# +----+----+----+
+# | bc | c1 | c2 |
+# +----+----+----+
+# | 0  | 12 | 1  |
+# | 10 | 12 | 1  |
+# | 20 | 12 | 1  |
+# | 30 | 12 | 1  |
+# | 40 | 12 | 1  |
+# | 50 | 8  | 1  |
+# | 60 | 8  | 1  |
+# | 70 | 8  | 1  |
+# | 80 | 8  | 1  |
+# | 90 | 8  | 1  |
+# +----+----+----+
+select
+  bigint_col bc, count(smallint_col) c1, count(distinct int_col) c2
+from functional.alltypessmall
+group by bigint_col
+order by bc;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=10
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+01:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+08:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=10
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+06:EXCHANGE [HASH(bigint_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+05:AGGREGATE
+|  output: count:merge(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+04:EXCHANGE [HASH(bigint_col,int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+====
+# Add limit 7.
+select
+  bigint_col bc, count(smallint_col) c1, count(distinct int_col) c2
+from functional.alltypessmall
+group by bigint_col
+order by bc
+limit 7;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:TOP-N [LIMIT=7]
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=7
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+01:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+08:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC
+|  limit: 7
+|
+03:TOP-N [LIMIT=7]
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=7
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+06:EXCHANGE [HASH(bigint_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+05:AGGREGATE
+|  output: count:merge(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+04:EXCHANGE [HASH(bigint_col,int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+====
+# Add equality HAVING predicate over grouping column.
+# That HAVING predicate should be pushed down to scan.
+select
+  bigint_col bc, count(smallint_col) c1, count(distinct int_col) c2
+from functional.alltypessmall
+group by bigint_col
+having bigint_col = 0
+order by bc;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=10
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+01:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=10
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   predicates: functional.alltypessmall.bigint_col = 0
+   row-size=14B cardinality=10
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+08:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=10
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+06:EXCHANGE [HASH(bigint_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=10
+|
+05:AGGREGATE
+|  output: count:merge(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=10
+|
+04:EXCHANGE [HASH(bigint_col,int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=10
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   predicates: functional.alltypessmall.bigint_col = 0
+   row-size=14B cardinality=10
+====
+# Add equality HAVING predicate over output expression.
+# Actual cardinality of 02:AGGREGATE is 5.
+# TODO: Apply the 10% default selectivity instead.
+select
+  bigint_col bc, count(smallint_col) c1, count(distinct int_col) c2
+from functional.alltypessmall
+group by bigint_col
+having count(smallint_col) = 8
+order by bc;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=1
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  having: count(smallint_col) = 8
+|  row-size=24B cardinality=1
+|
+01:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+08:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=1
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  having: count(smallint_col) = 8
+|  row-size=24B cardinality=1
+|
+06:EXCHANGE [HASH(bigint_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=1
+|
+05:AGGREGATE
+|  output: count:merge(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+04:EXCHANGE [HASH(bigint_col,int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+====
+# Add in-list HAVING predicate over output expression.
+# Actual cardinality of 02:AGGREGATE is 5.
+# TODO: Apply the 10% default selectivity instead.
+select
+  bigint_col bc, count(smallint_col) c1, count(distinct int_col) c2
+from functional.alltypessmall
+group by bigint_col
+having count(smallint_col) in (7, 8, 9)
+order by bc;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=3
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  having: count(smallint_col) IN (7, 8, 9)
+|  row-size=24B cardinality=3
+|
+01:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+08:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC
+|
+03:SORT
+|  order by: bigint_col ASC
+|  row-size=24B cardinality=3
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  having: count(smallint_col) IN (7, 8, 9)
+|  row-size=24B cardinality=3
+|
+06:EXCHANGE [HASH(bigint_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: bigint_col
+|  row-size=24B cardinality=3
+|
+05:AGGREGATE
+|  output: count:merge(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+04:EXCHANGE [HASH(bigint_col,int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=100
+|
+00:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=14B cardinality=100
+====
+# Aggregation across nested views. The NDV of aggregation columns are following:
+# ss_item_sk = 17975
+# ss_customer_sk = 90632
+# d_month_seq = 2421
+# numRows(store_sales) = 2880404 & numRows(date_dim) = 73049
+with v1 as (
+     select ss_item_sk, ss_customer_sk, d_month_seq, count(*)
+     from tpcds.store_sales ss
+     inner join tpcds.date_dim dd on ss.ss_sold_date_sk = dd.d_date_sk
+     group by ss_item_sk, ss_customer_sk, d_month_seq),
+   v2 as (
+     select ss_item_sk, ss_customer_sk, count(*)
+     from v1 group by ss_item_sk, ss_customer_sk)
+select ss_item_sk, count(*) from v2 group by ss_item_sk;
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: ss_item_sk
+|  row-size=16B cardinality=17.98K
+|
+04:AGGREGATE [FINALIZE]
+|  group by: ss_item_sk, ss_customer_sk
+|  row-size=12B cardinality=2.88M
+|
+03:AGGREGATE [FINALIZE]
+|  group by: ss_item_sk, ss_customer_sk, d_month_seq
+|  row-size=16B cardinality=2.88M
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = dd.d_date_sk
+|  runtime filters: RF000 <- dd.d_date_sk
+|  row-size=24B cardinality=2.88M
+|
+|--01:SCAN HDFS [tpcds.date_dim dd]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     row-size=8B cardinality=73.05K
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss.ss_sold_date_sk
+   row-size=16B cardinality=2.88M
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+13:EXCHANGE [UNPARTITIONED]
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_item_sk
+|  row-size=16B cardinality=17.98K
+|
+11:EXCHANGE [HASH(ss_item_sk)]
+|
+05:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_item_sk
+|  row-size=16B cardinality=17.98K
+|
+10:AGGREGATE [FINALIZE]
+|  group by: ss_item_sk, ss_customer_sk
+|  row-size=12B cardinality=2.88M
+|
+09:EXCHANGE [HASH(ss_item_sk,ss_customer_sk)]
+|
+04:AGGREGATE [STREAMING]
+|  group by: ss_item_sk, ss_customer_sk
+|  row-size=12B cardinality=2.88M
+|
+08:AGGREGATE [FINALIZE]
+|  group by: ss_item_sk, ss_customer_sk, d_month_seq
+|  row-size=16B cardinality=2.88M
+|
+07:EXCHANGE [HASH(ss_item_sk,ss_customer_sk,d_month_seq)]
+|
+03:AGGREGATE [STREAMING]
+|  group by: ss_item_sk, ss_customer_sk, d_month_seq
+|  row-size=16B cardinality=2.88M
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = dd.d_date_sk
+|  row-size=24B cardinality=2.88M
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: dd.d_date_sk
+|  |  runtime filters: RF000 <- dd.d_date_sk
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim dd]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     row-size=8B cardinality=73.05K
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss.ss_sold_date_sk
+   row-size=16B cardinality=2.88M
+====
+# Aggregation across nested views where the grouping columns do not change.
+# The NDV of aggregation columns are following:
+# c_nationkey = 25
+# c_custkey = 150000
+with v1 as (
+     select c_nationkey, c_custkey, count(*)
+     from tpch.customer
+     group by c_nationkey, c_custkey),
+   v2 as (
+     select c_nationkey, c_custkey, count(*)
+     from v1, tpch.orders
+     where c_custkey = o_custkey
+     group by c_nationkey, c_custkey)
+select c_nationkey, count(*) from v2 group by c_nationkey;
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+04:AGGREGATE [FINALIZE]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=1.50M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|  row-size=18B cardinality=1.50M
+|
+|--01:AGGREGATE [FINALIZE]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=150.00K
+|  |
+|  00:SCAN HDFS [tpch.customer]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+02:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+   row-size=8B cardinality=1.50M
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+13:EXCHANGE [UNPARTITIONED]
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+11:EXCHANGE [HASH(c_nationkey)]
+|
+05:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+10:AGGREGATE [FINALIZE]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=1.50M
+|
+09:EXCHANGE [HASH(c_nationkey,c_custkey)]
+|
+04:AGGREGATE [STREAMING]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=1.50M
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey
+|  row-size=18B cardinality=1.50M
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c_custkey
+|  |  runtime filters: RF000 <- c_custkey
+|  |
+|  08:EXCHANGE [BROADCAST]
+|  |
+|  07:AGGREGATE [FINALIZE]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=150.00K
+|  |
+|  06:EXCHANGE [HASH(c_nationkey,c_custkey)]
+|  |
+|  01:AGGREGATE [STREAMING]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=150.00K
+|  |
+|  00:SCAN HDFS [tpch.customer]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+02:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+   row-size=8B cardinality=1.50M
+====
+# Aggregation across nested views where the grouping columns do not change,
+# and there is a UnionNode in plan tree.
+# The NDV of aggregation columns are following:
+# c_nationkey = 25
+# c_custkey = 150000
+with v0 as (
+      select * from tpch.customer
+      union all
+      select * from tpch.customer
+    ),
+    v1 as (
+     select c_nationkey, c_custkey, count(*)
+     from v0
+     group by c_nationkey, c_custkey),
+   v2 as (
+     select c_nationkey, c_custkey, count(*)
+     from v1, tpch.orders
+     where c_custkey = o_custkey
+     group by c_nationkey, c_custkey)
+select c_nationkey, count(*) from v2 group by c_nationkey;
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+06:AGGREGATE [FINALIZE]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=3.00M
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|  row-size=18B cardinality=3.00M
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=300.00K
+|  |
+|  00:UNION
+|  |  pass-through-operands: all
+|  |  row-size=10B cardinality=300.00K
+|  |
+|  |--02:SCAN HDFS [tpch.customer]
+|  |     HDFS partitions=1/1 files=1 size=23.08MB
+|  |     row-size=10B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.customer]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+04:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+   row-size=8B cardinality=1.50M
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+15:EXCHANGE [UNPARTITIONED]
+|
+14:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+13:EXCHANGE [HASH(c_nationkey)]
+|
+07:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+12:AGGREGATE [FINALIZE]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=3.00M
+|
+11:EXCHANGE [HASH(c_nationkey,c_custkey)]
+|
+06:AGGREGATE [STREAMING]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=3.00M
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey
+|  row-size=18B cardinality=3.00M
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c_custkey
+|  |  runtime filters: RF000 <- c_custkey
+|  |
+|  10:EXCHANGE [BROADCAST]
+|  |
+|  09:AGGREGATE [FINALIZE]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=300.00K
+|  |
+|  08:EXCHANGE [HASH(c_nationkey,c_custkey)]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=300.00K
+|  |
+|  00:UNION
+|  |  pass-through-operands: all
+|  |  row-size=10B cardinality=300.00K
+|  |
+|  |--02:SCAN HDFS [tpch.customer]
+|  |     HDFS partitions=1/1 files=1 size=23.08MB
+|  |     row-size=10B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.customer]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+04:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+   row-size=8B cardinality=1.50M
+====
+# Aggregation across nested views where the grouping columns do not change,
+# and there is a UnionNode with limit in plan tree.
+# The NDV of aggregation columns are following:
+# c_nationkey = 25
+# c_custkey = 150000
+with v0 as (
+      select * from (
+        select * from tpch.customer
+        union all
+        select * from tpch.customer
+      ) u limit 100
+    ),
+    v1 as (
+     select c_nationkey, c_custkey, count(*)
+     from v0
+     group by c_nationkey, c_custkey),
+   v2 as (
+     select c_nationkey, c_custkey, count(*)
+     from v1, tpch.orders
+     where c_custkey = o_custkey
+     group by c_nationkey, c_custkey)
+select c_nationkey, count(*) from v2 group by c_nationkey;
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+06:AGGREGATE [FINALIZE]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=1.52K
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|  row-size=18B cardinality=1.52K
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=100
+|  |
+|  00:UNION
+|  |  pass-through-operands: all
+|  |  limit: 100
+|  |  row-size=10B cardinality=100
+|  |
+|  |--02:SCAN HDFS [tpch.customer]
+|  |     HDFS partitions=1/1 files=1 size=23.08MB
+|  |     row-size=10B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.customer]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+04:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+   row-size=8B cardinality=1.50M
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+14:EXCHANGE [UNPARTITIONED]
+|
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+12:EXCHANGE [HASH(c_nationkey)]
+|
+07:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: c_nationkey
+|  row-size=10B cardinality=25
+|
+11:AGGREGATE [FINALIZE]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=1.52K
+|
+10:EXCHANGE [HASH(c_nationkey,c_custkey)]
+|
+06:AGGREGATE [STREAMING]
+|  group by: c_nationkey, c_custkey
+|  row-size=10B cardinality=1.52K
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey
+|  row-size=18B cardinality=1.52K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c_custkey
+|  |  runtime filters: RF000 <- c_custkey
+|  |
+|  09:EXCHANGE [BROADCAST]
+|  |
+|  03:AGGREGATE [FINALIZE]
+|  |  group by: c_nationkey, c_custkey
+|  |  row-size=10B cardinality=100
+|  |
+|  08:EXCHANGE [UNPARTITIONED]
+|  |  limit: 100
+|  |
+|  00:UNION
+|  |  pass-through-operands: all
+|  |  limit: 100
+|  |  row-size=10B cardinality=100
+|  |
+|  |--02:SCAN HDFS [tpch.customer]
+|  |     HDFS partitions=1/1 files=1 size=23.08MB
+|  |     row-size=10B cardinality=150.00K
+|  |
+|  01:SCAN HDFS [tpch.customer]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     row-size=10B cardinality=150.00K
+|
+04:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+   row-size=8B cardinality=1.50M
 ====

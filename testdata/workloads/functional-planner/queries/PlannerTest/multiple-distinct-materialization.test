@@ -185,7 +185,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,5,7,10,11) = 2, count(tinyint_col)), aggif(valid_tid(2,5,7,10,11) = 7, count(int_col)), aggif(valid_tid(2,5,7,10,11) = 11, min(float_col)), aggif(valid_tid(2,5,7,10,11) = 11, max(float_col)), aggif(valid_tid(2,5,7,10,11) = 11, sum(double_col))
 |  group by: CASE valid_tid(2,7,11) WHEN 2 THEN string_col WHEN 7 THEN string_col WHEN 11 THEN string_col END, CASE valid_tid(2,7,11) WHEN 2 THEN date_string_col WHEN 7 THEN date_string_col WHEN 11 THEN date_string_col END
-|  row-size=56B cardinality=8.11K
+|  row-size=56B cardinality=7.30K
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -197,7 +197,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
 |    group by: string_col, date_string_col
-|  row-size=131B cardinality=22.08K
+|  row-size=131B cardinality=21.90K
 |
 01:AGGREGATE
 |  Class 0
@@ -220,7 +220,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,5,7,10,11) = 2, count(tinyint_col)), aggif(valid_tid(2,5,7,10,11) = 7, count(int_col)), aggif(valid_tid(2,5,7,10,11) = 11, min(float_col)), aggif(valid_tid(2,5,7,10,11) = 11, max(float_col)), aggif(valid_tid(2,5,7,10,11) = 11, sum(double_col))
 |  group by: CASE valid_tid(2,7,11) WHEN 2 THEN string_col WHEN 7 THEN string_col WHEN 11 THEN string_col END, CASE valid_tid(2,7,11) WHEN 2 THEN date_string_col WHEN 7 THEN date_string_col WHEN 11 THEN date_string_col END
-|  row-size=56B cardinality=8.11K
+|  row-size=56B cardinality=7.30K
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -232,7 +232,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
 |    group by: string_col, date_string_col
-|  row-size=131B cardinality=22.08K
+|  row-size=131B cardinality=21.90K
 |
 06:EXCHANGE [HASH(CASE valid_tid(2,7,11) WHEN 2 THEN murmur_hash(string_col) WHEN 7 THEN murmur_hash(string_col) WHEN 11 THEN murmur_hash(string_col) END,CASE valid_tid(2,7,11) WHEN 2 THEN murmur_hash(date_string_col) WHEN 7 THEN murmur_hash(date_string_col) WHEN 11 THEN murmur_hash(date_string_col) END)]
 |
@@ -246,7 +246,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
 |    group by: string_col, date_string_col
-|  row-size=131B cardinality=22.08K
+|  row-size=131B cardinality=21.90K
 |
 05:AGGREGATE
 |  Class 0
@@ -291,7 +291,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(3,6,9,12,13) = 3, count(tinyint_col)), aggif(valid_tid(3,6,9,12,13) = 9, avg(int_col)), aggif(valid_tid(3,6,9,12,13) = 13, max(float_col))
 |  group by: CASE valid_tid(3,9,13) WHEN 3 THEN string_col WHEN 9 THEN string_col WHEN 13 THEN string_col END, CASE valid_tid(3,9,13) WHEN 3 THEN date_string_col WHEN 9 THEN date_string_col WHEN 13 THEN date_string_col END
-|  row-size=44B cardinality=8.11K
+|  row-size=44B cardinality=7.30K
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -303,7 +303,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(float_col)
 |    group by: string_col, date_string_col
-|  row-size=119B cardinality=22.08K
+|  row-size=119B cardinality=21.90K
 |
 01:AGGREGATE
 |  Class 0
@@ -326,7 +326,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(3,6,9,12,13) = 3, count(tinyint_col)), aggif(valid_tid(3,6,9,12,13) = 9, avg(int_col)), aggif(valid_tid(3,6,9,12,13) = 13, max(float_col))
 |  group by: CASE valid_tid(3,9,13) WHEN 3 THEN string_col WHEN 9 THEN string_col WHEN 13 THEN string_col END, CASE valid_tid(3,9,13) WHEN 3 THEN date_string_col WHEN 9 THEN date_string_col WHEN 13 THEN date_string_col END
-|  row-size=44B cardinality=8.11K
+|  row-size=44B cardinality=7.30K
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -338,7 +338,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(float_col)
 |    group by: string_col, date_string_col
-|  row-size=119B cardinality=22.08K
+|  row-size=119B cardinality=21.90K
 |
 06:EXCHANGE [HASH(CASE valid_tid(2,8,13) WHEN 2 THEN murmur_hash(string_col) WHEN 8 THEN murmur_hash(string_col) WHEN 13 THEN murmur_hash(string_col) END,CASE valid_tid(2,8,13) WHEN 2 THEN murmur_hash(date_string_col) WHEN 8 THEN murmur_hash(date_string_col) WHEN 13 THEN murmur_hash(date_string_col) END)]
 |
@@ -352,7 +352,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(float_col)
 |    group by: string_col, date_string_col
-|  row-size=119B cardinality=22.08K
+|  row-size=119B cardinality=21.90K
 |
 05:AGGREGATE
 |  Class 0
@@ -479,7 +479,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, min(timestamp_col)), aggif(valid_tid(2,4,5) = 5, max(date_string_col))
 |  having: aggif(valid_tid(2,4,5) = 4, count(smallint_col)) < 10, aggif(valid_tid(2,4,5) = 5, max(date_string_col)) = 'test'
-|  row-size=44B cardinality=0
+|  row-size=44B cardinality=1
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -508,7 +508,7 @@ PLAN-ROOT SINK
 03:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, min(timestamp_col)), aggif(valid_tid(2,4,5) = 5, max(date_string_col))
 |  having: aggif(valid_tid(2,4,5) = 4, count(smallint_col)) < 10, aggif(valid_tid(2,4,5) = 5, max(date_string_col)) = 'test'
-|  row-size=44B cardinality=0
+|  row-size=44B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -748,7 +748,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [FINALIZE]
 |  output: count(tinyint_col)
 |  having: count(tinyint_col) < 9
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 01:AGGREGATE
 |  group by: tinyint_col
@@ -769,7 +769,7 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE
 |  output: count(tinyint_col)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 05:AGGREGATE
 |  group by: tinyint_col
@@ -798,7 +798,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [FINALIZE]
 |  output: count(smallint_col)
 |  having: count(smallint_col) < 9
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 01:AGGREGATE
 |  group by: smallint_col
@@ -819,7 +819,7 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE
 |  output: count(smallint_col)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 05:AGGREGATE
 |  group by: smallint_col
@@ -849,7 +849,7 @@ PLAN-ROOT SINK
 01:AGGREGATE [FINALIZE]
 |  output: min(string_col), max(string_col)
 |  having: max(string_col) > '0', min(string_col) < '9', max(string_col) < min(string_col)
-|  row-size=24B cardinality=0
+|  row-size=24B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -860,7 +860,7 @@ PLAN-ROOT SINK
 04:AGGREGATE [FINALIZE]
 |  output: min:merge(string_col), max:merge(string_col)
 |  having: max(string_col) > '0', min(string_col) < '9', max(string_col) < min(string_col)
-|  row-size=24B cardinality=0
+|  row-size=24B cardinality=1
 |
 03:EXCHANGE [UNPARTITIONED]
 |
@@ -886,7 +886,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [FINALIZE]
 |  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
 |  having: count(tinyint_col) = 10, max(string_col) > '0', min(string_col) < '9', max(string_col) < min(string_col)
-|  row-size=32B cardinality=0
+|  row-size=32B cardinality=1
 |
 01:AGGREGATE
 |  output: min(string_col), max(string_col)
@@ -908,7 +908,7 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE
 |  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
-|  row-size=32B cardinality=0
+|  row-size=32B cardinality=1
 |
 05:AGGREGATE
 |  output: min:merge(string_col), max:merge(string_col)
@@ -962,7 +962,7 @@ PLAN-ROOT SINK
 |  output: count:merge(tinyint_col)
 |  group by: date_string_col, timestamp_col
 |  having: count(tinyint_col) < 10
-|  row-size=44B cardinality=10
+|  row-size=44B cardinality=1
 |
 06:EXCHANGE [HASH(date_string_col,timestamp_col)]
 |
@@ -1003,7 +1003,7 @@ PLAN-ROOT SINK
 |  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
 |  having: count(tinyint_col) < 10, date_string_col < timestamp_col
-|  row-size=68B cardinality=0
+|  row-size=68B cardinality=1
 |
 01:AGGREGATE
 |  output: min(string_col), max(string_col)
@@ -1023,14 +1023,14 @@ PLAN-ROOT SINK
 |  output: count:merge(tinyint_col), min:merge(string_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
 |  having: count(tinyint_col) < 10, date_string_col < timestamp_col
-|  row-size=68B cardinality=3
+|  row-size=68B cardinality=1
 |
 06:EXCHANGE [HASH(date_string_col,timestamp_col)]
 |
 02:AGGREGATE [STREAMING]
 |  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
-|  row-size=68B cardinality=0
+|  row-size=68B cardinality=1
 |
 05:AGGREGATE
 |  output: min:merge(string_col), max:merge(string_col)
@@ -1066,7 +1066,7 @@ PLAN-ROOT SINK
 |  output: count(smallint_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
 |  having: count(smallint_col) < 20, date_string_col < timestamp_col
-|  row-size=56B cardinality=0
+|  row-size=56B cardinality=1
 |
 01:AGGREGATE
 |  output: max(string_col)
@@ -1086,14 +1086,14 @@ PLAN-ROOT SINK
 |  output: count:merge(smallint_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
 |  having: count(smallint_col) < 20, date_string_col < timestamp_col
-|  row-size=56B cardinality=3
+|  row-size=56B cardinality=1
 |
 06:EXCHANGE [HASH(date_string_col,timestamp_col)]
 |
 02:AGGREGATE [STREAMING]
 |  output: count(smallint_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
-|  row-size=56B cardinality=0
+|  row-size=56B cardinality=1
 |
 05:AGGREGATE
 |  output: max:merge(string_col)
