@@ -969,7 +969,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [STREAMING]
 |  output: count(tinyint_col)
 |  group by: date_string_col, timestamp_col
-|  row-size=44B cardinality=1
+|  row-size=44B cardinality=10
 |
 05:AGGREGATE
 |  group by: date_string_col, timestamp_col, tinyint_col
@@ -1030,7 +1030,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [STREAMING]
 |  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
-|  row-size=68B cardinality=1
+|  row-size=68B cardinality=3
 |
 05:AGGREGATE
 |  output: min:merge(string_col), max:merge(string_col)
@@ -1093,7 +1093,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [STREAMING]
 |  output: count(smallint_col), max:merge(string_col)
 |  group by: date_string_col, timestamp_col
-|  row-size=56B cardinality=1
+|  row-size=56B cardinality=3
 |
 05:AGGREGATE
 |  output: max:merge(string_col)

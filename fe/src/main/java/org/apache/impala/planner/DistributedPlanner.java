@@ -1051,13 +1051,21 @@ public class DistributedPlanner {
       node.unsetLimit();
     }
     node.unsetNeedsFinalize();
+    // Move all HAVING predicates to be transferred into mergeAggNode.
+    List<Expr> havingPredicates = node.conjuncts_;
+    node.conjuncts_ = new ArrayList<>();
+    // Recompute stats after setIsPreagg and predicates removal.
+    // Must do this before creating mergeFragment.
+    node.computeStats(ctx_.getRootAnalyzer());
 
-    // place a merge aggregation step in a new fragment
+    // Place the merge aggregation step in a new fragment.
     PlanFragment mergeFragment = createParentFragment(childFragment, parentPartition);
     AggregationNode mergeAggNode = new AggregationNode(ctx_.getNextNodeId(),
         mergeFragment.getPlanRoot(), node.getMultiAggInfo(), AggPhase.FIRST_MERGE);
-    mergeAggNode.init(ctx_.getRootAnalyzer());
     mergeAggNode.setLimit(limit);
+    // Transfer all HAVING predicates into mergeAggNode and init().
+    // init() is called after setLimit() to avoid calling computeStats() again.
+    mergeAggNode.init(ctx_.getRootAnalyzer(), havingPredicates);
     // Carry the IsNonCorrelatedSclarSubquery_ flag to the merge node. This flag is
     // applicable regardless of the partition scheme for the children since it is a
     // logical property.
@@ -1069,12 +1077,6 @@ public class DistributedPlanner {
       mergeAggNode.setDisableCodegen(true);
     }
 
-    // HAVING predicates can only be evaluated after the merge agg step
-    node.transferConjuncts(mergeAggNode);
-    // Recompute stats after transferring the conjuncts_ (order is important).
-    node.computeStats(ctx_.getRootAnalyzer());
-    mergeFragment.getPlanRoot().computeStats(ctx_.getRootAnalyzer());
-    mergeAggNode.computeStats(ctx_.getRootAnalyzer());
     // Set new plan root after updating stats.
     mergeFragment.addPlanRoot(mergeAggNode);
 
@@ -1119,6 +1121,9 @@ public class DistributedPlanner {
     } else {
       phase1AggNode.setIntermediateTuple();
       phase1AggNode.setIsPreagg(ctx_);
+      // Recompute stats after setIsPreagg.
+      // Must do this before creating firstMergeFragment.
+      phase1AggNode.computeStats(ctx_.getRootAnalyzer());
 
       DataPartition phase1MergePartition =
           DataPartition.hashPartitioned(phase1PartitionExprs);
@@ -1155,15 +1160,23 @@ public class DistributedPlanner {
       phase2AggNode.setIsPreagg(ctx_);
       phase2MergePartition = DataPartition.hashPartitioned(phase2PartitionExprs);
     }
+
+    // Move all HAVING predicates to be transferred into phase2MergeAggNode.
+    List<Expr> havingPredicates = phase2AggNode.conjuncts_;
+    phase2AggNode.conjuncts_ = new ArrayList<>();
+    // Recompute stats after setIsPreagg and predicates removal.
+    // Must do this before creating phase2MergeAggNode.
+    phase2AggNode.computeStats(ctx_.getRootAnalyzer());
+
+    // Place the merge aggregation step in a new fragment.
     PlanFragment secondMergeFragment =
         createParentFragment(firstMergeFragment, phase2MergePartition);
-
     AggregationNode phase2MergeAggNode = new AggregationNode(ctx_.getNextNodeId(),
         phase2AggNode, phase2AggNode.getMultiAggInfo(), AggPhase.SECOND_MERGE);
-    phase2MergeAggNode.init(ctx_.getRootAnalyzer());
     phase2MergeAggNode.setLimit(limit);
-    // Transfer having predicates to final merge agg node
-    phase2AggNode.transferConjuncts(phase2MergeAggNode);
+    // Transfer all HAVING predicates into phase2MergeAggNode and init().
+    // init() is called after setLimit() to avoid calling computeStats() again.
+    phase2MergeAggNode.init(ctx_.getRootAnalyzer(), havingPredicates);
     secondMergeFragment.addPlanRoot(phase2MergeAggNode);
     return secondMergeFragment;
   }

@@ -422,7 +422,7 @@ PLAN-ROOT SINK
 04:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: t.bigint_col
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=20
 |
 06:AGGREGATE
 |  group by: t.bigint_col, int_col
@@ -565,7 +565,7 @@ PLAN-ROOT SINK
 04:AGGREGATE [STREAMING]
 |  output: count(int_col), count:merge(smallint_col)
 |  group by: t.bigint_col
-|  row-size=24B cardinality=10
+|  row-size=24B cardinality=20
 |
 06:AGGREGATE
 |  output: count:merge(smallint_col)
@@ -645,7 +645,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [STREAMING]
 |  output: count(int_col), count:merge(smallint_col)
 |  group by: t.bigint_col
-|  row-size=24B cardinality=10
+|  row-size=24B cardinality=20
 |
 09:AGGREGATE
 |  output: count:merge(smallint_col)
@@ -1978,7 +1978,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [STREAMING]
 |  output: count(int_col), count:merge(smallint_col)
 |  group by: bigint_col
-|  row-size=24B cardinality=1
+|  row-size=24B cardinality=10
 |
 05:AGGREGATE
 |  output: count:merge(smallint_col)
@@ -2047,7 +2047,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [STREAMING]
 |  output: count(int_col), count:merge(smallint_col)
 |  group by: bigint_col
-|  row-size=24B cardinality=3
+|  row-size=24B cardinality=10
 |
 05:AGGREGATE
 |  output: count:merge(smallint_col)

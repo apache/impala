@@ -304,6 +304,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     conjuncts_.addAll(conjuncts);
   }
 
+  /**
+   * Deprecated because it may hide the need to recompute stats after conjunct transfer.
+   */
+  @Deprecated
   public void transferConjuncts(PlanNode recipient) {
     recipient.conjuncts_.addAll(conjuncts_);
     conjuncts_.clear();
