@@ -805,7 +805,9 @@ SqlNode LeafQuery(ExprContext exprContext) :
         // ensure a query is legal in this context
         checkQueryExpression(exprContext);
     }
-    e = SqlSelect() { return e; }
+    e = SqlSelect()
+    e = OrderByLimitOpt(e)
+    { return e; }
 |
     e = TableConstructor() { return e; }
 |

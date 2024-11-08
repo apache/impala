@@ -117,7 +117,12 @@ public class ImpalaProjectRel extends Project
 
   private NodeWithExprs getChildPlanNode(ParentPlanRelContext context,
       boolean isCoercedProjectForValues) throws ImpalaException {
-    Preconditions.checkState(context.filterCondition_ == null,
+    // The filter condition should have been pushed through the Project via a
+    // Calcite rule. The only exception to this is when a bogus "coerced project"
+    // (see comment in isCoercedProjectForValues method) is created after the
+    // rule has been applied.
+    Preconditions.checkState(context.filterCondition_ == null ||
+        isCoercedProjectForValues,
         "Failure, Filter RelNode needs to be passed through the Project Rel Node.");
     ImpalaPlanRel relInput = (ImpalaPlanRel) getInput(0);
     ParentPlanRelContext.Builder builder =

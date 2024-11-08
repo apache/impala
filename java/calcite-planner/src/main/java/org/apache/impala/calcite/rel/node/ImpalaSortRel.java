@@ -109,7 +109,8 @@ public class ImpalaSortRel extends Sort
       // all PlanNodes containing the limit so the PlanNode constructor can set the
       // limit, or leave the code here to mutate.
       inputNodeWithExprs.planNode_.setLimit(limit_);
-      return inputNodeWithExprs;
+      return NodeCreationUtils.wrapInSelectNodeIfNeeded(context,
+          inputNodeWithExprs, getCluster().getRexBuilder());
     }
 
     List<Expr> inputExprs = inputNodeWithExprs.outputExprs_;
@@ -164,10 +165,6 @@ public class ImpalaSortRel extends Sort
   }
 
   private void validateUnorderedLimit(RexNode filterCondition, long limit, long offset) {
-    // The filter should have been pushed through by the optimizer. This is verified
-    // here because there is no code to support pushing the filter condition if it
-    // hits this code.
-    Preconditions.checkArgument(filterCondition == null);
     Preconditions.checkArgument(limit_ > 0);
     Preconditions.checkArgument(offset_ == 0);
   }

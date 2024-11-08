@@ -96,7 +96,8 @@ public class CalciteOptimizer implements CompilerStep {
         new ConvertToCNFRules.JoinConvertToCNFRule(),
         new ConvertToCNFRules.ProjectConvertToCNFRule(),
         ImpalaMinusToDistinctRule.Config.DEFAULT.toRule(),
-        new CombineValuesNodesRule()
+        new CombineValuesNodesRule(),
+        CoreRules.SORT_REMOVE_CONSTANT_KEYS
         ));
 
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
@@ -145,13 +146,12 @@ public class CalciteOptimizer implements CompilerStep {
 
     HepProgramBuilder builder = new HepProgramBuilder();
 
-    // Impala cannot handle the LITERAL_AGG method so we need to create
-    // an equivalent plan
     RelNode retRelNode = plan;
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     builder.addRuleCollection(ImmutableList.of(
         RewriteRexOverRule.INSTANCE,
-        new ExtractLiteralAgg()
+        new ExtractLiteralAgg(),
+        CoreRules.FILTER_PROJECT_TRANSPOSE
         ));
 
 
