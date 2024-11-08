@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.SelectStmt;
+import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.rel.node.NodeWithExprs;
@@ -34,6 +35,7 @@ import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.ParseException;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.service.JniFrontend;
@@ -45,6 +47,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
@@ -60,11 +63,29 @@ public class CalciteJniFrontend extends JniFrontend {
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteJniFrontend.class.getName());
 
-  private static Pattern SEMI_JOIN = Pattern.compile("\\bsemi\\sjoin\\b",
+  private static Pattern LEFT_SEMI = Pattern.compile(".*\\bleft\\ssemi\\b.*",
       Pattern.CASE_INSENSITIVE);
 
-  private static Pattern ANTI_JOIN = Pattern.compile("\\banti\\sjoin\\b",
+  private static Pattern RIGHT_SEMI = Pattern.compile(".*\\bright\\ssemi\\b.*",
       Pattern.CASE_INSENSITIVE);
+
+  private static Pattern LEFT_ANTI = Pattern.compile(".*\\bleft\\santi\\b.*",
+      Pattern.CASE_INSENSITIVE);
+
+  private static Pattern RIGHT_ANTI = Pattern.compile(".*\\bright\\santi\\b.*",
+      Pattern.CASE_INSENSITIVE);
+
+  private static Pattern INPUT_FILE_NAME = Pattern.compile(".*\\binput__file__name\\b.*",
+      Pattern.CASE_INSENSITIVE);
+
+  private static Pattern FILE_POSITION = Pattern.compile(".*\\bfile__position\\b.*",
+      Pattern.CASE_INSENSITIVE);
+
+  private static Pattern TABLE_NOT_FOUND =
+      Pattern.compile(".*\\bTable '(.*)' not found\\b.*", Pattern.CASE_INSENSITIVE);
+
+  private static Pattern COLUMN_NOT_FOUND =
+      Pattern.compile(".*\\bColumn '(.*)' not found\\b.*", Pattern.CASE_INSENSITIVE);
 
   public CalciteJniFrontend(byte[] thriftBackendConfig, boolean isBackendTest)
       throws ImpalaException, TException {
@@ -84,6 +105,8 @@ public class CalciteJniFrontend extends JniFrontend {
 
     QueryContext queryCtx = new QueryContext(thriftQueryContext, getFrontend());
 
+    CalciteMetadataHandler mdHandler = null;
+
     if (!optionSupportedInCalcite(queryCtx)) {
       return runThroughOriginalPlanner(thriftQueryContext, queryCtx);
     }
@@ -99,8 +122,7 @@ public class CalciteJniFrontend extends JniFrontend {
       markEvent(queryParser, parsedSqlNode, queryCtx, "Parsed query");
 
       // Make sure the metadata cache has all the info for the query.
-      CalciteMetadataHandler mdHandler =
-          new CalciteMetadataHandler(parsedSqlNode, queryCtx);
+      mdHandler = new CalciteMetadataHandler(parsedSqlNode, queryCtx);
       markEvent(mdHandler, null, queryCtx, "Loaded tables");
 
       boolean isExplain = false;
@@ -140,6 +162,7 @@ public class CalciteJniFrontend extends JniFrontend {
 
       return serializedRequest;
     } catch (ParseException e) {
+      throwUnsupportedIfKnownException(e);
       // do a quick parse just to make sure it's not a select stmt. If it is
       // a select statement, we fail the query since all select statements
       // should be run through the Calcite Planner.
@@ -149,6 +172,13 @@ public class CalciteJniFrontend extends JniFrontend {
       LOG.info("Calcite planner failed to parse query: " + queryCtx.getStmt());
       LOG.info("Going to use original Impala planner.");
       return runThroughOriginalPlanner(thriftQueryContext, queryCtx);
+    } catch (ImpalaException e) {
+      if (mdHandler != null) {
+        throwUnsupportedIfKnownException(e, mdHandler.getStmtTableCache());
+      }
+      throw e;
+    } catch (Exception e) {
+      throw e;
     }
   }
 
@@ -186,6 +216,41 @@ public class CalciteJniFrontend extends JniFrontend {
 
   private static void loadCalciteImpalaFunctions() {
     ImpalaOperatorTable.create(BuiltinsDb.getInstance());
+  }
+
+  private static void throwUnsupportedIfKnownException(Exception e)
+      throws ImpalaException {
+    String s = e.toString().replace("\n"," ");;
+    if (LEFT_ANTI.matcher(s).matches() || RIGHT_ANTI.matcher(s).matches()) {
+      throw new UnsupportedFeatureException("Anti joins not supported.");
+    }
+    if (LEFT_SEMI.matcher(s).matches() || RIGHT_SEMI.matcher(s).matches()) {
+      throw new UnsupportedFeatureException("Semi joins not supported.");
+    }
+    if (INPUT_FILE_NAME.matcher(s).matches() || FILE_POSITION.matcher(s).matches()) {
+      throw new UnsupportedFeatureException("Virtual columns not supported.");
+    }
+  }
+
+  public static void throwUnsupportedIfKnownException(ImpalaException e,
+      StmtTableCache stmtTableCache) throws ImpalaException {
+    throwUnsupportedIfKnownException(e);
+    String s = e.toString().replace("\n"," ");;
+    Matcher m = TABLE_NOT_FOUND.matcher(s);
+    if (m.matches()) {
+      if (CalciteMetadataHandler.anyTableContainsColumn(stmtTableCache, m.group(1))) {
+        throw new UnsupportedFeatureException(
+            "Complex column " + m.group(1) + " not supported.");
+      }
+    }
+
+    m = COLUMN_NOT_FOUND.matcher(s);
+    if (m.matches()) {
+      if (CalciteMetadataHandler.anyTableContainsColumn(stmtTableCache, m.group(1))) {
+        throw new UnsupportedFeatureException(
+            "Complex column " + m.group(1) + " not supported.");
+      }
+    }
   }
 
   public static class QueryContext {

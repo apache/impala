@@ -50,6 +50,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.calcite.rel.util.ImpalaBaseTableRef;
@@ -82,10 +83,7 @@ public class CalciteTable extends RelOptAbstractTable
     this.table_ = (HdfsTable) table;
     this.qualifiedTableName_ = table.getTableName().toPath();
 
-    if (table instanceof IcebergTable) {
-      throw new UnsupportedFeatureException("Calcite parser does not support " +
-          "Iceberg tables yet.");
-    }
+    checkIfTableIsSupported(table);
   }
 
   private static RelDataType buildColumnsForRelDataType(FeTable table)
@@ -104,6 +102,18 @@ public class CalciteTable extends RelOptAbstractTable
       builder.add(column.getName(), type);
     }
     return builder.build();
+  }
+
+  private void checkIfTableIsSupported(FeTable table) throws ImpalaException {
+    if (table instanceof FeView) {
+      throw new UnsupportedFeatureException("Views are not supported yet.");
+    }
+
+    if (!(table instanceof HdfsTable)) {
+      String tableType = table.getClass().getSimpleName().replace("Table", "");
+      throw new UnsupportedFeatureException(tableType + " tables are not supported yet.");
+    }
+
   }
 
   public BaseTableRef createBaseTableRef(SimplifiedAnalyzer analyzer

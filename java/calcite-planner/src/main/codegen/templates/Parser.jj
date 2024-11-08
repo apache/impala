@@ -1306,6 +1306,8 @@ SqlSelect SqlSelect() :
 }
 {
     <SELECT> { s = span(); }
+    ( <CLUSTERED> )?
+    ( <STRAIGHT_JOIN> )?
     [ <HINT_BEG> AddHint(hints) ( <COMMA> AddHint(hints) )* <COMMENT_END> ]
     SqlSelectKeywords(keywords)
     (
@@ -7901,6 +7903,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < CLASS_ORIGIN: "CLASS_ORIGIN" >
 |   < CLOB: "CLOB" >
 |   < CLOSE: "CLOSE" >
+|   < CLUSTERED: "CLUSTERED" >
 |   < COALESCE: "COALESCE" >
 |   < COBOL: "COBOL" >
 |   < COLLATE: "COLLATE" >
@@ -8427,6 +8430,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < STATIC: "STATIC" >
 |   < STDDEV_POP: "STDDEV_POP" >
 |   < STDDEV_SAMP: "STDDEV_SAMP" >
+|   < STRAIGHT_JOIN: "STRAIGHT_JOIN" >
 |   < STREAM: "STREAM" >
 |   < STRING_AGG: "STRING_AGG" >
 |   < STRUCTURE: "STRUCTURE" >

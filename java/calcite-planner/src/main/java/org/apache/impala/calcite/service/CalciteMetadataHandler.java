@@ -47,6 +47,7 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
+import com.google.common.collect.Sets;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -96,8 +97,10 @@ public class CalciteMetadataHandler implements CompilerStep {
     // populate calcite schema.  This step needs to be done after the loader because the
     // schema needs to contain the columns in the table for validation, which cannot
     // be done when it's an IncompleteTable
-    populateCalciteSchema(reader_, queryCtx.getFrontend().getCatalog(),
-        tableVisitor.tableNames_);
+    List<String> errorTables = populateCalciteSchema(reader_,
+        queryCtx.getFrontend().getCatalog(), tableVisitor.tableNames_);
+
+    tableVisitor.checkForComplexTable(stmtTableCache_, errorTables, queryCtx);
   }
 
   /**
@@ -119,22 +122,26 @@ public class CalciteMetadataHandler implements CompilerStep {
   }
 
   /**
-   * Populate the CalciteSchema with tables being used by this query.
+   * Populate the CalciteSchema with tables being used by this query. Returns a
+   * list of tables in the query that are not found in the database.
    */
-  private void populateCalciteSchema(CalciteCatalogReader reader,
+  private static List<String> populateCalciteSchema(CalciteCatalogReader reader,
       FeCatalog catalog, Set<TableName> tableNames) throws ImpalaException {
+    List<String> notFoundTables = new ArrayList<>();
     CalciteSchema rootSchema = reader.getRootSchema();
     Map<String, CalciteDb.Builder> dbSchemas = new HashMap<>();
     for (TableName tableName : tableNames) {
       FeDb db = catalog.getDb(tableName.getDb());
       // db is not found, this will probably fail in the validation step
       if (db == null) {
+        notFoundTables.add(tableName.toString());
         continue;
       }
 
       // table is not found, this will probably fail in the validation step
       FeTable feTable = db.getTable(tableName.getTbl());
       if (feTable == null) {
+        notFoundTables.add(tableName.toString());
         continue;
       }
       if (!(feTable instanceof HdfsTable)) {
@@ -156,6 +163,7 @@ public class CalciteMetadataHandler implements CompilerStep {
     for (String dbName : dbSchemas.keySet()) {
       rootSchema.add(dbName, dbSchemas.get(dbName.toLowerCase()).build());
     }
+    return notFoundTables;
   }
 
   public StmtMetadataLoader.StmtTableCache getStmtTableCache() {
@@ -173,6 +181,11 @@ public class CalciteMetadataHandler implements CompilerStep {
   private static class TableVisitor extends SqlBasicVisitor<Void> {
     private final String currentDb_;
     public final Set<TableName> tableNames_ = new HashSet<>();
+
+    // Error condition for now. Complex tables are not yet supported
+    // so if we see a table name that has more than 2 parts, this variable
+    // will contain that table.
+    public final List<String> errorTables_ = new ArrayList<>();
 
     public TableVisitor(String currentDb) {
       this.currentDb_ = currentDb.toLowerCase();
@@ -194,13 +207,15 @@ public class CalciteMetadataHandler implements CompilerStep {
       if (fromNode instanceof SqlIdentifier) {
         String tableName = fromNode.toString();
         List<String> parts = Splitter.on('.').splitToList(tableName);
-        // TODO: 'complex' tables ignored for now
         if (parts.size() == 1) {
           localTableNames.add(new TableName(
               currentDb_.toLowerCase(), parts.get(0).toLowerCase()));
         } else if (parts.size() == 2) {
           localTableNames.add(
               new TableName(parts.get(0).toLowerCase(), parts.get(1).toLowerCase()));
+        } else {
+          errorTables_.add(tableName);
+          return localTableNames;
         }
       }
 
@@ -219,6 +234,66 @@ public class CalciteMetadataHandler implements CompilerStep {
       }
       return localTableNames;
     }
+
+    /**
+     * Check if the error table is actually a table with a complex column. There is Impala
+     * syntax where a complex column uses the same syntax in the FROM clause as a table.
+     * This method is passed in all the tables that are not found and checks to see if
+     * the table turned out to be a complex column rather than an actual table. If so,
+     * this throws an unsupported feature exception (for the time being). If it's not
+     * a table with a complex column, a table not found error will eventually be thrown
+     * in a different place.
+     */
+    public void checkForComplexTable(StmtMetadataLoader.StmtTableCache stmtTableCache,
+        List<String> errorTables, CalciteJniFrontend.QueryContext queryCtx)
+        throws ImpalaException {
+      List<String> allErrorTables = new ArrayList<>();
+      allErrorTables.addAll(errorTables_);
+      allErrorTables.addAll(errorTables);
+      for (String errorTable : allErrorTables) {
+        List<String> parts = Splitter.on('.').splitToList(errorTable);
+        // if there are 3 parts, then it has to be db.table.column and must be a
+        // complex column.
+        if (parts.size() > 2) {
+          throw new UnsupportedFeatureException("Complex column " +
+              errorTable + " not supported.");
+        }
+        // if there are 2 parts, then it is either a missing db.table or a
+        // table.column.  We look to see if the column can be found in any
+        // of the tables, in which case, it is a complex column being referenced.
+        if (parts.size() == 2) {
+          // first check the already existing cache for the error table.
+          if (anyTableContainsColumn(stmtTableCache, parts.get(1))) {
+            throw new UnsupportedFeatureException("Complex column " +
+                errorTable + " not supported.");
+          }
+          // it's possible that the table wasn't loaded yet because this method is
+          // only called when there is an error finding a table. Try loading the table
+          // from catalogd just in case, and check to see if it's a complex column.
+          TableName potentialComplexTable = new TableName(
+              currentDb_.toLowerCase(), parts.get(0).toLowerCase());
+          StmtMetadataLoader errorLoader = new StmtMetadataLoader(
+              queryCtx.getFrontend(), queryCtx.getCurrentDb(), queryCtx.getTimeline());
+          StmtMetadataLoader.StmtTableCache errorCache =
+              errorLoader.loadTables(Sets.newHashSet(potentialComplexTable));
+          if (anyTableContainsColumn(errorCache, parts.get(1))) {
+            throw new UnsupportedFeatureException("Complex column " +
+                errorTable + " not supported.");
+          }
+        }
+      }
+    }
+  }
+
+  public static boolean anyTableContainsColumn(
+      StmtMetadataLoader.StmtTableCache stmtTableCache, String columnName) {
+    String onlyColumnPart = columnName.split("\\.")[0];
+    for (FeTable table : stmtTableCache.tables.values()) {
+      if (table.getColumn(onlyColumnPart) != null) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
