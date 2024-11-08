@@ -927,7 +927,7 @@ row_regex: .*PlannerType: CalcitePlanner.*
 explain select * from functional.alltypestiny;
 ---- RESULTS: VERIFY_IS_SUBSET
 row_regex:.*01:EXCHANGE.*
-row_regex:.*00:SCAN HDFS.*
+row_regex:.*00:SCAN.*
 ---- RUNTIME_PROFILE
 row_regex: .*PlannerType: CalcitePlanner.*
 ====
@@ -936,8 +936,8 @@ set explain_level=3;
 explain select * from functional.alltypestiny;
 ---- RESULTS: VERIFY_IS_SUBSET
 row_regex:.*01:EXCHANGE.*
-row_regex:.*00:SCAN HDFS.*
-row_regex:.*HDFS partitions=4/4.*
+row_regex:.*00:SCAN.*
+row_regex:.*partitions=4/4.*
 ---- RUNTIME_PROFILE
 row_regex: .*PlannerType: CalcitePlanner.*
 ====
