@@ -21,10 +21,14 @@ import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexLiteral;
 
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
+import org.apache.impala.calcite.functions.AnalyzedNullLiteral;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.PlanNodeId;
@@ -100,12 +104,17 @@ public class ImpalaValuesRel extends Values
           new ArrayList<>(), getCluster().getRexBuilder(),
           context.ctx_.getRootAnalyzer());
 
+      // If the parentRowType_ is set, that means there is a passthrough "Project"
+      // RelNode on top of this Values RelNode.   This Project will contain the type we
+      // need to use.  This happens because Calcite treats literal strings as "char"
+      // and smaller integers (e.g. tinyint) as "int",
       if (context.parentRowType_ != null) {
-        LiteralExpr e = (LiteralExpr) converter.getImpalaConjuncts().get(0);
-        LiteralExpr f = LiteralExpr.createFromUnescapedStr(e.getStringValue(),
-            ImpalaTypeConverter.createImpalaType(
-                context.parentRowType_.getFieldList().get(i).getType()));
-        outputExprs.add(f);
+        LiteralExpr literalExpr =
+            getLiteralExprWithType(
+                (LiteralExpr) converter.getImpalaConjuncts().get(0),
+                context.parentRowType_.getFieldList().get(i).getType(),
+                context.ctx_.getRootAnalyzer());
+        outputExprs.add(literalExpr);
       } else {
         outputExprs.addAll(converter.getImpalaConjuncts());
       }
@@ -113,6 +122,19 @@ public class ImpalaValuesRel extends Values
     }
 
     return new NodeWithExprs(retNode, outputExprs);
+  }
+
+  private LiteralExpr getLiteralExprWithType(LiteralExpr expr, RelDataType type,
+      Analyzer analyzer) throws ImpalaException {
+    Type impalaType = ImpalaTypeConverter.createImpalaType(type);
+
+    if (expr instanceof NullLiteral) {
+      NullLiteral nullLiteral = new AnalyzedNullLiteral(impalaType);
+      nullLiteral.analyze(analyzer);
+      return nullLiteral;
+    }
+
+    return LiteralExpr.createFromUnescapedStr(expr.getStringValue(), impalaType);
   }
 
   @Override
