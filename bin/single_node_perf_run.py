@@ -88,6 +88,7 @@ import textwrap
 from tests.common.test_dimensions import TableFormatInfo
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
+IMPALA_PERF_RESULTS = os.path.join(IMPALA_HOME, "perf_results")
 
 
 def configured_call(cmd):
@@ -100,14 +101,17 @@ def configured_call(cmd):
 
 def load_data(db_to_load, table_formats, scale):
   """Loads a database with a particular scale factor."""
+  all_formats = ("text/none," + table_formats if "text/none" not in table_formats
+                 else table_formats)
   configured_call(["{0}/bin/load-data.py".format(IMPALA_HOME),
                    "--workloads", db_to_load, "--scale_factor", str(scale),
-                   "--table_formats", "text/none," + table_formats])
+                   "--table_formats", all_formats])
   for table_format in table_formats.split(","):
     suffix = TableFormatInfo.create_from_string(None, table_format).db_suffix()
     db_name = db_to_load + scale + suffix
     configured_call(["{0}/tests/util/compute_table_stats.py".format(IMPALA_HOME),
-                     "--stop_on_error", "--db_names", db_name])
+                     "--stop_on_error", "--db_names", db_name,
+                     "--parallelism", "1"])
 
 
 def get_git_hash_for_name(name):
@@ -164,7 +168,7 @@ def run_workload(base_dir, workloads, options):
 
 def report_benchmark_results(file_a, file_b, description):
   """Wrapper around report_benchmark_result.py."""
-  result = "{0}/perf_results/latest/performance_result.txt".format(IMPALA_HOME)
+  result = os.path.join(IMPALA_PERF_RESULTS, "latest", "performance_result.txt")
   with open(result, "w") as f:
     subprocess.check_call(
       ["{0}/tests/benchmark/report_benchmark_results.py".format(IMPALA_HOME),
@@ -266,7 +270,7 @@ def perf_ab_test(options, args):
   hash_a = get_git_hash_for_name(args[0])
 
   # Create the base directory to store the results in
-  results_path = os.path.join(IMPALA_HOME, "perf_results")
+  results_path = IMPALA_PERF_RESULTS
   if not os.access(results_path, os.W_OK):
     os.makedirs(results_path)
 
@@ -284,12 +288,20 @@ def perf_ab_test(options, args):
     start_minicluster()
   start_impala(options.num_impalads, options)
 
-  workloads = set(options.workloads.split(","))
+  workloads = options.workloads.split(",")
 
   if options.load:
-    WORKLOAD_TO_DATASET = {"tpch": "tpch", "tpcds": "tpcds", "targeted-perf": "tpch",
-                           "tpcds-unmodified": "tpcds-unmodified"}
-    datasets = set([WORKLOAD_TO_DATASET[workload] for workload in workloads])
+    WORKLOAD_TO_DATASET = {
+      "tpch": "tpch",
+      "tpcds": "tpcds",
+      "targeted-perf": "tpch",
+      "tpcds-unmodified": "tpcds-unmodified",
+      "tpcds_partitioned": "tpcds_partitioned"
+    }
+    datasets = [WORKLOAD_TO_DATASET[workload] for workload in workloads]
+    if "tpcds_partitioned" in datasets and "tpcds" not in datasets:
+      # "tpcds_partitioned" require the text "tpcds" database.
+      load_data("tpcds", "text/none", options.scale)
     for dataset in datasets:
       load_data(dataset, options.table_formats, options.scale)
 

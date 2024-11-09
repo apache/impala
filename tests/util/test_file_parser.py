@@ -394,7 +394,7 @@ def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=
   # find. Both workload directories contain other queries that are not part of the TPC
   # spec.
   file_workload = workload
-  if workload == "tpcds":
+  if workload in ["tpcds", "tpcds_partitioned"]:
     # TPCDS is assumed to always use decimal_v2, which is the default since 3.0
     file_workload = "tpcds-decimal_v2"
   if include_stress_queries:
@@ -402,7 +402,11 @@ def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=
   else:
     file_name_pattern = re.compile(r"^{0}-(q.*).test$".format(file_workload))
 
-  query_name_pattern = re.compile(r"^{0}-(.*)$".format(workload.upper()))
+  query_name_prefix = workload.upper()
+  if workload == "tpcds_partitioned":
+    # 'tpcds_partitioned' symlink to the same queries set of 'tpcds'.
+    query_name_prefix = "TPCDS"
+  query_name_pattern = re.compile(r"^{0}-(.*)$".format(query_name_prefix))
   if workload == "tpch_nested":
     query_name_pattern = re.compile(r"^TPCH-(.*)$")
 
@@ -426,6 +430,9 @@ def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=
     test_cases = parse_query_test_file(file_path)
     for test_case in test_cases:
       query_sql = remove_comments(test_case["QUERY"])
+      if workload == "tpcds_partitioned":
+        # replace old columns names from old TPC-DS spec with a new one.
+        query_sql = query_sql.replace("c_last_review_date", "c_last_review_date_sk")
 
       if re.match(filter_regex, test_case["QUERY_NAME"]):
         query_name_match = query_name_pattern.search(test_case["QUERY_NAME"])

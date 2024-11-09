@@ -35,7 +35,7 @@ t_meal_time               string
 primary key (t_time_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -73,7 +73,7 @@ d_current_year            string
 primary key (d_date_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -86,7 +86,7 @@ r_reason_desc         string
 primary key (r_reason_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -109,7 +109,7 @@ ca_location_type          string
 primary key (ca_address_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -122,7 +122,7 @@ ib_upper_bound            int
 primary key (ib_income_band_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -138,7 +138,7 @@ primary key (hd_demo_sk) DISABLE NOVALIDATE RELY
 foreign key (hd_income_band_sk) references {db_name}{db_suffix}.income_band (ib_income_band_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -157,7 +157,7 @@ cd_dep_college_count      int
 primary key (cd_demo_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -173,7 +173,7 @@ sm_contract               string
 primary key (sm_ship_mode_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -252,7 +252,7 @@ SELECT
   i_container,
   i_manager_id,
   i_product_name
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -276,7 +276,7 @@ w_gmt_offset              decimal(5,2)
 primary key (w_warehouse_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -319,7 +319,7 @@ foreign key (cc_closed_date_sk) references {db_name}{db_suffix}.date_dim (d_date
 foreign key (cc_open_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -392,7 +392,7 @@ SELECT
   c_login,
   c_email_address,
   CAST(c_last_review_date AS INT)
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -465,7 +465,7 @@ SELECT
   p_channel_details,
   p_purpose,
   p_discount_active
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -505,7 +505,7 @@ primary key (s_store_sk) DISABLE NOVALIDATE RELY
 foreign key (s_closed_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -526,7 +526,7 @@ foreign key (cp_start_date_sk) references {db_name}{db_suffix}.date_dim (d_date_
 foreign key (cp_end_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -553,7 +553,7 @@ foreign key (wp_access_date_sk) references {db_name}{db_suffix}.date_dim (d_date
 foreign key (wp_customer_sk) references {db_name}{db_suffix}.customer (c_customer_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -591,7 +591,7 @@ foreign key (web_open_date_sk) references {db_name}{db_suffix}.date_dim (d_date_
 foreign key (web_close_date_sk) references {db_name}{db_suffix}.date_dim (d_date_sk) DISABLE NOVALIDATE RELY
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM tpcds.{table_name};
+SELECT * FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -629,7 +629,7 @@ SELECT
   inv_warehouse_sk,
   inv_quantity_on_hand,
   inv_date_sk
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -762,7 +762,7 @@ SELECT
   cs_net_paid_inc_ship_tax,
   cs_net_profit,
   cs_sold_date_sk
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -874,7 +874,7 @@ SELECT
   cr_store_credit,
   cr_net_loss,
   cr_returned_date_sk
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -966,7 +966,7 @@ SELECT
   ss_net_paid_inc_tax,
   ss_net_profit,
   ss_sold_date_sk
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -1050,7 +1050,7 @@ SELECT
   sr_store_credit,
   sr_net_loss,
   sr_returned_date_sk
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -1183,7 +1183,7 @@ SELECT
   ws_net_paid_inc_ship_tax,
   ws_net_profit,
   ws_sold_date_sk
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET
 tpcds_partitioned
@@ -1283,5 +1283,5 @@ SELECT
   wr_account_credit,
   wr_net_loss,
   wr_returned_date_sk
-FROM tpcds.{table_name};
+FROM tpcds{scale_factor}.{table_name};
 ====
