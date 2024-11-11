@@ -24,6 +24,7 @@ import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
+import org.apache.calcite.sql.SqlSetOperator;
 import org.apache.calcite.sql.fun.ImpalaGroupingFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
 import org.apache.calcite.sql.fun.SqlCountAggFunction;
@@ -223,6 +224,27 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   public static final ImpalaCastFunction EXPLICIT_CAST = ImpalaCastFunction.INSTANCE;
 
   public static final ImpalaDecodeFunction DECODE = ImpalaDecodeFunction.INSTANCE;
+
+  // Override all the set operators. Calcite places intersect with greater precedence
+  // over union and except which is the SQL standard. Impala sets equal precedence for
+  // all the set operators.
+  public static final SqlSetOperator UNION =
+      new SqlSetOperator("UNION", SqlKind.UNION, 12, false);
+
+  public static final SqlSetOperator UNION_ALL =
+      new SqlSetOperator("UNION ALL", SqlKind.UNION, 12, true);
+
+  public static final SqlSetOperator EXCEPT =
+      new SqlSetOperator("EXCEPT", SqlKind.EXCEPT, 12, false);
+
+  public static final SqlSetOperator EXCEPT_ALL =
+      new SqlSetOperator("EXCEPT ALL", SqlKind.EXCEPT, 12, true);
+
+  public static final SqlSetOperator INTERSECT =
+      new SqlSetOperator("INTERSECT", SqlKind.INTERSECT, 12, false);
+
+  public static final SqlSetOperator INTERSECT_ALL =
+      new SqlSetOperator("INTERSECT ALL", SqlKind.INTERSECT, 12, true);
 
   public static ImpalaCustomOperatorTable instance() {
     return INSTANCE.get();

@@ -122,6 +122,7 @@ import org.apache.calcite.util.SourceStringReader;
 import org.apache.calcite.util.Util;
 import org.apache.calcite.util.trace.CalciteTrace;
 import org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier;
+import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -7730,16 +7731,16 @@ SqlBinaryOperator BinaryQueryOperator() :
     (
         <UNION>
         (
-            <ALL> { return SqlStdOperatorTable.UNION_ALL; }
-        |   <DISTINCT> { return SqlStdOperatorTable.UNION; }
-        |   { return SqlStdOperatorTable.UNION; }
+            <ALL> { return ImpalaCustomOperatorTable.UNION_ALL; }
+        |   <DISTINCT> { return ImpalaCustomOperatorTable.UNION; }
+        |   { return ImpalaCustomOperatorTable.UNION; }
         )
     |
         <INTERSECT>
         (
-            <ALL> { return SqlStdOperatorTable.INTERSECT_ALL; }
-        |   <DISTINCT> { return SqlStdOperatorTable.INTERSECT; }
-        |   { return SqlStdOperatorTable.INTERSECT; }
+            <ALL> { return ImpalaCustomOperatorTable.INTERSECT_ALL; }
+        |   <DISTINCT> { return ImpalaCustomOperatorTable.INTERSECT; }
+        |   { return ImpalaCustomOperatorTable.INTERSECT; }
         )
     |
         (
@@ -7752,9 +7753,9 @@ SqlBinaryOperator BinaryQueryOperator() :
             }
         )
         (
-            <ALL> { return SqlStdOperatorTable.EXCEPT_ALL; }
-        |   <DISTINCT> { return SqlStdOperatorTable.EXCEPT; }
-        |   { return SqlStdOperatorTable.EXCEPT; }
+            <ALL> { return ImpalaCustomOperatorTable.EXCEPT_ALL; }
+        |   <DISTINCT> { return ImpalaCustomOperatorTable.EXCEPT; }
+        |   { return ImpalaCustomOperatorTable.EXCEPT; }
         )
     )
 }
