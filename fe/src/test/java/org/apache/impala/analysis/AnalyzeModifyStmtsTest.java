@@ -360,6 +360,24 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         + "using functional_parquet.iceberg_non_partitioned s "
         + "on target.id = s.id "
         + "when not matched by source and target.user = 'something' then delete");
+    // INSERT *
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id when not matched then insert *");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id when not matched by target then insert *");
+    // UPDATE SET *
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id when matched then update set *");
+    AnalyzesOk("merge into "
+        + "functional_parquet.iceberg_v2_partitioned_position_deletes target "
+        + "using functional_parquet.iceberg_non_partitioned s "
+        + "on target.id = s.id when not matched by source then update set *");
 
     // Inline view as target
     AnalysisError("merge into "
@@ -414,8 +432,9 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
             + "(select * from functional_parquet.iceberg_non_partitioned) s "
             + "on t.id = s.id "
             + "when not matched then insert (id, user, action) values(t.user)",
-        "Column permutation mentions more columns (3) than "
-            + "the VALUES clause returns (1)");
+        "Column permutation mentions more columns (3) than the VALUES clause"
+            + " returns (1): WHEN NOT MATCHED BY TARGET THEN INSERT (id, user, action)"
+            + " VALUES (t.`user`)");
     // More columns in VALUES
     AnalysisError("merge into "
             + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
@@ -424,8 +443,9 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
             + "on t.id = s.id "
             + "when not matched then "
             + "insert (id) values(t.id, t.user, t.action)",
-        "Column permutation mentions fewer columns (1) than "
-            + "the VALUES clause returns (3)");
+        "Column permutation mentions fewer columns (1) than the VALUES clause"
+            + " returns (3): WHEN NOT MATCHED BY TARGET THEN INSERT (id) "
+            + "VALUES (t.id, t.`user`, t.action)");
     AnalysisError("merge into "
             + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
             + "using "
@@ -433,8 +453,9 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
             + "on t.id = s.id "
             + "when not matched then insert (id, user, action) "
             + "values(t.id, t.action, t.user, t.user)",
-        "Column permutation mentions fewer columns (3) than "
-            + "the VALUES clause returns (4)");
+        "Column permutation mentions fewer columns (3) than the VALUES clause"
+            + " returns (4): WHEN NOT MATCHED BY TARGET THEN INSERT (id, user, action) "
+            + "VALUES (t.id, t.action, t.`user`, t.`user`)");
     // Unresolved reference in WHEN NOT MATCHED clause
     AnalysisError("merge into "
             + "functional_parquet.iceberg_v2_partitioned_position_deletes t "
@@ -465,5 +486,47 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
             + "on t.id = s.id "
             + "when matched and s.id > 2 then delete",
         "Unable to rewrite MERGE query statement");
+    // UPDATE SET * with different column lists
+    AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
+            + "using functional_parquet.iceberg_non_partitioned s "
+            + "on t.id = s.id when matched and s.id > 2 then update set *",
+        "Target table has more columns (6) than the source expression (4): "
+            + "WHEN MATCHED AND s.id > 2 THEN UPDATE SET id = id, int_col = user, "
+            + "string_col = action, date_string_col = event_time");
+    AnalysisError("merge into functional_parquet.iceberg_timestamp_part t "
+            + "using functional_parquet.iceberg_partition_evolution s "
+            + "on t.i = s.id when matched and s.id > 2 then update set *",
+        "Target table has fewer columns (2) than the source expression (6): "
+            + "WHEN MATCHED AND s.id > 2 THEN UPDATE SET i = id, ts = int_col");
+    // UPDATE SET * with different column types
+    AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
+            + "using (select int_col, id, date_string_col, month, string_col, year from "
+            + "functional_parquet.iceberg_partition_evolution) s "
+            + "on t.id = s.id when matched and s.id > 2 then update set *",
+        "Target table 'functional_parquet.iceberg_partition_evolution' is incompatible"
+            + " with source expressions.\nExpression 's.`month`' (type: INT) is not "
+            + "compatible with column 'date_string_col' (type: STRING)");
+    // INSERT * with different column lists
+    AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
+            + "using functional_parquet.iceberg_non_partitioned s "
+            + "on t.id = s.id when not matched and s.id > 2 then insert *",
+        "Column permutation mentions more columns (6) than the source "
+            + "expression (4): WHEN NOT MATCHED BY TARGET AND s.id > 2 "
+            + "THEN INSERT (id, int_col, string_col, date_string_col, year, month) "
+            + "VALUES (s.id, s.`user`, s.action, s.event_time)");
+    AnalysisError("merge into functional_parquet.iceberg_timestamp_part t "
+            + "using functional_parquet.iceberg_non_partitioned s "
+            + "on t.i = s.id when not matched and s.id > 2 then insert *",
+        "Column permutation mentions fewer columns (2) than the source "
+            + "expression (4): WHEN NOT MATCHED BY TARGET AND s.id > 2 THEN INSERT "
+            + "(i, ts) VALUES (s.id, s.`user`, s.action, s.event_time)");
+    // INSERT * with different column types
+    AnalysisError("merge into functional_parquet.iceberg_partition_evolution t "
+            + "using (select int_col, id, date_string_col, month, string_col, year from "
+            + "functional_parquet.iceberg_partition_evolution) s "
+            + "on t.id = s.id when not matched then insert *",
+        "Target table 'functional_parquet.iceberg_partition_evolution' is incompatible"
+            + " with source expressions.\nExpression 's.`month`' (type: INT) is not "
+            + "compatible with column 'date_string_col' (type: STRING)");
   }
 }

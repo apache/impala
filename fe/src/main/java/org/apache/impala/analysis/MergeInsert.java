@@ -40,8 +40,8 @@ import org.apache.impala.thrift.TMergeMatchType;
  */
 public class MergeInsert extends MergeCase {
   // Stores the column names targeted by the merge insert case.
-  private final List<String> columnPermutation_;
-  private final SelectList selectList_;
+  protected List<String> columnPermutation_;
+  protected final SelectList selectList_;
 
   public MergeInsert(List<String> columnPermutation, SelectList selectList) {
     columnPermutation_ = columnPermutation;
@@ -50,10 +50,10 @@ public class MergeInsert extends MergeCase {
 
   protected MergeInsert(List<Expr> resultExprs, List<Expr> filterExprs,
       TableName targetTableName, List<Column> targetTableColumns, TableRef targetTableRef,
-      TMergeMatchType matchType, List<String> columnPermutation,
-      SelectList selectList) {
+      List<String> columnPermutation, SelectList selectList, TMergeMatchType matchType,
+      TableRef sourceTableRef) {
     super(resultExprs, filterExprs, targetTableName, targetTableColumns, targetTableRef,
-        matchType);
+        matchType, sourceTableRef);
     columnPermutation_ = columnPermutation;
     selectList_ = selectList;
   }
@@ -88,9 +88,9 @@ public class MergeInsert extends MergeCase {
     builder.append("VALUES ");
     StringJoiner selectItemJoiner = new StringJoiner(", ");
     for (SelectListItem item : selectList_.getItems()) {
-      selectItemJoiner.add(item.toSql(options));
+      selectItemJoiner.add(item.getExpr().toSql(options));
     }
-    builder.append(String.format("(%s) ", selectItemJoiner));
+    builder.append(String.format("(%s)", selectItemJoiner));
     return builder.toString();
   }
 
@@ -100,9 +100,8 @@ public class MergeInsert extends MergeCase {
   @Override
   public MergeInsert clone() {
     return new MergeInsert(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
-        targetTableName_, targetTableColumns_, targetTableRef_, matchType_,
-        columnPermutation_,
-        selectList_);
+        targetTableName_, targetTableColumns_, targetTableRef_, columnPermutation_,
+        selectList_, matchType_, sourceTableRef_);
   }
 
   /**
@@ -175,14 +174,22 @@ public class MergeInsert extends MergeCase {
 
     if (columnPermutationSize > selectListSize) {
       throw new AnalysisException(
-          String.format("%s more columns (%d) than the VALUES clause returns (%d)",
-              target, columnPermutationSize, selectListSize));
+          String.format(moreColumnsMessageTemplate(),
+              target, columnPermutationSize, selectListSize, toSql()));
     }
     if (columnPermutationSize < selectListSize) {
       throw new AnalysisException(
-          (String.format("%s fewer columns (%d) than the VALUES clause returns (%d)",
-              target, columnPermutationSize, selectListSize)));
+          (String.format(fewerColumnsMessageTemplate(),
+              target, columnPermutationSize, selectListSize, toSql())));
     }
+  }
+
+  protected String moreColumnsMessageTemplate() {
+    return "%s more columns (%d) than the VALUES clause returns (%d): %s";
+  }
+
+  protected String fewerColumnsMessageTemplate() {
+    return "%s fewer columns (%d) than the VALUES clause returns (%d): %s";
   }
 
   private void duplicateColumnCheck() throws AnalysisException {

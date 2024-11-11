@@ -39,9 +39,9 @@ public class MergeDelete extends MergeCase {
 
   protected MergeDelete(List<Expr> resultExprs, List<Expr> filterExprs,
       TableName targetTableName, List<Column> targetTableColumns,
-      TableRef targetTableRef, TMergeMatchType matchType) {
+      TableRef targetTableRef, TMergeMatchType matchType, TableRef sourceTableRef) {
     super(resultExprs, filterExprs, targetTableName, targetTableColumns, targetTableRef,
-        matchType);
+        matchType, sourceTableRef);
   }
 
   @Override
@@ -68,6 +68,7 @@ public class MergeDelete extends MergeCase {
   @Override
   public MergeDelete clone() {
     return new MergeDelete(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
-        targetTableName_, targetTableColumns_, targetTableRef_, matchType_);
+        targetTableName_, targetTableColumns_, targetTableRef_, matchType_,
+        sourceTableRef_);
   }
 }

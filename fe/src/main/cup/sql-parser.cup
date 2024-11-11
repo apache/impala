@@ -1101,13 +1101,18 @@ merge_update_and_delete ::=
 
 merge_update ::=
   KW_UPDATE KW_SET update_set_expr_list:values
-  {: RESULT = new MergeUpdate(values); :};
+  {: RESULT = new MergeUpdate(values); :}
+  | KW_UPDATE KW_SET STAR
+  {: RESULT = new MergeUpdateStar(); :};
 
 merge_insert ::=
   KW_INSERT LPAREN opt_ident_list:columns RPAREN KW_VALUES LPAREN select_list:operands RPAREN
   {: RESULT = new MergeInsert(columns, operands); :}
   | KW_INSERT KW_VALUES LPAREN select_list:operands RPAREN
-  {: RESULT = new MergeInsert(Collections.emptyList(), operands); :};
+  {: RESULT = new MergeInsert(Collections.emptyList(), operands); :}
+  | KW_INSERT STAR
+  {: RESULT = new MergeInsertStar(); :};
+
 
 merge_delete ::= KW_DELETE
   {: RESULT = new MergeDelete(); :};

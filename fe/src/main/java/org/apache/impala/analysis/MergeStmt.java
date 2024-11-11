@@ -176,4 +176,8 @@ public class MergeStmt extends DmlStatementBase {
     return cases_.stream().allMatch(
         mergeCase -> mergeCase.caseType().equals(TMergeCaseType.DELETE));
   }
+
+  public TableRef getSourceTableRef() {
+    return sourceTableRef_;
+  }
 }

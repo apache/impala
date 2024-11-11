@@ -32,7 +32,7 @@ import org.apache.impala.thrift.TMergeCaseType;
 import org.apache.impala.thrift.TMergeMatchType;
 
 public class MergeUpdate extends MergeCase {
-  private final List<Pair<SlotRef, Expr>> assignmentExprs_;
+  protected List<Pair<SlotRef, Expr>> assignmentExprs_;
 
   public MergeUpdate(List<Pair<SlotRef, Expr>> assignmentExprs) {
     assignmentExprs_ = assignmentExprs;
@@ -40,9 +40,10 @@ public class MergeUpdate extends MergeCase {
 
   protected MergeUpdate(List<Expr> resultExprs, List<Expr> filterExprs,
       TableName targetTableName, List<Column> targetTableColumns, TableRef targetTableRef,
-      TMergeMatchType matchType, List<Pair<SlotRef, Expr>> assignmentExprs) {
+      List<Pair<SlotRef, Expr>> assignmentExprs, TMergeMatchType matchType,
+      TableRef sourceTableRef) {
     super(resultExprs, filterExprs, targetTableName, targetTableColumns, targetTableRef,
-        matchType);
+        matchType, sourceTableRef);
     assignmentExprs_ = assignmentExprs;
   }
 
@@ -83,16 +84,16 @@ public class MergeUpdate extends MergeCase {
   @Override
   public String toSql(ToSqlOptions options) {
     String parent = super.toSql(options);
-    StringBuilder builder = new StringBuilder(parent);
-    builder.append("UPDATE SET ");
+    return parent + "UPDATE SET " + listAssignments(options);
+  }
+
+  protected String listAssignments(ToSqlOptions options) {
     StringJoiner assignmentJoiner = new StringJoiner(", ");
     for (Pair<SlotRef, Expr> entry : assignmentExprs_) {
       assignmentJoiner.add(String.format(
           "%s = %s", entry.first.toSql(options), entry.second.toSql(options)));
     }
-    builder.append(assignmentJoiner);
-
-    return builder.toString();
+    return assignmentJoiner.toString();
   }
 
   @Override
@@ -124,7 +125,7 @@ public class MergeUpdate extends MergeCase {
   @Override
   public MergeUpdate clone() {
     return new MergeUpdate(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
-        targetTableName_, targetTableColumns_, targetTableRef_, matchType_,
-        assignmentExprs_);
+        targetTableName_, targetTableColumns_, targetTableRef_, assignmentExprs_,
+        matchType_, sourceTableRef_);
   }
 }

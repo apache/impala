@@ -84,8 +84,9 @@ public class MergeInsertTest {
     try {
       mergeInsert.analyzeColumnPermutation();
     } catch (AnalysisException e) {
-      assertEquals("Column permutation mentions fewer columns (4) than the"
-              + " VALUES clause returns (5)",
+      assertEquals("Column permutation mentions fewer columns (4) than the VALUES "
+              + "clause returns (5): WHEN MATCHED THEN INSERT (a, b, c, d) VALUES"
+              + " (a, b, c, d, e)",
           e.getMessage());
       return;
     }
@@ -104,8 +105,8 @@ public class MergeInsertTest {
       mergeInsert.analyzeColumnPermutation();
     } catch (AnalysisException e) {
       assertEquals(
-          "Column permutation mentions more columns (5) than the VALUES "
-              + "clause returns (4)",
+          "Column permutation mentions more columns (5) than the VALUES clause returns"
+              + " (4): WHEN MATCHED THEN INSERT (a, b, c, d, e) VALUES (a, b, c, d)",
           e.getMessage());
       return;
     }
@@ -122,7 +123,7 @@ public class MergeInsertTest {
     MergeInsert mergeInsert = prepareMergeInsert(columnMap, columns, selectItems);
     try {
       List<Expr> exprs = mergeInsert.analyzeColumnPermutation();
-      exprs.size();
+      assertEquals(5, exprs.size());
     } catch (AnalysisException e) {
       fail();
     }
@@ -158,8 +159,8 @@ public class MergeInsertTest {
       mergeInsert.analyzeColumnPermutation();
     } catch (AnalysisException e) {
       assertEquals(
-          "Column permutation mentions fewer columns (0) than the VALUES "
-              + "clause returns (5)",
+          "Column permutation mentions fewer columns (0) than the VALUES clause returns"
+              + " (5): WHEN MATCHED THEN INSERT () VALUES (a, b, c, d, e)",
           e.getMessage());
       return;
     }

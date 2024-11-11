@@ -1998,6 +1998,9 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_merge_long(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-merge-long', vector, unique_database)
 
+  def test_merge_star(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-merge-star', vector, unique_database)
+
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it

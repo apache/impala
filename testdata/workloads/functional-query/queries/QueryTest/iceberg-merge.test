@@ -123,3 +123,19 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/target/data/delete-.*.parq','.*
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
+---- QUERY
+# Merge into unpartitioned target table from the source table
+# using not matched and insert * clause
+merge into target using source on target.id = source.id
+when not matched then insert *
+---- DML_RESULTS: target
+0,true,222,0,0,2022-12-12,'0 case 2'
+1,false,1,1.100000023841858,10,2009-01-01,'1'
+2,true,222,2.200000047683716,20,2009-01-01,'2 case 2'
+3,false,3,3.299999952316284,30,2009-01-01,'3'
+4,true,222,4.400000095367432,40,2009-01-01,'4 case 2'
+5,NULL,5,NULL,NULL,NULL,'NULL'
+6,true,6,6.599999904632568,60,2009-01-01,'6'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====

@@ -263,3 +263,41 @@ when not matched by source then update set string_col = "sixth", float_col = -68
 ---- TYPES
 INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
 ====
+---- QUERY
+# Merge into partitioned target table from the source table as
+# an inline view using an update to reset the remaining rows of the target table based on source
+merge into target_part target using (select * from source) source on target.id = source.id
+when matched then update set *
+when not matched by source then delete
+---- DML_RESULTS: target_part
+0,true,0,0,0,2009-01-01,'0'
+1,false,1,1.100000023841858,10,2009-01-01,'1'
+2,true,2,2.200000047683716,20,2009-01-01,'2'
+3,false,3,3.299999952316284,30,2009-01-01,'3'
+5,false,5,5.5,50,2009-01-01,'5'
+6,true,6,6.599999904632568,60,2009-01-01,'6'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+---- QUERY
+# Merge into partitioned target table from the source table as
+# an inline view using an insert to add a new rows by shifting the ids
+# and an update existing rows with shifted rows
+merge into target_part target using
+(select cast(id + 3 as int) id, false bool_col, int_col, float_col, decimal_col, date_col, string_col from source)
+source on target.id = source.id
+when not matched and source.id > 7 then insert *
+when matched and source.id < 4 then update set *
+---- DML_RESULTS: target_part
+0,true,0,0,0,2009-01-01,'0'
+1,false,1,1.100000023841858,10,2009-01-01,'1'
+2,true,2,2.200000047683716,20,2009-01-01,'2'
+3,false,0,0,0,2009-01-01,'0'
+5,false,5,5.5,50,2009-01-01,'5'
+6,true,6,6.599999904632568,60,2009-01-01,'6'
+8,false,5,5.5,50,2009-01-01,'5'
+9,false,6,6.599999904632568,60,2009-01-01,'6'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+====
+

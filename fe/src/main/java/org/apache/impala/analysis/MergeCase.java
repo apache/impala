@@ -41,6 +41,7 @@ public abstract class MergeCase extends StatementBase {
   protected TableName targetTableName_;
   protected List<Column> targetTableColumns_;
   protected TableRef targetTableRef_;
+  protected TableRef sourceTableRef_;
   protected TMergeMatchType matchType_;
 
   protected MergeCase() {
@@ -51,10 +52,11 @@ public abstract class MergeCase extends StatementBase {
 
   protected MergeCase(List<Expr> resultExprs, List<Expr> filterExprs,
       TableName targetTableName, List<Column> targetTableColumns,
-      TableRef targetTableRef, TMergeMatchType matchType) {
+      TableRef targetTableRef, TMergeMatchType matchType, TableRef sourceTableRef) {
     targetTableName_ = targetTableName;
     targetTableColumns_ = targetTableColumns;
     targetTableRef_ = targetTableRef;
+    sourceTableRef_ = sourceTableRef;
     resultExprs_ = resultExprs;
     filterExprs_ = filterExprs;
     matchType_ = matchType;
@@ -69,6 +71,16 @@ public abstract class MergeCase extends StatementBase {
     targetTableName_ = parent.getTargetTable().getTableName();
     targetTableColumns_ = parent.getTargetTable().getColumns();
     targetTableRef_ = parent.getTargetTableRef();
+    sourceTableRef_ = parent.getSourceTableRef();
+  }
+
+  protected List<String> getSourceColumnLabels() {
+    if (sourceTableRef_ instanceof InlineViewRef) {
+      InlineViewRef source = (InlineViewRef) sourceTableRef_;
+      return source.getColLabels();
+    } else {
+      return sourceTableRef_.getTable().getColumnNames();
+    }
   }
 
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {

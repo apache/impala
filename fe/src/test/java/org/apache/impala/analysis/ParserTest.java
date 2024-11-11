@@ -1980,7 +1980,7 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestMerge(){
+  public void TestMerge() {
     ParsesOk("merge into t using s on t.id = s.id "
         + "when matched then update set t.a = s.a");
     ParsesOk("merge into target t using source s on t.id = s.id "
@@ -2021,7 +2021,14 @@ public class ParserTest extends FrontendTestBase {
         + "then update set b = 12");
     ParsesOk("merge into t using s on t.id = s.id when not matched by source "
         + "and func(b) != func(a) then update set b = 12");
-
+    ParsesOk("merge into t using s on t.id = s.id when not matched "
+        + "then insert *");
+    ParsesOk("merge into t using s on t.id = s.id when not matched "
+        + "and i > 10 then insert *");
+    ParsesOk("merge into t using s on t.id = s.id when matched "
+        + "then update set *");
+    ParsesOk("merge into t using s on t.id = s.id when matched "
+        + "and i > 10 then update set *");
 
     ParserError("merge into t using s on t.id = s.id "
         + "when matched and t.a > s.b then delete from");
@@ -2043,6 +2050,10 @@ public class ParserTest extends FrontendTestBase {
         + "when not matched by source then insert values (1, 2, 3)");
     ParserError("merge into t using s on t.id = s.id "
         + "when not matched by source and a <> b then insert values (1, 2, 3)");
+    ParserError("merge into t using s on t.id = s.id when not matched "
+        + "and i > 10 then update *");
+    ParserError("merge into t using s on t.id = s.id when matched "
+        + "and i > 10 then insert *");
 
     // Invalid column permutation
     ParserError("merge into target t using (select * from source) s "

@@ -94,8 +94,6 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
       // * Updating partition column value with a non-constant expression
       // Therefore we are throwing an exception here because we cannot guarantee
       // that the result will be valid.
-      // TODO(IMPALA-12531): Mention the MERGE statement in the error message,
-      // as the MERGE statement should be able to do the duplicate checking.
       if (IcebergUtil.isPartitionColumn(c,
           originalTargetTable_.getDefaultPartitionSpec()) &&
           (modifyStmt_.fromClause_ != null && modifyStmt_.fromClause_.size() > 1) &&
@@ -103,7 +101,8 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
         throw new AnalysisException(
             String.format("Cannot UPDATE partitioning column '%s' via UPDATE FROM " +
                 "statement with multiple table refs, and when right-hand side '%s' is " +
-                "non-constant. ", lhsSlotRef.toSql(), rhsExpr.toSql()));
+                "non-constant. Use a MERGE statement instead.", lhsSlotRef.toSql(),
+                rhsExpr.toSql()));
       }
       DmlStatementBase.checkLhsOnlyAppearsOnce(colToExprs, c, lhsSlotRef, rhsExpr);
       colToExprs.put(c.getPosition(), rhsExpr);

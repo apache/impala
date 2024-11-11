@@ -1,0 +1,56 @@
+====
+---- QUERY
+# Table creation and initial data loading
+create table target(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  stored as iceberg tblproperties("format-version"="2");
+
+create table source(count int, registered boolean, numbers int, average_count float,
+    min_count decimal(20,0), insertion_date date, description string)
+  stored as iceberg tblproperties("format-version"="2");
+
+insert into source select id, bool_col, int_col,
+  float_col, cast(bigint_col as decimal(20,0)), to_date(timestamp_col),
+  string_col from functional.alltypes order by id limit 7;
+
+====
+---- QUERY
+# Merge into unpartitioned target table from the source table
+# using when not matched insert * clause where the column names are different
+merge into target using source on target.id = source.count
+when not matched then insert *
+---- DML_RESULTS: target
+0,true,0,0.0,0,2009-01-01,'0'
+1,false,1,1.10000002384,10,2009-01-01,'1'
+2,true,2,2.20000004768,20,2009-01-01,'2'
+3,false,3,3.29999995232,30,2009-01-01,'3'
+4,true,4,4.40000009537,40,2009-01-01,'4'
+5,false,5,5.5,50,2009-01-01,'5'
+6,true,6,6.59999990463,60,2009-01-01,'6'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 7
+NumDeletedRows: 0
+====
+---- QUERY
+# Merge into unpartitioned target table from the source table in an inline view
+# using when matched update set * clause where the column names are different
+merge into target using
+(select count, false registered, 123 fixed_numbers, 999.0, 78900000 , insertion_date, "something different" from source)source on target.id = source.count
+when matched then update set *
+---- DML_RESULTS: target
+0,false,123,999,78900000,2009-01-01,'something different'
+1,false,123,999,78900000,2009-01-01,'something different'
+2,false,123,999,78900000,2009-01-01,'something different'
+3,false,123,999,78900000,2009-01-01,'something different'
+4,false,123,999,78900000,2009-01-01,'something different'
+5,false,123,999,78900000,2009-01-01,'something different'
+6,false,123,999,78900000,2009-01-01,'something different'
+---- TYPES
+INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 7
+NumDeletedRows: 7
+====
+
