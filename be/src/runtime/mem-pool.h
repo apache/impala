@@ -35,6 +35,39 @@ namespace impala {
 
 class MemTracker;
 
+/// Similar to SummaryStatsCounter without thread-safe support so don't need
+/// to acquire locks.
+struct SummaryStats {
+  /// The total number of values seen so far.
+  int32_t total_num_values_ = 0;
+
+  /// Summary statistics of values seen so far.
+  int64_t min_ = INT64_MAX;
+  int64_t max_ = INT64_MIN;
+  int64_t sum_ = 0;
+
+  void UpdateCounter(int64_t new_value) {
+    ++total_num_values_;
+    sum_ += new_value;
+    if (new_value < min_) min_ = new_value;
+    if (new_value > max_) max_ = new_value;
+  }
+};
+
+struct MemPoolCounters {
+  /// Stats of duration in malloc()
+  SummaryStats sys_alloc_duration;
+
+  /// Stats of duration in free()
+  SummaryStats sys_free_duration;
+
+  /// Stats of allocated bytes in malloc()
+  SummaryStats allocated_bytes;
+
+  /// Stats of freed bytes in free()
+  SummaryStats freed_bytes;
+};
+
 /// A MemPool maintains a list of memory chunks from which it allocates memory in
 /// response to Allocate() calls;
 /// Chunks stay around for the lifetime of the mempool or until they are passed on to
@@ -181,6 +214,8 @@ class MemPool {
   /// Return sum of chunk_sizes_.
   int64_t GetTotalChunkSizes() const;
 
+  MemPoolCounters GetMemPoolCounters() const { return counters_; }
+
   /// TODO: make a macro for doing this
   /// For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
@@ -245,6 +280,8 @@ class MemPool {
   /// If set to true, all chunk sizes allocated will be rounded up to the next power of
   /// two.
   const bool enforce_binary_chunk_sizes_;
+
+  MemPoolCounters counters_;
 
   /// Find or allocated a chunk with at least min_size spare capacity and update
   /// current_chunk_idx_. Also updates chunks_, chunk_sizes_ and allocated_bytes_

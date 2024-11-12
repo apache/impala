@@ -45,6 +45,7 @@ class TestUtils(BaseTestSuite):
     runtime_profile = "- ExampleCounter: (Avg: 8.00 KB (8192) ; " \
                       "Min: 6.00 KB (6144) ; " \
                       "Max: 10.00 KB (10240) ; " \
+                      "Sum: 32 KB (32768) ; " \
                       "Number of samples: 4)"
     summary_stats = get_bytes_summary_stats_counter("ExampleCounter",
                                                     runtime_profile)

@@ -241,6 +241,8 @@ class RowBatch {
   MemPool* tuple_data_pool() { return &tuple_data_pool_; }
   int num_buffers() const { return buffers_.size(); }
 
+  MemPoolCounters GetMemPoolCounters() { return tuple_data_pool_.GetMemPoolCounters(); }
+
   /// Resets the row batch, returning all resources it has accumulated.
   void Reset();
 

@@ -23,6 +23,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/scratch-tuple-batch.h"
+#include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"
 #include "runtime/io/disk-io-mgr.h"
@@ -67,6 +68,20 @@ PROFILE_DEFINE_COUNTER(IoReadSkippedBytes, DEBUG, TUnit::BYTES,
 PROFILE_DEFINE_COUNTER(NumFileMetadataRead, DEBUG, TUnit::UNIT,
     "The total number of file metadata reads done in place of rows or row groups / "
     "stripe iteration.");
+PROFILE_DEFINE_SUMMARY_STATS_TIMER(ScratchBatchMemAllocDuration, DEBUG,
+    "Stats of time spent in malloc() used by MemPools of the scratch batch. These are "
+    "part of MaterializeTupleTime. If the sum accounts for a significant portion of it, "
+    "tuple materialization is dominated by memory allocation time.");
+PROFILE_DEFINE_SUMMARY_STATS_TIMER(ScratchBatchMemFreeDuration, DEBUG,
+    "Stats of time spent in free() used by MemPools of the scratch batch. Same as "
+    "ScratchBatchMemAllocDuration, these are part of MaterializeTupleTime.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ScratchBatchMemAllocBytes, DEBUG, TUnit::BYTES,
+    "Stats of bytes allocated by MemPools of the scratch batch.");
+PROFILE_DEFINE_TIMER(MaterializeCollectionGetMemTime, UNSTABLE, "Wall clock time spent "
+    "in getting/allocating collection memory, including the memcpy duration when doubling"
+    "the tuple buffer. It's part of the time spent in materializing collections. Thus "
+    "it's also part of MaterializeTupleTime. The memory allocation time in materializing"
+    " collections is also tracked in ScratchBatchMemAllocDuration.");
 
 const char* HdfsColumnarScanner::LLVM_CLASS_NAME = "class.impala::HdfsColumnarScanner";
 
@@ -104,6 +119,14 @@ Status HdfsColumnarScanner::Open(ScannerContext* context) {
   io_total_bytes_ = PROFILE_IoReadTotalBytes.Instantiate(profile);
   io_skipped_bytes_ = PROFILE_IoReadSkippedBytes.Instantiate(profile);
   num_file_metadata_read_ = PROFILE_NumFileMetadataRead.Instantiate(profile);
+  scratch_mem_alloc_duration_ = PROFILE_ScratchBatchMemAllocDuration.Instantiate(profile);
+  scratch_mem_free_duration_ = PROFILE_ScratchBatchMemFreeDuration.Instantiate(profile);
+  scratch_mem_alloc_bytes_ = PROFILE_ScratchBatchMemAllocBytes.Instantiate(profile);
+  // Only add this counter when there are array/map slots.
+  if (!scan_node_->tuple_desc()->collection_slots().empty()) {
+    get_collection_mem_timer_ =
+        PROFILE_MaterializeCollectionGetMemTime.Instantiate(profile);
+  }
   return Status::OK();
 }
 
@@ -316,5 +339,32 @@ void HdfsColumnarScanner::AddAsyncReadBytesCounter(int64_t total_bytes) {
 
 void HdfsColumnarScanner::AddSkippedReadBytesCounter(int64_t total_bytes) {
   io_skipped_bytes_->Add(total_bytes);
+}
+
+void HdfsColumnarScanner::CloseInternal() {
+  // Only aggregate the counters at the end to reduce the contention between scanner
+  // threads.
+  MemPoolCounters counters = scratch_batch_->tuple_mem_pool.GetMemPoolCounters();
+  scratch_mem_alloc_duration_->Merge(counters.sys_alloc_duration);
+  scratch_mem_free_duration_->Merge(counters.sys_free_duration);
+  scratch_mem_alloc_bytes_->Merge(counters.allocated_bytes);
+  // Merge counters of aux_mem_pool
+  counters = scratch_batch_->aux_mem_pool.GetMemPoolCounters();
+  scratch_mem_alloc_duration_->Merge(counters.sys_alloc_duration);
+  scratch_mem_free_duration_->Merge(counters.sys_free_duration);
+  scratch_mem_alloc_bytes_->Merge(counters.allocated_bytes);
+  HdfsScanner::CloseInternal();
+}
+
+Status HdfsColumnarScanner::GetCollectionMemory(CollectionValueBuilder* builder,
+    MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows) {
+  SCOPED_TIMER(get_collection_mem_timer_);
+  int num_tuples;
+  *pool = builder->pool();
+  RETURN_IF_ERROR(builder->GetFreeMemory(tuple_mem, &num_tuples));
+  // Treat tuple as a single-tuple row
+  *tuple_row_mem = reinterpret_cast<TupleRow*>(tuple_mem);
+  *num_rows = num_tuples;
+  return Status::OK();
 }
 }

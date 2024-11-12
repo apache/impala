@@ -28,7 +28,6 @@
 #include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "runtime/collection-value-builder.h"
 #include "runtime/fragment-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-filter.inline.h"
@@ -211,17 +210,6 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
   VLOG(2) << scanner_name << "(node_id=" << scan_node_->id()
           << ") using llvm codegend functions.";
   scan_node_->IncNumScannersCodegenEnabled();
-  return Status::OK();
-}
-
-Status HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
-    Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows) {
-  int num_tuples;
-  *pool = builder->pool();
-  RETURN_IF_ERROR(builder->GetFreeMemory(tuple_mem, &num_tuples));
-  // Treat tuple as a single-tuple row
-  *tuple_row_mem = reinterpret_cast<TupleRow*>(tuple_mem);
-  *num_rows = num_tuples;
   return Status::OK();
 }
 

@@ -23,6 +23,7 @@
 
 namespace impala {
 
+class CollectionValueBuilder;
 class HdfsScanNodeBase;
 class HdfsScanPlanNode;
 class RowBatch;
@@ -37,6 +38,8 @@ class HdfsColumnarScanner : public HdfsScanner {
   virtual ~HdfsColumnarScanner();
 
   virtual Status Open(ScannerContext* context) override WARN_UNUSED_RESULT;
+
+  virtual void CloseInternal() override;
 
   /// Codegen ProcessScratchBatch(). Stores the resulting function in
   /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
@@ -118,6 +121,17 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// in ExecEnv.
   static int64_t ComputeIdealReservation(const ColumnRangeLengths& col_range_lengths);
 
+  /// Gets memory for outputting tuples into the CollectionValue being constructed via
+  /// 'builder'. If memory limit is exceeded, an error status is returned. Otherwise,
+  /// returns the maximum number of tuples that can be output in 'num_rows'.
+  ///
+  /// The returned TupleRow* should not be incremented (i.e. don't call next_row() on
+  /// it). Instead, incrementing *tuple_mem will update *tuple_row_mem to be pointing at
+  /// the next tuple. This also means its unnecessary to call
+  /// (*tuple_row_mem)->SetTuple().
+  Status GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
+      Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows) WARN_UNUSED_RESULT;
+
   /// Number of columns that need to be read.
   RuntimeProfile::Counter* num_cols_counter_;
 
@@ -151,6 +165,14 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// row groups / stripes.
   RuntimeProfile::Counter* num_file_metadata_read_;
 
+  /// MemPool counters for the scratch batch
+  RuntimeProfile::SummaryStatsCounter* scratch_mem_alloc_duration_;
+  RuntimeProfile::SummaryStatsCounter* scratch_mem_free_duration_;
+  RuntimeProfile::SummaryStatsCounter* scratch_mem_alloc_bytes_;
+
+  /// Time spent in allocating collection memory and copying memory in doubling
+  /// the tuple buffer
+  RuntimeProfile::Counter* get_collection_mem_timer_ = nullptr;
  private:
   int ProcessScratchBatchCodegenOrInterpret(RowBatch* dst_batch);
 };

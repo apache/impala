@@ -597,7 +597,7 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
         Enqueue:
            - BytesReceived[0] (500.000ms): 0, 0, 0
            - DeferredQueueSize[0] (500.000ms): 0, 0, 0
-           - DispatchTime: (Avg: 85.578us ; Min: 29.095us ; Max: 738.280us ; Number of samples: 192)
+           - DispatchTime: (Avg: 85.578us ; Min: 29.095us ; Max: 738.280us ; Sum: 16.431ms ; Number of samples: 192)
            - DeserializeRowBatchTime: 3.977ms
            - InactiveTotalTime: 0.000ns
            - TotalBatchesEnqueued: 192 (192)
@@ -732,8 +732,8 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
         ExecOption[0-11]: Unpartitioned Sender Codegen Disabled: not needed
          - BytesSent[0] (500.000ms): 0, 0, 0
          - NetworkThroughput: (Avg: 293.70 KB/sec ; Min: 22.32 KB/sec ; Max: 1.40 MB/sec ; Number of samples: 192)
-         - RpcNetworkTime: (Avg: 807.928us ; Min: 113.656us ; Max: 3.404ms ; Number of samples: 204)
-         - RpcRecvrTime: (Avg: 111.588us ; Min: 28.393us ; Max: 777.779us ; Number of samples: 204)
+         - RpcNetworkTime: (Avg: 807.928us ; Min: 113.656us ; Max: 3.404ms ; Sum: 164.817ms ; Number of samples: 204)
+         - RpcRecvrTime: (Avg: 111.588us ; Min: 28.393us ; Max: 777.779us ; Sum: 22.764ms ; Number of samples: 204)
          - EosSent: mean=1 (1) min=1 (1) max=1 (1)
          - InactiveTotalTime: mean=14.875ms min=11.322ms max=18.352ms
          - PeakMemoryUsage: mean=9.84 KB (10080) min=9.84 KB (10080) max=9.84 KB (10080)
@@ -997,7 +997,7 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
         Enqueue [12 instances]:
            - BytesReceived[0] (500.000ms): 0, 0, 1.62 KB
            - DeferredQueueSize[0] (500.000ms): 0, 0, 0
-           - DispatchTime: (Avg: 257.144us ; Min: 26.992us ; Max: 3.948ms ; Number of samples: 144)
+           - DispatchTime: (Avg: 257.144us ; Min: 26.992us ; Max: 3.948ms ; Sum: 37.028ms ; Number of samples: 144)
            - DeserializeRowBatchTime: mean=264.636us min=241.086us max=300.026us
            - InactiveTotalTime: mean=0.000ns min=0.000ns max=0.000ns
            - TotalBatchesEnqueued: mean=12 (12) min=12 (12) max=12 (12)
@@ -1144,8 +1144,8 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
         ExecOption[0-11]: Hash Partitioned Sender Codegen Enabled
          - BytesSent[0] (500.000ms): 0, 0
          - NetworkThroughput: (Avg: 127.46 KB/sec ; Min: 4.74 KB/sec ; Max: 748.06 KB/sec ; Number of samples: 144)
-         - RpcNetworkTime: (Avg: 2.391ms ; Min: 203.041us ; Max: 19.273ms ; Number of samples: 288)
-         - RpcRecvrTime: (Avg: 225.821us ; Min: 27.480us ; Max: 3.984ms ; Number of samples: 288)
+         - RpcNetworkTime: (Avg: 2.391ms ; Min: 203.041us ; Max: 19.273ms ; Sum: 688.640ms ; Number of samples: 288)
+         - RpcRecvrTime: (Avg: 225.821us ; Min: 27.480us ; Max: 3.984ms ; Sum: 65.036ms ; Number of samples: 288)
          - EosSent: mean=12 (12) min=12 (12) max=12 (12)
          - InactiveTotalTime: mean=9.808ms min=3.492ms max=20.842ms
          - PeakMemoryUsage: mean=166.12 KB (170112) min=166.12 KB (170112) max=166.12 KB (170112)
@@ -1397,14 +1397,14 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
            - First Batch Returned: 237.374ms (106.703ms)
            - Last Batch Returned: 1s176ms (939.430ms)
            - Closed: 1s176ms (121.753us)
-         - FooterProcessingTime: (Avg: 5.955ms ; Min: 1.208ms ; Max: 110.662ms ; Number of samples: 1824)
-         - InitialRangeActualReservation: (Avg: 128.00 KB (131072) ; Min: 128.00 KB (131072) ; Max: 128.00 KB (131072) ; Number of samples: 1824)
-         - InitialRangeIdealReservation: (Avg: 112.28 KB (114975) ; Min: 64.00 KB (65536) ; Max: 128.00 KB (131072) ; Number of samples: 1824)
+         - FooterProcessingTime: (Avg: 5.955ms ; Min: 1.208ms ; Max: 110.662ms ; Sum: 10s862ms ; Number of samples: 1824)
+         - InitialRangeActualReservation: (Avg: 128.00 KB (131072) ; Min: 128.00 KB (131072) ; Max: 128.00 KB (131072) ; Sum: 228.00 MB (239075328) ; Number of samples: 1824)
+         - InitialRangeIdealReservation: (Avg: 112.28 KB (114975) ; Min: 64.00 KB (65536) ; Max: 128.00 KB (131072) ; Sum: 200.00 MB (209715200) ; Number of samples: 1824)
          - PageIndexProcessingTime: 0.000ns (Number of samples: 0)
          - ParquetCompressedBytesReadPerColumn: 0 (Number of samples: 0)
          - ParquetCompressedPageSize: 0 (Number of samples: 0)
-         - ParquetRowGroupActualReservation: (Avg: 128.00 KB (131072) ; Min: 128.00 KB (131072) ; Max: 128.00 KB (131072) ; Number of samples: 1824)
-         - ParquetRowGroupIdealReservation: (Avg: 0 ; Min: 0 ; Max: 0 ; Number of samples: 1824)
+         - ParquetRowGroupActualReservation: (Avg: 128.00 KB (131072) ; Min: 128.00 KB (131072) ; Max: 128.00 KB (131072) ; Sum: 228.00 MB (239075328) ; Number of samples: 1824)
+         - ParquetRowGroupIdealReservation: (Avg: 0 ; Min: 0 ; Max: 0 ; Sum: 0 ; Number of samples: 1824)
          - ParquetUncompressedBytesReadPerColumn: 0 (Number of samples: 0)
          - ParquetUncompressedPageSize: 0 (Number of samples: 0)
          - AverageHdfsReadThreadConcurrency: mean=0.67 min=0.50 max=1.00
@@ -1993,7 +1993,7 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
         Enqueue:
            - BytesReceived[0] (500.000ms): 0, 0, 0, 0, 0, 0, 0, 0, 0
            - DeferredQueueSize[0] (500.000ms): 0, 0, 0, 0, 0, 0, 0, 0, 0
-           - DispatchTime: (Avg: 62.664us ; Min: 37.152us ; Max: 81.138us ; Number of samples: 12)
+           - DispatchTime: (Avg: 62.664us ; Min: 37.152us ; Max: 81.138us ; Sum: 751.970us ; Number of samples: 12)
            - DeserializeRowBatchTime: 557.808us
            - InactiveTotalTime: 0.000ns
            - TotalBatchesEnqueued: 12 (12)
@@ -2140,8 +2140,8 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
         ExecOption[0-11]: Unpartitioned Sender Codegen Disabled: not needed
          - BytesSent[0] (500.000ms): 0, 0, 0, 0, 0, 0, 0, 0, 0
          - NetworkThroughput: (Avg: 53.21 MB/sec ; Min: 8.33 MB/sec ; Max: 76.41 MB/sec ; Number of samples: 12)
-         - RpcNetworkTime: (Avg: 264.769us ; Min: 106.362us ; Max: 1.706ms ; Number of samples: 24)
-         - RpcRecvrTime: (Avg: 85.190us ; Min: 31.436us ; Max: 145.534us ; Number of samples: 24)
+         - RpcNetworkTime: (Avg: 264.769us ; Min: 106.362us ; Max: 1.706ms ; Sum: 6.354ms ; Number of samples: 24)
+         - RpcRecvrTime: (Avg: 85.190us ; Min: 31.436us ; Max: 145.534us ; Sum: 2.044ms ; Number of samples: 24)
          - EosSent: mean=1 (1) min=1 (1) max=1 (1)
          - InactiveTotalTime: mean=503.701us min=1.186us max=1.773ms
          - PeakMemoryUsage: mean=8.00 B (8) min=8.00 B (8) max=8.00 B (8)
@@ -2357,16 +2357,16 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
            - First Batch Returned: 413.791ms (39.338ms)
            - Last Batch Returned: 4s361ms (3s947ms)
            - Closed: 4s361ms (107.905us)
-         - FooterProcessingTime: (Avg: 1.661ms ; Min: 144.950us ; Max: 35.064ms ; Number of samples: 1824)
-         - InitialRangeActualReservation: (Avg: 8.01 MB (8403339) ; Min: 8.00 MB (8388608) ; Max: 8.31 MB (8716288) ; Number of samples: 1824)
-         - InitialRangeIdealReservation: (Avg: 112.28 KB (114975) ; Min: 64.00 KB (65536) ; Max: 128.00 KB (131072) ; Number of samples: 1824)
+         - FooterProcessingTime: (Avg: 1.661ms ; Min: 144.950us ; Max: 35.064ms ; Sum: 3s030ms ; Number of samples: 1824)
+         - InitialRangeActualReservation: (Avg: 8.01 MB (8403339) ; Min: 8.00 MB (8388608) ; Max: 8.31 MB (8716288) ; Sum: 14.28 GB (15327690752) ; Number of samples: 1824)
+         - InitialRangeIdealReservation: (Avg: 112.28 KB (114975) ; Min: 64.00 KB (65536) ; Max: 128.00 KB (131072) ; Sum: 200.00 MB (209715200) ; Number of samples: 1824)
          - PageIndexProcessingTime: 0.000ns (Number of samples: 0)
-         - ParquetCompressedBytesReadPerColumn: (Avg: 249.59 KB (255579) ; Min: 75.88 KB (77698) ; Max: 519.11 KB (531566) ; Number of samples: 264)
-         - ParquetCompressedPageSize: (Avg: 1.64 KB (1679) ; Min: 162.00 B (162) ; Max: 78.28 KB (80161) ; Number of samples: 40174)
-         - ParquetRowGroupActualReservation: (Avg: 8.01 MB (8403518) ; Min: 8.00 MB (8388608) ; Max: 8.31 MB (8716288) ; Number of samples: 1824)
-         - ParquetRowGroupIdealReservation: (Avg: 224.81 KB (230202) ; Min: 176.00 KB (180224) ; Max: 8.31 MB (8716288) ; Number of samples: 1824)
-         - ParquetUncompressedBytesReadPerColumn: (Avg: 266.14 KB (272531) ; Min: 76.53 KB (78365) ; Max: 851.95 KB (872392) ; Number of samples: 264)
-         - ParquetUncompressedPageSize: (Avg: 1.75 KB (1790) ; Min: 158.00 B (158) ; Max: 78.27 KB (80152) ; Number of samples: 40174)
+         - ParquetCompressedBytesReadPerColumn: (Avg: 249.59 KB (255579) ; Min: 75.88 KB (77698) ; Max: 519.11 KB (531566) ; Sum: 64.35 MB (67472989) ; Number of samples: 264)
+         - ParquetCompressedPageSize: (Avg: 1.64 KB (1679) ; Min: 162.00 B (162) ; Max: 78.28 KB (80161) ; Sum: 64.35 MB (67472989) ; Number of samples: 40174)
+         - ParquetRowGroupActualReservation: (Avg: 8.01 MB (8403518) ; Min: 8.00 MB (8388608) ; Max: 8.31 MB (8716288) ; Sum: 14.28 GB (15328018432) ; Number of samples: 1824)
+         - ParquetRowGroupIdealReservation: (Avg: 224.81 KB (230202) ; Min: 176.00 KB (180224) ; Max: 8.31 MB (8716288) ; Sum: 400.44 MB (419889152) ; Number of samples: 1824)
+         - ParquetUncompressedBytesReadPerColumn: (Avg: 266.14 KB (272531) ; Min: 76.53 KB (78365) ; Max: 851.95 KB (872392) ; Sum: 68.62 MB (71948323) ; Number of samples: 264)
+         - ParquetUncompressedPageSize: (Avg: 1.75 KB (1790) ; Min: 158.00 B (158) ; Max: 78.27 KB (80152) ; Sum: 68.62 MB (71948323) ; Number of samples: 40174)
          - AverageHdfsReadThreadConcurrency: mean=0.08 min=0.00 max=1.25
          - BytesRead: mean=27.44 MB (28775477) min=25.82 MB (27069397) max=30.47 MB (31949790)
          - BytesReadDataNodeCache: mean=0 min=0 max=0

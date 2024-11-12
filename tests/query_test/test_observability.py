@@ -1034,6 +1034,46 @@ class TestObservability(ImpalaTestSuite):
     num_samples = int(samples_search.group(1))
     assert num_samples > 0
 
+  def test_query_profile_contains_row_batch_mem_counter(self):
+    """Test that counter for RowBatch/ScratchTupleBatch memory operations appears in the
+    profile"""
+    common_keys = [
+      "RowBatchMemPoolAllocDuration",
+      "RowBatchMemPoolAllocBytes",
+      "RowBatchMemPoolFreeDuration",
+      "RowBatchMemPoolFreeBytes",
+      "ScratchBatchMemAllocDuration",
+      "ScratchBatchMemAllocBytes",
+      "ScratchBatchMemFreeDuration",
+      "ParquetDataPagePoolAllocBytes",
+      "ParquetDataPagePoolAllocDuration",
+      "ParquetDataPagePoolFreeBytes",
+      "ParquetDataPagePoolFreeDuration",
+      "TotalThreadsMajorPageFaults",
+      "TotalThreadsMinorPageFaults",
+    ]
+    unnest_query = "select id, unnest(arr1) from functional_parquet.complextypes_arrays"
+    result = self.execute_query(unnest_query)
+    assert "MaterializeCollectionGetMemTime" in result.runtime_profile
+    for k in common_keys:
+      assert k in result.runtime_profile, k + " not found in profile:\n"\
+                                          + result.runtime_profile
+
+    no_array_query = "select id from functional_parquet.complextypes_arrays"
+    result = self.execute_query(no_array_query)
+    assert "MaterializeCollectionGetMemTime" not in result.runtime_profile
+    for k in common_keys:
+      assert k in result.runtime_profile, k + " not found in profile:\n"\
+                                          + result.runtime_profile
+
+    no_collection_slot_query = """select pos, item
+        from functional_parquet.complextypes_arrays.arr1"""
+    result = self.execute_query(no_collection_slot_query)
+    assert "MaterializeCollectionGetMemTime" not in result.runtime_profile
+    for k in common_keys:
+      assert k in result.runtime_profile, k + " not found in profile:\n"\
+                                          + result.runtime_profile
+
 
 class TestQueryStates(ImpalaTestSuite):
   """Test that the 'Query State' and 'Impala Query State' are set correctly in the

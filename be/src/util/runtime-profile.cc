@@ -82,6 +82,8 @@ static const string THREAD_USER_TIME = "UserTime";
 static const string THREAD_SYS_TIME = "SysTime";
 static const string THREAD_VOLUNTARY_CONTEXT_SWITCHES = "VoluntaryContextSwitches";
 static const string THREAD_INVOLUNTARY_CONTEXT_SWITCHES = "InvoluntaryContextSwitches";
+static const string THREAD_MINOR_PAGE_FAULTS = "MinorPageFaults";
+static const string THREAD_MAJOR_PAGE_FAULTS = "MajorPageFaults";
 
 // The root counter name for all top level counters.
 static const string ROOT_COUNTER = "";
@@ -1213,6 +1215,10 @@ RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
       AddCounter(prefix + THREAD_VOLUNTARY_CONTEXT_SWITCHES, TUnit::UNIT);
   counter->involuntary_context_switches_ =
       AddCounter(prefix + THREAD_INVOLUNTARY_CONTEXT_SWITCHES, TUnit::UNIT);
+  counter->minor_page_faults_ =
+      AddCounter(prefix + THREAD_MINOR_PAGE_FAULTS, TUnit::UNIT);
+  counter->major_page_faults_ =
+      AddCounter(prefix + THREAD_MAJOR_PAGE_FAULTS, TUnit::UNIT);
   return counter;
 }
 
@@ -2544,6 +2550,15 @@ void RuntimeProfileBase::SummaryStatsCounter::Merge(const SummaryStatsCounter& o
   value_.Store(total_num_values_ == 0 ? 0 : sum_ / total_num_values_);
 }
 
+void RuntimeProfileBase::SummaryStatsCounter::Merge(const SummaryStats& other) {
+  lock_guard<SpinLock> l(lock_);
+  total_num_values_ += other.total_num_values_;
+  min_ = min(min_, other.min_);
+  max_ = max(max_, other.max_);
+  sum_ += other.sum_;
+  value_.Store(total_num_values_ == 0 ? 0 : sum_ / total_num_values_);
+}
+
 int64_t RuntimeProfileBase::SummaryStatsCounter::MinValue() {
   lock_guard<SpinLock> l(lock_);
   return min_;
@@ -2571,8 +2586,13 @@ void RuntimeProfileBase::SummaryStatsCounter::PrettyPrint(
   } else {
     stream << "(Avg: " << PrettyPrinter::Print(value_.Load(), unit_, true)
            << " ; Min: " << PrettyPrinter::Print(min_, unit_, true)
-           << " ; Max: " << PrettyPrinter::Print(max_, unit_, true)
-           << " ; Number of samples: " << total_num_values_ << ")";
+           << " ; Max: " << PrettyPrinter::Print(max_, unit_, true);
+    // Don't print the sum if it's meaningless.
+    if (unit_ != TUnit::UNIT_PER_SECOND && unit_ != TUnit::BYTES_PER_SECOND
+        && unit_ != TUnit::BASIS_POINTS) {
+      stream << " ; Sum: " << PrettyPrinter::Print(sum_, unit_, true);
+    }
+    stream << " ; Number of samples: " << total_num_values_ << ")";
   }
   stream << endl;
 }

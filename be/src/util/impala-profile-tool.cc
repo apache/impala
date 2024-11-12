@@ -25,6 +25,7 @@
 #include <gflags/gflags.h>
 
 #include "common/object-pool.h"
+#include "util/os-info.h"
 #include "util/runtime-profile.h"
 
 #include "common/names.h"
@@ -95,6 +96,9 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Init OsInfo for StopWatch used in MemPool.
+  // TODO: try using a fake MemPool that invokes malloc/free directly.
+  OsInfo::Init();
   if (profile_format == "prettyjson") cout << "[\n";
   int errors = 0;
   int profiles_emitted = 0;

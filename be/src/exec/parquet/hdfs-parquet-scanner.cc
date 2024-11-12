@@ -65,6 +65,17 @@ using namespace impala::io;
 
 namespace impala {
 
+PROFILE_DEFINE_SUMMARY_STATS_TIMER(ParquetDataPagePoolAllocDuration, DEBUG,
+    "Stats of time spent in malloc() for reading/decompressing Parquet data pages. These "
+    "are part of DecompressionTime.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ParquetDataPagePoolAllocBytes, DEBUG, TUnit::BYTES,
+    "Stats of bytes allocated by malloc() for reading/decompressing Parquet data pages.");
+PROFILE_DEFINE_SUMMARY_STATS_TIMER(ParquetDataPagePoolFreeDuration, DEBUG,
+    "Stats of time spent in free() for reading/decompressing Parquet data pages. "
+    "Not part of DecompressionTime.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ParquetDataPagePoolFreeBytes, DEBUG, TUnit::BYTES,
+    "Stats of bytes released by free() for reading/decompressing Parquet data pages.");
+
 // Max entries in the dictionary before switching to PLAIN encoding. If a dictionary
 // has fewer entries, then the entire column is dictionary encoded. This threshold
 // is guaranteed to be true for Impala versions 2.9 or below.
@@ -152,7 +163,14 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       scan_node_->runtime_profile(), "ParquetUncompressedPageSize", TUnit::BYTES);
   process_page_index_stats_ =
       ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "PageIndexProcessingTime");
-
+  parquet_data_page_pool_alloc_duration_ =
+      PROFILE_ParquetDataPagePoolAllocDuration.Instantiate(scan_node_->runtime_profile());
+  parquet_data_page_pool_alloc_bytes_ =
+      PROFILE_ParquetDataPagePoolAllocBytes.Instantiate(scan_node_->runtime_profile());
+  parquet_data_page_pool_free_duration_ =
+      PROFILE_ParquetDataPagePoolFreeDuration.Instantiate(scan_node_->runtime_profile());
+  parquet_data_page_pool_free_bytes_ =
+      PROFILE_ParquetDataPagePoolFreeBytes.Instantiate(scan_node_->runtime_profile());
   codegend_process_scratch_batch_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET);
   if (codegend_process_scratch_batch_fn_ == nullptr) {
     scan_node_->IncNumScannersCodegenDisabled();
@@ -323,6 +341,11 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
     }
     BaseScalarColumnReader* scalar_reader = static_cast<BaseScalarColumnReader*>(reader);
     compression_types.push_back(scalar_reader->codec());
+    MemPoolCounters counters = scalar_reader->GetDataPagePoolCounters();
+    parquet_data_page_pool_alloc_duration_->Merge(counters.sys_alloc_duration);
+    parquet_data_page_pool_alloc_bytes_->Merge(counters.allocated_bytes);
+    parquet_data_page_pool_free_duration_->Merge(counters.sys_free_duration);
+    parquet_data_page_pool_free_bytes_->Merge(counters.freed_bytes);
   }
   assemble_rows_timer_.Stop();
   assemble_rows_timer_.ReleaseCounter();

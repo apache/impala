@@ -193,6 +193,7 @@ def get_bytes_summary_stats_counter(counter_name, runtime_profile):
        runtime_profile = "- ExampleCounter: (Avg: 8.00 KB (8192) ; " \
                                             "Min: 8.00 KB (8192) ; " \
                                             "Max: 8.00 KB (8192) ; " \
+                                            "Max: 32.00 KB (32768) ; " \
                                             "Number of samples: 4)"
        summary_stats = get_bytes_summary_stats_counter("ExampleCounter",
                                                       runtime_profile)
@@ -209,6 +210,7 @@ def get_bytes_summary_stats_counter(counter_name, runtime_profile):
     Avg:[^\(]*\((?P<avg>[0-9]+)\)\s;\s # Matches Avg: [?].[?] [?]B (?)
     Min:[^\(]*\((?P<min>[0-9]+)\)\s;\s # Matches Min: [?].[?] [?]B (?)
     Max:[^\(]*\((?P<max>[0-9]+)\)\s;\s # Matches Max: [?].[?] [?]B (?)
+    Sum:[^\(]*\((?P<sum>[0-9]+)\)\s;\s # Matches Sum: [?].[?] [?]B (?)
     Number\sof\ssamples:\s(?P<samples>[0-9]+)\) # Matches Number of samples: ?)""",
                                   re.VERBOSE)
 
@@ -227,8 +229,8 @@ def get_bytes_summary_stats_counter(counter_name, runtime_profile):
     else:
       summary_stat = summary_stat.groupdict()
       num_samples = int(summary_stat['samples'])
-      summary_stats.append(TSummaryStatsCounter(sum=num_samples *
-          int(summary_stat['avg']), total_num_values=num_samples,
+      summary_stats.append(TSummaryStatsCounter(
+          sum=int(summary_stat['sum']), total_num_values=num_samples,
           min_value=int(summary_stat['min']), max_value=int(summary_stat['max'])))
 
   return summary_stats

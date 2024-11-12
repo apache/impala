@@ -145,6 +145,10 @@ class ParquetColumnChunkReader {
   /// function call that advances the buffer.
   Status ReadDataPageData(DataPageInfo* page_info);
 
+  [[nodiscard]] MemPoolCounters GetMemPoolCounters() const {
+    return data_page_pool_->GetMemPoolCounters();
+  }
+
  private:
   HdfsParquetScanner* parent_;
   std::string schema_name_;

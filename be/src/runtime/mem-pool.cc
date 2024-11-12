@@ -54,12 +54,10 @@ MemPool::ChunkInfo::ChunkInfo(int64_t size, uint8_t* buf)
 }
 
 MemPool::~MemPool() {
-  int64_t total_bytes_released = 0;
-  for (size_t i = 0; i < chunks_.size(); ++i) {
-    total_bytes_released += chunks_[i].size;
-    free(chunks_[i].data);
+  for (auto& chunk : chunks_) {
+    free(chunk.data);
   }
-
+  // No need to update counters since chunks_ is expected to be empty here.
   DCHECK(chunks_.empty()) << "Must call FreeAll() or AcquireData() for this pool";
   DCHECK_EQ(zero_length_region_, MEM_POOL_POISON);
 }
@@ -78,9 +76,13 @@ void MemPool::Clear() {
 void MemPool::FreeAll() {
   DFAKE_SCOPED_LOCK(mutex_);
   int64_t total_bytes_released = 0;
+  MonotonicStopWatch sw;
+  sw.Start();
   for (auto& chunk: chunks_) {
     total_bytes_released += chunk.size;
     free(chunk.data);
+    counters_.sys_free_duration.UpdateCounter(sw.Reset());
+    counters_.freed_bytes.UpdateCounter(chunk.size);
   }
   chunks_.clear();
   next_chunk_size_ = INITIAL_CHUNK_SIZE;
@@ -128,13 +130,17 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
     mem_tracker_->Consume(chunk_size);
   }
 
+  MonotonicStopWatch sys_alloc_sw;
+  sys_alloc_sw.Start();
   // Allocate a new chunk. Return early if malloc fails.
   uint8_t* buf = reinterpret_cast<uint8_t*>(malloc(chunk_size));
+  uint64_t duration = sys_alloc_sw.ElapsedTime();
+  counters_.sys_alloc_duration.UpdateCounter(duration);
   if (UNLIKELY(buf == NULL)) {
     mem_tracker_->Release(chunk_size);
     return false;
   }
-
+  counters_.allocated_bytes.UpdateCounter(chunk_size);
   ASAN_POISON_MEMORY_REGION(buf, chunk_size);
 
   // Put it before the first free chunk. If no free chunks, it goes at the end.

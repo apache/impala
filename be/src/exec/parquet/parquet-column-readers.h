@@ -393,6 +393,9 @@ class BaseScalarColumnReader : public ParquetColumnReader {
     return row_group_first_row_ + current_row_;
   }
 
+  MemPoolCounters GetDataPagePoolCounters() const {
+    return col_chunk_reader_.GetMemPoolCounters();
+  }
  protected:
   // Friend parent scanner so it can perform validation (e.g. ValidateEndOfRowGroup())
   friend class HdfsParquetScanner;

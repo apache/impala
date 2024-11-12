@@ -48,6 +48,7 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"
+#include "util/scope-exit-trigger.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
@@ -68,6 +69,16 @@ static const string EXEC_TIMER_NAME = "ExecTime";
 
 PROFILE_DECLARE_COUNTER(ScanRangesComplete);
 PROFILE_DECLARE_COUNTER(BytesRead);
+PROFILE_DEFINE_SUMMARY_STATS_TIMER(RowBatchMemPoolAllocDuration, DEBUG,
+    "Stats of time spent in malloc() in data pool of fragment level RowBatches.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(RowBatchMemPoolAllocBytes, DEBUG, TUnit::BYTES,
+    "Stats of bytes allocated by malloc() in data pool of fragment level RowBatches.");
+PROFILE_DEFINE_SUMMARY_STATS_TIMER(RowBatchMemPoolFreeDuration, DEBUG,
+    "Stats of time spent in free() in releasing the data pool chunks of fragment level "
+    "RowBatches.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(RowBatchMemPoolFreeBytes, DEBUG, TUnit::BYTES,
+    "Stats of bytes released by free() in releasing the data pool chunks of fragment "
+    "level RowBatches.");
 
 FragmentInstanceState::FragmentInstanceState(QueryState* query_state,
     FragmentState* fragment_state, const TPlanFragmentInstanceCtx& instance_ctx,
@@ -435,6 +446,21 @@ Status FragmentInstanceState::ExecInternal() {
 
   RuntimeProfile::Counter* plan_exec_timer =
       ADD_CHILD_TIMER(timings_profile_, "ExecTreeExecTime", EXEC_TIMER_NAME);
+  RuntimeProfile::SummaryStatsCounter* row_batch_mem_alloc_duration =
+      PROFILE_RowBatchMemPoolAllocDuration.Instantiate(profile());
+  RuntimeProfile::SummaryStatsCounter* row_batch_mem_alloc_bytes =
+      PROFILE_RowBatchMemPoolAllocBytes.Instantiate(profile());
+  RuntimeProfile::SummaryStatsCounter* row_batch_mem_free_duration =
+      PROFILE_RowBatchMemPoolFreeDuration.Instantiate(profile());
+  RuntimeProfile::SummaryStatsCounter* row_batch_mem_free_bytes =
+      PROFILE_RowBatchMemPoolFreeBytes.Instantiate(profile());
+  auto update_counters = MakeScopeExitTrigger([&]() {
+    MemPoolCounters mem_counters = row_batch_->GetMemPoolCounters();
+    row_batch_mem_alloc_duration->Merge(mem_counters.sys_alloc_duration);
+    row_batch_mem_alloc_bytes->Merge(mem_counters.allocated_bytes);
+    row_batch_mem_free_duration->Merge(mem_counters.sys_free_duration);
+    row_batch_mem_free_bytes->Merge(mem_counters.freed_bytes);
+  });
   SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
   bool exec_tree_complete = false;
   UpdateState(StateEvent::WAITING_FOR_FIRST_BATCH);

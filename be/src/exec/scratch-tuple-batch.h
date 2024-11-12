@@ -218,8 +218,8 @@ struct ScratchTupleBatch {
     return batch_idx;
   }
 
-  Tuple* GetTuple(int tuple_idx) const {
-    return reinterpret_cast<Tuple*>(tuple_mem + tuple_idx * tuple_byte_size);
+  Tuple* GetTuple(int idx) const {
+    return reinterpret_cast<Tuple*>(tuple_mem + idx * tuple_byte_size);
   }
 
   uint8_t* CurrTuple() const { return tuple_mem + tuple_idx * tuple_byte_size; }
