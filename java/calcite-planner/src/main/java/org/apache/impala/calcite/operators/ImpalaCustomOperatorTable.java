@@ -217,6 +217,11 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
           null,
           OperandTypes.STRING_SAME_SAME_OR_ARRAY_SAME_SAME);
 
+  // The explicit cast function was created to deal with the cast function using
+  // Impala behavior. The operator is in the operator table because the Calcite
+  // validator needs to search for the explicit_cast function while validating.
+  public static final ImpalaCastFunction EXPLICIT_CAST = ImpalaCastFunction.INSTANCE;
+
   public static ImpalaCustomOperatorTable instance() {
     return INSTANCE.get();
   }
