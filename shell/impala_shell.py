@@ -74,6 +74,7 @@ DEFAULT_HS2_HTTP_PORT = 28000
 DEFAULT_STRICT_HS2_PORT = 11050
 DEFAULT_STRICT_HS2_HTTP_PORT = 10001
 
+
 def strip_comments(sql):
   """sqlparse default implementation of strip comments has a bad performance when parsing
   very large SQL due to the grouping. This is because the default implementation tries to
@@ -166,7 +167,7 @@ class ImpalaShell(cmd.Cmd, object):
   COMMENTS_BEFORE_SET_PATTERN = r'^(\s*/\*(.|\n)*?\*/|\s*--.*\n)*\s*((un)?set)'
   COMMENTS_BEFORE_SET_REPLACEMENT = r'\3'
   # Variable names are prefixed with the following string
-  VAR_PREFIXES = [ 'VAR', 'HIVEVAR' ]
+  VAR_PREFIXES = ['VAR', 'HIVEVAR']
   DEFAULT_DB = 'default'
   # Regex applied to all tokens of a query to detect DML statements.
   DML_REGEX = re.compile("^(insert|upsert|update|delete)$", re.I)
@@ -180,10 +181,10 @@ class ImpalaShell(cmd.Cmd, object):
   VALID_SHELL_OPTIONS = {
     'LIVE_PROGRESS': (lambda x: x in ImpalaShell.TRUE_STRINGS, "live_progress"),
     'LIVE_SUMMARY': (lambda x: x in ImpalaShell.TRUE_STRINGS, "live_summary"),
-    'WRITE_DELIMITED' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "write_delimited"),
-    'VERBOSE' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "verbose"),
-    'DELIMITER' : (lambda x: " " if x == '\\s' else x, "output_delimiter"),
-    'OUTPUT_FILE' : (lambda x: None if x == '' else x, "output_file"),
+    'WRITE_DELIMITED': (lambda x: x in ImpalaShell.TRUE_STRINGS, "write_delimited"),
+    'VERBOSE': (lambda x: x in ImpalaShell.TRUE_STRINGS, "verbose"),
+    'DELIMITER': (lambda x: " " if x == '\\s' else x, "output_delimiter"),
+    'OUTPUT_FILE': (lambda x: None if x == '' else x, "output_file"),
     'VERTICAL': (lambda x: x in ImpalaShell.TRUE_STRINGS, "vertical"),
   }
 
@@ -217,8 +218,8 @@ class ImpalaShell(cmd.Cmd, object):
         (self.strict_hs2_protocol and not self.use_kerberos and not self.use_jwt)
     self.client_connect_timeout_ms = options.client_connect_timeout_ms
     self.http_socket_timeout_s = None
-    if (options.http_socket_timeout_s != 'None' and
-          options.http_socket_timeout_s is not None):
+    if (options.http_socket_timeout_s != 'None'
+        and options.http_socket_timeout_s is not None):
         self.http_socket_timeout_s = float(options.http_socket_timeout_s)
     self.connect_max_tries = options.connect_max_tries
     self.verbose = options.verbose
@@ -415,8 +416,8 @@ class ImpalaShell(cmd.Cmd, object):
     default values.
     query_options parameter is a subset of the default_query_options map"""
     for option in sorted(query_options):
-      if (option in self.set_query_options and
-          self.set_query_options[option] != query_options[option]):  # noqa
+      if (option in self.set_query_options
+          and self.set_query_options[option] != query_options[option]):  # noqa
         print('\n'.join(["\t%s: %s" % (option, self.set_query_options[option])]))
       else:
         print('\n'.join(["\t%s: [%s]" % (option, query_options[option])]))
@@ -765,7 +766,7 @@ class ImpalaShell(cmd.Cmd, object):
     # Cmd is an old-style class, hence we need to call the method directly
     # instead of using super()
     # TODO: This may have to be changed to a super() call once we move to Python 3
-    if line == None:
+    if line is None:
       return CmdStatus.ERROR
     else:
       # This code is based on the code from the standard Python library package cmd.py:
@@ -848,15 +849,15 @@ class ImpalaShell(cmd.Cmd, object):
     arg_mode = str(arg_mode).lower()
     if arg_mode not in [QueryAttemptDisplayModes.ALL,
         QueryAttemptDisplayModes.LATEST, QueryAttemptDisplayModes.ORIGINAL]:
-      print("Invalid value for query attempt display mode: \'" +
-          arg_mode + "\'. Valid values are [ALL | LATEST | ORIGINAL]")
+      print("Invalid value for query attempt display mode: \'"
+            + arg_mode + "\'. Valid values are [ALL | LATEST | ORIGINAL]")
       return None
     return arg_mode
 
   def print_exec_summary(self, summary):
     output = []
     table = self._default_summary_table()
-    self.imp_client.build_summary_table(summary, 0, False, 0, False, output)
+    self.imp_client.build_summary_table(summary, output)
     formatter = PrettyOutputFormatter(table)
     self.output_stream = OutputStream(formatter, filename=self.output_file)
     self.output_stream.write(output)
@@ -1113,7 +1114,7 @@ class ImpalaShell(cmd.Cmd, object):
           self.ldap_password.endswith('\n'):
         print("Warning: LDAP password contains a trailing newline. "
               "Did you use 'echo' instead of 'echo -n'?", file=sys.stderr)
-      if self.use_ssl and sys.version_info < (2,7,9) \
+      if self.use_ssl and sys.version_info < (2, 7, 9) \
           and "EOF occurred in violation of protocol" in str(e):
         print("Warning: TLSv1.2 is not supported for Python < 2.7.9", file=sys.stderr)
       log_exception_with_timestamp(e, "Exception",
@@ -1190,7 +1191,7 @@ class ImpalaShell(cmd.Cmd, object):
     arg = arg.replace('\n', '')
     # Get the database and table name, using the current database if the table name
     # wasn't fully qualified.
-    db_name, tbl_name = self.current_db, arg
+    db_name = self.current_db
     if db_name is None:
       db_name = ImpalaShell.DEFAULT_DB
     db_table_name = arg.split('.')
@@ -1341,7 +1342,7 @@ class ImpalaShell(cmd.Cmd, object):
       if self.live_summary:
         table = self._default_summary_table()
         output = []
-        self.imp_client.build_summary_table(summary, 0, False, 0, False, output)
+        self.imp_client.build_summary_table(summary, output)
         formatter = PrettyOutputFormatter(table)
         data += formatter.format(output) + "\n"
 
@@ -1408,8 +1409,8 @@ class ImpalaShell(cmd.Cmd, object):
             "Query state can be monitored at: %s" % self.imp_client.get_query_link(
              self.imp_client.get_query_id_str(self.last_query_handle)))
 
-      wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle,
-          self._periodic_wait_callback)
+      self.imp_client.wait_to_finish(
+        self.last_query_handle, self._periodic_wait_callback)
       # Reset the progress stream.
       self.progress_stream.clear()
 
@@ -1516,7 +1517,6 @@ class ImpalaShell(cmd.Cmd, object):
       self.close_connection()
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     return CmdStatus.ERROR
-
 
   def construct_table_with_header(self, column_names):
     """ Constructs the table header for a given query handle.
@@ -1822,7 +1822,7 @@ class ImpalaShell(cmd.Cmd, object):
     """
     cmd_names = [cmd for cmd in self.commands if cmd.startswith(text.lower())]
     # If the user input is upper case, return commands in upper case.
-    if text.isupper(): return [cmd_names.upper() for cmd_names in cmd_names]
+    if text.isupper(): return [cmd_name.upper() for cmd_name in cmd_names]
     # If the user input is lower case or mixed case, return lower case commands.
     return cmd_names
 
@@ -1873,7 +1873,7 @@ HEADER_DIVIDER =\
 def _format_tip(tip):
   """Takes a tip string and splits it on word boundaries so that it fits neatly inside the
   shell header."""
-  return '\n'.join([l for l in textwrap.wrap(tip, len(HEADER_DIVIDER))])
+  return '\n'.join([line for line in textwrap.wrap(tip, len(HEADER_DIVIDER))])
 
 
 WELCOME_STRING = """\
@@ -1916,8 +1916,8 @@ def parse_variables(keyvals):
     for keyval in keyvals:
       match = re.match(kv_pattern, keyval)
       if not match:
-        print('Error: Could not parse key-value "%s". ' % (keyval,) +
-              'It must follow the pattern "KEY=VALUE".', file=sys.stderr)
+        print('Error: Could not parse key-value "%s". ' % (keyval,)
+              + 'It must follow the pattern "KEY=VALUE".', file=sys.stderr)
         parser.print_help()
         raise FatalShellException()
       else:
@@ -1943,8 +1943,8 @@ def replace_variables(set_variables, input_string):
     # Check if syntax is correct
     var_name = get_var_name(name)
     if var_name is None:
-      print('Error: Unknown substitution syntax (%s). ' % (name,) +
-            'Use ${VAR:var_name}.', file=sys.stderr)
+      print('Error: Unknown substitution syntax (%s). ' % (name,)
+            + 'Use ${VAR:var_name}.', file=sys.stderr)
       errors = True
     else:
       # Replaces variable value
@@ -1998,8 +1998,8 @@ def execute_queries_non_interactive_mode(options, query_options):
 
   queries = parse_query_text(query_text)
   with ImpalaShell(options, query_options) as shell:
-    return (shell.execute_query_list(shell.cmdqueue) and
-            shell.execute_query_list(queries))
+    return (shell.execute_query_list(shell.cmdqueue)
+            and shell.execute_query_list(queries))
 
 
 def get_intro(options):
@@ -2060,7 +2060,6 @@ def read_password_cmd(password_cmd, auth_method_desc, strip_newline=False):
     print("Error retrieving %s (command was: '%s', exception "
           "was: '%s')" % (auth_method_desc, password_cmd, e), file=sys.stderr)
     raise FatalShellException()
-
 
 
 def impala_shell_main():
@@ -2165,14 +2164,14 @@ def impala_shell_main():
     raise FatalShellException()
 
   if not options.ssl and not options.creds_ok_in_clear and options.use_ldap:
-    print("LDAP credentials may not be sent over insecure " +
-          "connections. Enable SSL or set --auth_creds_ok_in_clear",
+    print(("LDAP credentials may not be sent over insecure "
+           "connections. Enable SSL or set --auth_creds_ok_in_clear"),
           file=sys.stderr)
     raise FatalShellException()
 
   if not options.use_ldap and options.ldap_password_cmd:
-    print("Option --ldap_password_cmd requires using LDAP authentication " +
-          "mechanism (-l)", file=sys.stderr)
+    print(("Option --ldap_password_cmd requires using LDAP authentication "
+           "mechanism (-l)"), file=sys.stderr)
     raise FatalShellException()
 
   if options.use_jwt and options.protocol.lower() != 'hs2-http':
@@ -2273,8 +2272,8 @@ def impala_shell_main():
       raise FatalShellException()
 
   if options.http_socket_timeout_s is not None:
-    if (options.http_socket_timeout_s != 'None' and
-          float(options.http_socket_timeout_s) < 0):
+    if (options.http_socket_timeout_s != 'None'
+        and float(options.http_socket_timeout_s) < 0):
         print("http_socket_timeout_s must be a nonnegative floating point number"
               " expressing seconds, or None", file=sys.stderr)
         raise FatalShellException()

@@ -98,15 +98,168 @@ def utf8_encode_if_needed(val):
     val = val.encode('utf-8', errors='replace')
   return val
 
+
 # Regular expression that matches the progress line added to HS2 logs by
 # the Impala server.
-HS2_LOG_PROGRESS_REGEX = re.compile("Query.*Complete \([0-9]* out of [0-9]*\)\n")
+HS2_LOG_PROGRESS_REGEX = re.compile(r"Query.*Complete \([0-9]* out of [0-9]*\)\n")
 
 # Exception types to differentiate between the different RPCExceptions.
 # RPCException raised when TApplicationException is caught.
 RPC_EXCEPTION_TAPPLICATION = "TAPPLICATION_EXCEPTION"
 # RPCException raised when impala server sends a TStatusCode.ERROR_STATUS status code.
 RPC_EXCEPTION_SERVER = "SERVER_ERROR"
+
+
+def build_exec_summary_table(summary, idx, indent_level, new_indent_level, output,
+                             is_prettyprint=True, separate_prefix_column=False):
+  """Direct translation of Coordinator::PrintExecSummary() to recursively build a list
+  of rows of summary statistics, one per exec node
+
+  summary: the TExecSummary object that contains all the summary data
+
+  idx: the index of the node to print
+
+  indent_level: the number of spaces to print before writing the node's label, to give
+  the appearance of a tree. The 0th child of a node has the same indent_level as its
+  parent. All other children have an indent_level of one greater than their parent.
+
+  new_indent_level: If true, this indent level is different from the previous row's.
+
+  output: the list of rows into which to append the rows produced for this node and its
+  children.
+
+  is_prettyprint: Optional. If True, print time, units, and bytes columns in pretty
+  printed format.
+
+  separate_prefix_column: Optional. If True, the prefix and operator name will be
+  returned as separate column. Otherwise, prefix and operater name will be concatenated
+  into single column.
+
+  Returns the index of the next exec node in summary.exec_nodes that should be
+  processed, used internally to this method only.
+  """
+  attrs = ["latency_ns", "cpu_time_ns", "cardinality", "memory_used"]
+
+  # Initialise aggregate and maximum stats
+  agg_stats, max_stats = TExecStats(), TExecStats()
+  for attr in attrs:
+    setattr(agg_stats, attr, 0)
+    setattr(max_stats, attr, 0)
+
+  node = summary.nodes[idx]
+  if node.exec_stats is not None:
+    for stats in node.exec_stats:
+      for attr in attrs:
+        val = getattr(stats, attr)
+        if val is not None:
+          setattr(agg_stats, attr, getattr(agg_stats, attr) + val)
+          setattr(max_stats, attr, max(getattr(max_stats, attr), val))
+
+  if node.exec_stats is not None and node.exec_stats:
+    avg_time = agg_stats.latency_ns / len(node.exec_stats)
+  else:
+    avg_time = 0
+
+  is_sink = node.node_id == -1
+  # If the node is a broadcast-receiving exchange node, the cardinality of rows produced
+  # is the max over all instances (which should all have received the same number of
+  # rows). Otherwise, the cardinality is the sum over all instances which process
+  # disjoint partitions.
+  if is_sink:
+    cardinality = -1
+  elif node.is_broadcast:
+    cardinality = max_stats.cardinality
+  else:
+    cardinality = agg_stats.cardinality
+
+  est_stats = node.estimated_stats
+  label_prefix = ""
+  if indent_level > 0:
+    label_prefix = "|"
+    label_prefix += "  |" * (indent_level - 1)
+    if new_indent_level:
+      label_prefix += "--"
+    else:
+      label_prefix += "  "
+
+  def prettyprint(val, units, divisor):
+    for unit in units:
+      if val < divisor:
+        if unit == units[0]:
+          return "%d%s" % (val, unit)
+        else:
+          return "%3.2f%s" % (val, unit)
+      val /= divisor
+
+  def prettyprint_bytes(byte_val):
+    return prettyprint(byte_val, [' B', ' KB', ' MB', ' GB', ' TB'], 1024.0)
+
+  def prettyprint_units(unit_val):
+    return prettyprint(unit_val, ["", "K", "M", "B"], 1000.0)
+
+  def prettyprint_time(time_val):
+    return prettyprint(time_val, ["ns", "us", "ms", "s"], 1000.0)
+
+  instances = 0
+  if node.exec_stats is not None:
+    instances = len(node.exec_stats)
+  latency = max_stats.latency_ns
+  cardinality_est = est_stats.cardinality
+  memory_used = max_stats.memory_used
+  memory_est = est_stats.memory_used
+  if (is_prettyprint):
+    avg_time = prettyprint_time(avg_time)
+    latency = prettyprint_time(latency)
+    cardinality = "" if is_sink else prettyprint_units(cardinality)
+    cardinality_est = "" if is_sink else prettyprint_units(cardinality_est)
+    memory_used = prettyprint_bytes(memory_used)
+    memory_est = prettyprint_bytes(memory_est)
+
+  row = list()
+  if separate_prefix_column:
+    row.append(label_prefix)
+    row.append(node.label)
+  else:
+    row.append(label_prefix + node.label)
+
+  row.extend([
+    node.num_hosts,
+    instances,
+    avg_time,
+    latency,
+    cardinality,
+    cardinality_est,
+    memory_used,
+    memory_est,
+    node.label_detail])
+
+  output.append(row)
+  try:
+    sender_idx = summary.exch_to_sender_map[idx]
+    # This is an exchange node or a join node with a separate builder, so the source
+    # is a fragment root, and should be printed next.
+    sender_indent_level = indent_level + node.num_children
+    sender_new_indent_level = node.num_children > 0
+    build_exec_summary_table(summary, sender_idx, sender_indent_level,
+                             sender_new_indent_level, output, is_prettyprint,
+                             separate_prefix_column)
+  except (KeyError, TypeError):
+    # Fall through if idx not in map, or if exch_to_sender_map itself is not set
+    pass
+
+  idx += 1
+  if node.num_children > 0:
+    first_child_output = []
+    idx = build_exec_summary_table(summary, idx, indent_level, False, first_child_output,
+                                   is_prettyprint, separate_prefix_column)
+    for child_idx in xrange(1, node.num_children):
+      # All other children are indented (we only have 0, 1 or 2 children for every exec
+      # node at the moment)
+      idx = build_exec_summary_table(summary, idx, indent_level + 1, True, output,
+                                     is_prettyprint, separate_prefix_column)
+    output += first_child_output
+  return idx
+
 
 class QueryOptionLevels:
   """These are the levels used when displaying query options.
@@ -196,7 +349,7 @@ class ImpalaClient(object):
     try:
       self._open_session()
       return self._ping_impala_service()
-    except:
+    except Exception:
       # Ensure we are in a disconnected state if we failed above.
       self.close_connection()
       raise
@@ -525,130 +678,9 @@ class ImpalaClient(object):
     sock.setTimeout(None)
     return transport
 
-  def build_summary_table(self, summary, idx, is_fragment_root, indent_level,
-      new_indent_level, output):
-    """Direct translation of Coordinator::PrintExecSummary() to recursively build a list
-    of rows of summary statistics, one per exec node
-
-    summary: the TExecSummary object that contains all the summary data
-
-    idx: the index of the node to print
-
-    is_fragment_root: true if the node to print is the root of a fragment (and therefore
-    feeds into an exchange)
-
-    indent_level: the number of spaces to print before writing the node's label, to give
-    the appearance of a tree. The 0th child of a node has the same indent_level as its
-    parent. All other children have an indent_level of one greater than their parent.
-
-    output: the list of rows into which to append the rows produced for this node and its
-    children.
-
-    Returns the index of the next exec node in summary.exec_nodes that should be
-    processed, used internally to this method only.
-
-    NOTE: This is duplicated in impala_beeswax.py, and changes made here should also be
-    made there. TODO: refactor into a shared library. (IMPALA-5792)
-    """
-    attrs = ["latency_ns", "cpu_time_ns", "cardinality", "memory_used"]
-
-    # Initialise aggregate and maximum stats
-    agg_stats, max_stats = TExecStats(), TExecStats()
-    for attr in attrs:
-      setattr(agg_stats, attr, 0)
-      setattr(max_stats, attr, 0)
-
-    node = summary.nodes[idx]
-    if node.exec_stats is not None:
-      for stats in node.exec_stats:
-        for attr in attrs:
-          val = getattr(stats, attr)
-          if val is not None:
-            setattr(agg_stats, attr, getattr(agg_stats, attr) + val)
-            setattr(max_stats, attr, max(getattr(max_stats, attr), val))
-
-    if node.exec_stats is not None and node.exec_stats:
-      avg_time = agg_stats.latency_ns / len(node.exec_stats)
-    else:
-      avg_time = 0
-
-    # If the node is a broadcast-receiving exchange node, the cardinality of rows produced
-    # is the max over all instances (which should all have received the same number of
-    # rows). Otherwise, the cardinality is the sum over all instances which process
-    # disjoint partitions.
-    if node.is_broadcast:
-      cardinality = max_stats.cardinality
-    else:
-      cardinality = agg_stats.cardinality
-
-    est_stats = node.estimated_stats
-    label_prefix = ""
-    if indent_level > 0:
-      label_prefix = "|"
-      label_prefix += "  |" * (indent_level - 1)
-      if new_indent_level:
-        label_prefix += "--"
-      else:
-        label_prefix += "  "
-
-    def prettyprint(val, units, divisor):
-      for unit in units:
-        if val < divisor:
-          if unit == units[0]:
-            return "%d%s" % (val, unit)
-          else:
-            return "%3.2f%s" % (val, unit)
-        val /= divisor
-
-    def prettyprint_bytes(byte_val):
-      return prettyprint(byte_val, [' B', ' KB', ' MB', ' GB', ' TB'], 1024.0)
-
-    def prettyprint_units(unit_val):
-      return prettyprint(unit_val, ["", "K", "M", "B"], 1000.0)
-
-    def prettyprint_time(time_val):
-      return prettyprint(time_val, ["ns", "us", "ms", "s"], 1000.0)
-
-    instances = 0
-    if node.exec_stats is not None:
-      instances = len(node.exec_stats)
-    is_sink = node.node_id == -1
-    row = [ label_prefix + node.label,
-            node.num_hosts, instances,
-            prettyprint_time(avg_time),
-            prettyprint_time(max_stats.latency_ns),
-            "" if is_sink else prettyprint_units(cardinality),
-            "" if is_sink else prettyprint_units(est_stats.cardinality),
-            prettyprint_bytes(max_stats.memory_used),
-            prettyprint_bytes(est_stats.memory_used),
-            node.label_detail ]
-
-    output.append(row)
-    try:
-      sender_idx = summary.exch_to_sender_map[idx]
-      # This is an exchange node or a join node with a separate builder, so the source
-      # is a fragment root, and should be printed next.
-      sender_indent_level = indent_level + node.num_children
-      sender_new_indent_level = node.num_children > 0
-      self.build_summary_table(
-          summary, sender_idx, True, sender_indent_level, sender_new_indent_level, output)
-    except (KeyError, TypeError):
-      # Fall through if idx not in map, or if exch_to_sender_map itself is not set
-      pass
-
-    idx += 1
-    if node.num_children > 0:
-      first_child_output = []
-      idx = \
-        self.build_summary_table(
-            summary, idx, False, indent_level, False, first_child_output)
-      for child_idx in xrange(1, node.num_children):
-        # All other children are indented (we only have 0, 1 or 2 children for every exec
-        # node at the moment)
-        idx = self.build_summary_table(
-            summary, idx, False, indent_level + 1, True, output)
-      output += first_child_output
-    return idx
+  def build_summary_table(self, summary, output):
+    build_exec_summary_table(summary, 0, 0, False, output, is_prettyprint=True,
+                             separate_prefix_column=False)
 
   def _get_sleep_interval(self, start_time):
     """Returns a step function of time to sleep in seconds before polling
@@ -728,8 +760,8 @@ class ImpalaHS2Client(ImpalaClient):
                           username=self.user)
     resp = self._do_hs2_rpc(OpenSession, req, retry_on_error=True)
     self._check_hs2_rpc_status(resp.status)
-    assert (resp.serverProtocolVersion ==
-            TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6), resp.serverProtocolVersion
+    assert (resp.serverProtocolVersion
+            == TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6), resp.serverProtocolVersion
     # TODO: ensure it's closed if needed
     self.session_handle = resp.sessionHandle
 
@@ -754,7 +786,6 @@ class ImpalaHS2Client(ImpalaClient):
       headers["X-Forwarded-For"] = self.hs2_x_forward
 
     return headers
-
 
   def close_connection(self):
     if self.session_handle is not None:
@@ -799,8 +830,8 @@ class ImpalaHS2Client(ImpalaClient):
         QueryStateException):
         raise
       except RPCException as r:
-        if (r.exception_type == RPC_EXCEPTION_TAPPLICATION or
-          r.exception_type == RPC_EXCEPTION_SERVER):
+        if (r.exception_type == RPC_EXCEPTION_TAPPLICATION
+            or r.exception_type == RPC_EXCEPTION_SERVER):
           raise
         log_exception_with_timestamp(r, "Exception",
            "type={0} when listing query options. {1}".format(type(r), retry_msg))
@@ -1465,7 +1496,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
     dml_result, rpc_status = self._do_beeswax_rpc(
         lambda: self.imp_service.CloseInsert(last_query_handle))
     if rpc_status != RpcStatus.OK:
-       raise RPCException()
+      raise RPCException()
     last_query_handle.is_closed = True
     return self._process_dml_result(dml_result)
 
