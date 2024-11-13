@@ -894,7 +894,7 @@ Status KrpcDataStreamSender::Prepare(
     RETURN_IF_ERROR(channels_[i]->Init(state, char_mem_tracker_allocator_));
   }
   for (PartitionRowCollector& collector: partition_row_collectors_) {
-    collector.collector_batch_.reset(new OutboundRowBatch(char_mem_tracker_allocator_));
+    collector.collector_batch_.reset(new OutboundRowBatch(*char_mem_tracker_allocator_));
     collector.row_batch_capacity_ = collector.channel_->RowBatchCapacity();
   }
   for (auto& [ch, ice_ch] : channel_to_ice_channel_) {
