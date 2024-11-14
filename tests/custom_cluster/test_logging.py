@@ -16,11 +16,15 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+import logging
+import time
 import pytest
+import os
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 
+LOG = logging.getLogger(__name__)
 class TestLoggingCore(CustomClusterTestSuite):
   """Test existence of certain log lines under some scenario."""
 
@@ -63,3 +67,50 @@ class TestLoggingCore(CustomClusterTestSuite):
       disable_log_buffering=True)
   def test_max_errors_no_downgrade(self):
     self._test_max_errors(2, -1, False)
+
+
+class TestLogFlushPermissionDenied(CustomClusterTestSuite):
+    """Test logging of failures to open log files with cause Permission denied."""
+    LOG_FLUSH_FAILURES_DIR = "log_flush_failures_dir"
+
+    @classmethod
+    def get_workload(cls):
+        return 'functional-query'
+
+    def setup_method(self, method):
+        # Override parent
+        super(TestLogFlushPermissionDenied, self).setup_method(method)
+        tmp_dir = self.get_tmp_dir(self.LOG_FLUSH_FAILURES_DIR)
+        self.orig_permissions = os.stat(tmp_dir).st_mode
+        os.chmod(tmp_dir, 0)
+
+    def teardown_method(self, method):
+        # Override parent
+        os.chmod(self.get_tmp_dir(self.LOG_FLUSH_FAILURES_DIR), self.orig_permissions)
+        super(TestLogFlushPermissionDenied, self).teardown_method(method)
+
+    def __test_permission_denied(self, log_dir):
+        self.assert_impalad_log_contains("INFO",
+          r"Could not open log file: {0}.*, cause: Permission denied".format(log_dir), 2)
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+        impalad_args="--lineage_event_log_dir={" + LOG_FLUSH_FAILURES_DIR + "}",
+        tmp_dir_placeholders=[LOG_FLUSH_FAILURES_DIR])
+    def test_lineage_log_failure(self):
+      self.__test_permission_denied(self.get_tmp_dir(self.LOG_FLUSH_FAILURES_DIR))
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+            impalad_args="--audit_event_log_dir={" + LOG_FLUSH_FAILURES_DIR + "}",
+            tmp_dir_placeholders=[LOG_FLUSH_FAILURES_DIR])
+    def test_audit_log_failure(self):
+      self.__test_permission_denied(self.get_tmp_dir(self.LOG_FLUSH_FAILURES_DIR))
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+      impalad_args="--profile_log_dir={" + LOG_FLUSH_FAILURES_DIR + "}",
+      tmp_dir_placeholders=[LOG_FLUSH_FAILURES_DIR])
+    def test_profiles_failure(self):
+      time.sleep(5)
+      self.__test_permission_denied(self.get_tmp_dir(self.LOG_FLUSH_FAILURES_DIR))

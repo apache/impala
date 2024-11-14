@@ -19,6 +19,7 @@
 
 #include <mutex>
 #include <regex>
+#include <cerrno>
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
@@ -39,6 +40,7 @@ using boost::posix_time::ptime;
 using boost::posix_time::time_from_string;
 using kudu::JoinPathSegments;
 using namespace impala;
+using std::strerror;
 
 const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
 
@@ -131,7 +133,10 @@ Status SimpleLogger::FlushInternal() {
     log_file_.close();
   }
   log_file_.open(log_file_name_.c_str(), std::ios_base::app | std::ios_base::out);
-  if (!log_file_.is_open()) return Status("Could not open log file: " + log_file_name_);
+  if(log_file_.fail()) {
+    return Status("Could not open log file: "
+                  + log_file_name_ + ", cause: " + strerror(errno));
+  }
   return Status::OK();
 }
 
