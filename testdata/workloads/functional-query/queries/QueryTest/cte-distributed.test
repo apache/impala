@@ -1,0 +1,170 @@
+====
+---- QUERY
+EXPLAIN WITH v1 AS (SELECT n_name, n_nationkey FROM tpch.nation WHERE n_regionkey = 0)
+SELECT v1.n_name, v1_next.n_name FROM v1, v1 v1_next WHERE v1.n_nationkey + 1 = v1_next.n_nationkey;
+---- RESULTS: VERIFY_IS_EQUAL
+'Max Per-Host Resource Reservation: Memory=19.95MB Threads=5'
+'Per-Host Resource Estimates: Memory=52MB'
+''
+'PLAN-ROOT SINK'
+'|'
+'07:EXCHANGE [UNPARTITIONED]'
+'|'
+'05:HASH JOIN [INNER JOIN, BROADCAST]'
+'|  hash predicates: add(n_nationkey, 1) = n_nationkey'
+'|  row-size=32B cardinality=5'
+'|'
+'|--06:EXCHANGE [BROADCAST]'
+'|  |'
+'|  04:CTE CONSUMER [cte_suggestion_0]'
+'|  |  row-size=23B cardinality=5'
+'|  |'
+'|  01:CTE PRODUCER [cte_suggestion_0]'
+'|  |  row-size=23B cardinality=5'
+'|  |'
+'|  02:SCAN HDFS [tpch.nation]'
+'|     HDFS partitions=1/1 files=1 size=2.15KB'
+'|     predicates: tpch.nation.n_regionkey = 0, tpch.nation.n_nationkey IS NOT NULL'
+'|     row-size=23B cardinality=5'
+'|'
+'03:CTE CONSUMER [cte_suggestion_0]'
+'|  row-size=23B cardinality=5'
+'|'
+'01:CTE PRODUCER [cte_suggestion_0]'
+'|  row-size=23B cardinality=5'
+'|'
+'02:SCAN HDFS [tpch.nation]'
+'   HDFS partitions=1/1 files=1 size=2.15KB'
+'   predicates: tpch.nation.n_regionkey = 0, tpch.nation.n_nationkey IS NOT NULL'
+'   row-size=23B cardinality=5'
+''
+'LOCAL MULTI SINK [FRAGMENT=F02, EXCHANGE=01, cte_suggestion_0]'
+'|'
+'01:CTE PRODUCER [cte_suggestion_0]'
+'|  row-size=23B cardinality=5'
+'|'
+'02:SCAN HDFS [tpch.nation]'
+'   HDFS partitions=1/1 files=1 size=2.15KB'
+'   predicates: tpch.nation.n_regionkey = 0, tpch.nation.n_nationkey IS NOT NULL'
+'   row-size=23B cardinality=5'
+====
+---- QUERY
+WITH v1 AS (SELECT n_name, n_nationkey FROM tpch.nation WHERE n_regionkey = 0)
+SELECT v1.n_name, v1_next.n_name FROM v1, v1 v1_next WHERE v1.n_nationkey + 1 = v1_next.n_nationkey;
+---- RESULTS: VERIFY_IS_EQUAL
+'KENYA','MOROCCO'
+'MOROCCO','MOZAMBIQUE'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+CREATE TABLE emps (empid INT, deptno INT, name STRING, salary DECIMAL(8, 2)) STORED AS TEXTFILE;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO emps VALUES
+    (1, 1, "Phil", 45000.0), (2, 1, "Maggie", 55000.0), (3, 2, "Alice", 120000.0);
+---- RESULTS
+====
+---- QUERY
+EXPLAIN SELECT name FROM emps e WHERE salary > 50000
+UNION SELECT name FROM emps e WHERE salary > 50000;
+---- RESULTS: VERIFY_IS_EQUAL
+'Max Per-Host Resource Reservation: Memory=82.01MB Threads=5'
+'Per-Host Resource Estimates: Memory=302MB'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'$DATABASE.emps'
+''
+'PLAN-ROOT SINK'
+'|'
+'09:EXCHANGE [UNPARTITIONED]'
+'|'
+'08:AGGREGATE [FINALIZE]'
+'|  group by: NAME'
+'|  row-size=12B cardinality=2'
+'|'
+'07:EXCHANGE [HASH(NAME)]'
+'|'
+'06:AGGREGATE [STREAMING]'
+'|  group by: NAME'
+'|  row-size=12B cardinality=2'
+'|'
+'03:UNION'
+'|  pass-through-operands: all'
+'|  row-size=12B cardinality=2'
+'|'
+'|--05:CTE CONSUMER [cte_suggestion_0]'
+'|  |  row-size=16B cardinality=1'
+'|  |'
+'|  01:CTE PRODUCER [cte_suggestion_0]'
+'|  |  row-size=16B cardinality=1'
+'|  |'
+'|  02:SCAN HDFS [$DATABASE.emps]'
+'|     HDFS partitions=1/1 files=1 size=58B'
+'|     predicates: $DATABASE.emps.salary > 50000.00'
+'|     row-size=16B cardinality=1'
+'|'
+'04:CTE CONSUMER [cte_suggestion_0]'
+'|  row-size=16B cardinality=1'
+'|'
+'01:CTE PRODUCER [cte_suggestion_0]'
+'|  row-size=16B cardinality=1'
+'|'
+'02:SCAN HDFS [$DATABASE.emps]'
+'   HDFS partitions=1/1 files=1 size=58B'
+'   predicates: $DATABASE.emps.salary > 50000.00'
+'   row-size=16B cardinality=1'
+''
+'LOCAL MULTI SINK [FRAGMENT=F04, EXCHANGE=01, cte_suggestion_0]'
+'|'
+'01:CTE PRODUCER [cte_suggestion_0]'
+'|  row-size=16B cardinality=1'
+'|'
+'02:SCAN HDFS [$DATABASE.emps]'
+'   HDFS partitions=1/1 files=1 size=58B'
+'   predicates: $DATABASE.emps.salary > 50000.00'
+'   row-size=16B cardinality=1'
+====
+---- QUERY
+SELECT name FROM emps e WHERE salary > 50000
+UNION SELECT name FROM emps e WHERE salary > 50000;
+---- RESULTS: VERIFY_IS_EQUAL
+'Alice'
+'Maggie'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test uneven scan distribution.
+set mt_dop=2;
+with a as (select s_suppkey from tpch.supplier where s_nationkey > 1),
+  b as (select l_suppkey from tpch.lineitem where l_quantity > 2.0)
+select distinct(k) from (
+  select s_suppkey as k from a
+  union all select l_suppkey as k from b
+  union all select s_suppkey as k from a
+  union all select l_suppkey as k from b) order by k limit 5;
+---- RESULTS: VERIFY_IS_EQUAL
+1
+2
+3
+4
+5
+====
+---- QUERY
+# Test early consumer close.
+with a as (select s_suppkey from tpch.supplier where s_nationkey > 1),
+  b as (select l_suppkey from tpch.lineitem where l_quantity > 2.0)
+select distinct(k) from (
+  select s_suppkey as k from a limit 1
+  union all select l_suppkey as k from b limit 1
+  union all select s_suppkey as k from a
+  union all select l_suppkey as k from b) order by k limit 5;
+---- RESULTS: VERIFY_IS_EQUAL
+1
+2
+3
+4
+5
+====

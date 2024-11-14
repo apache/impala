@@ -31,6 +31,7 @@
 #include "exec/iceberg-merge-sink.h"
 #include "exec/kudu/kudu-table-sink.h"
 #include "exec/kudu/kudu-util.h"
+#include "exec/local-multi-sink.h"
 #include "exec/multi-table-sink.h"
 #include "exec/nested-loop-join-builder.h"
 #include "exec/partitioned-hash-join-builder.h"
@@ -133,6 +134,10 @@ Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
     }
     case TDataSinkType::MERGE_SINK: {
       *data_sink = pool->Add(new IcebergMergeSinkConfig());
+      break;
+    }
+    case TDataSinkType::LOCAL_MULTI_SINK: {
+      *data_sink = pool->Add(new LocalMultiSinkConfig());
       break;
     }
     default:

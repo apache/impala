@@ -357,11 +357,6 @@ public class CalciteOptimizer implements CompilerStep {
 
   public RelNode runCTEProgram(RelBuilder relBuilder,
       RelNode plan) throws ImpalaException {
-    if (queryOptions_.num_nodes != 1) {
-      // CTEs currently only supported in SingleNodePlanner.
-      return plan;
-    }
-
     final int referenceThreshold = queryOptions_.cte_threshold;
     if (referenceThreshold <= 0) {
       // Disable CTE planning.

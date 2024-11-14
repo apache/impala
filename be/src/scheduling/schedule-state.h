@@ -106,6 +106,7 @@ struct FragmentScheduleState {
 
   /// The root fragment of the plan runs on the coordinator.
   bool is_root_coord_fragment;
+  bool visited = false;
   const TPlanFragment& fragment;
 
   /// Fragments that are inputs to an ExchangeNode of this fragment.

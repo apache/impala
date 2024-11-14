@@ -45,6 +45,12 @@ class UnionPlanNode : public PlanNode {
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   virtual void Codegen(FragmentState* state) override;
 
+  bool WillNeedDeepCopy(const TQueryOptions& opts) const override {
+    // If a union has passthrough children, a GetNext call can invalidate earlier batches.
+    if (first_materialized_child_idx_ > 0) return true;
+    return PlanNode::WillNeedDeepCopy(opts);
+  }
+
   ~UnionPlanNode(){}
 
   /// Descriptor for tuples this union node constructs.

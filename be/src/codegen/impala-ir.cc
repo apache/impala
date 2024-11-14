@@ -32,6 +32,7 @@
 #include "exec/hdfs-columnar-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
 #include "exec/kudu/kudu-util-ir.cc"
+#include "exec/cte-consumer-node-ir.cc"
 #include "exec/non-grouping-aggregator-ir.cc"
 #include "exec/partitioned-hash-join-builder-ir.cc"
 #include "exec/partitioned-hash-join-node-ir.cc"

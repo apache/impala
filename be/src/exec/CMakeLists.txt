@@ -35,6 +35,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 
 add_library(ExecIr
+  cte-consumer-node-ir.cc
   grouping-aggregator-ir.cc
   hdfs-columnar-scanner-ir.cc
   hdfs-scanner-ir.cc
@@ -60,6 +61,8 @@ add_library(Exec
   buffered-plan-root-sink.cc
   cardinality-check-node.cc
   catalog-op-executor.cc
+  cte-consumer-node.cc
+  cte-producer-node.cc
   data-sink.cc
   data-source-scan-node.cc
   delimited-text-parser.cc
@@ -89,6 +92,7 @@ add_library(Exec
   join-builder.cc
   iceberg-merge-node.cc
   iceberg-merge-sink.cc
+  local-multi-sink.cc
   multi-table-sink.cc
   nested-loop-join-builder.cc
   nested-loop-join-node.cc
@@ -100,6 +104,7 @@ add_library(Exec
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
+  sequence-node.cc
   select-node.cc
   singular-row-src-node.cc
   sort-node.cc

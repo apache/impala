@@ -730,6 +730,14 @@ public class Planner {
     if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {
       // Print the non-fragmented parallel plan.
       str.append(fragments.get(0).getExplainString(options, explainLevel));
+      // Print disjoint local exchange fragments, if any.
+      for (int i = 1; i < fragments.size(); ++i) {
+        PlanFragment fragment = fragments.get(i);
+        if (fragment.getSink() instanceof LocalMultiSink) {
+          str.append("\n");
+          str.append(fragment.getExplainString(options, explainLevel));
+        }
+      }
     } else {
       // Print the fragmented parallel plan.
       for (int i = 0; i < fragments.size(); ++i) {

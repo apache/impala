@@ -172,6 +172,10 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     instance_ctx_pb->set_fragment_idx(fragment_idx);
     UniqueIdPBToTUniqueId(params.instance_id(), &instance_ctx.fragment_instance_id);
     instance_ctx.per_fragment_instance_idx = params.per_fragment_instance_idx();
+    instance_ctx.__set_cte_consumer_to_producer_idx({
+        params.cte_consumer_to_producer_idx().begin(),
+        params.cte_consumer_to_producer_idx().end()});
+    instance_ctx.__set_num_cte_consumers(params.num_cte_consumers());
     *instance_ctx_pb->mutable_per_node_scan_ranges() = params.per_node_scan_ranges();
     // Sum the scan ranges over all the fragments
     for (const auto& pair : params.per_node_scan_ranges()) {

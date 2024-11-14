@@ -102,12 +102,10 @@ class ResultRow(object):
     column_values = list()
     if not row_string:
       return column_values
-    string_val = None
-    current_column = 0
 
     for i, col_val in enumerate(self.__tokenize_row(row_string)):
-      assert current_column < len(column_types),\
-          'Number of columns returned > the number of column types: %s' % column_types
+      assert i < len(column_types), 'Number of columns returned > the number of column '\
+          'types: %s\n%s' % (column_types, row_string)
       column_values.append(ResultColumn(col_val, column_types[i], column_labels[i]))
     return column_values
 

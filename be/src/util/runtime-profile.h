@@ -465,6 +465,7 @@ class RuntimeProfile : public RuntimeProfileBase {
   static const string HASH_TABLE;
   static const string PREFIX_FILTER;
   static const string PREFIX_GROUPING_AGGREGATOR;
+  static const string PREFIX_LOCAL_EXCHANGER;
 
   /// Create a runtime profile object with 'name'. The profile, counters and any other
   /// structures owned by the profile are allocated from 'pool'.

@@ -94,7 +94,7 @@ public abstract class DataSink {
    * is displayed to the user.
    * e.g. table sink return the table name.
    */
-  abstract protected String getLabelDetail();
+  protected String getLabelDetail() { return ""; }
 
   /**
    * Return runtime filters produced by this sink. Subclasses that use runtime filters

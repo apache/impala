@@ -53,6 +53,7 @@ class FragmentInstanceState;
 class InitialReservations;
 class LlvmCodeGen;
 class CodeGenCache;
+class LocalExchanger;
 class MemTracker;
 class PlanNode;
 class PublishFilterParamsPB;
@@ -331,6 +332,21 @@ class QueryState {
         || exec_state == BackendExecState::ERROR;
   }
 
+  /// Registers a CTE exchanger for the given name.
+  void RegisterExchanger(std::string name, LocalExchanger* exchanger) {
+    std::lock_guard<std::mutex> l(exchangers_mutex_);
+    exchangers_.emplace(std::move(name), exchanger);
+  }
+
+  /// Returns a CTE exchanger for the given name if it exists, else nullptr.
+  LocalExchanger* GetExchanger(const std::string& name) const {
+    std::lock_guard<std::mutex> l(exchangers_mutex_);
+    if (auto it = exchangers_.find(name); it != exchangers_.end()) {
+      return it->second;
+    }
+    return nullptr;
+  }
+
  private:
   friend class QueryExecMgr;
 
@@ -507,6 +523,12 @@ class QueryState {
 
   /// Indicator of whether to disable the codegen cache for the query.
   bool disable_codegen_cache_ = false;
+
+  /// Protects access to exchangers_.
+  mutable std::mutex exchangers_mutex_;
+
+  /// Collect local exchangers, shared across fragments.
+  std::unordered_map<std::string, LocalExchanger*> exchangers_;
 
   /// Create QueryState w/ a refcnt of 0 and a memory limit of 'mem_limit' bytes applied
   /// to the query mem tracker. The query is associated with the resource pool set in

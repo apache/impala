@@ -850,7 +850,9 @@ struct TCTEProducer {
 struct TCTEConsumer {
   1: required string name
   2: required list<Types.TTupleId> input_row_tuples
-  3: required list<Exprs.TExpr> result_exprs
+  // nullable_tuples[i] is true if input_row_tuples[i] is nullable
+  3: required list<bool> nullable_tuples
+  4: required list<Exprs.TExpr> result_exprs
 }
 
 // See PipelineMembership in the frontend for details.

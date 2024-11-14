@@ -295,7 +295,9 @@ ir_functions = [
   ["TUPLE_SORTER_SORT_HELPER",
    "_ZN6impala6Sorter11TupleSorter10SortHelperENS0_13TupleIteratorES2_"],
   ["SORTED_RUN_MERGER_HEAPIFY_HELPER",
-   "_ZN6impala15SortedRunMerger13HeapifyHelperEi"]
+   "_ZN6impala15SortedRunMerger13HeapifyHelperEi"],
+  ["CTE_MATERIALIZE_BATCH",
+   "_ZN6impala15CTEConsumerNode16MaterializeBatchEPNS_8RowBatchES2_PPh"]
 ]
 
 enums_preamble = '\

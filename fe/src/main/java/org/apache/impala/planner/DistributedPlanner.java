@@ -18,6 +18,7 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
@@ -43,6 +44,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.google.common.math.IntMath;
 
 /**
@@ -53,6 +56,8 @@ public class DistributedPlanner {
   private final static Logger LOG = LoggerFactory.getLogger(DistributedPlanner.class);
 
   private final PlannerContext ctx_;
+
+  private final ListMultimap<String, PlanNode> cteConsumers_ = ArrayListMultimap.create();
 
   public DistributedPlanner(PlannerContext ctx) {
     ctx_ = ctx;
@@ -162,6 +167,42 @@ public class DistributedPlanner {
       result = childFragments.get(0);
     } else if (root instanceof UnpivotNode) {
       result = createUnpivotNodeFragment((UnpivotNode) root, childFragments);
+    } else if (root instanceof CTEConsumerNode) {
+      result = new PlanFragment(ctx_.getNextFragmentId(), root, DataPartition.RANDOM);
+      if (!cteConsumers_.containsKey(root.getDisplayLabelDetail())) {
+        // For now we choose not to represent a DAG of fragments and only reference
+        // the producer fragment on its first use. Add a placeholder for it.
+        result.addChild(null);
+      }
+      // CTEConsumerNode and CTEProducerNode use matching cteName_ to identify each other.
+      cteConsumers_.put(root.getDisplayLabelDetail(), root);
+    } else if (root instanceof CTEProducerNode) {
+      result = childFragments.get(0);
+      result.addPlanRoot(root);
+      // After distributed planning the child may have a different row layout than
+      // what CTEProducerNode was constructed with (e.g. a phase-split aggregation
+      // replaces the final output tuple with an intermediate tuple). Refresh the
+      // node's tuple IDs so the C++ row_desc matches child(0)->row_desc().
+      PlanNode cteChild = root.getChild(0);
+      root.tupleIds_ = new ArrayList<>(cteChild.getTupleIds());
+      root.nullableTupleIds_ = new HashSet<>(cteChild.getNullableTupleIds());
+      List<PlanNode> dests = cteConsumers_.get(root.getDisplayLabelDetail());
+      for (PlanNode dest : dests) {
+        dest.addChild(root);
+      }
+      result.setSink(new LocalMultiSink((CTEProducerNode) root, dests));
+
+      // Replace first placeholder with the actual producer fragment. Unions with
+      // multiple CTEs will have multiple placeholders, and may also have combined
+      // multiple CTEConsumerNodes into one fragment.
+      PlanFragment firstDest = dests.get(0).getFragment();
+      int firstNull = firstDest.getChildren().indexOf(null);
+      Preconditions.checkState(firstNull != -1);
+      firstDest.setChild(firstNull, result);
+    } else if (root instanceof SequenceNode) {
+      // The first child produces primary output of the SequenceNode. All other
+      // children are CTEProducers that are executed in independent fragments.
+      result = childFragments.get(0);
     } else {
       throw new InternalException("Cannot create plan fragment for this node type: "
           + root.getExplainString(ctx_.getQueryOptions()));

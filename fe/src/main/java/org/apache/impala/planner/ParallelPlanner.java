@@ -110,6 +110,8 @@ public class ParallelPlanner {
       return;
     }
     if (node instanceof ExchangeNode) return;
+    // Skip CTE consumer's child to prevent collecting joins multiple times.
+    if (node instanceof CTEConsumerNode) return;
     if (node instanceof SubplanNode) {
       collectJoins(node.getChild(0), result);
       return;

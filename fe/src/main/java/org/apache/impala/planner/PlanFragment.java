@@ -18,6 +18,7 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -224,7 +225,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    */
   public List<PlanNode> collectPlanNodes() {
     List<PlanNode> nodes = new ArrayList<>();
-    collectPlanNodesHelper(planRoot_, Predicates.alwaysTrue(), nodes);
+    BitSet visited = new BitSet();
+    collectPlanNodesHelper(planRoot_, Predicates.alwaysTrue(), nodes, visited);
     return nodes;
   }
 
@@ -235,17 +237,21 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    */
   public <T extends PlanNode> void collectPlanNodes(
       Predicate<? super PlanNode> predicate, List<T> nodes) {
-    collectPlanNodesHelper(planRoot_, predicate, nodes);
+    BitSet visited = new BitSet();
+    collectPlanNodesHelper(planRoot_, predicate, nodes, visited);
   }
 
   @SuppressWarnings("unchecked")
-  private  <T extends PlanNode> void collectPlanNodesHelper(
-      PlanNode root, Predicate<? super PlanNode> predicate, List<T> nodes) {
+  private  <T extends PlanNode> void collectPlanNodesHelper(PlanNode root,
+      Predicate<? super PlanNode> predicate, List<T> nodes, BitSet visited) {
     if (root == null) return;
+    // Avoid visiting nodes more than once (DAGs).
+    if (visited.get(root.getId().asInt())) return;
+    visited.set(root.getId().asInt());
     if (predicate.apply(root)) nodes.add((T)root);
     for (PlanNode child: root.getChildren()) {
       if (child.getFragment() == this) {
-        collectPlanNodesHelper(child, predicate, nodes);
+        collectPlanNodesHelper(child, predicate, nodes, visited);
       }
     }
   }
@@ -910,7 +916,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   protected void getFragmentsInPlanPreorderAux(List<PlanFragment> result) {
     result.add(this);
     for (PlanFragment child: children_) {
-      if (child.getSink() instanceof DataStreamSink) {
+      if (child.getSink() instanceof DataStreamSink
+          || child.getSink() instanceof LocalMultiSink) {
         child.getFragmentsInPlanPreorderAux(result);
       }
     }
@@ -929,8 +936,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       Preconditions.checkState(node.getFragment() == this);
     }
 
-    // all ExchangeNodes have registered input fragments
-    Preconditions.checkState(exchNodes.size() == getChildren().size());
+    // all ExchangeNodes have registered input fragments; collect them, ignoring CTEs
+    // that also produce separate fragments but are not connected via ExchangeNodes.
+    int notCTEs = 0;
+    for (PlanFragment child: getChildren()) {
+      PlanNode root = child.getPlanRoot();
+      if (!(root instanceof CTEProducerNode)) notCTEs++;
+    }
+    Preconditions.checkState(exchNodes.size() == notCTEs);
     List<PlanFragment> childFragments = new ArrayList<>();
     for (PlanNode exchNode: exchNodes) {
       PlanFragment childFragment = exchNode.getChild(0).getFragment();

@@ -50,6 +50,14 @@ message FInstanceExecParamsPB {
   // If this is a join build fragment, the number of fragment instances that consume the
   // join build. -1 = invalid.
   optional int32 num_join_build_outputs = 9 [default = -1];
+
+  // per_fragment_instance_idx of the CTE producer feeding each consumer in this instance
+  map<int32, int32> cte_consumer_to_producer_idx = 10;
+
+  // Number of CTE consumers for a CTE producer instance. Every CTE producer needs to
+  // have all CTE consumers scheduled to it, but some consumers can have more fragment
+  // instances (due to mt_dop) than the producer. This is determined during scheduling.
+  optional int32 num_cte_consumers = 11;
 }
 
 // Execution parameters for a single backend. Used to construct the

@@ -19,6 +19,7 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
@@ -102,11 +103,14 @@ public class CTEConsumerNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.CTE_CONSUMER_NODE;
     List<Integer> tupleIds = new ArrayList<>();
+    List<Boolean> nullableTuples = new ArrayList<>();
+    Set<TupleId> nullableTupleIds = ctePlan_.getNullableTupleIds();
     for (TupleId tupleId : ctePlan_.getTupleIds()) {
       tupleIds.add(tupleId.asInt());
+      nullableTuples.add(nullableTupleIds.contains(tupleId));
     }
-    msg.cte_consumer =
-        new TCTEConsumer(cteName_, tupleIds, Expr.treesToThrift(cteExprs_));
+    msg.cte_consumer = new TCTEConsumer(
+        cteName_, tupleIds, nullableTuples, Expr.treesToThrift(cteExprs_));
   }
 
   @Override

@@ -41,6 +41,13 @@ class BlockingJoinPlanNode : public PlanNode {
   virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override = 0;
 
+  /// Returns true if the join uses a separate build fragment and returns build-side
+  /// tuples in its output rows, or if the probe side WillNeedDeepCopy() returns true.
+  bool WillNeedDeepCopy(const TQueryOptions& opts) const override {
+    if (UseSeparateBuild(opts) && ReturnsBuildData(join_op_)) return true;
+    return PlanNode::WillNeedDeepCopy(opts);
+  }
+
   /// Returns true if this join node will use a separate builder that is the root sink
   /// of a different fragment. Otherwise the builder is owned by this node and consumes
   /// input from the second child node.

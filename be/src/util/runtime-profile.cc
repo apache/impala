@@ -93,6 +93,7 @@ const string RuntimeProfile::ENQUEUE = "Enqueue";
 const string RuntimeProfile::HASH_TABLE = "Hash Table";
 const string RuntimeProfile::PREFIX_FILTER = "Filter ";
 const string RuntimeProfile::PREFIX_GROUPING_AGGREGATOR = "GroupingAggregator ";
+const string RuntimeProfile::PREFIX_LOCAL_EXCHANGER = "LocalExchanger ";
 
 constexpr ProfileEntryPrototype::Significance ProfileEntryPrototype::ALLSIGNIFICANCE[];
 
@@ -125,7 +126,8 @@ static bool UntimedProfileNode(const string& name) {
       || name.compare(RuntimeProfile::ENQUEUE) == 0
       || name.compare(RuntimeProfile::HASH_TABLE) == 0
       || name.rfind(RuntimeProfile::PREFIX_FILTER, 0) == 0
-      || name.rfind(RuntimeProfile::PREFIX_GROUPING_AGGREGATOR, 0) == 0;
+      || name.rfind(RuntimeProfile::PREFIX_GROUPING_AGGREGATOR, 0) == 0
+      || name.rfind(RuntimeProfile::PREFIX_LOCAL_EXCHANGER, 0) == 0;
 }
 
 void ProfileEntryPrototypeRegistry::AddPrototype(const ProfileEntryPrototype* prototype) {

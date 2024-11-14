@@ -119,6 +119,12 @@ struct TPlanFragmentInstanceCtx {
   // Number of fragment instances executing across all Impalads for this fragment. Like
   // num_backends, this can be used for some estimations.
   12: optional i32 num_instances;
+
+  // per_fragment_instance_idx of the CTE producer feeding each consumer in this instance
+  13: optional map<Types.TPlanNodeId, i32> cte_consumer_to_producer_idx
+
+  // Number of CTE consumers for a CTE producer instance.
+  14: optional i32 num_cte_consumers
 }
 
 

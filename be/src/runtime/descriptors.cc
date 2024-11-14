@@ -419,7 +419,9 @@ string TupleDescriptor::DebugString() const {
   stringstream out;
   out << "Tuple(id=" << id_ << " size=" << byte_size_;
   if (table_desc_ != NULL) {
-    //out << " " << table_desc_->DebugString();
+    out << " " << table_desc_->DebugString();
+  } else {
+    out << " table_desc=null";
   }
   out << " slots=[";
   for (size_t i = 0; i < slots_.size(); ++i) {
@@ -457,7 +459,8 @@ RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl,
   DCHECK_GT(row_tuples.size(), 0);
   for (int i = 0; i < row_tuples.size(); ++i) {
     tuple_desc_map_.push_back(desc_tbl.GetTupleDescriptor(row_tuples[i]));
-    DCHECK(tuple_desc_map_.back() != NULL);
+    DCHECK(tuple_desc_map_.back() != NULL)
+        << "DescriptorTbl missing tuple id " << row_tuples[i];
   }
   InitTupleIdxMap();
   InitHasVarlenSlots();
@@ -679,6 +682,8 @@ Status DescriptorTbl::CreateInternal(ObjectPool* pool, const TDescriptorTable& t
     // fix up table pointer
     if (tdesc.__isset.tableId) {
       desc->table_desc_ = (*tbl)->GetTableDescriptor(tdesc.tableId);
+    } else {
+      VLOG(2) << "No tableId for descriptor " << tdesc.id;
     }
     (*tbl)->tuple_desc_map_[tdesc.id] = desc;
   }

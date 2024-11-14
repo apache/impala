@@ -37,6 +37,7 @@ enum TDataSinkType {
   ICEBERG_DELETE_BUILDER = 5
   MULTI_DATA_SINK = 6
   MERGE_SINK = 7
+  LOCAL_MULTI_SINK = 8
 }
 
 enum TSinkAction {
@@ -202,4 +203,7 @@ struct TDataSink {
   // Additional details that should be printed to the user. This is node specific
   // e.g. table name, join strategy, etc.
   11: optional string label_detail
+
+  // Forwards the same results to multiple fragments for LOCAL_MULTI_SINK
+  12: optional list<Types.TPlanNodeId> dest_node_ids
 }

@@ -1,0 +1,86 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+#pragma once
+
+#include <string>
+
+#include "codegen/codegen-fn-ptr.h"
+#include "exec/exec-node.h"
+
+namespace impala {
+
+class CTEConsumerNode;
+class LocalExchanger;
+
+class CTEConsumerPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
+  virtual void Close() override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  virtual void Codegen(FragmentState* state) override;
+
+  TupleDescriptor* tuple_desc_;
+  std::vector<ScalarExpr*> input_exprs_;
+
+  typedef void (*MaterializeBatchFn)(CTEConsumerNode*, RowBatch*, RowBatch*, uint8_t**);
+  /// Vector of pointers to codegen'ed MaterializeBatch functions. The vector contains one
+  /// function for each child. The size of the vector should be equal to the number of
+  /// children. If a child is passthrough, there should be a NULL for that child. If
+  /// Codegen is disabled, there should be a NULL for every child.
+  CodegenFnPtr<MaterializeBatchFn> codegend_materialize_batch_fn_;
+
+  bool is_passthrough_;
+};
+
+/// Node that scans results of a Common Table Expression from a LocalExchanger
+/// produced by a CTEProducerNode.
+class CTEConsumerNode : public ExecNode {
+ public:
+  CTEConsumerNode(
+      ObjectPool* pool, const CTEConsumerPlanNode& pnode, const DescriptorTbl& descs);
+
+  Status Prepare(RuntimeState* state) override;
+  Status Open(RuntimeState* state) override;
+  Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
+  Status Reset(RuntimeState* state, RowBatch* row_batch) override;
+  void Close(RuntimeState* state) override;
+  void DebugString(int indentation_level, std::stringstream* out) const override;
+
+  /// Evaluates exprs for the input batch and materializes the results into 'tuple_buf',
+  /// which is attached to 'dst_batch'. Runs until 'dst_batch' is at capacity, or all rows
+  /// have been consumed from 'input_batch'.
+  void MaterializeBatch(RowBatch* input_batch, RowBatch* dst_batch, uint8_t** tuple_buf);
+
+  /// Evaluates 'exprs' over 'row', materializes the results in 'tuple_buf'.
+  /// and appends the new tuple to 'dst_batch'. Increments 'num_rows_returned_'.
+  void MaterializeExprs(const std::vector<ScalarExprEvaluator*>& evaluators,
+      TupleRow* row, uint8_t* tuple_buf, RowBatch* dst_batch);
+
+ private:
+  std::string name_;
+  LocalExchanger* exchanger_ = nullptr;
+  const TupleDescriptor* tuple_desc_;
+  const std::vector<ScalarExpr*>& input_exprs_;
+  std::vector<ScalarExprEvaluator*> input_expr_evals_;
+  const CodegenFnPtr<CTEConsumerPlanNode::MaterializeBatchFn>&
+      codegend_materialize_batch_fn_;
+  int32_t consumer_index_;
+  bool is_passthrough_;
+};
+
+}

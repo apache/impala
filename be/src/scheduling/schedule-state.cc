@@ -127,11 +127,18 @@ void ScheduleState::Init() {
     // each fragment sends its output to the fragment containing the destination node
     // of its output sink
     for (const TPlanFragment& fragment: plan_exec_info.fragments) {
-      if (!fragment.output_sink.__isset.stream_sink) continue;
-      PlanNodeId dest_node_id = fragment.output_sink.stream_sink.dest_node_id;
-      FragmentIdx dest_idx = plan_node_to_fragment_idx_[dest_node_id];
-      FragmentScheduleState& dest_state = fragment_schedule_states_[dest_idx];
-      dest_state.exchange_input_fragments.push_back(fragment.idx);
+      if (fragment.output_sink.__isset.stream_sink) {
+        PlanNodeId dest_node_id = fragment.output_sink.stream_sink.dest_node_id;
+        FragmentIdx dest_idx = plan_node_to_fragment_idx_[dest_node_id];
+        FragmentScheduleState& dest_state = fragment_schedule_states_[dest_idx];
+        dest_state.exchange_input_fragments.push_back(fragment.idx);
+      } else if (fragment.output_sink.__isset.dest_node_ids) {
+        for (const TPlanNodeId& dest_node_id : fragment.output_sink.dest_node_ids) {
+          FragmentIdx dest_idx = plan_node_to_fragment_idx_[dest_node_id];
+          FragmentScheduleState& dest_state = fragment_schedule_states_[dest_idx];
+          dest_state.exchange_input_fragments.push_back(fragment.idx);
+        }
+      }
     }
   }
 }

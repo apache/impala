@@ -102,6 +102,15 @@ class PlanNode {
   /// check to see if codegen was enabled for the enclosing fragment.
   bool IsNodeCodegenDisabled() const { return tnode_->disable_codegen; }
 
+  /// Returns true if parents of this node will need to deep copy some output batches.
+  /// Nodes that MarkNeedsDeepCopy must override this method.
+  virtual bool WillNeedDeepCopy(const TQueryOptions& opts) const {
+    for (const PlanNode* child : children_) {
+      if (child->WillNeedDeepCopy(opts)) return true;
+    }
+    return false;
+  }
+
   /// TODO: IMPALA-9216: Add accessor methods for these members instead of making
   /// them public.
   /// Reference to the thrift node that represents this PlanNode.

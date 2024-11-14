@@ -53,6 +53,10 @@ class TestCalcitePlanner(ImpalaTestSuite):
     vector.get_value('exec_option')['cte_threshold'] = 1
     self.run_test_case('QueryTest/cte', vector, use_db=unique_database)
 
+  def test_cte_distributed(self, vector, unique_database):
+    vector.get_value('exec_option')['cte_threshold'] = 1
+    self.run_test_case('QueryTest/cte-distributed', vector, use_db=unique_database)
+
 
 class TestFallbackPlanner(ImpalaTestSuite):
 

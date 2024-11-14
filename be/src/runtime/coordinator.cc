@@ -372,6 +372,13 @@ void Coordinator::ExecSummary::Init(const QueryExecParams& exec_params) {
         }
         thrift_exec_summary.__isset.exch_to_sender_map = true;
         thrift_exec_summary.exch_to_sender_map[dst_node_idx] = root_node_idx;
+      } else if (fragment.__isset.output_sink &&
+          fragment.output_sink.__isset.dest_node_ids) {
+        for (const TPlanNodeId& dest_node_id : fragment.output_sink.dest_node_ids) {
+          int dst_node_idx = node_id_to_idx_map[dest_node_id];
+          thrift_exec_summary.__isset.exch_to_sender_map = true;
+          thrift_exec_summary.exch_to_sender_map[dst_node_idx] = root_node_idx;
+        }
       }
     }
   }

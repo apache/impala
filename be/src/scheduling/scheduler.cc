@@ -323,6 +323,72 @@ Status Scheduler::ComputeScanRangeAssignment(
   return Status::OK();
 }
 
+using InstanceStatesByHostMap =
+    unordered_map<NetworkAddressPB, vector<FInstanceScheduleState*>>;
+
+static InstanceStatesByHostMap GroupInstanceStatesByHost(
+    std::vector<FInstanceScheduleState>& instance_states) {
+  InstanceStatesByHostMap instances_by_host;
+  for (FInstanceScheduleState& instance_state : instance_states) {
+    instances_by_host[instance_state.host].push_back(&instance_state);
+  }
+  return instances_by_host;
+}
+
+template<typename K, typename V>
+static bool KeySetIncludes(
+    const unordered_map<K, V>& super_set,
+    const unordered_map<K, V>& sub_set) {
+  for (const auto& pair : sub_set) {
+    if (super_set.find(pair.first) == super_set.end()) return false;
+  }
+  return true;
+}
+
+static void ConnectCTEProducersAndConsumers(PlanNodeId dest_node_id,
+    InstanceStatesByHostMap& src_instances_by_host,
+    InstanceStatesByHostMap& dest_instances_by_host) {
+  DCHECK_GE(dest_instances_by_host.size(), src_instances_by_host.size());
+  DCHECK(KeySetIncludes(dest_instances_by_host, src_instances_by_host))
+      << "Not all CTE producer hosts have a matching consumer fragment.";
+  // For every consumer host, find the producer instances on the same host.
+  // If there isn't one, set cte_producer_instance_idx to -1.
+  for (const auto& dest_pair : dest_instances_by_host) {
+    const NetworkAddressPB& host = dest_pair.first;
+    const vector<FInstanceScheduleState*>& dest_instance_states = dest_pair.second;
+
+    auto src_it = src_instances_by_host.find(host);
+    if (src_it == src_instances_by_host.end()) {
+      VLOG(3) << "No CTE producer for consumer instances on host " << host;
+      continue;
+    }
+
+    const vector<FInstanceScheduleState*>& src_instance_states = src_it->second;
+    DCHECK_GE(dest_instance_states.size(), src_instance_states.size());
+    for (size_t i = 0; i < src_instance_states.size(); ++i) {
+      FInstanceScheduleState* dest_instance_state = dest_instance_states[i];
+      // LocalExchanger multicasts every batch to every registered consumer. Register
+      // one physical destination per producer instance for this logical CTE consumer.
+      // Extra destination instances are MT_DOP copies and must not replay the same CTE
+      // stream.
+      FInstanceScheduleState* src_instance_state = src_instance_states[i];
+      VLOG(3) << "Mapping CTE producer instance "
+              << src_instance_state->exec_params.per_fragment_instance_idx()
+              << " to consumer instance "
+              << dest_instance_state->exec_params.per_fragment_instance_idx()
+              << "(id=" << dest_node_id << ") on host " << host << ".";
+      // Map producer per_fragment_instance_idx to consumer PlanNodes.
+      // In a union, index for each consumer can be different.
+      google::protobuf::Map<int32_t, int32_t>* cte_map =
+          dest_instance_state->exec_params.mutable_cte_consumer_to_producer_idx();
+      (*cte_map)[dest_node_id] =
+          src_instance_state->exec_params.per_fragment_instance_idx();
+      src_instance_state->exec_params.set_num_cte_consumers(
+          src_instance_state->exec_params.num_cte_consumers() + 1);
+    }
+  }
+}
+
 Status Scheduler::ComputeFragmentExecParams(
     const ExecutorConfig& executor_config, ScheduleState* state) {
   const TQueryExecRequest& exec_request = state->request();
@@ -389,6 +455,76 @@ Status Scheduler::ComputeFragmentExecParams(
       }
     }
   }
+
+  // Link CTE producers and consumers after all fragments have been processed.
+  for (const TPlanExecInfo& plan_exec_info : exec_request.plan_exec_info) {
+    for (const TPlanFragment& src_fragment : plan_exec_info.fragments) {
+      if (src_fragment.output_sink.__isset.dest_node_ids) {
+        // Handle LocalMultiSink: map source states to destination states.
+        FragmentScheduleState* src_state =
+            state->GetFragmentScheduleState(src_fragment.idx);
+        for (FInstanceScheduleState& src_instance_state : src_state->instance_states) {
+          src_instance_state.exec_params.set_num_cte_consumers(0);
+        }
+        InstanceStatesByHostMap src_instances_by_host =
+            GroupInstanceStatesByHost(src_state->instance_states);
+        for (PlanNodeId dest_node_id : src_fragment.output_sink.dest_node_ids) {
+          FragmentIdx dest_idx = state->GetFragmentIdx(dest_node_id);
+          FragmentScheduleState* dest_state = state->GetFragmentScheduleState(dest_idx);
+          // Ensure each source instance maps to a destination instance on the same host.
+          InstanceStatesByHostMap dest_instances_by_host =
+              GroupInstanceStatesByHost(dest_state->instance_states);
+          VLOG(3) << "Mapping CTE producer fragment "
+                  << src_fragment.display_name << " to consumer fragment "
+                  << dest_state->fragment.display_name << " on "
+                  << dest_instances_by_host.size() << " hosts.";
+          ConnectCTEProducersAndConsumers(dest_node_id,
+              src_instances_by_host, dest_instances_by_host);
+        }
+      } else {
+        // Link CTE producers and consumers that share the same fragment. This handles
+        // single-node plans where the entire plan—including CTEProducerNode and
+        // CTEConsumerNodes—is in a single UNPARTITIONED fragment with no LocalMultiSink,
+        // so the cross-fragment loop above never fires.
+        FragmentScheduleState* frag_state =
+            state->GetFragmentScheduleState(src_fragment.idx);
+
+        for (const TPlanNode& node : src_fragment.plan.nodes) {
+          if (node.node_type != TPlanNodeType::CTE_PRODUCER_NODE) continue;
+          DCHECK(node.__isset.cte_producer);
+          const string& cte_name = node.cte_producer.name;
+
+          // Collect consumer nodes in this fragment that match this producer's name.
+          vector<PlanNodeId> consumer_ids;
+          for (const TPlanNode& other : src_fragment.plan.nodes) {
+            if (other.node_type != TPlanNodeType::CTE_CONSUMER_NODE) continue;
+            DCHECK(other.__isset.cte_consumer);
+            if (other.cte_consumer.name == cte_name) {
+              consumer_ids.push_back(other.node_id);
+            }
+          }
+          if (consumer_ids.empty()) continue;
+
+          VLOG(3) << "Linking " << consumer_ids.size()
+                  << " intra-fragment CTE consumer(s) to producer '" << cte_name
+                  << "' in fragment " << src_fragment.display_name;
+
+          // For each instance of this fragment, set num_cte_consumers and map each
+          // consumer node id to this instance's per_fragment_instance_idx so the
+          // backend can find the right LocalExchanger.
+          for (FInstanceScheduleState& inst : frag_state->instance_states) {
+            inst.exec_params.set_num_cte_consumers(
+                inst.exec_params.num_cte_consumers() + consumer_ids.size());
+            auto* cte_map = inst.exec_params.mutable_cte_consumer_to_producer_idx();
+            for (PlanNodeId consumer_id : consumer_ids) {
+              (*cte_map)[consumer_id] = inst.exec_params.per_fragment_instance_idx();
+            }
+          }
+        }
+      }
+    }
+  }
+
   return Status::OK();
 }
 
@@ -568,6 +704,12 @@ Status Scheduler::CheckEffectiveInstanceCount(
 Status Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     const TPlanExecInfo& plan_exec_info, FragmentScheduleState* fragment_state,
     ScheduleState* state) {
+  if (fragment_state->visited) {
+    // Don't visit a fragment state more than once. Can happen with CTEs feeding
+    // multiple fragments.
+    return Status::OK();
+  }
+  fragment_state->visited = true;
   // Create exec params for child fragments connected by an exchange. Instance creation
   // for this fragment depends on where the input fragment instances are scheduled.
   for (FragmentIdx input_fragment_idx : fragment_state->exchange_input_fragments) {
@@ -655,12 +797,14 @@ Status Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_confi
       }
     }
   } else if (ContainsUnionNode(fragment.plan) || ContainsScanNode(fragment.plan)) {
-    VLOG(3) << "Computing exec params for scan and/or union fragment.";
+    VLOG(3) << "Computing exec params for scan and/or union fragment "
+            << fragment_state->fragment.display_name;
     // case 2: leaf fragment (i.e. no input fragments) with a single scan node.
     // case 3: union fragment, which may have scan nodes and may have input fragments.
     CreateCollocatedAndScanInstances(executor_config, fragment_state, state);
   } else {
-    VLOG(3) << "Computing exec params for interior fragment.";
+    VLOG(3) << "Computing exec params for interior fragment "
+            << fragment_state->fragment.display_name;
     // case 4: interior (non-leaf) fragment without a scan or union.
     // We assign the same hosts as those of our leftmost input fragment (so that a
     // merge aggregation fragment runs on the hosts that provide the input data) OR
@@ -1017,21 +1161,41 @@ vector<vector<ScanRangeParamsPB>> Scheduler::AssignRangesToInstances(
   return per_instance_ranges;
 }
 
+static const FragmentScheduleState& GetCollocatedInputFragmentState(
+    const FragmentScheduleState* fragment_state, ScheduleState* state) {
+  DCHECK_GE(fragment_state->exchange_input_fragments.size(), 1);
+  const FragmentScheduleState* candidate_state =
+      state->GetFragmentScheduleState(fragment_state->exchange_input_fragments[0]);
+  // If a CTE consumer, set input as the consumer with the most inputs.
+  if (candidate_state->fragment.output_sink.__isset.stream_sink) {
+    VLOG(3) << "Fragment " << fragment_state->fragment.display_name
+            << " has CTE consumers. Finding the input fragment with the most inputs.";
+    for (int32_t idx : fragment_state->exchange_input_fragments) {
+      const FragmentScheduleState* fstate = state->GetFragmentScheduleState(idx);
+      VLOG(3) << "Fragment " << fstate->fragment.display_name
+              << " has " << fstate->instance_states.size() << " instances.";
+      if (fstate->instance_states.size() > candidate_state->instance_states.size()) {
+        candidate_state = fstate;
+      }
+    }
+  }
+  return *candidate_state;
+}
+
 void Scheduler::CreateInputCollocatedInstances(
     FragmentScheduleState* fragment_state, ScheduleState* state) {
-  DCHECK_GE(fragment_state->exchange_input_fragments.size(), 1);
-  const TPlanFragment& fragment = fragment_state->fragment;
   const FragmentScheduleState& input_fragment_state =
-      *state->GetFragmentScheduleState(fragment_state->exchange_input_fragments[0]);
-  int per_fragment_instance_idx = 0;
+      GetCollocatedInputFragmentState(fragment_state, state);
 
   int max_instances = input_fragment_state.instance_states.size();
+  const TPlanFragment& fragment = fragment_state->fragment;
   if (fragment.effective_instance_count > 0) {
     max_instances = fragment.effective_instance_count;
   } else if (IsExceedMaxFsWriters(fragment_state, &input_fragment_state, state)) {
     max_instances = state->query_options().max_fs_writers;
   }
 
+  int per_fragment_instance_idx = 0;
   if (max_instances != input_fragment_state.instance_states.size()) {
     std::unordered_set<std::pair<NetworkAddressPB, NetworkAddressPB>> all_hosts;
     for (const FInstanceScheduleState& input_instance_state :

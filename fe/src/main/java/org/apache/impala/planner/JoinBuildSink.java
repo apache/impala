@@ -150,11 +150,6 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
   }
 
   @Override
-  protected String getLabelDetail() {
-    return "";
-  }
-
-  @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
     // The processing cost to export rows.
     processingCost_ = joinNode_.computeJoinProcessingCost().second;
