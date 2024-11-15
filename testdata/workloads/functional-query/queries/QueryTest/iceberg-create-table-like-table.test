@@ -397,7 +397,7 @@ create table ice_hadoop_cat_no_part(
   array < STRING > >
 ) stored as iceberg tblproperties(
   'iceberg.catalog' = 'ice_hadoop_cat',
-  'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_cat_no_part'
+  'iceberg.table_identifier' = 'id_a.$DATABASE.ice_hadoop_cat_no_part'
 );
 ---- RESULTS
 'Table has been created.'
@@ -460,7 +460,7 @@ create table ice_hadoop_cat(
   array < STRING > >
 ) partitioned by spec (bucket(3, id)) stored as iceberg tblproperties(
   'iceberg.catalog' = 'ice_hadoop_cat',
-  'iceberg.table_identifier' = 'id_a.id_b.ice_hadoop_cat'
+  'iceberg.table_identifier' = 'id_a.$DATABASE.ice_hadoop_cat'
 );
 ---- RESULTS
 'Table has been created.'
