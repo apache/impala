@@ -87,6 +87,10 @@ under the License.
       <li>
         <xref href="impala_misc_functions.xml#misc_functions"/>
       </li>
+
+      <li>
+        <xref href="impala_geospatial_functions.xml#geospatial_functions"/>
+      </li>
     </ul>
 
     <p>

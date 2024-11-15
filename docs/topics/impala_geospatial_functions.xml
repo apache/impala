@@ -1,0 +1,912 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements. See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership. The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License. You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied. See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="geospatial_functions">
+  <title>Impala Geospatial Functions</title>
+  <titlealts audience="PDF">
+    <navtitle>Geospatial Functions</navtitle>
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Geospatial"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+    <p>Impala supports a range of geospatial functions to facilitate spatial data processing and analysis,
+     based on Apache Hive's implementation of ESRI functions.</p>
+    <p> Many functions return results in binary format (<codeph>BINARY</codeph>), these values can typically be
+      interpreted as geometries, and they can be used with Hive functions similarly. It's not recommended
+      to serialize geometries in this format, for compatibility, converting to Well-Known Binary format is recommended.
+      Possible geometries returned as <codeph>BINARY</codeph>:
+      <ul>
+        <li>POINT</li>
+        <li>LINESTRING</li>
+        <li>POLYGON</li>
+        <li>MULTIPOINT</li>
+        <li>MULTILINESTRING</li>
+        <li>MULTIPOLYGON</li>
+        <li>GEOMETRYCOLLECTION</li>
+      </ul>
+      Coordinates for geometries may be 2D (x, y), 3D (x, y, z) or 4D (x, y, z, m).
+      Geospatial functionality can be controlled through the startup flag <codeph>GEOSPATIAL_LIBRARY</codeph>.
+      <ul>
+        <li>By default, the library is set to <codeph>HIVE_ESRI</codeph>, enabling the
+        <xref href="https://github.com/Esri/spatial-framework-for-hadoop/wiki/UDF-Documentation" scope="external" format="html">Hive ESRI</xref>
+        geospatial functions.
+        </li>
+        <li>If geospatial functionality is not needed, it can be turned off by setting <codeph>GEOSPATIAL_LIBRARY</codeph> to <codeph>NONE</codeph>.</li>
+      </ul>
+    </p>
+    <p>There are 3 types of ST_* functions:
+    <ul>
+      <li>
+        Regular functions with one argument list and one return type.
+      </li>
+      <li>
+        Generic functions with multiple argument lists and overloads
+      </li>
+      <li>
+        Vararg functions with variable-length argument lists. The maximum number of arguments for vararg functions is limited to 14.
+      </li>
+    </ul>
+    </p>
+    <p>The list of supported functions:
+    <ul>
+      <li><xref href="#geospatial_functions/st_area">ST_Area</xref></li>
+      <li><xref href="#geospatial_functions/st_asbinary">ST_AsBinary</xref></li>
+      <li><xref href="#geospatial_functions/st_asgeojson">ST_AsGeoJson</xref></li>
+      <li><xref href="#geospatial_functions/st_asjson">ST_AsJson</xref></li>
+      <li><xref href="#geospatial_functions/st_asshape">ST_AsShape</xref></li>
+      <li><xref href="#geospatial_functions/st_astext">ST_AsText</xref></li>
+      <li><xref href="#geospatial_functions/st_bin">ST_Bin</xref></li>
+      <li><xref href="#geospatial_functions/st_binenvelope_point">ST_BinEnvelope</xref></li>
+      <li><xref href="#geospatial_functions/st_boundary">ST_Boundary</xref></li>
+      <li><xref href="#geospatial_functions/st_buffer">ST_Buffer</xref></li>
+      <li><xref href="#geospatial_functions/st_centroid">ST_Centroid</xref></li>
+      <li><xref href="#geospatial_functions/st_contains">ST_Contains</xref></li>
+      <li><xref href="#geospatial_functions/st_convexhull">ST_ConvexHull</xref></li>
+      <li><xref href="#geospatial_functions/st_coorddim">ST_CoordDim</xref></li>
+      <li><xref href="#geospatial_functions/st_crosses">ST_Crosses</xref></li>
+      <li><xref href="#geospatial_functions/st_difference">ST_Difference</xref></li>
+      <li><xref href="#geospatial_functions/st_dimension">ST_Dimension</xref></li>
+      <li><xref href="#geospatial_functions/st_disjoint">ST_Disjoint</xref></li>
+      <li><xref href="#geospatial_functions/st_distance">ST_Distance</xref></li>
+      <li><xref href="#geospatial_functions/st_endpoint">ST_EndPoint</xref></li>
+      <li><xref href="#geospatial_functions/st_envelope">ST_Envelope</xref></li>
+      <li><xref href="#geospatial_functions/st_envintersects">ST_EnvIntersects</xref></li>
+      <li><xref href="#geospatial_functions/st_equals">ST_Equals</xref></li>
+      <li><xref href="#geospatial_functions/st_exteriorring">ST_ExteriorRing</xref></li>
+      <li><xref href="#geospatial_functions/st_geodesiclengthwgs84">ST_GeodesicLengthWGS84</xref></li>
+      <li><xref href="#geospatial_functions/st_geomcollection_wkt">ST_GeomCollection</xref></li>
+      <li><xref href="#geospatial_functions/st_geometryn">ST_GeometryN</xref></li>
+      <li><xref href="#geospatial_functions/st_geometrytype">ST_GeometryType</xref></li>
+      <li><xref href="#geospatial_functions/st_geomfromgeojson">ST_GeomFromGeoJson</xref></li>
+      <li><xref href="#geospatial_functions/st_geomfromjson">ST_GeomFromJson</xref></li>
+      <li><xref href="#geospatial_functions/st_geomfromshape">ST_GeomFromShape</xref></li>
+      <li><xref href="#geospatial_functions/st_geomfromtext">ST_GeomFromText</xref></li>
+      <li><xref href="#geospatial_functions/st_geomfromwkb">ST_GeomFromWKB</xref></li>
+      <li><xref href="#geospatial_functions/st_interiorringn">ST_InteriorRingN</xref></li>
+      <li><xref href="#geospatial_functions/st_intersection">ST_Intersection</xref></li>
+      <li><xref href="#geospatial_functions/st_intersects">ST_Intersects</xref></li>
+      <li><xref href="#geospatial_functions/st_is3d">ST_Is3D</xref></li>
+      <li><xref href="#geospatial_functions/st_isclosed">ST_IsClosed</xref></li>
+      <li><xref href="#geospatial_functions/st_isempty">ST_IsEmpty</xref></li>
+      <li><xref href="#geospatial_functions/st_ismeasured">ST_IsMeasured</xref></li>
+      <li><xref href="#geospatial_functions/st_isring">ST_IsRing</xref></li>
+      <li><xref href="#geospatial_functions/st_issimple">ST_IsSimple</xref></li>
+      <li><xref href="#geospatial_functions/st_length">ST_Length</xref></li>
+      <li><xref href="#geospatial_functions/st_linefromwkb">ST_LineFromWKB</xref></li>
+      <li><xref href="#geospatial_functions/st_linestring">ST_LineString</xref></li>
+      <li><xref href="#geospatial_functions/st_m">ST_M</xref></li>
+      <li><xref href="#geospatial_functions/st_maxm">ST_MaxM</xref></li>
+      <li><xref href="#geospatial_functions/st_maxx">ST_MaxX</xref></li>
+      <li><xref href="#geospatial_functions/st_maxy">ST_MaxY</xref></li>
+      <li><xref href="#geospatial_functions/st_maxz">ST_MaxZ</xref></li>
+      <li><xref href="#geospatial_functions/st_minm">ST_MinM</xref></li>
+      <li><xref href="#geospatial_functions/st_minx">ST_MinX</xref></li>
+      <li><xref href="#geospatial_functions/st_miny">ST_MinY</xref></li>
+      <li><xref href="#geospatial_functions/st_minz">ST_MinZ</xref></li>
+      <li><xref href="#geospatial_functions/st_mlinefromwkb">ST_MLineFromWKB</xref></li>
+      <li><xref href="#geospatial_functions/st_mpointfromwkb">ST_MPointFromWKB</xref></li>
+      <li><xref href="#geospatial_functions/st_mpolyfromwkb">ST_MPolyFromWKB</xref></li>
+      <li><xref href="#geospatial_functions/st_multilinestring">ST_MultiLineString</xref></li>
+      <li><xref href="#geospatial_functions/st_multipoint">ST_MultiPoint</xref></li>
+      <li><xref href="#geospatial_functions/st_multipolygon">ST_MultiPolygon</xref></li>
+      <li><xref href="#geospatial_functions/st_numgeometries">ST_NumGeometries</xref></li>
+      <li><xref href="#geospatial_functions/st_numinteriorring">ST_NumInteriorRing</xref></li>
+      <li><xref href="#geospatial_functions/st_numpoints">ST_NumPoints</xref></li>
+      <li><xref href="#geospatial_functions/st_overlaps">ST_Overlaps</xref></li>
+      <li><xref href="#geospatial_functions/st_point">ST_Point</xref></li>
+      <li><xref href="#geospatial_functions/st_pointfromwkb">ST_PointFromWKB</xref></li>
+      <li><xref href="#geospatial_functions/st_pointn">ST_PointN</xref></li>
+      <li><xref href="#geospatial_functions/st_pointz">ST_PointZ</xref></li>
+      <li><xref href="#geospatial_functions/st_polyfromwkb">ST_PolyFromWKB</xref></li>
+      <li><xref href="#geospatial_functions/st_polygon">ST_Polygon</xref></li>
+      <li><xref href="#geospatial_functions/st_relate">ST_Relate</xref></li>
+      <li><xref href="#geospatial_functions/st_setsrid">ST_SetSRID</xref></li>
+      <li><xref href="#geospatial_functions/st_srid">ST_SRID</xref></li>
+      <li><xref href="#geospatial_functions/st_startpoint">ST_StartPoint</xref></li>
+      <li><xref href="#geospatial_functions/st_symmetricdiff">ST_SymmetricDiff</xref></li>
+      <li><xref href="#geospatial_functions/st_touches">ST_Touches</xref></li>
+      <li><xref href="#geospatial_functions/st_union">ST_Union</xref></li>
+      <li><xref href="#geospatial_functions/st_within">ST_Within</xref></li>
+      <li><xref href="#geospatial_functions/st_x">ST_X</xref></li>
+      <li><xref href="#geospatial_functions/st_y">ST_Y</xref></li>
+      <li><xref href="#geospatial_functions/st_z">ST_Z</xref></li>
+    </ul>
+    </p>
+
+    <dl>
+      <!-- ST_Area -->
+      <dlentry id="st_area">
+        <dt>ST_Area(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_AsBinary -->
+      <dlentry id="st_asbinary">
+        <dt>ST_AsBinary(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_AsGeoJson -->
+      <dlentry id="st_asgeojson">
+        <dt>ST_AsGeoJson(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> STRING</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_AsJson -->
+      <dlentry id="st_asjson">
+        <dt>ST_AsJson(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> STRING</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_AsShape -->
+      <dlentry id="st_asshape">
+        <dt>ST_AsShape(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+      <!-- ST_AsText -->
+      <dlentry id="st_astext">
+        <dt>ST_AsText(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> STRING</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Bin -->
+      <dlentry id="st_bin">
+        <dt>ST_Bin([BIGINT, DOUBLE] binsize, [BINARY, STRING] point)</dt>
+        <dd>
+          <p><b>Return type:</b> BIGINT</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_BinEnvelope -->
+      <dlentry id="st_binenvelope_point">
+        <dt>ST_BinEnvelope([BIGINT, DOUBLE] binsize, [BINARY, STRING] point)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_BinEnvelope -->
+      <dlentry id="st_binenvelope_bin_id">
+        <dt>ST_BinEnvelope([BIGINT, DOUBLE] binsize, BIGINT bin_id)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Boundary -->
+      <dlentry id="st_boundary">
+        <dt>ST_Boundary(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Buffer -->
+      <dlentry id="st_buffer">
+        <dt>ST_Buffer(BINARY geometry, DOUBLE distance)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Centroid -->
+      <dlentry id="st_centroid">
+        <dt>ST_Centroid(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+
+        </dd>
+      </dlentry>
+
+      <!-- ST_Contains -->
+      <dlentry id="st_contains">
+        <dt>ST_Contains([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_ConvexHull -->
+      <dlentry id="st_convexhull">
+        <dt>ST_ConvexHull(BINARY geometry...)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_CoordDim -->
+      <dlentry id="st_coorddim">
+        <dt>ST_CoordDim(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> INT</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Crosses -->
+      <dlentry id="st_crosses">
+        <dt>ST_Crosses([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Difference -->
+      <dlentry id="st_difference">
+        <dt>ST_Difference(BINARY geometry1, BINARY geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Dimension -->
+      <dlentry id="st_dimension">
+        <dt>ST_Dimension(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> INT</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Disjoint -->
+      <dlentry id="st_disjoint">
+        <dt>ST_Disjoint([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Distance -->
+      <dlentry id="st_distance">
+        <dt>ST_Distance(BINARY geometry1, BINARY geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_EndPoint -->
+      <dlentry id="st_endpoint">
+        <dt>ST_EndPoint(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Envelope -->
+      <dlentry id="st_envelope">
+        <dt>ST_Envelope(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_EnvIntersects -->
+      <dlentry id="st_envintersects">
+        <dt>ST_EnvIntersects(BINARY geometry1, BINARY geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Equals -->
+      <dlentry id="st_equals">
+        <dt>ST_Equals([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_ExteriorRing -->
+      <dlentry id="st_exteriorring">
+        <dt>ST_ExteriorRing(BINARY polygon)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeodesicLengthWGS84 -->
+      <dlentry id="st_geodesiclengthwgs84">
+        <dt>ST_GeodesicLengthWGS84(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeomCollection -->
+      <dlentry id="st_geomcollection_wkt">
+        <dt>ST_GeomCollection(STRING wkt)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_geomcollection_wkt_wkid">
+        <dt>ST_GeomCollection(STRING wkt, INT wkid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeometryN -->
+      <dlentry id="st_geometryn">
+        <dt>ST_GeometryN(BINARY geometry, INT n)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeometryType -->
+      <dlentry id="st_geometrytype">
+        <dt>ST_GeometryType(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> STRING</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeomFromGeoJson -->
+      <dlentry id="st_geomfromgeojson">
+        <dt>ST_GeomFromGeoJson(STRING geojson_string)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeomFromJson -->
+      <dlentry id="st_geomfromjson">
+        <dt>ST_GeomFromJson(STRING json_string)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeomFromShape -->
+      <dlentry id="st_geomfromshape">
+        <dt>ST_GeomFromShape(BINARY shape)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_geomfromshape_srid">
+        <dt>ST_GeomFromShape(BINARY shape, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeomFromText -->
+      <dlentry id="st_geomfromtext">
+        <dt>ST_GeomFromText(STRING wkt)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_geomfromtext_srid">
+        <dt>ST_GeomFromText(STRING wkt, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_GeomFromWKB -->
+      <dlentry id="st_geomfromwkb">
+        <dt>ST_GeomFromWKB(BINARY wkb)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_geomfromwkb_srid">
+        <dt>ST_GeomFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_InteriorRingN -->
+      <dlentry id="st_interiorringn">
+        <dt>ST_InteriorRingN(BINARY polygon, INT n)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Intersection -->
+      <dlentry id="st_intersection">
+        <dt>ST_Intersection([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Intersects -->
+      <dlentry id="st_intersects">
+        <dt>ST_Intersects([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Is3D -->
+      <dlentry id="st_is3d">
+        <dt>ST_Is3D(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_IsClosed -->
+      <dlentry id="st_isclosed">
+        <dt>ST_IsClosed(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_IsEmpty -->
+      <dlentry id="st_isempty">
+        <dt>ST_IsEmpty(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_IsMeasured -->
+      <dlentry id="st_ismeasured">
+        <dt>ST_IsMeasured(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_IsRing -->
+      <dlentry id="st_isring">
+        <dt>ST_IsRing(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_IsSimple -->
+      <dlentry id="st_issimple">
+        <dt>ST_IsSimple(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Length -->
+      <dlentry id="st_length">
+        <dt>ST_Length(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_LineFromWKB -->
+      <dlentry id="st_linefromwkb">
+        <dt>ST_LineFromWKB(BINARY wkb)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_linefromwkb_srid">
+        <dt>ST_LineFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_LineString -->
+      <dlentry id="st_linestring">
+        <dt>ST_LineString(DOUBLE point1, DOUBLE point2 [, DOUBLE pointN, DOUBLE pointM]*)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_linestring_wkt">
+        <dt>ST_LineString(STRING wkt)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_M -->
+      <dlentry id="st_m">
+        <dt>ST_M(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MaxM -->
+      <dlentry id="st_maxm">
+        <dt>ST_MaxM(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MaxX -->
+      <dlentry id="st_maxx">
+        <dt>ST_MaxX(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MaxY -->
+      <dlentry id="st_maxy">
+        <dt>ST_MaxY(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MaxZ -->
+      <dlentry id="st_maxz">
+        <dt>ST_MaxZ(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MinM -->
+      <dlentry id="st_minm">
+        <dt>ST_MinM(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MinX -->
+      <dlentry id="st_minx">
+        <dt>ST_MinX(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MinY -->
+      <dlentry id="st_miny">
+        <dt>ST_MinY(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MinZ -->
+      <dlentry id="st_minz">
+        <dt>ST_MinZ(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MLineFromWKB -->
+      <dlentry id="st_mlinefromwkb">
+        <dt>ST_MLineFromWKB(BINARY wkb)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_mlinefromwkb_srid">
+        <dt>ST_MLineFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MPointFromWKB -->
+      <dlentry id="st_mpointfromwkb">
+        <dt>ST_MPointFromWKB(BINARY wkb)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_mpointfromwkb_srid">
+        <dt>ST_MPointFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MPolyFromWKB -->
+      <dlentry id="st_mpolyfromwkb">
+        <dt>ST_MPolyFromWKB(BINARY wkb)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_mpolyfromwkb_srid">
+        <dt>ST_MPolyFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+            <!-- ST_MultiLineString -->
+      <dlentry id="st_multilinestring">
+        <dt>ST_MultiLineString(STRING wkt)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MultiPoint -->
+      <dlentry id="st_multipoint">
+        <dt>ST_MultiPoint(DOUBLE x1, DOUBLE y1, [, DOUBLE xn, DOUBLE yn])</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_multipoint_wkt">
+        <dt>ST_MultiPoint(STRING wkt)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_MultiPolygon -->
+      <dlentry id="st_multipolygon">
+        <dt>ST_MultiPolygon(STRING wkt)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_NumGeometries -->
+      <dlentry id="st_numgeometries">
+        <dt>ST_NumGeometries(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> INT</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_NumInteriorRing -->
+      <dlentry id="st_numinteriorring">
+        <dt>ST_NumInteriorRing(BINARY polygon)</dt>
+        <dd>
+          <p><b>Return type:</b> INT</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_NumPoints -->
+      <dlentry id="st_numpoints">
+        <dt>ST_NumPoints(BINARY linestring)</dt>
+        <dd>
+          <p><b>Return type:</b> INT</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Overlaps -->
+      <dlentry id="st_overlaps">
+        <dt>ST_Overlaps([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Point -->
+      <dlentry id="st_point">
+        <dt>ST_Point(DOUBLE x, DOUBLE y [, DOUBLE z [, DOUBLE m]])</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_PointFromWKB -->
+      <dlentry id="st_pointfromwkb">
+        <dt>ST_PointFromWKB(BINARY wkb)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_pointfromwkb_srid">
+        <dt>ST_PointFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_PointN -->
+      <dlentry id="st_pointn">
+        <dt>ST_PointN(BINARY linestring, INT n)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_PointZ -->
+      <dlentry id="st_pointz">
+        <dt>ST_PointZ(DOUBLE x, DOUBLE y, DOUBLE z [, DOUBLE m])</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_PolyFromWKB -->
+      <dlentry id="st_polyfromwkb">
+        <dt>ST_PolyFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_polyfromwkb_srid">
+        <dt>ST_PolyFromWKB(BINARY wkb, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Relate -->
+      <dlentry id="st_relate">
+        <dt>ST_Relate(BINARY geometry1, BINARY geometry2, STRING pattern)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Polygon -->
+      <dlentry id="st_polygon">
+        <dt>ST_Polygon(DOUBLE x, DOUBLE y, [DOUBLE xn, DOUBLE yn]*)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <dlentry id="st_polygon_wkt">
+        <dt>ST_Polygon(STRING wkt)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_SetSRID -->
+      <dlentry id="st_setsrid">
+        <dt>ST_SetSRID(BINARY geometry, INT srid)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_SRID -->
+      <dlentry id="st_srid">
+        <dt>ST_SRID(BINARY geometry)</dt>
+        <dd>
+          <p><b>Return type:</b> INT</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_StartPoint -->
+      <dlentry id="st_startpoint">
+        <dt>ST_StartPoint(BINARY linestring)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_SymmetricDiff -->
+      <dlentry id="st_symmetricdiff">
+        <dt>ST_SymmetricDiff(BINARY geometry1, BINARY geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Touches -->
+      <dlentry id="st_touches">
+        <dt>ST_Touches([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Union -->
+      <dlentry id="st_union">
+        <dt>ST_Union(BINARY geometry1, BINARY geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BINARY</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Within -->
+      <dlentry id="st_within">
+        <dt>ST_Within([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+        <dd>
+          <p><b>Return type:</b> BOOLEAN</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_X -->
+      <dlentry id="st_x">
+        <dt>ST_X(BINARY point)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Y -->
+      <dlentry id="st_y">
+        <dt>ST_Y(BINARY point)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+
+      <!-- ST_Z -->
+      <dlentry id="st_z">
+        <dt>ST_Z(BINARY point)</dt>
+        <dd>
+          <p><b>Return type:</b> DOUBLE</p>
+        </dd>
+      </dlentry>
+    </dl>
+  </conbody>
+</concept>

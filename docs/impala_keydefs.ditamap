@@ -10909,6 +10909,8 @@ under the License.
   <keydef href="topics/impala_analytic_functions.xml#row_number" keys="row_number"/>
   <keydef href="topics/impala_analytic_functions.xml#sum_analytic" keys="sum_analytic"/>
 
+  <keydef href="topics/impala_geospatial_functions.xml" keys="geospatial_functions"/>
+
   <keydef href="topics/impala_udf.xml" keys="udfs"/>
   <keydef href="topics/impala_udf.xml#udf_concepts" keys="udf_concepts"/>
   <keydef href="topics/impala_udf.xml#udfs_udafs" keys="udfs_udafs"/>

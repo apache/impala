@@ -300,6 +300,7 @@ under the License.
         <topicref href="topics/impala_variance.xml"/>
       </topicref>
       <topicref href="topics/impala_analytic_functions.xml"/>
+      <topicref href="topics/impala_geospatial_functions.xml"/>
     </topicref>
     <topicref href="topics/impala_udf.xml"/>
     <topicref href="topics/impala_langref_unsupported.xml"/>
