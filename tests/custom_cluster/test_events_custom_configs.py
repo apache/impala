@@ -1332,6 +1332,31 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     self.assert_impalad_log_contains('INFO', log_regex % 2, expected_count=1,
         timeout_s=20)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal "
+                  "--hms_event_polling_interval_s=1 "
+                  "--invalidate_metadata_on_event_processing_failure=false "
+                  "--debug_actions=mock_write_lock_failure:true",
+    disable_log_buffering=True, cluster_size=1)
+  def test_write_lock_on_partitioned_events(self, unique_database):
+    """IMPALA-12277: This test verifies that CommitCompactionEvent on a partitioned table
+    succeeds if the write lock is not held by the table while processing the event by the
+    event processor. 'mock_write_lock_failure' mocks that there is a failure while
+    acquiring write lock for CommitCompactionEvent"""
+    test_tbl = unique_database + ".test_invalidate_table"
+    acid_props = self._get_transactional_tblproperties(True)
+    self.client.execute("create table {} (id int) partitioned by (p int) {}"
+                        .format(test_tbl, acid_props))
+    for _ in range(10):
+      self.client.execute(
+        "insert into {} partition(p=0) values (1),(2),(3)".format(test_tbl))
+    self.run_stmt_in_hive(
+      "alter table {} partition(p=0) compact 'major' and wait".format(test_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):

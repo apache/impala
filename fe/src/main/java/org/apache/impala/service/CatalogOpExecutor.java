@@ -4958,7 +4958,9 @@ public class CatalogOpExecutor {
         table.setLastSyncedEventId(eventId);
       }
       UnlockWriteLockIfErronouslyLocked();
-      table.releaseWriteLock();
+      if (table.isWriteLockedByCurrentThread()) {
+        table.releaseWriteLock();
+      }
     }
   }
 
@@ -5063,7 +5065,14 @@ public class CatalogOpExecutor {
 
     boolean errorOccured = false;
     try {
-      tryWriteLock(table, reason, NoOpEventSequence.INSTANCE);
+      if (!DebugUtils.hasDebugAction(BackendConfig.INSTANCE.debugActions(),
+          DebugUtils.MOCK_WRITE_LOCK_FAILURE)) {
+        tryWriteLock(table, reason, NoOpEventSequence.INSTANCE);
+      } else {
+        // Mock the debug action that there is a failure in obtaining write lock.
+        // We don't want to throw InternalException to fail EP for test purpose.
+        return 0;
+      }
       InProgressTableModification modification =
           new InProgressTableModification(catalog_, table);
       catalog_.getLock().writeLock().unlock();
@@ -5100,7 +5109,9 @@ public class CatalogOpExecutor {
         table.setLastSyncedEventId(eventId);
       }
       UnlockWriteLockIfErronouslyLocked();
-      table.releaseWriteLock();
+      if (table.isWriteLockedByCurrentThread()) {
+        table.releaseWriteLock();
+      }
     }
     return 0;
   }
@@ -5173,7 +5184,9 @@ public class CatalogOpExecutor {
           "Could not acquire lock on the table " + table.getFullName(), e);
     } finally {
       UnlockWriteLockIfErronouslyLocked();
-      table.releaseWriteLock();
+      if (table.isWriteLockedByCurrentThread()) {
+        table.releaseWriteLock();
+      }
     }
   }
 
@@ -5296,7 +5309,9 @@ public class CatalogOpExecutor {
       throw e;
     } finally {
       UnlockWriteLockIfErronouslyLocked();
-      table.releaseWriteLock();
+      if (table.isWriteLockedByCurrentThread()) {
+        table.releaseWriteLock();
+      }
     }
   }
 

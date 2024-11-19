@@ -95,6 +95,11 @@ public class DebugUtils {
   // behavior of metastore returning partitions with empty values
   public static final String MOCK_EMPTY_PARTITION_VALUES = "mock_empty_partition_values";
 
+  // debug action label to mock catalogD to mimick that there was failure while
+  // obtaining write lock while reloading partitions. This action is required for repro
+  // test failure for IMPALA-13126.
+  public static final String MOCK_WRITE_LOCK_FAILURE = "mock_write_lock_failure";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */
