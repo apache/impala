@@ -1460,12 +1460,10 @@ class ImpalaShell(cmd.Cmd, object):
 
       if not is_dml:
         self.imp_client.close_query(self.last_query_handle)
-      try:
+      if self.show_profiles:
         profile, retried_profile = self.imp_client.get_runtime_profile(
             self.last_query_handle)
         self.print_runtime_profile(profile, retried_profile)
-      except RPCException as e:
-        if self.show_profiles: raise e
       return CmdStatus.SUCCESS
     except QueryCancelledByShellException as e:
       log_exception_with_timestamp(e, "Warning", "Query Interrupted")

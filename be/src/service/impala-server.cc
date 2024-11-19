@@ -473,6 +473,11 @@ const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
 // TODO: this should be turned into a proper error code and used throughout ImpalaServer.
 static const char* LEGACY_INVALID_QUERY_HANDLE_TEMPLATE = "Query id $0 not found.";
 
+// Log template for GetExecSummary and GetRuntimeProfileOutput when active query driver
+// is not found.
+static const char* INACTIVE_QUERY_DRIVER_TEMPLATE =
+    "Unable to find active query driver: $0. Continuing search at query log.";
+
 ThreadSafeRandom ImpalaServer::rng_(GetRandomSeed32());
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
@@ -831,6 +836,8 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
       RETURN_IF_ERROR(
           GetRuntimeProfileOutput(user, original_query_handle, format, original_profile));
       return Status::OK();
+    } else {
+      VLOG_QUERY << Substitute(INACTIVE_QUERY_DRIVER_TEMPLATE, status.GetDetail());
     }
   }
 
@@ -1040,6 +1047,8 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
         }
       }
       return Status::OK();
+    } else {
+      VLOG_QUERY << Substitute(INACTIVE_QUERY_DRIVER_TEMPLATE, status.GetDetail());
     }
   }
 
@@ -1771,9 +1780,7 @@ Status ImpalaServer::GetAllQueryHandles(const TUniqueId& query_id,
   DCHECK(original_query_handle != nullptr);
   shared_ptr<QueryDriver> query_driver = GetQueryDriver(query_id, return_unregistered);
   if (UNLIKELY(query_driver == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    VLOG(1) << err.GetDetail();
-    return err;
+    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
   }
   active_query_handle->SetHandle(query_driver,
       query_driver->GetActiveClientRequestState());

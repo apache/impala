@@ -1210,6 +1210,8 @@ void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
           request.operationHandle.operationId, &query_id, &op_secret),
       SQLSTATE_GENERAL_ERROR);
 
+  VLOG_QUERY << "GetExecSummary(): query_id=" << PrintId(query_id);
+
   // Make query id available to the following HS2_RETURN_IF_ERROR().
   ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
 
@@ -1297,7 +1299,7 @@ void ImpalaServer::GetRuntimeProfile(
       request.operationHandle.operationId, &query_id, &op_secret),
       SQLSTATE_GENERAL_ERROR);
 
-  VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
+  VLOG_QUERY << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
 
   // Make query id available to the following HS2_RETURN_IF_ERROR().
   ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);

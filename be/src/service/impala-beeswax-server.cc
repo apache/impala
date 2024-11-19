@@ -487,7 +487,7 @@ void ImpalaServer::GetRuntimeProfile(
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
 
-  VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
+  VLOG_QUERY << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
 
   // Make query id available to the following RaiseBeeswaxException().
   ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
@@ -526,7 +526,7 @@ void ImpalaServer::GetExecSummary(impala::TExecSummary& result,
   }
   TUniqueId query_id;
   BeeswaxHandleToTUniqueId(beeswax_handle, &query_id);
-  VLOG_RPC << "GetExecSummary(): query_id=" << PrintId(query_id);
+  VLOG_QUERY << "GetExecSummary(): query_id=" << PrintId(query_id);
 
   // Make query id available to the following RaiseBeeswaxException().
   ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
