@@ -153,7 +153,7 @@ public class ImpalaJoinRel extends Join
       analyzer.registerConjuncts(getJoinConjunctListToRegister(equiJoinExprs));
     }
 
-    return new NodeWithExprs(joinNode, outputExprs);
+    return new NodeWithExprs(joinNode, outputExprs, getRowType().getFieldNames());
   }
 
   private NodeWithExprs getChildPlanNode(RelNode relInput,

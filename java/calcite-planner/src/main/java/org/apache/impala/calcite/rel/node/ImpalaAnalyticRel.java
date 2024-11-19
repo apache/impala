@@ -165,7 +165,8 @@ public class ImpalaAnalyticRel extends Project
     List<Expr> outputExprs =
         getOutputExprs(mapping, projects, context.ctx_.getRootAnalyzer());
 
-    NodeWithExprs retNode = new NodeWithExprs(planNode, outputExprs);
+    NodeWithExprs retNode =
+        new NodeWithExprs(planNode, outputExprs, getRowType().getFieldNames());
 
     // If there is a filter condition, a SelectNode will get added on top
     // of the retNode.

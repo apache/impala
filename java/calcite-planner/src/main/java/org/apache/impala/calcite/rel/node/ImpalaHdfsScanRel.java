@@ -123,7 +123,8 @@ public class ImpalaHdfsScanRel extends TableScan
     physicalNode.setOutputSmap(new ExprSubstitutionMap());
     physicalNode.init(analyzer);
 
-    return new NodeWithExprs(physicalNode, outputExprs, countStarOptimizationExpr);
+    return new NodeWithExprs(physicalNode, outputExprs,
+        getRowType().getFieldNames(), countStarOptimizationExpr);
   }
 
   /**

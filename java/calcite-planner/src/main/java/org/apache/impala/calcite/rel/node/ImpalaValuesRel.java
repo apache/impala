@@ -121,7 +121,7 @@ public class ImpalaValuesRel extends Values
       i++;
     }
 
-    return new NodeWithExprs(retNode, outputExprs);
+    return new NodeWithExprs(retNode, outputExprs, getRowType().getFieldNames());
   }
 
   private LiteralExpr getLiteralExprWithType(LiteralExpr expr, RelDataType type,

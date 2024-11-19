@@ -88,12 +88,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
 
   @Override
   public List<String> getColLabels() {
-    List<String> colLabels = new ArrayList<>();
-    int colCnt = rootNode_.outputExprs_.size();
-    for (int i = 0; i < colCnt; ++i) {
-      colLabels.add(rootNode_.outputExprs_.get(i).toString());
-    }
-    return colLabels;
+    return rootNode_.fieldNames_;
   }
 
   @Override
@@ -101,7 +96,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
     TResultSetMetadata metadata = new TResultSetMetadata();
     int colCnt = rootNode_.outputExprs_.size();
     for (int i = 0; i < colCnt; ++i) {
-      TColumn colDesc = new TColumn(rootNode_.outputExprs_.get(i).toString(),
+      TColumn colDesc = new TColumn(rootNode_.fieldNames_.get(i).toLowerCase(),
           rootNode_.outputExprs_.get(i).getType().toThrift());
       metadata.addToColumns(colDesc);
     }

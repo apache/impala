@@ -106,6 +106,7 @@ public class ExecRequestCreator implements CompilerStep {
     TExecRequest request = createExecRequest(nodeWithExprs.planNode_,
         queryCtx.getTQueryCtx(), physPlanCreator.getPlannerContext(),
         physPlanCreator.getAnalyzer(), nodeWithExprs.outputExprs_,
+        nodeWithExprs.fieldNames_,
         mdHandler.getStmtTableCache().tables.values());
 
     return request;
@@ -118,6 +119,7 @@ public class ExecRequestCreator implements CompilerStep {
    */
   private TExecRequest createExecRequest(PlanNode planNodeRoot, TQueryCtx queryCtx,
       PlannerContext plannerContext, Analyzer analyzer, List<Expr> outputExprs,
+      List<String> fieldNames,
       Collection<FeTable> tables) throws ImpalaException {
     List<PlanFragment> fragments =
         createPlans(planNodeRoot, analyzer, plannerContext, outputExprs);
@@ -125,7 +127,7 @@ public class ExecRequestCreator implements CompilerStep {
 
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
     TExecRequest result = createExecRequest(queryCtx, planFragmentRoot,
-        queryExecRequest);
+        queryExecRequest, fieldNames);
     queryExecRequest.setHost_list(getHostLocations(tables));
     queryExecRequest.setCores_required(-1);
 
@@ -263,7 +265,8 @@ public class ExecRequestCreator implements CompilerStep {
   }
 
   private TExecRequest createExecRequest(TQueryCtx queryCtx,
-      PlanFragment planFragmentRoot, TQueryExecRequest queryExecRequest) {
+      PlanFragment planFragmentRoot, TQueryExecRequest queryExecRequest,
+      List<String> fieldNames) {
     TExecRequest result = new TExecRequest();
     // NOTE: the below 4 are mandatory fields
     result.setQuery_options(queryCtx.getClient_request().getQuery_options());
@@ -286,7 +289,7 @@ public class ExecRequestCreator implements CompilerStep {
     List<Expr> outputExprs = new ArrayList<>();
 
     planFragmentRoot.getSink().collectExprs(outputExprs);
-    result.setResult_set_metadata(createQueryResultSetMetadata(outputExprs));
+    result.setResult_set_metadata(createQueryResultSetMetadata(outputExprs, fieldNames));
 
     return result;
   }
@@ -311,11 +314,12 @@ public class ExecRequestCreator implements CompilerStep {
     return sb.toString();
   }
 
-  private TResultSetMetadata createQueryResultSetMetadata(List<Expr> outputExprs) {
+  private TResultSetMetadata createQueryResultSetMetadata(List<Expr> outputExprs,
+      List<String> fieldNames) {
     TResultSetMetadata metadata = new TResultSetMetadata();
     int colCnt = outputExprs.size();
     for (int i = 0; i < colCnt; ++i) {
-      TColumn colDesc = new TColumn(outputExprs.get(i).toString(),
+      TColumn colDesc = new TColumn(fieldNames.get(i).toLowerCase(),
           outputExprs.get(i).getType().toThrift());
       metadata.addToColumns(colDesc);
     }

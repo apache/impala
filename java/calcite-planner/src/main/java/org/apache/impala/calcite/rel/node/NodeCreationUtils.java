@@ -70,7 +70,7 @@ public class NodeCreationUtils {
 
     List<Expr> outputExprs = createOutputExprs(tupleDesc.getSlots());
 
-    return new NodeWithExprs(emptySetNode, outputExprs);
+    return new NodeWithExprs(emptySetNode, outputExprs, rowType.getFieldNames());
   }
 
   public static NodeWithExprs createUnionPlanNode(PlanNodeId nodeId,
@@ -87,7 +87,7 @@ public class NodeCreationUtils {
 
     unionNode.init(analyzer);
 
-    return new NodeWithExprs(unionNode, outputExprs);
+    return new NodeWithExprs(unionNode, outputExprs, rowType.getFieldNames());
   }
 
   public static List<Expr> createOutputExprs(List<SlotDescriptor> slotDescs) {
