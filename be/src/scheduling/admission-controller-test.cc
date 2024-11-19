@@ -105,7 +105,7 @@ class AdmissionControllerTest : public testing::Test {
     FLAGS_injected_group_members_debug_only = "group0:userA;"
                                               "group1:user1,user3;"
                                               "dev:alice,deborah;"
-                                              "it:bob,fiona;"
+                                              "it:bob,fiona,geeta;"
                                               "support:claire,geeta,howard;";
     ASSERT_OK(test_env_->Init());
   }
@@ -973,7 +973,7 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
   ASSERT_FALSE(admission_controller->CanAdmitQuota(
       *schedule_state, config_e, config_root, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
-      "current per-user load 3 for user userA is at or above the user limit 3");
+      "current per-user load 3 for user 'userA' is at or above the user limit 3");
 
   // If UserA's load is 2 it should be admitted because the user rule takes precedence
   // over the wildcard rule.
@@ -990,7 +990,7 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
   ASSERT_FALSE(admission_controller->CanAdmitQuota(
       *schedule_state, config_e, config_root, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
-      "current per-user load 3 for user user2 is at or above the wildcard limit 1");
+      "current per-user load 3 for user 'user2' is at or above the wildcard limit 1");
 
   pool_stats->agg_user_loads_.clear_key(USER2);
   ASSERT_TRUE(admission_controller->CanAdmitQuota(
@@ -1004,8 +1004,8 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
   ASSERT_FALSE(admission_controller->CanAdmitQuota(
       *schedule_state, config_e, config_root, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
-      "current per-group load 2 for user user3 in group group1 is at or above the group "
-      "limit 2");
+      "current per-group load 2 for user 'user3' in group 'group1' is at or above the "
+      "group limit 2");
 
   // Quota set to 0 disallows entry.
   schedule_state = MakeScheduleState(QUEUE_E, config_e, host_count, 30L * MEGABYTE,
@@ -1014,7 +1014,7 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
   ASSERT_FALSE(admission_controller->CanAdmitQuota(
       *schedule_state, config_e, config_root, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
-      "current per-user load 0 for user userH is at or above the user limit 0");
+      "current per-user load 0 for user 'userH' is at or above the user limit 0");
 
   ScheduleState* bad_user_state = MakeScheduleState(QUEUE_E, config_e, host_count,
       30L * MEGABYTE, ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME, "a@b.b.com@d.com");
@@ -1025,7 +1025,7 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
 
 /// Test CanAdmitRequest in the context of user and group quotas.
 // Group membership is injected in AdmissionControllerTest::Setup().
-// The user 'bob' is in group 'it'.
+// The users 'bob' and 'fiona' are in group 'it'.
 // The user 'howard' is in group 'support'.
 TEST_F(AdmissionControllerTest, QuotaExamples) {
   // Pass the paths of the configuration files as command line flags.
@@ -1033,20 +1033,79 @@ TEST_F(AdmissionControllerTest, QuotaExamples) {
   FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
   string not_admitted_reason;
 
-  ASSERT_TRUE(can_queue("bob", 1, 1, true, &not_admitted_reason));
+  // Alice can run 3 queries, because the more specific rule for 'alice' overrides
+  // the less-specific wildcard rule.
+  ASSERT_TRUE(can_queue("alice", 3, 2, true, &not_admitted_reason));
+  ASSERT_FALSE(can_queue("alice", 4, 12, true, &not_admitted_reason));
+  ASSERT_EQ(
+      "current per-user load 4 for user 'alice' is at or above the user limit 4 in pool "
+      "'" + QUEUE_SMALL + "'",
+      not_admitted_reason);
 
-  // Howard has a limit of 4 at root level.
+  // Bob can run 2 queries, because the more specific group rule for 'it' overrides
+  // the less-specific wildcard rule.
+  ASSERT_TRUE(can_queue("bob", 1, 1, true, &not_admitted_reason));
+  ASSERT_FALSE(can_queue("bob", 2, 1, true, &not_admitted_reason));
+  ASSERT_EQ(
+      "current per-group load 2 for user 'bob' in group 'it' is at or above the group "
+      "limit 2 in pool '"
+          + QUEUE_SMALL + "'",
+      not_admitted_reason);
+
+  ASSERT_FALSE(can_queue("claire", 5, 0, true, &not_admitted_reason));
+  ASSERT_EQ(
+      "current per-group load 5 for user 'claire' in group 'support' is at or above the "
+      "group limit 5 in pool '"
+          + QUEUE_SMALL + "'",
+      not_admitted_reason);
+
+  // Fiona can run 3 queries, because the more specific user rule overrides
+  // the less-specific group rule.
+  ASSERT_TRUE(can_queue("fiona", 2, 1, true, &not_admitted_reason));
+  ASSERT_FALSE(can_queue("fiona", 3, 1, true, &not_admitted_reason));
+  ASSERT_EQ(
+      "current per-user load 3 for user 'fiona' is at or above the user limit 3 in pool '"
+          + QUEUE_SMALL + "'",
+      not_admitted_reason);
+
+  // Geeta is in 2 groups: 'it' and 'support'.
+  // Group 'it' restricts her to running 2 queries in the small pool.
+  // Group 'support' restricts her to running 5 queries in the small pool.
+  // The 'support' rule is the least restrictive, so she can run 5 queries in the small
+  // pool.
+  ASSERT_TRUE(can_queue("geeta", 4, 1, true, &not_admitted_reason));
+  ASSERT_FALSE(can_queue("geeta", 5, 1, true, &not_admitted_reason));
+  ASSERT_EQ("current per-group load 5 for user 'geeta' in group 'support' is at or above "
+            "the group limit 5 in pool '"
+          + QUEUE_SMALL + "' (Ignored Group Quotas 'it':2)",
+      not_admitted_reason);
+
+  // Howard has a limit of 4 at root level, and limit of 100 in the small pool.
+  // Arguably this small pool configuration does not make sense as it will never have any
+  // effect.
+  ASSERT_TRUE(can_queue("howard", 2, 1, true, &not_admitted_reason));
   ASSERT_FALSE(can_queue("howard", 3, 1, true, &not_admitted_reason));
   ASSERT_EQ(
-      "current per-user load 4 for user howard is at or above the user limit 4 in pool "
-          + QUEUE_ROOT,
+      "current per-user load 4 for user 'howard' is at or above the user limit 4 in pool"
+      " '" + QUEUE_ROOT
+          + "'",
       not_admitted_reason);
 
   // Iris is not in any groups and so hits the large pool wildcard limit.
   ASSERT_FALSE(can_queue("iris", 0, 1, false, &not_admitted_reason));
   ASSERT_EQ(
-      "current per-user load 1 for user iris is at or above the wildcard limit 1 in pool "
-          + QUEUE_LARGE,
+      "current per-user load 1 for user 'iris' is at or above the wildcard limit 1 in "
+      "pool '"
+          + QUEUE_LARGE + "'",
+      not_admitted_reason);
+
+  // Jade has a limit of 100 at root level, and limit of 8 in the small pool.
+  // This is an example where there are User Quotas at both root and pool level.
+  ASSERT_TRUE(can_queue("jade", 7, 0, true, &not_admitted_reason));
+  ASSERT_FALSE(can_queue("jade", 8, 0, true, &not_admitted_reason));
+  ASSERT_EQ(
+      "current per-user load 8 for user 'jade' is at or above the user limit 8 in pool '"
+          + QUEUE_SMALL + "'",
       not_admitted_reason);
 }
 
@@ -2172,6 +2231,29 @@ TEST_F(AdmissionControllerTest, AggregatedUserLoads) {
   ASSERT_EQ(6, user_loads.get(USER3));
   ASSERT_EQ(5, user_loads.decrement(USER3));
   ASSERT_EQ(4, user_loads.decrement(USER3));
+}
+
+/// Unit test for AdmissionController::HasSufficientGroupQuota
+TEST_F(AdmissionControllerTest, HasSufficientGroupQuota) {
+  const vector<std::string> groups = {"group1", "group2", "group3", "group4"};
+  TPoolConfig config;
+  std::map<std::string, int32_t> limits = {
+      // These limits are unordered so that we touch both code paths that add a group to
+      // extra_groups in HasSufficientGroupQuota().
+      {"group1", 3},
+      {"group2", 1},
+      {"group4", 4}};
+  config.__set_group_query_limits(limits);
+
+  string quota_exceeded_reason;
+  bool key_matched;
+  bool ok;
+  ok = AdmissionController::HasSufficientGroupQuota(
+      USER1, groups, config, "poolname", 100, &quota_exceeded_reason, &key_matched);
+  EXPECT_FALSE(ok);
+  EXPECT_STR_CONTAINS(quota_exceeded_reason,
+      "current per-group load 100 for user 'user1' in group 'group4' is at or above the "
+      "group limit 4 in pool 'poolname' (Ignored Group Quotas 'group2':1 'group1':3)");
 }
 
 } // end namespace impala

@@ -1301,6 +1301,10 @@ class AdmissionController {
   bool HasSufficientGroupQuota(const string& user, const TPoolConfig& pool_cfg,
       const string& pool_name, int64_t user_load, string* quota_exceeded_reason,
       bool* key_matched) const;
+  static bool HasSufficientGroupQuota(const string& user,
+      const vector<std::string>& groups, const TPoolConfig& pool_cfg,
+      const string& pool_name, int64_t user_load, string* quota_exceeded_reason,
+      bool* key_matched);
 
   /// Returns available memory and slots of the executor group.
   const std::pair<int64_t, int64_t> GetAvailableMemAndSlots(
@@ -1383,13 +1387,14 @@ class AdmissionController {
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordAdmissionChecks);
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordScheduleState);
   FRIEND_TEST(AdmissionControllerTest, DequeueLoop);
+  FRIEND_TEST(AdmissionControllerTest, EraseHostStats);
   FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
+  FRIEND_TEST(AdmissionControllerTest, HasSufficientGroupQuota);
   FRIEND_TEST(AdmissionControllerTest, PoolStats);
   FRIEND_TEST(AdmissionControllerTest, QueryRejection);
   FRIEND_TEST(AdmissionControllerTest, QuotaExamples);
   FRIEND_TEST(AdmissionControllerTest, Simple);
   FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
-  FRIEND_TEST(AdmissionControllerTest, EraseHostStats);
   FRIEND_TEST(AdmissionControllerTest, UserAndGroupQuotas);
   friend class AdmissionControllerTest;
 };

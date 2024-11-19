@@ -289,15 +289,17 @@ const string HOST_SLOT_NOT_AVAILABLE = "Not enough admission control slots avail
                                        "in use.";
 
 // $0 = current load for user, $1 = user name, $2 = per-user quota, $3 is pool name
-const string USER_QUOTA_EXCEEDED =
-    "current per-user load $0 for user $1 is at or above the user limit $2 in pool $3";
-const string USER_WILDCARD_QUOTA_EXCEEDED = "current per-user load $0 for user $1 is at "
-                                            "or above the wildcard limit $2 in pool $3";
+const string USER_QUOTA_EXCEEDED = "current per-user load $0 for user '$1' is at or "
+                                   "above the user limit $2 in pool '$3'";
+const string USER_WILDCARD_QUOTA_EXCEEDED = "current per-user load $0 for user '$1' is at"
+                                            " or above the wildcard limit $2 in pool "
+                                            "'$3'";
 
 // $0 = current load for user, $1 = user name, $2 = group name, $3 = per-user quota,
 // $4 is pool name.
-const string GROUP_QUOTA_EXCEEDED = "current per-group load $0 for user $1 in group $2 "
-                                    "is at or above the group limit $3 in pool $4";
+const string GROUP_QUOTA_EXCEEDED = "current per-group load $0 for user '$1' in group "
+                                    "'$2' is at or above the group limit $3 in pool '$4'"
+                                    "$5";
 
 // $0 = user name
 const string BAD_USER_NAME = "cannot parse user name $0";
@@ -1239,22 +1241,58 @@ bool AdmissionController::HasSufficientGroupQuota(const string& user,
                << status.GetDetail();
     return false;
   }
+  const vector<std::string>& groups = res.groups;
 
-  // For every group see if there is a limit and enforce it.
+  return HasSufficientGroupQuota(
+      user, groups, pool_cfg, pool_name, user_load, quota_exceeded_reason, key_matched);
+}
 
-  for (const string& group : res.groups) {
+bool AdmissionController::HasSufficientGroupQuota(const string& user,
+    const vector<std::string>& groups,
+    const TPoolConfig& pool_cfg, const string& pool_name, int64_t user_load,
+    string* quota_exceeded_reason, bool* key_matched) {
+  // Find the highest group limit and enforce it.
+  int64_t highest_group_limit = -1;
+  string highest_group;
+  string extra_group_desc;
+  std::vector<std::pair<std::string, int>> extra_groups;
+
+  for (const string& group : groups) {
     auto it = pool_cfg.group_query_limits.find(group);
     int64_t group_limit = 0;
     if (it != pool_cfg.group_query_limits.end()) {
       // There is a per-user limit for the delegated user.
       group_limit = it->second;
-      if (user_load + 1 > group_limit) {
-        *quota_exceeded_reason = Substitute(
-            GROUP_QUOTA_EXCEEDED, user_load, user, group, group_limit, pool_name);
-        return false;
+      if (group_limit > highest_group_limit) {
+        if (highest_group_limit != -1) {
+          // Replacing old group, save it for error string.
+          extra_groups.emplace_back(highest_group, highest_group_limit);
+        }
+        highest_group_limit = group_limit;
+        highest_group = group;
+      } else {
+        // Ignoring this, group, save it for error string.
+        extra_groups.emplace_back(group, group_limit);
       }
-      *key_matched = true;
     }
+  }
+  if (!extra_groups.empty()) {
+    // Describe the Group Quotas we did not use.
+    std::stringstream ss;
+    ss << " (Ignored Group Quotas";
+    for (const auto& pair : extra_groups) {
+      ss << " '" << pair.first << "':" << pair.second;
+    }
+    ss << ")";
+    extra_group_desc = ss.str();
+  }
+  if (highest_group_limit != -1) {
+    if (user_load + 1 > highest_group_limit) {
+      *quota_exceeded_reason = Substitute(GROUP_QUOTA_EXCEEDED, user_load, user,
+          highest_group, highest_group_limit, pool_name, extra_group_desc);
+      return false;
+    }
+    *key_matched = true;
   }
   return true;
 }

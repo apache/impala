@@ -325,6 +325,7 @@ public class TestRequestPoolService {
       {
         put("*", 8);
         put("howard", 4);
+        put("jade", 100);
       }
     };
     Assert.assertEquals(rootUserExpected, rootConfig.user_query_limits);
@@ -338,6 +339,9 @@ public class TestRequestPoolService {
       {
         put("*", 1);
         put("alice", 4);
+        put("fiona", 3);
+        put("howard", 100);
+        put("jade", 8);
       }
     };
     Assert.assertEquals(smallUserExpected, smallConfig.user_query_limits);

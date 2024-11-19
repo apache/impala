@@ -1307,7 +1307,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
                              pool_to_fail=None):
     query_handles = []
     type = "group" if group_name else "user"
-    group_description = " in group " + group_name if group_name else ""
+    group_description = " in group '" + group_name + "'" if group_name else ""
     pool_that_fails = pool_to_fail if pool_to_fail else pool
     for i in range(limit):
       impalad = self.cluster.impalads[i % 2]
@@ -1328,8 +1328,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     except Exception as e:
       # Construct the expected error message.
       expected = ("Rejected query from pool {pool}: current per-{type} load {limit} for "
-                  "user {user}{group_description} is at or above the {err_type} limit "
-                  "{limit} in pool {pool_that_fails}".
+                  "user '{user}'{group_description} is at or above the {err_type} limit "
+                  "{limit} in pool '{pool_that_fails}'".
                   format(pool=pool, type=type, limit=limit, user=user,
                          group_description=group_description, err_type=err_type,
                          pool_that_fails=pool_that_fails))

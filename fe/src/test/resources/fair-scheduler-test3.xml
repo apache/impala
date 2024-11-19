@@ -19,6 +19,12 @@
       <totalCount>4</totalCount>
     </userQueryLimit>
 
+    <!-- User 'jade' is limited to running 100 queries across the cluster -->
+    <userQueryLimit>
+      <user>jade</user>
+      <totalCount>100</totalCount>
+    </userQueryLimit>
+
     <queue name="group-set-small">
       <!-- A user not matched by any other rule can run 1 query in the small pool -->
       <userQueryLimit>
@@ -43,6 +49,24 @@
       <userQueryLimit>
         <user>alice</user>
         <totalCount>4</totalCount>
+      </userQueryLimit>
+
+      <!-- The user 'fiona' can run 3 queries in the small pool -->
+      <userQueryLimit>
+        <user>fiona</user>
+        <totalCount>3</totalCount>
+      </userQueryLimit>
+
+      <!-- User 'howard' is limited to running 100 queries in the small pool -->
+      <userQueryLimit>
+        <user>howard</user>
+        <totalCount>100</totalCount>
+      </userQueryLimit>
+
+      <!-- User 'jade' is limited to running 8 queries in the small pool -->
+      <userQueryLimit>
+        <user>jade</user>
+        <totalCount>8</totalCount>
       </userQueryLimit>
     </queue>
 

@@ -89,7 +89,7 @@ under the License.
         concurrent and queued queries, for different categories of users within your
         organization. For details about all the Fair Scheduler configuration settings, see the
         <xref
-          href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration"
+          href="https://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration"
           scope="external" format="html">Apache
         wiki</xref>.
       </p>
@@ -104,6 +104,15 @@ llama.am.throttling.maximum.queued.reservations.<varname>queue_name</varname>
 <ph rev="2.5.0 IMPALA-2538">impala.admission-control.pool-default-query-options.<varname>queue_name</varname>
 impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph>
 </codeblock>
+
+      <p>
+        The <codeph>llama.am.throttling.maximum.placed.reservations.<varname>queue_name</varname></codeph>
+        setting specifies the number of queries that are allowed to run concurrently in this pool.
+      </p>
+      <p>
+        The <codeph>llama.am.throttling.maximum.queued.reservations.<varname>queue_name</varname></codeph>
+        setting specifies the number of queries that are allowed to be queued in this pool.
+      </p>
 
       <p rev="2.5.0 IMPALA-2538">
         The <codeph>impala.admission-control.pool-queue-timeout-ms</codeph> setting specifies
@@ -239,7 +248,283 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
 
     </concept>
 
+  <concept rev="4.5.0" id="user_quotas">
+
+      <title>Configuring User Quotas in the Admission Control Configuration</title>
+
+      <conbody>
+
+        <p>
+          Since <keyword keyref="impala45"/>, User Quotas can be used to define rules
+          that limit the total count of queries that a user can run concurrently.
+          The rules are based on either usernames or group membership.
+          The username is the short username, and groups are
+          <xref
+              href="https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/GroupsMapping.html"
+              scope="external" format="html">Hadoop Groups
+          </xref>.
+        </p>
+        <p>
+          Queries are counted from when they are queued to when they are released.
+          In a cluster without an Admission Daemon, the count of queries is synchronized
+          across all coordinators through the Statestore.
+          In this configuration over-admission is possible.
+        </p>
+        <p>
+          If a query fails to pass the User Quota rules then the query will be
+          rejected when it is submitted.
+        </p>
+
+        <p>
+          There are three type of rules:
+          <ul>
+            <li>
+              User Rules (based on a username)
+            </li>
+            <li>
+              Wildcard Rules (which match any username)
+            </li>
+            <li>
+              Group Rules (based on a user’s membership of a group)
+            </li>
+          </ul>
+          The rules can be placed at the Pool level or the Root level:
+          <ul>
+            <li>
+              A rule at the Pool level is evaluated against the number of queries a user has running in the pool
+            </li>
+            <li>
+              A rule at the Root level is evaluated against the total number of queries a user has running across all pools.
+            </li>
+          </ul>
+        </p>
+
+        <p>
+          The XML tags used for User Quotas are:
+          <ul>
+            <li>
+              <b>userQueryLimit</b> - used to define a User Rule
+            </li>
+            <li>
+              <b>groupQueryLimit</b> - used to define a Group Rule
+            </li>
+            <li>
+              <b>totalCount</b> - used to define the number of queries that can run
+              concurrently.
+            </li>
+            <li>
+              <b>user</b> - used to specify a username to define a User Rule,
+              or, by using the wildcard '*', to define a Wildcard Rule.
+            </li>
+            <li>
+              <b>group</b> - in a Group rule, used to specify a group name that the
+              rule applies to.
+            </li>
+          </ul>
+          Examples are provided below.
+        </p>
+
+        <p>
+          More specific rules override more general rules.
+          A user rule overrides a group rule or wildcard rule.
+          A group rule overrides a wildcard rule.
+          Pool level rules are evaluated first.
+          If Pool level rules pass, then Root level rules are evaluated.
+        </p>
+
+        <p>
+          Note that the examples of User Quota rules below are incomplete xml snippets
+          that would form part of an Admission Control configuration.
+          In particular, they omit the essential <b>aclSubmitApps</b> tag.
+        </p>
+
+        <section>
+          <title>A User Rule</title>
+          <codeblock>
+&lt;userQueryLimit&gt;
+  &lt;user&gt;alice&lt;/user&gt;
+  &lt;user&gt;bob&lt;/user&gt;
+  &lt;totalCount&gt;3&lt;/totalCount&gt;
+&lt;/userQueryLimit&gt;
+          </codeblock>
+          <p>
+            This rule limits the users ‘alice’ and ‘bob’ to each running 3 queries.
+            This rule could be placed at the Pool level or the Root level.
+          </p>
+        </section>
+
+        <section>
+          <title>A Pool Level Wildcard Rule</title>
+          <codeblock>
+&lt;queue name=&quot;root&quot;&gt;
+  &lt;queue name=&quot;queueE&quot;&gt;
+    &lt;userQueryLimit&gt;
+      &lt;user&gt;*&lt;/user&gt;
+      &lt;totalCount&gt;2&lt;/totalCount&gt;
+    &lt;/userQueryLimit&gt;
+  &lt;/queue&gt;
+...
+          </codeblock>
+          <p>
+            This is a wildcard rule on pool root.queueE that limits
+            all users to running 2 queries in that pool.
+          </p>
+        </section>
+
+        <section>
+          <title>A Root Level User Rule</title>
+          <codeblock>
+&lt;queue name=&quot;root&quot;&gt;
+  &lt;userQueryLimit&gt;
+    &lt;user&gt;userD&lt;/user&gt;
+    &lt;totalCount&gt;2&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+...
+          </codeblock>
+          <p>
+            This is a Root level user rule that limits userD to 2 queries across all
+            pools.
+          </p>
+        </section>
+
+        <section>
+          <title>A Group Rule</title>
+          <codeblock>
+&lt;queue name=&quot;root&quot;&gt;
+  &lt;queue name=&quot;queueE&quot;&gt;
+    &lt;groupQueryLimit&gt;
+      &lt;group&gt;group1&lt;/group&gt;
+      &lt;group&gt;group2&lt;/group&gt;
+      &lt;totalCount&gt;2&lt;/totalCount&gt;
+    &lt;/groupQueryLimit&gt;
+...
+          </codeblock>
+          <p>
+            This rule limits any user in groups group1 or group2 to running 2 queries
+            in pool root.queueE. Note this rule could also be placed at the root level.
+          </p>
+        </section>
+
+        <section>
+          <title>
+            More Specific Rules Override The Less Specific
+          </title>
+          <codeblock>
+&lt;queue name=&quot;group-set-small&quot;&gt;
+  &lt;!-- A user not matched by any other rule can run 1 query in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+      &lt;user&gt;*&lt;/user&gt;
+      &lt;totalCount&gt;1&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+  &lt;!-- The user &apos;alice&apos; can run 4 queries in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+    &lt;user&gt;alice&lt;/user&gt;
+    &lt;totalCount&gt;4&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+...
+          </codeblock>
+          <p>
+            With this rule, the user ‘alice’ can run 4 queries in "root.group-set-small".
+            The more specific User rule overrides the wildcard rule.
+            A user that is not ‘alice’ would be able to run 1 query, per the wildcard
+            rule.
+          </p>
+        </section>
+
+        <section>
+          <title>
+            Another Example of More Specific Rules Overriding Less Specific Rules
+          </title>
+          <codeblock>
+&lt;queue name=&quot;group-set-small&quot;&gt;
+  &lt;!-- A user not matched by any other rule can run 1 query in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+      &lt;user&gt;*&lt;/user&gt;
+      &lt;totalCount&gt;1&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+  &lt;!-- Members of the group &apos;it&apos; can run 2 queries in the small pool --&gt;
+  &lt;groupQueryLimit&gt;
+    &lt;group&gt;it&lt;/group&gt;
+    &lt;totalCount&gt;2&lt;/totalCount&gt;
+  &lt;/groupQueryLimit&gt;
+...
+          </codeblock>
+          <p>
+            Assuming the user ‘bob’ is in the ‘it’ group, they can run 2 queries
+            in "root.group-set-small".
+            The more specific Group rule overrides the wildcard rule.
+          </p>
+        </section>
+
+        <section>
+          <title>
+            User rules are more specific than group rules.
+          </title>
+          <codeblock>
+&lt;queue name=&quot;group-set-small&quot;&gt;
+  &lt;!-- Members of the group &apos;it&apos; can run 2 queries in the small pool --&gt;
+  &lt;groupQueryLimit&gt;
+    &lt;group&gt;it&lt;/group&gt;
+    &lt;totalCount&gt;2&lt;/totalCount&gt;
+  &lt;/groupQueryLimit&gt;
+  &lt;!-- The user &apos;fiona&apos; can run 3 queries in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+    &lt;user&gt;fiona&lt;/user&gt;
+    &lt;totalCount&gt;3&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+...
+          </codeblock>
+          <p>
+            The user 'fiona' can run 4 queries in "root.group-set-small", despite also
+            matching the 'it' group.
+            The more specific user rule overrides the group rule.
+          </p>
+        </section>
+
+        <section>
+          <title>
+            Both pool and root rules must be passed.
+          </title>
+          <codeblock>
+&lt;queue name=&quot;root&quot;&gt;
+  &lt;groupQueryLimit&gt;
+    &lt;group&gt;support&lt;/group&gt;
+    &lt;totalCount&gt;6&lt;/totalCount&gt;
+  &lt;/groupQueryLimit&gt;
+  &lt;queue name=&quot;group-set-small&quot;&gt;
+    &lt;groupQueryLimit&gt;
+      &lt;group&gt;dev&lt;/group&gt;
+      &lt;group&gt;support&lt;/group&gt;
+      &lt;totalCount&gt;5&lt;/totalCount&gt;
+    &lt;/groupQueryLimit&gt;
+  &lt;/queue&gt;
+...
+          </codeblock>
+          <p>
+            Members of group 'support' are limited to run 6 queries across all the pools.
+            Members of groups 'dev' and 'support' can run 5 queries
+            in "root.group-set-small".
+            To run, both rules must be passed.
+            The Pool level rule is evaluated first, so that an error mentioning that pool
+            will be seen in the case where both rules would fail.
+          </p>
+          <p>
+            A user may be a member of more than one group, which means that more than one
+            Group Rule may apply to a user at the Pool or Root level.
+            In this case, at each level, the least restrictive rule is applied.
+            For example, if the user is in 2 groups: 'it' and 'support', where
+            group 'it' restricts her to running 2 queries, and group 'support' restricts
+            her to running 5 queries, then the 'support' rule is the least restrictive,
+            so she can run 5 queries in the pool.
+          </p>
+        </section>
+
+      </conbody>
+
+    </concept>
+
   </concept>
+
 
   <concept id="concept_zy4_vxz_jgb">
 
@@ -433,7 +718,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
               that can go in this file, as described below. For details about all the Fair
               Scheduler configuration settings, see the
               <xref
-                href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration"
+                href="https://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration"
                 scope="external" format="html">Apache
               wiki</xref>.
             </p>

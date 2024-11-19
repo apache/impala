@@ -318,6 +318,22 @@ under the License.
           </dd>
 
         </dlentry>
+
+        <dlentry>
+
+          <dt>
+            --max_hs2_sessions_per_user
+          </dt>
+
+          <dd>
+            Specifies the maximum allowed number of HiveServer2 sessions that can be
+            opened by any single connected user on a coordinator.
+            <p>
+              The default is -1. Setting to -1 or 0 disables this feature.
+            </p>
+          </dd>
+
+        </dlentry>
       </dl>
 
     </section>
