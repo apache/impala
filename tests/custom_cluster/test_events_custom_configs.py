@@ -1325,9 +1325,12 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     EventProcessorUtils.wait_for_event_processing(self)
     log_regex = r"Invalidated objects in cache: \[partition %s:p=\d \(id=%%d\)\]" \
         % test_tbl
-    self.assert_impalad_log_contains('INFO', log_regex % 0)
-    self.assert_impalad_log_contains('INFO', log_regex % 1)
-    self.assert_impalad_log_contains('INFO', log_regex % 2)
+    self.assert_impalad_log_contains('INFO', log_regex % 0, expected_count=1,
+        timeout_s=20)
+    self.assert_impalad_log_contains('INFO', log_regex % 1, expected_count=1,
+        timeout_s=20)
+    self.assert_impalad_log_contains('INFO', log_regex % 2, expected_count=1,
+        timeout_s=20)
 
 
 @SkipIfFS.hive
