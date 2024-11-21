@@ -243,6 +243,22 @@ ubuntu16 apt-get --yes install python python-dev python-setuptools
 ubuntu18 apt-get --yes install python python-dev python-setuptools
 ubuntu20 apt-get --yes install python python-dev python-setuptools
 
+# Ubuntu 20's Python 2.7.18-1~20.04.5 version has a bug in its tarfile support.
+# If we detect the affected tarfile.py, download a patched version and overwrite it.
+if [[ $UBUNTU20 == true ]]; then
+  if [[ -f /usr/lib/python2.7/tarfile.py ]]; then
+    TARFILE_PY_HASH=$(sha1sum /usr/lib/python2.7/tarfile.py | cut -d' ' -f1)
+    if [[ "${TARFILE_PY_HASH}" == "6e1a6d9ea2a535cbb17fe266ed9ac76eb5e27b89" ]]; then
+      TMP_DIR=$(mktemp -d)
+      pushd $TMP_DIR
+      wget -nv https://launchpadlibrarian.net/759546541/tarfile.py
+      sudo cp tarfile.py /usr/lib/python2.7/tarfile.py
+      popd
+      rm -rf $TMP_DIR
+    fi
+  fi
+fi
+
 # Required by Kudu in the minicluster
 ubuntu20 apt-get --yes install libtinfo5
 ubuntu22 apt-get --yes install libtinfo5

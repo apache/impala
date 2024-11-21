@@ -39,6 +39,22 @@ sudo -E apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make python-de
 
 source /etc/lsb-release
 
+# Ubuntu 20's Python 2.7.18-1~20.04.5 version has a bug in its tarfile support.
+# If we detect the affected tarfile.py, download a patched version and overwrite it.
+if [[ $DISTRIB_ID == Ubuntu && $DISTRIB_RELEASE == 20.04 ]]; then
+  if [[ -f /usr/lib/python2.7/tarfile.py ]]; then
+    TARFILE_PY_HASH=$(sha1sum /usr/lib/python2.7/tarfile.py | cut -d' ' -f1)
+    if [[ "${TARFILE_PY_HASH}" == "6e1a6d9ea2a535cbb17fe266ed9ac76eb5e27b89" ]]; then
+      TMP_DIR=$(mktemp -d)
+      pushd $TMP_DIR
+      wget -nv https://launchpadlibrarian.net/759546541/tarfile.py
+      sudo cp tarfile.py /usr/lib/python2.7/tarfile.py
+      popd
+      rm -rf $TMP_DIR
+    fi
+  fi
+fi
+
 JDK_VERSION=8
 if [[ $DISTRIB_RELEASE = 14.04 ]]
 then
