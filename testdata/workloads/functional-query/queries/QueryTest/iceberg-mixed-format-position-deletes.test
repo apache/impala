@@ -19,11 +19,11 @@ refresh ice_mixed_formats;
 ---- QUERY
 SHOW FILES IN ice_mixed_formats;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-data-.*.parquet','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-delete-.*parquet','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-data-.*.orc','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-delete-.*orc','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-delete-.*.avro','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*(?!delete).*.parquet','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-delete.*parquet','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*(?!delete).*.orc','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-delete.*orc','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats/data/.*-delete.*.avro','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
@@ -83,11 +83,11 @@ refresh ice_mixed_formats_partitioned;
 ---- QUERY
 SHOW FILES IN ice_mixed_formats_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=0/.*-data-.*.parquet','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=0/.*-delete-.*parquet','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-data-.*.orc','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-delete-.*orc','.*B','','.*'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-delete-.*.avro','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=0/.*(?!delete).*.parquet','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=0/.*-delete.*parquet','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*(?!delete).*.orc','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-delete.*orc','.*B','','.*'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_mixed_formats_partitioned/data/j_trunc=2/.*-delete.*.avro','.*B','','.*'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
