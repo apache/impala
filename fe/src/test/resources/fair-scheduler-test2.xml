@@ -45,7 +45,7 @@
       <aclSubmitApps>* </aclSubmitApps>
       <userQueryLimit>
         <user>*</user>
-        <totalCount>30</totalCount>
+        <totalCount>50</totalCount>
       </userQueryLimit>
     </queue>
     <aclSubmitApps> </aclSubmitApps>
