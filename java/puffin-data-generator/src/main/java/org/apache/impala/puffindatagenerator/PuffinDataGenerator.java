@@ -72,7 +72,8 @@ import com.google.common.collect.ImmutableList;
  * template). This should match the schema of the table for which we are generating
  * metadata. The statistics in the generated Puffin files do not normally match the actual
  * data in the table. The template metadata.json file can be taken from a newly created
- * and truncated table (truncation is needed so that a snapshot exists).
+ * and truncated table (truncation is needed so that a snapshot exists). The table is
+ * truncated multiple times so that there are multiple snapshots.
  */
 public class PuffinDataGenerator {
   // The table for which we generate data can be created this way:
@@ -98,6 +99,7 @@ public class PuffinDataGenerator {
 
   private final String localOutputDir_;
   private final long snapshotId_;
+  private final List<Long> oldSnapshotIds_;
   private final ObjectMapper mapper_;
   private final JsonNode metadataJsonTemplate_;
 
@@ -130,7 +132,7 @@ public class PuffinDataGenerator {
 
   public static void main(String[] args) throws FileNotFoundException, IOException {
     final String metadataJsonTemplatePath =
-        "./testdata/ice_puffin/00001-2e1ade02-35ae-4a8f-a84f-784d1e0c0790.metadata.json";
+        "./testdata/ice_puffin/00003-442f9acd-964c-43d7-92b8-e0737a39719a.metadata.json";
     final String localOutputDir = "./puffin_files/";
     PuffinDataGenerator generator = new PuffinDataGenerator(
         metadataJsonTemplatePath, localOutputDir);
@@ -149,6 +151,7 @@ public class PuffinDataGenerator {
     generator.writeFileWithInvalidAndCorruptSketches();
     generator.writeFileMetadataNdvOkFileCorrupt();
     generator.writeFileMultipleFieldIds();
+    generator.writeSomeBlobsCurrentSomeNotInTwoFiles();
   }
 
   public PuffinDataGenerator(String metadataJsonTemplatePath, String localOutputDir)
@@ -167,6 +170,10 @@ public class PuffinDataGenerator {
 
     mapper_ = new ObjectMapper();
     metadataJsonTemplate_ = mapper_.readTree(metadataJsonStr);
+
+    List<Long> snapshotIds = getSnapshotIds();
+    snapshotIds.remove(snapshotId_);
+    oldSnapshotIds_ = snapshotIds;
   }
 
   private static long getSnapshotIdFromMetadataJson(String metadataJsonStr) {
@@ -184,6 +191,16 @@ public class PuffinDataGenerator {
     boolean match = matcher.find();
     Preconditions.checkState(match);
     return matcher.group(1);
+  }
+
+  private List<Long> getSnapshotIds() {
+    JsonNode snapshots = metadataJsonTemplate_.findValue("snapshots");
+    List<JsonNode> snapshotIds = snapshots.findValues("snapshot-id");
+    List<Long> res = new ArrayList<>();
+    for (JsonNode node : snapshotIds) {
+      res.add(node.asLong());
+    }
+    return res;
   }
 
   private String getPuffinFilePrefix() {
@@ -277,13 +294,13 @@ public class PuffinDataGenerator {
     blobs1.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 2, 2));
 
     List<Blob> blobs2 = new ArrayList<>();
-    long notCurrentSnapshotId = snapshotId_ - 1;
+    long notCurrentSnapshotId = oldSnapshotIds_.get(0);
     blobs2.add(createBlob(notCurrentSnapshotId, SEQUENCE_NUMBER, 3, 3));
     blobs2.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 4, 4));
 
     List<FileData> puffinFiles = new ArrayList<>();
     puffinFiles.add(new FileData(
-          "current_snapshot_id.stats", snapshotId_, blobs1, true));
+        "current_snapshot_id.stats", snapshotId_, blobs1, true));
     puffinFiles.add(new FileData(
         "not_current_snapshot_id.stats", notCurrentSnapshotId, blobs2, true));
     writeFilesForScenario(puffinFiles, "one_file_current_one_not.metadata.json");
@@ -291,17 +308,46 @@ public class PuffinDataGenerator {
 
   // Some blobs are for the current snapshot while some are not.
   private void writeNotAllBlobsCurrent() throws IOException {
-    long notCurrentSnapshotId = snapshotId_ - 1;
+    long notCurrentSnapshotId = oldSnapshotIds_.get(0);
     List<Blob> blobs = new ArrayList<>();
     blobs.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 1, 1));
     blobs.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 2, 2));
     blobs.add(createBlob(notCurrentSnapshotId, SEQUENCE_NUMBER, 3, 3));
-    blobs.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 4, 4));
+    blobs.add(createBlob(notCurrentSnapshotId, SEQUENCE_NUMBER, 4, 4));
 
     List<FileData> puffinFiles = new ArrayList<>();
     puffinFiles.add(new FileData(
         "not_all_blobs_current.stats", snapshotId_, blobs, true));
     writeFilesForScenario(puffinFiles, "not_all_blobs_current.metadata.json");
+  }
+
+  // Two Puffin files both contain ndv values for the current and an old snapshot for the
+  // same column. The reader should take the snapshot into account, otherwise it will
+  // produce an invalid result whichever file is read first, i.e. there is no "lucky"
+  // ordering.
+  private void writeSomeBlobsCurrentSomeNotInTwoFiles() throws IOException {
+    long notCurrentSnapshotId = oldSnapshotIds_.get(0);
+
+    List<Blob> blobs1 = new ArrayList<>();
+    blobs1.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 1, 1));
+    blobs1.add(createBlob(notCurrentSnapshotId, SEQUENCE_NUMBER, 2, 4));
+
+    List<Blob> blobs2 = new ArrayList<>();
+    blobs2.add(createBlob(notCurrentSnapshotId, SEQUENCE_NUMBER, 1, 5));
+    blobs2.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 2, 2));
+
+    // Even within a file, the reader has to take the snapshot into account.
+    blobs2.add(createBlob(notCurrentSnapshotId, SEQUENCE_NUMBER, 3, 8));
+    blobs2.add(createBlob(snapshotId_, SEQUENCE_NUMBER, 3, 3));
+    blobs2.add(createBlob(notCurrentSnapshotId, SEQUENCE_NUMBER, 3, 6));
+
+    List<FileData> puffinFiles = new ArrayList<>();
+    puffinFiles.add(new FileData(
+        "some_blobs_current_some_not_in_2_files1.stats", snapshotId_, blobs1, true));
+    puffinFiles.add(new FileData("some_blobs_current_some_not_in_2_files2.stats",
+        notCurrentSnapshotId, blobs2, true));
+    writeFilesForScenario(puffinFiles,
+        "some_blobs_current_some_not_in_2_files.metadata.json");
   }
 
   // One of the Puffin files is missing. The other file(s) should be taken into account.

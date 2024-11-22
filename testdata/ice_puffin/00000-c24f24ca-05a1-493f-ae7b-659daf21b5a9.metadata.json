@@ -1,0 +1,144 @@
+{
+  "format-version" : 1,
+  "table-uuid" : "608fe22a-7506-4029-a193-f3d69a0459cd",
+  "location" : "hdfs://localhost:20500/test-warehouse/ice_puffin",
+  "last-updated-ms" : 1729266210869,
+  "last-column-id" : 10,
+  "schema" : {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "int_col1",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "int_col2",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "bigint_col",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "float_col",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "double_col",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "decimal_col",
+      "required" : false,
+      "type" : "decimal(9, 0)"
+    }, {
+      "id" : 7,
+      "name" : "date_col",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 8,
+      "name" : "string_col",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 9,
+      "name" : "timestamp_col",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 10,
+      "name" : "bool_col",
+      "required" : false,
+      "type" : "boolean"
+    } ]
+  },
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "int_col1",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 2,
+      "name" : "int_col2",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "bigint_col",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "float_col",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "double_col",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "decimal_col",
+      "required" : false,
+      "type" : "decimal(9, 0)"
+    }, {
+      "id" : 7,
+      "name" : "date_col",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 8,
+      "name" : "string_col",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 9,
+      "name" : "timestamp_col",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 10,
+      "name" : "bool_col",
+      "required" : false,
+      "type" : "boolean"
+    } ]
+  } ],
+  "partition-spec" : [ ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "engine.hive.enabled" : "true",
+    "external.table.purge" : "TRUE",
+    "write.format.default" : "parquet",
+    "hive.metastore.table.owner" : "danielbecker",
+    "OBJCAPABILITIES" : "EXTREAD,EXTWRITE",
+    "storage_handler" : "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler"
+  },
+  "current-snapshot-id" : -1,
+  "refs" : { },
+  "snapshots" : [ ],
+  "statistics" : [ ],
+  "snapshot-log" : [ ],
+  "metadata-log" : [ ]
+}

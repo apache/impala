@@ -1,7 +1,7 @@
 {
   "format-version" : 1,
-  "table-uuid" : "UUID_PLACEHOLDER",
-  "location" : "TABLE_LOCATION_PLACEHOLDER",
+  "table-uuid" : "608fe22a-7506-4029-a193-f3d69a0459cd",
+  "location" : "hdfs://localhost:20500/test-warehouse/ice_puffin",
   "last-updated-ms" : 1729266229053,
   "last-column-id" : 10,
   "schema" : {
@@ -157,7 +157,7 @@
       "total-position-deletes" : "0",
       "total-equality-deletes" : "0"
     },
-    "manifest-list" : "TABLE_LOCATION_PLACEHOLDER/metadata/snap-2630643801692665966-1-5010cf53-bb8c-4dd2-94a6-ce516a3152d6.avro",
+    "manifest-list" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/snap-2630643801692665966-1-5010cf53-bb8c-4dd2-94a6-ce516a3152d6.avro",
     "schema-id" : 0
   }, {
     "snapshot-id" : 3941638984336887328,
@@ -173,7 +173,7 @@
       "total-position-deletes" : "0",
       "total-equality-deletes" : "0"
     },
-    "manifest-list" : "TABLE_LOCATION_PLACEHOLDER/metadata/snap-3941638984336887328-1-5896bbb0-146d-4f27-be25-c23bf13bf8ab.avro",
+    "manifest-list" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/snap-3941638984336887328-1-5896bbb0-146d-4f27-be25-c23bf13bf8ab.avro",
     "schema-id" : 0
   }, {
     "snapshot-id" : 4323499932319869599,
@@ -189,26 +189,10 @@
       "total-position-deletes" : "0",
       "total-equality-deletes" : "0"
     },
-    "manifest-list" : "TABLE_LOCATION_PLACEHOLDER/metadata/snap-4323499932319869599-1-88451644-3db8-481b-8dfa-618535418394.avro",
+    "manifest-list" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/snap-4323499932319869599-1-88451644-3db8-481b-8dfa-618535418394.avro",
     "schema-id" : 0
   } ],
-  "statistics" : [ {
-    "snapshot-id" : 4323499932319869599,
-    "statistics-path" : "TABLE_LOCATION_PLACEHOLDER/metadata/stats_for_unsupported_type.stats",
-    "file-size-in-bytes" : 496,
-    "file-footer-size-in-bytes" : 402,
-    "blob-metadata" : [ {
-      "type" : "apache-datasketches-theta-v1",
-      "snapshot-id" : 4323499932319869599,
-      "sequence-number" : 0,
-      "fields" : [ 1 ]
-    }, {
-      "type" : "apache-datasketches-theta-v1",
-      "snapshot-id" : 4323499932319869599,
-      "sequence-number" : 0,
-      "fields" : [ 10 ]
-    } ]
-  } ],
+  "statistics" : [ ],
   "snapshot-log" : [ {
     "timestamp-ms" : 1729266214873,
     "snapshot-id" : 2630643801692665966
@@ -221,12 +205,12 @@
   } ],
   "metadata-log" : [ {
     "timestamp-ms" : 1729266210869,
-    "metadata-file" : "TABLE_LOCATION_PLACEHOLDER/metadata/00000-c24f24ca-05a1-493f-ae7b-659daf21b5a9.metadata.json"
+    "metadata-file" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/00000-c24f24ca-05a1-493f-ae7b-659daf21b5a9.metadata.json"
   }, {
     "timestamp-ms" : 1729266214881,
-    "metadata-file" : "TABLE_LOCATION_PLACEHOLDER/metadata/00001-ae590078-1d64-45cb-892f-80b58829d673.metadata.json"
+    "metadata-file" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/00001-ae590078-1d64-45cb-892f-80b58829d673.metadata.json"
   }, {
     "timestamp-ms" : 1729266220840,
-    "metadata-file" : "TABLE_LOCATION_PLACEHOLDER/metadata/00002-5302617e-4ca6-4e44-a513-0f2082b05700.metadata.json"
+    "metadata-file" : "hdfs://localhost:20500/test-warehouse/ice_puffin/metadata/00002-5302617e-4ca6-4e44-a513-0f2082b05700.metadata.json"
   } ]
 }

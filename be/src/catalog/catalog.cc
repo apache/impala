@@ -46,8 +46,8 @@ DEFINE_int32(max_nonhdfs_partitions_parallel_load, 20,
 DEFINE_int32(initial_hms_cnxn_timeout_s, 120,
     "Number of seconds catalogd will wait to establish an initial connection to the HMS "
     "before exiting.");
-DEFINE_bool(disable_reading_puffin_stats, true, "If this flag is set to true, "
-    "Impala will not read Iceberg Puffin stats files.");
+DEFINE_bool(enable_reading_puffin_stats, false, "Impala will only read Iceberg Puffin "
+    "stats files if this flag is set to true.");
 
 Catalog::Catalog() {
   JniMethodDescriptor methods[] = {

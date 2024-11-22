@@ -2,7 +2,7 @@
   "format-version" : 1,
   "table-uuid" : "UUID_PLACEHOLDER",
   "location" : "TABLE_LOCATION_PLACEHOLDER",
-  "last-updated-ms" : 1728483427091,
+  "last-updated-ms" : 1729266229053,
   "last-column-id" : 10,
   "schema" : {
     "type" : "struct",
@@ -129,24 +129,24 @@
   } ],
   "properties" : {
     "engine.hive.enabled" : "true",
-    "impala.events.catalogServiceId" : "95d77e9a4a3d4e27:96a993b690a3fba6",
+    "impala.events.catalogServiceId" : "6a8070ad786a4fce:92459a1e159a245f",
     "external.table.purge" : "TRUE",
-    "impala.events.catalogVersion" : "2108",
+    "impala.events.catalogVersion" : "2110",
     "write.format.default" : "parquet",
     "hive.metastore.table.owner" : "danielbecker",
     "OBJCAPABILITIES" : "EXTREAD,EXTWRITE",
     "storage_handler" : "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler"
   },
-  "current-snapshot-id" : 2532372403033748214,
+  "current-snapshot-id" : 4323499932319869599,
   "refs" : {
     "main" : {
-      "snapshot-id" : 2532372403033748214,
+      "snapshot-id" : 4323499932319869599,
       "type" : "branch"
     }
   },
   "snapshots" : [ {
-    "snapshot-id" : 2532372403033748214,
-    "timestamp-ms" : 1728483427081,
+    "snapshot-id" : 2630643801692665966,
+    "timestamp-ms" : 1729266214873,
     "summary" : {
       "operation" : "delete",
       "changed-partition-count" : "0",
@@ -157,17 +157,49 @@
       "total-position-deletes" : "0",
       "total-equality-deletes" : "0"
     },
-    "manifest-list" : "TABLE_LOCATION_PLACEHOLDER/metadata/snap-2532372403033748214-1-c9f94c00-2920-4a39-8e7f-c7faf7e71a7d.avro",
+    "manifest-list" : "TABLE_LOCATION_PLACEHOLDER/metadata/snap-2630643801692665966-1-5010cf53-bb8c-4dd2-94a6-ce516a3152d6.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 3941638984336887328,
+    "parent-snapshot-id" : 2630643801692665966,
+    "timestamp-ms" : 1729266220836,
+    "summary" : {
+      "operation" : "delete",
+      "changed-partition-count" : "0",
+      "total-records" : "0",
+      "total-files-size" : "0",
+      "total-data-files" : "0",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "TABLE_LOCATION_PLACEHOLDER/metadata/snap-3941638984336887328-1-5896bbb0-146d-4f27-be25-c23bf13bf8ab.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 4323499932319869599,
+    "parent-snapshot-id" : 3941638984336887328,
+    "timestamp-ms" : 1729266229045,
+    "summary" : {
+      "operation" : "delete",
+      "changed-partition-count" : "0",
+      "total-records" : "0",
+      "total-files-size" : "0",
+      "total-data-files" : "0",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "TABLE_LOCATION_PLACEHOLDER/metadata/snap-4323499932319869599-1-88451644-3db8-481b-8dfa-618535418394.avro",
     "schema-id" : 0
   } ],
   "statistics" : [ {
-    "snapshot-id" : 2532372403033748214,
+    "snapshot-id" : 4323499932319869599,
     "statistics-path" : "TABLE_LOCATION_PLACEHOLDER/metadata/metadata_ndv_ok_sketches_corrupt.stats",
     "file-size-in-bytes" : 485,
     "file-footer-size-in-bytes" : 451,
     "blob-metadata" : [ {
       "type" : "apache-datasketches-theta-v1",
-      "snapshot-id" : 2532372403033748214,
+      "snapshot-id" : 4323499932319869599,
       "sequence-number" : 0,
       "fields" : [ 1 ],
       "properties" : {
@@ -175,7 +207,7 @@
       }
     }, {
       "type" : "apache-datasketches-theta-v1",
-      "snapshot-id" : 2532372403033748214,
+      "snapshot-id" : 4323499932319869599,
       "sequence-number" : 0,
       "fields" : [ 2 ],
       "properties" : {
@@ -184,11 +216,23 @@
     } ]
   } ],
   "snapshot-log" : [ {
-    "timestamp-ms" : 1728483427081,
-    "snapshot-id" : 2532372403033748214
+    "timestamp-ms" : 1729266214873,
+    "snapshot-id" : 2630643801692665966
+  }, {
+    "timestamp-ms" : 1729266220836,
+    "snapshot-id" : 3941638984336887328
+  }, {
+    "timestamp-ms" : 1729266229045,
+    "snapshot-id" : 4323499932319869599
   } ],
   "metadata-log" : [ {
-    "timestamp-ms" : 1728483321332,
-    "metadata-file" : "TABLE_LOCATION_PLACEHOLDER/metadata/00000-0991de67-dc39-4226-af9c-8f347dbd57e5.metadata.json"
+    "timestamp-ms" : 1729266210869,
+    "metadata-file" : "TABLE_LOCATION_PLACEHOLDER/metadata/00000-c24f24ca-05a1-493f-ae7b-659daf21b5a9.metadata.json"
+  }, {
+    "timestamp-ms" : 1729266214881,
+    "metadata-file" : "TABLE_LOCATION_PLACEHOLDER/metadata/00001-ae590078-1d64-45cb-892f-80b58829d673.metadata.json"
+  }, {
+    "timestamp-ms" : 1729266220840,
+    "metadata-file" : "TABLE_LOCATION_PLACEHOLDER/metadata/00002-5302617e-4ca6-4e44-a513-0f2082b05700.metadata.json"
   } ]
 }

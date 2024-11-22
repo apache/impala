@@ -194,9 +194,9 @@
   } ],
   "statistics" : [ {
     "snapshot-id" : 4323499932319869599,
-    "statistics-path" : "TABLE_LOCATION_PLACEHOLDER/metadata/stats_for_unsupported_type.stats",
-    "file-size-in-bytes" : 496,
-    "file-footer-size-in-bytes" : 402,
+    "statistics-path" : "TABLE_LOCATION_PLACEHOLDER/metadata/some_blobs_current_some_not_in_2_files1.stats",
+    "file-size-in-bytes" : 495,
+    "file-footer-size-in-bytes" : 401,
     "blob-metadata" : [ {
       "type" : "apache-datasketches-theta-v1",
       "snapshot-id" : 4323499932319869599,
@@ -204,9 +204,40 @@
       "fields" : [ 1 ]
     }, {
       "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 2630643801692665966,
+      "sequence-number" : 0,
+      "fields" : [ 2 ]
+    } ]
+  }, {
+    "snapshot-id" : 2630643801692665966,
+    "statistics-path" : "TABLE_LOCATION_PLACEHOLDER/metadata/some_blobs_current_some_not_in_2_files2.stats",
+    "file-size-in-bytes" : 1219,
+    "file-footer-size-in-bytes" : 878,
+    "blob-metadata" : [ {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 2630643801692665966,
+      "sequence-number" : 0,
+      "fields" : [ 1 ]
+    }, {
+      "type" : "apache-datasketches-theta-v1",
       "snapshot-id" : 4323499932319869599,
       "sequence-number" : 0,
-      "fields" : [ 10 ]
+      "fields" : [ 2 ]
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 2630643801692665966,
+      "sequence-number" : 0,
+      "fields" : [ 3 ]
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 4323499932319869599,
+      "sequence-number" : 0,
+      "fields" : [ 3 ]
+    }, {
+      "type" : "apache-datasketches-theta-v1",
+      "snapshot-id" : 2630643801692665966,
+      "sequence-number" : 0,
+      "fields" : [ 3 ]
     } ]
   } ],
   "snapshot-log" : [ {

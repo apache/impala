@@ -22,13 +22,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.analysis.IcebergPartitionField;
@@ -56,22 +57,29 @@ import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
-import org.apache.thrift.TException;
 
 /**
  * Representation of an Iceberg table in the catalog cache.
  *
  * For an Iceberg table, stats can come from 3 places:
  * 1. numRows: written by Iceberg
- * 2. HMS column stats: used even if stale
- * 3. NDV from Puffin: only from the current snapshot, overrides HMS NDV stats if present.
+ * 2. HMS column stats
+ * 3. NDV from Puffin
+ *
+ * If there are Puffin stats for different snapshots, the most recent one will be used for
+ * each column.
+ *
+ * If there are both HMS and Puffin stats for a column, the more recent one
+ * will be used - for HMS stats we use the 'impala.lastComputeStatsTime' table
+ * property, and for Puffin stats we use the snapshot timestamp to determine
+ * which is more recent.
  *
  * As Puffin only contains NDV stats, it is possible that at a given point the NDV is from
  * Puffin but other column stats, e.g. num nulls, come from the HMS and are based on a
  * much older state of the table.
  * Note that reading Puffin stats may be disabled by setting the
- * 'disable_reading_puffin_stats' startup flag or the table property
- * 'impala.iceberg_disable_reading_puffin_stats' to true.
+ * 'enable_reading_puffin_stats' startup flag or the table property
+ * 'impala.iceberg_read_puffin_stats' to false.
  */
 public class IcebergTable extends Table implements FeIcebergTable {
   // Alias to the string key that identifies the storage handler for Iceberg tables.
@@ -103,7 +111,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public static final String ICEBERG_TABLE_IDENTIFIER = "iceberg.table_identifier";
 
   public static final String ICEBERG_DISABLE_READING_PUFFIN_STATS =
-      "impala.iceberg_disable_reading_puffin_stats";
+      "impala.iceberg_read_puffin_stats";
 
   // Internal Iceberg table property that specifies the absolute path of the current
   // table metadata. This property is only valid for tables in 'hive.catalog'.
@@ -461,41 +469,60 @@ public class IcebergTable extends Table implements FeIcebergTable {
     }
   }
 
-  // Reads NDV stats from Puffin files belonging to the table (if any). Only considers
-  // statistics written for the current snapshot. Overrides NDV stats coming from the HMS
-  // - this is safe because we only consider Puffin stats for the current snapshot, so the
-  // NDV from Puffin is at least as current as the one in the HMS. Note that even if a
-  // value from HMS is overridden here, the new value will not be written back to HMS.
-  // Other stats, e.g. number of nulls, are not modified as Puffin stats only contain NDV
-  // values.
+  // Reads NDV stats from Puffin files belonging to the table (if any).
+  //
+  // If there are Puffin stats for different snapshots, the most recent one will be used
+  // for each column.
+  //
+  // If there are both HMS and Puffin stats for a column, the more recent one will be used
+  // - for HMS stats we use the 'impala.lastComputeStatsTime' table property, and for
+  // Puffin stats we use the snapshot timestamp to determine which is more recent.
+  //
+  // Note that even if a value from HMS is overridden here, the new value will not be
+  // written back to HMS.  Other stats, e.g. number of nulls, are not modified as Puffin
+  // stats only contain NDV values.
   private void applyPuffinNdvStats(EventSequence catalogTimeline) {
-    if (BackendConfig.INSTANCE.disableReadingPuffinStats()) return;
-    if (isPuffinStatsReadingDisabledForTable()) return;
+    if (!BackendConfig.INSTANCE.enableReadingPuffinStats()) return;
+    if (!isPuffinStatsReadingEnabledForTable()) return;
+
+    long hmsStatsTimestampMs = getLastComputeStatsTimeMs();
+    Set<Integer> fieldIdsWithHmsStats = collectFieldIdsWithNdvStats();
 
     Map<Integer, PuffinStatsLoader.PuffinStatsRecord> puffinNdvs =
-        PuffinStatsLoader.loadPuffinStats(icebergApiTable_, getFullName());
+        PuffinStatsLoader.loadPuffinStats(icebergApiTable_, getFullName(),
+            hmsStatsTimestampMs, fieldIdsWithHmsStats);
     for (Map.Entry<Integer, PuffinStatsLoader.PuffinStatsRecord> entry
         : puffinNdvs.entrySet()) {
       int fieldId = entry.getKey();
       long ndv = entry.getValue().ndv;
+      long snapshotId = entry.getValue().snapshotId;
+
+      Snapshot snapshot = icebergApiTable_.snapshot(snapshotId);
+      Preconditions.checkNotNull(snapshot);
 
       // Don't override a possibly existing HMS stat with an explicitly invalid value.
       if (ndv >= 0) {
         IcebergColumn col = getColumnByIcebergFieldId(fieldId);
         Preconditions.checkNotNull(col);
         Type colType = col.getType();
-        if (ColumnStats.supportsNdv(colType)) {
-          // For some types, e.g. BOOLEAN, HMS does not support NDV stats. We could still
-          // set them here, but it would cause differences between legacy and local
-          // catalog mode: in local catalog mode, the catalog sends the stats in HMS
-          // objects, so NDVs for unsupported types would be lost.
-          col.getStats().setNumDistinctValues(ndv);
 
-          // In local catalog mode, the stats sent from the catalog are those of
-          // 'hdfsTable_', not those of this class.
-          Column hdfsTableCol = hdfsTable_.getColumn(col.getName());
-          Preconditions.checkNotNull(hdfsTableCol);
-          hdfsTableCol.getStats().setNumDistinctValues(ndv);
+        // For some types, e.g. BOOLEAN, HMS does not support NDV stats. We could still
+        // set them here, but it would cause differences between legacy and local catalog
+        // mode: in local catalog mode, the catalog sends the stats in HMS objects, so
+        // NDVs for unsupported types would be lost.
+        if (ColumnStats.supportsNdv(colType)) {
+          // Only use the value from Puffin if it is more recent than the HMS stat value
+          // or if the latter doesn't exist.
+          if (!col.getStats().hasNumDistinctValues()
+              || snapshot.timestampMillis() >= hmsStatsTimestampMs) {
+            col.getStats().setNumDistinctValues(ndv);
+
+            // In local catalog mode, the stats sent from the catalog are those of
+            // 'hdfsTable_', not those of this class.
+            Column hdfsTableCol = hdfsTable_.getColumn(col.getName());
+            Preconditions.checkNotNull(hdfsTableCol);
+            hdfsTableCol.getStats().setNumDistinctValues(ndv);
+          }
         }
       }
     }
@@ -505,10 +532,30 @@ public class IcebergTable extends Table implements FeIcebergTable {
     }
   }
 
-  private boolean isPuffinStatsReadingDisabledForTable() {
+  private boolean isPuffinStatsReadingEnabledForTable() {
     String val = msTable_.getParameters().get(ICEBERG_DISABLE_READING_PUFFIN_STATS);
-    if (val == null) return false;
+    if (val == null) return true;
     return Boolean.parseBoolean(val);
+  }
+
+  private long getLastComputeStatsTimeMs() {
+    String val = msTable_.getParameters().get(Table.TBL_PROP_LAST_COMPUTE_STATS_TIME);
+    try {
+      return Long.parseLong(val) * 1000;
+    } catch (Exception e) {
+      return -1;
+    }
+  }
+
+  private Set<Integer> collectFieldIdsWithNdvStats() {
+    Set<Integer> res = new HashSet<>();
+    for (Column col : colsByPos_) {
+      if (col.getStats().hasNumDistinctValues()) {
+        IcebergColumn iCol = (IcebergColumn) col;
+        res.add(iCol.getFieldId());
+      }
+    }
+    return res;
   }
 
   /**

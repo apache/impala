@@ -865,18 +865,19 @@ ORDER BY made_current_at;
       For the Puffin specification, see <xref keyref="upstream_iceberg_puffin_site"/>.
       </p>
       <p>
-      Impala only reads Puffin stats when they are available for the current snapshot.
-      Puffin files or blobs that were written for other snapshots than the current one
-      are ignored. This behaviour is different from how Impala treats HMS stats, where
-      older stats can also be used - see <xref keyref="perf_stats"/> for more.
-      As this may be unintuitive for users, reading Puffin stats is disabled by default;
-      set the "--disable_reading_puffin_stats" startup flag to false to enable it.
+      If there are Puffin stats for multiple snapshots, Impala chooses the most recent
+      one for each column. Note that this means that the stats for different columns may
+      come from different snapshots.
       </p>
       <p>
-      When Puffin stats reading is enabled, the NDV values read from Puffin files take
-      precedence over NDV values stored in the HMS. This is because we only read Puffin
-      stats for the current snapshot, so these values are always up-to-date, while the
-      values in the HMS may be stale.
+      In case there are both HMS and Puffin stats for a column, the more recent one will
+      be used - for HMS stats we use the 'impala.lastComputeStatsTime' table property, and
+      for Puffin stats we use the snapshot timestamp to determine which one is more
+      recent.
+      </p>
+      <p>
+      Reading Puffin stats is disabled by default; set the "--enable_reading_puffin_stats"
+      startup flag to true to enable it.
       </p>
       <p>
       Some engines, e.g. Trino, also write the NDV as a property (with key "ndv") in the
@@ -889,11 +890,11 @@ ORDER BY made_current_at;
       For this reason, it is possible to disable reading Puffin stats in two ways:
       <ul>
         <li>Globally, with the aforementioned
-            <codeph>disable_reading_puffin_stats</codeph> startup flag - when it is set
-            to true, Impala will never read Puffin stats.</li>
+            <codeph>enable_reading_puffin_stats</codeph> startup flag - when it is set
+            to false, Impala will never read Puffin stats.</li>
         <li>For specific tables, by setting the
-            <codeph>impala.iceberg_disable_reading_puffin_stats</codeph> table property
-            to "true".</li>
+            <codeph>impala.iceberg_read_puffin_stats</codeph> table property to
+            "false".</li>
       </ul>
       </p>
       <p>
