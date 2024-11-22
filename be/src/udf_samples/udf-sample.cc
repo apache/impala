@@ -51,6 +51,7 @@ StringVal ClassifyReviews(FunctionContext* context, const StringVal& input) {
   const StringVal model("gpt-3.5-turbo");
   const StringVal api_key_jceks_secret("open-ai-key");
   const StringVal params("{\"temperature\": 0.9, \"model\": \"gpt-4\"}");
+  const StringVal options("{\"credential_type\": \"JCEKS\"}");
   return context->Functions()->ai_generate_text(
-      context, endpoint, prompt, model, api_key_jceks_secret, params);
+      context, endpoint, prompt, model, api_key_jceks_secret, params, options);
 }

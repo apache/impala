@@ -85,6 +85,7 @@ DECLARE_bool(disable_optimization_passes);
 DECLARE_string(hdfs_zone_info_zip);
 DECLARE_string(ai_endpoint);
 DECLARE_string(ai_model);
+DECLARE_string(ai_additional_platforms);
 
 namespace posix_time = boost::posix_time;
 using boost::bad_lexical_cast;
@@ -11299,6 +11300,8 @@ TEST_P(ExprTest, AiFunctionsTest) {
   StringVal prompt("hello!");
   // additional params
   StringVal json_params;
+  // impala options.
+  StringVal impala_options;
   // dry_run to receive HTTP request header and body
   bool dry_run = true;
 
@@ -11312,9 +11315,9 @@ TEST_P(ExprTest, AiFunctionsTest) {
 
   // Test fastpath
   StringVal result =
-    AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::OPEN_AI>(
-        ctx, FLAGS_ai_endpoint, prompt, StringVal::null(), StringVal::null(),
-        StringVal::null(), dry_run);
+      AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::OPEN_AI>(ctx,
+          FLAGS_ai_endpoint, prompt, StringVal::null(), StringVal::null(),
+          StringVal::null(), StringVal::null(), dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
@@ -11323,9 +11326,9 @@ TEST_P(ExprTest, AiFunctionsTest) {
              "\"hello!\"}]}"));
 
   result =
-    AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::AZURE_OPEN_AI>(
-        ctx, azure_openai_endpoint, prompt, StringVal::null(), StringVal::null(),
-        StringVal::null(), dry_run);
+      AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::AZURE_OPEN_AI>(
+          ctx, azure_openai_endpoint, prompt, StringVal::null(), StringVal::null(),
+          StringVal::null(), StringVal::null(), dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://resource.openai.azure.com/openai/deployments/"
              "deployment/completions?api-version=2024-02-01"
@@ -11336,18 +11339,19 @@ TEST_P(ExprTest, AiFunctionsTest) {
 
   // Test endpoints.
   // endpoints must begin with https.
-  result = AiFunctions::AiGenerateText(
-      ctx, StringVal("http://ai.com"), prompt, model, jceks_secret, json_params);
+  result = AiFunctions::AiGenerateText(ctx, StringVal("http://ai.com"), prompt, model,
+      jceks_secret, json_params, impala_options);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_INVALID_PROTOCOL_ERROR);
   // only OpenAI endpoints are supported.
   result = AiFunctions::AiGenerateText(
-      ctx, "https://ai.com", prompt, model, jceks_secret, json_params);
+      ctx, "https://ai.com", prompt, model, jceks_secret, json_params, impala_options);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_UNSUPPORTED_ENDPOINT_ERROR);
   // valid request using OpenAI endpoint.
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, prompt, model, jceks_secret, json_params, dry_run);
+      ctx, openai_endpoint, prompt, model, jceks_secret, json_params, impala_options,
+      dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
@@ -11359,7 +11363,8 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // prompt cannot be empty.
   StringVal invalid_prompt("");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, invalid_prompt, model, jceks_secret, json_params, dry_run);
+      ctx, openai_endpoint, invalid_prompt, model, jceks_secret, json_params,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_INVALID_PROMPT_ERROR);
   result = AiFunctions::AiGenerateTextDefault(ctx, invalid_prompt);
@@ -11368,7 +11373,8 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // prompt cannot be null.
   invalid_prompt = StringVal::null();
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, invalid_prompt, model, jceks_secret, json_params, dry_run);
+      ctx, openai_endpoint, invalid_prompt, model, jceks_secret, json_params,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_INVALID_PROMPT_ERROR);
   result = AiFunctions::AiGenerateTextDefault(ctx, invalid_prompt);
@@ -11379,7 +11385,8 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // invalid json results in error.
   StringVal invalid_json_params("{\"temperature\": 0.49, \"stop\": [\"*\",::,]}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, prompt, model, jceks_secret, invalid_json_params, dry_run);
+      ctx, openai_endpoint, prompt, model, jceks_secret, invalid_json_params,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
   // valid json results in overriding existing params ('model'), and adding new parms
@@ -11387,7 +11394,8 @@ TEST_P(ExprTest, AiFunctionsTest) {
   StringVal valid_json_params(
       "{\"model\": \"gpt\", \"temperature\": 0.49, \"stop\": [\"*\", \"%\"]}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, prompt, model, jceks_secret, valid_json_params, dry_run);
+      ctx, openai_endpoint, prompt, model, jceks_secret, valid_json_params,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
@@ -11398,25 +11406,29 @@ TEST_P(ExprTest, AiFunctionsTest) {
   StringVal forbidden_msg_override(
       "{\"messages\": [{\"role\":\"system\",\"content\":\"howdy!\"}]}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_msg_override, dry_run);
+      ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_msg_override,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR);
   // 'n != 1' cannot be overriden as additional params
   StringVal forbidden_n_value("{\"n\": 2}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_value, dry_run);
+      ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_value,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
   // non integer value of 'n' cannot be overriden as additional params
   StringVal forbidden_n_type("{\"n\": \"1\"}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_type, dry_run);
+      ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_type, impala_options,
+      dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
   // accept 'n=1' override as additional params
   StringVal allowed_n_override("{\"n\": 1}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, openai_endpoint, prompt, model, jceks_secret, allowed_n_override, dry_run);
+      ctx, openai_endpoint, prompt, model, jceks_secret, allowed_n_override,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
@@ -11427,7 +11439,7 @@ TEST_P(ExprTest, AiFunctionsTest) {
   // Test flag file options are used when input is empty/null
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, FLAGS_ai_endpoint, prompt, StringVal::null(), jceks_secret, json_params,
-      dry_run);
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
@@ -11435,13 +11447,83 @@ TEST_P(ExprTest, AiFunctionsTest) {
              "\n{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"user\",\"content\":"
              "\"hello!\"}]}"));
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
-      ctx, FLAGS_ai_endpoint, prompt, StringVal(""), jceks_secret, json_params, dry_run);
+      ctx, FLAGS_ai_endpoint, prompt, StringVal(""), jceks_secret, json_params,
+      impala_options, dry_run);
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       string("https://api.openai.com/v1/chat/completions"
              "\nContent-Type: application/json"
              "\nAuthorization: Bearer do_not_share"
              "\n{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"user\",\"content\":"
              "\"hello!\"}]}"));
+
+  // Test Impala options.
+  StringVal impala_options_payload("{\"payload\":\"testpayload\"}");
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, openai_endpoint, prompt, model, jceks_secret, json_params,
+      impala_options_payload, dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      string("https://api.openai.com/v1/chat/completions"
+             "\nContent-Type: application/json"
+             "\nAuthorization: Bearer do_not_share"
+             "\ntestpayload"));
+
+  // Test a not supported Impala option, doesn't affect the results.
+  StringVal impala_options_payload_extra(
+      "{\"payload\":\"testpayload\", "
+      "\"not_supported_key\":\"not_supported_content\"}");
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, openai_endpoint, prompt, model, jceks_secret, json_params,
+      impala_options_payload_extra, dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      string("https://api.openai.com/v1/chat/completions"
+             "\nContent-Type: application/json"
+             "\nAuthorization: Bearer do_not_share"
+             "\ntestpayload"));
+
+  // Test an Impala option with malformatted json.
+  StringVal impala_options_mal_formatted("{\"payload\":\"testpayload\", "
+                                         "malformatted_key:\"malformatted_content}");
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, openai_endpoint, prompt, model, jceks_secret, json_params,
+      impala_options_mal_formatted, dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+
+  // Test Impala options with payload exceeding 5MB.
+  string large_string(5 * 1024 * 1024 + 1, 'A');
+  string large_payload = "{\"payload\":\"" + large_string + "\"}";
+  StringVal impala_options_long(large_payload.c_str());
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, openai_endpoint, prompt, model, jceks_secret, json_params, impala_options_long,
+      dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+
+  // Test PLAIN credential type.
+  StringVal plain_token("test_token");
+  StringVal plain_token_options(
+      "{\"credential_type\":\"plain\",\"api_standard\":\"openai\"}");
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, openai_endpoint, prompt, model, plain_token, json_params, plain_token_options,
+      dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      string("https://api.openai.com/v1/chat/completions"
+             "\nContent-Type: application/json"
+             "\nAuthorization: Bearer test_token"
+             "\n{\"model\":\"bot\",\"messages\":[{\"role\":\"user\",\"content\":"
+             "\"hello!\"}]}"));
+
+  // Test PLAIN credential type with customized payload.
+  plain_token_options = StringVal("{\"credential_type\":\"plain\",\"api_standard\":"
+                                  "\"openai\", \"payload\":\"testpayload\"}");
+  result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
+      ctx, openai_endpoint, prompt, model, plain_token, json_params, plain_token_options,
+      dry_run);
+  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
+      string("https://api.openai.com/v1/chat/completions"
+             "\nContent-Type: application/json"
+             "\nAuthorization: Bearer test_token"
+             "\ntestpayload"));
 
   // Test OPEN AI's API response parsing
   string content(
@@ -11483,6 +11565,32 @@ TEST_P(ExprTest, AiFunctionsTest) {
   pool.FreeAll();
   UdfTestHarness::CloseContext(ctx);
   state.ReleaseResources();
+}
+
+TEST_P(ExprTest, AiFunctionsTestAdditionalSites) {
+  FLAGS_ai_additional_platforms = "ai-api.com , another-ai.org";
+  // Test existing endpoints.
+  EXPECT_EQ(AiFunctions::GetAiPlatformFromEndpoint(
+                "https://api.openai.com/v1/chat/completions", true),
+      AiFunctions::AI_PLATFORM::OPEN_AI);
+  EXPECT_EQ(AiFunctions::GetAiPlatformFromEndpoint(
+                "https://openai.azure.com/openai/deployments/", true),
+      AiFunctions::AI_PLATFORM::AZURE_OPEN_AI);
+
+  // Test additional added GENERAL ai platform sites.
+  EXPECT_EQ(
+      AiFunctions::GetAiPlatformFromEndpoint("https://ai-api.com/v1/generate", true),
+      AiFunctions::AI_PLATFORM::GENERAL);
+  EXPECT_EQ(
+      AiFunctions::GetAiPlatformFromEndpoint("https://another-ai.org/completions", true),
+      AiFunctions::AI_PLATFORM::GENERAL);
+  // Test unsupported endpoint.
+  EXPECT_EQ(AiFunctions::GetAiPlatformFromEndpoint("https://random-api.site", true),
+      AiFunctions::AI_PLATFORM::UNSUPPORTED);
+  // Test case sensitivity.
+  EXPECT_EQ(
+      AiFunctions::GetAiPlatformFromEndpoint("https://AI-API.COM/v1/generate", true),
+      AiFunctions::AI_PLATFORM::GENERAL);
 }
 
 } // namespace impala

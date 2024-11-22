@@ -123,8 +123,8 @@ using impala_udf::FunctionContext;
 class AiFunctions {
  public:
   static StringVal AiGenerateText(FunctionContext* ctx, const StringVal& endpoint,
-      const StringVal& prompt, const StringVal& model,
-      const StringVal& api_key_jceks_secret, const StringVal& params) {
+      const StringVal& prompt, const StringVal& model, const StringVal& auth_credential,
+      const StringVal& params, const StringVal& impala_options) {
     return StringVal(AI_FUNCTIONS_DUMMY_RESPONSE.c_str());
   }
   static StringVal AiGenerateTextDefault(FunctionContext* ctx, const StringVal& prompt) {

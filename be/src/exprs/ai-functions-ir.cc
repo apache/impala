@@ -18,11 +18,16 @@
 // The functions in this file are specifically not cross-compiled to IR because there
 // is no signifcant performance benefit to be gained.
 
-#include <gutil/strings/util.h>
+#include <boost/algorithm/string/trim.hpp>
 
 #include "exprs/ai-functions.inline.h"
 
 using namespace impala_udf;
+using boost::algorithm::trim;
+using std::any_of;
+using std::istringstream;
+using std::set;
+using std::string_view;
 
 DEFINE_string(ai_endpoint, "https://api.openai.com/v1/chat/completions",
     "The default API endpoint for an external AI engine.");
@@ -37,6 +42,10 @@ DEFINE_string(ai_api_key_jceks_secret, "",
     "The jceks secret key used for extracting the api key from configured keystores. "
     "'hadoop.security.credential.provider.path' in core-site must be configured to "
     "include the keystore storing the corresponding secret.");
+
+DEFINE_string(ai_additional_platforms, "",
+    "A comma-separated list of additional platforms allowed for Impala to access via "
+    "the AI api, formatted as 'site1,site2'.");
 
 DEFINE_int32(ai_connection_timeout_s, 10,
     "(Advanced) The time in seconds for connection timed out when communicating with an "
@@ -75,27 +84,94 @@ static const char* OPEN_AI_RESPONSE_FIELD_CHOICES = "choices";
 static const char* OPEN_AI_RESPONSE_FIELD_MESSAGE = "message";
 static const char* OPEN_AI_RESPONSE_FIELD_CONTENT = "content";
 
-bool AiFunctions::is_api_endpoint_valid(const std::string_view& endpoint) {
+/**
+ * Singleton class for managing the additional AI platforms endpoints.
+ * The additional platforms are loaded and parsed once to optimize for efficiency.
+ */
+class AIAdditionalPlatforms {
+ public:
+  // Singleton accessor.
+  static AIAdditionalPlatforms& GetInstance() {
+    static AIAdditionalPlatforms instance;
+    return instance;
+  }
+
+  // Prevent copying.
+  AIAdditionalPlatforms(const AIAdditionalPlatforms&) = delete;
+  AIAdditionalPlatforms& operator=(const AIAdditionalPlatforms&) = delete;
+
+  // Check if the endpoint matches any of the additional platforms.
+  bool IsGeneralSite(const string_view& endpoint) const {
+    return any_of(additional_platforms.begin(), additional_platforms.end(),
+        [&endpoint](const string& site) {
+          return gstrncasestr(endpoint.data(), site.c_str(), endpoint.size()) != nullptr;
+        });
+  }
+
+  // For testing.
+  void Reset() {
+    additional_platforms.clear();
+    ParseAdditionalSites();
+  }
+
+ private:
+  AIAdditionalPlatforms() { ParseAdditionalSites(); }
+
+  // Parse additional platforms from the flag ai_additional_platforms.
+  void ParseAdditionalSites() {
+    const string& ai_additional_platforms = FLAGS_ai_additional_platforms;
+
+    if (!ai_additional_platforms.empty()) {
+      istringstream stream(ai_additional_platforms);
+      string site;
+      LOG(INFO) << "Loading AI platform additional platforms: "
+                << ai_additional_platforms;
+
+      while (getline(stream, site, ',')) {
+        trim(site);
+        if (!site.empty()) {
+          additional_platforms.insert(site);
+          LOG(INFO) << "Loaded AI platform additional site: " << site;
+        }
+      }
+    }
+  }
+
+  // Storage of AI additional platforms;
+  set<string> additional_platforms;
+};
+
+bool AiFunctions::is_api_endpoint_valid(const string_view& endpoint) {
   // Simple validation for endpoint. It should start with https://
   return (strncaseprefix(endpoint.data(), endpoint.size(), AI_API_ENDPOINT_PREFIX,
               sizeof(AI_API_ENDPOINT_PREFIX))
       != nullptr);
 }
 
-bool AiFunctions::is_api_endpoint_supported(const std::string_view& endpoint) {
-  // Only OpenAI endpoints are supported.
+bool AiFunctions::is_api_endpoint_supported(const string_view& endpoint) {
+  // Only OpenAI or configured general endpoints are supported.
   return (
-      gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr ||
-      gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size()) != nullptr);
+      gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr
+      || gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size())
+          != nullptr
+      || AIAdditionalPlatforms::GetInstance().IsGeneralSite(endpoint));
 }
 
 AiFunctions::AI_PLATFORM AiFunctions::GetAiPlatformFromEndpoint(
-    const std::string_view& endpoint) {
-  // Only OpenAI endpoints are supported.
-  if (gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size()) != nullptr)
+    const string_view& endpoint, bool dry_run) {
+  if (UNLIKELY(dry_run)) AIAdditionalPlatforms::GetInstance().Reset();
+
+  // Only OpenAI or configured general endpoints are supported.
+  if (gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size())
+      != nullptr) {
     return AiFunctions::AI_PLATFORM::OPEN_AI;
-  if (gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr)
+  }
+  if (gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr) {
     return AiFunctions::AI_PLATFORM::AZURE_OPEN_AI;
+  }
+  if (AIAdditionalPlatforms::GetInstance().IsGeneralSite(endpoint)) {
+    return AI_PLATFORM::GENERAL;
+  }
   return AiFunctions::AI_PLATFORM::UNSUPPORTED;
 }
 
@@ -105,8 +181,7 @@ StringVal AiFunctions::copyErrorMessage(FunctionContext* ctx, const string& erro
       errorMsg.length());
 }
 
-string AiFunctions::AiGenerateTextParseOpenAiResponse(
-    const std::string_view& response) {
+string AiFunctions::AiGenerateTextParseOpenAiResponse(const string_view& response) {
   rapidjson::Document document;
   document.Parse(response.data(), response.size());
   // Check for parse errors
@@ -146,11 +221,12 @@ string AiFunctions::AiGenerateTextParseOpenAiResponse(
 template <bool fastpath>
 StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
     const StringVal& endpoint, const StringVal& prompt, const StringVal& model,
-    const StringVal& api_key_jceks_secret, const StringVal& params) {
-  std::string_view endpoint_sv(FLAGS_ai_endpoint);
+    const StringVal& auth_credential, const StringVal& platform_params,
+    const StringVal& impala_options) {
+  string_view endpoint_sv(FLAGS_ai_endpoint);
   // endpoint validation
   if (!fastpath && endpoint.ptr != nullptr && endpoint.len != 0) {
-    endpoint_sv = std::string_view(reinterpret_cast<char*>(endpoint.ptr), endpoint.len);
+    endpoint_sv = string_view(reinterpret_cast<char*>(endpoint.ptr), endpoint.len);
     // Simple validation for endpoint. It should start with https://
     if (!is_api_endpoint_valid(endpoint_sv)) {
       LOG(ERROR) << "AI Generate Text: \ninvalid protocol: " << endpoint_sv;
@@ -160,11 +236,15 @@ StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
   AI_PLATFORM platform = GetAiPlatformFromEndpoint(endpoint_sv);
   switch(platform) {
     case AI_PLATFORM::OPEN_AI:
-      return AiGenerateTextInternal<fastpath, AI_PLATFORM::OPEN_AI>(
-          ctx, endpoint_sv, prompt, model, api_key_jceks_secret, params, false);
+      return AiGenerateTextInternal<fastpath, AI_PLATFORM::OPEN_AI>(ctx, endpoint_sv,
+          prompt, model, auth_credential, platform_params, impala_options, false);
     case AI_PLATFORM::AZURE_OPEN_AI:
-      return AiGenerateTextInternal<fastpath, AI_PLATFORM::AZURE_OPEN_AI>(
-          ctx, endpoint_sv, prompt, model, api_key_jceks_secret, params, false);
+      return AiGenerateTextInternal<fastpath, AI_PLATFORM::AZURE_OPEN_AI>(ctx,
+          endpoint_sv, prompt, model, auth_credential, platform_params, impala_options,
+          false);
+    case AI_PLATFORM::GENERAL:
+      return AiGenerateTextInternal<fastpath, AI_PLATFORM::GENERAL>(ctx, endpoint_sv,
+          prompt, model, auth_credential, platform_params, impala_options, false);
     default:
       if (fastpath) {
         DCHECK(false) << "Default endpoint " << FLAGS_ai_endpoint << "must be supported";
@@ -175,16 +255,16 @@ StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
 }
 
 StringVal AiFunctions::AiGenerateText(FunctionContext* ctx, const StringVal& endpoint,
-    const StringVal& prompt, const StringVal& model,
-    const StringVal& api_key_jceks_secret, const StringVal& params) {
+    const StringVal& prompt, const StringVal& model, const StringVal& auth_credential,
+    const StringVal& platform_params, const StringVal& impala_options) {
   return AiGenerateTextHelper<false>(
-      ctx, endpoint, prompt, model, api_key_jceks_secret, params);
+      ctx, endpoint, prompt, model, auth_credential, platform_params, impala_options);
 }
 
 StringVal AiFunctions::AiGenerateTextDefault(
   FunctionContext* ctx, const StringVal& prompt) {
-  return AiGenerateTextHelper<true>(
-      ctx, NULL_STRINGVAL, prompt, NULL_STRINGVAL, NULL_STRINGVAL, NULL_STRINGVAL);
+  return AiGenerateTextHelper<true>(ctx, NULL_STRINGVAL, prompt, NULL_STRINGVAL,
+      NULL_STRINGVAL, NULL_STRINGVAL, NULL_STRINGVAL);
 }
 
 } // namespace impala

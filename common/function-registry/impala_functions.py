@@ -517,7 +517,7 @@ visible_functions = [
   [['repeat'], 'STRING', ['STRING', 'BIGINT'], 'impala::StringFunctions::Repeat'],
   [['lpad'], 'STRING', ['STRING', 'BIGINT', 'STRING'], 'impala::StringFunctions::Lpad'],
   [['rpad'], 'STRING', ['STRING', 'BIGINT', 'STRING'], 'impala::StringFunctions::Rpad'],
-  [['ai_generate_text'], 'STRING', ['STRING', 'STRING', 'STRING', 'STRING', 'STRING'],
+  [['ai_generate_text'], 'STRING', ['STRING', 'STRING', 'STRING', 'STRING', 'STRING', 'STRING'],
    'impala::AiFunctions::AiGenerateText'],
   [['ai_generate_text_default'], 'STRING', ['STRING'],
    'impala::AiFunctions::AiGenerateTextDefault'],

@@ -67,14 +67,17 @@ class FunctionContext;
 struct BuiltInFunctions {
  public:
   /// Sends a prompt to the default endpoint and uses the default model, default
-  /// jceks api-key secret and default params.
+  /// auth credentials and default platform params and impala options.
   StringVal (*ai_generate_text_default)(
       FunctionContext* context, const StringVal& prompt);
-  /// Sends a prompt to the input AI endpoint using the input model, jceks api_key secret
-  /// and optional params.
+  /// Sends a prompt to the input AI endpoint using the input model, authentication
+  /// credential and optional platform params and impala options.
+  /// The authentication credential can be a jceks api_key secret or plain text
+  /// depending on the specific scenario.
   StringVal (*ai_generate_text)(FunctionContext* context, const StringVal& endpoint,
       const StringVal& prompt, const StringVal& model,
-      const StringVal& api_key_jceks_secret, const StringVal& params);
+      const StringVal& api_auth_credential, const StringVal& platform_params,
+      const StringVal& impala_options);
 };
 
 /// A FunctionContext is passed to every UDF/UDA and is the interface for the UDF to the

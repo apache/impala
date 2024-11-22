@@ -39,21 +39,46 @@ class AiFunctions {
   static const char* OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER;
   static const char* OPEN_AI_REQUEST_AUTH_HEADER;
   static const char* AZURE_OPEN_AI_REQUEST_AUTH_HEADER;
-  enum AI_PLATFORM {
+  enum class AI_PLATFORM {
     /// Unsupported platform
     UNSUPPORTED,
     /// OpenAI public platform
     OPEN_AI,
     /// Azure OpenAI platform
-    AZURE_OPEN_AI
+    AZURE_OPEN_AI,
+    /// General AI platform
+    GENERAL
   };
-  /// Sends a prompt to the input AI endpoint using the input model, api_key and
-  /// optional params.
+  enum class API_STANDARD {
+    /// Unsupported standard
+    UNSUPPORTED,
+    /// OpenAI standard
+    OPEN_AI
+  };
+  enum class CREDENTIAL_TYPE {
+    /// Input credentials will be treated as plain text.
+    PLAIN,
+    /// Input credentials will be treated as a jceks secret.
+    JCEKS
+  };
+  struct AiFunctionsOptions {
+    // Default of api standard is OPEN_AI
+    AiFunctions::API_STANDARD api_standard = AiFunctions::API_STANDARD::OPEN_AI;
+    // Default of credential type is JCEKS.
+    AiFunctions::CREDENTIAL_TYPE credential_type = AiFunctions::CREDENTIAL_TYPE::JCEKS;
+    // Only valid when a customized payload is included in the request.
+    std::string_view ai_custom_payload;
+  };
+  /// Sends a prompt to the input AI endpoint using the input model, authentication
+  /// credential and optional platform params and impala options.
+  /// platform_params (optional) are additional AI platform specific parameters included
+  /// in the request sent to the AI model.
+  /// impala_options (optional) are Impala API specific options i.e AiFunctionsOptions.
   static StringVal AiGenerateText(FunctionContext* ctx, const StringVal& endpoint,
-      const StringVal& prompt, const StringVal& model,
-      const StringVal& api_key_jceks_secret, const StringVal& params);
+      const StringVal& prompt, const StringVal& model, const StringVal& auth_credential,
+      const StringVal& platform_params, const StringVal& impala_options);
   /// Sends a prompt to the default endpoint and uses the default model, default
-  /// api-key and default params.
+  /// api-key and default platform params and impala options.
   static StringVal AiGenerateTextDefault(FunctionContext* ctx, const StringVal& prompt);
   /// Set the ai_api_key_ member.
   static void set_api_key(string& api_key) { ai_api_key_ = api_key; }
@@ -69,27 +94,28 @@ class AiFunctions {
   /// request to the external API endpoint. If 'dry_run' is set, the POST request is
   /// returned. 'dry_run' mode is used only for unit tests.
   template <bool fastpath, AI_PLATFORM platform>
-  static StringVal AiGenerateTextInternal(
-      FunctionContext* ctx, const std::string_view& endpoint,
-      const StringVal& prompt, const StringVal& model,
-      const StringVal& api_key_jceks_secret, const StringVal& params, const bool dry_run);
+  static StringVal AiGenerateTextInternal(FunctionContext* ctx,
+      const std::string_view& endpoint, const StringVal& prompt, const StringVal& model,
+      const StringVal& auth_credential, const StringVal& platform_params,
+      const StringVal& impala_options, const bool dry_run);
   /// Helper function for calling AiGenerateTextInternal with common code for both
   /// fastpath and regular path.
   template <bool fastpath>
-  static StringVal AiGenerateTextHelper(
-    FunctionContext* ctx, const StringVal& endpoint, const StringVal& prompt,
-    const StringVal& model, const StringVal& api_key_jceks_secret,
-    const StringVal& params);
+  static StringVal AiGenerateTextHelper(FunctionContext* ctx, const StringVal& endpoint,
+      const StringVal& prompt, const StringVal& model, const StringVal& auth_credential,
+      const StringVal& platform_params, const StringVal& impala_options);
   /// Internal helper function for parsing OPEN AI's API response. Input parameter is the
   /// json representation of the OPEN AI's API response.
   static std::string AiGenerateTextParseOpenAiResponse(
       const std::string_view& reponse);
   /// Helper function for getting AI Platform from the endpoint
-  static AI_PLATFORM GetAiPlatformFromEndpoint(const std::string_view& endpoint);
+  static AI_PLATFORM GetAiPlatformFromEndpoint(
+      const std::string_view& endpoint, const bool dry_run = false);
   /// Helper functions for deep copying error message
   static StringVal copyErrorMessage(FunctionContext* ctx, const string& errorMsg);
 
   friend class ExprTest_AiFunctionsTest_Test;
+  friend class ExprTest_AiFunctionsTestAdditionalSites_Test;
 };
 
 } // namespace impala
