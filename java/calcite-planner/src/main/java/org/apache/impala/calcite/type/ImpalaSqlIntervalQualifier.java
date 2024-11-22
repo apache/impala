@@ -71,6 +71,8 @@ public class ImpalaSqlIntervalQualifier extends SqlIntervalQualifier {
       case MILLISECOND:
       case MICROSECOND:
       case NANOSECOND:
+        break;
+      default:
         return super.evaluateIntervalLiteral(value, pos, typeSystem);
     }
 
