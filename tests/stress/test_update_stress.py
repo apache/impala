@@ -21,12 +21,13 @@ import pytest
 import random
 import time
 from multiprocessing import Value
+from subprocess import check_output
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.stress.stress_util import run_tasks, Task
-from tests.util.filesystem_utils import IS_HDFS
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX, IS_HDFS
 
 
 # Longer-running UPDATE tests are executed here
@@ -238,7 +239,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     """Issues DELETE and UPDATE statements in parallel in a way that some
     invariants must be true when a spectator process inspects the table."""
 
-    tbl_name = "%s.test_concurrent_deletes_and_updates" % unique_database
+    tbl_suffix = "test_concurrent_deletes_and_updates"
+    tbl_name = unique_database + "." + tbl_suffix
     self.client.set_configuration_option("SYNC_DDL", "true")
     self.client.execute("""create table {0} (id int, j bigint)
         stored as iceberg
@@ -259,6 +261,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     result = self.client.execute("select count(*) from {}".format(tbl_name))
     assert result.data == ['0']
 
+    self.check_no_orphan_files(unique_database, tbl_suffix)
+
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_deletes_and_updates_and_optimize(self, unique_database):
@@ -266,7 +270,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     invariants must be true when a spectator process inspects the table.
     An optimizer thread also invokes OPTMIZE regularly on the table."""
 
-    tbl_name = "%s.test_concurrent_write_and_optimize" % unique_database
+    tbl_suffix = "test_concurrent_write_and_optimize"
+    tbl_name = unique_database + "." + tbl_suffix
     self.client.set_configuration_option("SYNC_DDL", "true")
     self.client.execute("""create table {0} (id int, j bigint)
         stored as iceberg
@@ -293,3 +298,25 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
 
     result = self.client.execute("select count(*) from {}".format(tbl_name))
     assert result.data == ['0']
+
+    self.check_no_orphan_files(unique_database, tbl_suffix)
+
+  def check_no_orphan_files(self, unique_database, table_name):
+    # Check that the uncommitted data and delete files are removed from the file system
+    # and only those files remain that are reachable through valid snapshots.
+    data_files_in_tbl_result = self.client.execute(
+        "select file_path from {}.{}.all_files;".format(unique_database, table_name))
+    data_files_in_tbl = [row.split('/test-warehouse')[1]
+        for row in data_files_in_tbl_result.data]
+
+    table_location = "{0}/test-warehouse/{1}.db/{2}/data".format(
+        FILESYSTEM_PREFIX, unique_database, table_name)
+    data_files_on_fs_result = check_output(["hdfs", "dfs", "-ls", table_location])
+    # The first row of the HDFS result is a summary, the following lines contain
+    # 1 file each.
+    data_files_on_fs_rows = data_files_on_fs_result.strip().split('\n')[1:]
+    data_files_on_fs = [row.split()[-1].split('/test-warehouse')[1]
+        for row in data_files_on_fs_rows]
+
+    assert len(data_files_in_tbl) == len(data_files_on_fs_rows)
+    assert set(data_files_on_fs) == set(data_files_in_tbl)

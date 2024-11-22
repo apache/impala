@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Random;
 
 import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,9 @@ public class DebugUtils {
 
   // debug action label for Iceberg transaction commit.
   public static final String ICEBERG_COMMIT = "catalogd_iceberg_commit";
+
+  // debug action label for Iceberg validation check failure.
+  public static final String ICEBERG_CONFLICT = "catalogd_iceberg_conflict";
 
   // debug action label for Iceberg create table.
   public static final String ICEBERG_CREATE = "catalogd_iceberg_create";
@@ -195,6 +199,9 @@ public class DebugUtils {
           switch (exceptionClazz.toLowerCase()) {
             case "commitfailedexception":
               exceptionToThrow = new CommitFailedException(param);
+              break;
+            case "validationexception":
+              exceptionToThrow = new ValidationException(param);
               break;
             case "icebergalreadyexistsexception":
               exceptionToThrow = new org.apache.iceberg.exceptions.

@@ -87,6 +87,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.analysis.AlterTableSortByStmt;
@@ -7570,25 +7571,37 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     FeIcebergTable iceTbl = (FeIcebergTable)table;
     org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
-    IcebergCatalogOpExecutor.execute(iceTbl, iceTxn,
-        update.getIceberg_operation());
-    catalogTimeline.markEvent("Executed Iceberg operation " +
-        update.getIceberg_operation().getOperation());
-    if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
-      // Add catalog service id and the 'newCatalogVersion' to the table parameters.
-      // This way we can avoid reloading the table on self-events (Iceberg generates
-      // an ALTER TABLE statement to set the new metadata_location).
-      modification.registerInflightEvent();
-      IcebergCatalogOpExecutor.addCatalogVersionToTxn(
-          iceTxn, catalog_.getCatalogServiceId(), modification.newVersionNumber());
-      catalogTimeline.markEvent("Updated table properties");
-    }
+    try {
+      DebugUtils.executeDebugAction(
+          update.getDebug_action(), DebugUtils.ICEBERG_CONFLICT);
+      IcebergCatalogOpExecutor.execute(iceTbl, iceTxn, update.getIceberg_operation());
+      catalogTimeline.markEvent("Executed Iceberg operation " +
+          update.getIceberg_operation().getOperation());
+      if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
+        // Add catalog service id and the 'newCatalogVersion' to the table parameters.
+        // This way we can avoid reloading the table on self-events (Iceberg generates
+        // an ALTER TABLE statement to set the new metadata_location).
+        modification.registerInflightEvent();
+        IcebergCatalogOpExecutor.addCatalogVersionToTxn(
+            iceTxn, catalog_.getCatalogServiceId(), modification.newVersionNumber());
+        catalogTimeline.markEvent("Updated table properties");
+      }
 
-    if (update.isSetDebug_action()) {
-      String debugAction = update.getDebug_action();
-      DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_COMMIT);
+      DebugUtils.executeDebugAction(update.getDebug_action(), DebugUtils.ICEBERG_COMMIT);
+      iceTxn.commitTransaction();
+    // If we have no information about the success of the commit, we should not delete
+    // anything.
+    } catch (CommitStateUnknownException u) {
+      throw new ImpalaRuntimeException(u.getMessage(), u);
+    // If the commit failed, the newly written files should be deleted to avoid creating
+    // orphan files in the table. Only data/delete files need cleanup from Impala, Iceberg
+    // deletes the metadata files created for this update.
+    } catch (Exception e) {
+      IcebergCatalogOpExecutor.cleanupUncommittedFiles(update.getIceberg_operation());
+      LOG.info("Cleaned up uncommitted data files after failing to commit them to " +
+          "table {}", table.getFullName());
+      throw new ImpalaRuntimeException(e.getMessage(), e);
     }
-    iceTxn.commitTransaction();
     modification.markInflightEventRegistrationComplete();
   }
 

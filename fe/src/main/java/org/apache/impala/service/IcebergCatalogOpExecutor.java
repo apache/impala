@@ -18,7 +18,6 @@
 package org.apache.impala.service;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +44,6 @@ import org.apache.iceberg.UpdatePartitionSpec;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Term;
 import org.apache.iceberg.hive.HiveCatalog;
@@ -76,6 +74,8 @@ import org.apache.thrift.TException;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.impala.common.FileSystemUtil.deleteIfExists;
 
 /**
  * This is a helper for the CatalogOpExecutor to provide Iceberg related DDL functionality
@@ -381,19 +381,15 @@ public class IcebergCatalogOpExecutor {
       DeleteFile deleteFile = createDeleteFile(feIcebergTable, buf);
       rowDelta.addDeletes(deleteFile);
     }
-    try {
-      // Validate that there are no conflicting data files, because if data files are
-      // added in the meantime, they potentially contain records that should have been
-      // affected by this DELETE operation.
-      rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
-      rowDelta.validateNoConflictingDataFiles();
-      rowDelta.validateDataFilesExist(
-          icebergOp.getData_files_referenced_by_position_deletes());
-      rowDelta.validateDeletedFiles();
-      rowDelta.commit();
-    } catch (ValidationException e) {
-      throw new ImpalaRuntimeException(e.getMessage(), e);
-    }
+    // Validate that there are no conflicting data files, because if data files are
+    // added in the meantime, they potentially contain records that should have been
+    // affected by this DELETE operation.
+    rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
+    rowDelta.validateNoConflictingDataFiles();
+    rowDelta.validateDataFilesExist(
+        icebergOp.getData_files_referenced_by_position_deletes());
+    rowDelta.validateDeletedFiles();
+    rowDelta.commit();
   }
 
   private static void updateRows(FeIcebergTable feIcebergTable, Transaction txn,
@@ -409,22 +405,18 @@ public class IcebergCatalogOpExecutor {
       DataFile dataFile = createDataFile(feIcebergTable, buf);
       rowDelta.addRows(dataFile);
     }
-    try {
-      // Validate that there are no conflicting data files, because if data files are
-      // added in the meantime, they potentially contain records that should have been
-      // affected by this UPDATE operation. Also validate that there are no conflicting
-      // delete files, because we don't want to revive records that have been deleted
-      // in the meantime.
-      rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
-      rowDelta.validateNoConflictingDataFiles();
-      rowDelta.validateNoConflictingDeleteFiles();
-      rowDelta.validateDataFilesExist(
-          icebergOp.getData_files_referenced_by_position_deletes());
-      rowDelta.validateDeletedFiles();
-      rowDelta.commit();
-    } catch (ValidationException e) {
-      throw new ImpalaRuntimeException(e.getMessage(), e);
-    }
+    // Validate that there are no conflicting data files, because if data files are
+    // added in the meantime, they potentially contain records that should have been
+    // affected by this UPDATE operation. Also validate that there are no conflicting
+    // delete files, because we don't want to revive records that have been deleted
+    // in the meantime.
+    rowDelta.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
+    rowDelta.validateNoConflictingDataFiles();
+    rowDelta.validateNoConflictingDeleteFiles();
+    rowDelta.validateDataFilesExist(
+        icebergOp.getData_files_referenced_by_position_deletes());
+    rowDelta.validateDeletedFiles();
+    rowDelta.commit();
   }
 
   private static DataFile createDataFile(FeIcebergTable feIcebergTable, ByteBuffer buf)
@@ -488,11 +480,7 @@ public class IcebergCatalogOpExecutor {
       DataFile dataFile = createDataFile(feIcebergTable, buf);
       batchWrite.addFile(dataFile);
     }
-    try {
-      batchWrite.commit();
-    } catch (ValidationException e) {
-      throw new ImpalaRuntimeException(e.getMessage(), e);
-    }
+    batchWrite.commit();
   }
 
   private static Metrics buildDataFileMetrics(FbIcebergDataFile dataFile) {
@@ -564,12 +552,8 @@ public class IcebergCatalogOpExecutor {
       DataFile dataFile = createDataFile(feIcebergTable, buf);
       rewrite.addFile(dataFile);
     }
-    try {
-      rewrite.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
-      rewrite.commit();
-    } catch (ValidationException e) {
-      throw new ImpalaRuntimeException(e.getMessage(), e);
-    }
+    rewrite.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
+    rewrite.commit();
   }
 
   /**
@@ -593,5 +577,30 @@ public class IcebergCatalogOpExecutor {
     updateProps.set(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
                     String.valueOf(version));
     updateProps.commit();
+  }
+
+  /**
+   * When a write operation fails the validation check due to conflicts, the data/delete
+   * files created by it cannot be committed to the table: they would become orphan files.
+   * This method deletes these uncommitted data/delete files from the file system.
+   * @param icebergOp the failed DML operation that contains the list of newly written
+   *                  data and delete files which have to be cleaned up.
+   */
+  protected static void cleanupUncommittedFiles(TIcebergOperationParam icebergOp) {
+    if (icebergOp.isSetIceberg_data_files_fb()) {
+      deleteIcebergFiles(icebergOp.getIceberg_data_files_fb());
+    }
+    if (icebergOp.isSetIceberg_delete_files_fb()) {
+      deleteIcebergFiles(icebergOp.getIceberg_delete_files_fb());
+    }
+  }
+
+  private static void deleteIcebergFiles(Iterable<ByteBuffer> icebergFiles) {
+    for (ByteBuffer buf : icebergFiles) {
+      String pathString = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf).path();
+      if (pathString != null) {
+        deleteIfExists(new org.apache.hadoop.fs.Path((pathString)));
+      }
+    }
   }
 }
