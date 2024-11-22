@@ -1005,6 +1005,7 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
         end_of_stripe_ = true;
         return Status::OK();
       }
+      COUNTER_ADD(scan_node_->rows_read_counter(), orc_root_batch_->numElements);
       num_rows_read += orc_root_batch_->numElements;
     }
 
@@ -1013,7 +1014,6 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
     continue_execution &= !scan_node_->ReachedLimitShared() && !context_->cancelled();
   }
   stripe_rows_read_ += num_rows_read;
-  COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
   coll_items_read_counter_ = 0;

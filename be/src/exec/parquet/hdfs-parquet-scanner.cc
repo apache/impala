@@ -2328,13 +2328,13 @@ Status HdfsParquetScanner::AssembleRowsWithoutLateMaterialization(
       last_num_tuples = scratch_batch_->num_tuples;
     }
     RETURN_IF_ERROR(CheckPageFiltering());
+    COUNTER_ADD(scan_node_->rows_read_counter(), scratch_batch_->num_tuples);
     num_rows_read += scratch_batch_->num_tuples;
     int num_row_to_commit = TransferScratchTuples(row_batch);
     RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
     if (row_batch->AtCapacity()) break;
   }
   row_group_rows_read_ += num_rows_read;
-  COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
   coll_items_read_counter_ = 0;
