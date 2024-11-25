@@ -78,7 +78,8 @@ class TestQueryLive(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt")
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
   def test_query_live(self):
     """Asserts the query live table shows and allows filtering queries."""
     # Use a query that reads data from disk for the 1st one, as more representative and a
@@ -178,7 +179,8 @@ class TestQueryLive(CustomClusterTestSuite):
                                     catalogd_args="--enable_workload_mgmt "
                                                   "--catalog_topic_mode=minimal",
                                     default_query_options=[
-                                      ('default_transactional_type', 'insert_only')])
+                                      ('default_transactional_type', 'insert_only')],
+                                    disable_log_buffering=True)
   def test_default_transactional(self):
     """Asserts the query live table works when impala is started with
     default_transactional_type=insert_only."""
@@ -192,7 +194,8 @@ class TestQueryLive(CustomClusterTestSuite):
                                                  "--cluster_id=test_query_live "
                                                  "--use_local_catalog=true",
                                     catalogd_args="--enable_workload_mgmt "
-                                                  "--catalog_topic_mode=minimal")
+                                                  "--catalog_topic_mode=minimal",
+                                    disable_log_buffering=True)
   def test_local_catalog(self):
     """Asserts the query live table works with local catalog mode."""
     result = self.client.execute("select * from functional.alltypes",
@@ -240,7 +243,8 @@ class TestQueryLive(CustomClusterTestSuite):
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",
                                     cluster_size=3,
-                                    num_exclusive_coordinators=2)
+                                    num_exclusive_coordinators=2,
+                                    disable_log_buffering=True)
   def test_dedicated_coordinators(self):
     """Asserts scans are performed only on coordinators."""
     # Use a query that reads data from disk for the 1st one, as more representative and a
@@ -273,7 +277,8 @@ class TestQueryLive(CustomClusterTestSuite):
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",
                                     cluster_size=3,
-                                    num_exclusive_coordinators=2)
+                                    num_exclusive_coordinators=2,
+                                    disable_log_buffering=True)
   def test_executor_groups(self):
     """Asserts scans are performed only on coordinators with multiple executor groups."""
     # Add a (non-dedicated) coordinator and executor in a different executor group.
@@ -291,7 +296,8 @@ class TestQueryLive(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt")
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
   def test_query_entries_are_unique(self):
     """Asserts queries in the query live table are unique."""
     # Start a query and close it with a delay between CloseClientRequestState and
@@ -357,7 +363,8 @@ class TestQueryLive(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt")
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
   def test_shutdown_coordinator(self):
     """Asserts query fails if a coordinator disappears after scheduling. Depends on
     test config of statestore_heartbeat_frequency_ms=50."""
@@ -381,7 +388,8 @@ class TestQueryLive(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt")
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
   def test_graceful_shutdown_coordinator(self):
     """Asserts query succeeds if another coordinator is shutdown gracefully after
     scheduling. Depends on test config of statestore_heartbeat_frequency_ms=50."""
@@ -415,7 +423,8 @@ class TestQueryLive(CustomClusterTestSuite):
                                     catalogd_args="--enable_workload_mgmt",
                                     impalad_graceful_shutdown=True,
                                     cluster_size=3,
-                                    num_exclusive_coordinators=2)
+                                    num_exclusive_coordinators=2,
+                                    disable_log_buffering=True)
   def test_multi_table_union(self):
     """Asserts only system table scan fragments are scheduled to coordinators."""
     utc_timestamp = self.execute_query('select utc_timestamp()')
@@ -449,7 +458,8 @@ class TestQueryLive(CustomClusterTestSuite):
                                                  "--cluster_id=test_query_live",
                                     catalogd_args="--enable_workload_mgmt",
                                     cluster_size=3,
-                                    num_exclusive_coordinators=2)
+                                    num_exclusive_coordinators=2,
+                                    disable_log_buffering=True)
   def test_multi_table_join(self, unique_database):
     """Asserts only system table scan fragments are scheduled to coordinators."""
     self.execute_query('create table {}.users (user string)'.format(unique_database))

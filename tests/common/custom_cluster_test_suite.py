@@ -36,6 +36,7 @@ from tests.common.file_utils import cleanup_tmp_test_dir, make_tmp_test_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import IS_LOCAL
+from tests.util.retry import retry
 from time import sleep
 
 LOG = logging.getLogger(__name__)
@@ -385,10 +386,17 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     self.assert_catalogd_log_contains("INFO", r'Completed workload management '
         r'initialization', timeout_s=timeout_s)
 
-    ret = self.assert_catalogd_log_contains("INFO", r'A catalog update with \d+ entries '
-        r'is assembled. Catalog version: (\d+)', timeout_s=10, expected_count=-1)
-    self.assert_impalad_log_contains("INFO", r'Catalog topic update applied with '
-        r'version: {}'.format(ret.group(1)), timeout_s=30)
+    catalog_log = self.assert_catalogd_log_contains("INFO", r'A catalog update with \d+ '
+        r'entries is assembled. Catalog version: (\d+)', timeout_s=10, expected_count=-1)
+
+    def assert_func(last_iteration):
+      coord_log = self.assert_impalad_log_contains("INFO", r'Catalog topic update '
+          r'applied with version: (\d+)', timeout_s=5, expected_count=-1)
+      return int(coord_log.group(1)) >= int(catalog_log.group(1))
+
+    assert retry(func=assert_func, max_attempts=10, sleep_time_s=3, backoff=1), \
+        "Expected a catalog topic update with version '{}' or later, but no such " \
+        "update was found.".format(catalog_log.group(1))
 
   @classmethod
   def _stop_impala_cluster(cls):

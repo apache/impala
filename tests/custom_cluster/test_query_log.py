@@ -91,7 +91,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                                  "--query_log_max_plan_length={0}"
                                                  .format(MAX_SQL_PLAN_LEN),
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_lower_max_sql_plan(self, vector):
     """Asserts that length limits on the sql and plan columns in the completed queries
        table are respected."""
@@ -127,7 +128,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                                  "--query_log_write_interval_s=1 "
                                                  "--cluster_id=test_max_select",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_sql_plan_too_long(self, vector):
     """Asserts that very long queries have their corresponding plan and sql columns
        shortened in the completed queries table."""
@@ -164,7 +166,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                                  "--query_log_size=0 "
                                                  "--query_log_size_in_bytes=0",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_no_query_log(self, vector):
     """Asserts queries are written to the completed queries table when the in-memory
        query log queue is turned off."""
@@ -195,7 +198,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     catalogd_args="--enable_workload_mgmt",
                                     impalad_graceful_shutdown=True,
                                     cluster_size=1,
-                                    tmp_dir_placeholders=['query_data_cache'])
+                                    tmp_dir_placeholders=['query_data_cache'],
+                                    disable_log_buffering=True)
   def test_query_data_cache(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile. Specifically focuses on the data cache metrics."""
@@ -237,7 +241,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     impala_log_dir=("{" + LOG_DIR_MAX_WRITES + "}"),
                                     catalogd_args="--enable_workload_mgmt",
                                     impalad_graceful_shutdown=True,
-                                    tmp_dir_placeholders=[LOG_DIR_MAX_WRITES])
+                                    tmp_dir_placeholders=[LOG_DIR_MAX_WRITES],
+                                    disable_log_buffering=True)
   def test_max_attempts_exceeded(self, vector):
     """Asserts that completed queries are only attempted 3 times to be inserted into the
        completed queries table. This test deletes the completed queries table thus it must
@@ -290,7 +295,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     catalogd_args="--enable_workload_mgmt",
                                     default_query_options=[
                                       ('statement_expression_limit', 1024)],
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_flush_on_queued_count_exceeded(self, vector):
     """Asserts that queries that have completed are written to the query log table when
        the maximum number of queued records is reached. Also verifies that writing
@@ -352,7 +358,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_dedicated_coordinator_no_mt_dop(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile when dedicated coordinators are used."""
@@ -379,7 +386,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_dedicated_coordinator_with_mt_dop(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile when dedicated coordinators are used along with an MT_DOP setting
@@ -426,7 +434,8 @@ class TestQueryLogOtherTable(TestQueryLogTableBase):
                                                   "--blacklisted_dbs=information_schema "
                                                   "--query_log_table_name={0}"
                                                   .format(OTHER_TBL),
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_renamed_log_table(self, vector):
     """Asserts that the completed queries table can be renamed."""
 
@@ -467,7 +476,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
                                                  .format(HS2_OPERATIONS_CLUSTER_ID),
                                     catalogd_args="--enable_workload_mgmt",
                                     cluster_size=2,
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_hs2_metadata_operations(self, vector):
     """Certain HS2 operations appear to Impala as a special kind of query. Specifically,
        these operations have a type of unknown and a normally invalid sql syntax. This
@@ -594,7 +604,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
                                                  "--cluster_id=test_query_hist_mult",
                                     catalogd_args="--enable_workload_mgmt",
                                     cluster_size=2,
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_query_multiple_tables(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile for a query that reads from multiple tables."""
@@ -622,7 +633,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
                                                  "--query_log_write_interval_s=1 "
                                                  "--cluster_id=test_query_hist_3",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_insert_select(self, vector, unique_database,
       unique_name):
     """Asserts the values written to the query log table match the values from the
@@ -654,7 +666,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=15",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_flush_on_interval(self, vector):
     """Asserts that queries that have completed are written to the query log table
        after the specified write interval elapses."""
@@ -767,7 +780,8 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
                                                  "--query_log_write_interval_s=1 "
                                                  "--cluster_id=test_query_hist_2",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_ddl(self, vector, unique_database, unique_name):
     """Asserts the values written to the query log table match the values from the
        query profile for a DDL query."""
@@ -793,7 +807,8 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
                                                  "--query_log_write_interval_s=1 "
                                                  "--cluster_id=test_query_hist_3",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_dml(self, vector, unique_database, unique_name):
     """Asserts the values written to the query log table match the values from the
        query profile for a DML query."""
@@ -826,7 +841,8 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
                                                  "--query_log_write_interval_s=1 "
                                                  "--cluster_id=test_query_hist_2",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_invalid_query(self, vector):
     """Asserts correct values are written to the completed queries table for a failed
        query. The query profile is used as the source of expected values."""
@@ -857,7 +873,8 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_ignored_sqls_not_written(self, vector):
     """Asserts that expected queries are not written to the query log table."""
     client = self.get_client(vector.get_value('protocol'))
@@ -949,7 +966,8 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_write_interval_s=1",
                                     catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True)
+                                    impalad_graceful_shutdown=True,
+                                    disable_log_buffering=True)
   def test_sql_injection_attempts(self, vector):
     client = self.get_client(vector.get_value('protocol'))
     impalad = self.cluster.get_first_impalad()
@@ -1036,7 +1054,8 @@ class TestQueryLogTableBufferPool(TestQueryLogTableBase):
                                                  "--scratch_dirs={scratch_dir}:5G",
                                     catalogd_args="--enable_workload_mgmt",
                                     impalad_graceful_shutdown=True,
-                                    tmp_dir_placeholders=['scratch_dir'])
+                                    tmp_dir_placeholders=['scratch_dir'],
+                                    disable_log_buffering=True)
   def test_select(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile. If the buffer_pool_limit parameter is not None, then this test
