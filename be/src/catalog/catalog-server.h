@@ -129,11 +129,19 @@ class CatalogServer {
     return protocol_version_;
   }
 
-  /// Blocks until the first catalog update happens (indicated by the variable
-  /// last_sent_catalog_version_ having a value greater than 0). Does not time out.
+  /// Blocks until this catalog is ready to process requests and does not time out.
+  ///
+  /// If catalog HA is not enabled, the catalog being ready is indicated by the variable
+  /// last_sent_catalog_version_ having a value greater than 0.
+  ///
+  /// If catalog HA is enabled, waits until the active and standby catalogd daemons have
+  /// been determined. In the active daemon, this function will not return until the
+  /// last_sent_catalog_version_ variable is greater than 0. In the standby daemon, this
+  /// function returns as soon as the daemon has been determined to be the standby.
+  ///
   /// Returns `true` or `false` indicating if this catalogd is the active catalogd.
-  /// If catalog ha is not enabled, returns `true`.
-  bool WaitForFirstCatalogUpdate();
+  /// If catalog HA is not enabled, returns `true`.
+  bool WaitForCatalogReady();
 
   // Initializes workload management by creating or upgrading the necessary database and
   // tables. Does not check if the current catalogd is active or if workload management is
@@ -209,12 +217,16 @@ class CatalogServer {
   std::unique_ptr<Thread> catalog_metrics_refresh_thread_;
 
   /// Protects is_active_, active_catalogd_version_checker_,
-  /// catalog_update_cv_, pending_topic_updates_, catalog_objects_to/from_version_, and
-  /// last_sent_catalog_version.
+  /// catalog_update_cv_, pending_topic_updates_, catalog_objects_to/from_version_,
+  /// last_sent_catalog_version, and is_ha_determined_.
   std::mutex catalog_lock_;
 
   /// Set to true if this catalog instance is active.
   bool is_active_;
+
+  /// Set to true after active catalog has been determined. Will be true if catalog ha
+  /// is not enabled.
+  bool is_ha_determined_;
 
   /// Object to track the version of received active catalogd.
   boost::scoped_ptr<ActiveCatalogdVersionChecker> active_catalogd_version_checker_;

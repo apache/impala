@@ -477,7 +477,7 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
   : protocol_version_(CatalogServiceVersion::V2),
     thrift_iface_(new CatalogServiceThriftIf(this)),
     thrift_serializer_(FLAGS_compact_catalog_topic), metrics_(metrics),
-    is_active_(!FLAGS_enable_catalogd_ha),
+    is_active_(!FLAGS_enable_catalogd_ha), is_ha_determined_(!FLAGS_enable_catalogd_ha),
     topic_updates_ready_(false), last_sent_catalog_version_(0L),
     catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
@@ -717,6 +717,8 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
       catalog_->RegenerateServiceId();
     }
   }
+
+  is_ha_determined_ = true;
 }
 
 bool CatalogServer::IsActive() {

@@ -21,10 +21,13 @@ import os
 import re
 
 from subprocess import CalledProcessError
+from logging import getLogger
 
 from SystemTables.ttypes import TQueryTableColumn
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.workload_management import assert_query
+
+LOG = getLogger(__name__)
 
 
 class TestWorkloadManagementInitBase(CustomClusterTestSuite):
@@ -464,49 +467,6 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     assert len(data) == len(log_results.column_labels)
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt",
-      catalogd_args="--enable_workload_mgmt", start_args="--enable_catalogd_ha",
-      statestored_args="--use_subscriber_id_as_catalogd_priority=true",
-      disable_log_buffering=True)
-  def test_catalog_ha(self):
-    """Asserts workload management initialization is only done on the active catalogd."""
-
-    # Assert the active catalog ran workload management initialization.
-    self.assert_catalogd_log_contains("INFO",
-        r"Completed workload management initialization")
-
-    # Assert the standby catalog skipped workload management initialization.
-    self.assert_catalogd_log_contains("INFO", r"workload management", expected_count=0,
-        node_index=1)
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt",
-      catalogd_args="--enable_workload_mgmt", start_args="--enable_catalogd_ha",
-      statestored_args="--use_subscriber_id_as_catalogd_priority=true",
-      disable_log_buffering=True)
-  def test_catalog_ha_failover(self):
-    """Asserts workload management initialization is not run a second time when catalogd
-       failover happens."""
-
-    # Assert the active catalog ran workload management initialization.
-    self.assert_catalogd_log_contains("INFO",
-        r"Completed workload management initialization")
-
-    # Assert the standby catalog skipped workload management initialization.
-    self.assert_catalogd_log_contains("INFO", r"workload management initialization",
-        expected_count=0, node_index=1)
-
-    # Kill active catalogd
-    catalogds = self.cluster.catalogds()
-    catalogds[0].kill()
-
-    # Wait for failover.
-    catalogds[1].service.wait_for_metric_value("catalog-server.active-status",
-        expected_value=True, timeout=30)
-
-    # Assert workload management initialization did not run a second time.
-    self.assert_catalogd_log_contains("INFO", r"workload management initialization",
-        expected_count=0, node_index=1)
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt",
       statestored_args="--use_subscriber_id_as_catalogd_priority=true",
       start_args="--enable_statestored_ha",
@@ -518,23 +478,6 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     # Assert catalogd ran workload management initialization.
     self.assert_catalogd_log_contains("INFO",
         r"Completed workload management initialization")
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt",
-      catalogd_args="--enable_workload_mgmt",
-      statestored_args="--use_subscriber_id_as_catalogd_priority=true",
-      start_args="--enable_catalogd_ha --enable_statestored_ha",
-      disable_log_buffering=True)
-  def test_catalog_statestore_ha(self):
-    """Asserts workload management initialization is only done on the active catalogd
-       when both catalog and statestore ha is enabled."""
-
-    # Assert the active catalog ran workload management initialization.
-    self.assert_catalogd_log_contains("INFO",
-        r"Completed workload management initialization")
-
-    # Assert the standby catalog skipped workload management initialization.
-    self.assert_catalogd_log_contains("INFO", r"workload management", expected_count=0,
-        node_index=1)
 
 
 class TestWorkloadManagementInitNoWait(TestWorkloadManagementInitBase):
@@ -624,3 +567,73 @@ class TestWorkloadManagementInitNoWait(TestWorkloadManagementInitBase):
     # Assert the standby catalog skipped workload management initialization.
     self.assert_catalogd_log_contains("INFO", r"workload management initialization",
         expected_count=0, node_index=1)
+
+
+class TestWorkloadManagementCatalogHA(TestWorkloadManagementInitBase):
+
+  """Tests for the workload management initialization process. The setup method of this
+     class ensures only 1 catalogd ran the workload management initialization process."""
+
+  def setup_method(self, method):
+    super(TestWorkloadManagementCatalogHA, self).setup_method(method)
+
+    # Find all catalog instances that have initialized workload management.
+    init_logs = self.assert_catalogd_ha_contains("INFO",
+        r"Completed workload management initialization", timeout_s=30)
+    assert len(init_logs) == 2, "Expected length of catalogd matches to be '2' but " \
+        "was '{}'".format(len(init_logs))
+
+    # Assert only 1 catalog ran workload management initialization.
+    assert init_logs[0] is None or init_logs[1] is None, "Both catalogds ran workload " \
+        "management initialization"
+
+    # Assert the standby catalog skipped workload management initialization.
+    self.standby_catalog = 1
+    self.active_catalog = 0
+    if init_logs[0] is None:
+      # Catalogd 1 is the active catalog
+      self.standby_catalog = 0
+      self.active_catalog = 1
+
+    LOG.info("Found active catalogd is daemon '{}' and standby catalogd is daemon '{}'"
+          .format(self.active_catalog, self.standby_catalog))
+
+    self.assert_catalogd_log_contains("INFO",
+        r"Skipping workload management initialization since catalogd HA is enabled and "
+        r"this catalogd is not active", node_index=self.standby_catalog)
+
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt",
+      catalogd_args="--enable_workload_mgmt", start_args="--enable_catalogd_ha",
+      statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+      disable_log_buffering=True)
+  def test_catalog_ha_failover(self):
+    """Asserts workload management initialization is not run a second time when catalogd
+       failover happens."""
+
+    # Kill active catalogd
+    catalogds = self.cluster.catalogds()
+    catalogds[0].kill()
+
+    # Wait for failover.
+    catalogds[1].service.wait_for_metric_value("catalog-server.active-status",
+        expected_value=True, timeout=30)
+
+    # Wait for standby catalog to complete its initialization as the active catalogd.
+    self.assert_catalogd_log_contains("INFO", r'catalog update with \d+ entries is '
+        r'assembled', expected_count=-1, node_index=self.standby_catalog)
+
+    # Assert workload management initialization did not run a second time.
+    self.assert_catalogd_log_contains("INFO", r"Starting workload management "
+        r"initialization", expected_count=0, node_index=self.standby_catalog)
+
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt",
+      catalogd_args="--enable_workload_mgmt",
+      statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+      start_args="--enable_catalogd_ha --enable_statestored_ha",
+      disable_log_buffering=True)
+  def test_catalog_statestore_ha(self):
+    """Asserts workload management initialization is only done on the active catalogd
+       when both catalog and statestore ha is enabled."""
+
+    self.assert_log_contains("statestored", "INFO", r"Registering: catalog", 2, 30)
+    self.assert_log_contains("statestored_node1", "INFO", r"Registering: catalog", 2, 30)

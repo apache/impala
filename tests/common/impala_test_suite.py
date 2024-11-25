@@ -1393,6 +1393,27 @@ class ImpalaTestSuite(BaseTestSuite):
     return self.assert_log_contains(
         "impalad", level, line_regex, expected_count, timeout_s, dry_run)
 
+  def assert_catalogd_ha_contains(self, level, line_regex, timeout_s=6):
+    """
+    When running catalogd in ha mode, asserts that the specified line_regex is found at
+    least once across all instances of catalogd.
+    Returns a list of the results of calling assert_catalogd_log_contains for each
+    catalogd daemon. If no matches were found for a daemon, the list index for that daemon
+    will be None.
+    """
+
+    matches = []
+    for node_idx in range(len(self.cluster.catalogds())):
+      try:
+        matches.append(self.assert_catalogd_log_contains(level, line_regex, -1, timeout_s,
+            node_index=node_idx))
+      except AssertionError:
+        matches.append(None)
+
+    assert not all(elem is None for elem in matches), "No log lines found in any " \
+        "catalogd instances for regex: {}".format(line_regex)
+    return matches
+
   def assert_catalogd_log_contains(self, level, line_regex, expected_count=1,
       timeout_s=6, dry_run=False, node_index=0):
     """

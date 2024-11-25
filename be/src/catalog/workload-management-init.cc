@@ -497,18 +497,24 @@ static Status _tableSchemaManagement(CatalogServiceIf* svc, const string& ip_add
 } // function _logTableSchemaManagement
 
 inline bool CatalogServer::IsCatalogInitialized() {
-  unique_lock<mutex> l(catalog_lock_);
-  return last_sent_catalog_version_ > 0;
+  lock_guard<mutex> l(catalog_lock_);
+
+  // The first expression evaluates to true when the first catalog update is sent. If
+  // catalog HA is enabled, the last_sent_catalog_version_ variable will only be
+  // incremented on the active catalogd.
+  // The second expression evaluates to true when the the standby catalogd determines that
+  // it is the standby.
+  return last_sent_catalog_version_ > 0 || (is_ha_determined_ && !is_active_);
 } // CatalogServer::IsCatalogInitialized
 
-bool CatalogServer::WaitForFirstCatalogUpdate() {
+bool CatalogServer::WaitForCatalogReady() {
   while (!IsCatalogInitialized()) {
     LOG(INFO) << "Waiting for first catalog update";
     SleepForMs(WM_INIT_CHECK_SLEEP_MS);
   }
 
   return IsActive();
-} // function CatalogServer::WaitForFirstCatalogUpdate
+} // function CatalogServer::WaitForCatalogReady
 
 Status CatalogServer::InitWorkloadManagement() {
   DCHECK_NE(nullptr, thrift_iface_.get());

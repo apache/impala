@@ -103,8 +103,13 @@ int CatalogdMain(int argc, char** argv) {
   catalog_server.MarkServiceAsStarted();
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
 
-  if (FLAGS_enable_workload_mgmt && catalog_server.WaitForFirstCatalogUpdate()) {
-    ABORT_IF_ERROR(catalog_server.InitWorkloadManagement());
+  if (FLAGS_enable_workload_mgmt) {
+    if (catalog_server.WaitForCatalogReady()) {
+      ABORT_IF_ERROR(catalog_server.InitWorkloadManagement());
+    } else {
+      LOG(INFO) << "Skipping workload management initialization since catalogd HA is "
+                << "enabled and this catalogd is not active";
+    }
   }
 
   server->Join();
