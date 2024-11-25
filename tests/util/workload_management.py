@@ -218,7 +218,8 @@ def assert_query(query_tbl, client, expected_cluster_id="", raw_profile=None,
     query_opts = re.search(r'\n\s+Query Options \(set by configuration\):\s+(.*?)\n',
         profile_text)
     assert query_opts is not None
-    assert value == query_opts.group(1), "query opts set by config incorrect"
+    assert value == query_opts.group(1).replace("&apos;", "'"), \
+        "query opts set by config incorrect"
 
   # Resource Pool
   value = column_val(TQueryTableColumn.RESOURCE_POOL)
@@ -335,8 +336,12 @@ def assert_query(query_tbl, client, expected_cluster_id="", raw_profile=None,
 
   # Executor Groups
   value = column_val(TQueryTableColumn.EXECUTOR_GROUPS)
-  exec_groups = re.search(r'\n\s+(Executor group \d+:.*?)\n\s+PlannerInfo', profile_text,
-      re.DOTALL)
+  # The following regular expression matches both named and unnamed executor groups in the
+  # query profile.  For example, both of the following lines will match this regex:
+  #    Executor group 1 (small):
+  #    Executor group 1:
+  exec_groups = re.search(r'\n\s+(Executor group \d+(?:\s+\(\w+\))?:.*?)\n\s+PlannerInfo',
+      profile_text, re.DOTALL)
   if query_state_value == "EXCEPTION":
     assert exec_groups is None, "executor groups should not have been found"
   else:

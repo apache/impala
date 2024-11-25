@@ -27,6 +27,7 @@ import pipes
 import pytest
 import subprocess
 
+from glob import glob
 from impala_py_lib.helpers import find_all_files, is_core_dump
 from re import search
 from signal import SIGRTMIN
@@ -79,6 +80,9 @@ TMP_DIR_PLACEHOLDERS = 'tmp_dir_placeholders'
 EXPECT_STARTUP_FAIL = 'expect_startup_fail'
 # If True, add '--logbuflevel=-1' into all impala daemon args.
 DISABLE_LOG_BUFFERING = 'disable_log_buffering'
+# If True, resolves the actual files for all the log symlinks and outputs the resolved
+# paths to stderr.
+LOG_SYMLINKS = 'log_symlinks'
 
 # Args that accept additional formatting to supply temporary dir path.
 ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
@@ -149,7 +153,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
       impalad_graceful_shutdown=False, tmp_dir_placeholders=[],
-      expect_startup_fail=False, disable_log_buffering=False):
+      expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     args = dict()
@@ -191,6 +195,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[EXPECT_STARTUP_FAIL] = True
     if disable_log_buffering:
       args[DISABLE_LOG_BUFFERING] = True
+    if log_symlinks:
+      args[LOG_SYMLINKS] = True
 
     def decorate(obj):
       """If obj is a class, set SHARED_CLUSTER_ARGS for setup/teardown_class. Otherwise
@@ -372,10 +378,17 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       self.cluster_teardown(method.__name__, method.__dict__)
 
   def wait_for_wm_init_complete(self, timeout_s=120):
-    """Waits for the catalog to report the workload management initialization process
-       has completed."""
+    """
+    Waits for the catalog to report the workload management initialization process has
+    completed and for the catalog updates to be received by the coordinators.
+    """
     self.assert_catalogd_log_contains("INFO", r'Completed workload management '
         r'initialization', timeout_s=timeout_s)
+
+    ret = self.assert_catalogd_log_contains("INFO", r'A catalog update with \d+ entries '
+        r'is assembled. Catalog version: (\d+)', timeout_s=10, expected_count=-1)
+    self.assert_impalad_log_contains("INFO", r'Catalog topic update applied with '
+        r'version: {}'.format(ret.group(1)), timeout_s=30)
 
   @classmethod
   def _stop_impala_cluster(cls):
@@ -432,6 +445,30 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     check_call([script_setup_ranger])
 
   @classmethod
+  def _log_symlinks(cls, logdir=None, log=None,
+      patterns=["*.INFO", "*.WARNING", "*.ERROR", "*.FATAL"]):
+    """
+     Resolves all symlinks in the specified logdir and print out their actual paths.
+     If the 'logdir' parameter is None, will use the value in 'cls.impala_log_dir'.
+     If the 'log' parameter is None, will call the 'print' function to output the resolved
+     paths, otherwise will call 'log.info' to output the resolved paths.
+    """
+    if logdir is None:
+      logdir = cls.impala_log_dir
+
+    file_list = "Log Files for Test:\n"
+    for pattern in patterns:
+      matching_files = glob(os.path.join(logdir, pattern))
+      for matching_file in sorted(matching_files):
+        file_list += "  * {} - {}\n".format(matching_file.split(os.path.sep)[-1],
+            os.path.realpath(matching_file))
+
+    if log is None:
+      print(file_list)
+    else:
+      log.info(file_list)
+
+  @classmethod
   def _start_impala_cluster(cls,
                             options,
                             impala_log_dir=os.getenv('LOG_DIR', "/tmp/"),
@@ -447,7 +484,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             statestored_timeout_s=60,
                             impalad_timeout_s=60,
                             ignore_pid_on_log_rotation=False,
-                            wait_for_backends=True):
+                            wait_for_backends=True,
+                            log_symlinks=False):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -492,6 +530,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     try:
       check_call(cmd + options, close_fds=True)
     finally:
+      if log_symlinks:
+        cls._log_symlinks(log=LOG)
+
       # Failure tests expect cluster to be initialised even if start-impala-cluster fails.
       cls.cluster = ImpalaCluster.get_e2e_test_cluster()
     statestored = cls.cluster.statestored

@@ -1,0 +1,64 @@
+====
+---- QUERY
+describe formatted sys.impala_query_log
+---- RESULTS
+'cluster_id','string',NULL
+'query_id','string',NULL
+'session_id','string',NULL
+'session_type','string',NULL
+'hiveserver2_protocol_version','string',NULL
+'db_user','string',NULL
+'db_user_connection','string',NULL
+'db_name','string',NULL
+'impala_coordinator','string',NULL
+'query_status','string',NULL
+'query_state','string',NULL
+'impala_query_end_state','string',NULL
+'query_type','string',NULL
+'network_address','string',NULL
+'start_time_utc','timestamp',NULL
+'total_time_ms','decimal(18,3)',NULL
+'query_opts_config','string',NULL
+'resource_pool','string',NULL
+'per_host_mem_estimate','bigint',NULL
+'dedicated_coord_mem_estimate','bigint',NULL
+'per_host_fragment_instances','string',NULL
+'backends_count','int',NULL
+'admission_result','string',NULL
+'cluster_memory_admitted','bigint',NULL
+'executor_group','string',NULL
+'executor_groups','string',NULL
+'exec_summary','string',NULL
+'num_rows_fetched','bigint',NULL
+'row_materialization_rows_per_sec','bigint',NULL
+'row_materialization_time_ms','decimal(18,3)',NULL
+'compressed_bytes_spilled','bigint',NULL
+'event_planning_finished','decimal(18,3)',NULL
+'event_submit_for_admission','decimal(18,3)',NULL
+'event_completed_admission','decimal(18,3)',NULL
+'event_all_backends_started','decimal(18,3)',NULL
+'event_rows_available','decimal(18,3)',NULL
+'event_first_row_fetched','decimal(18,3)',NULL
+'event_last_row_fetched','decimal(18,3)',NULL
+'event_unregister_query','decimal(18,3)',NULL
+'read_io_wait_total_ms','decimal(18,3)',NULL
+'read_io_wait_mean_ms','decimal(18,3)',NULL
+'bytes_read_cache_total','bigint',NULL
+'bytes_read_total','bigint',NULL
+'pernode_peak_mem_min','bigint',NULL
+'pernode_peak_mem_max','bigint',NULL
+'pernode_peak_mem_mean','bigint',NULL
+'sql','string',NULL
+'plan','string',NULL
+'tables_queried','string',NULL
+'select_columns','string',NULL
+'where_columns','string',NULL
+'join_columns','string',NULL
+'aggregate_columns','string',NULL
+'orderby_columns','string',NULL
+---- RESULTS: VERIFY_IS_SUBSET
+'','schema_version      ','1.0.0               '
+'','wm_schema_version   ','1.1.0               '
+---- TYPES
+string,string,string
+====

@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-describe sys.impala_query_live
+describe formatted sys.impala_query_live
 ---- RESULTS
 'cluster_id','string',''
 'query_id','string',''
@@ -51,11 +51,9 @@ describe sys.impala_query_live
 'sql','string',''
 'plan','string',''
 'tables_queried','string',''
-'select_columns','string',''
-'where_columns','string',''
-'join_columns','string',''
-'aggregate_columns','string',''
-'orderby_columns','string',''
+---- RESULTS: VERIFY_IS_SUBSET
+'','schema_version      ','1.0.0               '
+'','wm_schema_version   ','1.0.0               '
 ---- TYPES
 string,string,string
 ====
