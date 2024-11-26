@@ -1,0 +1,6 @@
+The doubles_byte_stream_split.parquet and floats_byte_stream_split.parquet files were
+generated with the parquet_files_generator.py script. The script is using PyArrow
+(https://arrow.apache.org/docs/python).
+
+To regenerate the files, run:
+python3 parquet_files_generator.py
