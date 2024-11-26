@@ -77,4 +77,8 @@
     <name>llama.am.throttling.maximum.placed.reservations.root.queueD</name>
     <value>6</value>
   </property>
+  <property>
+    <name>impala.admission-control.pool-queue-timeout-ms.root.queueF</name>
+    <value>600000</value>
+  </property>
 </configuration>
