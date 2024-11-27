@@ -17,6 +17,7 @@
 from __future__ import absolute_import, division, print_function
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.event_processor_utils import EventProcessorUtils
 
 EVENT_SYNC_QUERY_OPTIONS = {
     "sync_hms_events_wait_time_s": 10,
@@ -244,6 +245,9 @@ class TestEventProcessingBase(ImpalaTestSuite):
       # replicate the table from source to target
       cls.run_stmt_in_hive("repl load {0} into {1}".format(source_db,
         target_db))
+      # we wait (20sec) until the events catch up in case repl command above did some HMS
+      # operations.
+      EventProcessorUtils.wait_for_event_processing(suite, timeout=20)
       # confirm the number of rows in target match with the source table.
       rows_in_unpart_tbl_target = int(cls.execute_scalar_expect_success(impala_client,
         "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
