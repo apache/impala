@@ -143,13 +143,15 @@ public class ImpalaJoinRel extends Join
           rightInput.planNode_, false /* not a straight join */, distMode, joinOp,
           equiJoinConjuncts, otherJoinConjuncts, filterConjuncts, analyzer);
 
-    if (equiJoinConjuncts.size() > 0) {
-      // register the equi and non-equi join conjuncts with the analyzer such that
-      // value transfer graph creation can consume it
+    // register the equi join conjuncts with the analyzer such that
+    // value transfer graph creation can consume it. It is only useful
+    // in the value transfer graph if the value transfer is equal on
+    // both sides. Any outer join is removed since the value on the outer
+    // join side could be NULL when the left side is not NULL.
+    if (equiJoinConjuncts.size() > 0 && joinOp == JoinOperator.INNER_JOIN) {
       List<Expr> equiJoinExprs = new ArrayList<Expr>(equiJoinConjuncts);
       analyzer.registerConjuncts(getJoinConjunctListToRegister(equiJoinExprs));
     }
-    analyzer.registerConjuncts(getJoinConjunctListToRegister(otherJoinConjuncts));
 
     return new NodeWithExprs(joinNode, outputExprs);
   }
