@@ -320,7 +320,7 @@ Status HdfsTextScanner::FinishScanRange(RowBatch* row_batch) {
           !boundary_row_.IsEmpty() ||
           (delimited_text_parser_->HasUnfinishedTuple() &&
               (!scan_node_->materialized_slots().empty() ||
-                  scan_node_->num_materialized_partition_keys() > 0))) {
+                  template_tuple_ != nullptr))) {
         // There is data in the partial column because there is a missing row delimiter
         // at the end of the file. Copy the data into a new string buffer that gets
         // memory from the row batch pool, so that the boundary pool could be freed.

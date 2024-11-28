@@ -23,3 +23,33 @@ select input__file__name, * from i_n_f;
 ---- TYPES
 STRING, STRING
 ====
+---- QUERY
+# IMPALA-13589: Select INPUT_FILE__NAME only
+select input__file__name from functional.table_no_newline;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse/table_no_newline/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline/table_no_newline.csv'
+---- TYPES
+STRING
+====
+---- QUERY
+# IMPALA-13589: Select INPUT_FILE__NAME only in partitioned table
+select input__file__name from functional.table_no_newline_part;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2010/month=3/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2010/month=3/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2010/month=3/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2010/month=3/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2010/month=3/table_no_newline.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2015/month=3/table_missing_columns.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2015/month=3/table_missing_columns.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2015/month=3/table_missing_columns.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2015/month=3/table_missing_columns.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2015/month=3/table_missing_columns.csv'
+regex:'$NAMENODE/test-warehouse/table_no_newline_part/year=2015/month=3/table_missing_columns.csv'
+---- TYPES
+STRING
+====

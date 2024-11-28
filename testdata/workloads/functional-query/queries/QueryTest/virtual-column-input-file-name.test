@@ -1,5 +1,20 @@
 ====
 ---- QUERY
+# Select INPUT_FILE__NAME only
+select input__file__name from alltypestiny;
+---- RESULTS
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=1(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=2(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=3(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*'
+regex:'$NAMENODE/test-warehouse(/managed/functional[^/]*)?/[^/]*/year=2009/month=4(/base_\d*/|/).*'
+---- TYPES
+STRING
+====
+---- QUERY
 # Select INPUT_FILE__NAME plus all cols
 select input__file__name, * from alltypestiny;
 ---- RESULTS
