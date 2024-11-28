@@ -879,6 +879,12 @@ ORDER BY made_current_at;
       values in the HMS may be stale.
       </p>
       <p>
+      Some engines, e.g. Trino, also write the NDV as a property (with key "ndv") in the
+      "statistics" section of the metadata.json file for each blob, in addition to the
+      Puffin file. If such a property is present for a blob, Impala will read the value
+      from the metadata.json file instead of the Puffin file to reduce file I/O.
+      </p>
+      <p>
       Note that it is currently not possible to drop Puffin stats from Impala.
       For this reason, it is possible to disable reading Puffin stats in two ways:
       <ul>
