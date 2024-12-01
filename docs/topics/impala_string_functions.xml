@@ -1805,7 +1805,7 @@ select replace('hello world','xyz','abc');
       <dlentry id="trim">
 
         <dt>
-          TRIM(STRING a)
+          TRIM(STRING a), TRIM({{LEADING | TRAILING | BOTH} [STRING chars_to_trim] | STRING chars_to_trim} FROM STRING a)
         </dt>
 
         <dd>
@@ -1817,6 +1817,31 @@ select replace('hello world','xyz','abc');
             cycle, if input values might still have surrounding spaces. For a more
             general-purpose function that can remove other leading and trailing characters
             besides spaces, see <codeph>BTRIM()</codeph>.
+          </p>
+
+          <p>
+            TRIM-FROM syntax is a SQL-standardized wrapper around
+            <codeph>LTRIM</codeph> / <codeph>RTRIM</codeph> / <codeph>BTRIM</codeph>.
+            Depending on the first parameter <codeph>LEADING</codeph> /
+            <codeph>TRAILING</codeph> / <codeph>BOTH</codeph>, wrapper resolves itself to
+            the corresponding underlying function. Default value is <codeph>BOTH</codeph>.
+            If present, the <codeph>chars_to_trim</codeph> parameter is passed forward to
+            the underlying function. Thus, given syntax may come in three different forms:
+          </p>
+
+          <p>
+            Syntax #1: <codeph>TRIM(&lt;where&gt; FROM &lt;string&gt;)</codeph> --&gt;
+            <codeph>{L|R|B}TRIM(string)</codeph>;
+          </p>
+
+          <p>
+            Syntax #2: <codeph>TRIM(&lt;charset&gt; FROM &lt;string&gt;)</codeph>  --&gt;
+            <codeph>BTRIM(string, charset)</codeph>;
+          </p>
+
+          <p>
+            Syntax #3: <codeph>TRIM(&lt;where&gt; &lt;charset&gt; FROM &lt;string&gt;)</codeph>
+            --&gt;<codeph>{L|R|B}TRIM(string, charset)</codeph>.
           </p>
 
           <p>

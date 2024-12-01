@@ -1902,7 +1902,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "functional_orc_def.complextypes_structs",
         "No matching function with signature: lower(STRUCT<b:BOOLEAN>).");
 
-    // Special cases for FROM in function call
+    // Special cases for FROM in EXTRACT function call
     AnalyzesOk("select extract(year from now())");
     AnalyzesOk("select extract(year from cast(now() as date))");
     AnalyzesOk("select extract(year from date_col) from functional.date_tbl");
@@ -1923,6 +1923,65 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Function functional.extract conflicts with the EXTRACT builtin");
     AnalysisError("select date_part(year from now())",
         "Function DATE_PART does not accept the keyword FROM");
+
+    // Special cases for FROM in TRIM in function call
+    // TRIM(where FROM string): trim space by default
+    AnalyzesOk("select trim(trailing FROM '     &@&127+  &@   ')");
+    AnalyzesOk("select tRIm(trailing FROM '     &@&127+  &@   ')");
+    AnalyzesOk("select utf8_trim(trailing FROM '     &@&127+  &@   ')");
+    AnalysisError("select trim(foo from '     &@&127+  &@   ')",
+        "Trim option 'foo' in expression 'trim(foo FROM '     &@&127+  &@   ')' is " +
+        "invalid. Expected one of: LEADING, TRAILING, BOTH.");
+    AnalysisError("select utf8_trim(foo from '     &@&127+  &@   ')",
+        "Trim option 'foo' in expression 'utf8_trim(foo FROM '     &@&127+  &@   ')' " +
+        "is invalid. Expected one of: LEADING, TRAILING, BOTH.");
+    AnalysisError("select trim(leading from 0)",
+        "Expression '0' has a return type of TINYINT but a STRING is required.");
+    AnalysisError("select date_part(both from ' xyz ')",
+        "Function DATE_PART does not accept the keyword FROM.");
+
+    // TRIM(string FROM string): trim from both sides by default
+    AnalyzesOk("select trim('+-*' from '&$^$)*(^*^++--*')");
+    AnalyzesOk("select trim(NULL from '&$^$)*(^*^++--*')");
+    AnalyzesOk("select trim('' from '&$^$)*(^*^++--*')");
+    AnalysisError("select trim('cosmos' from 10)",
+        "Expression '10' has a return type of TINYINT but a STRING is required.");
+    AnalysisError("select trim(100 from '  universe  ');",
+        "Expression '100' has a return type of TINYINT but a STRING is required.");
+    AnalysisError("select trim(3.1415926 from 2.718281828);",
+        "Expression '3.1415926' has a return type of DECIMAL(8,7) but a STRING is " +
+        "required. Expression '2.718281828' has a return type of DECIMAL(10,9) but a " +
+        "STRING is required.");
+    AnalysisError("select trim(int_col from 'abc') from functional.alltypes",
+        "Expression 'int_col' has a return type of INT but a STRING is required.");
+
+    // TRIM(where string FROM string): regular test cases
+    AnalyzesOk("select trim(trailing 'a0-' from 'c2aa0a+&$%-a00000-a')");
+    AnalyzesOk("select trim(leAdiNG 'rt' From 'rrrrssssstttttt')");
+    AnalyzesOk("select trim(tRAIlinG 'rt' FROM 'rrrrssssstttttt')");
+    AnalysisError("select trim(xyz ' ' from now())",
+        "Syntax error in line 1:\n" +
+        "select trim(xyz ' ' from now())\n" +
+        "                ^\n" +
+        "Encountered: STRING LITERAL\n" +
+        "Expected: AND, BETWEEN, DIV, FROM, IGNORE, ILIKE, IN, IREGEXP, IS, LIKE, ||, " +
+        "NOT, OR, REGEXP, RLIKE, COMMA\n\n");
+    AnalysisError("select trim(both ' ' from now())",
+        "Expression 'now()' has a return type of TIMESTAMP but a STRING is required.");
+    AnalysisError("select trim(xyz ' ' from ' Quantum ')",
+        "Syntax error in line 1:\n" +
+        "select trim(xyz ' ' from ' Quantum ')\n" +
+        "                ^\n" +
+        "Encountered: STRING LITERAL\n" +
+        "Expected: AND, BETWEEN, DIV, FROM, IGNORE, ILIKE, IN, IREGEXP, IS, LIKE, ||, " +
+        "NOT, OR, REGEXP, RLIKE, COMMA\n\n");
+    AnalysisError("select trim(both 6.022140857E23 from '  Avogadro constant ')",
+        "Expression '6.022140857E+23' has a return type of DECIMAL(24,0) but a STRING " +
+        "is required.");
+    AnalysisError("select trim(both 1.6E-19 from 6.62606896E-34)",
+        "Expression '1.6E-19' has a return type of DECIMAL(20,20) but a STRING is " +
+        "required. Expression '6.62606896E-34' has a return type of DOUBLE but a " +
+        "STRING is required.");
 
     // IGNORE NULLS may only be used with first_value/last_value
     AnalysisError("select lower('FOO' ignore nulls)",

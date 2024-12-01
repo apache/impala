@@ -4765,6 +4765,63 @@ TEST_P(ExprTest, StringFunctions) {
   TestStringValue("btrim('æeioü','æü')", "eio");
   TestStringValue("btrim('\\\\abcdefg\\\\', 'ag\\\\')", "bcdef");
 
+  /// Test cases for TRIM UDF
+  // TRIM(where FROM string): trim space by default;
+  TestStringValue("trim(leading FROM '   1 2 3 4 5   ')", "1 2 3 4 5   ");
+  TestStringValue("trim(leAdiNG FrOm '  212  ')", "212  ");
+  TestStringValue("trim(leading from 'blackhole')", "blackhole");
+  TestStringValue("trim(trailing FroM '  13 1 3 4 6 1 24   ')", "  13 1 3 4 6 1 24");
+  TestStringValue("trim(tRAIlinG fROm '  1a 9b 4c 5d     ')", "  1a 9b 4c 5d");
+  TestStringValue("trim(trailing from '  abcdefg  ')", "  abcdefg");
+  TestStringValue("trim(bOTh frOm '   ab c d e f 1234  ')", "ab c d e f 1234");
+  TestStringValue("trim(both from '  aaaaaaaaa  ')", "aaaaaaaaa");
+  TestStringValue("trim(both from 'pulsar')", "pulsar");
+
+  // TRIM(string FROM string): trim from both sides by default;
+  TestStringValue("trim('1234' FroM '23471364134612413434')", "713641346");
+  TestStringValue("trim('abc' from 'abacdefg')", "defg");
+  TestStringValue("trim('xyz' fROm 'abcdabcdabc')", "abcdabcdabc");
+  TestStringValue("trim('aaaaabbbbbccccccccffffffffg' from 'abcdefg')", "de");
+  TestStringValue("trim('' fROM '  helloworld  ')", "  helloworld  ");
+  TestStringValue("trim(' ' from '  helloworld  ')", "helloworld");
+  TestStringValue("trim(NULL FROM '  helloworld  ')", "  helloworld  ");
+  TestStringValue("trim('both' FROM 'boneth')", "ne");
+
+  // TRIM(where string FROM string): regular test cases
+  // leading/trailing
+  TestStringValue("trim(leading 'rt' froM 'rrrrssssstttttt')", "ssssstttttt");
+  TestStringValue("trim(trailing '1234' FroM '23471364134612413434')", "234713641346");
+  TestStringValue("trim(TRAILING 'a0' from '0ac2aa0aa00000a')", "0ac2");
+  TestStringValue("trim(trailing 'rt' FROm 'rrrrssssstttttt')", "rrrrsssss");
+  TestStringValue("trim(tRAIlinG 'rt' FROM 'rrrrssssstttttt')", "rrrrsssss");
+  // both
+  TestStringValue("trim(both 'aaaaaaaaaaaaaaaaaaaaabg' from 'abcdefg')", "cdef");
+  TestStringValue("trim(bOTh 'a' from 'aaaaaaaaa')", "");
+  // Empty source strings return empty results
+  TestStringValue("trim(leading 'abc' from '')", "");
+  TestStringValue("trim(trailing 'xyzabcrst' from '')", "");
+  TestStringValue("trim(both 'aeiou' from '')", "");
+  // Null source strings return null results
+  TestIsNull("trim(leading '' from NULL)", TYPE_STRING);
+  TestIsNull("trim(trailing '' from NULL)", TYPE_STRING);
+  TestIsNull("trim(both 'aeiou' from NULL)", TYPE_STRING);
+  TestIsNull("trim(BoTh 'abc' from NULL)", TYPE_STRING);
+  // Special cases for string_expr nonterminal
+  TestStringValue("trim(both 'ao' from 'aaYYBBoo')", "YYBB");
+  TestStringValue("trim(both from '  YYBB ')", "YYBB");
+  TestStringValue("trim(+'aaoo' from 'aaYYBBoo')", "YYBB");
+  TestStringValue("trim(upper('a') from 'AAYYBB')", "YYBB");
+  TestStringValue(
+      "trim(replace('hello world', 'world', 'earth') from 'aaYYBBoo')",
+      "YYBB");
+  TestStringValue("trim(left('12ao5BY',5) from 'aaYYBBoo')", "YYBB");
+  TestStringValue("trim(right('BY54ao1',5) from 'aaYYBBoo')", "YYBB");
+  TestStringValue("trim(if((1=2) ,NULL, 'ao') from 'aaYYBBoo')", "YYBB");
+  TestStringValue("trim(cast(12.45 as string) from '1YYBB2')", "YYBB");
+  TestStringValue(
+      "trim(case when 1 = 2 then NULL else 'ao' end from 'aaYYBBoo')",
+      "YYBB");
+
   TestStringValue("space(0)", "");
   TestStringValue("space(-1)", "");
   TestStringValue("space(cast(1 as bigint))", " ");

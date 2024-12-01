@@ -1507,6 +1507,13 @@ public class ToSqlTest extends FrontendTestBase {
     // FunctionCallExpr.
     testToSql("select pi(), (pi()), trim('a'), (trim('a'))",
         "SELECT pi(), (pi()), trim('a'), (trim('a'))");
+    // TrimFromExpr.
+    testToSql("select trim('aa' from 'abc'), (trim('aa' from 'abc')), " +
+        "trim(leading 'aa' from 'abc'), trim(string_col from 'string') " +
+        "from functional.alltypes",
+        "SELECT trim('aa' FROM 'abc'), (trim('aa' FROM 'abc')), " +
+        "trim(LEADING 'aa' FROM 'abc'), trim(string_col FROM 'string') " +
+        "FROM functional.alltypes");
     // LiteralExpr.
     testToSql("select 10, (10), 20.0, (20.0), NULL, (NULL), 'abc', ('abc')",
         "SELECT 10, (10), 20.0, (20.0), NULL, (NULL), 'abc', ('abc')");

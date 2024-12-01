@@ -329,7 +329,41 @@ INT,STRING,STRING
 ====
 ---- QUERY
 set utf8_mode=true;
+select id, name, trim(leading substr(name, 1, 1) from name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','三'
+2,'李四','四'
+3,'王五','五'
+4,'李小龙','小龙'
+5,'Alice','lice'
+6,'陈Bob','Bob'
+7,'Бopиc','opиc'
+8,'Jörg','örg'
+9,'ひなた','なた'
+10,'서연','연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
 select id, name, rtrim(name, substr(name, 2)) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张'
+2,'李四','李'
+3,'王五','王'
+4,'李小龙','李'
+5,'Alice','A'
+6,'陈Bob','陈'
+7,'Бopиc','Б'
+8,'Jörg','J'
+9,'ひなた','ひ'
+10,'서연','서'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, trim(trailing substr(name, 2) from name) from utf8_str_tiny;
 ---- RESULTS: RAW_STRING
 1,'张三','张'
 2,'李四','李'
@@ -363,7 +397,41 @@ INT,STRING,STRING
 ====
 ---- QUERY
 set utf8_mode=true;
+select id, name, trim(leading '张李王小A陈БJひ서' from name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','三'
+2,'李四','四'
+3,'王五','五'
+4,'李小龙','龙'
+5,'Alice','lice'
+6,'陈Bob','Bob'
+7,'Бopиc','opиc'
+8,'Jörg','örg'
+9,'ひなた','なた'
+10,'서연','연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
 select id, name, rtrim(name, '三四五小龙') from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张'
+2,'李四','李'
+3,'王五','王'
+4,'李小龙','李'
+5,'Alice','Alice'
+6,'陈Bob','陈Bob'
+7,'Бopиc','Бopиc'
+8,'Jörg','Jörg'
+9,'ひなた','ひなた'
+10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, trim(trailing '三四五小龙' from name) from utf8_str_tiny;
 ---- RESULTS: RAW_STRING
 1,'张三','张'
 2,'李四','李'
@@ -392,6 +460,120 @@ select id, name, btrim(name, '！？。，：；‘’“”≠≥≤∞ε∑∫
 8,'Jörg','Jörg'
 9,'ひなた','ひなた'
 10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, trim('！？。，：；‘’“”≠≥≤∞ε∑∫√' from name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张三'
+2,'李四','李四'
+3,'王五','王五'
+4,'李小龙','李小龙'
+5,'Alice','Alice'
+6,'陈Bob','陈Bob'
+7,'Бopиc','Бopиc'
+8,'Jörg','Jörg'
+9,'ひなた','ひなた'
+10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=false;
+select id, name, utf8_trim('！？。，：；‘’“”≠≥≤∞ε∑∫√' from name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张三'
+2,'李四','李四'
+3,'王五','王五'
+4,'李小龙','李小龙'
+5,'Alice','Alice'
+6,'陈Bob','陈Bob'
+7,'Бopиc','Бopиc'
+8,'Jörg','Jörg'
+9,'ひなた','ひなた'
+10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=false;
+select id, name, utf8_trim('！？。，：；‘’“”≠≥≤∞ε∑∫√' from name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张三'
+2,'李四','李四'
+3,'王五','王五'
+4,'李小龙','李小龙'
+5,'Alice','Alice'
+6,'陈Bob','陈Bob'
+7,'Бopиc','Бopиc'
+8,'Jörg','Jörg'
+9,'ひなた','ひなた'
+10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, unnest(arr2) as item, trim(unnest(arr2) from "aaYYBBoo") from complextypes_arrays order by id, item;
+---- RESULTS: RAW_STRING
+1,'five','aaYYBBoo'
+1,'four','aaYYBB'
+1,'one','aaYYBB'
+1,'three','aaYYBBoo'
+1,'two','aaYYBB'
+2,'five','aaYYBBoo'
+2,'one','aaYYBB'
+2,'three','aaYYBBoo'
+2,'two','aaYYBB'
+2,'NULL','aaYYBBoo'
+3,'ten','aaYYBBoo'
+4,'eight','aaYYBBoo'
+4,'nine','aaYYBBoo'
+4,'ten','aaYYBBoo'
+5,'eleven','aaYYBBoo'
+5,'ten','aaYYBBoo'
+5,'thirteen','aaYYBBoo'
+5,'twelve','aaYYBBoo'
+6,'str1','aaYYBBoo'
+6,'str2','aaYYBBoo'
+9,'str1','aaYYBBoo'
+9,'str2','aaYYBBoo'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, trim(first_value(name) over (order by id) from name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三',''
+2,'李四','李四'
+3,'王五','王五'
+4,'李小龙','李小龙'
+5,'Alice','Alice'
+6,'陈Bob','陈Bob'
+7,'Бopиc','Бopиc'
+8,'Jörg','Jörg'
+9,'ひなた','ひなた'
+10,'서연','서연'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, name, trim(name from name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三',''
+2,'李四',''
+3,'王五',''
+4,'李小龙',''
+5,'Alice',''
+6,'陈Bob',''
+7,'Бopиc',''
+8,'Jörg',''
+9,'ひなた',''
+10,'서연',''
 ---- TYPES
 INT,STRING,STRING
 ====
