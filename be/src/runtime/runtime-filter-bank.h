@@ -262,7 +262,7 @@ class RuntimeFilterBank {
   /// all created when the filter bank is initialized. Each filter state can be locked
   /// separately to help with scalability. Aligned so that each lock is on a separate
   /// cache line.
-  struct PerFilterState {
+  struct PerFilterState : public CacheLineAligned {
     /// pending_producers: the number of producers that will call UpdateFilterFromLocal().
     /// result_filter: the initial filter that will be returned to producers. Non-NULL if
     ///   there are any producers. Must be owned by 'obj_pool_'.
@@ -297,7 +297,7 @@ class RuntimeFilterBank {
     /// Contains references to all the in-list filters generated. Used in Close() to
     /// safely release all memory allocated for InListFilters.
     vector<InListFilter*> in_list_filters;
-  } CACHELINE_ALIGNED;
+  };
 
   /// Object pool for objects that will be freed in Close(), e.g. allocated filters.
   ObjectPool obj_pool_;
